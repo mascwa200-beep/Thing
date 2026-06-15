@@ -108,6 +108,32 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
                             }
                         }
 
+                        // Planets
+                        item { SectionBar("Planets — visible now") }
+                        item {
+                            val visible = d?.planets.orEmpty().filter { it.aboveHorizon }.sortedBy { it.magnitude }
+                            NeonPanel(Modifier.fillMaxWidth()) {
+                                if (visible.isEmpty()) {
+                                    Text("No naked-eye planets above the horizon right now.",
+                                        style = MaterialTheme.typography.bodyMedium, color = c.muted)
+                                } else Column {
+                                    visible.forEach { p ->
+                                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text(p.name, style = MaterialTheme.typography.titleSmall, color = c.ink)
+                                            Text(
+                                                "alt ${p.altitudeDeg.toInt()}° · ${dev.mascwa.pulse.core.util.Geo.cardinal(p.azimuthDeg)} · mag ${"%.1f".format(p.magnitude)}",
+                                                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                                            )
+                                        }
+                                    }
+                                    Text("Approximate naked-eye positions (low-precision ephemeris).",
+                                        style = MaterialTheme.typography.labelSmall, color = c.muted,
+                                        modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+                        }
+
                         // NEOs
                         item {
                             SectionBar(

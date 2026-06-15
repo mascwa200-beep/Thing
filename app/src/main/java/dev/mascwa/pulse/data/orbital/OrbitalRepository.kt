@@ -31,8 +31,8 @@ class OrbitalRepository(
         val key = "orbital_${latitude?.let { "%.2f".format(it) } ?: "na"}"
         if (!force) {
             cache.read(key, ttl, OrbitalData.serializer())?.let {
-                // Recompute moon for the current moment even from cache.
-                return Fetched(it.value.copy(moon = MoonPhase.at()), true, it.savedAtMs)
+                // Recompute moon + planets for the current moment even from cache.
+                return Fetched(withSky(it.value, latitude, longitude), true, it.savedAtMs)
             }
         }
         val nasaKey = settings.current().apiKeys.nasaOrDemo
@@ -54,14 +54,20 @@ class OrbitalRepository(
                 )
             }
             cache.write(key, data, OrbitalData.serializer())
-            Fetched(data, false)
+            Fetched(withSky(data, latitude, longitude), false)
         } catch (e: Exception) {
             cache.readAny(key, OrbitalData.serializer())?.let {
-                return Fetched(it.value.copy(moon = MoonPhase.at()), true, it.savedAtMs)
+                return Fetched(withSky(it.value, latitude, longitude), true, it.savedAtMs)
             }
             throw e
         }
     }
+
+    /** Attach freshly-computed moon + planets (pure, no network). */
+    private fun withSky(data: OrbitalData, lat: Double?, lon: Double?): OrbitalData = data.copy(
+        moon = MoonPhase.at(),
+        planets = if (lat != null && lon != null) PlanetCalc.planetsNow(lat, lon) else emptyList(),
+    )
 
     private suspend fun loadIss(): IssPosition {
         val text = http.getString("https://api.wheretheiss.at/v1/satellites/25544")

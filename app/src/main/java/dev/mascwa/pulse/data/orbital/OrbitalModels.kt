@@ -37,10 +37,20 @@ data class NeoObject(
 )
 
 @Serializable
+data class Planet(
+    val name: String,
+    val altitudeDeg: Double,   // above horizon if > 0
+    val azimuthDeg: Double,    // from true north, clockwise
+    val magnitude: Double,     // lower = brighter
+    val aboveHorizon: Boolean,
+)
+
+@Serializable
 data class OrbitalData(
     val iss: IssPosition? = null,
     val sun: SunTimes? = null,
     val moon: MoonInfo,
+    val planets: List<Planet> = emptyList(),
     val neos: List<NeoObject> = emptyList(),
     val neoHazardousCount: Int = 0,
     val updatedEpochMs: Long = System.currentTimeMillis(),
