@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Back up user settings/watchlists; skip the regenerable network cache. -->
+    <include domain="file" path="datastore/" />
+    <exclude domain="file" path="pulse_cache/" />
+</full-backup-content>

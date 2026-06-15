@@ -1,0 +1,52 @@
+package dev.mascwa.pulse.di
+
+import android.content.Context
+import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.economy.EconomyRepository
+import dev.mascwa.pulse.data.economy.WorldBankClient
+import dev.mascwa.pulse.data.fuel.FuelRepository
+import dev.mascwa.pulse.data.markets.MarketsRepository
+import dev.mascwa.pulse.data.news.NewsRepository
+import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.weather.LocationProvider
+import dev.mascwa.pulse.data.weather.WeatherRepository
+import dev.mascwa.pulse.notifications.NotificationScheduler
+import dev.mascwa.pulse.notifications.Notifier
+import kotlinx.serialization.json.Json
+
+/**
+ * Manual dependency-injection graph. A single container of lazily-created
+ * singletons held by the Application. Avoids annotation processors (Hilt/kapt)
+ * which keeps the Gradle build robust across Android Studio / AGP versions.
+ */
+class AppContainer(private val appContext: Context) {
+
+    val json: Json by lazy { HttpClient.defaultJson() }
+    val http: HttpClient by lazy { HttpClient.create(json) }
+    val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
+
+    val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }
+
+    private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
+
+    val newsRepository: NewsRepository by lazy {
+        NewsRepository(http, diskCache, settingsRepository)
+    }
+    val marketsRepository: MarketsRepository by lazy {
+        MarketsRepository(http, diskCache, settingsRepository)
+    }
+    val economyRepository: EconomyRepository by lazy {
+        EconomyRepository(worldBank, diskCache, settingsRepository)
+    }
+    val fuelRepository: FuelRepository by lazy {
+        FuelRepository(http, marketsRepository, worldBank, diskCache, settingsRepository)
+    }
+    val weatherRepository: WeatherRepository by lazy {
+        WeatherRepository(http, diskCache, settingsRepository)
+    }
+    val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
+
+    val notifier: Notifier by lazy { Notifier(appContext) }
+    val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
+}

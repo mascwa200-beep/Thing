@@ -1,0 +1,39 @@
+package dev.mascwa.pulse.di
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import dev.mascwa.pulse.feature.economy.EconomyViewModel
+import dev.mascwa.pulse.feature.fuel.FuelViewModel
+import dev.mascwa.pulse.feature.home.HomeViewModel
+import dev.mascwa.pulse.feature.markets.MarketsViewModel
+import dev.mascwa.pulse.feature.news.NewsViewModel
+import dev.mascwa.pulse.feature.settings.SettingsViewModel
+import dev.mascwa.pulse.feature.weather.WeatherViewModel
+
+/** Manual ViewModel factory backed by the [AppContainer]. */
+class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        val vm: ViewModel = when {
+            modelClass.isAssignableFrom(HomeViewModel::class.java) ->
+                HomeViewModel(
+                    c.newsRepository, c.marketsRepository, c.weatherRepository,
+                    c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
+                )
+            modelClass.isAssignableFrom(NewsViewModel::class.java) ->
+                NewsViewModel(c.newsRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(MarketsViewModel::class.java) ->
+                MarketsViewModel(c.marketsRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(EconomyViewModel::class.java) ->
+                EconomyViewModel(c.economyRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(FuelViewModel::class.java) ->
+                FuelViewModel(c.fuelRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
+                WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
+            modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier)
+            else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
+        }
+        return vm as T
+    }
+}

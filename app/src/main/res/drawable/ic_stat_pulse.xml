@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <!-- Notification small icon: white-on-alpha pulse waveform. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,11.25 L7.5,11.25 L9.2,7 L12,17 L14.4,9.5 L15.6,11.25 L21,11.25 L21,12.75 L14.8,12.75 L14.4,14 L11.9,5.2 L9.6,12.75 L3,12.75 Z" />
+</vector>
