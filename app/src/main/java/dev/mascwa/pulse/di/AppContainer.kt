@@ -30,7 +30,7 @@ import kotlinx.serialization.json.Json
 class AppContainer(private val appContext: Context) {
 
     val json: Json by lazy { HttpClient.defaultJson() }
-    val http: HttpClient by lazy { HttpClient.create(json) }
+    val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }

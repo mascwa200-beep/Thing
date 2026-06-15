@@ -171,7 +171,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
 private fun ActionRow(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
                       accent: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, borderColor = accent.copy(alpha = 0.5f)) {
+    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, borderColor = accent.copy(alpha = 0.5f), corners = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center) {

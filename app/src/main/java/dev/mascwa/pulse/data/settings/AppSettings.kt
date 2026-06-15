@@ -19,6 +19,7 @@ enum class AccentColor(val argb: Long, val r: Int, val g: Int, val b: Int) {
     AMBER(0xFFFFC542, 255, 197, 66),
     LIME(0xFF5CFF8F, 92, 255, 143),
     VIOLET(0xFFB061FF, 176, 97, 255),
+    YELLOW(0xFFFCEE0A, 252, 238, 10),
 }
 
 enum class TemperatureUnit(val apiValue: String, val symbol: String) {

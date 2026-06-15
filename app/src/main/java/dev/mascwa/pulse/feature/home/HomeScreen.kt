@@ -317,7 +317,7 @@ private fun Tag(text: String, color: androidx.compose.ui.graphics.Color, filled:
 @Composable
 private fun MarketsSnapshot(async: Async<List<Quote>>, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }) {
+    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
         Column {
             val quotes = async.data.orEmpty().take(4)
             if (quotes.isEmpty()) {
@@ -336,7 +336,7 @@ private fun MarketsSnapshot(async: Async<List<Quote>>, onClick: () -> Unit) {
 @Composable
 private fun WeatherSnapshot(async: Async<dev.mascwa.pulse.data.weather.WeatherData>, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }) {
+    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
         val wd = async.data
         val cur = wd?.current
         if (cur == null) {
@@ -357,7 +357,7 @@ private fun WeatherSnapshot(async: Async<dev.mascwa.pulse.data.weather.WeatherDa
 @Composable
 private fun EconomySnapshot(state: HomeUiState, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }) {
+    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
         val dash = state.economy.data
         if (dash == null) {
             Text(if (state.economy.loading) "Loading…" else "—", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
@@ -379,7 +379,7 @@ private fun EconomySnapshot(state: HomeUiState, onClick: () -> Unit) {
 @Composable
 private fun FuelSnapshot(state: HomeUiState, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }) {
+    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
         val benches = state.fuel.data?.benchmarks?.take(3).orEmpty()
         if (benches.isEmpty()) {
             Text(if (state.fuel.loading) "Loading…" else "—", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)

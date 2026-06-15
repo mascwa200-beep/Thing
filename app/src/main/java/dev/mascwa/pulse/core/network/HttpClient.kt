@@ -4,9 +4,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
+import okhttp3.Dispatcher
 import okhttp3.Headers.Companion.toHeaders
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -63,16 +66,27 @@ class HttpClient(
         const val USER_AGENT =
             "PulseApp/1.0 (Android; Pixel 10 Pro XL; +https://localhost) okhttp"
 
-        fun create(json: Json): HttpClient {
-            val ok = OkHttpClient.Builder()
+        fun create(json: Json, cacheDir: File? = null): HttpClient {
+            // Allow more concurrent requests per host so parallel fan-outs
+            // (e.g. Hacker News item fetches) aren't throttled to 5 at a time.
+            val dispatcher = Dispatcher().apply {
+                maxRequests = 64
+                maxRequestsPerHost = 12
+            }
+            val builder = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .callTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .build()
-            return HttpClient(ok, json)
+                .dispatcher(dispatcher)
+            if (cacheDir != null) {
+                runCatching {
+                    builder.cache(Cache(File(cacheDir, "http_cache"), 16L * 1024 * 1024))
+                }
+            }
+            return HttpClient(builder.build(), json)
         }
 
         fun defaultJson(): Json = Json {
