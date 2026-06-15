@@ -180,6 +180,9 @@ data class AppSettings(
     val lemmyInstance: String = "lemmy.world",
     val mastodonInstance: String = "mastodon.social",
 
+    // Image search — user-added site URLs (a %s is replaced with the query)
+    val customImageSites: List<String> = emptyList(),
+
     // Integrations
     val apiKeys: ApiKeys = ApiKeys(),
 

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Public
@@ -59,6 +60,7 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
         GridEntry("Fuel & Energy", "Benchmarks · pump prices", Icons.Filled.LocalGasStation, Routes.FUEL, false),
         GridEntry("Social", "Lemmy · Mastodon · Hacker News", Icons.Filled.Forum, Routes.SOCIAL, false),
         GridEntry("Search", "DuckDuckGo / Google / Brave", Icons.Filled.TravelExplore, Routes.SEARCH, false),
+        GridEntry("Images", "Search the web or your own sites", Icons.Filled.Image, Routes.IMAGES, false),
     )
 
     PulseScaffold(title = "Grid") { innerPadding ->

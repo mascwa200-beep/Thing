@@ -76,6 +76,9 @@ class AppContainer(private val appContext: Context) {
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
         dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
     }
+    val imageRepository: dev.mascwa.pulse.data.images.ImageRepository by lazy {
+        dev.mascwa.pulse.data.images.ImageRepository(http)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

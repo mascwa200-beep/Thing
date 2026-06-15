@@ -44,6 +44,7 @@ object Routes {
     // Social & search (Phase 3)
     const val SOCIAL = "social"
     const val SEARCH = "search"
+    const val IMAGES = "images"
 }
 
 data class TopDestination(
