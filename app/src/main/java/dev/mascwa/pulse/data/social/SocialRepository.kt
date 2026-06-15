@@ -4,6 +4,8 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.contentOrNull
@@ -103,18 +105,23 @@ class SocialRepository(
                 "https://hacker-news.firebaseio.com/v0/topstories.json",
                 ListSerializer(Long.serializer()),
             ).take(25)
-            val items = ids.mapNotNull { id ->
-                runCatching {
-                    val o = http.json.parseToJsonElement(
-                        http.getString("https://hacker-news.firebaseio.com/v0/item/$id.json"),
-                    ).jsonObject
-                    val title = o["title"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
-                    val link = o["url"]?.jsonPrimitive?.contentOrNull ?: "https://news.ycombinator.com/item?id=$id"
-                    val score = o["score"]?.jsonPrimitive?.intOrNull ?: 0
-                    val comments = o["descendants"]?.jsonPrimitive?.intOrNull ?: 0
-                    val time = (o["time"]?.jsonPrimitive?.longOrNull ?: 0L) * 1000L
-                    SocialItem(title, link, "Hacker News", "▲ $score · $comments comments", time)
-                }.getOrNull()
+            // Fetch all item details in parallel (was sequential — a big stall).
+            val items = coroutineScope {
+                ids.map { id ->
+                    async {
+                        runCatching {
+                            val o = http.json.parseToJsonElement(
+                                http.getString("https://hacker-news.firebaseio.com/v0/item/$id.json"),
+                            ).jsonObject
+                            val title = o["title"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
+                            val link = o["url"]?.jsonPrimitive?.contentOrNull ?: "https://news.ycombinator.com/item?id=$id"
+                            val score = o["score"]?.jsonPrimitive?.intOrNull ?: 0
+                            val comments = o["descendants"]?.jsonPrimitive?.intOrNull ?: 0
+                            val time = (o["time"]?.jsonPrimitive?.longOrNull ?: 0L) * 1000L
+                            SocialItem(title, link, "Hacker News", "▲ $score · $comments comments", time)
+                        }.getOrNull()
+                    }
+                }.mapNotNull { it.await() }
             }
             SocialFeed(items)
         }

@@ -20,7 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,23 @@ import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
+/** Draws Cyberpunk-style L-shaped HUD corner brackets inside a draw scope. */
+fun DrawScope.hudCorners(color: Color, lenPx: Float, strokePx: Float, marginPx: Float) {
+    val w = size.width; val h = size.height; val m = marginPx
+    // Top-left
+    drawLine(color, Offset(m, m), Offset(m + lenPx, m), strokePx)
+    drawLine(color, Offset(m, m), Offset(m, m + lenPx), strokePx)
+    // Top-right
+    drawLine(color, Offset(w - m, m), Offset(w - m - lenPx, m), strokePx)
+    drawLine(color, Offset(w - m, m), Offset(w - m, m + lenPx), strokePx)
+    // Bottom-left
+    drawLine(color, Offset(m, h - m), Offset(m + lenPx, h - m), strokePx)
+    drawLine(color, Offset(m, h - m), Offset(m, h - m - lenPx), strokePx)
+    // Bottom-right
+    drawLine(color, Offset(w - m, h - m), Offset(w - m - lenPx, h - m), strokePx)
+    drawLine(color, Offset(w - m, h - m), Offset(w - m, h - m - lenPx), strokePx)
+}
+
 /** Bordered carbon/panel container — the core NIGHTWIRE surface. */
 @Composable
 fun NeonPanel(
@@ -36,13 +56,21 @@ fun NeonPanel(
     padding: PaddingValues = PaddingValues(13.dp),
     borderColor: Color = Pulse.colors.lineSoft,
     background: Color = Pulse.colors.panel,
+    corners: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val accent = Pulse.colors.accent
     Box(
         modifier
             .clip(RoundedCornerShape(14.dp))
             .background(background)
             .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(14.dp))
+            .then(
+                if (corners) Modifier.drawWithContent {
+                    drawContent()
+                    hudCorners(accent, 12.dp.toPx(), 1.5.dp.toPx(), 3.dp.toPx())
+                } else Modifier,
+            )
             .padding(padding),
     ) { content() }
 }
@@ -161,6 +189,10 @@ fun HubTile(
             .clip(RoundedCornerShape(14.dp))
             .background(c.panel)
             .border(BorderStroke(1.dp, c.lineSoft), RoundedCornerShape(14.dp))
+            .drawWithContent {
+                drawContent()
+                hudCorners(accent.copy(alpha = 0.7f), 11.dp.toPx(), 1.5.dp.toPx(), 3.dp.toPx())
+            }
             .clickable { onClick() }
             .padding(14.dp),
     ) {

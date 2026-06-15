@@ -67,7 +67,7 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                             val kp = sw?.kp
                             val storm = sw?.stormLevel ?: "—"
                             val stormy = (kp ?: 0.0) >= 5
-                            NeonPanel(Modifier.fillMaxWidth(), borderColor = if (stormy) c.magenta else c.lineSoft) {
+                            NeonPanel(Modifier.fillMaxWidth(), borderColor = if (stormy) c.magenta else c.lineSoft, corners = true) {
                                 Column {
                                     Text("PLANETARY K-INDEX", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                                     Text(

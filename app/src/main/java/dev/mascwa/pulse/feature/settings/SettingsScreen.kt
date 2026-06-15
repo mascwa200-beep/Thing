@@ -299,6 +299,35 @@ fun SettingsScreen(vm: SettingsViewModel) {
             }
             item { HorizontalDivider() }
 
+            // ----- Image search sites -----
+            item { PrefSection("Image search sites") {} }
+            item {
+                Text(
+                    "Sites you've added on the Images screen (a %s is replaced with your keyword).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+            itemsIndexed(s.customImageSites) { i, site ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                    IconButton(onClick = {
+                        vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
+                    }) { Icon(Icons.Filled.Delete, "Remove") }
+                }
+            }
+            item {
+                AddTextRow("Add image site URL") { url ->
+                    if (url.startsWith("http")) {
+                        vm.update { it.copy(customImageSites = (it.customImageSites + url.trim()).distinct()) }
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Optional API keys -----
             item {
                 PrefSection("Optional API keys") {

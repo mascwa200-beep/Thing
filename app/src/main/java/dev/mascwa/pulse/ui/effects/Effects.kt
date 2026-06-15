@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -45,16 +47,22 @@ fun ScanlineOverlay(
         animationSpec = infiniteRepeatable(tween(7000, easing = LinearEasing), RepeatMode.Restart),
         label = "sweepPos",
     )
+    // Scanlines as a single GPU-tiled gradient (drawn once per frame, not ~1000
+    // individual rects). The brush is size-independent, so build it once.
+    val lineBrush = remember {
+        Brush.verticalGradient(
+            0f to Color.Black.copy(alpha = 0.14f),
+            0.34f to Color.Black.copy(alpha = 0.14f),
+            0.35f to Color.Transparent,
+            1f to Color.Transparent,
+            startY = 0f, endY = 3f,
+            tileMode = TileMode.Repeated,
+        )
+    }
     Box(modifier.fillMaxSize().zIndex(50f)) {
         Canvas(Modifier.fillMaxSize()) {
-            // Static scanlines: a 1px dark line every 3px.
-            var y = 0f
-            val lineColor = Color.Black.copy(alpha = 0.14f)
-            while (y < size.height) {
-                drawRect(lineColor, topLeft = Offset(0f, y), size = Size(size.width, 1f))
-                y += 3f
-            }
-            // Moving accent sweep band.
+            drawRect(lineBrush)
+            // Moving accent sweep band (one op).
             val bandH = size.height * 0.16f
             val top = -bandH + sweep * (size.height + bandH)
             drawRect(
