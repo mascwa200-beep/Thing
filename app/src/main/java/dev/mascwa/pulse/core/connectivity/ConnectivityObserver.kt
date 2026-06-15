@@ -5,9 +5,13 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import androidx.core.content.getSystemService
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+/** Live online/offline state for composables (e.g. the cached-data banner). */
+val LocalIsOnline = staticCompositionLocalOf { true }
 
 /**
  * Live online/offline state from any transport (WiFi or cellular). Drives the

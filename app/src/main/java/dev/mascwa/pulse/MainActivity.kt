@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
+                    dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
                 ) {
                 Box(Modifier.fillMaxSize()) {
                     if (gated) {

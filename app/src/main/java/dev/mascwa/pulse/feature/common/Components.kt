@@ -87,7 +87,9 @@ fun EmptyState(message: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun StaleBanner(visible: Boolean, modifier: Modifier = Modifier) {
-    if (!visible) return
+    // Only surface the "cached data" notice when the device is actually offline.
+    // A fresh disk-cache hit while online is normal and must not trigger this.
+    if (!visible || dev.mascwa.pulse.core.connectivity.LocalIsOnline.current) return
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier.fillMaxWidth(),
