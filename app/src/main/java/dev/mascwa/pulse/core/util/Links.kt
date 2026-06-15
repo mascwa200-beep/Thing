@@ -5,6 +5,16 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 
+/** Shares plain text (a link, coordinates, etc.) via the system share sheet. */
+fun shareText(context: Context, text: String, title: String = "Share") {
+    if (text.isBlank()) return
+    val intent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_TEXT, text)
+    val chooser = Intent.createChooser(intent, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(chooser) }
+}
+
 /** Opens this app's system notification settings (to enable a denied permission). */
 fun openAppNotificationSettings(context: Context) {
     val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)

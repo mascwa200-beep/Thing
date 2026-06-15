@@ -60,16 +60,22 @@ class HomeViewModel(
             val sections = s.homeSections
             _state.update { it.copy(sections = sections) }
 
+            // Above-the-fold first (instant from cache, snappier cold start)…
             if (HomeSection.HEADLINES in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TOP, f) }) { st, a -> st.copy(headlines = a) }
             if (HomeSection.MARKETS in sections) launchInto(force, { f -> markets.fetchAll(f) }) { st, a -> st.copy(markets = a) }
-            if (HomeSection.ECONOMY in sections || HomeSection.INFLATION in sections)
-                launchInto(force, { f -> economy.fetchDashboard(f) }) { st, a -> st.copy(economy = a) }
-            if (HomeSection.FUEL in sections) launchInto(force, { f -> fuel.fetch(f) }) { st, a -> st.copy(fuel = a) }
-            if (HomeSection.POLITICS in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POLITICS, f) }) { st, a -> st.copy(politics = a) }
-            if (HomeSection.TECH in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TECH, f) }) { st, a -> st.copy(tech = a) }
-            if (HomeSection.POPCULTURE in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POPCULTURE, f) }) { st, a -> st.copy(popculture = a) }
+            if (HomeSection.WEATHER in sections) launch { loadWeather(force, s) }
 
-            if (HomeSection.WEATHER in sections) loadWeather(force, s)
+            // …then stagger the secondary sections so they don't all hit the
+            // network at frame 0 (reduces cold-start contention/jank).
+            launch {
+                kotlinx.coroutines.delay(450)
+                if (HomeSection.ECONOMY in sections || HomeSection.INFLATION in sections)
+                    launchInto(force, { f -> economy.fetchDashboard(f) }) { st, a -> st.copy(economy = a) }
+                if (HomeSection.FUEL in sections) launchInto(force, { f -> fuel.fetch(f) }) { st, a -> st.copy(fuel = a) }
+                if (HomeSection.POLITICS in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POLITICS, f) }) { st, a -> st.copy(politics = a) }
+                if (HomeSection.TECH in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TECH, f) }) { st, a -> st.copy(tech = a) }
+                if (HomeSection.POPCULTURE in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POPCULTURE, f) }) { st, a -> st.copy(popculture = a) }
+            }
         }
     }
 

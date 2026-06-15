@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -162,8 +163,13 @@ fun ImageScreen(vm: ImageViewModel, onBack: (() -> Unit)? = null) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { viewer = null }) { Icon(Icons.Filled.Close, "Close", tint = Color.White) }
-                    TextButton(onClick = { openUrl(context, img.sourceUrl) }) {
-                        Text("Open source", color = c.accent)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { dev.mascwa.pulse.core.util.shareText(context, img.fullUrl) }) {
+                            Icon(Icons.Filled.Share, "Share", tint = Color.White)
+                        }
+                        TextButton(onClick = { openUrl(context, img.sourceUrl) }) {
+                            Text("Open source", color = c.accent)
+                        }
                     }
                 }
             }
