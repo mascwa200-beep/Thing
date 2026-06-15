@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by app.container.settingsRepository.settings
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
+            val online by app.container.connectivityObserver.isOnline.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -93,7 +94,7 @@ class MainActivity : ComponentActivity() {
                             onExit = { finish() },
                         )
                     } else {
-                        PulseApp(factory = factory, startRoute = startRoute)
+                        PulseApp(factory = factory, startRoute = startRoute, isOnline = online)
                         // Terminal boot sequence, once per launch.
                         if (settings.bootAnimation && !booted) {
                             BootScreen(onFinished = { booted = true })

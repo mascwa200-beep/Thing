@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -13,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -61,8 +63,11 @@ import dev.mascwa.pulse.navigation.TOP_DESTINATIONS
 fun PulseApp(
     factory: ViewModelProvider.Factory,
     startRoute: String?,
+    isOnline: Boolean = true,
 ) {
     val navController = rememberNavController()
+    var offlineDismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(isOnline) { if (isOnline) offlineDismissed = false }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
@@ -75,6 +80,7 @@ fun PulseApp(
     }
 
     val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = nw.void,
@@ -222,6 +228,18 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
             }
+        }
+    }
+
+        // Auto Offline Survival Mode when there's no connection.
+        if (!isOnline && !offlineDismissed) {
+            dev.mascwa.pulse.feature.survive.OfflineSurvivalScreen(
+                onOpenRoute = { r ->
+                    offlineDismissed = true
+                    navController.navigate(r) { launchSingleTop = true }
+                },
+                onDismiss = { offlineDismissed = true },
+            )
         }
     }
 
