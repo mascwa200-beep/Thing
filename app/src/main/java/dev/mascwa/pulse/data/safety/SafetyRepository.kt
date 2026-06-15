@@ -40,7 +40,8 @@ class SafetyRepository(
                 val quakesD = async { runCatching { usgs(lat, lon) }.getOrDefault(emptyList()) }
                 val gdacsD = async { runCatching { gdacs(lat, lon) }.getOrDefault(emptyList()) }
                 val nwsD = async { runCatching { nws(lat, lon) }.getOrDefault(emptyList()) }
-                (quakesD.await() + gdacsD.await() + nwsD.await())
+                val crimeD = async { runCatching { ukCrime(lat, lon) }.getOrDefault(emptyList()) }
+                (quakesD.await() + gdacsD.await() + nwsD.await() + crimeD.await())
             }
                 .distinctBy { it.id }
                 .sortedWith(compareBy({ it.distanceMeters }, { -it.timeEpochMs }))
@@ -162,6 +163,42 @@ class SafetyRepository(
                 source = "NWS",
             )
         }
+    }
+
+    // --- UK street-level crime (data.police.uk, keyless; England/Wales/NI only) ---
+    private suspend fun ukCrime(lat: Double, lon: Double): List<Incident> {
+        val text = http.getString("https://data.police.uk/api/crimes-street/all-crime?lat=$lat&lng=$lon")
+        val arr = http.json.parseToJsonElement(text).jsonArray
+        return arr.mapNotNull { el ->
+            runCatching {
+                val o = el.jsonObject
+                val loc = o["location"]?.jsonObject ?: return@runCatching null
+                val clat = loc["latitude"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: return@runCatching null
+                val clon = loc["longitude"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: return@runCatching null
+                val category = (o["category"]?.jsonPrimitive?.contentOrNull ?: "crime")
+                    .replace('-', ' ').replaceFirstChar { it.uppercase() }
+                val street = loc["street"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
+                val sev = if (category.contains("violen", true) || category.contains("robbery", true) ||
+                    category.contains("weapon", true)) Severity.MODERATE else Severity.LOW
+                Incident(
+                    id = "police_${o["persistent_id"]?.jsonPrimitive?.contentOrNull?.ifBlank { null } ?: "${clat}_${clon}_$category"}",
+                    type = IncidentType.CRIME.name,
+                    title = category + (street?.let { " · $it" } ?: ""),
+                    severity = sev.name,
+                    latitude = clat, longitude = clon,
+                    distanceMeters = Geo.distanceMeters(lat, lon, clat, clon),
+                    bearing = Geo.bearingDegrees(lat, lon, clat, clon),
+                    timeEpochMs = parseMonth(o["month"]?.jsonPrimitive?.contentOrNull),
+                    source = "Police.uk",
+                )
+            }.getOrNull()
+        }.sortedBy { it.distanceMeters }.take(25)
+    }
+
+    private val monthFmt = SimpleDateFormat("yyyy-MM", Locale.US)
+    private fun parseMonth(s: String?): Long {
+        if (s.isNullOrBlank()) return 0L
+        return runCatching { monthFmt.parse(s)?.time }.getOrNull() ?: 0L
     }
 
     private val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)

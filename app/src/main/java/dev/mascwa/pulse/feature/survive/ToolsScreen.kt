@@ -35,6 +35,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun ToolsScreen(vm: ToolsViewModel, onBack: (() -> Unit)? = null) {
     val strobe by vm.strobe.collectAsStateWithLifecycle()
     val alarm by vm.alarm.collectAsStateWithLifecycle()
+    val torch by vm.torch.collectAsStateWithLifecycle()
     var flare by remember { mutableStateOf(false) }
     val c = Pulse.colors
 
@@ -64,6 +65,12 @@ fun ToolsScreen(vm: ToolsViewModel, onBack: (() -> Unit)? = null) {
                 subtitle = if (vm.torchAvailable) "Flashes · · · — — — · · · in morse" else "No flashlight on this device",
                 active = strobe, accent = c.amber, enabled = vm.torchAvailable,
             ) { vm.toggleStrobe() }
+
+            ToolButton(
+                title = if (torch) "Flashlight — ON" else "Flashlight",
+                subtitle = if (vm.torchAvailable) "Steady torch" else "No flashlight on this device",
+                active = torch, accent = c.amber, enabled = vm.torchAvailable,
+            ) { vm.toggleTorch() }
 
             ToolButton(
                 title = if (alarm) "Loud alarm — ON" else "Loud alarm",

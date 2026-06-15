@@ -21,6 +21,9 @@ class ToolsViewModel(
     private val _alarm = MutableStateFlow(false)
     val alarm: StateFlow<Boolean> = _alarm.asStateFlow()
 
+    private val _torch = MutableStateFlow(false)
+    val torch: StateFlow<Boolean> = _torch.asStateFlow()
+
     val torchAvailable: Boolean get() = tools.torchAvailable()
 
     private var strobeJob: Job? = null
@@ -31,6 +34,7 @@ class ToolsViewModel(
 
     private fun startStrobe() {
         if (!tools.torchAvailable()) return
+        _torch.value = false
         _strobe.value = true
         strobeJob = viewModelScope.launch {
             while (isActive) {
@@ -48,6 +52,14 @@ class ToolsViewModel(
         strobeJob = null
         tools.setTorch(false)
         _strobe.value = false
+    }
+
+    fun toggleTorch() {
+        if (!tools.torchAvailable()) return
+        if (_strobe.value) stopStrobe()
+        val on = !_torch.value
+        tools.setTorch(on)
+        _torch.value = on
     }
 
     fun toggleAlarm() {
