@@ -24,11 +24,33 @@ class ImageRepository(private val http: HttpClient) {
         return (openverse + wikimedia).distinctBy { it.fullUrl }
     }
 
+    /**
+     * Search a user-added site for [query] and pull its images. If the saved URL
+     * contains "%s" it's used as an exact search template; otherwise common
+     * site-search URL patterns are tried until one returns images.
+     */
     suspend fun fromSite(siteTemplate: String, query: String): List<ImageResult> {
-        val url = if (siteTemplate.contains("%s")) {
-            siteTemplate.replace("%s", URLEncoder.encode(query.trim(), "UTF-8"))
-        } else siteTemplate
-        return runCatching { extractImages(url) }.getOrDefault(emptyList())
+        val q = URLEncoder.encode(query.trim(), "UTF-8")
+        val candidates: List<String> = when {
+            siteTemplate.contains("%s") -> listOf(siteTemplate.replace("%s", q))
+            query.isBlank() -> listOf(siteTemplate)
+            else -> {
+                val base = siteTemplate.trimEnd('/')
+                listOf(
+                    "$base/?s=$q",          // WordPress & many CMS
+                    "$base/search?q=$q",    // common search path
+                    "$base/?q=$q",
+                    "$base/search/$q",
+                    "$base/search?query=$q",
+                    siteTemplate,            // fallback: the page itself
+                )
+            }
+        }
+        for (url in candidates) {
+            val imgs = runCatching { extractImages(url) }.getOrDefault(emptyList())
+            if (imgs.isNotEmpty()) return imgs
+        }
+        return emptyList()
     }
 
     private suspend fun openverse(query: String): List<ImageResult> {

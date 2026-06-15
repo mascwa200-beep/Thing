@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -13,8 +12,9 @@ import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.R
 
 /**
- * Builds and posts notifications with a Cyberpunk 2077–style custom layout
- * (neon-yellow accent bar, mono/display fonts, "// TAG" header) on dark.
+ * Posts standard, always-reliable notifications with a Cyberpunk accent:
+ * neon-yellow tint ([setColor]) and a "// TAG" sub-header. (Custom RemoteViews
+ * were dropped because they can silently fail to render in the system UI.)
  */
 class Notifier(private val context: Context) {
 
@@ -50,22 +50,6 @@ class Notifier(private val context: Context) {
         channel: String, id: Int, tag: String, title: String, body: String, route: String, priority: Int,
     ) {
         if (!canPost()) return
-        val n = baseBuilder(channel, tag, title, body, route)
-            .setPriority(priority)
-            .build()
-        safeNotify(id, n)
-    }
-
-    private fun remoteView(layout: Int, tag: String, title: String, body: String): RemoteViews =
-        RemoteViews(context.packageName, layout).apply {
-            setTextViewText(R.id.notif_tag, "// $tag")
-            setTextViewText(R.id.notif_title, title)
-            setTextViewText(R.id.notif_body, body)
-        }
-
-    private fun baseBuilder(
-        channel: String, tag: String, title: String, body: String, route: String,
-    ): NotificationCompat.Builder {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(MainActivity.EXTRA_ROUTE, route)
@@ -74,20 +58,18 @@ class Notifier(private val context: Context) {
             context, route.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val collapsed = remoteView(R.layout.notif_cyberpunk, tag, title, body)
-        val expanded = remoteView(R.layout.notif_cyberpunk_big, tag, title, body)
-        return NotificationCompat.Builder(context, channel)
+        val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_pulse)
             .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
-            .setColorized(true)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomContentView(collapsed)
-            .setCustomBigContentView(expanded)
-            // Plain-text fallback for surfaces that ignore custom views.
+            .setSubText("// $tag")
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(title).bigText(body))
+            .setPriority(priority)
             .setContentIntent(pi)
             .setAutoCancel(true)
+            .build()
+        safeNotify(id, notification)
     }
 
     private fun safeNotify(id: Int, notification: android.app.Notification) {
