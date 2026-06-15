@@ -40,6 +40,7 @@ fun SurviveHubScreen(onOpenRoute: (String) -> Unit, onBack: (() -> Unit)? = null
         ) {
             item { HubTile("SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, { onOpenRoute(Routes.SOS) }, accent = c.magenta) }
             item { HubTile("Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, { onOpenRoute(Routes.PLACES) }) }
+            item { HubTile("Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, { onOpenRoute(Routes.SAFETY) }, accent = c.amber) }
             item { HubTile("Survival Guides", "First aid, water, fire, signalling · offline", Icons.AutoMirrored.Filled.MenuBook, { onOpenRoute(Routes.SURVIVAL) }, accent = c.positive) }
             item { HubTile("Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, { onOpenRoute(Routes.TOOLS) }, accent = c.positive) }
         }

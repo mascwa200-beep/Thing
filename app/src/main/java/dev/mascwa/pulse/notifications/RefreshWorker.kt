@@ -143,6 +143,37 @@ class RefreshWorker(
             }
         }
 
+        // --- Nearby safety incidents ---
+        if (prefs.safetyAlerts) {
+            runCatching {
+                val loc = container.locationProvider.current()
+                if (loc != null) {
+                    val safety = container.safetyRepository.fetch(loc.latitude, loc.longitude, force = true).data
+                    val radiusM = settings.safetyRadiusKm * 1000.0
+                    val already = state.safetyAlertedIds.toMutableSet()
+                    val severe = safety.incidents.filter {
+                        val sev = runCatching { dev.mascwa.pulse.data.safety.Severity.valueOf(it.severity) }
+                            .getOrDefault(dev.mascwa.pulse.data.safety.Severity.LOW)
+                        (sev == dev.mascwa.pulse.data.safety.Severity.HIGH ||
+                            sev == dev.mascwa.pulse.data.safety.Severity.EXTREME) &&
+                            it.distanceMeters <= radiusM && it.id !in already
+                    }
+                    severe.take(3).forEach { inc ->
+                        notifier.notifySafety(
+                            id = 6000 + (inc.id.hashCode() and 0xFFF),
+                            title = "Safety: ${inc.title.take(60)}",
+                            body = (if (inc.distanceMeters > 0)
+                                "${Formatters.compact(inc.distanceMeters / 1000)} km away · " else "Your area · ") + inc.source,
+                        )
+                        already += inc.id
+                    }
+                    if (severe.isNotEmpty()) {
+                        state = state.copy(safetyAlertedIds = already.toList().takeLast(100))
+                    }
+                }
+            }
+        }
+
         // --- Daily digest ---
         if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
             runCatching {

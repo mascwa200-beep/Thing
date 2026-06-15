@@ -12,4 +12,5 @@ data class NotifyState(
     val lastDigestDay: String = "",
     val spaceAlertDay: String = "",
     val neoAlertDay: String = "",
+    val safetyAlertedIds: List<String> = emptyList(),
 )

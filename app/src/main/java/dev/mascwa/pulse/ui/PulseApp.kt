@@ -204,6 +204,10 @@ fun PulseApp(
                 val vm: SosViewModel = viewModel(factory = factory)
                 SosScreen(vm, onBack = { navController.popBackStack() })
             }
+            composable(Routes.SAFETY) {
+                val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() })
+            }
         }
     }
 

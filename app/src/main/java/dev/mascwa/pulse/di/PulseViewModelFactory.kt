@@ -49,6 +49,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 ToolsViewModel(c.survivalTools)
             modelClass.isAssignableFrom(SosViewModel::class.java) ->
                 SosViewModel(c.emergencyService, c.settingsRepository, c.locationProvider, c.survivalTools)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.safety.SafetyViewModel::class.java) ->
+                dev.mascwa.pulse.feature.safety.SafetyViewModel(c.safetyRepository, c.locationProvider)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->

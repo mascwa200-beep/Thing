@@ -61,6 +61,9 @@ class AppContainer(private val appContext: Context) {
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
+    val safetyRepository: dev.mascwa.pulse.data.safety.SafetyRepository by lazy {
+        dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
+    }
     val survivalContentRepository: SurvivalContentRepository by lazy {
         SurvivalContentRepository(appContext, json)
     }
