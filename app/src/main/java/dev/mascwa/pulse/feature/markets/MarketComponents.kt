@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.feature.common.ChangePill
 import dev.mascwa.pulse.feature.common.Sparkline
