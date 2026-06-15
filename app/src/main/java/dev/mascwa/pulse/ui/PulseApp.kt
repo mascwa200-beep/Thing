@@ -212,6 +212,16 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.map.MapViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.map.MapScreen(vm, onBack = { navController.popBackStack() })
             }
+
+            // ---- Social & search (Phase 3) ----
+            composable(Routes.SOCIAL) {
+                val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SEARCH) {
+                val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
+            }
         }
     }
 

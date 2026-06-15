@@ -4,6 +4,14 @@ import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** Free, keyless search engines opened in the browser (no search API needed). */
+enum class SearchEngine(val label: String, val urlTemplate: String) {
+    DUCKDUCKGO("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
+    GOOGLE("Google", "https://www.google.com/search?q=%s"),
+    BRAVE("Brave", "https://search.brave.com/search?q=%s"),
+    STARTPAGE("Startpage", "https://www.startpage.com/sp/search?query=%s"),
+}
+
 /** NIGHTWIRE accent colours, user-selectable; recolour the whole UI live. */
 enum class AccentColor(val argb: Long, val r: Int, val g: Int, val b: Int) {
     CYAN(0xFF2DE2E6, 45, 226, 230),
@@ -166,6 +174,11 @@ data class AppSettings(
     // News
     val customFeeds: List<CustomFeed> = emptyList(),
     val mutedKeywords: List<String> = emptyList(),
+
+    // Social & search
+    val searchEngine: SearchEngine = SearchEngine.DUCKDUCKGO,
+    val lemmyInstance: String = "lemmy.world",
+    val mastodonInstance: String = "mastodon.social",
 
     // Integrations
     val apiKeys: ApiKeys = ApiKeys(),

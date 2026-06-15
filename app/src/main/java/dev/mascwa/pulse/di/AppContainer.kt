@@ -69,6 +69,9 @@ class AppContainer(private val appContext: Context) {
     }
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
+    val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
+        dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

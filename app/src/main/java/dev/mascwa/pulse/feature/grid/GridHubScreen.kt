@@ -13,11 +13,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Rocket
+import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -55,6 +57,8 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
         GridEntry("Economy", "Inflation · GDP · jobs", Icons.Filled.AccountBalance, Routes.ECONOMY, false),
         GridEntry("Inflation", "CPI history", Icons.Filled.Percent, Routes.INFLATION, false),
         GridEntry("Fuel & Energy", "Benchmarks · pump prices", Icons.Filled.LocalGasStation, Routes.FUEL, false),
+        GridEntry("Social", "Lemmy · Mastodon · Hacker News", Icons.Filled.Forum, Routes.SOCIAL, false),
+        GridEntry("Search", "DuckDuckGo / Google / Brave", Icons.Filled.TravelExplore, Routes.SEARCH, false),
     )
 
     PulseScaffold(title = "Grid") { innerPadding ->

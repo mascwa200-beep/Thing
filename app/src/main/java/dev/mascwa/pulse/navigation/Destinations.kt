@@ -40,6 +40,10 @@ object Routes {
     const val TOOLS = "tools"
     const val SAFETY = "safety"
     const val MAP = "map"
+
+    // Social & search (Phase 3)
+    const val SOCIAL = "social"
+    const val SEARCH = "search"
 }
 
 data class TopDestination(
