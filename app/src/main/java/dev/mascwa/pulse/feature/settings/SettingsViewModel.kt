@@ -61,15 +61,12 @@ class SettingsViewModel(
     }
 
     fun sendTestNotification() {
-        notifier.notifyDigest(
+        // Use the high-importance breaking channel so it pops as a heads-up.
+        notifier.notifyBreaking(
             id = 9999,
             title = "Pulse notifications are working",
-            body = "This is a test notification.",
-            lines = listOf(
-                "📰 Breaking-news alerts are enabled",
-                "📈 Market & price alerts are enabled",
-                "🌤️ Weather alerts are enabled",
-            ),
+            body = "If you can see this, alerts are enabled. Breaking news, market, weather, sky and safety alerts will appear like this.",
+            route = "grid",
         )
     }
 }

@@ -57,10 +57,27 @@ import dev.mascwa.pulse.feature.economy.CountryPicker
 fun SettingsScreen(vm: SettingsViewModel) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    fun notificationsAllowed(): Boolean =
+        android.os.Build.VERSION.SDK_INT < 33 ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* state reflected by system; nothing else needed */ }
+
+    // Requests permission if needed, then fires the test notification.
+    val testNotifLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) vm.sendTestNotification()
+        else android.widget.Toast.makeText(
+            context, "Enable notifications for Pulse in system settings", android.widget.Toast.LENGTH_LONG,
+        ).show()
+    }
 
     PulseScaffold(title = "Settings") { innerPadding ->
         LazyColumn(modifier = Modifier.padding(innerPadding), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
@@ -183,7 +200,14 @@ fun SettingsScreen(vm: SettingsViewModel) {
                             vm.update { it.copy(notifications = it.notifications.copy(quietEndHour = h)) }
                         }
                     }
-                    PrefClickable("Send test notification", onClick = { vm.sendTestNotification() })
+                    PrefClickable(
+                        "Send test notification",
+                        subtitle = "Posts a sample alert (grants permission first if needed)",
+                        onClick = {
+                            if (notificationsAllowed()) vm.sendTestNotification()
+                            else testNotifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                    )
                 }
             }
             item { HorizontalDivider() }
