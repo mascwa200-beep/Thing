@@ -31,6 +31,14 @@ object Routes {
     const val COMPASS = "compass"
     const val SPACE_WX = "space_wx"
     const val ORBITAL = "orbital"
+
+    // Survive (Phase 2)
+    const val SURVIVE = "survive"
+    const val SOS = "sos"
+    const val PLACES = "places"
+    const val SURVIVAL = "survival"
+    const val TOOLS = "tools"
+    const val SAFETY = "safety"
 }
 
 data class TopDestination(

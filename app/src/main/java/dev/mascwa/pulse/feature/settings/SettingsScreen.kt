@@ -158,6 +158,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(weatherAlerts = v)) } })
                     PrefSwitch("Space & sky alerts", checked = s.notifications.spaceAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(spaceAlerts = v)) } })
+                    PrefSwitch("Safety / nearby incidents", checked = s.notifications.safetyAlerts, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(safetyAlerts = v)) } })
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     SingleChoiceRow(
@@ -299,6 +301,63 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     }
                     EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa)) { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(nasa = v.trim())) }
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
+            // ----- Safety (SOS) -----
+            item {
+                PrefSection("Safety (SOS)") {
+                    Text(
+                        "Medical info & contacts for the SOS screen. Stays on this device.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    val card = s.emergencyCard
+                    EditableValueRow("Full name", card.fullName.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(fullName = v.trim())) }
+                    }
+                    EditableValueRow("Blood type", card.bloodType.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(bloodType = v.trim())) }
+                    }
+                    EditableValueRow("Allergies", card.allergies.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(allergies = v.trim())) }
+                    }
+                    EditableValueRow("Medications", card.medications.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(medications = v.trim())) }
+                    }
+                    EditableValueRow("Conditions", card.conditions.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(conditions = v.trim())) }
+                    }
+                    EditableValueRow("Notes", card.notes.ifBlank { "Not set" }) { v ->
+                        vm.update { it.copy(emergencyCard = it.emergencyCard.copy(notes = v.trim())) }
+                    }
+                    PrefSwitch(
+                        "Auto-send SOS SMS",
+                        "One tap sends your coordinates to contacts (requests SMS permission)",
+                        s.autoSendSos,
+                    ) { v -> vm.update { it.copy(autoSendSos = v) } }
+                    Text("Emergency contacts", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    s.emergencyContacts.forEachIndexed { i, contact ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(contact.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(contact.phone, style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = {
+                                vm.update { it.copy(emergencyContacts = it.emergencyContacts.filterIndexed { idx, _ -> idx != i }) }
+                            }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }
+                    }
+                    AddContactRow { contact ->
+                        vm.update { it.copy(emergencyContacts = it.emergencyContacts + contact) }
                     }
                 }
             }
@@ -529,6 +588,34 @@ private fun AddFeedRow(onAdd: (CustomFeed) -> Unit) {
             confirmButton = {
                 TextButton(enabled = url.startsWith("http"), onClick = {
                     onAdd(CustomFeed(name.ifBlank { url }, url.trim())); show = false
+                }) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun AddContactRow(onAdd: (dev.mascwa.pulse.data.settings.EmergencyContact) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    PrefClickable("Add emergency contact", onClick = { show = true })
+    if (show) {
+        var name by remember { mutableStateOf("") }
+        var phone by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { show = false },
+            title = { Text("Add contact") },
+            text = {
+                Column {
+                    OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                    OutlinedTextField(phone, { phone = it }, label = { Text("Phone") }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone))
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = phone.isNotBlank(), onClick = {
+                    onAdd(dev.mascwa.pulse.data.settings.EmergencyContact(name.ifBlank { phone }.trim(), phone.trim()))
+                    show = false
                 }) { Text("Add") }
             },
             dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },

@@ -48,6 +48,7 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
 
     val entries = listOf(
         GridEntry("Sky", "Space wx · orbital · compass", Icons.Filled.Rocket, Routes.SKY, true),
+        GridEntry("Survive", "Nearest help · SOS · offline guides", Icons.Filled.HealthAndSafety, Routes.SURVIVE, true),
         GridEntry("Compass", "Heading · offline", Icons.Filled.Explore, Routes.COMPASS, true),
         GridEntry("Space Weather", "Kp · aurora · alerts", Icons.Filled.Bolt, Routes.SPACE_WX, false),
         GridEntry("Orbital", "ISS · sun · moon · NEOs", Icons.Filled.Public, Routes.ORBITAL, false),

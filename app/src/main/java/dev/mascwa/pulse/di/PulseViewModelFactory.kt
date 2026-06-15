@@ -7,6 +7,10 @@ import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.fuel.FuelViewModel
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
+import dev.mascwa.pulse.feature.sos.SosViewModel
+import dev.mascwa.pulse.feature.survive.GuidesViewModel
+import dev.mascwa.pulse.feature.survive.PlacesViewModel
+import dev.mascwa.pulse.feature.survive.ToolsViewModel
 import dev.mascwa.pulse.feature.home.HomeViewModel
 import dev.mascwa.pulse.feature.markets.MarketsViewModel
 import dev.mascwa.pulse.feature.news.NewsViewModel
@@ -37,6 +41,14 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 OrbitalViewModel(c.orbitalRepository, c.locationProvider)
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider)
+            modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
+                PlacesViewModel(c.overpassRepository, c.locationProvider)
+            modelClass.isAssignableFrom(GuidesViewModel::class.java) ->
+                GuidesViewModel(c.survivalContentRepository)
+            modelClass.isAssignableFrom(ToolsViewModel::class.java) ->
+                ToolsViewModel(c.survivalTools)
+            modelClass.isAssignableFrom(SosViewModel::class.java) ->
+                SosViewModel(c.emergencyService, c.settingsRepository, c.locationProvider, c.survivalTools)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->

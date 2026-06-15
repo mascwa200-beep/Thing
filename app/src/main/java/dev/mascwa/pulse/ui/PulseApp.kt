@@ -34,6 +34,15 @@ import dev.mascwa.pulse.feature.sky.OrbitalViewModel
 import dev.mascwa.pulse.feature.sky.SkyHubScreen
 import dev.mascwa.pulse.feature.sky.SpaceWeatherScreen
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
+import dev.mascwa.pulse.feature.sos.SosScreen
+import dev.mascwa.pulse.feature.sos.SosViewModel
+import dev.mascwa.pulse.feature.survive.GuidesScreen
+import dev.mascwa.pulse.feature.survive.GuidesViewModel
+import dev.mascwa.pulse.feature.survive.PlacesScreen
+import dev.mascwa.pulse.feature.survive.PlacesViewModel
+import dev.mascwa.pulse.feature.survive.SurviveHubScreen
+import dev.mascwa.pulse.feature.survive.ToolsScreen
+import dev.mascwa.pulse.feature.survive.ToolsViewModel
 import dev.mascwa.pulse.feature.home.HomeNav
 import dev.mascwa.pulse.feature.home.HomeScreen
 import dev.mascwa.pulse.feature.home.HomeViewModel
@@ -173,6 +182,27 @@ fun PulseApp(
             composable(Routes.ORBITAL) {
                 val vm: OrbitalViewModel = viewModel(factory = factory)
                 OrbitalScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Survive (Phase 2) ----
+            composable(Routes.SURVIVE) {
+                SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.PLACES) {
+                val vm: PlacesViewModel = viewModel(factory = factory)
+                PlacesScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SURVIVAL) {
+                val vm: GuidesViewModel = viewModel(factory = factory)
+                GuidesScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.TOOLS) {
+                val vm: ToolsViewModel = viewModel(factory = factory)
+                ToolsScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SOS) {
+                val vm: SosViewModel = viewModel(factory = factory)
+                SosScreen(vm, onBack = { navController.popBackStack() })
             }
         }
     }

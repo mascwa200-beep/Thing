@@ -67,6 +67,23 @@ data class SavedLocation(
     val timezone: String = "auto",
 )
 
+/** Personal medical / ICE info for the SOS card (stays on-device). */
+@Serializable
+data class EmergencyCard(
+    val fullName: String = "",
+    val bloodType: String = "",
+    val allergies: String = "",
+    val medications: String = "",
+    val conditions: String = "",
+    val notes: String = "",
+) {
+    val isEmpty get() = fullName.isBlank() && bloodType.isBlank() && allergies.isBlank() &&
+        medications.isBlank() && conditions.isBlank() && notes.isBlank()
+}
+
+@Serializable
+data class EmergencyContact(val name: String, val phone: String)
+
 /** Optional, user-supplied free API keys. Blank = use keyless sources. */
 @Serializable
 data class ApiKeys(
@@ -94,6 +111,7 @@ data class NotificationPrefs(
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,
+    val safetyAlerts: Boolean = true,
     val dailyDigest: Boolean = true,
     val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,
@@ -151,6 +169,13 @@ data class AppSettings(
 
     // Integrations
     val apiKeys: ApiKeys = ApiKeys(),
+
+    // Safety / SOS
+    val emergencyCard: EmergencyCard = EmergencyCard(),
+    val emergencyContacts: List<EmergencyContact> = emptyList(),
+    val autoSendSos: Boolean = false,
+    val monitoredPlaces: List<SavedLocation> = emptyList(),
+    val safetyRadiusKm: Int = 50,
 
     // Notifications
     val notifications: NotificationPrefs = NotificationPrefs(),

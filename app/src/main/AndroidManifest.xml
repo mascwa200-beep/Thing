@@ -16,12 +16,19 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+
     <!-- This app is built exclusively for a single flagship device. Declaring
          it touch-only with a high-density large screen keeps the Play-style
          feature contract explicit even though distribution is sideload-only. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:name=".PulseApplication"

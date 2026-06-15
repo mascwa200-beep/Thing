@@ -7,11 +7,15 @@ import dev.mascwa.pulse.data.economy.EconomyRepository
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.fuel.FuelRepository
 import dev.mascwa.pulse.data.markets.MarketsRepository
+import dev.mascwa.pulse.data.emergency.EmergencyService
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.sensors.CompassController
+import dev.mascwa.pulse.data.sensors.SurvivalTools
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
+import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.notifications.NotificationScheduler
@@ -55,6 +59,13 @@ class AppContainer(private val appContext: Context) {
         OrbitalRepository(http, diskCache, settingsRepository)
     }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
+
+    val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
+    val survivalContentRepository: SurvivalContentRepository by lazy {
+        SurvivalContentRepository(appContext, json)
+    }
+    val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
+    val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
