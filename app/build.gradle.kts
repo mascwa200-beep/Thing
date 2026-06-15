@@ -140,4 +140,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
+
+    // Keyless OpenStreetMap map view
+    implementation(libs.osmdroid.android)
 }

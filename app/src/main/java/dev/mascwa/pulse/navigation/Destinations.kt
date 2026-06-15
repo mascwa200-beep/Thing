@@ -39,6 +39,7 @@ object Routes {
     const val SURVIVAL = "survival"
     const val TOOLS = "tools"
     const val SAFETY = "safety"
+    const val MAP = "map"
 }
 
 data class TopDestination(

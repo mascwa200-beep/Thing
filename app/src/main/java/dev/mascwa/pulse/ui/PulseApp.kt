@@ -208,6 +208,10 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() })
             }
+            composable(Routes.MAP) {
+                val vm: dev.mascwa.pulse.feature.map.MapViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.map.MapScreen(vm, onBack = { navController.popBackStack() })
+            }
         }
     }
 
