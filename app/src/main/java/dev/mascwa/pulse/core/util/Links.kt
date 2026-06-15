@@ -5,6 +5,25 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 
+/** Opens this app's system notification settings (to enable a denied permission). */
+fun openAppNotificationSettings(context: Context) {
+    val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        // Fall back to the app details page.
+        runCatching {
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:${context.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+}
+
 /** Opens a maps app at the given coordinates. */
 fun openMaps(context: Context, lat: Double, lon: Double, label: String? = null) {
     val q = if (label != null) "$lat,$lon(${Uri.encode(label)})" else "$lat,$lon"

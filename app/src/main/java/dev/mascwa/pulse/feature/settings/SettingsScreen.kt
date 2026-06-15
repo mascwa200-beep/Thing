@@ -67,16 +67,16 @@ fun SettingsScreen(vm: SettingsViewModel) {
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* state reflected by system; nothing else needed */ }
+    ) { granted ->
+        if (!granted) dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
+    }
 
     // Requests permission if needed, then fires the test notification.
     val testNotifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) vm.sendTestNotification()
-        else android.widget.Toast.makeText(
-            context, "Enable notifications for Pulse in system settings", android.widget.Toast.LENGTH_LONG,
-        ).show()
+        else dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
     }
 
     PulseScaffold(title = "Settings") { innerPadding ->
