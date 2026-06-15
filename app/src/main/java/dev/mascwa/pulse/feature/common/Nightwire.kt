@@ -1,0 +1,151 @@
+package dev.mascwa.pulse.feature.common
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
+
+/** Bordered carbon/panel container — the core NIGHTWIRE surface. */
+@Composable
+fun NeonPanel(
+    modifier: Modifier = Modifier,
+    padding: PaddingValues = PaddingValues(13.dp),
+    borderColor: Color = Pulse.colors.lineSoft,
+    background: Color = Pulse.colors.panel,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(14.dp))
+            .padding(padding),
+    ) { content() }
+}
+
+/** Section header: accent bar + uppercase display title, optional mono action. */
+@Composable
+fun SectionBar(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: String? = null,
+    onTrailing: (() -> Unit)? = null,
+) {
+    val c = Pulse.colors
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(top = 18.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(3.dp).height(14.dp).clip(RoundedCornerShape(2.dp)).background(c.accent))
+            Text(
+                title.uppercase(),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp, letterSpacing = 2.4.sp, color = c.ink,
+                modifier = Modifier.padding(start = 9.dp),
+            )
+        }
+        if (trailing != null) {
+            Text(
+                trailing,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted,
+                modifier = if (onTrailing != null) Modifier.clickable { onTrailing() } else Modifier,
+            )
+        }
+    }
+}
+
+/** Pill chip for category filters / ranges. */
+@Composable
+fun NeonChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    Box(
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (selected) c.accent.copy(alpha = 0.13f) else c.panel)
+            .border(
+                BorderStroke(1.dp, if (selected) c.accent else c.line),
+                RoundedCornerShape(20.dp),
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text.uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 0.6.sp,
+            color = if (selected) c.accent else c.ink2,
+        )
+    }
+}
+
+/** Label/number/sub stat tile (inflation, fuel, econ, weather stats). */
+@Composable
+fun StatTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    sub: String? = null,
+    valueColor: Color = Pulse.colors.ink,
+    subColor: Color = Pulse.colors.muted,
+) {
+    val c = Pulse.colors
+    NeonPanel(modifier, padding = PaddingValues(start = 12.dp, end = 12.dp, top = 11.dp, bottom = 11.dp)) {
+        Column {
+            Text(
+                label.uppercase(),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.7.sp, color = c.muted,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                value,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                color = valueColor, modifier = Modifier.padding(top = 7.dp),
+            )
+            if (sub != null) {
+                Text(
+                    sub, fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                    color = subColor, modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Thin divider in the line-soft colour. */
+@Composable
+fun NeonDivider(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(1.dp).background(Pulse.colors.lineSoft))
+}
+
+/** Small status dot with glow. */
+@Composable
+fun StatusDot(color: Color, size: Int = 8) {
+    Box(Modifier.size(size.dp).clip(RoundedCornerShape(50)).background(color))
+}

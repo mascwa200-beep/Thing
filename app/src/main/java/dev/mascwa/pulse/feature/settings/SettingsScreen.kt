@@ -4,8 +4,13 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,21 +68,19 @@ fun SettingsScreen(vm: SettingsViewModel) {
             // ----- Appearance -----
             item {
                 PrefSection("Appearance") {
-                    PrefRadioGroup(
-                        options = listOf(
-                            ThemeMode.SYSTEM to "Follow system",
-                            ThemeMode.LIGHT to "Light",
-                            ThemeMode.DARK to "Dark",
-                        ),
-                        selected = s.theme,
-                        onSelect = { mode -> vm.update { it.copy(theme = mode) } },
-                    )
-                    PrefSwitch(
-                        title = "Material You colours",
-                        subtitle = "Use the wallpaper-based dynamic palette",
-                        checked = s.dynamicColor,
-                        onChange = { v -> vm.update { it.copy(dynamicColor = v) } },
-                    )
+                    AccentSwatchRow(selected = s.accentColor, onSelect = { a -> vm.update { it.copy(accentColor = a) } })
+                    PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
+                        vm.update { it.copy(amoledBlack = v) }
+                    }
+                    PrefSwitch("Scanlines & CRT", "Retro display overlay", s.scanlines) { v ->
+                        vm.update { it.copy(scanlines = v) }
+                    }
+                    PrefSwitch("Glitch effects", "Animated chromatic distortion", s.glitch) { v ->
+                        vm.update { it.copy(glitch = v) }
+                    }
+                    PrefSwitch("Boot sequence", "Terminal animation on launch", s.bootAnimation) { v ->
+                        vm.update { it.copy(bootAnimation = v) }
+                    }
                 }
             }
             item { HorizontalDivider() }
@@ -312,6 +315,31 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AccentSwatchRow(selected: dev.mascwa.pulse.data.settings.AccentColor, onSelect: (dev.mascwa.pulse.data.settings.AccentColor) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        dev.mascwa.pulse.data.settings.AccentColor.entries.forEach { a ->
+            val color = androidx.compose.ui.graphics.Color(a.argb)
+            Box(
+                Modifier
+                    .size(30.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                    .background(color)
+                    .then(
+                        if (a == selected)
+                            Modifier.border(2.dp, androidx.compose.ui.graphics.Color.White,
+                                androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                        else Modifier,
+                    )
+                    .clickable { onSelect(a) },
+            )
         }
     }
 }

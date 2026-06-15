@@ -1,52 +1,79 @@
 package dev.mascwa.pulse.ui.theme
 
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import dev.mascwa.pulse.data.settings.AccentColor
 
-// Branded fallback palette (used when Material You dynamic colour is disabled).
-private val Blue80 = Color(0xFFADC6FF)
-private val Blue40 = Color(0xFF3D5BF6)
-private val Blue20 = Color(0xFF00208E)
-private val Cyan80 = Color(0xFF82D5E6)
-private val Cyan40 = Color(0xFF00687C)
+/* ============================================================
+   NIGHTWIRE palette — cyberpunk news/markets/world terminal
+   ============================================================ */
 
-val PulseLightColors = lightColorScheme(
-    primary = Blue40,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDBE1FF),
-    onPrimaryContainer = Color(0xFF001257),
-    secondary = Cyan40,
-    onSecondary = Color.White,
-    tertiary = Color(0xFF6B5778),
-    background = Color(0xFFFDFBFF),
-    onBackground = Color(0xFF1A1B20),
-    surface = Color(0xFFFDFBFF),
-    onSurface = Color(0xFF1A1B20),
-    surfaceVariant = Color(0xFFE2E1EC),
-    onSurfaceVariant = Color(0xFF45464F),
-    error = Color(0xFFBA1A1A),
+// Surfaces
+val Void = Color(0xFF05070D)
+val Carbon = Color(0xFF0A0D15)
+val Panel = Color(0xFF0E121C)
+val Raise = Color(0xFF141A28)
+val Line = Color(0xFF1E2636)
+val LineSoft = Color(0xFF161D2B)
+val TrueBlack = Color(0xFF000000)
+
+// Fixed semantic neon
+val Magenta = Color(0xFFFF3864)
+val Amber = Color(0xFFFFC542)
+val Positive = Color(0xFF46F9A0)
+val Negative = Color(0xFFFF4D6D)
+val Violet = Color(0xFF9B8CFF)
+val SkyBlue = Color(0xFF5AD1FF)
+
+// Text
+val Ink = Color(0xFFE6EFFA)
+val Ink2 = Color(0xFFA9B8CE)
+val Muted = Color(0xFF5E708C)
+val Faint = Color(0xFF36435A)
+
+fun accentColorOf(a: AccentColor): Color = Color(a.argb)
+
+/** Full NIGHTWIRE colour set exposed to composables via [LocalNightwire]. */
+@Immutable
+data class NightwirePalette(
+    val accent: Color,
+    val void: Color,
+    val carbon: Color,
+    val panel: Color,
+    val raise: Color,
+    val line: Color,
+    val lineSoft: Color,
+    val ink: Color,
+    val ink2: Color,
+    val muted: Color,
+    val faint: Color,
+    val magenta: Color,
+    val amber: Color,
+    val positive: Color,
+    val negative: Color,
+    val violet: Color,
+    val sky: Color,
+) {
+    /** Colour for a market/percent value. */
+    fun trend(positive: Boolean): Color = if (positive) this.positive else this.negative
+}
+
+fun nightwirePalette(accent: Color, amoled: Boolean) = NightwirePalette(
+    accent = accent,
+    void = if (amoled) TrueBlack else Void,
+    carbon = if (amoled) TrueBlack else Carbon,
+    panel = if (amoled) Color(0xFF07090F) else Panel,
+    raise = Raise,
+    line = Line,
+    lineSoft = LineSoft,
+    ink = Ink,
+    ink2 = Ink2,
+    muted = Muted,
+    faint = Faint,
+    magenta = Magenta,
+    amber = Amber,
+    positive = Positive,
+    negative = Negative,
+    violet = Violet,
+    sky = SkyBlue,
 )
-
-val PulseDarkColors = darkColorScheme(
-    primary = Blue80,
-    onPrimary = Blue20,
-    primaryContainer = Color(0xFF1E429E),
-    onPrimaryContainer = Color(0xFFDBE1FF),
-    secondary = Cyan80,
-    onSecondary = Color(0xFF003543),
-    tertiary = Color(0xFFD6BEE4),
-    background = Color(0xFF111318),
-    onBackground = Color(0xFFE3E1E9),
-    surface = Color(0xFF111318),
-    onSurface = Color(0xFFE3E1E9),
-    surfaceVariant = Color(0xFF45464F),
-    onSurfaceVariant = Color(0xFFC6C5D0),
-    error = Color(0xFFFFB4AB),
-)
-
-// Semantic colours for finance up/down used across markets/economy/fuel.
-val PositiveGreen = Color(0xFF1B8E5A)
-val PositiveGreenDark = Color(0xFF5BD99B)
-val NegativeRed = Color(0xFFC5283D)
-val NegativeRedDark = Color(0xFFFF8A8A)

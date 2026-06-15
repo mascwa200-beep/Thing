@@ -4,6 +4,15 @@ import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** NIGHTWIRE accent colours, user-selectable; recolour the whole UI live. */
+enum class AccentColor(val argb: Long, val r: Int, val g: Int, val b: Int) {
+    CYAN(0xFF2DE2E6, 45, 226, 230),
+    MAGENTA(0xFFFF3864, 255, 56, 100),
+    AMBER(0xFFFFC542, 255, 197, 66),
+    LIME(0xFF5CFF8F, 92, 255, 143),
+    VIOLET(0xFFB061FF, 176, 97, 255),
+}
+
 enum class TemperatureUnit(val apiValue: String, val symbol: String) {
     CELSIUS("celsius", "°C"),
     FAHRENHEIT("fahrenheit", "°F"),
@@ -94,9 +103,14 @@ data class NotificationPrefs(
 @Serializable
 data class AppSettings(
     // Appearance
-    val theme: ThemeMode = ThemeMode.SYSTEM,
-    val dynamicColor: Boolean = true,
+    val theme: ThemeMode = ThemeMode.DARK,            // NIGHTWIRE is a dark terminal
+    val dynamicColor: Boolean = false,                // accent swatches drive colour instead
     val highContrast: Boolean = false,
+    val accentColor: AccentColor = AccentColor.CYAN,
+    val amoledBlack: Boolean = false,                 // true-black surfaces
+    val scanlines: Boolean = true,                    // CRT scanline overlay
+    val glitch: Boolean = true,                       // chromatic glitch FX
+    val bootAnimation: Boolean = true,                // terminal boot sequence on launch
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)

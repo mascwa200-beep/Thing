@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,10 +57,15 @@ fun PulseApp(
         }
     }
 
+    val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = nw.void,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = nw.carbon,
+                tonalElevation = 0.dp,
+            ) {
                 TOP_DESTINATIONS.forEach { dest ->
                     val selected = currentRoute == dest.route
                     NavigationBarItem(
@@ -69,7 +77,21 @@ fun PulseApp(
                                 contentDescription = dest.label,
                             )
                         },
-                        label = { Text(dest.label) },
+                        label = {
+                            Text(
+                                dest.label,
+                                fontFamily = dev.mascwa.pulse.ui.theme.JetBrainsMono,
+                                fontSize = 9.sp,
+                                letterSpacing = 0.6.sp,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = nw.accent,
+                            selectedTextColor = nw.accent,
+                            indicatorColor = nw.accent.copy(alpha = 0.14f),
+                            unselectedIconColor = nw.muted,
+                            unselectedTextColor = nw.muted,
+                        ),
                     )
                 }
             }
@@ -91,6 +113,7 @@ fun PulseApp(
                         openEconomy = { navController.navigate(Routes.ECONOMY) { launchSingleTop = true } },
                         openInflation = { navController.navigate(Routes.INFLATION) { launchSingleTop = true } },
                         openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
+                        openSettings = { navigateTopLevel(Routes.SETTINGS) },
                     ),
                 )
             }

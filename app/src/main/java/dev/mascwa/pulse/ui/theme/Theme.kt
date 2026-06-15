@@ -1,52 +1,61 @@
 package dev.mascwa.pulse.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import dev.mascwa.pulse.data.settings.ThemeMode
+import dev.mascwa.pulse.data.settings.AccentColor
+
+/** Access the NIGHTWIRE palette anywhere: `Pulse.colors.accent`. */
+val LocalNightwire = staticCompositionLocalOf {
+    nightwirePalette(accentColorOf(AccentColor.CYAN), amoled = false)
+}
+
+object Pulse {
+    val colors: NightwirePalette
+        @Composable get() = LocalNightwire.current
+}
 
 @Composable
-fun PulseTheme(
-    themeMode: ThemeMode,
-    dynamicColor: Boolean,
+fun NightwireTheme(
+    accent: AccentColor,
+    amoledBlack: Boolean,
     content: @Composable () -> Unit,
 ) {
-    val dark = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-    val context = LocalContext.current
-    val colors: ColorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> PulseDarkColors
-        else -> PulseLightColors
-    }
+    val accentColor = accentColorOf(accent)
+    val palette = nightwirePalette(accentColor, amoledBlack)
 
-    MaterialTheme(
-        colorScheme = colors,
-        typography = PulseTypography,
-        content = content,
+    val scheme = darkColorScheme(
+        primary = accentColor,
+        onPrimary = Color(0xFF04121A),
+        primaryContainer = accentColor.copy(alpha = 0.16f),
+        onPrimaryContainer = accentColor,
+        secondary = palette.magenta,
+        onSecondary = Color(0xFF1A0207),
+        tertiary = palette.amber,
+        background = palette.void,
+        onBackground = palette.ink,
+        surface = palette.panel,
+        onSurface = palette.ink,
+        surfaceVariant = palette.raise,
+        onSurfaceVariant = palette.ink2,
+        outline = palette.line,
+        outlineVariant = palette.lineSoft,
+        error = palette.negative,
+        scrim = Color(0xCC02030A),
     )
-}
 
-/** Semantic up/down colour aware of light/dark. */
-@Composable
-fun trendColor(positive: Boolean): Color {
-    val dark = MaterialTheme.colorScheme.background.approxLuminance() < 0.5f
-    return when {
-        positive && dark -> PositiveGreenDark
-        positive -> PositiveGreen
-        dark -> NegativeRedDark
-        else -> NegativeRed
+    CompositionLocalProvider(LocalNightwire provides palette) {
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = NightwireTypography,
+            content = content,
+        )
     }
 }
 
-private fun Color.approxLuminance(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
+/** Semantic up/down colour. */
+@Composable
+fun trendColor(positive: Boolean): Color = LocalNightwire.current.trend(positive)
