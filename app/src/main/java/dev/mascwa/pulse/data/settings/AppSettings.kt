@@ -75,12 +75,15 @@ data class ApiKeys(
     val eia: String = "",
     val finnhub: String = "",
     val openWeatherMap: String = "",
+    val nasa: String = "",
 ) {
     val hasNewsApi get() = newsApi.isNotBlank()
     val hasFred get() = fred.isNotBlank()
     val hasEia get() = eia.isNotBlank()
     val hasFinnhub get() = finnhub.isNotBlank()
     val hasOwm get() = openWeatherMap.isNotBlank()
+    /** NASA NeoWs falls back to the shared DEMO_KEY when no personal key is set. */
+    val nasaOrDemo get() = nasa.ifBlank { "DEMO_KEY" }
 }
 
 /** Notification preferences. */
@@ -90,6 +93,7 @@ data class NotificationPrefs(
     val breakingNews: Boolean = true,
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
+    val spaceAlerts: Boolean = true,
     val dailyDigest: Boolean = true,
     val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,

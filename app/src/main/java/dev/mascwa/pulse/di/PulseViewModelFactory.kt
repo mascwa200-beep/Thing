@@ -2,8 +2,11 @@ package dev.mascwa.pulse.di
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import dev.mascwa.pulse.feature.compass.CompassViewModel
 import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.fuel.FuelViewModel
+import dev.mascwa.pulse.feature.sky.OrbitalViewModel
+import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.feature.home.HomeViewModel
 import dev.mascwa.pulse.feature.markets.MarketsViewModel
 import dev.mascwa.pulse.feature.news.NewsViewModel
@@ -28,6 +31,12 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 EconomyViewModel(c.economyRepository, c.settingsRepository)
             modelClass.isAssignableFrom(FuelViewModel::class.java) ->
                 FuelViewModel(c.fuelRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
+                SpaceWeatherViewModel(c.spaceWeatherRepository)
+            modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider)
+            modelClass.isAssignableFrom(CompassViewModel::class.java) ->
+                CompassViewModel(c.newCompassController(), c.locationProvider)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->

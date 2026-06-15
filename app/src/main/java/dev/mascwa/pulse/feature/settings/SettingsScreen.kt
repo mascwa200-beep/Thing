@@ -156,6 +156,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
                     PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(weatherAlerts = v)) } })
+                    PrefSwitch("Space & sky alerts", checked = s.notifications.spaceAlerts, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(spaceAlerts = v)) } })
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     SingleChoiceRow(
@@ -294,6 +296,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     }
                     EditableValueRow("OpenWeatherMap", masked(s.apiKeys.openWeatherMap)) { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(openWeatherMap = v.trim())) }
+                    }
+                    EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa)) { v ->
+                        vm.update { it.copy(apiKeys = it.apiKeys.copy(nasa = v.trim())) }
                     }
                 }
             }

@@ -144,6 +144,53 @@ fun NeonDivider(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(1.dp).background(Pulse.colors.lineSoft))
 }
 
+/** Launcher tile for hub screens (GRID / SKY / SURVIVE). */
+@Composable
+fun HubTile(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color = Pulse.colors.accent,
+    badge: String? = null,
+) {
+    val c = Pulse.colors
+    Box(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.panel)
+            .border(BorderStroke(1.dp, c.lineSoft), RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(14.dp),
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(
+                    icon, null, tint = accent,
+                    modifier = Modifier.size(22.dp),
+                )
+                if (badge != null) {
+                    Box(
+                        Modifier.padding(start = 8.dp).clip(RoundedCornerShape(5.dp))
+                            .background(c.magenta).padding(horizontal = 5.dp, vertical = 1.dp),
+                    ) {
+                        Text(badge, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.void)
+                    }
+                }
+            }
+            Text(
+                title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                color = c.ink, modifier = Modifier.padding(top = 10.dp),
+            )
+            Text(
+                subtitle, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp),
+            )
+        }
+    }
+}
+
 /** Small status dot with glow. */
 @Composable
 fun StatusDot(color: Color, size: Int = 8) {

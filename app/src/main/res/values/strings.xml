@@ -32,6 +32,8 @@
     <string name="channel_weather_desc">Severe weather and daily forecast summary</string>
     <string name="channel_digest_name">Daily digest</string>
     <string name="channel_digest_desc">A once-a-day roundup across your topics</string>
+    <string name="channel_space_name">Space &amp; sky alerts</string>
+    <string name="channel_space_desc">Geomagnetic storms, aurora chances and close asteroid approaches</string>
 
     <!-- Device gate -->
     <string name="gate_title">Built for Pixel 10 Pro XL</string>

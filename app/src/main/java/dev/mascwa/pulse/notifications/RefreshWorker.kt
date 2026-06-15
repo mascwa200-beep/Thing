@@ -110,6 +110,39 @@ class RefreshWorker(
             }
         }
 
+        // --- Space weather (geomagnetic storm) ---
+        if (prefs.spaceAlerts && state.spaceAlertDay != today) {
+            runCatching {
+                val sw = container.spaceWeatherRepository.fetch(force = true).data
+                val kp = sw.kp
+                if (kp != null && kp >= 5.0) {
+                    notifier.notifySpace(
+                        id = 5001,
+                        title = "Geomagnetic storm: ${sw.stormLevel}",
+                        body = "Planetary Kp ${"%.1f".format(kp)}. Aurora: ${sw.auroraChance}.",
+                    )
+                    state = state.copy(spaceAlertDay = today)
+                }
+            }
+        }
+
+        // --- Hazardous near-Earth object ---
+        if (prefs.spaceAlerts && state.neoAlertDay != today) {
+            runCatching {
+                val orbital = container.orbitalRepository.fetch(null, null, force = true).data
+                val hazard = orbital.neos.firstOrNull { it.hazardous }
+                if (hazard != null) {
+                    notifier.notifySpace(
+                        id = 5002,
+                        title = "Close approach: ${orbital.neoHazardousCount} flagged object(s)",
+                        body = "${hazard.name.removeSurrounding("(", ")")} passes today" +
+                            (hazard.missDistanceKm?.let { " · ${Formatters.compact(it)} km" } ?: ""),
+                    )
+                    state = state.copy(neoAlertDay = today)
+                }
+            }
+        }
+
         // --- Daily digest ---
         if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
             runCatching {

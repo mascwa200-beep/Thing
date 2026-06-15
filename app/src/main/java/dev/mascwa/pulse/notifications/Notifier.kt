@@ -31,6 +31,9 @@ class Notifier(private val context: Context) {
     fun notifyWeather(id: Int, title: String, body: String) =
         post(NotificationChannels.WEATHER, id, title, body, "weather", NotificationCompat.PRIORITY_DEFAULT)
 
+    fun notifySpace(id: Int, title: String, body: String) =
+        post(NotificationChannels.SPACE, id, title, body, "grid", NotificationCompat.PRIORITY_DEFAULT)
+
     fun notifyDigest(id: Int, title: String, body: String, lines: List<String>) {
         if (!canPost()) return
         val style = NotificationCompat.InboxStyle().setBigContentTitle(title)

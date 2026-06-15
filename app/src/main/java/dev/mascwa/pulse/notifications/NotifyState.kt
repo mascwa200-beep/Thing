@@ -10,4 +10,6 @@ data class NotifyState(
     val marketAlertedSymbols: List<String> = emptyList(),
     val weatherAlertDay: String = "",
     val lastDigestDay: String = "",
+    val spaceAlertDay: String = "",
+    val neoAlertDay: String = "",
 )

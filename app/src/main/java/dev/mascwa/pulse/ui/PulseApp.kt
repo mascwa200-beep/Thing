@@ -21,11 +21,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.mascwa.pulse.feature.compass.CompassScreen
+import dev.mascwa.pulse.feature.compass.CompassViewModel
 import dev.mascwa.pulse.feature.economy.EconomyScreen
 import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.economy.InflationScreen
 import dev.mascwa.pulse.feature.fuel.FuelScreen
 import dev.mascwa.pulse.feature.fuel.FuelViewModel
+import dev.mascwa.pulse.feature.grid.GridHubScreen
+import dev.mascwa.pulse.feature.sky.OrbitalScreen
+import dev.mascwa.pulse.feature.sky.OrbitalViewModel
+import dev.mascwa.pulse.feature.sky.SkyHubScreen
+import dev.mascwa.pulse.feature.sky.SpaceWeatherScreen
+import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.feature.home.HomeNav
 import dev.mascwa.pulse.feature.home.HomeScreen
 import dev.mascwa.pulse.feature.home.HomeViewModel
@@ -144,6 +152,27 @@ fun PulseApp(
             composable(Routes.FUEL) {
                 val vm: FuelViewModel = viewModel(factory = factory)
                 FuelScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Grid hub + Sky (Phase 1) ----
+            val openRoute: (String) -> Unit = { route ->
+                navController.navigate(route) { launchSingleTop = true }
+            }
+            composable(Routes.GRID) { GridHubScreen(onOpenRoute = openRoute) }
+            composable(Routes.SKY) {
+                SkyHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.COMPASS) {
+                val vm: CompassViewModel = viewModel(factory = factory)
+                CompassScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SPACE_WX) {
+                val vm: SpaceWeatherViewModel = viewModel(factory = factory)
+                SpaceWeatherScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.ORBITAL) {
+                val vm: OrbitalViewModel = viewModel(factory = factory)
+                OrbitalScreen(vm, onBack = { navController.popBackStack() })
             }
         }
     }
