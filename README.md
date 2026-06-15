@@ -41,34 +41,66 @@ Plus:
 - DataStore (settings) · WorkManager (background refresh & notifications)
 - `minSdk 31`, `targetSdk 35`, `compileSdk 35`
 
-## Build & sideload
+## Get the APK onto your Pixel 10 Pro XL
 
-You need **Android Studio** (latest stable). The first sync downloads the
-Android SDK platform 35 and build tools automatically.
+There are two ways to get an installable `app-debug.apk`. **Route A needs no
+tools at all.**
+
+### Route A — download the prebuilt APK from CI (no Android Studio)
+
+Every push is compiled by GitHub Actions, which uploads a ready-to-install APK.
+
+1. On GitHub, open the repo ▸ **Actions** tab ▸ the latest green **Android Build**
+   run (for this branch).
+2. Scroll to **Artifacts** and download **`pulse-debug-apk`** — it's a `.zip`
+   containing `app-debug.apk`.
+3. Unzip it to get `app-debug.apk`, then jump to **Sideloading** below.
+
+> Artifacts expire ~90 days after the run; just re-run the workflow (Actions ▸
+> the run ▸ **Re-run jobs**) to get a fresh one.
+
+### Route B — build it yourself in Android Studio
+
+Open the project in **Android Studio** (latest stable); the first Gradle sync
+downloads the Android SDK platform 35 + build tools automatically. Then either
+**Run ▶** with the phone connected, or **Build ▸ Build APK(s)**, or from a
+terminal:
 
 ```bash
-# Debug APK (easiest to sideload — signed with the debug key)
 ./gradlew assembleDebug
 # Output: app/build/outputs/apk/debug/app-debug.apk
-
-# Release APK (minified). Without a keystore it falls back to the debug key,
-# which is fine for personal sideloading.
-./gradlew assembleRelease
 ```
 
-Install on the device:
+## Sideloading onto the phone
 
-```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
+**Easiest — over USB with adb** (Android Studio installs adb for you):
 
-…or in Android Studio: **Run ▶** with the Pixel 10 Pro XL connected, or
-**Build ▸ Build Bundle(s) / APK(s) ▸ Build APK(s)**.
+1. On the Pixel: **Settings ▸ About phone**, tap **Build number** 7× to unlock
+   Developer options, then **Settings ▸ System ▸ Developer options ▸ USB
+   debugging = on**.
+2. Plug the phone into the computer, accept the "Allow USB debugging?" prompt.
+3. Run:
+   ```bash
+   adb install -r app-debug.apk
+   ```
+   The app ("Pulse") appears in your launcher.
+
+**No computer — install the file directly on the phone:**
+
+1. Copy `app-debug.apk` to the phone (Drive, email to yourself, USB transfer,
+   or download the CI artifact zip in Chrome and extract it with the Files app).
+2. Tap the APK. Android will ask to allow your file manager / browser to
+   **install unknown apps** — toggle it on, then **Install**.
+3. Open **Pulse** from the launcher.
+
+> This is a personal **debug** build, signed with the standard debug key — which
+> is exactly what you want for sideloading to your own device. For a properly
+> signed release build, see *Optional release signing* below.
 
 ### Optional release signing
 
 Fill these in `gradle.properties` (or pass as `-P` flags) to produce a
-properly signed release APK:
+properly signed release APK (`./gradlew assembleRelease`):
 
 ```
 PULSE_RELEASE_STORE_FILE=/path/to/keystore.jks
