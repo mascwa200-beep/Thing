@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -56,10 +57,22 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val resident by vm.resident.collectAsState()
     val vitals by vm.vitals.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
+    val wakeWord by vm.wakeWord.collectAsState()
     val context = LocalContext.current
     val vitalsPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { VitalsTrackingService.start(context) }
+
+    // Enabling the wake word needs the microphone; only commit it once granted.
+    fun enableWakeWord() {
+        vm.setWakeWord(true)
+        vm.setResident(true) // the wake word lives in the resident service
+        ActiveMatrixService.stop(context)
+        ActiveMatrixService.start(context, wakeWord = true)
+    }
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) enableWakeWord() }
 
     PulseScaffold(
         title = "J.A.R.V.I.S. SETUP",
@@ -130,7 +143,29 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 enabled = resident,
                 onToggle = { on ->
                     vm.setResident(on)
-                    if (on) ActiveMatrixService.start(context) else ActiveMatrixService.stop(context)
+                    if (on) ActiveMatrixService.start(context, wakeWord = wakeWord) else ActiveMatrixService.stop(context)
+                },
+            )
+
+            SettingToggle(
+                title = "WAKE WORD · \"J.A.R.V.I.S.\"",
+                subtitle = "Listen for the wake word while resident, then take a spoken command — " +
+                    "all on-device, nothing recorded or sent. Uses the mic and more battery.",
+                enabled = wakeWord,
+                onToggle = { on ->
+                    if (on) {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.RECORD_AUDIO,
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (granted) enableWakeWord() else micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    } else {
+                        vm.setWakeWord(false)
+                        // Restart the resident service without the mic (if it's running).
+                        if (resident) {
+                            ActiveMatrixService.stop(context)
+                            ActiveMatrixService.start(context, wakeWord = false)
+                        }
+                    }
                 },
             )
 

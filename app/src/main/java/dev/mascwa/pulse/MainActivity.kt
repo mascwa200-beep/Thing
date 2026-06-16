@@ -59,7 +59,11 @@ class MainActivity : ComponentActivity() {
                 }
                 // Bring J.A.R.V.I.S. back online if the user left it resident.
                 if (settings.jarvis.residentService) {
-                    runCatching { dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(this@MainActivity) }
+                    runCatching {
+                        dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(
+                            this@MainActivity, wakeWord = settings.jarvis.wakeWord,
+                        )
+                    }
                 }
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }

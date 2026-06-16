@@ -230,7 +230,10 @@ class JarvisViewModel(
     }
 
     override fun onCleared() {
-        voskSpeech.stop()
+        // Only release the mic if WE were tap-to-talk listening — the shared recognizer may be
+        // serving the resident wake word, which must keep running when the chat screen closes.
+        val active = _voiceInput.value is VoiceInputState.Listening || _voiceInput.value is VoiceInputState.Preparing
+        if (active) voskSpeech.stop()
         super.onCleared()
     }
 

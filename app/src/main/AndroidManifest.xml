@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word is enabled. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
@@ -87,7 +89,7 @@
         <service
             android:name=".jarvis.matrix.ActiveMatrixService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|dataSync">
+            android:foregroundServiceType="specialUse|dataSync|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="on_device_assistant_context" />
