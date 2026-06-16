@@ -14,6 +14,10 @@ val releaseKeyAlias = (project.findProperty("PULSE_RELEASE_KEY_ALIAS") as String
 val releaseKeyPassword = (project.findProperty("PULSE_RELEASE_KEY_PASSWORD") as String?).orEmpty()
 val hasReleaseSigning = releaseStoreFile.isNotBlank() && file(releaseStoreFile).exists()
 
+// CI passes -PPULSE_VERSION_CODE=<github run number> so each published build has a higher
+// versionCode than the last — Android blocks downgrades, so this keeps in-place updates working.
+val pulseBuildNumber = (project.findProperty("PULSE_VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+
 android {
     namespace = "dev.mascwa.pulse"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -22,8 +26,8 @@ android {
         applicationId = "dev.mascwa.pulse"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = pulseBuildNumber
+        versionName = "1.0.$pulseBuildNumber"
 
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en")
@@ -35,6 +39,15 @@ android {
     }
 
     signingConfigs {
+        // Pin the debug key to a committed keystore so every CI build is signed identically.
+        // Without this each runner generates a throwaway debug key, which makes Android reject
+        // the new APK as a signature change and forces an uninstall (wiping the model + data).
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(releaseStoreFile)
