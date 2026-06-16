@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.jarvis.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.PrimaryKey
 
 /**
@@ -31,4 +32,30 @@ object Speaker {
     const val USER = "user"
     const val JARVIS = "jarvis"
     const val SYSTEM = "system"
+}
+
+/**
+ * Durable notes/facts the agent can save and later retrieve (the on-device "memory"/RAG store).
+ * Retrieval is lexical via the FTS4 mirror [AgentNoteFts] — no embeddings on-device.
+ */
+@Entity(tableName = "agent_notes")
+data class AgentNoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "note_text") val noteText: String,
+    @ColumnInfo(name = "source") val source: String = "user", // user | observation | inference
+)
+
+/** Full-text index over [AgentNoteEntity.noteText] (external-content FTS; rowid = note id). */
+@Fts4(contentEntity = AgentNoteEntity::class)
+@Entity(tableName = "agent_notes_fts")
+data class AgentNoteFts(
+    @ColumnInfo(name = "note_text") val noteText: String,
+)
+
+/** Sources for [AgentNoteEntity.source]. */
+object NoteSource {
+    const val USER = "user"
+    const val OBSERVATION = "observation"
+    const val INFERENCE = "inference"
 }

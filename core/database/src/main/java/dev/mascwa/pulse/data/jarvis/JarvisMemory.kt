@@ -1,7 +1,9 @@
 package dev.mascwa.pulse.data.jarvis
 
+import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.jarvis.db.ConversationHistoryEntity
 import dev.mascwa.pulse.data.jarvis.db.JarvisDatabase
+import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.data.jarvis.db.SystemStateEntity
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +16,7 @@ class JarvisMemory(db: JarvisDatabase) {
 
     private val states = db.systemStateDao()
     private val convo = db.conversationDao()
+    private val notes = db.agentNoteDao()
 
     /** Live conversation history (oldest → newest) for the console. */
     val history: Flow<List<ConversationHistoryEntity>> = convo.observeAll()
@@ -41,6 +44,32 @@ class JarvisMemory(db: JarvisDatabase) {
         convo.recent(limit).asReversed()
 
     suspend fun clearHistory() = convo.clear()
+
+    // ---- Durable agent memory (notes / facts) — the on-device RAG store ----
+
+    /** Save a durable note/fact the agent can later recall. */
+    suspend fun remember(text: String, source: String = NoteSource.USER): Long =
+        notes.insert(AgentNoteEntity(timestamp = System.currentTimeMillis(), noteText = text.trim(), source = source))
+
+    /**
+     * Lexically retrieve the notes most relevant to [query]. The query is sanitized into safe FTS
+     * MATCH syntax (alphanumeric terms OR-ed together) so arbitrary user text can never break it.
+     */
+    suspend fun recall(query: String, limit: Int = 5): List<AgentNoteEntity> {
+        val match = query.lowercase()
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.length > 2 }
+            .distinct()
+            .take(8)
+            .joinToString(" OR ")
+        if (match.isBlank()) return emptyList()
+        return runCatching { notes.search(match, limit) }.getOrDefault(emptyList())
+    }
+
+    /** Most recent notes regardless of relevance. */
+    suspend fun recentNotes(limit: Int = 10): List<AgentNoteEntity> = notes.recent(limit)
+
+    suspend fun clearNotes() = notes.clear()
 
     companion object {
         const val SPEAKER_USER = Speaker.USER

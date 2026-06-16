@@ -37,3 +37,23 @@ interface ConversationDao {
     @Query("DELETE FROM context_history")
     suspend fun clear()
 }
+
+/** Durable agent notes/facts with lexical (FTS4) retrieval. */
+@Dao
+interface AgentNoteDao {
+    @Insert
+    suspend fun insert(note: AgentNoteEntity): Long
+
+    /** Lexical search; [match] must already be sanitized into valid FTS MATCH syntax. */
+    @Query(
+        "SELECT n.* FROM agent_notes n JOIN agent_notes_fts fts ON n.id = fts.rowid " +
+            "WHERE agent_notes_fts MATCH :match ORDER BY n.timestamp DESC LIMIT :limit",
+    )
+    suspend fun search(match: String, limit: Int): List<AgentNoteEntity>
+
+    @Query("SELECT * FROM agent_notes ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<AgentNoteEntity>
+
+    @Query("DELETE FROM agent_notes")
+    suspend fun clear()
+}
