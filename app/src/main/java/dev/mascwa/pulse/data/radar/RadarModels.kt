@@ -22,6 +22,11 @@ data class Contact(
     val trackDeg: Double? = null, // heading 0..360 (aircraft only)
     val detail: String = "",      // registration · type / place
     val kind: String = ContactKind.AIRCRAFT.name,
+    val squawk: String? = null,
+    val verticalRateFpm: Int? = null,
+    val category: String? = null, // ADS-B emitter category (e.g. A3)
+    val military: Boolean = false,
+    val emergency: Boolean = false, // squawk 7500/7600/7700
     val distanceMeters: Double = 0.0,
     val bearingDeg: Double = 0.0,
 )

@@ -145,6 +145,7 @@ data class AppSettings(
     val glitch: Boolean = true,                       // chromatic glitch FX
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
+    val haptics: Boolean = true,                      // subtle UI haptic ticks
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)

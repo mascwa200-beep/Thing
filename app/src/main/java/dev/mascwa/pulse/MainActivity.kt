@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
+                    dev.mascwa.pulse.ui.effects.LocalHaptics provides settings.haptics,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
                     dev.mascwa.pulse.feature.common.LocalHud provides dev.mascwa.pulse.feature.common.HudState(
                         kp = kp,

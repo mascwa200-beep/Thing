@@ -8,6 +8,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -86,6 +87,10 @@ class RadarRepository(
             val altFeet = o["alt_baro"]?.jsonPrimitive?.doubleOrNull   // string "ground" → null
             val gsKnots = o["gs"]?.jsonPrimitive?.doubleOrNull
             val track = o["track"]?.jsonPrimitive?.doubleOrNull
+            val squawk = o["squawk"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
+            val baroRate = o["baro_rate"]?.jsonPrimitive?.doubleOrNull
+            val category = o["category"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
+            val military = (o["dbFlags"]?.jsonPrimitive?.intOrNull ?: 0) and 0x1 == 0x1
             Contact(
                 id = "ac_${hex.ifBlank { "$clat$clon" }}",
                 label = flight ?: reg ?: hex.uppercase().ifBlank { "UNKNOWN" },
@@ -95,6 +100,11 @@ class RadarRepository(
                 trackDeg = track,
                 detail = listOfNotNull(reg, type).joinToString(" · "),
                 kind = ContactKind.AIRCRAFT.name,
+                squawk = squawk,
+                verticalRateFpm = baroRate?.toInt(),
+                category = category,
+                military = military,
+                emergency = squawk in setOf("7500", "7600", "7700"),
             )
         }
         return list to src

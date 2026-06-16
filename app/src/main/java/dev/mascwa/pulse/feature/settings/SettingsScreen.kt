@@ -101,6 +101,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
                     }
+                    PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
+                        vm.update { it.copy(haptics = v) }
+                    }
                 }
             }
             item { HorizontalDivider() }

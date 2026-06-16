@@ -41,6 +41,7 @@ private val BOOT_SEQUENCE = listOf(
     BootLine("> calibrating weather grid", true),
     BootLine("> decrypting world signal", true),
     BootLine("> arming push relays", true),
+    BootLine("> system online // all subsystems nominal", true),
     BootLine("WELCOME, OPERATOR", false),
 )
 
@@ -104,8 +105,8 @@ fun BootScreen(onFinished: () -> Unit) {
                     items(BOOT_SEQUENCE.take(shown)) { line ->
                         Row(Modifier.fillMaxWidth()) {
                             if (line.ok) {
-                                Text(line.text, fontFamily = JetBrainsMono, fontSize = 11.sp,
-                                    color = c.ink2, modifier = Modifier.weight(1f))
+                                DecryptText(line.text, JetBrainsMono, 11.sp, c.ink2,
+                                    Modifier.weight(1f), durationMs = 300)
                                 Text("[OK]", fontFamily = JetBrainsMono, fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold, color = c.positive)
                             } else {

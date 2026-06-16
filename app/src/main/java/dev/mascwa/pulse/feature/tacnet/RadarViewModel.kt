@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
+import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
@@ -33,10 +34,28 @@ class RadarViewModel(
     private val _needsPermission = MutableStateFlow(false)
     val needsPermission: StateFlow<Boolean> = _needsPermission.asStateFlow()
 
+    private val _altFilter = MutableStateFlow(AltFilter.ALL)
+    val altFilter: StateFlow<AltFilter> = _altFilter.asStateFlow()
+
+    private val _milOnly = MutableStateFlow(false)
+    val milOnly: StateFlow<Boolean> = _milOnly.asStateFlow()
+
+    private val _emergOnly = MutableStateFlow(false)
+    val emergOnly: StateFlow<Boolean> = _emergOnly.asStateFlow()
+
+    private val _countHistory = MutableStateFlow<List<Int>>(emptyList())
+    val countHistory: StateFlow<List<Int>> = _countHistory.asStateFlow()
+
     private var lastLoc: DeviceLocation? = null
     private var auto: Job? = null
 
     val ranges = listOf(50, 100, 250, 500)
+
+    enum class AltFilter { ALL, LOW, MID, HIGH }
+
+    fun setAltFilter(f: AltFilter) { _altFilter.value = f }
+    fun toggleMil() { _milOnly.value = !_milOnly.value }
+    fun toggleEmerg() { _emergOnly.value = !_emergOnly.value }
 
     init { load(force = false, refetchLocation = true) }
 
@@ -76,6 +95,10 @@ class RadarViewModel(
             }
             lastLoc = loc
             _state.load(force) { repo.fetch(loc.latitude, loc.longitude, it) }
+            _state.value.data?.let { d ->
+                val n = d.contacts.count { it.kind == ContactKind.AIRCRAFT.name }
+                _countHistory.value = (_countHistory.value + n).takeLast(40)
+            }
         }
     }
 }
