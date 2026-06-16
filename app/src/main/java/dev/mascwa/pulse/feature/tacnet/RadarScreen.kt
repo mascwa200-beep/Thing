@@ -158,14 +158,14 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                NeonChip("ALL", altFilter == RadarViewModel.AltFilter.ALL) { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.ALL) }
-                                NeonChip("<10K", altFilter == RadarViewModel.AltFilter.LOW) { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.LOW) }
-                                NeonChip("10-30K", altFilter == RadarViewModel.AltFilter.MID) { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.MID) }
-                                NeonChip(">30K", altFilter == RadarViewModel.AltFilter.HIGH) { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.HIGH) }
+                                NeonChip("ALL", altFilter == RadarViewModel.AltFilter.ALL, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.ALL) })
+                                NeonChip("<10K", altFilter == RadarViewModel.AltFilter.LOW, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.LOW) })
+                                NeonChip("10-30K", altFilter == RadarViewModel.AltFilter.MID, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.MID) })
+                                NeonChip(">30K", altFilter == RadarViewModel.AltFilter.HIGH, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.HIGH) })
                             }
                             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                NeonChip("MIL", milOnly) { haptic(HapticFeedbackType.LongPress); vm.toggleMil() }
-                                NeonChip("EMERG", emergOnly) { haptic(HapticFeedbackType.LongPress); vm.toggleEmerg() }
+                                NeonChip("MIL", milOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleMil() })
+                                NeonChip("EMERG", emergOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleEmerg() })
                             }
                         }
                     }
