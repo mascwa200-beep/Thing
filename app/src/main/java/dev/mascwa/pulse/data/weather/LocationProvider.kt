@@ -41,10 +41,23 @@ class LocationProvider(private val context: Context) {
 
     suspend fun current(): DeviceLocation? {
         if (!hasPermission()) return null
-        val loc = fusedFix() ?: managerFix() ?: lastKnown() ?: return null
+        // On a de-Googled build (e.g. GrapheneOS with no sandboxed Play Services)
+        // skip the fused path entirely and go straight to the platform GPS provider —
+        // faster first fix, and no failed Play-Services round-trip.
+        val loc = (if (isGmsAvailable()) fusedFix() else null) ?: managerFix() ?: lastKnown() ?: return null
         val name = reverseGeocode(loc.latitude, loc.longitude) ?: formatCoords(loc.latitude, loc.longitude)
         return DeviceLocation(loc.latitude, loc.longitude, name)
     }
+
+    /**
+     * True only when Google Play Services is actually installed. Lets us avoid touching
+     * any `com.google.android.gms` class on Play-Services-free devices (GrapheneOS, etc.).
+     */
+    @Suppress("DEPRECATION")
+    private fun isGmsAvailable(): Boolean = runCatching {
+        context.packageManager.getPackageInfo(GMS_PACKAGE, 0)
+        true
+    }.getOrDefault(false)
 
     /** Google Play Services fix (fast, GPS-accuracy). Works offline for GPS. */
     private suspend fun fusedFix(): Location? = try {
@@ -53,6 +66,9 @@ class LocationProvider(private val context: Context) {
             client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
         } ?: withTimeoutOrNull(2_000) { client.lastLocation.await() }
     } catch (_: SecurityException) {
+        null
+    } catch (_: LinkageError) {
+        // Play Services classes somehow unavailable at runtime — fall back to platform GPS.
         null
     } catch (_: Exception) {
         null
@@ -120,5 +136,6 @@ class LocationProvider(private val context: Context) {
 
     private companion object {
         const val FIX_TIMEOUT_MS = 8_000L
+        const val GMS_PACKAGE = "com.google.android.gms"
     }
 }
