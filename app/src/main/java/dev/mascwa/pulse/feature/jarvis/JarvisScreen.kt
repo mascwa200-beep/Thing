@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +75,13 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
                 android.content.pm.PackageManager.PERMISSION_GRANTED -> vm.startVoiceInput()
             else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // While the console is on-screen it owns the mic (tap-to-talk); the resident wake loop
+    // pauses and auto-resumes when we leave — so the two never fight over the recognizer.
+    DisposableEffect(Unit) {
+        vm.setConsoleActive(true)
+        onDispose { vm.setConsoleActive(false) }
     }
 
     // Keep the latest turn in view as messages arrive / stream.

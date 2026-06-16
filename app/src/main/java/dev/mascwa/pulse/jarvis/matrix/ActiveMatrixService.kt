@@ -122,11 +122,25 @@ class ActiveMatrixService : Service() {
                 update("Wake word unavailable — voice model couldn't load.")
                 return@launch
             }
-            listenForWake(vosk)
+            // The console and the wake loop share one recognizer. Pause while the console owns the
+            // mic for tap-to-talk; resume automatically when it's released. (StateFlow emits its
+            // current value on collect, so this also performs the initial start.)
+            vosk.consoleActive.collect { inConsole ->
+                if (inConsole) {
+                    vosk.stop()
+                    update("Paused — console has the mic.")
+                } else if (waking) {
+                    listenForWake(vosk)
+                }
+            }
         }
     }
 
     private fun listenForWake(vosk: VoskSpeech) {
+        if (vosk.consoleActive.value) {
+            update("Paused — console has the mic.")
+            return
+        }
         capturing = false
         update("Listening for \"J.A.R.V.I.S.\"…")
         vosk.start(grammar = WAKE_GRAMMAR, listener = object : VoskListener {

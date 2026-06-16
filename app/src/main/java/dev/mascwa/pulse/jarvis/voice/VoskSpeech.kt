@@ -2,6 +2,7 @@ package dev.mascwa.pulse.jarvis.voice
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -35,6 +36,10 @@ class VoskSpeech(context: Context) {
 
     /** Provisioning progress for the underlying speech model (download / unpack). */
     val provisioning: StateFlow<SttModelStore.State> = store.state
+
+    /** True while the J.A.R.V.I.S. console owns the mic for tap-to-talk. The resident wake loop
+     *  observes this and pauses, so the two never fight over the single shared recognizer. */
+    val consoleActive = MutableStateFlow(false)
 
     val isModelReady: Boolean get() = model != null
 

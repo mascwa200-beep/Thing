@@ -234,6 +234,13 @@ class JarvisViewModel(
         _voiceInput.value = VoiceInputState.Idle
     }
 
+    /** Claim the shared mic while the console is on-screen so the resident wake loop pauses;
+     *  release it on exit (also stopping any tap-to-talk) so the wake word auto-resumes. */
+    fun setConsoleActive(active: Boolean) {
+        voskSpeech.consoleActive.value = active
+        if (!active) stopVoiceInput()
+    }
+
     fun clearHistory() {
         viewModelScope.launch { memory.clearHistory() }
     }
