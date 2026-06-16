@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
+         All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"

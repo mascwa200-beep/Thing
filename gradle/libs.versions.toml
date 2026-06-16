@@ -44,6 +44,10 @@ composeCharts = "0.1.2"
 # opened legacy `.task` zip bundles (hence "Unable to open zip archive" on a .litertlm).
 mediapipeGenai = "0.10.27"
 
+# Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
+vosk = "0.3.75"
+jna = "5.13.0"
+
 # Testing
 junit = "4.13.2"
 
@@ -94,6 +98,9 @@ osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.
 
 # On-device LLM
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+
+# Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

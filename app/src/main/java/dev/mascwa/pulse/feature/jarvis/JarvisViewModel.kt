@@ -17,6 +17,8 @@ import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
+import dev.mascwa.pulse.jarvis.voice.VoskListener
+import dev.mascwa.pulse.jarvis.voice.VoskSpeech
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,14 @@ data class JarvisMessage(
     val timestamp: Long,
 )
 
+/** Tap-to-talk voice input lifecycle. */
+sealed interface VoiceInputState {
+    data object Idle : VoiceInputState
+    data object Preparing : VoiceInputState
+    data class Listening(val partial: String) : VoiceInputState
+    data class Error(val message: String) : VoiceInputState
+}
+
 class JarvisViewModel(
     private val memory: JarvisMemory,
     private val engine: LocalInferenceEngine,
@@ -41,6 +51,7 @@ class JarvisViewModel(
     private val orchestrator: ActionOrchestrator,
     private val tts: TextToSpeechEngine,
     private val settings: SettingsRepository,
+    private val voskSpeech: VoskSpeech,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -78,6 +89,10 @@ class JarvisViewModel(
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    private val _voiceInput = MutableStateFlow<VoiceInputState>(VoiceInputState.Idle)
+    /** Tap-to-talk voice-input state (Idle → Preparing → Listening → back to Idle on a result). */
+    val voiceInput: StateFlow<VoiceInputState> = _voiceInput.asStateFlow()
 
     init {
         viewModelScope.launch { engine.ensureReady() }
@@ -172,8 +187,51 @@ class JarvisViewModel(
         }
     }
 
+    /** Begin tap-to-talk: provision/load the speech model if needed, then transcribe one
+     *  utterance and send it. Caller must already hold the RECORD_AUDIO permission. */
+    fun startVoiceInput() {
+        if (_voiceInput.value is VoiceInputState.Listening || _voiceInput.value is VoiceInputState.Preparing) return
+        viewModelScope.launch {
+            _voiceInput.value = VoiceInputState.Preparing
+            if (!voskSpeech.ensureModel()) {
+                _voiceInput.value = VoiceInputState.Error("Voice model unavailable.")
+                return@launch
+            }
+            _voiceInput.value = VoiceInputState.Listening("")
+            val started = voskSpeech.start(listener = object : VoskListener {
+                override fun onPartial(text: String) {
+                    _voiceInput.value = VoiceInputState.Listening(text)
+                }
+                override fun onFinal(text: String) {
+                    viewModelScope.launch {
+                        voskSpeech.stop()
+                        _voiceInput.value = VoiceInputState.Idle
+                        if (text.isNotBlank()) send(text)
+                    }
+                }
+                override fun onError(message: String) {
+                    viewModelScope.launch {
+                        voskSpeech.stop()
+                        _voiceInput.value = VoiceInputState.Error(message)
+                    }
+                }
+            })
+            if (!started) _voiceInput.value = VoiceInputState.Error("Couldn't start the microphone.")
+        }
+    }
+
+    fun stopVoiceInput() {
+        voskSpeech.stop()
+        _voiceInput.value = VoiceInputState.Idle
+    }
+
     fun clearHistory() {
         viewModelScope.launch { memory.clearHistory() }
+    }
+
+    override fun onCleared() {
+        voskSpeech.stop()
+        super.onCleared()
     }
 
     private companion object {

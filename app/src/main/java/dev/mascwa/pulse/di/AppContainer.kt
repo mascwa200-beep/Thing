@@ -120,6 +120,10 @@ class AppContainer(private val appContext: Context) {
     val textToSpeech: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine by lazy {
         dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext)
     }
+    /** Offline on-device speech recognition (Vosk) for tap-to-talk and the wake word. */
+    val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {
+        dev.mascwa.pulse.jarvis.voice.VoskSpeech(appContext)
+    }
 
     /** App-wide crash reporter backing the global handler + the SYS crash console. */
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {

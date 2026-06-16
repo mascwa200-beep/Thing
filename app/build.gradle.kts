@@ -140,6 +140,11 @@ dependencies {
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
 
+    // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
+    // native libraries are packaged; the plain jar lacks them.
+    implementation(libs.vosk.android)
+    implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
+
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
