@@ -19,12 +19,19 @@ class HudViewModel(
     private val _kp = MutableStateFlow<Double?>(null)
     val kp: StateFlow<Double?> = _kp.asStateFlow()
 
+    private val _auroraPct = MutableStateFlow<Int?>(null)
+    val auroraPct: StateFlow<Int?> = _auroraPct.asStateFlow()
+
     fun hasLocationPermission(): Boolean = location.hasPermission()
 
     init {
         viewModelScope.launch {
             while (true) {
-                runCatching { space.fetch(false) }.getOrNull()?.let { _kp.value = it.data.kp }
+                val loc = if (location.hasPermission()) runCatching { location.current() }.getOrNull() else null
+                runCatching { space.fetch(false, loc?.latitude, loc?.longitude) }.getOrNull()?.let {
+                    _kp.value = it.data.kp
+                    _auroraPct.value = it.data.auroraProbabilityPct
+                }
                 delay(10 * 60 * 1000L)
             }
         }

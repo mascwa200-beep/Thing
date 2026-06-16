@@ -120,6 +120,7 @@ data class NotificationPrefs(
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,
+    val auroraAlerts: Boolean = true,     // NOAA OVATION aurora probability at your location
     val safetyAlerts: Boolean = true,
     val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
     val dailyDigest: Boolean = true,

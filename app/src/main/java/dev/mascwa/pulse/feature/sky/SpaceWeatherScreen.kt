@@ -93,10 +93,26 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                             }
                         }
                         item {
-                            NeonPanel(Modifier.fillMaxWidth()) {
+                            val pct = sw?.auroraProbabilityPct
+                            val bright = (pct ?: 0) >= 25
+                            NeonPanel(Modifier.fillMaxWidth(), borderColor = if (bright) c.violet else c.lineSoft) {
                                 Column {
                                     Text("AURORA CHANCE", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                                     Text(sw?.auroraChance ?: "—", style = MaterialTheme.typography.titleMedium, color = c.sky)
+                                    if (pct != null) {
+                                        Text(
+                                            "$pct% overhead probability at your location",
+                                            fontFamily = JetBrainsMono, fontSize = 11.sp,
+                                            color = if (bright) c.violet else c.ink2,
+                                            modifier = Modifier.padding(top = 4.dp),
+                                        )
+                                    } else {
+                                        Text(
+                                            "Grant location for the OVATION probability here.",
+                                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                                            modifier = Modifier.padding(top = 4.dp),
+                                        )
+                                    }
                                 }
                             }
                         }

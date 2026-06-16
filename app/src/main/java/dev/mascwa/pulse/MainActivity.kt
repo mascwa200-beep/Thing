@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
             val hudVm: dev.mascwa.pulse.feature.common.HudViewModel =
                 androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             val kp by hudVm.kp.collectAsStateWithLifecycle()
+            val auroraPct by hudVm.auroraPct.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -88,6 +89,7 @@ class MainActivity : ComponentActivity() {
                         kp = kp,
                         hasLocation = app.container.locationProvider.hasPermission(),
                         enabled = settings.hudStrip,
+                        auroraPct = auroraPct,
                     ),
                 ) {
                 Box(Modifier.fillMaxSize()) {

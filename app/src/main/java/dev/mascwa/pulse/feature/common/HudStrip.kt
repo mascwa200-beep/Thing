@@ -37,7 +37,12 @@ import java.util.Date
 import java.util.Locale
 
 /** Live data for the always-on HUD strip, provided from the activity root. */
-data class HudState(val kp: Double?, val hasLocation: Boolean, val enabled: Boolean)
+data class HudState(
+    val kp: Double?,
+    val hasLocation: Boolean,
+    val enabled: Boolean,
+    val auroraPct: Int? = null,
+)
 
 val LocalHud = staticCompositionLocalOf { HudState(null, false, false) }
 
@@ -89,6 +94,7 @@ fun HudStrip(modifier: Modifier = Modifier) {
             HudCell("NET", if (online) net else "OFF", if (online) c.positive else c.negative)
             HudCell("BAT", battery?.let { "$it%${if (charging) "+" else ""}" } ?: "--", batteryColor(battery, charging, c))
             HudCell("KP", hud.kp?.let { "%.0f".format(it) } ?: "--", kpColor(hud.kp, c))
+            hud.auroraPct?.let { HudCell("AUR", "$it%", auroraColor(it, c)) }
         }
     }
 }
@@ -128,4 +134,10 @@ private fun kpColor(kp: Double?, c: NightwirePalette): Color = when {
     kp >= 5 -> c.magenta
     kp >= 4 -> c.amber
     else -> c.positive
+}
+
+private fun auroraColor(pct: Int, c: NightwirePalette): Color = when {
+    pct >= 50 -> c.magenta
+    pct >= 25 -> c.violet
+    else -> c.ink2
 }

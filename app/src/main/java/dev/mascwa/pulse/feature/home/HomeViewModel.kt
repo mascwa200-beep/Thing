@@ -13,6 +13,9 @@ import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
+import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.SkyDigest
+import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -35,6 +38,7 @@ data class HomeUiState(
     val politics: Async<List<Article>> = Async(loading = true),
     val tech: Async<List<Article>> = Async(loading = true),
     val popculture: Async<List<Article>> = Async(loading = true),
+    val skyLines: List<String> = emptyList(),
 )
 
 class HomeViewModel(
@@ -45,6 +49,8 @@ class HomeViewModel(
     private val fuel: FuelRepository,
     private val location: LocationProvider,
     private val settings: SettingsRepository,
+    private val orbital: OrbitalRepository,
+    private val space: SpaceWeatherRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -75,8 +81,24 @@ class HomeViewModel(
                 if (HomeSection.POLITICS in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POLITICS, f) }) { st, a -> st.copy(politics = a) }
                 if (HomeSection.TECH in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TECH, f) }) { st, a -> st.copy(tech = a) }
                 if (HomeSection.POPCULTURE in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POPCULTURE, f) }) { st, a -> st.copy(popculture = a) }
+                loadSky(force, s)
             }
         }
+    }
+
+    /** "Today in the sky" digest line — orbital + space weather (keyless). */
+    private suspend fun loadSky(force: Boolean, s: dev.mascwa.pulse.data.settings.AppSettings) {
+        val (lat, lon) = run {
+            if (s.useDeviceLocation && location.hasPermission()) {
+                location.current()?.let { return@run it.latitude to it.longitude }
+            }
+            val saved = s.savedLocations.getOrNull(s.selectedLocationIndex) ?: s.savedLocations.firstOrNull()
+            if (saved != null) saved.latitude to saved.longitude else 51.5074 to -0.1278
+        }
+        val orb = runCatching { orbital.fetch(lat, lon, force).data }.getOrNull() ?: return
+        val sw = runCatching { space.fetch(false, lat, lon).data }.getOrNull()
+        val lines = SkyDigest.lines(orb, sw, lat, lon)
+        _state.update { it.copy(skyLines = lines) }
     }
 
     private fun <T> launchInto(

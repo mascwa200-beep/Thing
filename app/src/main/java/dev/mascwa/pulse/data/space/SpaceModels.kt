@@ -17,6 +17,7 @@ data class SpaceWeather(
     val bz: Double? = null,                // nT (negative = geoeffective)
     val stormLevel: String = "None",       // NOAA G-scale label
     val auroraChance: String = "Low",
+    val auroraProbabilityPct: Int? = null, // NOAA OVATION probability at your location
     val alerts: List<SpaceAlert> = emptyList(),
     val updatedEpochMs: Long = System.currentTimeMillis(),
 ) {

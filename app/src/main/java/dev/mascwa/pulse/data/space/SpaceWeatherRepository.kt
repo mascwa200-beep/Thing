@@ -6,9 +6,11 @@ import dev.mascwa.pulse.core.util.Fetched
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.math.roundToInt
 
 /** NOAA SWPC space-weather data — keyless JSON. */
 class SpaceWeatherRepository(
@@ -16,9 +18,12 @@ class SpaceWeatherRepository(
     private val cache: DiskCache,
 ) {
     private val ttl = 15 * 60 * 1000L
-    private val key = "space_weather"
 
-    suspend fun fetch(force: Boolean): Fetched<SpaceWeather> {
+    /** [lat]/[lon] optional — when present, the NOAA OVATION aurora probability
+     *  for that point is included. */
+    suspend fun fetch(force: Boolean, lat: Double? = null, lon: Double? = null): Fetched<SpaceWeather> {
+        val key = if (lat != null && lon != null)
+            "space_weather_${"%.0f".format(lat)}_${"%.0f".format(lon)}" else "space_weather"
         if (!force) {
             cache.read(key, ttl, SpaceWeather.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)
@@ -30,6 +35,9 @@ class SpaceWeatherRepository(
                 val windD = async { runCatching { loadSummary(SOLAR_WIND_SPEED, "WindSpeed") }.getOrNull() }
                 val bzD = async { runCatching { loadSummary(SOLAR_WIND_MAG, "Bz") }.getOrNull() }
                 val alertsD = async { runCatching { loadAlerts() }.getOrDefault(emptyList()) }
+                val auroraD = async {
+                    if (lat != null && lon != null) runCatching { loadAurora(lat, lon) }.getOrNull() else null
+                }
 
                 val kpSeries = kpD.await()
                 val kp = kpSeries.lastOrNull()
@@ -40,6 +48,7 @@ class SpaceWeatherRepository(
                     bz = bzD.await(),
                     stormLevel = SpaceWeather.stormLevelForKp(kp),
                     auroraChance = SpaceWeather.auroraForKp(kp),
+                    auroraProbabilityPct = auroraD.await(),
                     alerts = alertsD.await(),
                 )
             }
@@ -51,6 +60,35 @@ class SpaceWeatherRepository(
             }
             throw e
         }
+    }
+
+    /** NOAA OVATION aurora probability (%) at the grid point nearest to [lat]/[lon].
+     *  The feed is a full integer-degree grid as `[lon(0..359), lat(-90..90), prob]`. */
+    private suspend fun loadAurora(lat: Double, lon: Double): Int? {
+        val text = http.getString("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json")
+        val coords = http.json.parseToJsonElement(text).jsonObject["coordinates"]?.jsonArray ?: return null
+        val lonR = (((lon % 360) + 360) % 360).roundToInt() % 360
+        val latR = lat.roundToInt().coerceIn(-90, 90)
+        // Fast path: lon-major ordering, lat ascending from -90.
+        coords.getOrNull(lonR * 181 + (latR + 90))?.jsonArray?.let { row ->
+            if (row.getOrNull(0)?.jsonPrimitive?.intOrNull == lonR &&
+                row.getOrNull(1)?.jsonPrimitive?.intOrNull == latR
+            ) {
+                return row.getOrNull(2)?.jsonPrimitive?.intOrNull
+            }
+        }
+        // Fallback: nearest-grid scan.
+        var best: Int? = null
+        var bestDist = Int.MAX_VALUE
+        coords.forEach { el ->
+            val a = el.jsonArray
+            val clon = a.getOrNull(0)?.jsonPrimitive?.intOrNull ?: return@forEach
+            val clat = a.getOrNull(1)?.jsonPrimitive?.intOrNull ?: return@forEach
+            val dLon = minOf((clon - lonR + 360) % 360, (lonR - clon + 360) % 360)
+            val d = dLon * dLon + (clat - latR) * (clat - latR)
+            if (d < bestDist) { bestDist = d; best = a.getOrNull(2)?.jsonPrimitive?.intOrNull }
+        }
+        return best
     }
 
     /** Planetary K-index: array-of-arrays, first row is the header. */

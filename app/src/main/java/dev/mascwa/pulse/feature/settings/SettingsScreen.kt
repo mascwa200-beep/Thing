@@ -178,6 +178,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(weatherAlerts = v)) } })
                     PrefSwitch("Space & sky alerts", checked = s.notifications.spaceAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(spaceAlerts = v)) } })
+                    PrefSwitch("Aurora likely (your location)", checked = s.notifications.auroraAlerts, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(auroraAlerts = v)) } })
                     PrefSwitch("Safety / nearby incidents", checked = s.notifications.safetyAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(safetyAlerts = v)) } })
                     PrefSwitch("Overhead flights (Tacnet)", checked = s.notifications.flightAlerts, enabled = on,

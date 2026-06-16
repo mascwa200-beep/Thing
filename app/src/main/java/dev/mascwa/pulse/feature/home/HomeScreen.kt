@@ -53,6 +53,7 @@ import dev.mascwa.pulse.feature.common.Ticker
 import dev.mascwa.pulse.feature.common.TickerItem
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.news.ArticleRowCompact
+import dev.mascwa.pulse.ui.effects.DecryptText
 import dev.mascwa.pulse.ui.effects.GlitchText
 import dev.mascwa.pulse.ui.effects.LocalGlitchEnabled
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -154,6 +155,11 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
 
                 // Greeting
                 item { Greeting() }
+
+                // Today in the sky
+                if (state.skyLines.isNotEmpty()) {
+                    item { SkyDigestCard(state.skyLines) }
+                }
 
                 // Breaking hero
                 state.headlines.data?.firstOrNull()?.let { lead ->
@@ -258,6 +264,29 @@ private fun Greeting() {
             Text("Here's your ", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
             Text("world", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.accent)
             Text(".", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
+        }
+    }
+}
+
+@Composable
+private fun SkyDigestCard(lines: List<String>) {
+    val c = Pulse.colors
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp),
+        corners = true,
+        borderColor = c.violet.copy(alpha = 0.5f),
+    ) {
+        Column {
+            DecryptText(
+                text = "TODAY IN THE SKY",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.violet,
+            )
+            lines.forEach { ln ->
+                Text(
+                    ln, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
         }
     }
 }

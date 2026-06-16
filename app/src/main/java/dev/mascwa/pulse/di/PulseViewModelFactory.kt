@@ -26,6 +26,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 HomeViewModel(
                     c.newsRepository, c.marketsRepository, c.weatherRepository,
                     c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
+                    c.orbitalRepository, c.spaceWeatherRepository,
                 )
             modelClass.isAssignableFrom(NewsViewModel::class.java) ->
                 NewsViewModel(c.newsRepository, c.settingsRepository)
@@ -36,7 +37,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(FuelViewModel::class.java) ->
                 FuelViewModel(c.fuelRepository, c.settingsRepository)
             modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
-                SpaceWeatherViewModel(c.spaceWeatherRepository)
+                SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
                 OrbitalViewModel(c.orbitalRepository, c.locationProvider)
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->

@@ -126,6 +126,26 @@ class RefreshWorker(
             }
         }
 
+        // --- Aurora likely (NOAA OVATION at the user's location) ---
+        if (prefs.auroraAlerts && state.auroraAlertDay != today) {
+            runCatching {
+                val loc = container.locationProvider.current()
+                if (loc != null) {
+                    val sw = container.spaceWeatherRepository.fetch(true, loc.latitude, loc.longitude).data
+                    val pct = sw.auroraProbabilityPct
+                    if (pct != null && pct >= 25) {
+                        notifier.notifySpace(
+                            id = 5003,
+                            title = "Aurora likely — $pct% overhead",
+                            body = "NOAA OVATION puts aurora at $pct% over your location" +
+                                (sw.kp?.let { " · Kp ${"%.1f".format(it)}" } ?: "") + ".",
+                        )
+                        state = state.copy(auroraAlertDay = today)
+                    }
+                }
+            }
+        }
+
         // --- Hazardous near-Earth object ---
         if (prefs.spaceAlerts && state.neoAlertDay != today) {
             runCatching {
@@ -256,6 +276,20 @@ class RefreshWorker(
             val econ = container.economyRepository.fetchDashboard(force = false).data
             val infl = econ.series.firstOrNull { it.indicatorId == "FP.CPI.TOTL.ZG" }?.latest
             infl?.let { lines += "💹 Inflation (${it.year}): ${Formatters.percent(it.value)}" }
+        }
+        // Today in the sky (sun/moon/planets/aurora) — keyless, mostly offline.
+        runCatching {
+            val (lat, lon) = run {
+                if (settings.useDeviceLocation) {
+                    container.locationProvider.current()?.let { return@run it.latitude to it.longitude }
+                }
+                val saved = settings.savedLocations.getOrNull(settings.selectedLocationIndex)
+                    ?: settings.savedLocations.firstOrNull()
+                if (saved != null) saved.latitude to saved.longitude else 51.5074 to -0.1278
+            }
+            val orb = container.orbitalRepository.fetch(lat, lon, false).data
+            val sw = runCatching { container.spaceWeatherRepository.fetch(false, lat, lon).data }.getOrNull()
+            dev.mascwa.pulse.data.orbital.SkyDigest.lines(orb, sw, lat, lon).take(2).forEach { lines += it }
         }
         return lines
     }

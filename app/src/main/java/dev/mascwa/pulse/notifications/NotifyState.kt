@@ -11,6 +11,7 @@ data class NotifyState(
     val weatherAlertDay: String = "",
     val lastDigestDay: String = "",
     val spaceAlertDay: String = "",
+    val auroraAlertDay: String = "",
     val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
     val flightAlertedIds: List<String> = emptyList(),
