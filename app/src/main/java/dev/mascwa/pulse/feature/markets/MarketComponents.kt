@@ -45,6 +45,7 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             )
         }
+        val type = runCatching { WatchType.valueOf(quote.type) }.getOrNull()
         Column(Modifier.weight(1f)) {
             Text(
                 quote.label,
@@ -58,6 +59,13 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (quote.low != null && quote.high != null && type != WatchType.CRYPTO) {
+                Text(
+                    "L ${Formatters.number(quote.low, 2)} · H ${Formatters.number(quote.high, 2)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Sparkline(
             values = quote.sparkline,

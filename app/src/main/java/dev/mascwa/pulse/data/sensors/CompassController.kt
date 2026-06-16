@@ -38,6 +38,9 @@ class CompassController(context: Context) : SensorEventListener {
     private val rotationMatrix = FloatArray(9)
     private val orientation = FloatArray(3)
 
+    /** Low-pass state for the heading (null until the first reading). */
+    private var filteredAzimuth: Float? = null
+
     fun setLocation(lat: Double, lon: Double, altitude: Double) {
         val geo = GeomagneticField(
             lat.toFloat(), lon.toFloat(), altitude.toFloat(), System.currentTimeMillis(),
@@ -47,7 +50,8 @@ class CompassController(context: Context) : SensorEventListener {
 
     fun start() {
         val sensor = rotationSensor ?: return
-        sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        // GAME rate gives smoother, more responsive heading updates than UI.
+        sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
     }
 
     fun stop() {
@@ -58,13 +62,30 @@ class CompassController(context: Context) : SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
         SensorManager.getOrientation(rotationMatrix, orientation)
-        val azimuth = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) % 360f + 360f) % 360f
-        _reading.value = _reading.value.copy(magneticAzimuth = azimuth)
+        val raw = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) % 360f + 360f) % 360f
+        // Circular low-pass: averaging via sin/cos so 359°→1° doesn't smear to 180°.
+        val smoothed = filteredAzimuth?.let { circularLerp(it, raw, SMOOTHING) } ?: raw
+        filteredAzimuth = smoothed
+        _reading.value = _reading.value.copy(magneticAzimuth = smoothed)
+    }
+
+    private fun circularLerp(prev: Float, curr: Float, alpha: Float): Float {
+        val p = Math.toRadians(prev.toDouble())
+        val c = Math.toRadians(curr.toDouble())
+        val sin = (1 - alpha) * Math.sin(p) + alpha * Math.sin(c)
+        val cos = (1 - alpha) * Math.cos(p) + alpha * Math.cos(c)
+        val deg = Math.toDegrees(Math.atan2(sin, cos)).toFloat()
+        return (deg % 360f + 360f) % 360f
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         val low = accuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW ||
             accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE
         _reading.value = _reading.value.copy(accuracyLow = low)
+    }
+
+    private companion object {
+        /** Low-pass weight for new samples (higher = snappier, lower = smoother). */
+        const val SMOOTHING = 0.2f
     }
 }

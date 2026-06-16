@@ -1,6 +1,9 @@
 package dev.mascwa.pulse.feature.markets
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,11 +17,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
+import dev.mascwa.pulse.feature.common.ChangePill
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
@@ -56,8 +63,26 @@ fun MarketsScreen(vm: MarketsViewModel) {
                         WatchType.FOREX to "Forex",
                         WatchType.COMMODITY to "Commodities",
                     )
+                    val all = ((watch.data ?: emptyList()) + (crypto.data ?: emptyList()))
+                        .filter { it.changePercent != null }
+                    val gainers = all.sortedByDescending { it.changePercent!! }.take(3)
+                    val losers = (all - gainers.toSet()).sortedBy { it.changePercent!! }.take(3)
+
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                         if (watch.stale || crypto.stale) item { StaleBanner(true) }
+
+                        if (gainers.isNotEmpty()) {
+                            item(key = "h_gain") { SectionLabel("Top gainers") }
+                            items(gainers, key = { "g_${it.id}" }) { MoverRow(it) }
+                        }
+                        if (losers.isNotEmpty()) {
+                            item(key = "h_lose") { SectionLabel("Top losers") }
+                            items(losers, key = { "l_${it.id}" }) { MoverRow(it) }
+                        }
+                        if (gainers.isNotEmpty() || losers.isNotEmpty()) {
+                            item(key = "d_movers") { HorizontalDivider() }
+                        }
+
                         order.forEach { (type, label) ->
                             val rows = grouped[type].orEmpty()
                             if (rows.isNotEmpty()) {
@@ -78,6 +103,22 @@ fun MarketsScreen(vm: MarketsViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MoverRow(q: Quote) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            q.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+        )
+        Text(formatPrice(q), style = MaterialTheme.typography.bodyMedium)
+        ChangePill(q.changePercent)
     }
 }
 

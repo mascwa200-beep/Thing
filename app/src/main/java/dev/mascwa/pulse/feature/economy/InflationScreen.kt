@@ -33,6 +33,48 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.trendColor
 
 @Composable
+private fun InflationExplainer() {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Understanding this number", style = MaterialTheme.typography.titleMedium)
+            ExplainBlock(
+                "What it measures",
+                "Consumer Price Inflation tracks the average change in prices a household pays for a fixed " +
+                    "\"basket\" of goods and services. The headline figure is the annual % change — how much " +
+                    "more (or less) the same basket costs versus a year earlier.",
+            )
+            ExplainBlock(
+                "What's in the basket",
+                "Housing & utilities, food & drink, transport & fuel, healthcare, recreation, clothing and " +
+                    "personal care — each weighted by how much a typical household spends on it (weights vary by " +
+                    "country). Energy and food are the most volatile; \"core\" inflation strips those out.",
+            )
+            ExplainBlock(
+                "What drives it",
+                "Common factors: energy & supply shocks, demand outpacing supply, wage growth, currency moves, " +
+                    "and government fiscal + central-bank interest-rate policy. A reading near ~2% is the target " +
+                    "many central banks aim for.",
+            )
+            Text(
+                "Note: this is general context. Pinning a specific year's inflation on particular policies or " +
+                    "events requires official national statistics and analysis — not something this annual figure " +
+                    "alone can attribute.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExplainBlock(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 fun InflationScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val infl = state.inflation
@@ -93,6 +135,22 @@ fun InflationScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
                                 }
                             }
                         }
+                        item {
+                            val pts = series?.points.orEmpty()
+                            if (pts.size >= 2) {
+                                val latest = pts.last().value
+                                val prev = pts[pts.size - 2].value
+                                val rising = latest > prev
+                                Text(
+                                    (if (rising) "▲ Accelerating" else "▼ Cooling") +
+                                        " vs ${pts[pts.size - 2].year} (${Formatters.percent(prev)})",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    color = trendColor(!rising),
+                                )
+                            }
+                        }
+                        item { InflationExplainer() }
                         item {
                             Text("History", style = MaterialTheme.typography.titleMedium)
                         }
