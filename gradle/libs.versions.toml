@@ -40,7 +40,9 @@ osmdroid = "6.1.20"
 composeCharts = "0.1.2"
 
 # On-device LLM (MediaPipe LLM Inference — standalone, NOT Play Services)
-mediapipeGenai = "0.10.24"
+# 0.10.25+ is required to load the LiteRT-LM `.litertlm` model format; 0.10.24 only
+# opened legacy `.task` zip bundles (hence "Unable to open zip archive" on a .litertlm).
+mediapipeGenai = "0.10.27"
 
 # Testing
 junit = "4.13.2"
