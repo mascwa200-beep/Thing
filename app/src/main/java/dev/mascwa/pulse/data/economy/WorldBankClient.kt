@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Thin client for the World Bank Open Data API (keyless, international).
- * Endpoint shape: a 2-element JSON array — [metadata, [dataPoints...]].
+ * Endpoint shape: a 2-element JSON array of metadata plus a list of data points.
  */
 class WorldBankClient(private val http: HttpClient) {
 

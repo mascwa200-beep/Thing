@@ -66,7 +66,7 @@ class SpaceWeatherRepository(
     }
 
     /** NOAA OVATION aurora probability (%) at the grid point nearest to [lat]/[lon].
-     *  The feed is a full integer-degree grid as `[lon(0..359), lat(-90..90), prob]`. */
+     *  The feed is a full integer-degree grid of (lon 0..359, lat -90..90, prob) triples. */
     private suspend fun loadAurora(lat: Double, lon: Double): Int? {
         val text = http.getString("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json")
         val coords = http.json.parseToJsonElement(text).jsonObject["coordinates"]?.jsonArray ?: return null
