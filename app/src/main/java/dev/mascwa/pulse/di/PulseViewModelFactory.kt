@@ -77,6 +77,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                 SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
+                dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T

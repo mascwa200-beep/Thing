@@ -47,15 +47,24 @@ class ActiveMatrixService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForegroundCompat(buildNotification("Active · standing by."))
+        // Foreground start can throw (ForegroundServiceStartNotAllowed / FGS-type errors on
+        // Android 14+). Stand down gracefully instead of crashing the app.
+        try {
+            startForegroundCompat(buildNotification("Active · standing by."))
+        } catch (t: Throwable) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (!observing) {
             observing = true
             scope.launch {
-                var prev: DeviceContext? = null
-                provider.updates.collect { now ->
-                    val line = if (prev == null) banter.greeting(now) else banter.reactTo(prev, now)
-                    prev = now
-                    if (!line.isNullOrBlank()) update(line)
+                runCatching {
+                    var prev: DeviceContext? = null
+                    provider.updates.collect { now ->
+                        val line = if (prev == null) banter.greeting(now) else banter.reactTo(prev, now)
+                        prev = now
+                        if (!line.isNullOrBlank()) update(line)
+                    }
                 }
             }
         }

@@ -121,6 +121,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext)
     }
 
+    /** App-wide crash reporter backing the global handler + the SYS crash console. */
+    val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
+        dev.mascwa.pulse.crash.CrashReporter(appContext)
+    }
+
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
 

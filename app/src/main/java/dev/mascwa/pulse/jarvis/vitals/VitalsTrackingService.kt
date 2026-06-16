@@ -56,7 +56,12 @@ class VitalsTrackingService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForegroundCompat(ongoing("Listening for a heart-rate strap…"))
+        try {
+            startForegroundCompat(ongoing("Listening for a heart-rate strap…"))
+        } catch (t: Throwable) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         beginIfPossible()
         return START_STICKY
     }
@@ -86,7 +91,13 @@ class VitalsTrackingService : Service() {
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
             .build()
-        scanner.startScan(listOf(filter), settings, scanCallback)
+        // startScan can throw SecurityException (permission revoked mid-run) or IllegalState
+        // (Bluetooth turned off) even past the gate — fail honestly instead of crashing.
+        runCatching { scanner.startScan(listOf(filter), settings, scanCallback) }
+            .onFailure {
+                scanning = false
+                updateOngoing("Couldn't start the Bluetooth scan.")
+            }
     }
 
     private val scanCallback = object : ScanCallback() {
@@ -95,10 +106,12 @@ class VitalsTrackingService : Service() {
             val device = result.device ?: return
             // First strap wins; stop scanning and connect.
             val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
-            adapter?.bluetoothLeScanner?.stopScan(this)
+            runCatching { adapter?.bluetoothLeScanner?.stopScan(this) }
             scanning = false
             updateOngoing("Connecting to ${device.name ?: "heart-rate strap"}…")
-            gatt = device.connectGatt(this@VitalsTrackingService, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+            runCatching {
+                gatt = device.connectGatt(this@VitalsTrackingService, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+            }.onFailure { updateOngoing("Couldn't connect to the strap.") }
         }
     }
 

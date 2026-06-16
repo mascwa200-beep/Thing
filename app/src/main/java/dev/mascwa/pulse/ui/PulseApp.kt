@@ -154,7 +154,7 @@ fun PulseApp(
             }
             composable(Routes.SETTINGS) {
                 val vm: SettingsViewModel = viewModel(factory = factory)
-                SettingsScreen(vm)
+                SettingsScreen(vm, onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } })
             }
             composable(Routes.ECONOMY) {
                 val vm: EconomyViewModel = viewModel(factory = factory)
@@ -258,6 +258,12 @@ fun PulseApp(
             composable(Routes.JARVIS_SETUP) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Diagnostics ----
+            composable(Routes.CRASH_LOG) {
+                val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.diagnostics.CrashLogScreen(vm, onBack = { navController.popBackStack() })
             }
         }
     }

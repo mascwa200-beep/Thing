@@ -54,7 +54,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel) {
+fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -432,6 +432,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
+                        onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
                         onClick = { vm.resetToDefaults() })
                     Text(

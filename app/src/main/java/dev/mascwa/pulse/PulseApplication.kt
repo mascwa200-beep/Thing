@@ -19,6 +19,9 @@ class PulseApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Install the app-wide crash guard early so any uncaught throwable is logged to the
+        // on-device crash console before the OS terminates the process.
+        container.crashReporter.install()
         NotificationChannels.ensure(this)
     }
 

@@ -111,7 +111,11 @@ class JarvisViewModel(
                         speakIfEnabled(reply)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Throwable (not just Exception) so an OutOfMemoryError from inference becomes a
+                // fault bubble rather than an app crash.
                 memory.append(Speaker.JARVIS, "// fault: ${e.message ?: "inference error"}")
             } finally {
                 _streaming.value = ""

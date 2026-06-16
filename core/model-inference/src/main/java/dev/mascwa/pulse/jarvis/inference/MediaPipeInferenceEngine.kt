@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
@@ -45,6 +46,10 @@ class MediaPipeInferenceEngine(
         response.split(' ').forEachIndexed { i, word ->
             emit(if (i == 0) word else " $word")
         }
+    }.catch { e ->
+        // Surface a JVM-level inference failure (incl. OutOfMemoryError on a large model) as a
+        // fault line instead of letting it crash the app. Native C++ crashes can't be caught here.
+        emit("// inference fault: ${e.message ?: e.javaClass.simpleName}")
     }.flowOn(Dispatchers.Default)
 
     override fun close() {

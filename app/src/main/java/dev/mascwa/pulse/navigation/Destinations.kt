@@ -54,6 +54,9 @@ object Routes {
     // J.A.R.V.I.S. Matrix (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"
+
+    // Diagnostics
+    const val CRASH_LOG = "crash_log"
 }
 
 data class TopDestination(
