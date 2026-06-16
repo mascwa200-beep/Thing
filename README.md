@@ -21,11 +21,33 @@ Settings to unlock richer sources.
 | **Fuel & Energy** | Stooq energy futures (Brent/WTI/NatGas/RBOB/Heating oil) + World Bank national pump prices | EIA (US weekly retail) |
 | **Weather** | Open-Meteo forecast + geocoding + air quality (global) | OpenWeatherMap |
 
+Plus hubs reached from the **GRID** tab:
+
+- **SKY** — offline compass (true north via the WMM), space weather (NOAA SWPC
+  Kp/solar wind/aurora), and orbital bodies (live ISS, sun/moon, planets, NEOs).
+- **TACNET** — a real-time cyberpunk hub:
+  - **Radar** — a phosphor scope with a rotating sweep, range rings
+    (50/100/250/500 km), bearing ticks and a crosshair, plotting **real** contacts
+    around your live GPS: **live aircraft** from keyless community ADS-B
+    (`adsb.lol` → `adsb.fi` fallback), the **live ISS**, and **nearby earthquakes**
+    (USGS). Blips ping as the sweep passes; tap one for callsign/altitude/speed.
+    Auto-refreshes; offline shows the last picture with a `LINK LOST` marker.
+  - **Telemetry** — a fully-offline vitals console: barometer→altitude,
+    magnetometer, accel/gyro tilt, light, plus battery/network/memory and GPS,
+    with live gauges and a scrolling data-stream log.
+- **SURVIVE** — nearest help (hospitals/shelters/food banks/radio towers via OSM),
+  offline survival guides & tools, and an SOS centre.
+- **WIRE+** — social discovery (Lemmy/Mastodon/Hacker News), a keyless search bar,
+  and an in-app image search.
+
 Plus:
 
+- **Global HUD strip** — an always-on cockpit bar (clock · GPS-lock · link ·
+  battery · live Kp) under every screen; toggle in Settings.
 - **Push notifications** — breaking-news alerts, market/price threshold alerts,
-  severe-weather alerts, and a daily digest, all via a `WorkManager` background
-  job. Per-channel toggles, quiet hours, and digest time in Settings.
+  severe-weather, geomagnetic-storm, nearby-incident, **overhead-flight**, and a
+  daily digest, all via a `WorkManager` background job. Per-channel toggles,
+  quiet hours, and digest time in Settings.
 - **Customizable settings** — theme & Material You colour, region/units/currency,
   refresh interval, reorderable Home dashboard, editable watchlist, custom RSS
   feeds, muted keywords, optional API keys, cache management.
