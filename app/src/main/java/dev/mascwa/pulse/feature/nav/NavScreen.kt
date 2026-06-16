@@ -4,9 +4,13 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -22,10 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,9 +51,24 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.BackgroundLayer
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillExtrusionLayer
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Point
 
-// OpenFreeMap: keyless, no-registration vector tiles (OSM data). Phase-2 swaps to a custom dark style.
+// OpenFreeMap: keyless, no-registration vector tiles (OSM data). We load it then recolour every
+// layer into the NIGHTWIRE/cyberpunk look at runtime (red buildings, cyan roads, void background).
 private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private const val USER_SOURCE = "nav-user"
+private const val USER_LAYER = "nav-user-dot"
+private const val FOLLOW_ZOOM = 16.5
+private const val FOLLOW_TILT = 50.0
+private val WATER = Color(0xFF06121F)   // deep navy so water reads as "off" against the red city
 
 @Composable
 fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
@@ -70,21 +88,47 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
 
     val mapView = rememberMapViewWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    // True = camera tracks GPS heading-up; flips to false the moment the user pans/zooms/rotates.
+    var follow by remember { mutableStateOf(true) }
 
-    // Follow GPS + face the heading (heading-up). Cheap instant move; the heading is pre-smoothed.
-    LaunchedEffect(location, heading, map) {
+    // One-time map wiring: enable free-roam gestures, load + cyberpunk-ify the style, add the player
+    // marker, and drop follow-mode as soon as the user drives the camera by hand.
+    LaunchedEffect(mapView) {
+        mapView.getMapAsync { ml ->
+            map = ml
+            ml.uiSettings.apply {
+                isScrollGesturesEnabled = true
+                isZoomGesturesEnabled = true
+                isRotateGesturesEnabled = true
+                isTiltGesturesEnabled = true
+                isDoubleTapGesturesEnabled = true
+                isCompassEnabled = false
+                isLogoEnabled = false
+                isAttributionEnabled = true // keep the required OSM/OpenFreeMap attribution
+            }
+            ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
+                cyberpunkify(style, c)
+                addPlayerMarker(style, c)
+            }
+            ml.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) follow = false
+            }
+        }
+    }
+
+    // Keep the player marker pinned to the live GPS fix even while free-roaming.
+    LaunchedEffect(location, map) {
+        val style = map?.style ?: return@LaunchedEffect
+        val loc = location ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(USER_SOURCE)?.setGeoJson(Point.fromLngLat(loc.longitude, loc.latitude))
+    }
+
+    // While tracking, follow GPS heading-up. Once the user pans, this no-ops until they recenter.
+    LaunchedEffect(location, heading, follow, map) {
+        if (!follow) return@LaunchedEffect
         val m = map ?: return@LaunchedEffect
         val loc = location ?: return@LaunchedEffect
-        m.moveCamera(
-            CameraUpdateFactory.newCameraPosition(
-                CameraPosition.Builder()
-                    .target(LatLng(loc.latitude, loc.longitude))
-                    .zoom(16.5)
-                    .tilt(50.0)
-                    .bearing(heading.toDouble())
-                    .build(),
-            ),
-        )
+        m.moveCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading)))
     }
 
     PulseScaffold(
@@ -96,46 +140,109 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize()) { mv ->
-                mv.getMapAsync { ml ->
-                    map = ml
-                    if (ml.style == null) ml.setStyle(Style.Builder().fromUri(STYLE_URL))
-                    ml.uiSettings.apply {
-                        isRotateGesturesEnabled = false
-                        isCompassEnabled = false
-                        isLogoEnabled = false
-                        isAttributionEnabled = true // keep the required OSM/OpenFreeMap attribution
-                    }
-                }
-            }
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
             NavChrome(heading = heading, hasFix = location != null, c = c)
+            RecenterButton(
+                following = follow,
+                c = c,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                onClick = {
+                    follow = true
+                    val loc = location
+                    val m = map
+                    if (loc != null && m != null) {
+                        m.animateCamera(
+                            CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading)),
+                        )
+                    }
+                },
+            )
         }
     }
 }
 
-/** The cyberpunk overlay: range ring, corner brackets, a centred player chevron and a heading tick. */
+private fun followCamera(lat: Double, lon: Double, heading: Float): CameraPosition =
+    CameraPosition.Builder()
+        .target(LatLng(lat, lon))
+        .zoom(FOLLOW_ZOOM)
+        .tilt(FOLLOW_TILT)
+        .bearing(heading.toDouble())
+        .build()
+
+/** Recolour the loaded OSM style into the cyberpunk palette: void background, red buildings, cyan
+ *  road network, dimmed water/land, and readable labels. Works on whatever layers the style ships. */
+private fun cyberpunkify(style: Style, c: NightwirePalette) {
+    val void = c.void.toArgb()
+    val red = c.magenta.toArgb()
+    val cyan = c.sky.toArgb()
+    val water = WATER.toArgb()
+    val label = c.ink.toArgb()
+    style.layers.forEach { layer ->
+        val id = layer.id.lowercase()
+        when (layer) {
+            is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(void))
+            is FillExtrusionLayer -> layer.setProperties(
+                PropertyFactory.fillExtrusionColor(red),
+                PropertyFactory.fillExtrusionOpacity(0.55f),
+            )
+            is FillLayer -> when {
+                "water" in id -> layer.setProperties(PropertyFactory.fillColor(water))
+                "building" in id -> layer.setProperties(PropertyFactory.fillColor(red), PropertyFactory.fillOpacity(0.32f))
+                else -> layer.setProperties(PropertyFactory.fillColor(void)) // land/parks blend into the void
+            }
+            is LineLayer -> when {
+                "water" in id || "river" in id || "waterway" in id -> layer.setProperties(PropertyFactory.lineColor(water))
+                "building" in id -> layer.setProperties(PropertyFactory.lineColor(red))
+                "boundary" in id || "admin" in id -> layer.setProperties(PropertyFactory.lineColor(c.muted.toArgb()))
+                else -> layer.setProperties(PropertyFactory.lineColor(cyan)) // roads / rail / paths
+            }
+            is SymbolLayer -> layer.setProperties(
+                PropertyFactory.textColor(label),
+                PropertyFactory.textHaloColor(void),
+                PropertyFactory.textHaloWidth(1.3f),
+            )
+            is CircleLayer -> layer.setProperties(PropertyFactory.circleColor(cyan))
+        }
+    }
+}
+
+/** The player position as a glowing cyan dot pinned to the map (correct while panning). */
+private fun addPlayerMarker(style: Style, c: NightwirePalette) {
+    if (style.getSource(USER_SOURCE) != null) return
+    style.addSource(GeoJsonSource(USER_SOURCE))
+    style.addLayer(
+        CircleLayer(USER_LAYER, USER_SOURCE).withProperties(
+            PropertyFactory.circleColor(c.sky.toArgb()),
+            PropertyFactory.circleRadius(6f),
+            PropertyFactory.circleStrokeColor(c.void.toArgb()),
+            PropertyFactory.circleStrokeWidth(2.5f),
+        ),
+    )
+}
+
+@Composable
+private fun RecenterButton(following: Boolean, c: NightwirePalette, modifier: Modifier, onClick: () -> Unit) {
+    val tint = if (following) c.accent else c.ink
+    Box(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(c.panel.copy(alpha = 0.82f))
+            .border(1.dp, tint, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            if (following) "◎ TRACKING" else "◎ RECENTER",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = tint,
+        )
+    }
+}
+
+/** The cyberpunk HUD frame: corner brackets, a heading readout, and a GPS-acquiring notice. */
 @Composable
 private fun NavChrome(heading: Float, hasFix: Boolean, c: NightwirePalette) {
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val r = minOf(size.width, size.height) * 0.34f
-            drawCircle(c.accent.copy(alpha = 0.45f), r, Offset(cx, cy), style = Stroke(1.5f))
-            drawCircle(c.accent.copy(alpha = 0.14f), r * 0.6f, Offset(cx, cy), style = Stroke(1f))
-            // North tick (rotates opposite the heading so it always points to true north).
-            rotate(-heading, Offset(cx, cy)) {
-                drawLine(c.magenta, Offset(cx, cy - r), Offset(cx, cy - r - 14f), 3f)
-            }
-            // Player chevron at centre, pointing up (heading-up map).
-            val chevron = Path().apply {
-                moveTo(cx, cy - 16f)
-                lineTo(cx - 11f, cy + 12f)
-                lineTo(cx, cy + 4f)
-                lineTo(cx + 11f, cy + 12f)
-                close()
-            }
-            drawPath(chevron, if (hasFix) c.accent else c.faint)
             hudCorners(c.accent, 16.dp.toPx(), 1.5.dp.toPx(), 6.dp.toPx())
         }
         Text(
