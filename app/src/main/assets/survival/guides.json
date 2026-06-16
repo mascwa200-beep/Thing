@@ -1,0 +1,135 @@
+{
+  "guides": [
+    {
+      "id": "first-aid",
+      "title": "First Aid",
+      "category": "Medical",
+      "summary": "Bleeding, CPR, shock, burns, fractures and choking.",
+      "sections": [
+        { "heading": "Priorities (DR ABC)", "body": "Danger: make the scene safe first. Response: tap and shout. Airway: tilt head back, lift chin. Breathing: look/listen for 10s. Circulation: control major bleeding. Call emergency services as early as possible." },
+        { "heading": "Severe bleeding", "body": "Apply firm direct pressure with a cloth; keep pressing. Add layers, do not remove soaked ones. Raise the limb if no fracture. If life-threatening limb bleeding won't stop, apply a tourniquet 5-7 cm above the wound, tighten until bleeding stops, and note the time." },
+        { "heading": "CPR (adult)", "body": "Unresponsive and not breathing normally: push hard and fast in the centre of the chest, ~5-6 cm deep, 100-120/min. 30 compressions then 2 breaths if trained, otherwise compressions only. Use an AED as soon as one is available and follow its voice prompts." },
+        { "heading": "Choking", "body": "If they can cough, encourage it. If not: 5 back blows between the shoulder blades, then 5 abdominal thrusts (Heimlich). Alternate until clear or they go unconscious — then start CPR." },
+        { "heading": "Shock", "body": "Pale, cold, clammy, rapid breathing. Lay them down, raise legs if no spinal/leg injury, keep warm, reassure, do not give food or drink." },
+        { "heading": "Burns", "body": "Cool with running water for 20 minutes. Remove jewellery/loose clothing before swelling. Cover loosely with cling film or a clean non-fluffy cloth. Never apply ice, butter or creams." }
+      ]
+    },
+    {
+      "id": "water",
+      "title": "Water",
+      "category": "Essentials",
+      "summary": "Finding and making water safe to drink.",
+      "sections": [
+        { "heading": "Rule of threes", "body": "You can survive ~3 days without water. Prioritise it after immediate danger and shelter in extreme cold." },
+        { "heading": "Finding water", "body": "Follow valleys downhill, look for green vegetation, collect rain and dew, and morning condensation. In dry country, dig in the outside bend of a dry riverbed. Avoid stagnant water with no life around it." },
+        { "heading": "Make it safe", "body": "Filter cloudy water through cloth first. Then BOIL for 1 minute (3 minutes above 2000 m) — the most reliable method. No fire? Chemical: unscented household bleach 2 drops per litre, wait 30 min. Or use purification tablets per their instructions. UV/clear-bottle solar (SODIS): full sun for 6 hours." },
+        { "heading": "Cautions", "body": "Boiling/chemicals kill germs but do NOT remove chemical pollution, salt or heavy metals. Never drink seawater or urine." }
+      ]
+    },
+    {
+      "id": "fire",
+      "title": "Fire",
+      "category": "Essentials",
+      "summary": "Building and keeping a fire for warmth and signalling.",
+      "sections": [
+        { "heading": "Prepare", "body": "Clear a 1 m circle to bare earth, away from overhanging branches and wind. Gather three grades: tinder (dry grass, bark, lint), kindling (pencil-thin twigs), and fuel (thumb-thick and up). Gather far more than you think you need before lighting." },
+        { "heading": "Light it", "body": "Build a small teepee or lean-to of tinder and kindling. Light from the upwind side. Feed gradually from small to large. Shelter the flame from wind and ground damp with a platform of dry sticks." },
+        { "heading": "Keep it", "body": "Bank larger logs around the edge. To preserve coals overnight, cover with ash. Never leave a fire unattended; drown, stir, and feel for heat before leaving." }
+      ]
+    },
+    {
+      "id": "shelter",
+      "title": "Shelter & Warmth",
+      "category": "Essentials",
+      "summary": "Staying dry, out of wind, and off cold ground.",
+      "sections": [
+        { "heading": "Why shelter first", "body": "In cold or wet conditions exposure can kill in hours — well before thirst or hunger. Get out of wind and rain and OFF the cold ground." },
+        { "heading": "Insulate down and up", "body": "Ground steals heat fastest. Pile dry leaves, grass, branches or a pack beneath you. Trap air with layers; a debris pile 0.5-1 m thick around and over you holds body heat." },
+        { "heading": "Quick shelters", "body": "Lean a ridgepole against a rock/stump, lay branches along it, pile debris on top. In snow, a tree-well or compacted snow trench blocks wind. Keep the entrance small and downwind." },
+        { "heading": "Stay dry", "body": "Wet clothing loses most of its insulation. Wring out, layer, and avoid sweating — vent before you overheat." }
+      ]
+    },
+    {
+      "id": "signaling",
+      "title": "Signalling for Rescue",
+      "category": "Rescue",
+      "summary": "SOS, mirror, ground signals, whistle and light.",
+      "sections": [
+        { "heading": "SOS", "body": "The universal distress signal is · · · — — — · · · (three short, three long, three short) with no gap between letters. Send it with light, whistle, or sound. Three of anything (3 fires, 3 whistle blasts, 3 flashes) means distress." },
+        { "heading": "Use the app", "body": "Open Tools for an automatic SOS strobe (camera flash) and a loud alarm. These run offline. Conserve battery between attempts." },
+        { "heading": "Signal mirror", "body": "Reflect sunlight toward aircraft/vehicles; flash repeatedly. Aim by holding two fingers up at the target and flashing across them." },
+        { "heading": "Ground-to-air", "body": "Make large symbols (≥3 m) with high contrast: V = need assistance, X = need medical help, → = going this direction. Stamp into snow or lay out branches/rocks." }
+      ]
+    },
+    {
+      "id": "navigation",
+      "title": "Finding Direction",
+      "category": "Navigation",
+      "summary": "Direction from the sun, stars and a watch.",
+      "sections": [
+        { "heading": "Use the Compass", "body": "The app's Compass works offline and shows true north using the World Magnetic Model. Note a landmark on your bearing before moving." },
+        { "heading": "Sun", "body": "The sun rises in the east and sets in the west everywhere. At local noon it is due south in the Northern Hemisphere (due north in the Southern). A shadow stick: mark a shadow tip, wait 15+ min, mark again — the line between marks runs roughly west-to-east." },
+        { "heading": "Stars (Northern Hemisphere)", "body": "Find the Big Dipper; the two stars at the end of its 'cup' point to Polaris, the North Star, which sits over true north." },
+        { "heading": "Stars (Southern Hemisphere)", "body": "Find the Southern Cross; extend its long axis ~4.5x its length to an empty point — straight down from there is roughly south." }
+      ]
+    },
+    {
+      "id": "emergency-comms",
+      "title": "Calling for Help",
+      "category": "Rescue",
+      "summary": "Reach emergency services, save battery, improvise signal.",
+      "sections": [
+        { "heading": "Emergency call", "body": "Dial your local emergency number (the SOS screen picks it for your region — 911/112/999/000…). Calls to emergency services often connect even with no SIM or on another carrier's network if any signal exists. Stay on the line and give your location." },
+        { "heading": "If you can't get through", "body": "Texts need far less signal than calls — try SMS to a contact (the SOS screen pre-fills your coordinates). Move to high open ground; signal is best with line-of-sight to a town or tower. Hold the phone still — moving drops weak connections." },
+        { "heading": "Pixel satellite SOS", "body": "Recent Pixel phones can contact emergency services via satellite when there's no cell or Wi-Fi. Go outside with a clear view of the sky and follow the on-screen Emergency SOS prompts. Keep the phone pointed as directed." },
+        { "heading": "Wireless emergency alerts", "body": "Leave Wireless Emergency Alerts ON (Settings ▸ Safety & emergency) to receive government broadcasts about nearby threats even when data is down." },
+        { "heading": "Save the battery", "body": "Enable battery saver, turn on airplane mode between attempts (radios searching for signal drain fast), lower brightness, close apps, keep the phone warm against your body in cold. Power on only to send a message or call at set times." },
+        { "heading": "Improve reception", "body": "Higher ground and clear sky help most. A makeshift reflector (foil behind the phone) or resting the phone on metal can occasionally help. Try the edges of clearings rather than dense cover." }
+      ]
+    },
+    {
+      "id": "weather-hazards",
+      "title": "Weather Hazards",
+      "category": "Hazards",
+      "summary": "Lightning, heat, cold and flooding.",
+      "sections": [
+        { "heading": "Lightning", "body": "If you can hear thunder you are in range. Get off high ground and away from lone trees, water and metal. Indoors/vehicle is safest. If caught: crouch low on the balls of your feet, minimise ground contact, do not lie flat." },
+        { "heading": "Heat", "body": "Rest in shade during peak sun, drink water, loosen clothing, wet skin. Heatstroke (hot dry skin, confusion, collapse) is a 911 emergency — cool aggressively with water and fanning." },
+        { "heading": "Cold / hypothermia", "body": "Shivering, slurred speech, clumsiness, confusion. Get dry, insulate from the ground, add layers, shelter from wind, warm drinks if alert. Handle gently; do not rub limbs." },
+        { "heading": "Flooding", "body": "Move to high ground early. Never walk or drive through moving water — 15 cm can knock you down, 30 cm can float a car. Turn around, don't drown." }
+      ]
+    },
+    {
+      "id": "morse",
+      "title": "Morse Code",
+      "category": "Reference",
+      "summary": "Full alphabet, numbers and SOS.",
+      "sections": [
+        { "heading": "Letters", "body": "A ·—  B —···  C —·—·  D —··  E ·  F ··—·  G ——·  H ····  I ··  J ·———  K —·—  L ·—··  M ——  N —·  O ———  P ·——·  Q ——·—  R ·—·  S ···  T —  U ··—  V ···—  W ·——  X —··—  Y —·——  Z ——··" },
+        { "heading": "Numbers", "body": "1 ·————  2 ··———  3 ···——  4 ····—  5 ·····  6 —····  7 ——···  8 ———··  9 ————·  0 —————" },
+        { "heading": "Timing & SOS", "body": "A dash is 3x a dot. Gap between symbols = 1 dot; between letters = 3 dots; between words = 7 dots. SOS = · · · — — — · · · sent as one group." }
+      ]
+    },
+    {
+      "id": "nato-phonetic",
+      "title": "NATO Phonetic Alphabet",
+      "category": "Reference",
+      "summary": "Spell clearly over noisy radio/phone.",
+      "sections": [
+        { "heading": "Alphabet", "body": "A Alfa · B Bravo · C Charlie · D Delta · E Echo · F Foxtrot · G Golf · H Hotel · I India · J Juliett · K Kilo · L Lima · M Mike · N November · O Oscar · P Papa · Q Quebec · R Romeo · S Sierra · T Tango · U Uniform · V Victor · W Whiskey · X X-ray · Y Yankee · Z Zulu" },
+        { "heading": "Numbers", "body": "Speak digits individually. 'Niner' is used for 9 to avoid confusion with 5. Say 'figures' before a number group if needed." }
+      ]
+    },
+    {
+      "id": "emergency-frequencies",
+      "title": "Emergency Frequencies",
+      "category": "Reference",
+      "summary": "Common distress and calling channels.",
+      "sections": [
+        { "heading": "Air & sea", "body": "121.5 MHz — international aeronautical emergency. 243.0 MHz — military. VHF marine Channel 16 (156.8 MHz) — international maritime distress/calling. 406 MHz — emergency beacons (EPIRB/PLB), satellite-detected." },
+        { "heading": "Consumer radios", "body": "FRS/GMRS Channel 1 and Channel 9 are common informal calling/emergency channels in North America. PMR446 Channel 1 in Europe. Monitor and call on these if you carry walkie-talkies." },
+        { "heading": "Amateur (ham) calling", "body": "2 m: 146.520 MHz FM simplex calling (US). 70 cm: 446.000 MHz. HF voice calling examples: 7.200, 14.300 MHz. A licence is normally required, but any frequency may be used in a genuine life-threatening emergency." }
+      ]
+    }
+  ]
+}

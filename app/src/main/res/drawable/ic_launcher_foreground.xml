@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Adaptive-icon foreground: neon "wire" waveform on the safe 72x72 zone. -->
+    <group android:scaleX="1.0" android:scaleY="1.0" android:pivotX="54" android:pivotY="54">
+        <path
+            android:strokeColor="#2DE2E6"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="M30,54 L42,54 L47,40 L54,68 L61,47 L66,54 L78,54" />
+        <path
+            android:strokeColor="#FF3864"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M34,66 L74,66" />
+    </group>
+</vector>

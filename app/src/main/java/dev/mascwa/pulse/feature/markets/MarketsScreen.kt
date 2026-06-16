@@ -1,0 +1,134 @@
+package dev.mascwa.pulse.feature.markets
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.data.markets.Quote
+import dev.mascwa.pulse.data.settings.WatchType
+import dev.mascwa.pulse.feature.common.ChangePill
+import dev.mascwa.pulse.feature.common.EmptyState
+import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.StaleBanner
+
+@Composable
+fun MarketsScreen(vm: MarketsViewModel) {
+    val state by vm.state.collectAsStateWithLifecycle()
+
+    PulseScaffold(
+        title = "Markets",
+        actions = {
+            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh") }
+        },
+    ) { innerPadding ->
+        val watch = state.watchlist
+        val crypto = state.crypto
+        val anyLoadingInitial = watch.isInitialLoading && crypto.isInitialLoading
+        val anyError = watch.isError && crypto.isError
+
+        PullToRefreshBox(
+            isRefreshing = (watch.loading || crypto.loading) && (watch.data != null || crypto.data != null),
+            onRefresh = { vm.refresh() },
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            when {
+                anyLoadingInitial -> LoadingState()
+                anyError -> ErrorState(watch.error ?: crypto.error ?: "Error", onRetry = { vm.refresh() })
+                else -> {
+                    val grouped = vm.grouped(watch.data ?: emptyList())
+                    val order = listOf(
+                        WatchType.INDEX to "Indices",
+                        WatchType.STOCK to "Stocks",
+                        WatchType.FOREX to "Forex",
+                        WatchType.COMMODITY to "Commodities",
+                    )
+                    val all = ((watch.data ?: emptyList()) + (crypto.data ?: emptyList()))
+                        .filter { it.changePercent != null }
+                    val gainers = all.sortedByDescending { it.changePercent!! }.take(3)
+                    val losers = (all - gainers.toSet()).sortedBy { it.changePercent!! }.take(3)
+
+                    LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                        if (watch.stale || crypto.stale) item { StaleBanner(true) }
+
+                        if (gainers.isNotEmpty()) {
+                            item(key = "h_gain") { SectionLabel("Top gainers") }
+                            items(gainers, key = { "g_${it.id}" }) { MoverRow(it) }
+                        }
+                        if (losers.isNotEmpty()) {
+                            item(key = "h_lose") { SectionLabel("Top losers") }
+                            items(losers, key = { "l_${it.id}" }) { MoverRow(it) }
+                        }
+                        if (gainers.isNotEmpty() || losers.isNotEmpty()) {
+                            item(key = "d_movers") { HorizontalDivider() }
+                        }
+
+                        order.forEach { (type, label) ->
+                            val rows = grouped[type].orEmpty()
+                            if (rows.isNotEmpty()) {
+                                item(key = "h_$label") { SectionLabel(label) }
+                                items(rows, key = { it.id }) { QuoteRow(it) }
+                                item(key = "d_$label") { HorizontalDivider() }
+                            }
+                        }
+                        val cryptoRows = crypto.data.orEmpty()
+                        if (cryptoRows.isNotEmpty()) {
+                            item(key = "h_crypto") { SectionLabel("Crypto") }
+                            items(cryptoRows, key = { "c_${it.id}" }) { QuoteRow(it) }
+                        }
+                        if (grouped.isEmpty() && cryptoRows.isEmpty()) {
+                            item { EmptyState("Your watchlist is empty. Add symbols in Settings.") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoverRow(q: Quote) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            q.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+        )
+        Text(formatPrice(q), style = MaterialTheme.typography.bodyMedium)
+        ChangePill(q.changePercent)
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
+}

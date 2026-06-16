@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name">Pulse</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_news">News</string>
+    <string name="nav_markets">Markets</string>
+    <string name="nav_weather">Weather</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Sections -->
+    <string name="section_economy">Economy</string>
+    <string name="section_inflation">Inflation</string>
+    <string name="section_fuel">Fuel &amp; Energy</string>
+    <string name="section_politics">Politics</string>
+    <string name="section_popculture">Pop Culture</string>
+    <string name="section_tech">Tech</string>
+
+    <!-- Generic -->
+    <string name="retry">Retry</string>
+    <string name="refresh">Refresh</string>
+    <string name="loading">Loading…</string>
+    <string name="offline_cached">Offline — showing cached data</string>
+    <string name="empty_generic">Nothing to show yet.</string>
+
+    <!-- Notification channels -->
+    <string name="channel_breaking_name">Breaking news</string>
+    <string name="channel_breaking_desc">Top headlines as they happen</string>
+    <string name="channel_markets_name">Market &amp; price alerts</string>
+    <string name="channel_markets_desc">Watchlist moves, crypto and fuel thresholds</string>
+    <string name="channel_weather_name">Weather alerts</string>
+    <string name="channel_weather_desc">Severe weather and daily forecast summary</string>
+    <string name="channel_digest_name">Daily digest</string>
+    <string name="channel_digest_desc">A once-a-day roundup across your topics</string>
+    <string name="channel_space_name">Space &amp; sky alerts</string>
+    <string name="channel_space_desc">Geomagnetic storms, aurora chances and close asteroid approaches</string>
+    <string name="channel_safety_name">Nearby safety alerts</string>
+    <string name="channel_safety_desc">Earthquakes, disasters and severe weather near you</string>
+    <string name="channel_flight_name">Overhead flights</string>
+    <string name="channel_flight_desc">Aircraft passing directly overhead, from live ADS-B</string>
+
+    <!-- Device gate -->
+    <string name="gate_title">Built for Pixel 10 Pro XL</string>
+    <string name="gate_body">Pulse is an exclusive build for the Google Pixel 10 Pro XL. This device reports a different model, so some layout and features are not guaranteed.</string>
+    <string name="gate_detected">Detected device: %1$s</string>
+    <string name="gate_continue">Continue anyway</string>
+    <string name="gate_exit">Exit</string>
+</resources>

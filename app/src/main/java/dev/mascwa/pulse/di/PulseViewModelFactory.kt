@@ -1,0 +1,84 @@
+package dev.mascwa.pulse.di
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import dev.mascwa.pulse.feature.compass.CompassViewModel
+import dev.mascwa.pulse.feature.economy.EconomyViewModel
+import dev.mascwa.pulse.feature.fuel.FuelViewModel
+import dev.mascwa.pulse.feature.sky.OrbitalViewModel
+import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
+import dev.mascwa.pulse.feature.sos.SosViewModel
+import dev.mascwa.pulse.feature.survive.GuidesViewModel
+import dev.mascwa.pulse.feature.survive.PlacesViewModel
+import dev.mascwa.pulse.feature.survive.ToolsViewModel
+import dev.mascwa.pulse.feature.home.HomeViewModel
+import dev.mascwa.pulse.feature.markets.MarketsViewModel
+import dev.mascwa.pulse.feature.news.NewsViewModel
+import dev.mascwa.pulse.feature.settings.SettingsViewModel
+import dev.mascwa.pulse.feature.weather.WeatherViewModel
+
+/** Manual ViewModel factory backed by the [AppContainer]. */
+class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        val vm: ViewModel = when {
+            modelClass.isAssignableFrom(HomeViewModel::class.java) ->
+                HomeViewModel(
+                    c.newsRepository, c.marketsRepository, c.weatherRepository,
+                    c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
+                    c.orbitalRepository, c.spaceWeatherRepository,
+                )
+            modelClass.isAssignableFrom(NewsViewModel::class.java) ->
+                NewsViewModel(c.newsRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(MarketsViewModel::class.java) ->
+                MarketsViewModel(c.marketsRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(EconomyViewModel::class.java) ->
+                EconomyViewModel(c.economyRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(FuelViewModel::class.java) ->
+                FuelViewModel(c.fuelRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
+                SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
+            modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider)
+            modelClass.isAssignableFrom(CompassViewModel::class.java) ->
+                CompassViewModel(c.newCompassController(), c.locationProvider)
+            modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
+                PlacesViewModel(c.overpassRepository, c.locationProvider)
+            modelClass.isAssignableFrom(GuidesViewModel::class.java) ->
+                GuidesViewModel(c.survivalContentRepository)
+            modelClass.isAssignableFrom(ToolsViewModel::class.java) ->
+                ToolsViewModel(c.survivalTools)
+            modelClass.isAssignableFrom(SosViewModel::class.java) ->
+                SosViewModel(c.emergencyService, c.settingsRepository, c.locationProvider, c.survivalTools)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.safety.SafetyViewModel::class.java) ->
+                dev.mascwa.pulse.feature.safety.SafetyViewModel(c.safetyRepository, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.map.MapViewModel::class.java) ->
+                dev.mascwa.pulse.feature.map.MapViewModel(c.safetyRepository, c.overpassRepository, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.social.SocialViewModel::class.java) ->
+                dev.mascwa.pulse.feature.social.SocialViewModel(c.socialRepository)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.search.SearchViewModel::class.java) ->
+                dev.mascwa.pulse.feature.search.SearchViewModel(c.settingsRepository)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.images.ImageViewModel::class.java) ->
+                dev.mascwa.pulse.feature.images.ImageViewModel(c.imageRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.RadarViewModel::class.java) ->
+                dev.mascwa.pulse.feature.tacnet.RadarViewModel(c.radarRepository, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.TelemetryViewModel::class.java) ->
+                dev.mascwa.pulse.feature.tacnet.TelemetryViewModel(c.newTelemetryController(), c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.common.HudViewModel::class.java) ->
+                dev.mascwa.pulse.feature.common.HudViewModel(c.spaceWeatherRepository, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisViewModel::class.java) ->
+                dev.mascwa.pulse.feature.jarvis.JarvisViewModel(
+                    c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine,
+                    c.intentRouter, c.actionOrchestrator,
+                )
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
+                dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(c.modelManager, c.inferenceEngine, c.settingsRepository)
+            modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
+                WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
+            modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier)
+            else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
+        }
+        return vm as T
+    }
+}
