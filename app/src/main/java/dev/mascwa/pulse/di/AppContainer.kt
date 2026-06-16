@@ -91,9 +91,16 @@ class AppContainer(private val appContext: Context) {
     val jarvisMemory: dev.mascwa.pulse.data.jarvis.JarvisMemory by lazy {
         dev.mascwa.pulse.data.jarvis.JarvisMemory(jarvisDatabase)
     }
-    /** Swapped to the MediaPipe engine once a model is provisioned (Phase 5C). */
-    val inferenceEngine: dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine by lazy {
-        dev.mascwa.pulse.jarvis.inference.EchoInferenceEngine()
+    /** Provisions + tracks the on-device LLM model file (download / delete / path). */
+    val modelManager: dev.mascwa.pulse.jarvis.inference.ModelManager by lazy {
+        dev.mascwa.pulse.jarvis.inference.ModelManager(appContext)
+    }
+    /**
+     * The engine the console + (later) banter/router talk to. Routes to the real
+     * MediaPipe LLM once a model is provisioned, else the offline persona core.
+     */
+    val inferenceEngine: dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine by lazy {
+        dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(appContext, modelManager)
     }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
