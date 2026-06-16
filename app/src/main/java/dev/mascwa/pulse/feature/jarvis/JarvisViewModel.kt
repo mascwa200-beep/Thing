@@ -15,6 +15,7 @@ import dev.mascwa.pulse.jarvis.orchestrator.CommandStatus
 import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.EngineState
+import dev.mascwa.pulse.jarvis.agent.AgentOrchestrator
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
 import dev.mascwa.pulse.jarvis.voice.VoskListener
@@ -53,6 +54,7 @@ class JarvisViewModel(
     private val tts: TextToSpeechEngine,
     private val settings: SettingsRepository,
     private val voskSpeech: VoskSpeech,
+    private val agent: AgentOrchestrator,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -115,14 +117,12 @@ class JarvisViewModel(
                     }
                     is JarvisIntent.Lockdown -> executeLockdown()
                     is JarvisIntent.Chat -> {
-                        val history = memory.recentContext(HISTORY_TURNS)
-                            .map { ChatTurn(it.speaker, it.messageText) }
-                        val sb = StringBuilder()
-                        engine.generate(intent.text, history, SYSTEM_PROMPT).collect { token ->
-                            sb.append(token)
-                            _streaming.value = sb.toString()
+                        val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
+                        val reply = if (useAgent) {
+                            generateWithAgent(intent.text)
+                        } else {
+                            generateDirect(intent.text)
                         }
-                        val reply = sb.toString().ifBlank { "…" }
                         memory.append(Speaker.JARVIS, reply)
                         speakIfEnabled(reply)
                     }
@@ -173,6 +173,30 @@ class JarvisViewModel(
             if (r.detail.isNotBlank()) append(" — ").append(r.detail)
             append('\n')
         }
+    }
+
+    /** Single-shot reply straight from the model (no tools), streaming tokens to the console. */
+    private suspend fun generateDirect(text: String): String {
+        val history = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
+        val sb = StringBuilder()
+        engine.generate(text, history, SYSTEM_PROMPT).collect { token ->
+            sb.append(token)
+            _streaming.value = sb.toString()
+        }
+        return sb.toString().ifBlank { "…" }
+    }
+
+    /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. */
+    private suspend fun generateWithAgent(text: String): String {
+        val sb = StringBuilder()
+        agent.run(text, SYSTEM_PROMPT).collect { step ->
+            when (step.kind) {
+                AgentOrchestrator.Kind.THINKING -> _streaming.value = "◌ reasoning…"
+                AgentOrchestrator.Kind.TOOL -> _streaming.value = "⚙ ${step.text}"
+                AgentOrchestrator.Kind.FINAL -> sb.append(step.text)
+            }
+        }
+        return sb.toString().ifBlank { "…" }
     }
 
     /** Speak [text] aloud when the user has voice replies enabled. */

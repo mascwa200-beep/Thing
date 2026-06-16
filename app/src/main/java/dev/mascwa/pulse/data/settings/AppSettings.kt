@@ -129,6 +129,10 @@ data class JarvisSettings(
     val voiceReplies: Boolean = false,
     /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
     val wakeWord: Boolean = false,
+    /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
+    val agentToolsEnabled: Boolean = false,
+    /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
+    val githubToken: String = "",
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

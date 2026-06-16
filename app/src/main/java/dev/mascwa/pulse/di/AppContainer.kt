@@ -129,6 +129,21 @@ class AppContainer(private val appContext: Context) {
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
         dev.mascwa.pulse.crash.CrashReporter(appContext)
     }
+    /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
+    val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
+        listOf(
+            dev.mascwa.pulse.jarvis.agent.WebSearchTool(http),
+            dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
+            dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
+            dev.mascwa.pulse.jarvis.agent.RememberTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
+        )
+    }
+    /** Bounded ReAct loop wiring the on-device model to [agentTools] + durable memory. */
+    val agentOrchestrator: dev.mascwa.pulse.jarvis.agent.AgentOrchestrator by lazy {
+        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentTools)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

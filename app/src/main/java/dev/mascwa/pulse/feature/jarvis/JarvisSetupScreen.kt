@@ -58,6 +58,8 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val vitals by vm.vitals.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
+    val agentTools by vm.agentTools.collectAsState()
+    val githubToken by vm.githubToken.collectAsState()
     val context = LocalContext.current
     val vitalsPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -185,6 +187,18 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     }
                 },
             )
+
+            SettingToggle(
+                title = "AGENT TOOLS",
+                subtitle = "Let J.A.R.V.I.S. use tools — web search/fetch, read-only GitHub repos, " +
+                    "device state, and durable memory — in a short reasoning loop. Slower, and " +
+                    "best-effort on the small on-device model.",
+                enabled = agentTools,
+                onToggle = vm::setAgentTools,
+            )
+
+            FieldLabel("GITHUB TOKEN  ·  optional, for private repos")
+            MonoField(githubToken, vm::onGithubTokenChange, "ghp_…  (read-only repo access)")
         }
     }
 }

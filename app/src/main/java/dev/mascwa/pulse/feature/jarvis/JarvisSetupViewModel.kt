@@ -51,6 +51,13 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. listens for its wake word while resident. */
     val wakeWord: StateFlow<Boolean> = _wakeWord.asStateFlow()
 
+    private val _agentTools = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. may use tools (web/GitHub-read/device/memory) in its agentic loop. */
+    val agentTools: StateFlow<Boolean> = _agentTools.asStateFlow()
+
+    private val _githubToken = MutableStateFlow("")
+    val githubToken: StateFlow<String> = _githubToken.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
@@ -60,6 +67,8 @@ class JarvisSetupViewModel(
             _vitals.value = saved.vitalsTracking
             _voiceReplies.value = saved.voiceReplies
             _wakeWord.value = saved.wakeWord
+            _agentTools.value = saved.agentToolsEnabled
+            _githubToken.value = saved.githubToken
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -88,6 +97,21 @@ class JarvisSetupViewModel(
         _voiceReplies.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(voiceReplies = enabled)) }
+        }
+    }
+
+    fun setAgentTools(enabled: Boolean) {
+        _agentTools.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(agentToolsEnabled = enabled)) }
+        }
+    }
+
+    /** Update + persist the GitHub token (trimmed) for the read-only repo tool. */
+    fun onGithubTokenChange(value: String) {
+        _githubToken.value = value
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(githubToken = value.trim())) }
         }
     }
 

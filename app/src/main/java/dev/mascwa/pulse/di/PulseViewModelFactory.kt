@@ -70,7 +70,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.jarvis.JarvisViewModel(
                     c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine,
                     c.intentRouter, c.actionOrchestrator, c.textToSpeech, c.settingsRepository,
-                    c.voskSpeech,
+                    c.voskSpeech, c.agentOrchestrator,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(c.modelManager, c.inferenceEngine, c.settingsRepository)
