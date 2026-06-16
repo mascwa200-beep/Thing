@@ -51,6 +51,9 @@ class KnowledgeStore(db: JarvisDatabase) {
 
     suspend fun deleteDocument(title: String) = dao.deleteByTitle(title.trim())
 
+    /** Remove only the docs from a given [source] (e.g. "bundled") — leaves user-added docs intact. */
+    suspend fun deleteBySource(source: String) = dao.deleteBySource(source)
+
     suspend fun clear() = dao.clear()
 
     /**

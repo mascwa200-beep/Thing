@@ -83,6 +83,9 @@ interface KnowledgeDocDao {
     @Query("DELETE FROM knowledge_docs WHERE title = :title")
     suspend fun deleteByTitle(title: String)
 
+    @Query("DELETE FROM knowledge_docs WHERE source = :source")
+    suspend fun deleteBySource(source: String)
+
     @Query("DELETE FROM knowledge_docs")
     suspend fun clear()
 }

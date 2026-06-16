@@ -95,6 +95,10 @@ class AppContainer(private val appContext: Context) {
     val knowledgeStore: dev.mascwa.pulse.data.jarvis.KnowledgeStore by lazy {
         dev.mascwa.pulse.data.jarvis.KnowledgeStore(jarvisDatabase)
     }
+    /** Seeds the APK-bundled reference docs into [knowledgeStore] on first launch. */
+    val knowledgeSeeder: dev.mascwa.pulse.jarvis.KnowledgeSeeder by lazy {
+        dev.mascwa.pulse.jarvis.KnowledgeSeeder(appContext, knowledgeStore, jarvisMemory)
+    }
     /** Provisions + tracks the on-device LLM model file (download / delete / path). */
     val modelManager: dev.mascwa.pulse.jarvis.inference.ModelManager by lazy {
         dev.mascwa.pulse.jarvis.inference.ModelManager(appContext)
