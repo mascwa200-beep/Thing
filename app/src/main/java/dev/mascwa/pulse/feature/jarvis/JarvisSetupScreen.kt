@@ -55,6 +55,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val engine by vm.engineState.collectAsState()
     val resident by vm.resident.collectAsState()
     val vitals by vm.vitals.collectAsState()
+    val voiceReplies by vm.voiceReplies.collectAsState()
     val context = LocalContext.current
     val vitalsPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -113,6 +114,14 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     )
                 }
             }
+
+            SettingToggle(
+                title = "VOICE REPLIES",
+                subtitle = "Speak J.A.R.V.I.S. replies aloud with the device's on-device " +
+                    "text-to-speech. No cloud voices. Honest no-op if no TTS engine is installed.",
+                enabled = voiceReplies,
+                onToggle = vm::setVoiceReplies,
+            )
 
             SettingToggle(
                 title = "ACTIVE-MATRIX",

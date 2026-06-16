@@ -125,6 +125,10 @@ data class JarvisSettings(
     val residentService: Boolean = false,
     /** Monitor a paired BLE heart-rate strap and check in on anomalies (opt-in). */
     val vitalsTracking: Boolean = false,
+    /** Speak replies aloud using the device's on-device text-to-speech engine. */
+    val voiceReplies: Boolean = false,
+    /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
+    val wakeWord: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

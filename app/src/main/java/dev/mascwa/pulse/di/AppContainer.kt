@@ -116,6 +116,10 @@ class AppContainer(private val appContext: Context) {
     val actionOrchestrator: dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator by lazy {
         dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator(appContext)
     }
+    /** On-device text-to-speech so J.A.R.V.I.S. can speak replies (AOSP, no Play Services). */
+    val textToSpeech: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine by lazy {
+        dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

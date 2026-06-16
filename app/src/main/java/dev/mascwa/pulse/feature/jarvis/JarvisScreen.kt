@@ -18,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -50,6 +52,7 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
     val busy by vm.busy.collectAsState()
     val engineState by vm.engineState.collectAsState()
     val banter by vm.banterLine.collectAsState()
+    val voiceReplies by vm.voiceReplies.collectAsState()
     val listState = rememberLazyListState()
 
     // Keep the latest turn in view as messages arrive / stream.
@@ -66,6 +69,13 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
             }
         },
         actions = {
+            IconButton(onClick = { vm.setVoiceReplies(!voiceReplies) }) {
+                Icon(
+                    if (voiceReplies) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                    contentDescription = if (voiceReplies) "Mute voice" else "Speak replies",
+                    tint = if (voiceReplies) c.sky else c.muted,
+                )
+            }
             IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
                 Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
             }

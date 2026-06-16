@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.Speaker
+import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
@@ -15,6 +16,7 @@ import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
+import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +39,8 @@ class JarvisViewModel(
     private val banter: BanterContextEngine,
     private val router: IntentRouter,
     private val orchestrator: ActionOrchestrator,
+    private val tts: TextToSpeechEngine,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -47,6 +51,12 @@ class JarvisViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val engineState: StateFlow<EngineState> = engine.state
+
+    /** Whether replies are spoken aloud (mirrors the persisted Jarvis setting). */
+    val voiceReplies: StateFlow<Boolean> =
+        settings.settings
+            .map { it.jarvis.voiceReplies }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /**
      * The assistant's proactive, context-aware line: a greeting on first read, then a fresh
@@ -82,8 +92,11 @@ class JarvisViewModel(
             memory.append(Speaker.USER, text)
             try {
                 when (val intent = router.route(text)) {
-                    is JarvisIntent.Status ->
-                        memory.append(Speaker.JARVIS, banter.statusReport(deviceContext.snapshot()))
+                    is JarvisIntent.Status -> {
+                        val report = banter.statusReport(deviceContext.snapshot())
+                        memory.append(Speaker.JARVIS, report)
+                        speakIfEnabled(report)
+                    }
                     is JarvisIntent.Lockdown -> executeLockdown()
                     is JarvisIntent.Chat -> {
                         val history = memory.recentContext(HISTORY_TURNS)
@@ -93,7 +106,9 @@ class JarvisViewModel(
                             sb.append(token)
                             _streaming.value = sb.toString()
                         }
-                        memory.append(Speaker.JARVIS, sb.toString().ifBlank { "…" })
+                        val reply = sb.toString().ifBlank { "…" }
+                        memory.append(Speaker.JARVIS, reply)
+                        speakIfEnabled(reply)
                     }
                 }
             } catch (e: Exception) {
@@ -137,6 +152,19 @@ class JarvisViewModel(
             append(chip).append(' ').append(r.label)
             if (r.detail.isNotBlank()) append(" — ").append(r.detail)
             append('\n')
+        }
+    }
+
+    /** Speak [text] aloud when the user has voice replies enabled. */
+    private fun speakIfEnabled(text: String) {
+        if (voiceReplies.value) tts.speak(text)
+    }
+
+    /** Toggle spoken replies; persists the setting and silences any current utterance when off. */
+    fun setVoiceReplies(on: Boolean) {
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(voiceReplies = on)) }
+            if (!on) tts.stop()
         }
     }
 

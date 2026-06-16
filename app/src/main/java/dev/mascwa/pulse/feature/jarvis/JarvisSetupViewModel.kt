@@ -43,6 +43,14 @@ class JarvisSetupViewModel(
     /** Whether the user wants BLE heart-rate vitals tracking. */
     val vitals: StateFlow<Boolean> = _vitals.asStateFlow()
 
+    private val _voiceReplies = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. speaks replies aloud. */
+    val voiceReplies: StateFlow<Boolean> = _voiceReplies.asStateFlow()
+
+    private val _wakeWord = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. listens for its wake word while resident. */
+    val wakeWord: StateFlow<Boolean> = _wakeWord.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
@@ -50,6 +58,8 @@ class JarvisSetupViewModel(
             _token.value = saved.modelToken
             _resident.value = saved.residentService
             _vitals.value = saved.vitalsTracking
+            _voiceReplies.value = saved.voiceReplies
+            _wakeWord.value = saved.wakeWord
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -71,6 +81,22 @@ class JarvisSetupViewModel(
         _vitals.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(vitalsTracking = enabled)) }
+        }
+    }
+
+    fun setVoiceReplies(enabled: Boolean) {
+        _voiceReplies.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(voiceReplies = enabled)) }
+        }
+    }
+
+    /** Persist the wake-word preference. The screen restarts the resident service so it
+     *  re-opens (or releases) the microphone to match. */
+    fun setWakeWord(enabled: Boolean) {
+        _wakeWord.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(wakeWord = enabled)) }
         }
     }
 
