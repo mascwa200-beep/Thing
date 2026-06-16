@@ -7,6 +7,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
@@ -97,7 +98,7 @@ class VitalsTrackingService : Service() {
             adapter?.bluetoothLeScanner?.stopScan(this)
             scanning = false
             updateOngoing("Connecting to ${device.name ?: "heart-rate strap"}…")
-            gatt = device.connectGatt(this@VitalsTrackingService, false, gattCallback, BluetoothGatt.TRANSPORT_LE)
+            gatt = device.connectGatt(this@VitalsTrackingService, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         }
     }
 
