@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -41,7 +42,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit) {
+fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Unit = {}) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
     val streaming by vm.streaming.collectAsState()
@@ -63,6 +64,9 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit) {
             }
         },
         actions = {
+            IconButton(onClick = onOpenSetup) {
+                Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
+            }
             IconButton(onClick = { vm.clearHistory() }) {
                 Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear", tint = c.muted)
             }

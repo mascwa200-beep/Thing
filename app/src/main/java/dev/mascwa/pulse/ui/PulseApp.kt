@@ -249,7 +249,15 @@ fun PulseApp(
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
             composable(Routes.JARVIS) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.jarvis.JarvisScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.jarvis.JarvisScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
+                )
+            }
+            composable(Routes.JARVIS_SETUP) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(vm, onBack = { navController.popBackStack() })
             }
         }
     }

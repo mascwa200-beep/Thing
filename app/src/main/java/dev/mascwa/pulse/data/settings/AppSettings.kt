@@ -112,6 +112,19 @@ data class ApiKeys(
     val nasaOrDemo get() = nasa.ifBlank { "DEMO_KEY" }
 }
 
+/** On-device assistant (J.A.R.V.I.S. Matrix) configuration. Stays on-device. */
+@Serializable
+data class JarvisSettings(
+    /** Direct URL to a MediaPipe-compatible .task LLM model (e.g. a Hugging Face file). */
+    val modelUrl: String = "",
+    /** Optional Bearer token for gated hosts (e.g. a Hugging Face access token). */
+    val modelToken: String = "",
+    /** Max tokens generated per turn. */
+    val maxTokens: Int = 1024,
+) {
+    val hasModelUrl get() = modelUrl.isNotBlank()
+}
+
 /** Notification preferences. */
 @Serializable
 data class NotificationPrefs(
@@ -197,6 +210,9 @@ data class AppSettings(
     val autoSendSos: Boolean = false,
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
+
+    // On-device assistant
+    val jarvis: JarvisSettings = JarvisSettings(),
 
     // Notifications
     val notifications: NotificationPrefs = NotificationPrefs(),
