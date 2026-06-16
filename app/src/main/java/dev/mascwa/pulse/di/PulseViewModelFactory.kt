@@ -59,6 +59,10 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.search.SearchViewModel(c.settingsRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.images.ImageViewModel::class.java) ->
                 dev.mascwa.pulse.feature.images.ImageViewModel(c.imageRepository, c.settingsRepository)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.RadarViewModel::class.java) ->
+                dev.mascwa.pulse.feature.tacnet.RadarViewModel(c.radarRepository, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.TelemetryViewModel::class.java) ->
+                dev.mascwa.pulse.feature.tacnet.TelemetryViewModel(c.newTelemetryController(), c.locationProvider)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->

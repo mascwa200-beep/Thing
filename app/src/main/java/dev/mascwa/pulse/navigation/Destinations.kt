@@ -45,6 +45,11 @@ object Routes {
     const val SOCIAL = "social"
     const val SEARCH = "search"
     const val IMAGES = "images"
+
+    // Tacnet (real-time radar + telemetry)
+    const val TACNET = "tacnet"
+    const val RADAR = "radar"
+    const val TELEMETRY = "telemetry"
 }
 
 data class TopDestination(

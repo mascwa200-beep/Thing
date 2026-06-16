@@ -3,6 +3,7 @@ package dev.mascwa.pulse.ui.effects
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +75,9 @@ fun BootScreen(onFinished: () -> Unit) {
         Box(
             Modifier
                 .fillMaxSize()
+                // Opaque backdrop so the live app underneath is fully masked until
+                // the boot sequence finishes and fades out (no "blend-through").
+                .background(c.void)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,

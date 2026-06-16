@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Rocket
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Text
@@ -51,6 +52,7 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
 
     val entries = listOf(
         GridEntry("Sky", "Space wx · orbital · compass", Icons.Filled.Rocket, Routes.SKY, true),
+        GridEntry("Tacnet", "Live radar · flight telemetry · vitals", Icons.Filled.Radar, Routes.TACNET, true),
         GridEntry("Survive", "Nearest help · SOS · offline guides", Icons.Filled.HealthAndSafety, Routes.SURVIVE, true),
         GridEntry("Compass", "Heading · offline", Icons.Filled.Explore, Routes.COMPASS, true),
         GridEntry("Space Weather", "Kp · aurora · alerts", Icons.Filled.Bolt, Routes.SPACE_WX, false),

@@ -80,8 +80,16 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.images.ImageRepository(http)
     }
 
+    val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
+        dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
+    }
+
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
+
+    /** Telemetry is stateful per-screen (sensor lifecycle), so hand out fresh. */
+    fun newTelemetryController(): dev.mascwa.pulse.data.sensors.TelemetryController =
+        dev.mascwa.pulse.data.sensors.TelemetryController(appContext)
 
     val notifier: Notifier by lazy { Notifier(appContext) }
     val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
