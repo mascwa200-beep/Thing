@@ -61,6 +61,9 @@ class MainActivity : ComponentActivity() {
             val settings by app.container.settingsRepository.settings
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
             val online by app.container.connectivityObserver.isOnline.collectAsStateWithLifecycle()
+            val hudVm: dev.mascwa.pulse.feature.common.HudViewModel =
+                androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
+            val kp by hudVm.kp.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -81,6 +84,11 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
+                    dev.mascwa.pulse.feature.common.LocalHud provides dev.mascwa.pulse.feature.common.HudState(
+                        kp = kp,
+                        hasLocation = app.container.locationProvider.hasPermission(),
+                        enabled = settings.hudStrip,
+                    ),
                 ) {
                 Box(Modifier.fillMaxSize()) {
                     if (gated) {

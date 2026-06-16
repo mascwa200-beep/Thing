@@ -121,6 +121,7 @@ data class NotificationPrefs(
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,
     val safetyAlerts: Boolean = true,
+    val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
     val dailyDigest: Boolean = true,
     val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,
@@ -142,6 +143,7 @@ data class AppSettings(
     val scanlines: Boolean = true,                    // CRT scanline overlay
     val glitch: Boolean = true,                       // chromatic glitch FX
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
+    val hudStrip: Boolean = true,                     // global HUD telemetry strip
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)

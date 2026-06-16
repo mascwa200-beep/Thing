@@ -32,12 +32,16 @@ fun PulseScaffold(
         modifier = if (scrollBehavior != null)
             modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else modifier,
         topBar = {
-            topBarOverride?.invoke() ?: TopAppBar(
-                title = { Text(title) },
-                navigationIcon = navigationIcon,
-                actions = actions,
-                scrollBehavior = scrollBehavior,
-            )
+            androidx.compose.foundation.layout.Column {
+                topBarOverride?.invoke() ?: TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = navigationIcon,
+                    actions = actions,
+                    scrollBehavior = scrollBehavior,
+                )
+                // Always-on cockpit telemetry strip (no-op when disabled in Settings).
+                HudStrip()
+            }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         content = content,

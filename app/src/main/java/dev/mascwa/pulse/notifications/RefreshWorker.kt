@@ -174,6 +174,34 @@ class RefreshWorker(
             }
         }
 
+        // --- Overhead flight (live ADS-B) ---
+        if (prefs.flightAlerts) {
+            runCatching {
+                val loc = container.locationProvider.current()
+                if (loc != null) {
+                    val radar = container.radarRepository.fetch(loc.latitude, loc.longitude, force = true).data
+                    val already = state.flightAlertedIds.toMutableSet()
+                    val overhead = radar.contacts
+                        .filter {
+                            it.kind == dev.mascwa.pulse.data.radar.ContactKind.AIRCRAFT.name &&
+                                it.altitudeM != null && it.distanceMeters <= 3000.0 && it.id !in already
+                        }
+                        .sortedBy { it.distanceMeters }
+                    overhead.firstOrNull()?.let { ac ->
+                        val altFt = ((ac.altitudeM ?: 0.0) / 0.3048).toInt()
+                        notifier.notifyFlight(
+                            id = 7000 + (ac.id.hashCode() and 0xFFF),
+                            title = "Overhead: ${ac.label}",
+                            body = "$altFt ft" +
+                                (ac.groundSpeedKmh?.let { " · ${it.toInt()} km/h" } ?: "") +
+                                " · ${Formatters.compact(ac.distanceMeters / 1000)} km",
+                        )
+                        state = state.copy(flightAlertedIds = (already + ac.id).toList().takeLast(50))
+                    }
+                }
+            }
+        }
+
         // --- Daily digest ---
         if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
             runCatching {

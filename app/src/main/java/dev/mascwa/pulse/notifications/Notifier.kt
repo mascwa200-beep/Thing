@@ -41,6 +41,9 @@ class Notifier(private val context: Context) {
     fun notifySafety(id: Int, title: String, body: String) =
         post(NotificationChannels.SAFETY, id, "SAFETY", title, body, "grid", NotificationCompat.PRIORITY_HIGH)
 
+    fun notifyFlight(id: Int, title: String, body: String) =
+        post(NotificationChannels.FLIGHT, id, "TACNET", title, body, "grid", NotificationCompat.PRIORITY_LOW)
+
     fun notifyDigest(id: Int, title: String, body: String, lines: List<String>) {
         val joined = lines.joinToString("\n").ifBlank { body }
         post(NotificationChannels.DIGEST, id, "DAILY DIGEST", title, joined, "home", NotificationCompat.PRIORITY_LOW)

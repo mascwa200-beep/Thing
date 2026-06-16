@@ -13,4 +13,5 @@ data class NotifyState(
     val spaceAlertDay: String = "",
     val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
+    val flightAlertedIds: List<String> = emptyList(),
 )

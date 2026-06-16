@@ -93,7 +93,7 @@ fun SectionBar(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(3.dp).height(14.dp).clip(RoundedCornerShape(2.dp)).background(c.accent))
-            Text(
+            dev.mascwa.pulse.ui.effects.DecryptText(
                 title.uppercase(),
                 fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp, letterSpacing = 2.4.sp, color = c.ink,
