@@ -137,11 +137,13 @@ class ModelManager(context: Context) {
             }
         }
 
-    /** The fully-provisioned model file on disk (ignoring any in-progress `.part`), if present. */
+    /** The fully-provisioned model file on disk (ignoring any in-progress `.part`), if present.
+     *  If more than one ever coexists, the most recently written wins — so a freshly downloaded
+     *  `.litertlm` is never shadowed by a stale `.task` that failed to delete. */
     private fun existingModel(): File? =
-        modelsDir.listFiles()?.firstOrNull {
-            it.isFile && it.name.startsWith(PREFIX) && !it.name.endsWith(PART_SUFFIX) && it.length() > 0L
-        }
+        modelsDir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith(PREFIX) && !it.name.endsWith(PART_SUFFIX) && it.length() > 0L }
+            ?.maxByOrNull { it.lastModified() }
 
     private fun targetFileFor(url: String): File = File(modelsDir, modelFileNameFor(url))
 

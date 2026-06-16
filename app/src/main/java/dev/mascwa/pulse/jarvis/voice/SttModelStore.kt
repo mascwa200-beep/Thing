@@ -86,16 +86,29 @@ class SttModelStore(context: Context) {
                     }
                 }
             }
+            // Unpack into a staging dir, then promote atomically — so a process killed mid-unzip
+            // can never leave a half-extracted model that passes the readiness check yet won't load.
             _state.value = State.Unpacking
-            unzip(zip, root)
+            val staging = File(root, ".staging")
+            staging.deleteRecursively()
+            staging.mkdirs()
+            unzip(zip, staging)
             zip.delete()
-            val dir = modelDir()
-                ?: run {
-                    _state.value = State.Failed("Model archive missing expected layout.")
-                    return@withContext Result.failure(IllegalStateException("no model dir after unzip"))
-                }
+            val unpacked = staging.takeIf { File(it, "conf").isDirectory }
+                ?: staging.listFiles()?.firstOrNull { it.isDirectory && File(it, "conf").isDirectory }
+            if (unpacked == null) {
+                staging.deleteRecursively()
+                _state.value = State.Failed("Model archive missing expected layout.")
+                return@withContext Result.failure(IllegalStateException("no model dir after unzip"))
+            }
+            val finalDir = File(root, "model")
+            finalDir.deleteRecursively()
+            if (!unpacked.renameTo(finalDir)) {
+                unpacked.copyRecursively(finalDir, overwrite = true)
+            }
+            staging.deleteRecursively()
             _state.value = State.Ready
-            Result.success(dir)
+            Result.success(finalDir)
         } catch (t: Throwable) {
             runCatching { zip.delete() }
             _state.value = State.Failed(t.message ?: "Voice model download failed.")

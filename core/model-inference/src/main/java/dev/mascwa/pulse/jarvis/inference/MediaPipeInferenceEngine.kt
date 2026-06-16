@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Real on-device LLM backed by MediaPipe LLM Inference. The model (.task / .bin) is
@@ -27,6 +29,10 @@ class MediaPipeInferenceEngine(
     private val _state = MutableStateFlow<EngineState>(EngineState.Ready)
     override val state: StateFlow<EngineState> = _state
 
+    // A single LlmInference session is not concurrency-safe; serialize generations so the
+    // resident wake-word service and the chat screen can't invoke it at the same time.
+    private val genMutex = Mutex()
+
     private val llm: LlmInference = LlmInference.createFromOptions(
         context.applicationContext,
         LlmInference.LlmInferenceOptions.builder()
@@ -41,8 +47,8 @@ class MediaPipeInferenceEngine(
         system: String?,
     ): Flow<String> = flow {
         // The single-shot API returns the whole response; re-stream it word-by-word so
-        // the console keeps its live "typing" cadence.
-        val response = llm.generateResponse(buildPrompt(prompt, history, system))
+        // the console keeps its live "typing" cadence. Serialized via genMutex.
+        val response = genMutex.withLock { llm.generateResponse(buildPrompt(prompt, history, system)) }
         response.split(' ').forEachIndexed { i, word ->
             emit(if (i == 0) word else " $word")
         }

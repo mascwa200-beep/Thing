@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TextToSpeechEngine(context: Context) {
 
     private val ready = AtomicBoolean(false)
-    private var engine: TextToSpeech? = null
+    @Volatile private var engine: TextToSpeech? = null
 
     init {
         val appContext = context.applicationContext

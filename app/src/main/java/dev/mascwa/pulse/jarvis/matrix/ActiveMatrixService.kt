@@ -37,8 +37,10 @@ import kotlinx.coroutines.launch
 class ActiveMatrixService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    // Wake-word orchestration runs on Main: Vosk delivers its callbacks on the main looper.
-    private val voiceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // Wake-word orchestration runs on Main (non-immediate on purpose): Vosk delivers callbacks on
+    // the main looper, and restarting the recognizer must be POSTED off the callback frame — never
+    // run synchronously inside it (stop() joins the recognizer thread).
+    private val voiceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val banter = BanterContextEngine()
     private lateinit var provider: DeviceContextProvider
     private var observing = false
@@ -60,13 +62,17 @@ class ActiveMatrixService : Service() {
             return START_NOT_STICKY
         }
         // Only run the always-on mic if the wake word is enabled AND the permission is held.
-        val withMic = intent?.getBooleanExtra(EXTRA_WAKE_WORD, false) == true && hasRecordAudio()
+        val wantMic = intent?.getBooleanExtra(EXTRA_WAKE_WORD, false) == true && hasRecordAudio()
         // Foreground start can throw (ForegroundServiceStartNotAllowed / FGS-type errors on
         // Android 14+). Retry without the mic, then stand down gracefully rather than crash.
+        // micActive tracks whether the *microphone* FGS type actually started — we must NOT open
+        // the mic if we fell back to a non-mic foreground service.
+        var micActive = wantMic
         try {
-            startForegroundCompat(buildNotification("Active · standing by."), withMic)
+            startForegroundCompat(buildNotification("Active · standing by."), wantMic)
         } catch (t: Throwable) {
-            val recovered = withMic && runCatching {
+            micActive = false
+            val recovered = wantMic && runCatching {
                 startForegroundCompat(buildNotification("Active · standing by."), withMic = false)
             }.isSuccess
             if (!recovered) {
@@ -87,7 +93,7 @@ class ActiveMatrixService : Service() {
                 }
             }
         }
-        if (withMic && !waking) {
+        if (micActive && !waking) {
             waking = true
             startWakeWord()
         }
@@ -136,19 +142,19 @@ class ActiveMatrixService : Service() {
         voiceScope.launch { captureCommand(vosk) }
     }
 
-    /** After the wake word, capture one free-form command, answer it, and speak the reply. */
+    /** After the wake word, capture one free-form command, answer it, and speak the reply.
+     *  A timeout re-arms the wake loop if the user says nothing (so `capturing` never latches). */
     private fun captureCommand(vosk: VoskSpeech) {
         update("Yes? Listening…")
-        vosk.start(grammar = null, listener = object : VoskListener {
+        vosk.start(grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
                 voiceScope.launch {
                     if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk)
                 }
             }
-            override fun onError(message: String) {
-                voiceScope.launch { listenForWake(vosk) }
-            }
+            override fun onError(message: String) { voiceScope.launch { listenForWake(vosk) } }
+            override fun onTimeout() { voiceScope.launch { listenForWake(vosk) } }
         })
     }
 
@@ -160,14 +166,18 @@ class ActiveMatrixService : Service() {
             listenForWake(vosk)
             return
         }
-        runCatching { engine.ensureReady() }
-        val sb = StringBuilder()
-        runCatching {
+        try {
+            runCatching { engine.ensureReady() }
+            val sb = StringBuilder()
             engine.generate(command, emptyList(), SYSTEM_PROMPT).collect { sb.append(it) }
+            val reply = sb.toString().ifBlank { "Standing by." }
+            update(reply.take(140))
+            runCatching { container?.textToSpeech?.speak(reply) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e // honour service teardown — don't re-arm the mic on a dying service
+        } catch (e: Throwable) {
+            update("Couldn't answer that.")
         }
-        val reply = sb.toString().ifBlank { "Standing by." }
-        update(reply.take(140))
-        runCatching { container?.textToSpeech?.speak(reply) }
         listenForWake(vosk)
     }
 
@@ -230,6 +240,8 @@ class ActiveMatrixService : Service() {
 
         // Keyword-spotting grammar: only "jarvis" plus the unknown-word token.
         private const val WAKE_GRAMMAR = "[\"jarvis\", \"[unk]\"]"
+        // Re-arm the wake loop if no command is spoken within this window after waking.
+        private const val COMMAND_TIMEOUT_MS = 8000
         private const val SYSTEM_PROMPT =
             "You are J.A.R.V.I.S. Matrix, a concise, deadpan, privacy-first on-device assistant. " +
                 "You run entirely on the user's phone. Be brief and helpful. Never invent facts."

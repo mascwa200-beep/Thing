@@ -19,6 +19,7 @@ import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -198,21 +199,29 @@ class JarvisViewModel(
                 return@launch
             }
             _voiceInput.value = VoiceInputState.Listening("")
-            val started = voskSpeech.start(listener = object : VoskListener {
+            // Dispatchers.Main (non-immediate) so stop()/send() are POSTED off Vosk's callback
+            // frame — stop() joins the recognizer thread and must not run inside the callback.
+            val started = voskSpeech.start(timeoutMs = TAP_TO_TALK_TIMEOUT_MS, listener = object : VoskListener {
                 override fun onPartial(text: String) {
                     _voiceInput.value = VoiceInputState.Listening(text)
                 }
                 override fun onFinal(text: String) {
-                    viewModelScope.launch {
+                    viewModelScope.launch(Dispatchers.Main) {
                         voskSpeech.stop()
                         _voiceInput.value = VoiceInputState.Idle
                         if (text.isNotBlank()) send(text)
                     }
                 }
                 override fun onError(message: String) {
-                    viewModelScope.launch {
+                    viewModelScope.launch(Dispatchers.Main) {
                         voskSpeech.stop()
                         _voiceInput.value = VoiceInputState.Error(message)
+                    }
+                }
+                override fun onTimeout() {
+                    viewModelScope.launch(Dispatchers.Main) {
+                        voskSpeech.stop()
+                        _voiceInput.value = VoiceInputState.Idle
                     }
                 }
             })
@@ -239,6 +248,7 @@ class JarvisViewModel(
 
     private companion object {
         const val HISTORY_TURNS = 12
+        const val TAP_TO_TALK_TIMEOUT_MS = 10_000
         const val SYSTEM_PROMPT =
             "You are J.A.R.V.I.S. Matrix, a concise, deadpan, privacy-first on-device assistant. " +
                 "You run entirely on the user's phone. Be brief and helpful. Never invent facts."

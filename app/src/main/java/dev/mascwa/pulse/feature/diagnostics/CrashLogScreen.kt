@@ -124,8 +124,10 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
                                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
                             )
                             if (isOpen) {
+                                // Read once per entry, off the recomposition hot path.
+                                val full = remember(entry) { vm.read(entry) }
                                 Text(
-                                    vm.read(entry),
+                                    full,
                                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                                     modifier = Modifier.padding(top = 4.dp),
                                 )

@@ -10,11 +10,13 @@ import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 
-/** Streaming-recognition callbacks (delivered on Vosk's worker thread). */
+/** Streaming-recognition callbacks (delivered on the main looper by Vosk's SpeechService). */
 interface VoskListener {
     fun onPartial(text: String)
     fun onFinal(text: String)
     fun onError(message: String)
+    /** Fires when a non-zero recognition timeout elapses with no final result. */
+    fun onTimeout() {}
 }
 
 /**
@@ -48,15 +50,16 @@ class VoskSpeech(context: Context) {
     /**
      * Begin streaming recognition. [grammar] — a JSON array string like `["jarvis","[unk]"]` —
      * constrains the vocabulary for keyword spotting; null means free-form transcription.
-     * Returns false if the model isn't loaded or the microphone can't be opened.
+     * [timeoutMs] > 0 ends the session and fires [VoskListener.onTimeout] after that idle window
+     * (0 = listen indefinitely). Returns false if the model isn't loaded or the mic can't open.
      */
-    fun start(grammar: String? = null, listener: VoskListener): Boolean {
+    fun start(grammar: String? = null, timeoutMs: Int = 0, listener: VoskListener): Boolean {
         val m = model ?: return false
         stop()
         return runCatching {
             val recognizer = if (grammar != null) Recognizer(m, SAMPLE_RATE, grammar) else Recognizer(m, SAMPLE_RATE)
             val service = SpeechService(recognizer, SAMPLE_RATE)
-            service.startListening(adapter(listener))
+            if (timeoutMs > 0) service.startListening(adapter(listener), timeoutMs) else service.startListening(adapter(listener))
             speechService = service
             true
         }.getOrElse {
@@ -91,7 +94,7 @@ class VoskSpeech(context: Context) {
         override fun onError(exception: Exception?) {
             listener.onError(exception?.message ?: "Recognition error.")
         }
-        override fun onTimeout() { /* caller decides when to stop */ }
+        override fun onTimeout() { listener.onTimeout() }
     }
 
     private fun jsonField(hypothesis: String?, key: String): String? =
