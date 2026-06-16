@@ -24,3 +24,4 @@ rootProject.name = "Pulse"
 include(":app")
 include(":core:database")
 include(":core:model-inference")
+include(":core:telemetry")

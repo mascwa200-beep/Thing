@@ -102,6 +102,16 @@ class AppContainer(private val appContext: Context) {
     val inferenceEngine: dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine by lazy {
         dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(appContext, modelManager)
     }
+    /** Reads live device power/network/time context for proactive banter + status answers. */
+    val deviceContextProvider: dev.mascwa.pulse.core.telemetry.DeviceContextProvider by lazy {
+        dev.mascwa.pulse.core.telemetry.DeviceContextProvider(appContext)
+    }
+    val banterEngine: dev.mascwa.pulse.core.telemetry.BanterContextEngine by lazy {
+        dev.mascwa.pulse.core.telemetry.BanterContextEngine()
+    }
+    val intentRouter: dev.mascwa.pulse.core.telemetry.IntentRouter by lazy {
+        dev.mascwa.pulse.core.telemetry.IntentRouter()
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

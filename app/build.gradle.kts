@@ -138,6 +138,7 @@ dependencies {
     // Local feature modules
     implementation(project(":core:database"))
     implementation(project(":core:model-inference"))
+    implementation(project(":core:telemetry"))
 
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)

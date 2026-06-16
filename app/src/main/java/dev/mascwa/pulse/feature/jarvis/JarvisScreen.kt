@@ -48,6 +48,7 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
     val streaming by vm.streaming.collectAsState()
     val busy by vm.busy.collectAsState()
     val engineState by vm.engineState.collectAsState()
+    val banter by vm.banterLine.collectAsState()
     val listState = rememberLazyListState()
 
     // Keep the latest turn in view as messages arrive / stream.
@@ -74,6 +75,7 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
             StatusLine(engineState)
+            if (banter.isNotBlank()) BanterLine(banter)
 
             if (messages.isEmpty() && streaming.isEmpty()) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -116,6 +118,16 @@ private fun StatusLine(state: EngineState) {
         label,
         fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = color,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+    )
+}
+
+@Composable
+private fun BanterLine(text: String) {
+    val c = Pulse.colors
+    Text(
+        "▮ $text",
+        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 6.dp),
     )
 }
 
