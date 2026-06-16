@@ -5,6 +5,9 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -36,7 +39,7 @@ class SpaceWeatherRepository(
                 val bzD = async { runCatching { loadSummary(SOLAR_WIND_MAG, "Bz") }.getOrNull() }
                 val alertsD = async { runCatching { loadAlerts() }.getOrDefault(emptyList()) }
                 val auroraD = async {
-                    if (lat != null && lon != null) runCatching { loadAurora(lat, lon) }.getOrNull() else null
+                    if (lat != null && lon != null) auroraFor(lat, lon) else null
                 }
 
                 val kpSeries = kpD.await()
@@ -91,12 +94,22 @@ class SpaceWeatherRepository(
         return best
     }
 
-    /** Planetary K-index: array-of-arrays, first row is the header. */
+    /** Public, time-boxed aurora probability for the HUD / on-demand callers. */
+    suspend fun auroraFor(lat: Double, lon: Double): Int? =
+        runCatching { withTimeoutOrNull(4_000) { loadAurora(lat, lon) } }.getOrNull()
+
+    /** Planetary K-index. NOAA serves this either as array-of-arrays (with a
+     *  header row) or array-of-objects — handle both. */
     private suspend fun loadKp(): List<Double> {
         val text = http.getString("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json")
         val arr = http.json.parseToJsonElement(text).jsonArray
-        return arr.drop(1).mapNotNull { row ->
-            row.jsonArray.getOrNull(1)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+        return arr.mapNotNull { row ->
+            when (row) {
+                is JsonArray -> row.getOrNull(1)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                is JsonObject -> (row["kp_index"] ?: row["Kp"] ?: row["kp"])
+                    ?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                else -> null
+            }
         }
     }
 

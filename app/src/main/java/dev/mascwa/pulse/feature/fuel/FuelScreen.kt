@@ -59,19 +59,21 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
 
                         item { SectionLabel("Energy benchmarks (live)") }
                         items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) { QuoteRow(it) }
-
-                        item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-                        item { SectionLabel("National pump prices — ${data?.countryName ?: ""}") }
-                        items(data?.nationalPrices.orEmpty(), key = { it.fuel }) { PumpPriceCard(it) }
-                        if (data?.nationalPrices.isNullOrEmpty()) {
+                        if (data?.benchmarks.isNullOrEmpty()) {
                             item {
                                 Text(
-                                    "No national pump-price data available for this country.",
+                                    "Couldn't reach the energy markets feed. Pull to refresh.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(16.dp),
                                 )
                             }
+                        }
+
+                        if (!data?.nationalPrices.isNullOrEmpty()) {
+                            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+                            item { SectionLabel("National pump prices — ${data?.countryName ?: ""}") }
+                            items(data!!.nationalPrices, key = { it.fuel }) { PumpPriceCard(it) }
                         }
 
                         if (!data?.usRetail.isNullOrEmpty()) {
@@ -100,8 +102,8 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
 
                         item {
                             Text(
-                                "Benchmarks: Stooq futures. Pump prices: World Bank (annual). " +
-                                    "Add an EIA key in Settings for live US weekly retail prices.",
+                                "Benchmarks: live energy futures (Yahoo Finance, keyless). " +
+                                    "Add an EIA key in Settings for live US weekly retail pump prices.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(16.dp),

@@ -3,7 +3,6 @@ package dev.mascwa.pulse.data.fuel
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
-import dev.mascwa.pulse.data.economy.ValueFormat
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.markets.MarketsRepository
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -52,42 +51,21 @@ class FuelRepository(
         }
         return try {
             val data = coroutineScope {
-                val benchmarksD = async { runCatching { markets.stooqQuotes(energySymbols) }.getOrDefault(emptyList()) }
-                val gasolineD = async {
-                    runCatching {
-                        worldBank.seriesRaw(
-                            "EP.PMP.SGAS.CD", "Gasoline pump price", "US$/litre",
-                            ValueFormat.CURRENCY_USD, false, country, startYear = 2005,
-                        )
-                    }.getOrNull()
-                }
-                val dieselD = async {
-                    runCatching {
-                        worldBank.seriesRaw(
-                            "EP.PMP.DESL.CD", "Diesel pump price", "US$/litre",
-                            ValueFormat.CURRENCY_USD, false, country, startYear = 2005,
-                        )
-                    }.getOrNull()
-                }
+                val benchmarksD = async { runCatching { markets.quotesFor(energySymbols) }.getOrDefault(emptyList()) }
                 val eiaD = async {
                     if (s.apiKeys.hasEia && country.equals("US", true)) {
                         runCatching { fetchEiaUsRetail(s.apiKeys.eia) }.getOrDefault(emptyList())
                     } else emptyList()
                 }
 
-                val gasoline = gasolineD.await()
-                val diesel = dieselD.await()
-                val countryName = gasoline?.countryName
-                    ?: diesel?.countryName ?: country
-
                 FuelData(
                     countryCode = country,
-                    countryName = countryName,
+                    countryName = country,
                     benchmarks = benchmarksD.await(),
-                    nationalPrices = listOfNotNull(
-                        gasoline?.latest?.let { PumpPrice("Gasoline", it.value, it.year) },
-                        diesel?.latest?.let { PumpPrice("Diesel", it.value, it.year) },
-                    ),
+                    // The World Bank pump-price indicators (EP.PMP.SGAS.CD / EP.PMP.DESL.CD)
+                    // were archived/removed upstream, so national averages are only
+                    // available via the optional EIA key (US) for now.
+                    nationalPrices = emptyList(),
                     usRetail = eiaD.await(),
                 )
             }

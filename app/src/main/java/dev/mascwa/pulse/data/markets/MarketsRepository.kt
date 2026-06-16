@@ -1,7 +1,6 @@
 package dev.mascwa.pulse.data.markets
 
 import dev.mascwa.pulse.core.cache.DiskCache
-import dev.mascwa.pulse.core.network.Csv
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -10,14 +9,19 @@ import dev.mascwa.pulse.data.settings.WatchType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.builtins.ListSerializer
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.net.URLEncoder
 
 /**
  * Market data from keyless sources:
- *  - Indices / stocks / forex / commodities via Stooq daily-history CSV
- *    (gives both the latest close vs previous close AND a sparkline in one call)
+ *  - Indices / stocks / forex / commodities via the Yahoo Finance chart API
+ *    (one call yields the latest price, previous close, day range AND a sparkline).
+ *    Stooq was dropped after it moved behind a JavaScript anti-bot wall that
+ *    returns an HTML challenge instead of CSV to non-browser clients.
  *  - Crypto via the CoinGecko public API (price, 24h change, market cap, sparkline)
  */
 class MarketsRepository(
@@ -38,7 +42,7 @@ class MarketsRepository(
         return try {
             val quotes = coroutineScope {
                 s.watchlist.map { item ->
-                    async { runCatching { fetchStooq(item) }.getOrNull() }
+                    async { runCatching { fetchYahoo(item) }.getOrNull() }
                 }.mapNotNull { it.await() }
             }
             cache.write(key, quotes, ListSerializer(Quote.serializer()))
@@ -88,29 +92,31 @@ class MarketsRepository(
         return Fetched(combined, w.fromCache && (c?.fromCache ?: true))
     }
 
-    /** Fetch arbitrary Stooq-quoted instruments (used by the Fuel screen). */
-    suspend fun stooqQuotes(items: List<WatchItem>): List<Quote> = coroutineScope {
-        items.map { item -> async { runCatching { fetchStooq(item) }.getOrNull() } }
+    /** Fetch arbitrary instruments (used by the Fuel screen). */
+    suspend fun quotesFor(items: List<WatchItem>): List<Quote> = coroutineScope {
+        items.map { item -> async { runCatching { fetchYahoo(item) }.getOrNull() } }
             .mapNotNull { it.await() }
     }
 
-    private suspend fun fetchStooq(item: WatchItem): Quote {
-        val cal = Calendar.getInstance()
-        val d2 = SimpleDateFormat("yyyyMMdd", Locale.US).format(cal.time)
-        cal.add(Calendar.DAY_OF_YEAR, -120)
-        val d1 = SimpleDateFormat("yyyyMMdd", Locale.US).format(cal.time)
-        val url = "https://stooq.com/q/d/l/?s=${item.id}&d1=$d1&d2=$d2&i=d"
-
-        val csv = http.getString(url)
-        val rows = Csv.parseWithHeader(csv)
-        val closes = rows.mapNotNull { it["close"]?.toDoubleOrNull() }
-        if (closes.isEmpty()) error("No data for ${item.id}")
-
-        val last = rows.last()
-        val price = closes.last()
-        val prev = if (closes.size >= 2) closes[closes.size - 2] else null
+    /** Yahoo Finance chart API — keyless. One call gives price, previous close,
+     *  day range, currency and a 1-month close series for the sparkline. */
+    private suspend fun fetchYahoo(item: WatchItem): Quote {
+        val sym = URLEncoder.encode(yahooSymbol(item), "UTF-8")
+        val url = "https://query1.finance.yahoo.com/v8/finance/chart/$sym?interval=1d&range=1mo"
+        val text = http.getString(url, mapOf("User-Agent" to YAHOO_UA))
+        val result = http.json.parseToJsonElement(text).jsonObject["chart"]?.jsonObject
+            ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject ?: error("No data for ${item.id}")
+        val meta = result["meta"]?.jsonObject ?: error("No meta for ${item.id}")
+        fun metaD(k: String) = meta[k]?.jsonPrimitive?.doubleOrNull
+        val price = metaD("regularMarketPrice") ?: error("No price for ${item.id}")
+        val prev = metaD("chartPreviousClose") ?: metaD("previousClose")
         val change = if (prev != null) price - prev else null
         val pct = if (prev != null && prev != 0.0) (change!! / prev) * 100.0 else null
+        val closes = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
+            ?.firstOrNull()?.jsonObject?.get("close")?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.doubleOrNull } ?: emptyList()
+        val currency = if (item.type == WatchType.FOREX) ""
+        else meta["currency"]?.jsonPrimitive?.contentOrNull ?: currencyFor(item)
 
         return Quote(
             id = item.id,
@@ -120,14 +126,27 @@ class MarketsRepository(
             change = change,
             changePercent = pct,
             previousClose = prev,
-            open = last["open"]?.toDoubleOrNull(),
-            high = last["high"]?.toDoubleOrNull(),
-            low = last["low"]?.toDoubleOrNull(),
-            volume = last["volume"]?.toDoubleOrNull(),
-            currency = currencyFor(item),
+            open = metaD("regularMarketOpen"),
+            high = metaD("regularMarketDayHigh"),
+            low = metaD("regularMarketDayLow"),
+            volume = metaD("regularMarketVolume"),
+            currency = currency,
             updatedEpochMs = System.currentTimeMillis(),
             sparkline = closes.takeLast(40),
         )
+    }
+
+    /** Maps the app's Stooq-style instrument ids to Yahoo symbols. */
+    private fun yahooSymbol(item: WatchItem): String {
+        YAHOO_OVERRIDES[item.id]?.let { return it }
+        val id = item.id
+        return when {
+            id.startsWith("^") -> id.uppercase()
+            id.endsWith(".us") -> id.removeSuffix(".us").uppercase()
+            id.endsWith(".f") -> id.removeSuffix(".f").uppercase() + "=F"
+            item.type == WatchType.FOREX -> id.uppercase() + "=X"
+            else -> id.uppercase()
+        }
     }
 
     private fun currencyFor(item: WatchItem): String = when (item.type) {
@@ -144,6 +163,23 @@ class MarketsRepository(
         item.id == "^dax" -> "EUR"
         item.id == "^nkx" -> "JPY"
         else -> "USD"
+    }
+
+    private companion object {
+        const val YAHOO_UA =
+            "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/120.0.0.0 Mobile Safari/537.36"
+
+        /** Stooq id → Yahoo symbol where the simple rules don't apply. */
+        val YAHOO_OVERRIDES = mapOf(
+            "^spx" to "^GSPC",
+            "^ndq" to "^NDX",
+            "^dji" to "^DJI",
+            "^ftm" to "^FTSE",
+            "^dax" to "^GDAXI",
+            "^nkx" to "^N225",
+            "cb.f" to "BZ=F", // Brent
+        )
     }
 
     private fun CoinMarket.toQuote(item: WatchItem, currency: String) = Quote(
