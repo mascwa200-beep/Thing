@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,6 +107,9 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
 
             FieldLabel("MODEL URL")
             MonoField(url, vm::onUrlChange, "https://…/model.task")
+
+            FieldLabel("PRESETS  ·  tap to fill the URL, then DOWNLOAD")
+            ModelPresetRow(onPick = vm::onUrlChange)
 
             FieldLabel("ACCESS TOKEN  ·  optional, for gated hosts")
             MonoField(token, vm::onTokenChange, "hf_…  (sent as Bearer)")
@@ -239,6 +243,47 @@ private fun SettingToggle(title: String, subtitle: String, enabled: Boolean, onT
                     uncheckedTrackColor = c.panel,
                 ),
             )
+        }
+    }
+}
+
+/** A curated model the user can provision with one tap (premade MediaPipe .task on Hugging Face). */
+private data class ModelPreset(val label: String, val note: String, val url: String)
+
+private val MODEL_PRESETS = listOf(
+    ModelPreset(
+        "QWEN 1.5B", "fast",
+        "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/" +
+            "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+    ),
+    ModelPreset(
+        "GEMMA 4B", "smart · recommended",
+        "https://huggingface.co/litert-community/Gemma3-4B-IT/resolve/main/gemma3-4b-it-int4-web.task",
+    ),
+    ModelPreset(
+        "GEMMA 4B Q4", "best · larger",
+        "https://huggingface.co/litert-community/Gemma3-4B-IT/resolve/main/gemma3-4b-it-q4_0-web.task",
+    ),
+)
+
+@Composable
+private fun ModelPresetRow(onPick: (String) -> Unit) {
+    val c = Pulse.colors
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MODEL_PRESETS.forEach { preset ->
+            Column(
+                Modifier
+                    .border(1.dp, c.lineSoft, RoundedCornerShape(6.dp))
+                    .background(c.muted.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                    .clickable { onPick(preset.url) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(preset.label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink)
+                Text(preset.note, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            }
         }
     }
 }

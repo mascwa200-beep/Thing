@@ -10,6 +10,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.IntentRouter
 import dev.mascwa.pulse.core.telemetry.JarvisIntent
+import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator
 import dev.mascwa.pulse.jarvis.orchestrator.CommandStatus
 import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
@@ -280,8 +281,6 @@ class JarvisViewModel(
     private companion object {
         const val HISTORY_TURNS = 12
         const val TAP_TO_TALK_TIMEOUT_MS = 10_000
-        const val SYSTEM_PROMPT =
-            "You are J.A.R.V.I.S. Matrix, a concise, deadpan, privacy-first on-device assistant. " +
-                "You run entirely on the user's phone. Be brief and helpful. Never invent facts."
+        val SYSTEM_PROMPT = JarvisPersona.SYSTEM_PROMPT
     }
 }

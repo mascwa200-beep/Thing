@@ -21,6 +21,7 @@ import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
 import kotlinx.coroutines.CoroutineScope
@@ -151,9 +152,32 @@ class ActiveMatrixService : Service() {
     }
 
     private fun maybeWake(vosk: VoskSpeech, text: String) {
-        if (capturing || !text.contains("jarvis", ignoreCase = true)) return
+        if (capturing || !isWakePhrase(text)) return
         capturing = true
         voiceScope.launch { captureCommand(vosk) }
+    }
+
+    /** Lenient wake detection: accepts "jarvis"/"hey jarvis"/etc., the near-homophones the small STT
+     *  model tends to mishear, and any token within an edit distance of 1 of "jarvis". */
+    private fun isWakePhrase(text: String): Boolean {
+        val lower = text.lowercase()
+        if (WAKE_WORDS.any { lower.contains(it) }) return true
+        return lower.split(Regex("[^a-z]+")).any { it.length in 4..7 && levenshtein(it, "jarvis") <= 1 }
+    }
+
+    /** Iterative Levenshtein edit distance (small strings; allocation-light). */
+    private fun levenshtein(a: String, b: String): Int {
+        val dp = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = dp[0]
+            dp[0] = i
+            for (j in 1..b.length) {
+                val tmp = dp[j]
+                dp[j] = if (a[i - 1] == b[j - 1]) prev else 1 + minOf(prev, dp[j], dp[j - 1])
+                prev = tmp
+            }
+        }
+        return dp[b.length]
     }
 
     /** After the wake word, capture one free-form command, answer it, and speak the reply.
@@ -183,7 +207,7 @@ class ActiveMatrixService : Service() {
         try {
             runCatching { engine.ensureReady() }
             val sb = StringBuilder()
-            engine.generate(command, emptyList(), SYSTEM_PROMPT).collect { sb.append(it) }
+            engine.generate(command, emptyList(), JarvisPersona.SYSTEM_PROMPT).collect { sb.append(it) }
             val reply = sb.toString().ifBlank { "Standing by." }
             update(reply.take(140))
             runCatching { container?.textToSpeech?.speak(reply) }
@@ -252,13 +276,14 @@ class ActiveMatrixService : Service() {
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.matrix.STOP"
         private const val EXTRA_WAKE_WORD = "dev.mascwa.pulse.jarvis.matrix.WAKE_WORD"
 
-        // Keyword-spotting grammar: only "jarvis" plus the unknown-word token.
-        private const val WAKE_GRAMMAR = "[\"jarvis\", \"[unk]\"]"
+        // Keyword-spotting grammar: the wake word plus common lead-ins ("hey/ok jarvis") and the
+        // unknown-word token. Vosk only emits words it's told about, so multi-word forms are explicit.
+        private const val WAKE_GRAMMAR =
+            "[\"jarvis\", \"hey jarvis\", \"ok jarvis\", \"okay jarvis\", \"hi jarvis\", \"[unk]\"]"
+        // Near-homophones the small STT model often produces for "jarvis"; matched leniently below.
+        private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
         // Re-arm the wake loop if no command is spoken within this window after waking.
         private const val COMMAND_TIMEOUT_MS = 8000
-        private const val SYSTEM_PROMPT =
-            "You are J.A.R.V.I.S. Matrix, a concise, deadpan, privacy-first on-device assistant. " +
-                "You run entirely on the user's phone. Be brief and helpful. Never invent facts."
 
         fun start(context: Context, wakeWord: Boolean = false) {
             val intent = Intent(context, ActiveMatrixService::class.java)
