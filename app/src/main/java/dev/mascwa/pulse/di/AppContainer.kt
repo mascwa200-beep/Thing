@@ -100,7 +100,16 @@ class AppContainer(private val appContext: Context) {
      * MediaPipe LLM once a model is provisioned, else the offline persona core.
      */
     val inferenceEngine: dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine by lazy {
-        dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(appContext, modelManager)
+        dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(
+            appContext,
+            modelManager,
+            // Read the chat-template choice + model URL fresh per generation so a Setup change
+            // takes effect immediately, without reloading the model.
+            promptConfig = {
+                val j = settingsRepository.current().jarvis
+                dev.mascwa.pulse.jarvis.inference.PromptConfig(j.chatFormat, j.modelUrl.ifBlank { null })
+            },
+        )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */
     val deviceContextProvider: dev.mascwa.pulse.core.telemetry.DeviceContextProvider by lazy {

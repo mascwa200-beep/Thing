@@ -19,10 +19,12 @@ class RoutingInferenceEngine(
     private val modelManager: ModelManager,
     private val fallback: LocalInferenceEngine = EchoInferenceEngine(),
     private val maxTokens: Int = 1024,
+    /** Live chat-template choice + model URL, forwarded to the isolated engine's prompt builder. */
+    private val promptConfig: suspend () -> PromptConfig = { PromptConfig() },
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
-    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens)
+    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()

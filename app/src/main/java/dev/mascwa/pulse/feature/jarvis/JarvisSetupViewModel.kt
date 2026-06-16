@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.jarvis
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.jarvis.inference.ModelManager
@@ -58,6 +59,10 @@ class JarvisSetupViewModel(
     private val _githubToken = MutableStateFlow("")
     val githubToken: StateFlow<String> = _githubToken.asStateFlow()
 
+    private val _chatFormat = MutableStateFlow(ChatFormat.AUTO)
+    /** Chat template used to format prompts for the model (Auto/ChatML/Gemma/Plain). */
+    val chatFormat: StateFlow<ChatFormat> = _chatFormat.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
@@ -69,6 +74,7 @@ class JarvisSetupViewModel(
             _wakeWord.value = saved.wakeWord
             _agentTools.value = saved.agentToolsEnabled
             _githubToken.value = saved.githubToken
+            _chatFormat.value = saved.chatFormat
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -104,6 +110,14 @@ class JarvisSetupViewModel(
         _agentTools.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(agentToolsEnabled = enabled)) }
+        }
+    }
+
+    /** Persist the chat-template choice; the engine reads it fresh on the next generation. */
+    fun setChatFormat(format: ChatFormat) {
+        _chatFormat.value = format
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(chatFormat = format)) }
         }
     }
 

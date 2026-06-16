@@ -34,4 +34,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     // Streaming model download.
     implementation(libs.okhttp)
+    testImplementation(libs.junit)
 }

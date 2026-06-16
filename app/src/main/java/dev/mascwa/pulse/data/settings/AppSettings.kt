@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -133,6 +134,11 @@ data class JarvisSettings(
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
     val githubToken: String = "",
+    /**
+     * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
+     * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
+     */
+    val chatFormat: ChatFormat = ChatFormat.AUTO,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

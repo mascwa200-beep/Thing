@@ -41,6 +41,7 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -59,6 +60,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val voiceReplies by vm.voiceReplies.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
+    val chatFormat by vm.chatFormat.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val context = LocalContext.current
     val vitalsPermissions = rememberLauncherForActivityResult(
@@ -129,6 +131,14 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     )
                 }
             }
+
+            FieldLabel("CHAT TEMPLATE  ·  prompt format for the model")
+            ChatFormatSelector(selected = chatFormat, onSelect = vm::setChatFormat)
+            Text(
+                "AUTO picks ChatML (Qwen) or Gemma turns from the model URL. If replies come out " +
+                    "garbled or repeat control tokens, switch to PLAIN.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
 
             SettingToggle(
                 title = "VOICE REPLIES",
@@ -229,6 +239,29 @@ private fun SettingToggle(title: String, subtitle: String, enabled: Boolean, onT
                     uncheckedTrackColor = c.panel,
                 ),
             )
+        }
+    }
+}
+
+@Composable
+private fun ChatFormatSelector(selected: ChatFormat, onSelect: (ChatFormat) -> Unit) {
+    val c = Pulse.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChatFormat.entries.forEach { format ->
+            val on = format == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(format) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    format.label.uppercase(Locale.US),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint,
+                )
+            }
         }
     }
 }

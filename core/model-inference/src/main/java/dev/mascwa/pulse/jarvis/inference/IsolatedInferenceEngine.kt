@@ -29,6 +29,9 @@ class IsolatedInferenceEngine(
     context: Context,
     private val modelManager: ModelManager,
     private val maxTokens: Int = 1024,
+    /** Supplies the live chat-template choice + model URL, read fresh on each generation so a
+     *  Setup change takes effect without reloading the model. */
+    private val promptConfig: suspend () -> PromptConfig = { PromptConfig() },
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
@@ -112,7 +115,8 @@ class IsolatedInferenceEngine(
             emit("// inference offline")
             return@flow
         }
-        val full = buildPrompt(prompt, history, system)
+        val cfg = promptConfig()
+        val full = renderPrompt(ChatFormat.resolve(cfg.format, cfg.modelUrl), prompt, history, system)
         val response = withContext(Dispatchers.IO) {
             genMutex.withLock { runCatching { svc.generate(full) }.getOrNull() }
         } ?: "// inference fault: process lost"
@@ -126,18 +130,6 @@ class IsolatedInferenceEngine(
         bound = false
         service = null
     }
-
-    /** Flatten the persona prompt + recent turns + the new message into one transcript. */
-    private fun buildPrompt(prompt: String, history: List<ChatTurn>, system: String?): String =
-        buildString {
-            if (!system.isNullOrBlank()) append(system.trim()).append("\n\n")
-            history.takeLast(8).forEach { turn ->
-                val who = if (turn.role.equals("user", ignoreCase = true)) "User" else "J.A.R.V.I.S."
-                append(who).append(": ").append(turn.text.trim()).append('\n')
-            }
-            append("User: ").append(prompt.trim()).append('\n')
-            append("J.A.R.V.I.S.: ")
-        }
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 8000L

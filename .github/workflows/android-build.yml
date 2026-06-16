@@ -40,7 +40,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew :core:telemetry:testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         # Pass the run number as the versionCode so each published build out-versions the last
