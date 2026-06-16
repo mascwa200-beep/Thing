@@ -9,6 +9,9 @@ import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.IntentRouter
 import dev.mascwa.pulse.core.telemetry.JarvisIntent
+import dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator
+import dev.mascwa.pulse.jarvis.orchestrator.CommandStatus
+import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
@@ -33,6 +36,7 @@ class JarvisViewModel(
     private val deviceContext: DeviceContextProvider,
     private val banter: BanterContextEngine,
     private val router: IntentRouter,
+    private val orchestrator: ActionOrchestrator,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -80,13 +84,7 @@ class JarvisViewModel(
                 when (val intent = router.route(text)) {
                     is JarvisIntent.Status ->
                         memory.append(Speaker.JARVIS, banter.statusReport(deviceContext.snapshot()))
-                    is JarvisIntent.Lockdown ->
-                        memory.append(
-                            Speaker.JARVIS,
-                            "Lockdown arms from the Active-Matrix service (coming online): it silences " +
-                                "the profile and clears the clipboard. Network and Bluetooth toggles are " +
-                                "Settings-only on this OS, so I'll deep-link you there.",
-                        )
+                    is JarvisIntent.Lockdown -> executeLockdown()
                     is JarvisIntent.Chat -> {
                         val history = memory.recentContext(HISTORY_TURNS)
                             .map { ChatTurn(it.speaker, it.messageText) }
@@ -104,6 +102,41 @@ class JarvisViewModel(
                 _streaming.value = ""
                 _busy.value = false
             }
+        }
+    }
+
+    /** Run the Lockdown macro from a console control (no fake user bubble). */
+    fun runLockdown() {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                executeLockdown()
+            } catch (e: Exception) {
+                memory.append(Speaker.JARVIS, "// lockdown fault: ${e.message ?: "error"}")
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /** Execute the lockdown sequence and report honest, per-command results. */
+    private suspend fun executeLockdown() {
+        val results = orchestrator.executeLockdownSequence()
+        memory.append(Speaker.JARVIS, formatLockdown(results))
+    }
+
+    private fun formatLockdown(results: List<LockdownResult>): String = buildString {
+        append("Lockdown sequence:\n")
+        results.forEach { r ->
+            val chip = when (r.status) {
+                CommandStatus.DONE -> "✓"
+                CommandStatus.NEEDS_PERMISSION -> "⚠"
+                CommandStatus.UNSUPPORTED -> "✕"
+            }
+            append(chip).append(' ').append(r.label)
+            if (r.detail.isNotBlank()) append(" — ").append(r.detail)
+            append('\n')
         }
     }
 

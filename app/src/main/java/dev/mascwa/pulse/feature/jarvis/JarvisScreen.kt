@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +66,9 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
             }
         },
         actions = {
+            IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
+                Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
+            }
             IconButton(onClick = onOpenSetup) {
                 Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
             }

@@ -112,6 +112,10 @@ class AppContainer(private val appContext: Context) {
     val intentRouter: dev.mascwa.pulse.core.telemetry.IntentRouter by lazy {
         dev.mascwa.pulse.core.telemetry.IntentRouter()
     }
+    /** Executes the "Lockdown" macro (clipboard wipe, DND/silent, halt BLE) with honest results. */
+    val actionOrchestrator: dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator by lazy {
+        dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator(appContext)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

@@ -68,7 +68,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.common.HudViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisViewModel(
-                    c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine, c.intentRouter,
+                    c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine,
+                    c.intentRouter, c.actionOrchestrator,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(c.modelManager, c.inferenceEngine, c.settingsRepository)
