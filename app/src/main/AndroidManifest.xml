@@ -17,6 +17,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
+         neverForLocation: we never use BLE scans to derive location. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
     <!-- Optional, only used if the user enables device-location weather. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -81,6 +88,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="on_device_assistant_context" />
         </service>
+
+        <!-- Optional BLE heart-rate vitals monitor (opt-in). -->
+        <service
+            android:name=".jarvis.vitals.VitalsTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->

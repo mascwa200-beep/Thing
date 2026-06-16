@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
             if (settings.jarvis.residentService) {
                 dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(this@MainActivity)
             }
+            if (settings.jarvis.vitalsTracking) {
+                dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity)
+            }
         }
 
         setContent {

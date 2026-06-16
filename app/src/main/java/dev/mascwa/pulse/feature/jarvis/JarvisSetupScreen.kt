@@ -1,5 +1,8 @@
 package dev.mascwa.pulse.feature.jarvis
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
+import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -50,7 +54,11 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val download by vm.downloadState.collectAsState()
     val engine by vm.engineState.collectAsState()
     val resident by vm.resident.collectAsState()
+    val vitals by vm.vitals.collectAsState()
     val context = LocalContext.current
+    val vitalsPermissions = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { VitalsTrackingService.start(context) }
 
     PulseScaffold(
         title = "J.A.R.V.I.S. SETUP",
@@ -106,11 +114,31 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 }
             }
 
-            ResidentToggle(
+            SettingToggle(
+                title = "ACTIVE-MATRIX",
+                subtitle = "Keep J.A.R.V.I.S. resident in the background and surface proactive, " +
+                    "on-device remarks in an ongoing notification.",
                 enabled = resident,
                 onToggle = { on ->
                     vm.setResident(on)
                     if (on) ActiveMatrixService.start(context) else ActiveMatrixService.stop(context)
+                },
+            )
+
+            SettingToggle(
+                title = "VITALS · BLE HEART-RATE",
+                subtitle = "Pair a Bluetooth heart-rate strap. J.A.R.V.I.S. checks in if your heart " +
+                    "rate spikes without movement. Honest no-op when no strap is connected.",
+                enabled = vitals,
+                onToggle = { on ->
+                    vm.setVitals(on)
+                    if (on) {
+                        vitalsPermissions.launch(
+                            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT),
+                        )
+                    } else {
+                        VitalsTrackingService.stop(context)
+                    }
                 },
             )
         }
@@ -118,18 +146,17 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ResidentToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun SettingToggle(title: String, subtitle: String, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     val c = Pulse.colors
     NeonPanel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "ACTIVE-MATRIX",
+                    title,
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink,
                 )
                 Text(
-                    "Keep J.A.R.V.I.S. resident in the background and surface proactive, " +
-                        "on-device remarks in an ongoing notification.",
+                    subtitle,
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                     modifier = Modifier.padding(top = 3.dp),
                 )

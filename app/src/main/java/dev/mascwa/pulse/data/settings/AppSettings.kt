@@ -123,6 +123,8 @@ data class JarvisSettings(
     val maxTokens: Int = 1024,
     /** Keep J.A.R.V.I.S. resident via the Active-Matrix foreground service. */
     val residentService: Boolean = false,
+    /** Monitor a paired BLE heart-rate strap and check in on anomalies (opt-in). */
+    val vitalsTracking: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

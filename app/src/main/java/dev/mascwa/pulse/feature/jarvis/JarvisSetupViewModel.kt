@@ -39,12 +39,17 @@ class JarvisSetupViewModel(
     /** Whether the user wants the Active-Matrix resident service running. */
     val resident: StateFlow<Boolean> = _resident.asStateFlow()
 
+    private val _vitals = MutableStateFlow(false)
+    /** Whether the user wants BLE heart-rate vitals tracking. */
+    val vitals: StateFlow<Boolean> = _vitals.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
             _url.value = saved.modelUrl
             _token.value = saved.modelToken
             _resident.value = saved.residentService
+            _vitals.value = saved.vitalsTracking
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -59,6 +64,13 @@ class JarvisSetupViewModel(
         _resident.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(residentService = enabled)) }
+        }
+    }
+
+    fun setVitals(enabled: Boolean) {
+        _vitals.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(vitalsTracking = enabled)) }
         }
     }
 
