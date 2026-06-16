@@ -55,6 +55,10 @@ class MainActivity : ComponentActivity() {
                     settings.refreshIntervalMinutes, settings.refreshOnlyOnWifi,
                 )
             }
+            // Bring J.A.R.V.I.S. back online if the user left it resident.
+            if (settings.jarvis.residentService) {
+                dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(this@MainActivity)
+            }
         }
 
         setContent {

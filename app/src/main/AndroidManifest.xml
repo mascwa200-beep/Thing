@@ -12,6 +12,11 @@
     <!-- Background refresh that survives reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Active-Matrix: keep J.A.R.V.I.S. resident as a foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <!-- Optional, only used if the user enables device-location weather. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -65,6 +70,17 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
+             the service picks the matching type at runtime. -->
+        <service
+            android:name=".jarvis.matrix.ActiveMatrixService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|dataSync">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="on_device_assistant_context" />
+        </service>
 
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->

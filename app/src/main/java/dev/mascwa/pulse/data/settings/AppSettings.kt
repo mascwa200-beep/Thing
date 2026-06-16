@@ -121,6 +121,8 @@ data class JarvisSettings(
     val modelToken: String = "",
     /** Max tokens generated per turn. */
     val maxTokens: Int = 1024,
+    /** Keep J.A.R.V.I.S. resident via the Active-Matrix foreground service. */
+    val residentService: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

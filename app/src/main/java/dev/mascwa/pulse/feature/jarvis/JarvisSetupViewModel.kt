@@ -35,11 +35,16 @@ class JarvisSetupViewModel(
     private val _token = MutableStateFlow("")
     val token: StateFlow<String> = _token.asStateFlow()
 
+    private val _resident = MutableStateFlow(false)
+    /** Whether the user wants the Active-Matrix resident service running. */
+    val resident: StateFlow<Boolean> = _resident.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
             _url.value = saved.modelUrl
             _token.value = saved.modelToken
+            _resident.value = saved.residentService
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -47,6 +52,15 @@ class JarvisSetupViewModel(
 
     fun onUrlChange(value: String) { _url.value = value }
     fun onTokenChange(value: String) { _token.value = value }
+
+    /** Persist the resident-service preference. Starting/stopping the service itself is
+     *  done by the screen, which has the Android context. */
+    fun setResident(enabled: Boolean) {
+        _resident.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(residentService = enabled)) }
+        }
+    }
 
     fun download() {
         viewModelScope.launch {

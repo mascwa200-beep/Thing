@@ -19,18 +19,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -44,6 +49,8 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val token by vm.token.collectAsState()
     val download by vm.downloadState.collectAsState()
     val engine by vm.engineState.collectAsState()
+    val resident by vm.resident.collectAsState()
+    val context = LocalContext.current
 
     PulseScaffold(
         title = "J.A.R.V.I.S. SETUP",
@@ -98,6 +105,45 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     )
                 }
             }
+
+            ResidentToggle(
+                enabled = resident,
+                onToggle = { on ->
+                    vm.setResident(on)
+                    if (on) ActiveMatrixService.start(context) else ActiveMatrixService.stop(context)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResidentToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val c = Pulse.colors
+    NeonPanel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "ACTIVE-MATRIX",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink,
+                )
+                Text(
+                    "Keep J.A.R.V.I.S. resident in the background and surface proactive, " +
+                        "on-device remarks in an ongoing notification.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = c.accent,
+                    checkedTrackColor = c.accent.copy(alpha = 0.3f),
+                    uncheckedThumbColor = c.muted,
+                    uncheckedTrackColor = c.panel,
+                ),
+            )
         }
     }
 }
