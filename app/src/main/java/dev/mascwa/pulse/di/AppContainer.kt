@@ -33,6 +33,24 @@ class AppContainer(private val appContext: Context) {
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
 
+    /**
+     * Bounded Coil image loader so thumbnail-heavy screens (news/markets/images/social) can't grow
+     * the heap without limit — a key part of stopping the OS low-memory kills. Installed as the app's
+     * singleton loader via [PulseApplication.newImageLoader], so every `AsyncImage` uses it.
+     */
+    val imageLoader: coil.ImageLoader by lazy {
+        coil.ImageLoader.Builder(appContext)
+            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.15).build() }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(java.io.File(appContext.cacheDir, "image_cache"))
+                    .maxSizeBytes(48L * 1024 * 1024)
+                    .build()
+            }
+            .respectCacheHeaders(false)
+            .build()
+    }
+
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }
 
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
