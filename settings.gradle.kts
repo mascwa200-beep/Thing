@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Pulse"
 include(":app")
+include(":core:database")
