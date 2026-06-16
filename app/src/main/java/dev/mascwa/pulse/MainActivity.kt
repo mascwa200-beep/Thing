@@ -79,6 +79,9 @@ class MainActivity : ComponentActivity() {
                 androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             val kp by hudVm.kp.collectAsStateWithLifecycle()
             val auroraPct by hudVm.auroraPct.collectAsStateWithLifecycle()
+            val solarWind by hudVm.solarWindKmS.collectAsStateWithLifecycle()
+            val bz by hudVm.bz.collectAsStateWithLifecycle()
+            val stormLevel by hudVm.stormLevel.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -105,6 +108,10 @@ class MainActivity : ComponentActivity() {
                         hasLocation = app.container.locationProvider.hasPermission(),
                         enabled = settings.hudStrip,
                         auroraPct = auroraPct,
+                        solarWindKmS = solarWind,
+                        bz = bz,
+                        stormLevel = stormLevel,
+                        dataStream = settings.hudDataStream,
                     ),
                 ) {
                 Box(Modifier.fillMaxSize()) {

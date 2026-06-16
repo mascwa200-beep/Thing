@@ -166,6 +166,7 @@ data class AppSettings(
     val glitch: Boolean = true,                       // chromatic glitch FX
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
+    val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
 
     // Locale / region (International defaults; everything overridable here)
