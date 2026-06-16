@@ -18,6 +18,9 @@ enum class ChatFormat(val label: String) {
     /** Gemma: `<start_of_turn>user|model … <end_of_turn>`; no dedicated system role. */
     GEMMA("Gemma"),
 
+    /** Phi-4 (mini): `<|system|>…<|end|><|user|>…<|end|><|assistant|>` with no newlines. */
+    PHI("Phi"),
+
     /**
      * Legacy plain transcript ("User:/J.A.R.V.I.S.:"). A safe fallback for a model that already
      * embeds its own template (so we don't double-wrap) or an unrecognised family.
@@ -33,7 +36,9 @@ enum class ChatFormat(val label: String) {
          */
         fun resolve(format: ChatFormat, modelUrl: String?): ChatFormat = when (format) {
             AUTO -> when {
-                modelUrl != null && modelUrl.contains("gemma", ignoreCase = true) -> GEMMA
+                modelUrl == null -> CHATML
+                modelUrl.contains("gemma", ignoreCase = true) -> GEMMA
+                modelUrl.contains("phi", ignoreCase = true) -> PHI
                 else -> CHATML
             }
             else -> format
@@ -68,6 +73,7 @@ fun renderPrompt(
     return when (format) {
         ChatFormat.PLAIN -> plain(user, turns, sys)
         ChatFormat.GEMMA -> gemma(user, turns, sys)
+        ChatFormat.PHI -> phi(user, turns, sys)
         // AUTO shouldn't reach here, but default to ChatML rather than the broken transcript.
         ChatFormat.CHATML, ChatFormat.AUTO -> chatml(user, turns, sys)
     }
@@ -100,6 +106,17 @@ private fun gemma(user: String, history: List<ChatTurn>, system: String): String
         }
         append("<start_of_turn>model\n")
     }
+}
+
+/** Phi-4 (mini): system/user/assistant turns delimited by `<|…|>` + `<|end|>`, no newlines. */
+private fun phi(user: String, history: List<ChatTurn>, system: String): String = buildString {
+    if (system.isNotBlank()) append("<|system|>").append(system).append("<|end|>")
+    history.forEach { turn ->
+        val role = if (isUser(turn)) "user" else "assistant"
+        append("<|").append(role).append("|>").append(turn.text.trim()).append("<|end|>")
+    }
+    append("<|user|>").append(user).append("<|end|>")
+    append("<|assistant|>")
 }
 
 /** Legacy transcript — kept so a model that already templates internally isn't double-wrapped. */

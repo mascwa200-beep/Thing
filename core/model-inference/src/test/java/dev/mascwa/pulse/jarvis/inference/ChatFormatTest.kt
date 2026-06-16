@@ -10,6 +10,8 @@ class ChatFormatTest {
     private val qwenUrl =
         "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_q8_ekv1280.task"
     private val gemmaUrl = "https://huggingface.co/litert-community/Gemma-3-1B-IT/resolve/main/gemma3-1b-it.task"
+    private val phiUrl =
+        "https://huggingface.co/litert-community/Phi-4-mini-instruct/resolve/main/Phi-4-mini-instruct_multi-prefill-seq_q8_ekv1280.task"
 
     @Test
     fun autoResolvesQwenToChatMl() {
@@ -19,6 +21,11 @@ class ChatFormatTest {
     @Test
     fun autoResolvesGemmaToGemma() {
         assertEquals(ChatFormat.GEMMA, ChatFormat.resolve(ChatFormat.AUTO, gemmaUrl))
+    }
+
+    @Test
+    fun autoResolvesPhiToPhi() {
+        assertEquals(ChatFormat.PHI, ChatFormat.resolve(ChatFormat.AUTO, phiUrl))
     }
 
     @Test
@@ -77,6 +84,22 @@ class ChatFormatTest {
         val out = renderPrompt(ChatFormat.GEMMA, "hello", emptyList(), system = "Sys")
         assertTrue(out.contains("<start_of_turn>user\nSys\n\nhello<end_of_turn>"))
         assertTrue(out.endsWith("<start_of_turn>model\n"))
+    }
+
+    @Test
+    fun phiUsesPipeTokensAndOpensAssistant() {
+        val out = renderPrompt(
+            ChatFormat.PHI,
+            prompt = "how are you",
+            history = listOf(ChatTurn("user", "hi"), ChatTurn("jarvis", "hello")),
+            system = "Sys",
+        )
+        assertFalse(out.contains("<|im_start|>"))
+        assertTrue(out.contains("<|system|>Sys<|end|>"))
+        assertTrue(out.contains("<|user|>hi<|end|>"))
+        assertTrue(out.contains("<|assistant|>hello<|end|>"))
+        assertTrue(out.contains("<|user|>how are you<|end|>"))
+        assertTrue(out.endsWith("<|assistant|>"))
     }
 
     @Test

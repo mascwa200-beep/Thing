@@ -131,7 +131,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             FieldLabel("MODEL URL")
             MonoField(url, vm::onUrlChange, "https://…/model.task")
 
-            FieldLabel("PRESETS  ·  tap to fill the URL, then DOWNLOAD")
+            FieldLabel("PRESETS  ·  free, no account  ·  tap to fill the URL, then DOWNLOAD")
             ModelPresetRow(onPick = vm::onUrlChange)
 
             FieldLabel("ACCESS TOKEN  ·  optional, for gated hosts")
@@ -338,17 +338,14 @@ private data class ModelPreset(val label: String, val note: String, val url: Str
 
 private val MODEL_PRESETS = listOf(
     ModelPreset(
-        "QWEN 1.5B", "fast",
+        "QWEN 1.5B", "fast · free",
         "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/" +
             "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
     ),
     ModelPreset(
-        "GEMMA 4B", "smart · recommended",
-        "https://huggingface.co/litert-community/Gemma3-4B-IT/resolve/main/gemma3-4b-it-int4-web.task",
-    ),
-    ModelPreset(
-        "GEMMA 4B Q4", "best · larger",
-        "https://huggingface.co/litert-community/Gemma3-4B-IT/resolve/main/gemma3-4b-it-q4_0-web.task",
+        "PHI-4 MINI", "smart · free · recommended",
+        "https://huggingface.co/litert-community/Phi-4-mini-instruct/resolve/main/" +
+            "Phi-4-mini-instruct_multi-prefill-seq_q8_ekv1280.task",
     ),
 )
 
