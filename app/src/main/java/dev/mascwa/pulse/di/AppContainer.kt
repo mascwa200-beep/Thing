@@ -84,6 +84,18 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
     }
 
+    // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
+    val jarvisDatabase: dev.mascwa.pulse.data.jarvis.db.JarvisDatabase by lazy {
+        dev.mascwa.pulse.data.jarvis.db.JarvisDatabase.build(appContext)
+    }
+    val jarvisMemory: dev.mascwa.pulse.data.jarvis.JarvisMemory by lazy {
+        dev.mascwa.pulse.data.jarvis.JarvisMemory(jarvisDatabase)
+    }
+    /** Swapped to the MediaPipe engine once a model is provisioned (Phase 5C). */
+    val inferenceEngine: dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine by lazy {
+        dev.mascwa.pulse.jarvis.inference.EchoInferenceEngine()
+    }
+
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
 

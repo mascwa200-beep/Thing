@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Rocket
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
     val c = Pulse.colors
 
     val entries = listOf(
+        GridEntry("J.A.R.V.I.S.", "On-device assistant · private", Icons.Filled.SmartToy, Routes.JARVIS, true),
         GridEntry("Sky", "Space wx · orbital · compass", Icons.Filled.Rocket, Routes.SKY, true),
         GridEntry("Tacnet", "Live radar · flight telemetry · vitals", Icons.Filled.Radar, Routes.TACNET, true),
         GridEntry("Survive", "Nearest help · SOS · offline guides", Icons.Filled.HealthAndSafety, Routes.SURVIVE, true),

@@ -50,6 +50,9 @@ object Routes {
     const val TACNET = "tacnet"
     const val RADAR = "radar"
     const val TELEMETRY = "telemetry"
+
+    // J.A.R.V.I.S. Matrix (on-device assistant)
+    const val JARVIS = "jarvis"
 }
 
 data class TopDestination(

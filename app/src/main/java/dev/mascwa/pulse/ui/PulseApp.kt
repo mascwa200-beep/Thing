@@ -245,6 +245,12 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.tacnet.TelemetryScreen(vm, onBack = { navController.popBackStack() })
             }
+
+            // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
+            composable(Routes.JARVIS) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisScreen(vm, onBack = { navController.popBackStack() })
+            }
         }
     }
 
