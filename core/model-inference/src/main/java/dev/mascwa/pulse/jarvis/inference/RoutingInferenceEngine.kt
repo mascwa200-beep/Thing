@@ -1,21 +1,18 @@
 package dev.mascwa.pulse.jarvis.inference
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withContext
 
 /**
- * The single engine the rest of the app depends on. It prefers the real MediaPipe LLM
- * once a model has been provisioned on disk and transparently falls back to the
- * deterministic [EchoInferenceEngine] persona core otherwise — so the console always
- * works, with or without a downloaded model.
+ * The single engine the rest of the app depends on. It prefers the real LLM — now loaded in a
+ * **separate process** via [IsolatedInferenceEngine], so a native model-load crash can't take down
+ * the app — and transparently falls back to the deterministic [EchoInferenceEngine] persona core
+ * otherwise, so the console always works.
  *
- * The MediaPipe runtime is loaded lazily by [ensureReady]; call it again after a
- * download completes to switch the live engine over without restarting the app.
+ * The isolated engine is warmed lazily by [ensureReady]; call it again after a download completes.
  */
 class RoutingInferenceEngine(
     context: Context,
@@ -25,18 +22,23 @@ class RoutingInferenceEngine(
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
+    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
 
-    @Volatile
-    private var delegate: MediaPipeInferenceEngine? = null
+    @Volatile private var active = false
+
+    // Once a load fails (e.g. the model is too heavy and the :inference process aborts), don't keep
+    // re-spawning a crashing process every time the console opens — hold the error until the user
+    // re-provisions or deletes the model (which calls reset()).
+    @Volatile private var loadFailed = false
 
     /** True when the real LLM is loaded and serving (vs. the persona fallback). */
-    val isModelActive: Boolean get() = delegate != null
+    val isModelActive: Boolean get() = active
 
     override suspend fun ensureReady() {
-        if (delegate != null) {
+        if (active) {
             _state.value = EngineState.Ready
             return
         }
@@ -44,32 +46,33 @@ class RoutingInferenceEngine(
             _state.value = EngineState.Unavailable
             return
         }
+        if (loadFailed) return // keep the existing Error; reset() clears this on re-provision/delete
         _state.value = EngineState.Preparing
-        withContext(Dispatchers.Default) {
-            runCatching { MediaPipeInferenceEngine(appContext, modelManager.modelPath(), maxTokens) }
-        }.onSuccess {
-            delegate = it
-            _state.value = EngineState.Ready
-        }.onFailure {
-            _state.value = EngineState.Error(it.message ?: "Model failed to load.")
-        }
+        // The isolated engine binds the :inference process and loads the model there. A native
+        // abort surfaces as EngineState.Error (not an app crash); we mirror its result.
+        isolated.ensureReady()
+        val result = isolated.state.value
+        _state.value = result
+        active = result is EngineState.Ready
+        loadFailed = result is EngineState.Error
     }
 
     override fun generate(
         prompt: String,
         history: List<ChatTurn>,
         system: String?,
-    ): Flow<String> = (delegate ?: fallback).generate(prompt, history, system)
+    ): Flow<String> = if (active) isolated.generate(prompt, history, system) else fallback.generate(prompt, history, system)
 
     /** Drop the loaded model (e.g. after the user deletes it) and revert to the core. */
     fun reset() {
-        delegate?.close()
-        delegate = null
+        active = false
+        loadFailed = false
+        isolated.close()
         _state.value = EngineState.Unavailable
     }
 
     override fun close() {
-        delegate?.close()
+        isolated.close()
         fallback.close()
     }
 }
