@@ -281,8 +281,8 @@ private fun ScannerDialog(onClose: () -> Unit) {
         (context.applicationContext as dev.mascwa.pulse.PulseApplication).container.newTelemetryController()
     }
     DisposableEffect(Unit) {
-        controller.start()
-        onDispose { controller.stop() }
+        runCatching { controller.start() }
+        onDispose { runCatching { controller.stop() } }
     }
     val t by controller.telemetry.collectAsState()
 

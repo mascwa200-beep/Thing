@@ -27,18 +27,18 @@ class RoutingInferenceEngine(
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
 
-    @Volatile private var active = false
-
     // Once a load fails (e.g. the model is too heavy and the :inference process aborts), don't keep
     // re-spawning a crashing process every time the console opens — hold the error until the user
     // re-provisions or deletes the model (which calls reset()).
     @Volatile private var loadFailed = false
 
-    /** True when the real LLM is loaded and serving (vs. the persona fallback). */
-    val isModelActive: Boolean get() = active
+    /** True when the real LLM is loaded and serving (vs. the persona fallback). Reflects LIVE
+     *  process state, so if the :inference process is killed this flips back to false. */
+    val isModelActive: Boolean get() = isolated.isReady
 
     override suspend fun ensureReady() {
-        if (active) {
+        // Fast path only while the isolated process is genuinely alive + loaded.
+        if (isolated.isReady) {
             _state.value = EngineState.Ready
             return
         }
@@ -53,7 +53,6 @@ class RoutingInferenceEngine(
         isolated.ensureReady()
         val result = isolated.state.value
         _state.value = result
-        active = result is EngineState.Ready
         loadFailed = result is EngineState.Error
     }
 
@@ -61,11 +60,13 @@ class RoutingInferenceEngine(
         prompt: String,
         history: List<ChatTurn>,
         system: String?,
-    ): Flow<String> = if (active) isolated.generate(prompt, history, system) else fallback.generate(prompt, history, system)
+    ): Flow<String> =
+        // Route by LIVE readiness: if the process died mid-session, fall back to the persona core
+        // rather than emitting an "offline" stub for every turn.
+        if (isolated.isReady) isolated.generate(prompt, history, system) else fallback.generate(prompt, history, system)
 
     /** Drop the loaded model (e.g. after the user deletes it) and revert to the core. */
     fun reset() {
-        active = false
         loadFailed = false
         isolated.close()
         _state.value = EngineState.Unavailable

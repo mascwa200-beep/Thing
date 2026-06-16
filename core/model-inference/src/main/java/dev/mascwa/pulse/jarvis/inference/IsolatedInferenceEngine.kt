@@ -40,6 +40,9 @@ class IsolatedInferenceEngine(
     private val genMutex = Mutex()
     private var connectSignal: CompletableDeferred<Unit>? = null
 
+    /** True only while bound to a live process that has the model loaded. */
+    val isReady: Boolean get() = service != null && _state.value is EngineState.Ready
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             service = IInferenceService.Stub.asInterface(binder)
@@ -84,6 +87,11 @@ class IsolatedInferenceEngine(
 
     private suspend fun connect(): IInferenceService? {
         service?.let { return it }
+        // Stale binding (process died, service nulled by onServiceDisconnected): unbind for a clean rebind.
+        if (bound) {
+            runCatching { appContext.unbindService(connection) }
+            bound = false
+        }
         val signal = CompletableDeferred<Unit>()
         connectSignal = signal
         bound = runCatching {

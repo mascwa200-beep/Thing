@@ -61,7 +61,8 @@ class JarvisMemory(db: JarvisDatabase) {
             .filter { it.length > 2 }
             .distinct()
             .take(8)
-            .joinToString(" OR ")
+            // Quote each term so an FTS reserved word (or/and/not/near) is treated as a literal.
+            .joinToString(" OR ") { "\"$it\"" }
         if (match.isBlank()) return emptyList()
         return runCatching { notes.search(match, limit) }.getOrDefault(emptyList())
     }
