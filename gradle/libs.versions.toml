@@ -42,6 +42,9 @@ composeCharts = "0.1.2"
 # On-device LLM (MediaPipe LLM Inference — standalone, NOT Play Services)
 mediapipeGenai = "0.10.24"
 
+# Testing
+junit = "4.13.2"
+
 [libraries]
 # Core / lifecycle / activity
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -89,6 +92,9 @@ osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.
 
 # On-device LLM
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

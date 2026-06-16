@@ -54,13 +54,47 @@ Plus:
 - **Offline support** — every screen caches its last good payload to disk and
   shows it instantly (with an "offline" banner) when the network is unavailable.
 
+## J.A.R.V.I.S. Matrix — on-device assistant
+
+A private, fully on-device assistant. Everything runs on the phone; nothing you
+say to it is transmitted. Open it from the grid tile.
+
+- **On-device LLM** — answers come from a local **MediaPipe LLM Inference** model
+  (standalone, no Google Play Services). Provision a model in **Setup**: paste a
+  direct URL to a MediaPipe `.task` model (e.g. a Gemma `.task` on Hugging Face,
+  with an optional access token for gated hosts) and it streams to private app
+  storage. Until then — or with all networking off — the assistant answers from a
+  deterministic **persona core** that never fabricates facts. Conversation history
+  persists locally (Room).
+- **Proactive context (banter)** — it narrates *real* device state (battery,
+  charging, power-save, network, time) and reacts to threshold crossings; ask for
+  "status" and it answers from live telemetry, not the model.
+- **Active-Matrix** — an opt-in foreground service that keeps the assistant
+  resident and surfaces proactive remarks in an ongoing notification.
+- **Vitals (opt-in)** — pair a Bluetooth LE heart-rate strap (GATT `0x180D`/`0x2A37`)
+  and it checks in if your heart rate spikes **without** a rise in movement. Honest
+  no-op when no strap is connected.
+- **Lockdown** — a one-tap macro with **honest** per-command results: wipes the
+  clipboard, enters Do-Not-Disturb / silent (when DND access is granted, else it
+  says so), and halts the app's own BLE use. Network/airplane toggles are
+  Settings-only on modern Android / GrapheneOS, so it points you there rather than
+  pretending to flip them.
+
+Built as Gradle modules: `:core:database` (Room state + memory),
+`:core:model-inference` (the inference abstraction + MediaPipe engine + downloader),
+`:core:telemetry` (device context, banter, intent router, vitals analyzer), and `:app`.
+
+> **Privacy & honesty:** no model is bundled; the model you provide stays on-device;
+> infeasible actions are surfaced as "needs Settings"/"unsupported" rather than faked.
+
 ## Tech stack
 
 - Kotlin · Jetpack Compose · Material 3 (Material You dynamic colour)
-- MVVM + repositories · Coroutines/Flow
-- Manual DI (no annotation processors → robust Gradle builds)
+- MVVM + repositories · Coroutines/Flow · multi-module (`:app` + `:core:*`)
+- Manual DI · Room (assistant memory) · MediaPipe LLM Inference (on-device LLM)
 - OkHttp + kotlinx.serialization (JSON, RSS/XML, CSV) · Coil (images)
 - DataStore (settings) · WorkManager (background refresh & notifications)
+- JUnit unit tests on the pure logic (vitals analyzer, intent router, banter)
 - `minSdk 31`, `targetSdk 35`, `compileSdk 35`
 
 ## Get the APK onto your Pixel 10 Pro XL
