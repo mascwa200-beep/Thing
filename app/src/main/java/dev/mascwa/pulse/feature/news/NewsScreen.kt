@@ -130,7 +130,7 @@ fun NewsScreen(vm: NewsViewModel) {
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
                 ) {
                     if (content.stale) item { StaleBanner(true) }
-                    items(content.data!!, key = { it.url }) { article ->
+                    items(content.data!!.distinctBy { it.url }, key = { it.url }) { article ->
                         ArticleCard(article, onClick = { openUrl(context, article.url) })
                     }
                 }

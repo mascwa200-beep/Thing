@@ -89,7 +89,7 @@ private fun FeedList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (async.stale) item { StaleBanner(true) }
-            items(async.data!!.items, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
+            items(async.data!!.items.distinctBy { it.url }, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
         }
     }
 }
@@ -127,7 +127,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
                             modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
                     }
                 }
-                items(data.statuses, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
+                items(data.statuses.distinctBy { it.url }, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
             }
         }
     }

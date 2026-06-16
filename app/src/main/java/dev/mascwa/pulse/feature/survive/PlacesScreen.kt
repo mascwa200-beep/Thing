@@ -91,7 +91,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (res.stale) item { StaleBanner(true) }
-                        items(res.data!!.places, key = { it.name + it.latitude }) { p ->
+                        items(res.data!!.places.distinctBy { it.name + it.latitude }, key = { it.name + it.latitude }) { p ->
                             PlaceRow(p, onMap = { openMaps(context, p.latitude, p.longitude, p.name) },
                                 onCall = { p.phone?.let { dialNumber(context, it) } })
                         }

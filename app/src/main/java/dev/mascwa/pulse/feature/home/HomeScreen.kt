@@ -186,7 +186,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                     "pol" -> state.politics.data
                     "cult" -> state.popculture.data
                     else -> state.headlines.data
-                }.orEmpty().take(12)
+                }.orEmpty().distinctBy { it.url }.take(12)
                 if (feed.isEmpty()) {
                     item {
                         Text(

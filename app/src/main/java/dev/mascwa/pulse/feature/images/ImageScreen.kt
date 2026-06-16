@@ -116,7 +116,7 @@ fun ImageScreen(vm: ImageViewModel, onBack: (() -> Unit)? = null) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        items(res.data!!, key = { it.thumbUrl }) { img ->
+                        items(res.data!!.distinctBy { it.thumbUrl }, key = { it.thumbUrl }) { img ->
                             AsyncImage(
                                 model = img.thumbUrl,
                                 contentDescription = img.title,
