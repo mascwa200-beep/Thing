@@ -260,6 +260,12 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            // ---- 3D cyberpunk navigation map ----
+            composable(Routes.NAV) {
+                val vm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.nav.NavScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- Diagnostics ----
             composable(Routes.CRASH_LOG) {
                 val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)

@@ -145,6 +145,9 @@ dependencies {
     implementation(libs.vosk.android)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
 
+    // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
+    implementation(libs.maplibre.android)
+
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
