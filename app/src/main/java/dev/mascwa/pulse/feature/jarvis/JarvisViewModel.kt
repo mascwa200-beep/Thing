@@ -56,6 +56,7 @@ class JarvisViewModel(
     private val settings: SettingsRepository,
     private val voskSpeech: VoskSpeech,
     private val agent: AgentOrchestrator,
+    private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -179,12 +180,22 @@ class JarvisViewModel(
     /** Single-shot reply straight from the model (no tools), streaming tokens to the console. */
     private suspend fun generateDirect(text: String): String {
         val history = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
+        val system = withKnowledge(SYSTEM_PROMPT, text)
         val sb = StringBuilder()
-        engine.generate(text, history, SYSTEM_PROMPT).collect { token ->
+        engine.generate(text, history, system).collect { token ->
             sb.append(token)
             _streaming.value = sb.toString()
         }
         return sb.toString().ifBlank { "…" }
+    }
+
+    /** Prepend the most relevant knowledge-library chunks to [base] so direct chat is RAG-grounded
+     *  too (not only the agent path). No-op when the library is empty or nothing matches. */
+    private suspend fun withKnowledge(base: String, query: String): String {
+        val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
+        if (docs.isEmpty()) return base
+        val block = docs.joinToString("\n") { "- [${it.title}] ${it.text.take(400)}" }
+        return base + "\n\nRelevant knowledge from your library (use if helpful):\n" + block
     }
 
     /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. */

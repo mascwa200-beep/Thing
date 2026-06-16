@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.jarvis.agent
 
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
+import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -15,6 +16,7 @@ class AgentOrchestrator(
     private val engine: LocalInferenceEngine,
     private val memory: JarvisMemory,
     private val tools: List<JarvisTool>,
+    private val knowledge: KnowledgeStore,
 ) {
     enum class Kind { THINKING, TOOL, FINAL }
     data class Step(val kind: Kind, val text: String)
@@ -22,7 +24,12 @@ class AgentOrchestrator(
     /** Drives the loop, emitting progress [Step]s; the terminal step is [Kind.FINAL]. */
     fun run(query: String, persona: String): Flow<Step> = flow {
         val recalled = runCatching { memory.recall(query) }.getOrDefault(emptyList())
-        val system = buildSystem(persona, recalled.map { it.noteText })
+        val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
+        val system = buildSystem(
+            persona,
+            recalled.map { it.noteText },
+            docs.map { "[${it.title}] ${it.text}" },
+        )
         val scratch = StringBuilder(query.trim())
         var step = 0
         while (step < MAX_STEPS) {
@@ -68,7 +75,11 @@ class AgentOrchestrator(
     private fun stripFinal(out: String): String =
         out.replace(Regex("(?im)^\\s*FINAL:\\s*"), "").trim()
 
-    private fun buildSystem(persona: String, memoryNotes: List<String>): String = buildString {
+    private fun buildSystem(
+        persona: String,
+        memoryNotes: List<String>,
+        knowledgeChunks: List<String>,
+    ): String = buildString {
         append(persona.trim()).append("\n\n")
         append("You can use tools to get real, current information. To use one, reply with a single line:\n")
         append("TOOL <name> <argument>\n")
@@ -80,6 +91,10 @@ class AgentOrchestrator(
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")
             memoryNotes.forEach { append("- ").append(it).append('\n') }
+        }
+        if (knowledgeChunks.isNotEmpty()) {
+            append("\n\nRelevant knowledge from your library (use if helpful):\n")
+            knowledgeChunks.forEach { append("- ").append(it.take(400)).append('\n') }
         }
     }
 

@@ -4,6 +4,7 @@ import android.util.Base64
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
+import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.serialization.Serializable
@@ -131,6 +132,18 @@ class RecallTool(private val memory: JarvisMemory) : JarvisTool {
         val notes = memory.recall(arg.trim(), limit = 6)
         return if (notes.isEmpty()) "No saved notes match \"$arg\"."
         else notes.joinToString("\n") { "- ${it.noteText}" }.clip()
+    }
+}
+
+/** Search the on-device knowledge library (the docs the user has loaded) — the docs RAG. */
+class KnowledgeTool(private val knowledge: KnowledgeStore) : JarvisTool {
+    override val name = "docs"
+    override val usage = "docs <query> — search your loaded knowledge library (programming docs, notes, etc.)"
+
+    override suspend fun run(arg: String): String {
+        val hits = knowledge.search(arg.trim(), limit = 5)
+        return if (hits.isEmpty()) "No docs match \"$arg\"."
+        else hits.joinToString("\n\n") { "[${it.title}] ${it.text}" }.clip()
     }
 }
 

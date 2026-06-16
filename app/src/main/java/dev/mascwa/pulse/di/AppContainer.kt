@@ -91,6 +91,10 @@ class AppContainer(private val appContext: Context) {
     val jarvisMemory: dev.mascwa.pulse.data.jarvis.JarvisMemory by lazy {
         dev.mascwa.pulse.data.jarvis.JarvisMemory(jarvisDatabase)
     }
+    /** The on-device knowledge library (docs RAG) J.A.R.V.I.S. retrieves from. */
+    val knowledgeStore: dev.mascwa.pulse.data.jarvis.KnowledgeStore by lazy {
+        dev.mascwa.pulse.data.jarvis.KnowledgeStore(jarvisDatabase)
+    }
     /** Provisions + tracks the on-device LLM model file (download / delete / path). */
     val modelManager: dev.mascwa.pulse.jarvis.inference.ModelManager by lazy {
         dev.mascwa.pulse.jarvis.inference.ModelManager(appContext)
@@ -146,12 +150,13 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.RememberTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
         )
     }
-    /** Bounded ReAct loop wiring the on-device model to [agentTools] + durable memory. */
+    /** Bounded ReAct loop wiring the on-device model to [agentTools] + durable memory + knowledge. */
     val agentOrchestrator: dev.mascwa.pulse.jarvis.agent.AgentOrchestrator by lazy {
-        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentTools)
+        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentTools, knowledgeStore)
     }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */

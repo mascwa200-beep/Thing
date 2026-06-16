@@ -57,3 +57,32 @@ interface AgentNoteDao {
     @Query("DELETE FROM agent_notes")
     suspend fun clear()
 }
+
+/** The knowledge library (docs RAG): chunked documents with lexical (FTS4) retrieval. */
+@Dao
+interface KnowledgeDocDao {
+    @Insert
+    suspend fun insert(doc: KnowledgeDocEntity): Long
+
+    @Insert
+    suspend fun insertAll(docs: List<KnowledgeDocEntity>)
+
+    /** Lexical search; [match] must already be sanitized into valid FTS MATCH syntax. */
+    @Query(
+        "SELECT k.* FROM knowledge_docs k JOIN knowledge_docs_fts fts ON k.id = fts.rowid " +
+            "WHERE knowledge_docs_fts MATCH :match ORDER BY k.timestamp DESC LIMIT :limit",
+    )
+    suspend fun search(match: String, limit: Int): List<KnowledgeDocEntity>
+
+    @Query("SELECT COUNT(*) FROM knowledge_docs")
+    suspend fun count(): Int
+
+    @Query("SELECT COUNT(DISTINCT title) FROM knowledge_docs")
+    suspend fun docCount(): Int
+
+    @Query("DELETE FROM knowledge_docs WHERE title = :title")
+    suspend fun deleteByTitle(title: String)
+
+    @Query("DELETE FROM knowledge_docs")
+    suspend fun clear()
+}

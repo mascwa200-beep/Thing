@@ -22,6 +22,7 @@ class JarvisSetupViewModel(
     private val modelManager: ModelManager,
     private val engine: RoutingInferenceEngine,
     private val settings: SettingsRepository,
+    private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
 ) : ViewModel() {
 
     /** Download lifecycle (Idle → Running → Done/Failed). Pre-seeded to Done if a model already exists. */
@@ -63,6 +64,14 @@ class JarvisSetupViewModel(
     /** Chat template used to format prompts for the model (Auto/ChatML/Gemma/Plain). */
     val chatFormat: StateFlow<ChatFormat> = _chatFormat.asStateFlow()
 
+    private val _knowledgeChunks = MutableStateFlow(0)
+    /** Number of chunks stored in the knowledge library (docs RAG). */
+    val knowledgeChunks: StateFlow<Int> = _knowledgeChunks.asStateFlow()
+
+    private val _knowledgeDocs = MutableStateFlow(0)
+    /** Number of distinct documents in the knowledge library. */
+    val knowledgeDocs: StateFlow<Int> = _knowledgeDocs.asStateFlow()
+
     init {
         viewModelScope.launch {
             val saved = settings.current().jarvis
@@ -78,6 +87,7 @@ class JarvisSetupViewModel(
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
+        refreshKnowledge()
     }
 
     fun onUrlChange(value: String) { _url.value = value }
@@ -118,6 +128,30 @@ class JarvisSetupViewModel(
         _chatFormat.value = format
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(chatFormat = format)) }
+        }
+    }
+
+    /** Add a document to the knowledge library; it is chunked and indexed for retrieval. */
+    fun addKnowledge(title: String, text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            knowledge.addDocument(title, text, source = "manual")
+            refreshKnowledge()
+        }
+    }
+
+    /** Empty the knowledge library. */
+    fun clearKnowledge() {
+        viewModelScope.launch {
+            knowledge.clear()
+            refreshKnowledge()
+        }
+    }
+
+    private fun refreshKnowledge() {
+        viewModelScope.launch {
+            _knowledgeChunks.value = runCatching { knowledge.chunkCount() }.getOrDefault(0)
+            _knowledgeDocs.value = runCatching { knowledge.documentCount() }.getOrDefault(0)
         }
     }
 

@@ -31,6 +31,10 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,8 @@ import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -63,10 +69,27 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val agentTools by vm.agentTools.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
+    val knowledgeChunks by vm.knowledgeChunks.collectAsState()
+    val knowledgeDocs by vm.knowledgeDocs.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val vitalsPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { VitalsTrackingService.start(context) }
+
+    // Import a text/markdown file into the knowledge library (read off the main thread).
+    val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch(Dispatchers.IO) {
+            val name = uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null } ?: "Imported document"
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull().orEmpty()
+            if (text.isNotBlank()) vm.addKnowledge(name, text)
+        }
+    }
+
+    var kbTitle by remember { mutableStateOf("") }
+    var kbBody by remember { mutableStateOf("") }
 
     // Enabling the wake word needs the microphone; only commit it once granted.
     fun enableWakeWord() {
@@ -213,8 +236,71 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
 
             FieldLabel("GITHUB TOKEN  ·  optional, for private repos")
             MonoField(githubToken, vm::onGithubTokenChange, "ghp_…  (read-only repo access)")
+
+            FieldLabel("KNOWLEDGE BASE  ·  docs J.A.R.V.I.S. can search (on-device RAG)")
+            NeonPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "$knowledgeDocs docs · $knowledgeChunks chunks indexed. Load reference docs " +
+                            "(e.g. language notes, API docs) and J.A.R.V.I.S. retrieves the relevant " +
+                            "bits into its answers. This is retrieval, not training — stays on-device.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    )
+                    MonoField(kbTitle, { kbTitle = it }, "Title (e.g. Kotlin coroutines)")
+                    MonoFieldArea(kbBody, { kbBody = it }, "Paste document text…")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NeonButton(
+                            text = "ADD DOC",
+                            enabled = kbBody.isNotBlank(),
+                            color = c.accent,
+                            onClick = {
+                                vm.addKnowledge(kbTitle, kbBody)
+                                kbTitle = ""
+                                kbBody = ""
+                            },
+                        )
+                        NeonButton(
+                            text = "IMPORT FILE",
+                            enabled = true,
+                            color = c.accent,
+                            onClick = { docPicker.launch("text/*") },
+                        )
+                        if (knowledgeChunks > 0) {
+                            NeonButton(
+                                text = "CLEAR",
+                                enabled = true,
+                                color = c.magenta,
+                                onClick = vm::clearKnowledge,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun MonoFieldArea(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+    val c = Pulse.colors
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().height(120.dp),
+        singleLine = false,
+        placeholder = {
+            Text(placeholder, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+        },
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = c.panel,
+            unfocusedContainerColor = c.panel,
+            focusedIndicatorColor = c.accent,
+            unfocusedIndicatorColor = c.lineSoft,
+            cursorColor = c.accent,
+            focusedTextColor = c.ink,
+            unfocusedTextColor = c.ink,
+        ),
+    )
 }
 
 @Composable
