@@ -32,6 +32,19 @@ class JarvisApprovalsViewModel(
         selfEdit.state.map { it.versions.reversed() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Registered authored Lua tools (enable/disable/delete). */
+    val tools: StateFlow<List<dev.mascwa.pulse.data.selfedit.AuthoredTool>> =
+        selfEdit.state.map { it.authoredTools }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setToolEnabled(name: String, enabled: Boolean) {
+        viewModelScope.launch { runCatching { selfEdit.setAuthoredToolEnabled(name, enabled) } }
+    }
+
+    fun removeTool(name: String) {
+        viewModelScope.launch { runCatching { selfEdit.removeAuthoredTool(name) }; _result.value = "Removed tool \"$name\"." }
+    }
+
     private val _result = MutableStateFlow("")
     val result: StateFlow<String> = _result.asStateFlow()
 

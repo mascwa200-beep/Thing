@@ -123,11 +123,19 @@ class SelfInspectTool(
     private val context: Context,
 ) : JarvisTool {
     override val name = "selfinspect"
-    override val usage = "selfinspect <persona|knowledge|assets> — read your own config (read-only)"
+    override val usage = "selfinspect <persona|knowledge|assets|tools> — read your own config (read-only)"
 
     override suspend fun run(arg: String): String {
         val what = arg.trim().lowercase()
         return when {
+            what.startsWith("tool") -> {
+                val authored = runCatching { selfEdit.current().authoredTools }.getOrDefault(emptyList())
+                val builtins = "Built-in tools: web, fetch, repo, remember, recall, docs, device."
+                if (authored.isEmpty()) "$builtins\nNo authored tools yet."
+                else "$builtins\nAuthored tools:\n" + authored.joinToString("\n") {
+                    "- ${it.name}${if (it.enabled) "" else " (off)"} [${it.caps.joinToString(",")}]"
+                }
+            }
             what.startsWith("persona") || what.startsWith("charter") -> {
                 val charter = runCatching { selfEdit.current().charter }.getOrDefault("")
                 if (charter.isBlank()) "Persona: (built-in default — no custom charter set)." else "Persona charter:\n$charter"
@@ -140,7 +148,7 @@ class SelfInspectTool(
                 val files = runCatching { context.assets.list("knowledge")?.toList() }.getOrNull().orEmpty()
                 if (files.isEmpty()) "No bundled assets found." else "Bundled assets:\n" + files.joinToString("\n") { "- $it" }
             }
-            else -> "Inspect what? Try: persona, knowledge, assets. (Source code isn't on the device, so it can't be read.)"
+            else -> "Inspect what? Try: persona, knowledge, assets, tools. (Source code isn't on the device, so it can't be read.)"
         }
     }
 }

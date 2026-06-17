@@ -39,6 +39,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     val pending by vm.pending.collectAsState()
     val versions by vm.versions.collectAsState()
+    val tools by vm.tools.collectAsState()
     val result by vm.result.collectAsState()
 
     PulseScaffold(
@@ -71,12 +72,47 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
                 ApprovalCard(action, c, onApprove = { vm.approve(action) }, onReject = { vm.reject(action.id) })
             }
 
+            if (tools.isNotEmpty()) {
+                item { SectionBar("AUTHORED TOOLS · ${tools.size}") }
+                items(tools, key = { "tool_${it.name}" }) { t ->
+                    AuthoredToolRow(
+                        t, c,
+                        onToggle = { vm.setToolEnabled(t.name, !t.enabled) },
+                        onRemove = { vm.removeTool(t.name) },
+                    )
+                }
+            }
+
             if (versions.isNotEmpty()) {
                 item { SectionBar("HISTORY · tap to roll back") }
                 items(versions, key = { "${it.type}_${it.key}_${it.timestamp}" }) { v ->
                     VersionRow(v, c, onRollback = { vm.rollback(v) })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AuthoredToolRow(
+    tool: dev.mascwa.pulse.data.selfedit.AuthoredTool,
+    c: dev.mascwa.pulse.ui.theme.NightwirePalette,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tool.name + (if (!tool.enabled) " · off" else ""),
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    color = if (tool.enabled) c.ink else c.muted,
+                )
+                val caps = if (tool.caps.isEmpty()) "no capabilities" else "caps: ${tool.caps.joinToString(", ")}"
+                Text(caps, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
+            }
+            ActionButton(if (tool.enabled) "DISABLE" else "ENABLE", if (tool.enabled) c.amber else c.positive, onToggle)
+            ActionButton("DELETE", c.magenta, onRemove)
         }
     }
 }

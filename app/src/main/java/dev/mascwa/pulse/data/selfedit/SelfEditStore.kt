@@ -76,6 +76,11 @@ class SelfEditStore(private val context: Context, private val json: Json) {
         s.copy(authoredTools = s.authoredTools.filterNot { it.name == name })
     }
 
+    /** Enable/disable an authored tool without deleting it (disabled tools aren't offered to the model). */
+    suspend fun setAuthoredToolEnabled(name: String, enabled: Boolean) = update { s ->
+        s.copy(authoredTools = s.authoredTools.map { if (it.name == name) it.copy(enabled = enabled) else it })
+    }
+
     private companion object {
         const val MAX_VERSIONS = 30
         const val MAX_PENDING = 50
