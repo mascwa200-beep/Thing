@@ -73,6 +73,10 @@ class JarvisSetupViewModel(
     /** The user-supplied persona "charter" prepended atop every prompt (blank = built-in persona). */
     val charter: StateFlow<String> = _charter.asStateFlow()
 
+    private val _backend = MutableStateFlow(0)
+    /** Inference backend: 0=auto, 1=GPU, 2=CPU. */
+    val inferenceBackend: StateFlow<Int> = _backend.asStateFlow()
+
     private val _knowledgeChunks = MutableStateFlow(0)
     /** Number of chunks stored in the knowledge library (docs RAG). */
     val knowledgeChunks: StateFlow<Int> = _knowledgeChunks.asStateFlow()
@@ -94,6 +98,7 @@ class JarvisSetupViewModel(
             _selfEdit.value = saved.selfEditEnabled
             _githubToken.value = saved.githubToken
             _chatFormat.value = saved.chatFormat
+            _backend.value = saved.inferenceBackend
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
@@ -103,6 +108,16 @@ class JarvisSetupViewModel(
 
     fun onUrlChange(value: String) { _url.value = value }
     fun onTokenChange(value: String) { _token.value = value }
+
+    /** Persist the inference backend and reload the model on it now. */
+    fun setInferenceBackend(backend: Int) {
+        _backend.value = backend
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(inferenceBackend = backend)) }
+            engine.reset()
+            runCatching { engine.ensureReady() }
+        }
+    }
 
     fun onCharterChange(value: String) { _charter.value = value }
 

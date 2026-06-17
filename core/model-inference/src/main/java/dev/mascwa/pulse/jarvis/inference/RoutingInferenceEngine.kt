@@ -21,10 +21,14 @@ class RoutingInferenceEngine(
     private val maxTokens: Int = 1024,
     /** Live chat-template choice + model URL, forwarded to the isolated engine's prompt builder. */
     private val promptConfig: suspend () -> PromptConfig = { PromptConfig() },
+    /** Preferred inference backend (0=auto/1=GPU/2=CPU), read at load time. */
+    private val backendProvider: suspend () -> Int = { 0 },
+    /** Called when generation crashes natively on a non-CPU backend (app switches to CPU). */
+    private val onNativeCrash: suspend () -> Unit = {},
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
-    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig)
+    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()

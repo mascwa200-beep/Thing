@@ -140,6 +140,9 @@ data class JarvisSettings(
      * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
      */
     val chatFormat: ChatFormat = ChatFormat.AUTO,
+    /** MediaPipe inference backend: 0=auto (let it choose), 1=GPU, 2=CPU. Auto-falls back to CPU if a
+     *  GPU decode crashes the inference process. CPU is slower but far more compatible. */
+    val inferenceBackend: Int = 0,
     /** Let J.A.R.V.I.S. PROPOSE edits to its own persona/knowledge/tools + research (each applied only
      *  on your explicit approval in the Approvals screen). Opt-in; requires agent tools too. */
     val selfEditEnabled: Boolean = false,

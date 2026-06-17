@@ -149,6 +149,12 @@ class AppContainer(private val appContext: Context) {
                 val j = settingsRepository.current().jarvis
                 dev.mascwa.pulse.jarvis.inference.PromptConfig(j.chatFormat, j.modelUrl.ifBlank { null })
             },
+            // Preferred backend, read fresh at load time (0=auto, 1=GPU, 2=CPU).
+            backendProvider = { runCatching { settingsRepository.current().jarvis.inferenceBackend }.getOrDefault(0) },
+            // On a native GPU crash, persist CPU so the next load (ensureReady before each send) uses it.
+            onNativeCrash = {
+                runCatching { settingsRepository.update { it.copy(jarvis = it.jarvis.copy(inferenceBackend = 2)) } }
+            },
         )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */

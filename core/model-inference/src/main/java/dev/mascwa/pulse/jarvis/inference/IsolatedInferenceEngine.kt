@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.jarvis.inference
 
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -7,6 +9,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,11 +35,19 @@ class IsolatedInferenceEngine(
     /** Supplies the live chat-template choice + model URL, read fresh on each generation so a
      *  Setup change takes effect without reloading the model. */
     private val promptConfig: suspend () -> PromptConfig = { PromptConfig() },
+    /** Preferred backend, read fresh at load time: 0=auto, 1=GPU, 2=CPU. */
+    private val backendProvider: suspend () -> Int = { 0 },
+    /** Invoked when generation dies with a native crash on a non-CPU backend, so the app layer can
+     *  switch the persisted backend to CPU (the engine then reloads on the next ensureReady). */
+    private val onNativeCrash: suspend () -> Unit = {},
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
+
+    /** Backend used for the current load (so a crash can decide whether to auto-fall back to CPU). */
+    @Volatile private var lastBackend = 0
 
     @Volatile private var service: IInferenceService? = null
     @Volatile private var bound = false
@@ -77,7 +88,9 @@ class IsolatedInferenceEngine(
         }
         // load() blocks while the model is read in the other process; a native abort there throws
         // DeadObjectException here rather than crashing us.
-        withContext(Dispatchers.IO) { runCatching { svc.load(modelManager.modelPath(), maxTokens) } }
+        val backend = runCatching { backendProvider() }.getOrDefault(0)
+        lastBackend = backend
+        withContext(Dispatchers.IO) { runCatching { svc.load(modelManager.modelPath(), maxTokens, backend) } }
             .onSuccess { ok ->
                 _state.value = if (ok) EngineState.Ready else EngineState.Error("The model failed to load, sir.")
             }
@@ -119,11 +132,49 @@ class IsolatedInferenceEngine(
         val full = renderPrompt(ChatFormat.resolve(cfg.format, cfg.modelUrl), prompt, history, system)
         val response = withContext(Dispatchers.IO) {
             genMutex.withLock { runCatching { svc.generate(full) }.getOrNull() }
-        } ?: "// inference fault: process lost"
+        }
+        if (response == null) {
+            // The :inference process died mid-generation (a native abort the JVM can't catch). Read
+            // the real exit reason and, if it was a crash on a non-CPU backend, ask the app to switch
+            // to CPU; the next message reloads there (ensureReady runs before each send).
+            service = null
+            var exit = readInferenceExit()
+            if (exit == null) { delay(200); exit = readInferenceExit() }
+            val reason = exit?.first ?: "process lost"
+            val crashed = exit?.second ?: true // unknown → assume a crash and try CPU
+            if (crashed && lastBackend != BACKEND_CPU) {
+                runCatching { onNativeCrash() }
+                _state.value = EngineState.Error("Inference crashed ($reason). Switched to the CPU backend — try again, sir.")
+                emit("// inference fault: $reason — switching to the CPU backend. Try again, sir.")
+            } else {
+                _state.value = EngineState.Error("Inference crashed ($reason).")
+                emit("// inference fault: $reason")
+            }
+            return@flow
+        }
         response.split(' ').forEachIndexed { i, word ->
             emit(if (i == 0) word else " $word")
         }
     }.flowOn(Dispatchers.Default)
+
+    /** Most-recent `:inference` process exit, as (human reason, wasNativeCrash) — or null if unknown. */
+    private fun readInferenceExit(): Pair<String, Boolean>? = runCatching {
+        val am = appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return null
+        val info = am.getHistoricalProcessExitReasons(appContext.packageName, 0, 6)
+            .firstOrNull { it.processName.endsWith(":inference") } ?: return null
+        val crashed = info.reason == ApplicationExitInfo.REASON_CRASH_NATIVE ||
+            info.reason == ApplicationExitInfo.REASON_CRASH ||
+            (info.reason == ApplicationExitInfo.REASON_SIGNALED && info.status in intArrayOf(4, 6, 7, 8, 11))
+        val text = when (info.reason) {
+            ApplicationExitInfo.REASON_CRASH_NATIVE -> "native crash"
+            ApplicationExitInfo.REASON_CRASH -> "app crash"
+            ApplicationExitInfo.REASON_SIGNALED -> "signal ${info.status}"
+            ApplicationExitInfo.REASON_LOW_MEMORY -> "low memory"
+            ApplicationExitInfo.REASON_ANR -> "ANR"
+            else -> "exit ${info.reason}"
+        } + (info.description?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
+        text to crashed
+    }.getOrNull()
 
     override fun close() {
         runCatching { if (bound) appContext.unbindService(connection) }
@@ -133,5 +184,6 @@ class IsolatedInferenceEngine(
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 8000L
+        const val BACKEND_CPU = 2
     }
 }

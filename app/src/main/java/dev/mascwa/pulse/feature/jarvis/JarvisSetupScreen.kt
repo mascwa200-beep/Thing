@@ -69,6 +69,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
+    val backend by vm.inferenceBackend.collectAsState()
     val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
@@ -166,6 +167,14 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             Text(
                 "AUTO picks ChatML (Qwen) or Gemma turns from the model URL. If replies come out " +
                     "garbled or repeat control tokens, switch to PLAIN.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("INFERENCE BACKEND  ·  CPU is slower but more compatible")
+            BackendSelector(selected = backend, onSelect = vm::setInferenceBackend)
+            Text(
+                "AUTO lets MediaPipe choose and falls back to CPU automatically if a GPU run crashes " +
+                    "the model. If chat shows \"inference fault\", try CPU.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
@@ -392,6 +401,27 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
             ) {
                 Text(preset.label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink)
                 Text(preset.note, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val c = Pulse.colors
+    val options = listOf(0 to "AUTO", 1 to "GPU", 2 to "CPU")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { (value, label) ->
+            val on = value == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
             }
         }
     }

@@ -5,8 +5,9 @@
 package dev.mascwa.pulse.jarvis.inference;
 
 interface IInferenceService {
-    /** Load the model in this process. Returns true on success; throws if the process dies. */
-    boolean load(String modelPath, int maxTokens);
+    /** Load the model in this process. [backend]: 0=auto/default, 1=GPU, 2=CPU. Returns true on
+     *  success; throws if the process dies. */
+    boolean load(String modelPath, int maxTokens, int backend);
 
     /** Run one full generation for an already-built prompt. */
     String generate(String fullPrompt);

@@ -15,17 +15,21 @@ class InferenceService : Service() {
     @Volatile private var llm: LlmInference? = null
 
     private val binder = object : IInferenceService.Stub() {
-        override fun load(modelPath: String?, maxTokens: Int): Boolean {
+        override fun load(modelPath: String?, maxTokens: Int, backend: Int): Boolean {
             val path = modelPath ?: return false
             return try {
                 runCatching { llm?.close() }
-                llm = LlmInference.createFromOptions(
-                    applicationContext,
-                    LlmInference.LlmInferenceOptions.builder()
-                        .setModelPath(path)
-                        .setMaxTokens(if (maxTokens > 0) maxTokens else 1024)
-                        .build(),
-                )
+                val builder = LlmInference.LlmInferenceOptions.builder()
+                    .setModelPath(path)
+                    .setMaxTokens(if (maxTokens > 0) maxTokens else 1024)
+                // Backend choice: a native abort on the first GPU decode is the classic failure on
+                // some devices/models; CPU is slower but far more compatible. 0 = let MediaPipe pick.
+                when (backend) {
+                    1 -> builder.setPreferredBackend(LlmInference.Backend.GPU)
+                    2 -> builder.setPreferredBackend(LlmInference.Backend.CPU)
+                    else -> {}
+                }
+                llm = LlmInference.createFromOptions(applicationContext, builder.build())
                 true
             } catch (t: Throwable) {
                 // A JVM-level failure (e.g. a catchable OOM) → false. A native abort terminates this
