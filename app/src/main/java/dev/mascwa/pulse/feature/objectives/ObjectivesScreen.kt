@@ -105,9 +105,9 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            NeonChip("Main", kind == ObjectiveKind.MAIN) { kind = ObjectiveKind.MAIN }
-                            NeonChip("Side", kind == ObjectiveKind.SIDE) { kind = ObjectiveKind.SIDE }
-                            NeonChip("Plain", kind == ObjectiveKind.PLAIN) { kind = ObjectiveKind.PLAIN }
+                            NeonChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
+                            NeonChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
+                            NeonChip("Plain", kind == ObjectiveKind.PLAIN, onClick = { kind = ObjectiveKind.PLAIN })
                         }
                         Text(
                             "◢ ADD",
