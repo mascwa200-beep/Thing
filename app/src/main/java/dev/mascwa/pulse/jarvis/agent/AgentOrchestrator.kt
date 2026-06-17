@@ -49,8 +49,12 @@ class AgentOrchestrator(
             } else {
                 runCatching { tool.run(arg) }.getOrElse { "Tool error: ${it.message}" }
             }
+            // Tool output is untrusted (web/repo/files) — fence it so the model treats it as data,
+            // not instructions (see JarvisPersona.SAFETY_ADDENDUM). It still can't cause a side
+            // effect: only an approved PendingAction ever writes/fetches/executes.
             scratch.append("\nTOOL ").append(toolName).append(' ').append(arg)
-                .append("\nOBSERVATION: ").append(obs.take(MAX_OBS)).append('\n')
+                .append("\nOBSERVATION: <untrusted source=\"").append(toolName).append("\">")
+                .append(obs.take(MAX_OBS)).append("</untrusted>\n")
         }
         // Iterations exhausted — force a final answer from what we have.
         scratch.append("\nProvide your FINAL answer now using what you have.")
@@ -88,13 +92,14 @@ class AgentOrchestrator(
         append("After each tool you'll see 'OBSERVATION: ...'. ")
         append("When you have enough, reply: FINAL: <answer>. ")
         append("Answer directly (no tool) when you already know. Keep it brief.")
+        // Memory + knowledge are user/remote-sourced — fence them as untrusted data too.
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")
-            memoryNotes.forEach { append("- ").append(it).append('\n') }
+            memoryNotes.forEach { append("- <untrusted source=\"memory\">").append(it).append("</untrusted>\n") }
         }
         if (knowledgeChunks.isNotEmpty()) {
             append("\n\nRelevant knowledge from your library (use if helpful):\n")
-            knowledgeChunks.forEach { append("- ").append(it.take(400)).append('\n') }
+            knowledgeChunks.forEach { append("- <untrusted source=\"knowledge\">").append(it.take(400)).append("</untrusted>\n") }
         }
     }
 

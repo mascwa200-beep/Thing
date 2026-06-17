@@ -23,6 +23,7 @@ class JarvisSetupViewModel(
     private val engine: RoutingInferenceEngine,
     private val settings: SettingsRepository,
     private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
+    private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
 ) : ViewModel() {
 
     /** Download lifecycle (Idle → Running → Done/Failed). Pre-seeded to Done if a model already exists. */
@@ -64,6 +65,10 @@ class JarvisSetupViewModel(
     /** Chat template used to format prompts for the model (Auto/ChatML/Gemma/Plain). */
     val chatFormat: StateFlow<ChatFormat> = _chatFormat.asStateFlow()
 
+    private val _charter = MutableStateFlow("")
+    /** The user-supplied persona "charter" prepended atop every prompt (blank = built-in persona). */
+    val charter: StateFlow<String> = _charter.asStateFlow()
+
     private val _knowledgeChunks = MutableStateFlow(0)
     /** Number of chunks stored in the knowledge library (docs RAG). */
     val knowledgeChunks: StateFlow<Int> = _knowledgeChunks.asStateFlow()
@@ -84,6 +89,7 @@ class JarvisSetupViewModel(
             _agentTools.value = saved.agentToolsEnabled
             _githubToken.value = saved.githubToken
             _chatFormat.value = saved.chatFormat
+            _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
         }
@@ -92,6 +98,13 @@ class JarvisSetupViewModel(
 
     fun onUrlChange(value: String) { _url.value = value }
     fun onTokenChange(value: String) { _token.value = value }
+
+    fun onCharterChange(value: String) { _charter.value = value }
+
+    /** Persist the persona charter (snapshotting the previous one for rollback). */
+    fun saveCharter() {
+        viewModelScope.launch { runCatching { selfEdit.setCharter(_charter.value) } }
+    }
 
     /** Persist the resident-service preference. Starting/stopping the service itself is
      *  done by the screen, which has the Android context. */

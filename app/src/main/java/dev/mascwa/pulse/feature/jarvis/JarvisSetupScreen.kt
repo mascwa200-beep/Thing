@@ -68,6 +68,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val wakeWord by vm.wakeWord.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
+    val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
     val knowledgeDocs by vm.knowledgeDocs.collectAsState()
@@ -164,6 +165,21 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             Text(
                 "AUTO picks ChatML (Qwen) or Gemma turns from the model URL. If replies come out " +
                     "garbled or repeat control tokens, switch to PLAIN.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("CHARTER  ·  J.A.R.V.I.S.'s personality, prepended to every prompt")
+            MonoFieldArea(
+                charter, vm::onCharterChange,
+                "Leave blank for the built-in persona, or describe the character you want: tone, how it " +
+                    "refers to itself, how it addresses you, its quirks…",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NeonButton(text = "SAVE CHARTER", enabled = true, color = c.accent, onClick = vm::saveCharter)
+            }
+            Text(
+                "Saved on-device. A built-in safety rule is always appended in code and can't be " +
+                    "overridden by the charter.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 

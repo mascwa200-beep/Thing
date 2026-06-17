@@ -70,11 +70,11 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.jarvis.JarvisViewModel(
                     c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine,
                     c.intentRouter, c.actionOrchestrator, c.textToSpeech, c.settingsRepository,
-                    c.voskSpeech, c.agentOrchestrator, c.knowledgeStore,
+                    c.voskSpeech, c.agentOrchestrator, c.knowledgeStore, c.selfEditStore,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(
-                    c.modelManager, c.inferenceEngine, c.settingsRepository, c.knowledgeStore,
+                    c.modelManager, c.inferenceEngine, c.settingsRepository, c.knowledgeStore, c.selfEditStore,
                 )
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)

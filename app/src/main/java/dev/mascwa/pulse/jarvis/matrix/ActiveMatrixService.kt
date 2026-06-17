@@ -240,8 +240,11 @@ class ActiveMatrixService : Service() {
         }
         try {
             runCatching { engine.ensureReady() }
+            val persona = JarvisPersona.compose(
+                runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
+            )
             val sb = StringBuilder()
-            engine.generate(command, emptyList(), JarvisPersona.SYSTEM_PROMPT).collect { sb.append(it) }
+            engine.generate(command, emptyList(), persona).collect { sb.append(it) }
             val reply = sb.toString().ifBlank { "Standing by, sir." }
             update(reply.take(140))
             runCatching { container?.textToSpeech?.speak(reply) }

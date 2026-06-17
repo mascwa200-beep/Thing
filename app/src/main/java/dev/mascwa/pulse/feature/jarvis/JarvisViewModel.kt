@@ -57,6 +57,7 @@ class JarvisViewModel(
     private val voskSpeech: VoskSpeech,
     private val agent: AgentOrchestrator,
     private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
+    private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -180,7 +181,7 @@ class JarvisViewModel(
     /** Single-shot reply straight from the model (no tools), streaming tokens to the console. */
     private suspend fun generateDirect(text: String): String {
         val history = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
-        val system = withKnowledge(SYSTEM_PROMPT, text)
+        val system = withKnowledge(composePersona(), text)
         val sb = StringBuilder()
         engine.generate(text, history, system).collect { token ->
             sb.append(token)
@@ -194,14 +195,19 @@ class JarvisViewModel(
     private suspend fun withKnowledge(base: String, query: String): String {
         val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
         if (docs.isEmpty()) return base
-        val block = docs.joinToString("\n") { "- [${it.title}] ${it.text.take(400)}" }
+        // Fence retrieved docs as untrusted data (see JarvisPersona.SAFETY_ADDENDUM).
+        val block = docs.joinToString("\n") { "- <untrusted source=\"knowledge\">[${it.title}] ${it.text.take(400)}</untrusted>" }
         return base + "\n\nRelevant knowledge from your library (use if helpful):\n" + block
     }
+
+    /** The live system prompt: the user's charter (or built-in persona) + the immutable safety addendum. */
+    private suspend fun composePersona(): String =
+        JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
 
     /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. */
     private suspend fun generateWithAgent(text: String): String {
         val sb = StringBuilder()
-        agent.run(text, SYSTEM_PROMPT).collect { step ->
+        agent.run(text, composePersona()).collect { step ->
             when (step.kind) {
                 AgentOrchestrator.Kind.THINKING -> _streaming.value = "◌ reasoning…"
                 AgentOrchestrator.Kind.TOOL -> _streaming.value = "⚙ ${step.text}"
@@ -292,6 +298,5 @@ class JarvisViewModel(
     private companion object {
         const val HISTORY_TURNS = 12
         const val TAP_TO_TALK_TIMEOUT_MS = 10_000
-        val SYSTEM_PROMPT = JarvisPersona.SYSTEM_PROMPT
     }
 }

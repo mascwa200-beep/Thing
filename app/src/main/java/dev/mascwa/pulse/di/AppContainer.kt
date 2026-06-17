@@ -33,6 +33,12 @@ class AppContainer(private val appContext: Context) {
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
 
+    /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,
+     *  authored tools). Separate DataStore file so it never migrates/wipes settings or the Room DB. */
+    val selfEditStore: dev.mascwa.pulse.data.selfedit.SelfEditStore by lazy {
+        dev.mascwa.pulse.data.selfedit.SelfEditStore(appContext, json)
+    }
+
     /**
      * Bounded Coil image loader so thumbnail-heavy screens (news/markets/images/social) can't grow
      * the heap without limit — a key part of stopping the OS low-memory kills. Installed as the app's
