@@ -93,7 +93,12 @@ private const val ROUTE_LAYER = "nav-route-line"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
-private val WATER = Color(0xFF06121F)   // deep navy so water reads as "off" against the red city
+// Cyberpunk 2077 map palette (tuned to the reference screenshots).
+private val LAND = Color(0xFF080C18)          // near-black navy base (land / parks / background)
+private val WATER = Color(0xFF0B1A2E)          // slightly lifted navy so water reads distinct from land
+private val BUILDING = Color(0xFFFF2A4E)       // red building mass
+private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
+private val ROAD = Color(0xFF2DE2E6)           // glowing cyan road network
 
 @Composable
 fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
@@ -140,7 +145,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
             }
             ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                 cyberpunkify(style, c)
-                ensureBuildingExtrusion(style, c)
+                ensureBuildingExtrusion(style)
                 addRouteLayer(style, c)
                 addPoiLayer(style, c)
                 addWaypointLayer(style, c)
@@ -318,33 +323,39 @@ private fun jsonString(s: String): String {
 /** Recolour the loaded OSM style into the cyberpunk palette: void background, red buildings, cyan
  *  road network, dimmed water/land, and readable labels. Works on whatever layers the style ships. */
 private fun cyberpunkify(style: Style, c: NightwirePalette) {
-    val void = c.void.toArgb()
-    val red = c.magenta.toArgb()
-    val cyan = c.sky.toArgb()
+    val land = LAND.toArgb()
+    val red = BUILDING.toArgb()
+    val redEdge = BUILDING_EDGE.toArgb()
+    val cyan = ROAD.toArgb()
     val water = WATER.toArgb()
     val label = c.ink.toArgb()
     style.layers.forEach { layer ->
         val id = layer.id.lowercase()
         when (layer) {
-            is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(void))
+            is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(land))
             is FillExtrusionLayer -> layer.setProperties(
                 PropertyFactory.fillExtrusionColor(red),
                 PropertyFactory.fillExtrusionOpacity(0.6f),
             )
             is FillLayer -> when {
                 "water" in id -> layer.setProperties(PropertyFactory.fillColor(water))
-                "building" in id -> layer.setProperties(PropertyFactory.fillColor(red), PropertyFactory.fillOpacity(0.32f))
-                else -> layer.setProperties(PropertyFactory.fillColor(void)) // land/parks blend into the void
+                "building" in id -> layer.setProperties(
+                    PropertyFactory.fillColor(red),
+                    PropertyFactory.fillOpacity(0.45f),
+                    PropertyFactory.fillOutlineColor(redEdge),
+                )
+                else -> layer.setProperties(PropertyFactory.fillColor(land)) // land/parks blend into the base
             }
             is LineLayer -> when {
                 "water" in id || "river" in id || "waterway" in id -> layer.setProperties(PropertyFactory.lineColor(water))
-                "building" in id -> layer.setProperties(PropertyFactory.lineColor(red))
+                "building" in id -> layer.setProperties(PropertyFactory.lineColor(redEdge))
                 "boundary" in id || "admin" in id -> layer.setProperties(PropertyFactory.lineColor(c.muted.toArgb()))
-                else -> layer.setProperties(PropertyFactory.lineColor(cyan)) // roads / rail / paths
+                // roads / rail / paths: glowing cyan (keep the style's zoom-based width, add a soft glow).
+                else -> layer.setProperties(PropertyFactory.lineColor(cyan), PropertyFactory.lineBlur(1.4f))
             }
             is SymbolLayer -> layer.setProperties(
                 PropertyFactory.textColor(label),
-                PropertyFactory.textHaloColor(void),
+                PropertyFactory.textHaloColor(land),
                 PropertyFactory.textHaloWidth(1.3f),
             )
             is CircleLayer -> layer.setProperties(PropertyFactory.circleColor(cyan))
@@ -355,8 +366,8 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
 /** Make every building a red 3D block: recolour + lower the min-zoom of any extrusion layers, or add
  *  one over the OpenMapTiles "building" source layer if the style has none. Defensive: a wrong source
  *  name degrades to "no extra buildings", never a crash. */
-private fun ensureBuildingExtrusion(style: Style, c: NightwirePalette) {
-    val red = c.magenta.toArgb()
+private fun ensureBuildingExtrusion(style: Style) {
+    val red = BUILDING.toArgb()
     val existing = style.layers.filterIsInstance<FillExtrusionLayer>()
     if (existing.isNotEmpty()) {
         existing.forEach { layer ->
