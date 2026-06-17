@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.sensors.CompassController
+import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.Job
@@ -27,10 +28,42 @@ class NavViewModel(
     private val locationProvider: LocationProvider,
     private val compass: CompassController,
     private val overpass: OverpassRepository,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _location = MutableStateFlow<DeviceLocation?>(null)
     val location: StateFlow<DeviceLocation?> = _location.asStateFlow()
+
+    /** 3D tilted view (vs flat 2D) and heading-up rotation (vs north-up) — persisted in settings. */
+    private val _nav3d = MutableStateFlow(true)
+    val nav3d: StateFlow<Boolean> = _nav3d.asStateFlow()
+    private val _headingUp = MutableStateFlow(false)
+    val headingUp: StateFlow<Boolean> = _headingUp.asStateFlow()
+
+    /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
+    private val _selectedPoi = MutableStateFlow<Place?>(null)
+    val selectedPoi: StateFlow<Place?> = _selectedPoi.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            runCatching { settings.current() }.getOrNull()?.let {
+                _nav3d.value = it.nav3d
+                _headingUp.value = it.navHeadingUp
+            }
+        }
+    }
+
+    fun set3d(on: Boolean) {
+        _nav3d.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(nav3d = on) } } }
+    }
+
+    fun setHeadingUp(on: Boolean) {
+        _headingUp.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navHeadingUp = on) } } }
+    }
+
+    fun selectPoi(place: Place?) { _selectedPoi.value = place }
 
     /** Smoothed true-north heading in degrees (0..360); drives the heading-up camera. */
     val headingDeg: StateFlow<Float> =

@@ -230,6 +230,10 @@ data class AppSettings(
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
 
+    // NAV map view (persisted so the map opens how you left it).
+    val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
+    val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
+
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),
 

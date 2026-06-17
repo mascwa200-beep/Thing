@@ -10,13 +10,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
+import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -60,6 +61,7 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
@@ -67,7 +69,6 @@ import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Point
 
@@ -90,6 +91,9 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val enabled by vm.enabled.collectAsState()
     val pois by vm.pois.collectAsState()
     val scanning by vm.scanning.collectAsState()
+    val nav3d by vm.nav3d.collectAsState()
+    val headingUp by vm.headingUp.collectAsState()
+    val selectedPoi by vm.selectedPoi.collectAsState()
 
     DisposableEffect(Unit) {
         vm.start()
@@ -103,11 +107,11 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
 
     val mapView = rememberMapViewWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    // True = camera tracks GPS heading-up; flips to false the moment the user pans/zooms/rotates.
+    // True = camera tracks GPS; flips to false the moment the user pans/zooms/rotates by hand.
     var follow by remember { mutableStateOf(true) }
 
-    // One-time map wiring: enable free-roam gestures, load + cyberpunk-ify the style, add the player
-    // marker, and drop follow-mode as soon as the user drives the camera by hand.
+    // One-time map wiring: free-roam gestures, cyberpunk style + red 3D buildings, the player marker,
+    // tap-to-select POIs, and dropping follow-mode as soon as the user drives the camera by hand.
     LaunchedEffect(mapView) {
         mapView.getMapAsync { ml ->
             map = ml
@@ -123,11 +127,19 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
             }
             ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                 cyberpunkify(style, c)
+                ensureBuildingExtrusion(style, c)
                 addPoiLayer(style, c)
                 addPlayerMarker(style, c)
             }
             ml.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) follow = false
+            }
+            ml.addOnMapClickListener { latLng ->
+                val pt = ml.projection.toScreenLocation(latLng)
+                val name = ml.queryRenderedFeatures(pt, POI_LAYER).firstOrNull()?.getStringProperty("name")
+                val hit = name?.let { n -> vm.pois.value.values.flatten().firstOrNull { it.name == n } }
+                vm.selectPoi(hit)
+                hit != null
             }
         }
     }
@@ -146,12 +158,29 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         src.setGeoJson(poiGeoJson(enabled, pois))
     }
 
-    // While tracking, follow GPS heading-up. Once the user pans, this no-ops until they recenter.
-    LaunchedEffect(location, heading, follow, map) {
+    // While tracking, follow GPS in the current mode (3D/2D, heading-up/north-up).
+    LaunchedEffect(location, heading, follow, nav3d, headingUp, map) {
         if (!follow) return@LaunchedEffect
         val m = map ?: return@LaunchedEffect
         val loc = location ?: return@LaunchedEffect
-        m.moveCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading)))
+        m.moveCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading, nav3d, headingUp)))
+    }
+
+    // Mode toggled while free-roaming: re-tilt / re-bearing in place without recentering.
+    LaunchedEffect(nav3d, headingUp, map) {
+        if (follow) return@LaunchedEffect
+        val m = map ?: return@LaunchedEffect
+        val cur = m.cameraPosition
+        m.animateCamera(
+            CameraUpdateFactory.newCameraPosition(
+                CameraPosition.Builder()
+                    .target(cur.target)
+                    .zoom(cur.zoom)
+                    .tilt(if (nav3d) FOLLOW_TILT else 0.0)
+                    .bearing(if (headingUp) heading.toDouble() else 0.0)
+                    .build(),
+            ),
+        )
     }
 
     PulseScaffold(
@@ -165,32 +194,61 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
             NavChrome(heading = heading, hasFix = location != null, c = c)
-            RecenterButton(
-                following = follow,
-                c = c,
-                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                onClick = {
+
+            // Right-edge control cluster.
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MapControlButton("◎", active = follow, c = c) {
                     follow = true
                     val loc = location
                     val m = map
                     if (loc != null && m != null) {
-                        m.animateCamera(
-                            CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading)),
-                        )
+                        m.animateCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading, nav3d, headingUp)))
                     }
-                },
-            )
-            FilterLegend(
-                enabled = enabled,
-                counts = pois.mapValues { it.value.size },
-                scanning = scanning,
-                onScan = { centerOf(map, location)?.let { vm.scan(it.first, it.second) } },
-                onToggle = { cat -> centerOf(map, location)?.let { vm.toggle(cat, it.first, it.second) } },
-                c = c,
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 28.dp),
-            )
+                }
+                MapControlButton("+", active = false, c = c) { map?.animateCamera(CameraUpdateFactory.zoomIn()) }
+                MapControlButton("−", active = false, c = c) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
+                MapControlButton(if (nav3d) "3D" else "2D", active = nav3d, c = c) { vm.set3d(!nav3d) }
+                MapControlButton("⟲", active = headingUp, c = c) { vm.setHeadingUp(!headingUp) }
+            }
+
+            // Bottom stack: optional POI detail card above the filter bar.
+            Column(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                selectedPoi?.let { poi ->
+                    PoiDetailCard(poi = poi, location = location, c = c, onClose = { vm.selectPoi(null) })
+                }
+                FilterBar(
+                    enabled = enabled,
+                    counts = pois.mapValues { it.value.size },
+                    scanning = scanning,
+                    onScan = { centerOf(map, location)?.let { vm.scan(it.first, it.second) } },
+                    onToggle = { cat -> centerOf(map, location)?.let { vm.toggle(cat, it.first, it.second) } },
+                    c = c,
+                )
+            }
         }
     }
+}
+
+/** Camera for follow mode: tilt/bearing derive from the view mode (north-up = bearing 0). */
+private fun followCamera(lat: Double, lon: Double, heading: Float, nav3d: Boolean, headingUp: Boolean): CameraPosition =
+    CameraPosition.Builder()
+        .target(LatLng(lat, lon))
+        .zoom(FOLLOW_ZOOM)
+        .tilt(if (nav3d) FOLLOW_TILT else 0.0)
+        .bearing(if (headingUp) heading.toDouble() else 0.0)
+        .build()
+
+/** Best map reference point for a POI scan: the current map centre, else the GPS fix. */
+private fun centerOf(map: MapLibreMap?, location: DeviceLocation?): Pair<Double, Double>? {
+    map?.cameraPosition?.target?.let { return it.latitude to it.longitude }
+    location?.let { return it.latitude to it.longitude }
+    return null
 }
 
 /** Build a GeoJSON FeatureCollection string for the enabled categories' POIs (fed to the source as
@@ -226,21 +284,6 @@ private fun jsonString(s: String): String {
     return sb.append('"').toString()
 }
 
-/** Best map reference point for a POI scan: the current map centre, else the GPS fix. */
-private fun centerOf(map: MapLibreMap?, location: DeviceLocation?): Pair<Double, Double>? {
-    map?.cameraPosition?.target?.let { return it.latitude to it.longitude }
-    location?.let { return it.latitude to it.longitude }
-    return null
-}
-
-private fun followCamera(lat: Double, lon: Double, heading: Float): CameraPosition =
-    CameraPosition.Builder()
-        .target(LatLng(lat, lon))
-        .zoom(FOLLOW_ZOOM)
-        .tilt(FOLLOW_TILT)
-        .bearing(heading.toDouble())
-        .build()
-
 /** Recolour the loaded OSM style into the cyberpunk palette: void background, red buildings, cyan
  *  road network, dimmed water/land, and readable labels. Works on whatever layers the style ships. */
 private fun cyberpunkify(style: Style, c: NightwirePalette) {
@@ -255,7 +298,7 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
             is BackgroundLayer -> layer.setProperties(PropertyFactory.backgroundColor(void))
             is FillExtrusionLayer -> layer.setProperties(
                 PropertyFactory.fillExtrusionColor(red),
-                PropertyFactory.fillExtrusionOpacity(0.55f),
+                PropertyFactory.fillExtrusionOpacity(0.6f),
             )
             is FillLayer -> when {
                 "water" in id -> layer.setProperties(PropertyFactory.fillColor(water))
@@ -275,6 +318,35 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
             )
             is CircleLayer -> layer.setProperties(PropertyFactory.circleColor(cyan))
         }
+    }
+}
+
+/** Make every building a red 3D block: recolour + lower the min-zoom of any extrusion layers, or add
+ *  one over the OpenMapTiles "building" source layer if the style has none. Defensive: a wrong source
+ *  name degrades to "no extra buildings", never a crash. */
+private fun ensureBuildingExtrusion(style: Style, c: NightwirePalette) {
+    val red = c.magenta.toArgb()
+    val existing = style.layers.filterIsInstance<FillExtrusionLayer>()
+    if (existing.isNotEmpty()) {
+        existing.forEach { layer ->
+            layer.minZoom = 13f
+            layer.setProperties(
+                PropertyFactory.fillExtrusionColor(red),
+                PropertyFactory.fillExtrusionOpacity(0.6f),
+            )
+        }
+        return
+    }
+    runCatching {
+        val layer = FillExtrusionLayer("nav-buildings-3d", "openmaptiles").withSourceLayer("building")
+        layer.minZoom = 13f
+        layer.setProperties(
+            PropertyFactory.fillExtrusionColor(red),
+            PropertyFactory.fillExtrusionOpacity(0.6f),
+            PropertyFactory.fillExtrusionHeight(Expression.get("render_height")),
+            PropertyFactory.fillExtrusionBase(Expression.get("render_min_height")),
+        )
+        style.addLayer(layer)
     }
 }
 
@@ -307,80 +379,94 @@ private fun addPoiLayer(style: Style, c: NightwirePalette) {
     )
 }
 
+/** Square HUD-styled map control button (recenter / zoom / 2D-3D / rotate). */
 @Composable
-private fun RecenterButton(following: Boolean, c: NightwirePalette, modifier: Modifier, onClick: () -> Unit) {
-    val tint = if (following) c.accent else c.ink
+private fun MapControlButton(label: String, active: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    val tint = if (active) c.accent else c.ink
     Box(
-        modifier
+        Modifier
+            .size(44.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(c.panel.copy(alpha = 0.82f))
             .border(1.dp, tint, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            if (following) "◎ TRACKING" else "◎ RECENTER",
-            fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = tint,
-        )
+        Text(label, fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
     }
 }
 
-/** The cyberpunk "legend": a SCAN action + a scrollable row of toggleable POI category chips. */
+/** Detail card for a tapped POI: name, distance, address. (SET WAYPOINT arrives in Phase 3.) */
 @Composable
-private fun FilterLegend(
+private fun PoiDetailCard(poi: Place, location: DeviceLocation?, c: NightwirePalette, onClose: () -> Unit) {
+    val dist = location?.let { Geo.formatDistance(Geo.distanceMeters(it.latitude, it.longitude, poi.latitude, poi.longitude)) }
+    NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    poi.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink, modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "✕", fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.muted,
+                    modifier = Modifier.clickable(onClick = onClose).padding(4.dp),
+                )
+            }
+            if (dist != null) {
+                Text("◢ $dist", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.sky, modifier = Modifier.padding(top = 2.dp))
+            }
+            poi.address?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+    }
+}
+
+/** The cyberpunk filter bar: a SCAN action + a scrollable row of toggleable POI category buttons. */
+@Composable
+private fun FilterBar(
     enabled: Set<NavCategory>,
     counts: Map<NavCategory, Int>,
     scanning: Boolean,
     onScan: () -> Unit,
     onToggle: (NavCategory) -> Unit,
     c: NightwirePalette,
-    modifier: Modifier,
 ) {
-    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Chip(
-            label = if (scanning) "SCANNING…" else "⟳ SCAN",
-            dot = null,
-            outline = c.accent,
-            textColor = c.accent,
-            background = c.panel.copy(alpha = 0.92f),
-            onClick = onScan,
-        )
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(c.panel.copy(alpha = 0.92f))
+                .border(1.dp, c.accent, RoundedCornerShape(10.dp))
+                .clickable(enabled = !scanning, onClick = onScan)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(if (scanning) "SCANNING…" else "⟳ SCAN", fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.accent)
+        }
         NavCategory.entries.forEach { cat ->
             val on = cat in enabled
             val dot = Color(cat.colorArgb)
-            Chip(
-                label = if (on) "${cat.label}  ${counts[cat] ?: 0}" else cat.label,
-                dot = dot,
-                outline = if (on) dot else c.muted,
-                textColor = if (on) c.ink else c.muted,
-                background = c.panel.copy(alpha = if (on) 0.92f else 0.7f),
-                onClick = { onToggle(cat) },
-            )
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(c.panel.copy(alpha = if (on) 0.92f else 0.7f))
+                    .border(1.dp, if (on) dot else c.muted, RoundedCornerShape(10.dp))
+                    .clickable { onToggle(cat) }
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(cat.icon, contentDescription = cat.label, tint = if (on) dot else c.muted, modifier = Modifier.size(20.dp))
+                Text(
+                    if (on) "${cat.label} ${counts[cat] ?: 0}" else cat.label,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = if (on) c.ink else c.muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
         }
-    }
-}
-
-@Composable
-private fun Chip(
-    label: String,
-    dot: Color?,
-    outline: Color,
-    textColor: Color,
-    background: Color,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(background)
-            .border(1.dp, outline, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (dot != null) Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-        Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = textColor)
     }
 }
 
@@ -400,7 +486,7 @@ private fun NavChrome(heading: Float, hasFix: Boolean, c: NightwirePalette) {
             Text(
                 "ACQUIRING GPS…",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
             )
         }
     }
