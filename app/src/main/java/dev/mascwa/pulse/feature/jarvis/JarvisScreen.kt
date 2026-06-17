@@ -275,7 +275,7 @@ private fun InputBar(busy: Boolean, voice: VoiceInputState, onSend: (String) -> 
 private fun VoiceLine(voice: VoiceInputState) {
     val c = Pulse.colors
     val (text, color) = when (voice) {
-        is VoiceInputState.Preparing -> "◌ PREPARING VOICE…" to c.amber
+        is VoiceInputState.Preparing -> ("◌ " + voice.status.ifBlank { "PREPARING VOICE…" }.uppercase()) to c.amber
         is VoiceInputState.Listening ->
             ("● LISTENING… " + voice.partial.ifBlank { "(speak now)" }) to c.magenta
         is VoiceInputState.Error -> "✕ ${voice.message}" to c.magenta

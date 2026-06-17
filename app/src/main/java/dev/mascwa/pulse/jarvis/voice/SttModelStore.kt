@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
- * Provisions the offline Vosk speech model on demand: streams the (~128 MB) zip to private
+ * Provisions the offline Vosk speech model on demand: streams the (~1.8 GB) zip to private
  * storage and unpacks it, so voice input needs no bundled asset bloat and no Play Services.
  * The model stays in [Context.getFilesDir] and never leaves the device.
  */
@@ -148,10 +148,11 @@ class SttModelStore(context: Context) {
     }
 
     companion object {
-        /** Vosk en-US "lgraph" model (~128 MB) — markedly better accuracy than the small model, and
-         *  its dynamic graph still supports the wake-word grammar. Stays fully on-device. */
-        const val DEFAULT_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip"
+        /** Full Vosk en-US 0.22 model (~1.8 GB) — the accurate, "big" model for dictation. It's a
+         *  static graph, so it does NOT support Vosk's runtime grammar; wake spotting falls back to
+         *  free-form recognition (see [VoskSpeech.start]). Stays fully on-device. */
+        const val DEFAULT_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip"
         /** Bump when [DEFAULT_URL] changes to force a one-time re-provision of the new model. */
-        const val MODEL_VERSION = "en-us-0.22-lgraph"
+        const val MODEL_VERSION = "en-us-0.22-full"
     }
 }

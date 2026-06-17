@@ -40,7 +40,8 @@ data class JarvisMessage(
 /** Tap-to-talk voice input lifecycle. */
 sealed interface VoiceInputState {
     data object Idle : VoiceInputState
-    data object Preparing : VoiceInputState
+    /** [status] carries provisioning progress (e.g. "downloading voice model 42%") for the big model. */
+    data class Preparing(val status: String = "") : VoiceInputState
     data class Listening(val partial: String) : VoiceInputState
     data class Error(val message: String) : VoiceInputState
 }
@@ -261,8 +262,22 @@ class JarvisViewModel(
     fun startVoiceInput() {
         if (_voiceInput.value is VoiceInputState.Listening || _voiceInput.value is VoiceInputState.Preparing) return
         viewModelScope.launch {
-            _voiceInput.value = VoiceInputState.Preparing
-            if (!voskSpeech.ensureModel()) {
+            _voiceInput.value = VoiceInputState.Preparing()
+            // The big STT model is a ~1.8 GB download on first use — reflect its progress so the
+            // button doesn't look frozen for minutes.
+            val progress = launch {
+                voskSpeech.provisioning.collect { st ->
+                    val msg = when (st) {
+                        is dev.mascwa.pulse.jarvis.voice.SttModelStore.State.Downloading -> "downloading voice model ${st.pct}%"
+                        is dev.mascwa.pulse.jarvis.voice.SttModelStore.State.Unpacking -> "unpacking voice model…"
+                        else -> ""
+                    }
+                    if (_voiceInput.value is VoiceInputState.Preparing) _voiceInput.value = VoiceInputState.Preparing(msg)
+                }
+            }
+            val ready = voskSpeech.ensureModel()
+            progress.cancel()
+            if (!ready) {
                 _voiceInput.value = VoiceInputState.Error("Voice model unavailable.")
                 return@launch
             }

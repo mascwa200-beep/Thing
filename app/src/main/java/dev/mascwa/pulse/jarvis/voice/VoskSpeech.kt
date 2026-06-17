@@ -63,7 +63,14 @@ class VoskSpeech(context: Context) {
         val m = model ?: return false
         stop()
         return runCatching {
-            val recognizer = if (grammar != null) Recognizer(m, SAMPLE_RATE, grammar) else Recognizer(m, SAMPLE_RATE)
+            // A static (large) model doesn't support Vosk's runtime grammar constructor; if it throws,
+            // fall back to free-form recognition so wake spotting still works (the caller matches the
+            // wake word in the transcript). Dynamic models keep using the grammar for tighter spotting.
+            val recognizer = if (grammar != null) {
+                runCatching { Recognizer(m, SAMPLE_RATE, grammar) }.getOrElse { Recognizer(m, SAMPLE_RATE) }
+            } else {
+                Recognizer(m, SAMPLE_RATE)
+            }
             val service = SpeechService(recognizer, SAMPLE_RATE)
             if (timeoutMs > 0) service.startListening(adapter(listener), timeoutMs) else service.startListening(adapter(listener))
             speechService = service

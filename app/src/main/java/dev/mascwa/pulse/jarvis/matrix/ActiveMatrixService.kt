@@ -178,7 +178,9 @@ class ActiveMatrixService : Service() {
         }
         capturing = false
         update("Listening for \"J.A.R.V.I.S.\"…")
-        vosk.start(grammar = WAKE_GRAMMAR, listener = object : VoskListener {
+        // Free-form recognition: the big STT model is a static graph (no runtime grammar), so we
+        // transcribe and match the wake word in the text via the lenient isWakePhrase below.
+        vosk.start(grammar = null, listener = object : VoskListener {
             override fun onPartial(text: String) { maybeWake(vosk, text) }
             override fun onFinal(text: String) { maybeWake(vosk, text) }
             override fun onError(message: String) { /* keep the resident notice; no retry storm */ }
@@ -313,11 +315,7 @@ class ActiveMatrixService : Service() {
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.matrix.STOP"
         private const val EXTRA_WAKE_WORD = "dev.mascwa.pulse.jarvis.matrix.WAKE_WORD"
 
-        // Keyword-spotting grammar: the wake word plus common lead-ins ("hey/ok jarvis") and the
-        // unknown-word token. Vosk only emits words it's told about, so multi-word forms are explicit.
-        private const val WAKE_GRAMMAR =
-            "[\"jarvis\", \"hey jarvis\", \"ok jarvis\", \"okay jarvis\", \"hi jarvis\", \"[unk]\"]"
-        // Near-homophones the small STT model often produces for "jarvis"; matched leniently below.
+        // Near-homophones the STT model often produces for "jarvis"; matched leniently below.
         private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
         // Re-arm the wake loop if no command is spoken within this window after waking.
         private const val COMMAND_TIMEOUT_MS = 8000
