@@ -121,8 +121,9 @@ data class JarvisSettings(
     val modelUrl: String = "",
     /** Optional Bearer token for gated hosts (e.g. a Hugging Face access token). */
     val modelToken: String = "",
-    /** Max tokens generated per turn. */
-    val maxTokens: Int = 1024,
+    /** Model's total token budget (input context + output). The engine reserves part for the answer
+     *  and clamps the input to the rest, so a long chat can't overflow the context and crash. */
+    val maxTokens: Int = 2048,
     /** Keep J.A.R.V.I.S. resident via the Active-Matrix foreground service. */
     val residentService: Boolean = false,
     /** Monitor a paired BLE heart-rate strap and check in on anomalies (opt-in). */

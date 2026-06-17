@@ -59,6 +59,12 @@ data class PromptConfig(
  *
  * [history] is oldest → newest; only the last [maxTurns] are kept. Roles follow [ChatTurn.role]:
  * "user" is the user, anything else (e.g. "jarvis") is the assistant/model.
+ *
+ * [maxInputTokens] (when > 0) caps the rendered INPUT to roughly that many tokens. MediaPipe's
+ * total token budget covers input **and** output, so an oversized input (a long chat) overflows the
+ * context and aborts generation *natively*. To stay safe we trim to fit — dropping the **oldest**
+ * turns first, then truncating the (persona + RAG) [system] block, then the [prompt] as a last
+ * resort. Token counts are estimated from text length (~[CHARS_PER_TOKEN] chars/token).
  */
 fun renderPrompt(
     format: ChatFormat,
@@ -66,10 +72,29 @@ fun renderPrompt(
     history: List<ChatTurn>,
     system: String?,
     maxTurns: Int = 8,
+    maxInputTokens: Int = 0,
 ): String {
-    val turns = history.takeLast(maxTurns)
-    val sys = system?.trim().orEmpty()
-    val user = prompt.trim()
+    var turns = history.takeLast(maxTurns)
+    var sys = system?.trim().orEmpty()
+    var user = prompt.trim()
+
+    if (maxInputTokens > 0) {
+        fun est(s: String) = (s.length + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN
+        fun total() = est(sys) + est(user) +
+            turns.sumOf { est(it.text) } + PER_TURN_OVERHEAD * (turns.size + 1)
+        // 1) Shed the oldest turns until the rest fits.
+        while (total() > maxInputTokens && turns.isNotEmpty()) turns = turns.drop(1)
+        // 2) Still over (a huge persona/RAG block)? Truncate the system block's tail.
+        if (total() > maxInputTokens && sys.isNotEmpty()) {
+            val keep = (sys.length - (total() - maxInputTokens) * CHARS_PER_TOKEN).coerceAtLeast(0)
+            sys = if (keep == 0) "" else sys.take(keep).trimEnd()
+        }
+        // 3) Last resort — the new message alone exceeds the budget; clamp it so we never overflow.
+        if (total() > maxInputTokens) {
+            user = user.take((maxInputTokens * CHARS_PER_TOKEN).coerceAtLeast(0)).trimEnd()
+        }
+    }
+
     return when (format) {
         ChatFormat.PLAIN -> plain(user, turns, sys)
         ChatFormat.GEMMA -> gemma(user, turns, sys)
@@ -78,6 +103,11 @@ fun renderPrompt(
         ChatFormat.CHATML, ChatFormat.AUTO -> chatml(user, turns, sys)
     }
 }
+
+/** Rough bytes-per-token for English text; used only to budget the input so it never overflows. */
+private const val CHARS_PER_TOKEN = 4
+/** Approx. control-token cost each turn adds (role markers + separators). */
+private const val PER_TURN_OVERHEAD = 8
 
 private fun isUser(turn: ChatTurn) = turn.role.equals("user", ignoreCase = true)
 

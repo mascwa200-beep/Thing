@@ -44,7 +44,12 @@ class InferenceService : Service() {
             return try {
                 engine.generateResponse(prompt)
             } catch (t: Throwable) {
-                "// inference fault: ${t.message ?: t.javaClass.simpleName}"
+                val msg = t.message ?: t.javaClass.simpleName
+                // Flag a context-window rejection so the caller can show a friendly hint rather than
+                // an opaque fault. MediaPipe phrases this variously ("too long" / "exceeds" / token).
+                val tokenLimit = listOf("too long", "exceed", "max tokens", "maximum number of tokens", "context")
+                    .any { msg.contains(it, ignoreCase = true) }
+                if (tokenLimit) "// prompt too long: $msg" else "// inference fault: $msg"
             }
         }
     }

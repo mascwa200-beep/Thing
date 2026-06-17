@@ -155,6 +155,9 @@ class AppContainer(private val appContext: Context) {
             onNativeCrash = {
                 runCatching { settingsRepository.update { it.copy(jarvis = it.jarvis.copy(inferenceBackend = 2)) } }
             },
+            // Total token budget (input + output), read fresh at load time. The engine reserves part
+            // of this for the answer and clamps the input to the rest, so a long chat can't overflow.
+            maxTokensProvider = { runCatching { settingsRepository.current().jarvis.maxTokens }.getOrDefault(2048) },
         )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */

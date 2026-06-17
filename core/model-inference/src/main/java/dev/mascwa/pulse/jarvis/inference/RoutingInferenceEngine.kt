@@ -25,10 +25,12 @@ class RoutingInferenceEngine(
     private val backendProvider: suspend () -> Int = { 0 },
     /** Called when generation crashes natively on a non-CPU backend (app switches to CPU). */
     private val onNativeCrash: suspend () -> Unit = {},
+    /** The model's total token budget (input + output), read fresh at load time. */
+    private val maxTokensProvider: suspend () -> Int = { maxTokens },
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
-    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash)
+    private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash, maxTokensProvider)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()

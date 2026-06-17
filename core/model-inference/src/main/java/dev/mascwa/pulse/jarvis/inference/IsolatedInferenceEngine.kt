@@ -40,6 +40,8 @@ class IsolatedInferenceEngine(
     /** Invoked when generation dies with a native crash on a non-CPU backend, so the app layer can
      *  switch the persisted backend to CPU (the engine then reloads on the next ensureReady). */
     private val onNativeCrash: suspend () -> Unit = {},
+    /** The model's total token budget (input + output), read fresh at load time. */
+    private val maxTokensProvider: suspend () -> Int = { maxTokens },
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
@@ -48,6 +50,9 @@ class IsolatedInferenceEngine(
 
     /** Backend used for the current load (so a crash can decide whether to auto-fall back to CPU). */
     @Volatile private var lastBackend = 0
+
+    /** Total token budget the model was loaded with; sets the input clamp (see [generate]). */
+    @Volatile private var activeMaxTokens = maxTokens
 
     @Volatile private var service: IInferenceService? = null
     @Volatile private var bound = false
@@ -90,7 +95,9 @@ class IsolatedInferenceEngine(
         // DeadObjectException here rather than crashing us.
         val backend = runCatching { backendProvider() }.getOrDefault(0)
         lastBackend = backend
-        withContext(Dispatchers.IO) { runCatching { svc.load(modelManager.modelPath(), maxTokens, backend) } }
+        val tokens = runCatching { maxTokensProvider() }.getOrDefault(maxTokens).let { if (it > 0) it else maxTokens }
+        activeMaxTokens = tokens
+        withContext(Dispatchers.IO) { runCatching { svc.load(modelManager.modelPath(), tokens, backend) } }
             .onSuccess { ok ->
                 _state.value = if (ok) EngineState.Ready else EngineState.Error("The model failed to load, sir.")
             }
@@ -129,9 +136,18 @@ class IsolatedInferenceEngine(
             return@flow
         }
         val cfg = promptConfig()
-        val full = renderPrompt(ChatFormat.resolve(cfg.format, cfg.modelUrl), prompt, history, system)
+        // Reserve part of the model's total budget for the answer; clamp the input to the rest so a
+        // long chat can't overflow the context and abort generation natively.
+        val inputBudget = (activeMaxTokens * INPUT_BUDGET_PCT) / 100
+        val full = renderPrompt(ChatFormat.resolve(cfg.format, cfg.modelUrl), prompt, history, system, maxInputTokens = inputBudget)
         val response = withContext(Dispatchers.IO) {
             genMutex.withLock { runCatching { svc.generate(full) }.getOrNull() }
+        }
+        // The model itself reported the prompt was too long (caught in the service, returns a marker
+        // rather than aborting): surface it plainly instead of as a fault bubble.
+        if (response != null && response.trimStart().startsWith("// prompt too long")) {
+            emit("That turn was a little long for my context, sir — try a shorter prompt or clear the history.")
+            return@flow
         }
         if (response == null) {
             // The :inference process died mid-generation (a native abort the JVM can't catch). Read
@@ -185,5 +201,7 @@ class IsolatedInferenceEngine(
     private companion object {
         const val CONNECT_TIMEOUT_MS = 8000L
         const val BACKEND_CPU = 2
+        // Share of the total token budget reserved for the *input*; the remainder is for the answer.
+        const val INPUT_BUDGET_PCT = 60
     }
 }
