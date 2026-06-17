@@ -156,6 +156,11 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // Greeting
                 item { Greeting() }
 
+                // Compact weather (temp + rain) above the sky digest.
+                if (state.weather.data?.current != null) {
+                    item { WeatherMiniWidget(state.weather, nav.openWeather) }
+                }
+
                 // Today in the sky
                 if (state.skyLines.isNotEmpty()) {
                     item { SkyDigestCard(state.skyLines) }
@@ -357,6 +362,36 @@ private fun MarketsSnapshot(async: Async<List<Quote>>, onClick: () -> Unit) {
                     Text(Formatters.signedPercent(q.changePercent), fontFamily = JetBrainsMono, fontSize = 12.sp,
                         fontWeight = FontWeight.Medium, color = trendColor((q.changePercent ?: 0.0) >= 0))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeatherMiniWidget(async: Async<dev.mascwa.pulse.data.weather.WeatherData>, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val wd = async.data ?: return
+    val cur = wd.current ?: return
+    val rain = wd.hourly.take(6).mapNotNull { it.precipProbability }.maxOrNull()
+    NeonPanel(Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onClick() }, corners = true) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(WeatherCode.emoji(cur.weatherCode, cur.isDay), fontSize = 22.sp)
+            Text(
+                "${Formatters.number(cur.temperature, 0)}${wd.tempUnitSymbol}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = c.ink,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+            Text(
+                WeatherCode.describe(cur.weatherCode),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+                modifier = Modifier.padding(start = 10.dp).weight(1f),
+            )
+            if (rain != null) {
+                Text(
+                    "☂ $rain%",
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    color = if (rain >= 50) c.sky else c.muted,
+                )
             }
         }
     }
