@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -112,6 +116,9 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val headingUp by vm.headingUp.collectAsState()
     val selectedPoi by vm.selectedPoi.collectAsState()
     val activeWaypoint by vm.activeWaypoint.collectAsState()
+    val flyTo by vm.flyTo.collectAsState()
+    val searchMessage by vm.searchMessage.collectAsState()
+    var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
         vm.start()
@@ -210,6 +217,24 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         )
     }
 
+    // A successful place search: stop following and fly the camera to the geocoded location.
+    LaunchedEffect(flyTo, map) {
+        val target = flyTo ?: return@LaunchedEffect
+        val m = map ?: return@LaunchedEffect
+        follow = false
+        m.animateCamera(
+            CameraUpdateFactory.newCameraPosition(
+                CameraPosition.Builder()
+                    .target(LatLng(target.first, target.second))
+                    .zoom(FOLLOW_ZOOM)
+                    .tilt(if (nav3d) FOLLOW_TILT else 0.0)
+                    .bearing(0.0)
+                    .build(),
+            ),
+        )
+        vm.consumeFlyTo()
+    }
+
     PulseScaffold(
         title = "NAV",
         navigationIcon = {
@@ -220,7 +245,17 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-            NavChrome(heading = heading, hasFix = location != null, c = c)
+            NavChrome(hasFix = location != null, c = c)
+
+            // Search bar — geocode a place, drop a waypoint, fly there.
+            NavSearchBar(
+                query = query,
+                onQuery = { query = it; vm.clearSearchMessage() },
+                onSearch = { if (query.isNotBlank()) vm.search(query) },
+                message = searchMessage,
+                c = c,
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 12.dp, end = 64.dp, top = 8.dp),
+            )
 
             // Right-edge control cluster.
             Column(
@@ -583,24 +618,63 @@ private fun FilterBar(
     }
 }
 
-/** The cyberpunk HUD frame: corner brackets, a heading readout, and a GPS-acquiring notice. */
+/** The cyberpunk HUD frame: corner brackets + a GPS-acquiring notice. */
 @Composable
-private fun NavChrome(heading: Float, hasFix: Boolean, c: NightwirePalette) {
+private fun NavChrome(hasFix: Boolean, c: NightwirePalette) {
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) {
             hudCorners(c.accent, 16.dp.toPx(), 1.5.dp.toPx(), 6.dp.toPx())
         }
-        Text(
-            "◢ NAV // ${heading.toInt()}° ${Geo.cardinal(heading.toDouble())}",
-            fontFamily = ChakraPetch, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.accent,
-            modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-        )
         if (!hasFix) {
             Text(
                 "ACQUIRING GPS…",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
             )
+        }
+    }
+}
+
+/** A search field that geocodes a place and flies to it; shows a brief "not found" message. */
+@Composable
+private fun NavSearchBar(
+    query: String,
+    onQuery: (String) -> Unit,
+    onSearch: () -> Unit,
+    message: String?,
+    c: NightwirePalette,
+    modifier: Modifier,
+) {
+    Column(modifier) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(c.panel.copy(alpha = 0.9f))
+                .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQuery,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text("Search a place…", fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted)
+                    }
+                    inner()
+                },
+            )
+            Text("⌕", fontFamily = JetBrainsMono, fontSize = 16.sp, color = c.accent, modifier = Modifier.clickable(onClick = onSearch).padding(6.dp))
+        }
+        if (message != null) {
+            Text(message, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
         }
     }
 }

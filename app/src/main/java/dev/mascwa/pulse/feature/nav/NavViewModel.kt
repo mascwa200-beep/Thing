@@ -52,6 +52,13 @@ class NavViewModel(
     private val _selectedPoi = MutableStateFlow<Place?>(null)
     val selectedPoi: StateFlow<Place?> = _selectedPoi.asStateFlow()
 
+    /** One-shot camera target from a successful place search (screen consumes it). */
+    private val _flyTo = MutableStateFlow<Pair<Double, Double>?>(null)
+    val flyTo: StateFlow<Pair<Double, Double>?> = _flyTo.asStateFlow()
+
+    private val _searchMessage = MutableStateFlow<String?>(null)
+    val searchMessage: StateFlow<String?> = _searchMessage.asStateFlow()
+
     init {
         viewModelScope.launch {
             runCatching { settings.current() }.getOrNull()?.let {
@@ -72,6 +79,27 @@ class NavViewModel(
     }
 
     fun selectPoi(place: Place?) { _selectedPoi.value = place }
+
+    /** Search for a place by name/address: geocode it, drop a (white) waypoint there, and fly to it. */
+    fun search(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) return
+        viewModelScope.launch {
+            _searchMessage.value = null
+            val coords = runCatching { locationProvider.geocode(q) }.getOrNull()
+            if (coords == null) {
+                _searchMessage.value = "Couldn't find \"$q\"."
+            } else {
+                runCatching { waypointStore.add(q, coords.first, coords.second, ObjectiveKind.PLAIN) }
+                _flyTo.value = coords
+            }
+        }
+    }
+
+    /** Clear the one-shot fly-to once the screen has animated to it. */
+    fun consumeFlyTo() { _flyTo.value = null }
+
+    fun clearSearchMessage() { _searchMessage.value = null }
 
     /** Set the tapped POI as the active map waypoint (plain/white) and close the detail card. */
     fun setWaypointFromPoi(place: Place) {
