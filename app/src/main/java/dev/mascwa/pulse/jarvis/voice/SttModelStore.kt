@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
- * Provisions the offline Vosk speech model on demand: streams the (~40 MB) zip to private
+ * Provisions the offline Vosk speech model on demand: streams the (~128 MB) zip to private
  * storage and unpacks it, so voice input needs no bundled asset bloat and no Play Services.
  * The model stays in [Context.getFilesDir] and never leaves the device.
  */
@@ -47,9 +47,17 @@ class SttModelStore(context: Context) {
 
     /** Ensure the model is unpacked, downloading it first if necessary. */
     suspend fun ensure(url: String = DEFAULT_URL): Result<File> = withContext(Dispatchers.IO) {
-        modelDir()?.let {
-            _state.value = State.Ready
-            return@withContext Result.success(it)
+        // Re-provision when the bundled model version changes; otherwise reuse the unpacked one.
+        val versionFile = File(root, ".model_version")
+        val installed = runCatching { versionFile.readText().trim() }.getOrNull()
+        if (installed == MODEL_VERSION) {
+            modelDir()?.let {
+                _state.value = State.Ready
+                return@withContext Result.success(it)
+            }
+        } else {
+            // A previous (smaller/older) model is present — clear it so the new one is fetched cleanly.
+            root.listFiles()?.forEach { it.deleteRecursively() }
         }
         val zip = File(root, "model.zip.part")
         try {
@@ -107,6 +115,7 @@ class SttModelStore(context: Context) {
                 unpacked.copyRecursively(finalDir, overwrite = true)
             }
             staging.deleteRecursively()
+            runCatching { versionFile.writeText(MODEL_VERSION) }
             _state.value = State.Ready
             Result.success(finalDir)
         } catch (t: Throwable) {
@@ -139,7 +148,10 @@ class SttModelStore(context: Context) {
     }
 
     companion object {
-        /** Vosk small US-English model (~40 MB) — good accuracy at a small footprint. */
-        const val DEFAULT_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+        /** Vosk en-US "lgraph" model (~128 MB) — markedly better accuracy than the small model, and
+         *  its dynamic graph still supports the wake-word grammar. Stays fully on-device. */
+        const val DEFAULT_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip"
+        /** Bump when [DEFAULT_URL] changes to force a one-time re-provision of the new model. */
+        const val MODEL_VERSION = "en-us-0.22-lgraph"
     }
 }

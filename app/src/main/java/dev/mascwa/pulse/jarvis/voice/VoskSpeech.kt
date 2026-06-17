@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.jarvis.voice
 
 import android.content.Context
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,10 +92,10 @@ class VoskSpeech(context: Context) {
             jsonField(hypothesis, "partial")?.takeIf { it.isNotBlank() }?.let(listener::onPartial)
         }
         override fun onResult(hypothesis: String?) {
-            jsonField(hypothesis, "text")?.takeIf { it.isNotBlank() }?.let(listener::onFinal)
+            jsonField(hypothesis, "text")?.takeIf { it.isNotBlank() }?.let { listener.onFinal(normalize(it)) }
         }
         override fun onFinalResult(hypothesis: String?) {
-            jsonField(hypothesis, "text")?.takeIf { it.isNotBlank() }?.let(listener::onFinal)
+            jsonField(hypothesis, "text")?.takeIf { it.isNotBlank() }?.let { listener.onFinal(normalize(it)) }
         }
         override fun onError(exception: Exception?) {
             listener.onError(exception?.message ?: "Recognition error.")
@@ -104,6 +105,14 @@ class VoskSpeech(context: Context) {
 
     private fun jsonField(hypothesis: String?, key: String): String? =
         hypothesis?.let { runCatching { JSONObject(it).optString(key) }.getOrNull() }
+
+    /** Tidy raw recognizer text: fix common "Jarvis" mishears and capitalize the first letter. */
+    private fun normalize(text: String): String {
+        var t = text.trim()
+        if (t.isEmpty()) return t
+        t = t.replace(Regex("\\b(jervis|jarvas|jarvix|javis|jarviss|jervais)\\b", RegexOption.IGNORE_CASE), "Jarvis")
+        return t.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+    }
 
     private companion object {
         const val SAMPLE_RATE = 16000f
