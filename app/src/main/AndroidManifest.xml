@@ -88,6 +88,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- Glanceable home-screen widget: active objective + weather; taps to the J.A.R.V.I.S. console. -->
+        <receiver
+            android:name=".widget.PulseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pulse_widget_info" />
+        </receiver>
+
         <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
              the service picks the matching type at runtime. -->
         <service
