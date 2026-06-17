@@ -10,10 +10,10 @@ class BanterContextEngine {
     /** A context-aware opening line shown when the console comes up. */
     fun greeting(ctx: DeviceContext): String {
         val time = when (ctx.dayPart) {
-            DayPart.MORNING -> "Good morning."
-            DayPart.AFTERNOON -> "Good afternoon."
-            DayPart.EVENING -> "Good evening."
-            DayPart.NIGHT -> "Late session."
+            DayPart.MORNING -> "Good morning, sir."
+            DayPart.AFTERNOON -> "Good afternoon, sir."
+            DayPart.EVENING -> "Good evening, sir."
+            DayPart.NIGHT -> "Burning the midnight oil, sir."
         }
         val power = when {
             ctx.isCriticalBattery -> " Battery's critical at ${ctx.batteryPct}% — I'd plug in now."

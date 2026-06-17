@@ -33,6 +33,30 @@ class AppContainer(private val appContext: Context) {
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
 
+    /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,
+     *  authored tools). Separate DataStore file so it never migrates/wipes settings or the Room DB. */
+    val selfEditStore: dev.mascwa.pulse.data.selfedit.SelfEditStore by lazy {
+        dev.mascwa.pulse.data.selfedit.SelfEditStore(appContext, json)
+    }
+
+    /**
+     * Bounded Coil image loader so thumbnail-heavy screens (news/markets/images/social) can't grow
+     * the heap without limit — a key part of stopping the OS low-memory kills. Installed as the app's
+     * singleton loader via [PulseApplication.newImageLoader], so every `AsyncImage` uses it.
+     */
+    val imageLoader: coil.ImageLoader by lazy {
+        coil.ImageLoader.Builder(appContext)
+            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.15).build() }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(java.io.File(appContext.cacheDir, "image_cache"))
+                    .maxSizeBytes(48L * 1024 * 1024)
+                    .build()
+            }
+            .respectCacheHeaders(false)
+            .build()
+    }
+
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }
 
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
@@ -65,6 +89,14 @@ class AppContainer(private val appContext: Context) {
     }
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
+
+    // NAV objectives: device-calendar events (geocoded) + manual waypoints persisted in settings.
+    val calendarObjectives: dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository by lazy {
+        dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository(appContext)
+    }
+    val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore by lazy {
+        dev.mascwa.pulse.data.objectives.WaypointStore(settingsRepository)
+    }
     val safetyRepository: dev.mascwa.pulse.data.safety.SafetyRepository by lazy {
         dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
     }
@@ -91,6 +123,14 @@ class AppContainer(private val appContext: Context) {
     val jarvisMemory: dev.mascwa.pulse.data.jarvis.JarvisMemory by lazy {
         dev.mascwa.pulse.data.jarvis.JarvisMemory(jarvisDatabase)
     }
+    /** The on-device knowledge library (docs RAG) J.A.R.V.I.S. retrieves from. */
+    val knowledgeStore: dev.mascwa.pulse.data.jarvis.KnowledgeStore by lazy {
+        dev.mascwa.pulse.data.jarvis.KnowledgeStore(jarvisDatabase)
+    }
+    /** Seeds the APK-bundled reference docs into [knowledgeStore] on first launch. */
+    val knowledgeSeeder: dev.mascwa.pulse.jarvis.KnowledgeSeeder by lazy {
+        dev.mascwa.pulse.jarvis.KnowledgeSeeder(appContext, knowledgeStore, jarvisMemory)
+    }
     /** Provisions + tracks the on-device LLM model file (download / delete / path). */
     val modelManager: dev.mascwa.pulse.jarvis.inference.ModelManager by lazy {
         dev.mascwa.pulse.jarvis.inference.ModelManager(appContext)
@@ -100,7 +140,22 @@ class AppContainer(private val appContext: Context) {
      * MediaPipe LLM once a model is provisioned, else the offline persona core.
      */
     val inferenceEngine: dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine by lazy {
-        dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(appContext, modelManager)
+        dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine(
+            appContext,
+            modelManager,
+            // Read the chat-template choice + model URL fresh per generation so a Setup change
+            // takes effect immediately, without reloading the model.
+            promptConfig = {
+                val j = settingsRepository.current().jarvis
+                dev.mascwa.pulse.jarvis.inference.PromptConfig(j.chatFormat, j.modelUrl.ifBlank { null })
+            },
+            // Preferred backend, read fresh at load time (0=auto, 1=GPU, 2=CPU).
+            backendProvider = { runCatching { settingsRepository.current().jarvis.inferenceBackend }.getOrDefault(0) },
+            // On a native GPU crash, persist CPU so the next load (ensureReady before each send) uses it.
+            onNativeCrash = {
+                runCatching { settingsRepository.update { it.copy(jarvis = it.jarvis.copy(inferenceBackend = 2)) } }
+            },
+        )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */
     val deviceContextProvider: dev.mascwa.pulse.core.telemetry.DeviceContextProvider by lazy {
@@ -115,6 +170,94 @@ class AppContainer(private val appContext: Context) {
     /** Executes the "Lockdown" macro (clipboard wipe, DND/silent, halt BLE) with honest results. */
     val actionOrchestrator: dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator by lazy {
         dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator(appContext)
+    }
+    /** On-device text-to-speech so J.A.R.V.I.S. can speak replies (AOSP, no Play Services). */
+    val textToSpeech: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine by lazy {
+        dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext)
+    }
+    /** Offline on-device speech recognition (Vosk) for tap-to-talk and the wake word. */
+    val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {
+        dev.mascwa.pulse.jarvis.voice.VoskSpeech(appContext)
+    }
+
+    /** App-wide crash reporter backing the global handler + the SYS crash console. */
+    val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
+        dev.mascwa.pulse.crash.CrashReporter(appContext)
+    }
+    /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
+    val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
+        listOf(
+            dev.mascwa.pulse.jarvis.agent.WebSearchTool(http),
+            dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
+            dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
+            dev.mascwa.pulse.jarvis.agent.RememberTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
+            dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
+        )
+    }
+    /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user
+     *  has turned self-edit on. They never mutate anything — they queue a PendingAction for approval. */
+    private val selfEditTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
+        listOf(
+            dev.mascwa.pulse.jarvis.agent.ProposePersonaTool(selfEditStore),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "add"),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "edit"),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "delete"),
+            dev.mascwa.pulse.jarvis.agent.ProposeResearchTool(selfEditStore),
+            dev.mascwa.pulse.jarvis.agent.ProposeToolTool(selfEditStore),
+            dev.mascwa.pulse.jarvis.agent.SelfInspectTool(selfEditStore, knowledgeStore, appContext),
+        )
+    }
+
+    /** Vetted capability implementations an authored Lua tool may be granted (web/fetch/docs/recall).
+     *  Each delegates to an existing built-in tool — authored scripts get no raw fs/network. */
+    private val toolCapabilities: Map<String, suspend (String) -> String> by lazy {
+        mapOf<String, suspend (String) -> String>(
+            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(q) },
+            "fetch" to { q -> dev.mascwa.pulse.jarvis.agent.WebFetchTool(http).run(q) },
+            "docs" to { q -> dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore).run(q) },
+            "recall" to { q -> dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory).run(q) },
+        )
+    }
+
+    /** The single applier of approved self-changes (called only from the Approvals UI tap). RESEARCH
+     *  fetches via the vetted web-search tool — and only after the user approves. */
+    val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate by lazy {
+        dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(
+            selfEditStore,
+            knowledgeStore,
+            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
+        )
+    }
+
+    /** Live tool set resolved per agent run: base tools + (self-edit tools + approved authored Lua
+     *  tools, when self-edit is enabled). Resolved each run, so toggles / new tools apply at once. */
+    private val agentToolsProvider: suspend () -> List<dev.mascwa.pulse.jarvis.agent.JarvisTool> = {
+        val selfOn = runCatching { settingsRepository.current().jarvis.selfEditEnabled }.getOrDefault(false)
+        val authored = if (selfOn) {
+            runCatching {
+                selfEditStore.current().authoredTools
+                    .filter { it.enabled }
+                    .map { dev.mascwa.pulse.jarvis.agent.LuaScriptTool(it, toolCapabilities) }
+            }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        agentTools + (if (selfOn) selfEditTools else emptyList()) + authored
+    }
+
+    /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */
+    val agentOrchestrator: dev.mascwa.pulse.jarvis.agent.AgentOrchestrator by lazy {
+        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentToolsProvider, knowledgeStore)
+    }
+
+    /** Builds J.A.R.V.I.S.'s spoken daily brief from live weather/objectives/news/markets. */
+    val briefingBuilder: dev.mascwa.pulse.jarvis.BriefingBuilder by lazy {
+        dev.mascwa.pulse.jarvis.BriefingBuilder(
+            weatherRepository, newsRepository, marketsRepository,
+            calendarObjectives, waypointStore, locationProvider, settingsRepository,
+        )
     }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */

@@ -16,6 +16,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word is enabled. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
+         All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
@@ -27,6 +33,9 @@
     <!-- Optional, only used if the user enables device-location weather. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Optional: read calendar events with a location to show them as NAV objectives (opt-in). -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Survival tools (haptics) and optional one-tap SOS SMS. -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -45,6 +54,7 @@
     <application
         android:name=".PulseApplication"
         android:allowBackup="true"
+        android:largeHeap="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -78,12 +88,24 @@
             </intent-filter>
         </receiver>
 
+        <!-- Glanceable home-screen widget: active objective + weather; taps to the J.A.R.V.I.S. console. -->
+        <receiver
+            android:name=".widget.PulseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pulse_widget_info" />
+        </receiver>
+
         <!-- Active-Matrix resident assistant. specialUse on API 34+, dataSync below;
              the service picks the matching type at runtime. -->
         <service
             android:name=".jarvis.matrix.ActiveMatrixService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|dataSync">
+            android:foregroundServiceType="specialUse|dataSync|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="on_device_assistant_context" />

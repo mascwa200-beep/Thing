@@ -17,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -68,36 +73,64 @@ fun MapScreen(vm: MapViewModel, onBack: (() -> Unit)? = null) {
                     }
                 }
                 state.loading && state.markers.isEmpty() -> LoadingState()
-                else -> AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        Configuration.getInstance().userAgentValue = ctx.packageName
-                        MapView(ctx).apply {
-                            setTileSource(TileSourceFactory.MAPNIK)
-                            setMultiTouchControls(true)
-                            controller.setZoom(13.0)
-                            onResume()
-                        }
-                    },
-                    update = { map ->
-                        map.overlays.clear()
-                        state.markers.forEach { m ->
-                            map.overlays.add(
-                                Marker(map).apply {
-                                    position = GeoPoint(m.latitude, m.longitude)
-                                    title = m.title
-                                    snippet = m.snippet
-                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                },
-                            )
-                        }
-                        if (state.centerLat != null && state.centerLon != null) {
-                            map.controller.setCenter(GeoPoint(state.centerLat!!, state.centerLon!!))
-                        }
-                        map.invalidate()
-                    },
-                )
+                else -> {
+                    val mapView = rememberOsmMapViewWithLifecycle()
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { mapView },
+                        update = { map ->
+                            map.overlays.clear()
+                            state.markers.forEach { m ->
+                                map.overlays.add(
+                                    Marker(map).apply {
+                                        position = GeoPoint(m.latitude, m.longitude)
+                                        title = m.title
+                                        snippet = m.snippet
+                                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    },
+                                )
+                            }
+                            if (state.centerLat != null && state.centerLon != null) {
+                                map.controller.setCenter(GeoPoint(state.centerLat!!, state.centerLon!!))
+                            }
+                            map.invalidate()
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+/** An osmdroid [MapView] created once and bound to the composition lifecycle so its tile/overlay
+ *  resources are released (onDetach) when the screen leaves — fixes a leak across navigation. */
+@Composable
+private fun rememberOsmMapViewWithLifecycle(): MapView {
+    val context = LocalContext.current
+    val mapView = remember {
+        Configuration.getInstance().userAgentValue = context.packageName
+        MapView(context).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            controller.setZoom(13.0)
+        }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        mapView.onResume()
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onPause()
+            mapView.onDetach()
+        }
+    }
+    return mapView
 }

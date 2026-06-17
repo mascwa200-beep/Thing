@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,20 +31,28 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -55,10 +64,46 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val engine by vm.engineState.collectAsState()
     val resident by vm.resident.collectAsState()
     val vitals by vm.vitals.collectAsState()
+    val voiceReplies by vm.voiceReplies.collectAsState()
+    val wakeWord by vm.wakeWord.collectAsState()
+    val agentTools by vm.agentTools.collectAsState()
+    val selfEditEnabled by vm.selfEditEnabled.collectAsState()
+    val chatFormat by vm.chatFormat.collectAsState()
+    val backend by vm.inferenceBackend.collectAsState()
+    val charter by vm.charter.collectAsState()
+    val githubToken by vm.githubToken.collectAsState()
+    val knowledgeChunks by vm.knowledgeChunks.collectAsState()
+    val knowledgeDocs by vm.knowledgeDocs.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val vitalsPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { VitalsTrackingService.start(context) }
+
+    // Import a text/markdown file into the knowledge library (read off the main thread).
+    val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch(Dispatchers.IO) {
+            val name = uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null } ?: "Imported document"
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            }.getOrNull().orEmpty()
+            if (text.isNotBlank()) vm.addKnowledge(name, text)
+        }
+    }
+
+    var kbTitle by remember { mutableStateOf("") }
+    var kbBody by remember { mutableStateOf("") }
+
+    // Enabling the wake word needs the microphone; only commit it once granted.
+    fun enableWakeWord() {
+        vm.setWakeWord(true)
+        vm.setResident(true) // the wake word lives in the resident service
+        ActiveMatrixService.stop(context)
+        ActiveMatrixService.start(context, wakeWord = true)
+    }
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) enableWakeWord() }
 
     PulseScaffold(
         title = "J.A.R.V.I.S. SETUP",
@@ -89,6 +134,9 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             FieldLabel("MODEL URL")
             MonoField(url, vm::onUrlChange, "https://…/model.task")
 
+            FieldLabel("PRESETS  ·  free, no account  ·  tap to fill the URL, then DOWNLOAD")
+            ModelPresetRow(onPick = vm::onUrlChange)
+
             FieldLabel("ACCESS TOKEN  ·  optional, for gated hosts")
             MonoField(token, vm::onTokenChange, "hf_…  (sent as Bearer)")
 
@@ -114,6 +162,45 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 }
             }
 
+            FieldLabel("CHAT TEMPLATE  ·  prompt format for the model")
+            ChatFormatSelector(selected = chatFormat, onSelect = vm::setChatFormat)
+            Text(
+                "AUTO picks ChatML (Qwen) or Gemma turns from the model URL. If replies come out " +
+                    "garbled or repeat control tokens, switch to PLAIN.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("INFERENCE BACKEND  ·  CPU is slower but more compatible")
+            BackendSelector(selected = backend, onSelect = vm::setInferenceBackend)
+            Text(
+                "AUTO lets MediaPipe choose and falls back to CPU automatically if a GPU run crashes " +
+                    "the model. If chat shows \"inference fault\", try CPU.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("CHARTER  ·  J.A.R.V.I.S.'s personality, prepended to every prompt")
+            MonoFieldArea(
+                charter, vm::onCharterChange,
+                "Leave blank for the built-in persona, or describe the character you want: tone, how it " +
+                    "refers to itself, how it addresses you, its quirks…",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NeonButton(text = "SAVE CHARTER", enabled = true, color = c.accent, onClick = vm::saveCharter)
+            }
+            Text(
+                "Saved on-device. A built-in safety rule is always appended in code and can't be " +
+                    "overridden by the charter.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            SettingToggle(
+                title = "VOICE REPLIES",
+                subtitle = "Speak J.A.R.V.I.S. replies aloud with the device's on-device " +
+                    "text-to-speech. No cloud voices. Honest no-op if no TTS engine is installed.",
+                enabled = voiceReplies,
+                onToggle = vm::setVoiceReplies,
+            )
+
             SettingToggle(
                 title = "ACTIVE-MATRIX",
                 subtitle = "Keep J.A.R.V.I.S. resident in the background and surface proactive, " +
@@ -121,7 +208,29 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 enabled = resident,
                 onToggle = { on ->
                     vm.setResident(on)
-                    if (on) ActiveMatrixService.start(context) else ActiveMatrixService.stop(context)
+                    if (on) ActiveMatrixService.start(context, wakeWord = wakeWord) else ActiveMatrixService.stop(context)
+                },
+            )
+
+            SettingToggle(
+                title = "WAKE WORD · \"J.A.R.V.I.S.\"",
+                subtitle = "Listen for the wake word while resident, then take a spoken command — " +
+                    "all on-device, nothing recorded or sent. Uses the mic and more battery.",
+                enabled = wakeWord,
+                onToggle = { on ->
+                    if (on) {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.RECORD_AUDIO,
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (granted) enableWakeWord() else micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                    } else {
+                        vm.setWakeWord(false)
+                        // Restart the resident service without the mic (if it's running).
+                        if (resident) {
+                            ActiveMatrixService.stop(context)
+                            ActiveMatrixService.start(context, wakeWord = false)
+                        }
+                    }
                 },
             )
 
@@ -141,8 +250,92 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     }
                 },
             )
+
+            SettingToggle(
+                title = "AGENT TOOLS",
+                subtitle = "Let J.A.R.V.I.S. use tools — web search/fetch, read-only GitHub repos, " +
+                    "device state, and durable memory — in a short reasoning loop. Slower, and " +
+                    "best-effort on the small on-device model.",
+                enabled = agentTools,
+                onToggle = vm::setAgentTools,
+            )
+
+            SettingToggle(
+                title = "SELF-EDIT (PROPOSE-ONLY)",
+                subtitle = "Let J.A.R.V.I.S. PROPOSE changes to its own persona, knowledge and tools, " +
+                    "plus research. Nothing is applied until you tap APPROVE in the Approvals screen — " +
+                    "even web/repo content can never change anything on its own. Requires Agent Tools.",
+                enabled = selfEditEnabled,
+                onToggle = vm::setSelfEdit,
+            )
+
+            FieldLabel("GITHUB TOKEN  ·  optional, for private repos")
+            MonoField(githubToken, vm::onGithubTokenChange, "ghp_…  (read-only repo access)")
+
+            FieldLabel("KNOWLEDGE BASE  ·  docs J.A.R.V.I.S. can search (on-device RAG)")
+            NeonPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "$knowledgeDocs docs · $knowledgeChunks chunks indexed. Load reference docs " +
+                            "(e.g. language notes, API docs) and J.A.R.V.I.S. retrieves the relevant " +
+                            "bits into its answers. This is retrieval, not training — stays on-device.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    )
+                    MonoField(kbTitle, { kbTitle = it }, "Title (e.g. Kotlin coroutines)")
+                    MonoFieldArea(kbBody, { kbBody = it }, "Paste document text…")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NeonButton(
+                            text = "ADD DOC",
+                            enabled = kbBody.isNotBlank(),
+                            color = c.accent,
+                            onClick = {
+                                vm.addKnowledge(kbTitle, kbBody)
+                                kbTitle = ""
+                                kbBody = ""
+                            },
+                        )
+                        NeonButton(
+                            text = "IMPORT FILE",
+                            enabled = true,
+                            color = c.accent,
+                            onClick = { docPicker.launch("text/*") },
+                        )
+                        if (knowledgeChunks > 0) {
+                            NeonButton(
+                                text = "CLEAR",
+                                enabled = true,
+                                color = c.magenta,
+                                onClick = vm::clearKnowledge,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun MonoFieldArea(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+    val c = Pulse.colors
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().height(120.dp),
+        singleLine = false,
+        placeholder = {
+            Text(placeholder, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+        },
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = c.panel,
+            unfocusedContainerColor = c.panel,
+            focusedIndicatorColor = c.accent,
+            unfocusedIndicatorColor = c.lineSoft,
+            cursorColor = c.accent,
+            focusedTextColor = c.ink,
+            unfocusedTextColor = c.ink,
+        ),
+    )
 }
 
 @Composable
@@ -171,6 +364,88 @@ private fun SettingToggle(title: String, subtitle: String, enabled: Boolean, onT
                     uncheckedTrackColor = c.panel,
                 ),
             )
+        }
+    }
+}
+
+/** A curated model the user can provision with one tap (premade MediaPipe .task on Hugging Face). */
+private data class ModelPreset(val label: String, val note: String, val url: String)
+
+private val MODEL_PRESETS = listOf(
+    ModelPreset(
+        "QWEN 1.5B", "fast · free",
+        "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/" +
+            "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+    ),
+    ModelPreset(
+        "PHI-4 MINI", "smart · free · recommended",
+        "https://huggingface.co/litert-community/Phi-4-mini-instruct/resolve/main/" +
+            "Phi-4-mini-instruct_multi-prefill-seq_q8_ekv1280.task",
+    ),
+)
+
+@Composable
+private fun ModelPresetRow(onPick: (String) -> Unit) {
+    val c = Pulse.colors
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MODEL_PRESETS.forEach { preset ->
+            Column(
+                Modifier
+                    .border(1.dp, c.lineSoft, RoundedCornerShape(6.dp))
+                    .background(c.muted.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                    .clickable { onPick(preset.url) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(preset.label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink)
+                Text(preset.note, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val c = Pulse.colors
+    val options = listOf(0 to "AUTO", 1 to "GPU", 2 to "CPU")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { (value, label) ->
+            val on = value == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatFormatSelector(selected: ChatFormat, onSelect: (ChatFormat) -> Unit) {
+    val c = Pulse.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChatFormat.entries.forEach { format ->
+            val on = format == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(format) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    format.label.uppercase(Locale.US),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint,
+                )
+            }
         }
     }
 }

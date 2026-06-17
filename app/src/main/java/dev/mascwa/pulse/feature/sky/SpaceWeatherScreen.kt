@@ -124,7 +124,7 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                                     color = c.muted, modifier = Modifier.padding(4.dp))
                             }
                         } else {
-                            items(alerts, key = { it.title + it.issued }) { a ->
+                            items(alerts.distinctBy { it.title + it.issued }, key = { it.title + it.issued }) { a ->
                                 NeonPanel(Modifier.fillMaxWidth()) {
                                     Column {
                                         Text(a.title, style = MaterialTheme.typography.titleSmall, color = c.amber)

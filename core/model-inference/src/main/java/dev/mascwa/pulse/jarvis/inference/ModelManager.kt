@@ -24,13 +24,16 @@ sealed interface ModelDownloadState {
  * Fully self-contained: it streams over plain HTTPS (optionally with a Bearer token
  * for gated hosts like Hugging Face) and never touches Play Services. The model stays
  * in [Context.getFilesDir], so it is wiped on uninstall and never leaves the device.
+ *
+ * The on-disk filename mirrors the source URL's extension (`model.litertlm` for a
+ * `.litertlm` URL, otherwise `model.task`) so the MediaPipe runtime can tell the two
+ * container formats apart — saving a `.litertlm` as `model.task` made it try to open a
+ * non-zip file as a zip, which surfaced as "Unable to open zip archive".
  */
 class ModelManager(context: Context) {
 
     private val appContext = context.applicationContext
     private val modelsDir: File = File(appContext.filesDir, "jarvis/models").apply { mkdirs() }
-    private val modelFile: File = File(modelsDir, "model.task")
-    private val partFile: File = File(modelsDir, "model.task.part")
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -45,16 +48,19 @@ class ModelManager(context: Context) {
     val state: StateFlow<ModelDownloadState> = _state.asStateFlow()
 
     val isModelPresent: Boolean
-        get() = modelFile.exists() && modelFile.length() > 0L
+        get() = existingModel() != null
 
-    fun modelPath(): String = modelFile.absolutePath
+    /** Absolute path of the provisioned model (or the default name if none exists yet). */
+    fun modelPath(): String = (existingModel() ?: File(modelsDir, "${PREFIX}task")).absolutePath
 
-    fun modelSizeBytes(): Long = if (modelFile.exists()) modelFile.length() else 0L
+    fun modelSizeBytes(): Long = existingModel()?.length() ?: 0L
 
-    /** Remove the provisioned model and revert to the idle state. */
+    /** Remove every provisioned model file (any extension) and revert to the idle state. */
     fun deleteModel(): Boolean {
-        val removed = !modelFile.exists() || modelFile.delete()
-        runCatching { partFile.delete() }
+        var removed = true
+        modelsDir.listFiles()?.forEach { f ->
+            if (f.isFile && f.name.startsWith(PREFIX)) removed = f.delete() && removed
+        }
         _state.value = ModelDownloadState.Idle
         return removed
     }
@@ -62,7 +68,8 @@ class ModelManager(context: Context) {
     /**
      * Streams [url] into private storage, reporting progress through [state]. Writes to a
      * `.part` file and renames on success so a partial download is never mistaken for a
-     * complete model. Returns the model [File] on success.
+     * complete model. The target filename is chosen from [url] (see [targetFileFor]); any
+     * previously-provisioned model is removed first. Returns the model [File] on success.
      */
     suspend fun download(url: String, authToken: String? = null): Result<File> =
         withContext(Dispatchers.IO) {
@@ -70,6 +77,8 @@ class ModelManager(context: Context) {
                 _state.value = ModelDownloadState.Failed("No model URL configured.")
                 return@withContext Result.failure(IllegalArgumentException("blank model url"))
             }
+            val target = targetFileFor(url)
+            val partFile = File(modelsDir, "${target.name}$PART_SUFFIX")
             try {
                 _state.value = ModelDownloadState.Running(0, 0L, -1L)
                 val request = Request.Builder()
@@ -109,13 +118,17 @@ class ModelManager(context: Context) {
                             }
                         }
                     }
-                    if (modelFile.exists()) modelFile.delete()
-                    if (!partFile.renameTo(modelFile)) {
-                        partFile.copyTo(modelFile, overwrite = true)
+                    // Drop any previously-provisioned model (possibly a different extension)
+                    // so only the freshly-downloaded one remains.
+                    modelsDir.listFiles()?.forEach { f ->
+                        if (f.isFile && f.name.startsWith(PREFIX) && f.name != partFile.name) f.delete()
+                    }
+                    if (!partFile.renameTo(target)) {
+                        partFile.copyTo(target, overwrite = true)
                         partFile.delete()
                     }
                     _state.value = ModelDownloadState.Done
-                    Result.success(modelFile)
+                    Result.success(target)
                 }
             } catch (t: Throwable) {
                 runCatching { partFile.delete() }
@@ -123,4 +136,29 @@ class ModelManager(context: Context) {
                 Result.failure(t)
             }
         }
+
+    /** The fully-provisioned model file on disk (ignoring any in-progress `.part`), if present.
+     *  If more than one ever coexists, the most recently written wins — so a freshly downloaded
+     *  `.litertlm` is never shadowed by a stale `.task` that failed to delete. */
+    private fun existingModel(): File? =
+        modelsDir.listFiles()
+            ?.filter { it.isFile && it.name.startsWith(PREFIX) && !it.name.endsWith(PART_SUFFIX) && it.length() > 0L }
+            ?.maxByOrNull { it.lastModified() }
+
+    private fun targetFileFor(url: String): File = File(modelsDir, modelFileNameFor(url))
+
+    companion object {
+        private const val PREFIX = "model."
+        private const val PART_SUFFIX = ".part"
+
+        /**
+         * Picks the on-disk filename from a model URL so the runtime can detect the format:
+         * a `.litertlm` URL → `model.litertlm`, everything else → `model.task`. Query strings
+         * and fragments (e.g. Hugging Face `?download=true`) are ignored.
+         */
+        internal fun modelFileNameFor(url: String): String {
+            val clean = url.substringBefore('?').substringBefore('#').trimEnd('/')
+            return if (clean.endsWith(".litertlm", ignoreCase = true)) "${PREFIX}litertlm" else "${PREFIX}task"
+        }
+    }
 }

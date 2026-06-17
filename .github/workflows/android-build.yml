@@ -40,10 +40,13 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew :core:telemetry:testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        # Pass the run number as the versionCode so each published build out-versions the last
+        # (Android blocks downgrades); combined with the pinned debug key this enables in-place
+        # updates that preserve the user's settings + downloaded model.
+        run: ./gradlew assembleDebug -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
@@ -57,7 +60,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Pulse — latest debug build"
+          name: "Pulse — debug build #${{ github.run_number }}"
           prerelease: true
-          body: "Auto-built debug APK from commit ${{ github.sha }}. Install on a Pixel 10 Pro XL via sideload (allow 'install unknown apps')."
+          body: "Auto-built debug APK (build #${{ github.run_number }}) from commit ${{ github.sha }}. Sideload on a Pixel 10 Pro XL (allow 'install unknown apps'). Installs as an in-place UPDATE over a previous build — your settings and downloaded model are kept. (One-time: if you have an older differently-signed build, uninstall it once before installing this.)"
           files: app/build/outputs/apk/debug/app-debug.apk

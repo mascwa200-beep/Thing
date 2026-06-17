@@ -54,6 +54,16 @@ object Routes {
     // J.A.R.V.I.S. Matrix (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"
+    const val JARVIS_APPROVALS = "jarvis_approvals"
+
+    // 3D cyberpunk navigation map
+    const val NAV = "nav"
+
+    // Objectives / waypoint tracker (calendar + manual)
+    const val OBJECTIVES = "objectives"
+
+    // Diagnostics
+    const val CRASH_LOG = "crash_log"
 }
 
 data class TopDestination(

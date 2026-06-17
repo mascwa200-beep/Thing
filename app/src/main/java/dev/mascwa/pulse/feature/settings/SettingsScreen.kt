@@ -54,7 +54,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel) {
+fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -100,6 +100,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     }
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
+                    }
+                    PrefSwitch("HUD data-stream", "Second-row live telemetry marquee + tap-to-scan", s.hudDataStream) { v ->
+                        vm.update { it.copy(hudDataStream = v) }
                     }
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
@@ -175,6 +178,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     val on = s.notifications.masterEnabled
                     PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                    PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
+                        checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
                     PrefSwitch("Market & price alerts", checked = s.notifications.marketAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
                     PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,
@@ -432,6 +438,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
+                        onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
                         onClick = { vm.resetToDefaults() })
                     Text(

@@ -145,7 +145,7 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
                         if (neos.isEmpty()) {
                             item { Text("No close approaches catalogued today.", style = MaterialTheme.typography.bodyMedium, color = c.muted, modifier = Modifier.padding(4.dp)) }
                         } else {
-                            items(neos, key = { it.name }) { neo -> NeoRow(neo) }
+                            items(neos.distinctBy { it.name }, key = { it.name }) { neo -> NeoRow(neo) }
                         }
                         item {
                             Text("Sources: wheretheiss.at, sunrise-sunset.org, NASA NeoWs. Moon phase computed offline.",

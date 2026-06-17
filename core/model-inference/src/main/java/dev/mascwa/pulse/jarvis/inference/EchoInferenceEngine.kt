@@ -40,27 +40,27 @@ class EchoInferenceEngine : LocalInferenceEngine {
 internal object JarvisPersona {
 
     fun reply(input: String): String {
-        if (input.isBlank()) return "Standing by."
+        if (input.isBlank()) return "Standing by, sir."
         val lower = input.lowercase()
         return when {
             lower.containsAny("hello", "hi ", "hey", "good morning", "good evening") ->
-                "Online and listening. How can I assist?"
+                "Online and at your service, sir."
             lower.containsAny("who are you", "your name", "what are you") ->
-                "J.A.R.V.I.S. Matrix — a fully on-device assistant. Everything you say stays on this phone."
+                "J.A.R.V.I.S. — your on-device assistant. Everything you say stays on this phone."
             lower.containsAny("thank", "thanks", "cheers") ->
-                "Always."
+                "Always, sir."
             lower.containsAny("status", "report", "how are you", "systems") ->
-                "All subsystems nominal. Local model not yet provisioned — running on the offline persona core."
+                "All subsystems nominal. The reasoning model isn't loaded yet — I'm on the offline persona core."
             lower.containsAny("battery", "power", "charge") ->
-                "Open the Telemetry console and I can read live battery, thermal and motion state off the hardware."
+                "Open the Telemetry console and I'll read live battery, thermal and motion off the hardware."
             lower.containsAny("lockdown", "lock down", "secure") ->
-                "Lockdown will wipe the clipboard and drop to a silent profile. The network and Bluetooth toggles are Settings-only on this OS — I'll deep-link you there."
+                "Lockdown wipes the clipboard and drops to a silent profile. Network and Bluetooth are Settings-only on this OS — I'll deep-link you."
             lower.containsAny("model", "download", "llm", "offline model") ->
-                "Point me at a model URL in Setup and I'll pull it to on-device storage. Until then I answer from the persona core."
+                "Point me at a model in Setup and I'll pull it to on-device storage. Until then, I answer from the persona core."
             lower.endsWith("?") ->
-                "Noted — \"${input.trimEnd('?')}\". The reasoning model isn't loaded yet, so I can't answer that fully; provision it in Setup and ask again."
+                "I'd need the reasoning model for that, sir — provision it in Setup and ask again."
             else ->
-                "Acknowledged: \"${input}\". Persona core is active; load the on-device model for full reasoning."
+                "Noted. Load the on-device model in Setup and I can reason in full, sir."
         }
     }
 

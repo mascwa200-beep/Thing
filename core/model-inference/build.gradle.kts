@@ -20,6 +20,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    buildFeatures {
+        // The isolated inference process talks to the app over an AIDL interface.
+        aidl = true
+    }
 }
 
 dependencies {
@@ -29,4 +34,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     // Streaming model download.
     implementation(libs.okhttp)
+    testImplementation(libs.junit)
 }

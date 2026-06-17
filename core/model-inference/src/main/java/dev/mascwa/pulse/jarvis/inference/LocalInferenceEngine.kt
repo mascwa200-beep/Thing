@@ -19,7 +19,7 @@ sealed interface EngineState {
 /**
  * Abstraction over an on-device text generator. The console, banter engine and
  * intent router depend only on this — so the deterministic [EchoInferenceEngine]
- * and the real `MediaPipeInferenceEngine` are fully interchangeable.
+ * and the real process-isolated [IsolatedInferenceEngine] are fully interchangeable.
  */
 interface LocalInferenceEngine {
     val state: StateFlow<EngineState>

@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -125,6 +127,25 @@ data class JarvisSettings(
     val residentService: Boolean = false,
     /** Monitor a paired BLE heart-rate strap and check in on anomalies (opt-in). */
     val vitalsTracking: Boolean = false,
+    /** Speak replies aloud using the device's on-device text-to-speech engine. */
+    val voiceReplies: Boolean = false,
+    /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
+    val wakeWord: Boolean = false,
+    /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
+    val agentToolsEnabled: Boolean = false,
+    /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
+    val githubToken: String = "",
+    /**
+     * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
+     * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
+     */
+    val chatFormat: ChatFormat = ChatFormat.AUTO,
+    /** MediaPipe inference backend: 0=auto (let it choose), 1=GPU, 2=CPU. Auto-falls back to CPU if a
+     *  GPU decode crashes the inference process. CPU is slower but far more compatible. */
+    val inferenceBackend: Int = 0,
+    /** Let J.A.R.V.I.S. PROPOSE edits to its own persona/knowledge/tools + research (each applied only
+     *  on your explicit approval in the Approvals screen). Opt-in; requires agent tools too. */
+    val selfEditEnabled: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }
@@ -134,6 +155,9 @@ data class JarvisSettings(
 data class NotificationPrefs(
     val masterEnabled: Boolean = true,
     val breakingNews: Boolean = true,
+    /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
+     *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
+    val liveBreakingNews: Boolean = false,
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,
@@ -162,6 +186,7 @@ data class AppSettings(
     val glitch: Boolean = true,                       // chromatic glitch FX
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
+    val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
 
     // Locale / region (International defaults; everything overridable here)
@@ -214,6 +239,14 @@ data class AppSettings(
     val autoSendSos: Boolean = false,
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
+
+    // NAV map view (persisted so the map opens how you left it).
+    val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
+    val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
+
+    // NAV objectives: manual waypoints + the one currently tracked on the map.
+    val waypoints: List<Waypoint> = emptyList(),
+    val activeWaypointId: String? = null,
 
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),

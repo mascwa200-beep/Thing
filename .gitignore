@@ -12,3 +12,9 @@
 *.keystore
 *.jks
 local.defaults.properties
+
+# The debug keystore is intentionally committed so every CI build is signed with the
+# same key — this lets the published debug APK install as an in-place UPDATE (keeping the
+# user's settings + downloaded model) instead of forcing an uninstall. Debug keys are not
+# secret (well-known password "android"); this is safe to commit.
+!/app/debug.keystore
