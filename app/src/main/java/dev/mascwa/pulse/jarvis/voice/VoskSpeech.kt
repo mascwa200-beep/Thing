@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.jarvis.voice
 
 import android.content.Context
+import android.util.Log
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,9 +48,18 @@ class VoskSpeech(context: Context) {
     /** Download (if needed) and load the model. Safe to call repeatedly; returns success. */
     suspend fun ensureModel(): Boolean {
         if (model != null) return true
-        val dir = store.ensure().getOrNull() ?: return false
+        Log.i(TAG, "ensureModel: provisioning speech model…")
+        val result = store.ensure()
+        val dir = result.getOrElse {
+            Log.e(TAG, "ensureModel: model download/unpack failed", it)
+            return false
+        }
+        Log.i(TAG, "ensureModel: model present at ${dir.absolutePath}; loading…")
         return withContext(Dispatchers.IO) {
-            runCatching { Model(dir.absolutePath) }.onSuccess { model = it }.isSuccess
+            runCatching { Model(dir.absolutePath) }
+                .onSuccess { model = it; Log.i(TAG, "ensureModel: model loaded OK") }
+                .onFailure { Log.e(TAG, "ensureModel: Model() load failed (corrupt/too large?)", it) }
+                .isSuccess
         }
     }
 
@@ -60,7 +70,11 @@ class VoskSpeech(context: Context) {
      * (0 = listen indefinitely). Returns false if the model isn't loaded or the mic can't open.
      */
     fun start(grammar: String? = null, timeoutMs: Int = 0, listener: VoskListener): Boolean {
-        val m = model ?: return false
+        val m = model
+        if (m == null) {
+            Log.w(TAG, "start: model not loaded — call ensureModel() first")
+            return false
+        }
         stop()
         return runCatching {
             // A static (large) model doesn't support Vosk's runtime grammar constructor; if it throws,
@@ -74,8 +88,12 @@ class VoskSpeech(context: Context) {
             val service = SpeechService(recognizer, SAMPLE_RATE)
             if (timeoutMs > 0) service.startListening(adapter(listener), timeoutMs) else service.startListening(adapter(listener))
             speechService = service
+            Log.i(TAG, "start: listening (grammar=${grammar != null}, timeoutMs=$timeoutMs)")
             true
         }.getOrElse {
+            // Most often: AudioRecord couldn't open the mic (permission, another app holding it, or
+            // no foreground-mic). Surface it instead of failing silently.
+            Log.e(TAG, "start: couldn't open the microphone / recognizer", it)
             listener.onError(it.message ?: "Microphone unavailable.")
             false
         }
@@ -105,6 +123,7 @@ class VoskSpeech(context: Context) {
             jsonField(hypothesis, "text")?.takeIf { it.isNotBlank() }?.let { listener.onFinal(normalize(it)) }
         }
         override fun onError(exception: Exception?) {
+            Log.w(TAG, "recognizer onError", exception)
             listener.onError(exception?.message ?: "Recognition error.")
         }
         override fun onTimeout() { listener.onTimeout() }
@@ -123,5 +142,6 @@ class VoskSpeech(context: Context) {
 
     private companion object {
         const val SAMPLE_RATE = 16000f
+        const val TAG = "JarvisVoice"
     }
 }

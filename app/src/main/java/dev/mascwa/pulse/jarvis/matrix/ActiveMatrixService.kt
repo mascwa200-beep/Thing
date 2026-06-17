@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -24,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
+import dev.mascwa.pulse.jarvis.voice.SttModelStore
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
 import dev.mascwa.pulse.notifications.BreakingNewsPulse
@@ -73,7 +75,10 @@ class ActiveMatrixService : Service() {
             return START_NOT_STICKY
         }
         // Only run the always-on mic if the wake word is enabled AND the permission is held.
-        val wantMic = intent?.getBooleanExtra(EXTRA_WAKE_WORD, false) == true && hasRecordAudio()
+        val wantWake = intent?.getBooleanExtra(EXTRA_WAKE_WORD, false) == true
+        val hasMic = hasRecordAudio()
+        val wantMic = wantWake && hasMic
+        Log.i(TAG, "onStartCommand: wantWake=$wantWake hasMicPermission=$hasMic waking=$waking sdk=${Build.VERSION.SDK_INT}")
         // Foreground start can throw (ForegroundServiceStartNotAllowed / FGS-type errors on
         // Android 14+). Retry without the mic, then stand down gracefully rather than crash.
         // micActive tracks whether the *microphone* FGS type actually started — we must NOT open
@@ -82,6 +87,7 @@ class ActiveMatrixService : Service() {
         try {
             startForegroundCompat(buildNotification("Active · standing by."), wantMic)
         } catch (t: Throwable) {
+            Log.e(TAG, "onStartCommand: startForeground(withMic=$wantMic) failed; retrying without mic", t)
             micActive = false
             val recovered = wantMic && runCatching {
                 startForegroundCompat(buildNotification("Active · standing by."), withMic = false)
@@ -90,6 +96,14 @@ class ActiveMatrixService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+        }
+        // Make a non-running wake word explainable instead of silent.
+        if (wantWake && !hasMic) {
+            Log.w(TAG, "Wake word requested but RECORD_AUDIO not granted")
+            update("Wake word off — grant the Microphone permission, then re-enable it.")
+        } else if (wantWake && !micActive) {
+            Log.w(TAG, "Wake word requested but the foreground microphone service couldn't start")
+            update("Wake word off — the system blocked the microphone service. Reopen the app and retry.")
         }
         if (!observing) {
             observing = true
@@ -160,10 +174,26 @@ class ActiveMatrixService : Service() {
     private fun startWakeWord() {
         val vosk = container?.voskSpeech ?: return
         voiceScope.launch {
-            if (!vosk.ensureModel()) {
-                update("Wake word unavailable — voice model couldn't load.")
+            // Reflect the (potentially large) model download/unpack so the user sees progress, not a
+            // frozen "standing by". The first run can be a multi-hundred-MB to ~1.8 GB download.
+            update("Preparing voice model…")
+            val progress = launch {
+                vosk.provisioning.collect { st ->
+                    when (st) {
+                        is SttModelStore.State.Downloading -> update("Downloading voice model ${st.pct}% (one-time)…")
+                        is SttModelStore.State.Unpacking -> update("Unpacking voice model…")
+                        else -> {}
+                    }
+                }
+            }
+            val ok = vosk.ensureModel()
+            progress.cancel()
+            if (!ok) {
+                Log.w(TAG, "startWakeWord: model unavailable")
+                update("Wake word unavailable — voice model couldn't load (check storage/network).")
                 return@launch
             }
+            Log.i(TAG, "startWakeWord: model ready, entering wake loop")
             // The console and the wake loop share one recognizer. Pause while the console owns the
             // mic for tap-to-talk; resume automatically when it's released. (StateFlow emits its
             // current value on collect, so this also performs the initial start.)
@@ -188,15 +218,32 @@ class ActiveMatrixService : Service() {
         update("Listening for \"J.A.R.V.I.S.\"…")
         // Free-form recognition: the big STT model is a static graph (no runtime grammar), so we
         // transcribe and match the wake word in the text via the lenient isWakePhrase below.
-        vosk.start(grammar = null, listener = object : VoskListener {
+        val started = vosk.start(grammar = null, listener = object : VoskListener {
             override fun onPartial(text: String) { maybeWake(vosk, text) }
             override fun onFinal(text: String) { maybeWake(vosk, text) }
-            override fun onError(message: String) { /* keep the resident notice; no retry storm */ }
+            override fun onError(message: String) {
+                // Don't die silently: show it and self-heal after a backoff (no tight retry storm).
+                Log.w(TAG, "wake recognizer error: $message")
+                update("Mic hiccup ($message) — relistening shortly…")
+                voiceScope.launch {
+                    delay(WAKE_RETRY_MS)
+                    if (waking && !capturing && !vosk.consoleActive.value) listenForWake(vosk)
+                }
+            }
         })
+        if (!started) {
+            Log.e(TAG, "listenForWake: vosk.start returned false (mic unavailable)")
+            update("Couldn't open the microphone for the wake word — retrying shortly…")
+            voiceScope.launch {
+                delay(WAKE_RETRY_MS)
+                if (waking && !capturing && !vosk.consoleActive.value) listenForWake(vosk)
+            }
+        }
     }
 
     private fun maybeWake(vosk: VoskSpeech, text: String) {
         if (capturing || !isWakePhrase(text)) return
+        Log.i(TAG, "wake phrase detected in: \"$text\"")
         capturing = true
         voiceScope.launch { captureCommand(vosk) }
     }
@@ -231,12 +278,13 @@ class ActiveMatrixService : Service() {
         vosk.start(grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
+                Log.i(TAG, "command heard: \"$text\"")
                 voiceScope.launch {
                     if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk)
                 }
             }
-            override fun onError(message: String) { voiceScope.launch { listenForWake(vosk) } }
-            override fun onTimeout() { voiceScope.launch { listenForWake(vosk) } }
+            override fun onError(message: String) { Log.w(TAG, "command error: $message"); voiceScope.launch { listenForWake(vosk) } }
+            override fun onTimeout() { Log.i(TAG, "command timeout — re-arming wake"); voiceScope.launch { listenForWake(vosk) } }
         })
     }
 
@@ -298,6 +346,7 @@ class ActiveMatrixService : Service() {
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e // honour service teardown — don't re-arm the mic on a dying service
         } catch (e: Throwable) {
+            Log.e(TAG, "respond: failed to answer", e)
             update("I couldn't answer that one, sir.")
             resetConvo()
             listenForWake(vosk)
@@ -403,8 +452,11 @@ class ActiveMatrixService : Service() {
 
         // Near-homophones the STT model often produces for "jarvis"; matched leniently below.
         private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
+        private const val TAG = "JarvisVoice"
         // Re-arm the wake loop if no command is spoken within this window after waking.
         private const val COMMAND_TIMEOUT_MS = 8000
+        // Backoff before re-arming the wake loop after a recognizer/mic error (avoids a tight storm).
+        private const val WAKE_RETRY_MS = 4000L
         // Live breaking-news poll cadence — as fresh as Android allows without a push server.
         private const val LIVE_NEWS_INTERVAL_MS = 90_000L
 
