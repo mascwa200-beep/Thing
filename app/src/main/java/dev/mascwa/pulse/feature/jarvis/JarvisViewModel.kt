@@ -266,7 +266,7 @@ class JarvisViewModel(
             // The big STT model is a ~1.8 GB download on first use — reflect its progress so the
             // button doesn't look frozen for minutes.
             val progress = launch {
-                voskSpeech.provisioning.collect { st ->
+                voskSpeech.dictationProvisioning.collect { st ->
                     val msg = when (st) {
                         is dev.mascwa.pulse.jarvis.voice.SttModelStore.State.Downloading -> "downloading voice model ${st.pct}%"
                         is dev.mascwa.pulse.jarvis.voice.SttModelStore.State.Unpacking -> "unpacking voice model…"
@@ -275,7 +275,8 @@ class JarvisViewModel(
                     if (_voiceInput.value is VoiceInputState.Preparing) _voiceInput.value = VoiceInputState.Preparing(msg)
                 }
             }
-            val ready = voskSpeech.ensureModel()
+            // Tap-to-talk uses the accurate full model (downloaded on first use).
+            val ready = voskSpeech.ensureDictationModel()
             progress.cancel()
             if (!ready) {
                 _voiceInput.value = VoiceInputState.Error("Voice model unavailable.")
@@ -284,7 +285,7 @@ class JarvisViewModel(
             _voiceInput.value = VoiceInputState.Listening("")
             // Dispatchers.Main (non-immediate) so stop()/send() are POSTED off Vosk's callback
             // frame — stop() joins the recognizer thread and must not run inside the callback.
-            val started = voskSpeech.start(timeoutMs = TAP_TO_TALK_TIMEOUT_MS, listener = object : VoskListener {
+            val started = voskSpeech.start(dictation = true, timeoutMs = TAP_TO_TALK_TIMEOUT_MS, listener = object : VoskListener {
                 override fun onPartial(text: String) {
                     _voiceInput.value = VoiceInputState.Listening(text)
                 }

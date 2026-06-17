@@ -174,11 +174,11 @@ class ActiveMatrixService : Service() {
     private fun startWakeWord() {
         val vosk = container?.voskSpeech ?: return
         voiceScope.launch {
-            // Reflect the (potentially large) model download/unpack so the user sees progress, not a
-            // frozen "standing by". The first run can be a multi-hundred-MB to ~1.8 GB download.
+            // Reflect the model download/unpack so the user sees progress, not a frozen "standing by".
+            // The wake model is small (~40 MB) but the first run still downloads + unpacks it.
             update("Preparing voice model…")
             val progress = launch {
-                vosk.provisioning.collect { st ->
+                vosk.wakeProvisioning.collect { st ->
                     when (st) {
                         is SttModelStore.State.Downloading -> update("Downloading voice model ${st.pct}% (one-time)…")
                         is SttModelStore.State.Unpacking -> update("Unpacking voice model…")
@@ -186,7 +186,7 @@ class ActiveMatrixService : Service() {
                     }
                 }
             }
-            val ok = vosk.ensureModel()
+            val ok = vosk.ensureWakeModel()
             progress.cancel()
             if (!ok) {
                 Log.w(TAG, "startWakeWord: model unavailable")
@@ -216,9 +216,9 @@ class ActiveMatrixService : Service() {
         resetConvo() // back to idle: any open conversation is over
         capturing = false
         update("Listening for \"J.A.R.V.I.S.\"…")
-        // Free-form recognition: the big STT model is a static graph (no runtime grammar), so we
-        // transcribe and match the wake word in the text via the lenient isWakePhrase below.
-        val started = vosk.start(grammar = null, listener = object : VoskListener {
+        // Small wake model with a keyword grammar: cheap, tight spotting for an always-on mic. The
+        // lenient isWakePhrase below still catches the near-homophones the model emits.
+        val started = vosk.start(dictation = false, grammar = WAKE_GRAMMAR, listener = object : VoskListener {
             override fun onPartial(text: String) { maybeWake(vosk, text) }
             override fun onFinal(text: String) { maybeWake(vosk, text) }
             override fun onError(message: String) {
@@ -275,7 +275,9 @@ class ActiveMatrixService : Service() {
      *  A timeout re-arms the wake loop if the user says nothing (so `capturing` never latches). */
     private fun captureCommand(vosk: VoskSpeech) {
         update("Yes, sir? Listening…")
-        vosk.start(grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
+        // The resident assistant stays on the small model end-to-end so it never loads the heavy
+        // dictation model alongside the LLM (the chat mic uses the full model for accurate dictation).
+        vosk.start(dictation = false, grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
                 Log.i(TAG, "command heard: \"$text\"")
@@ -450,6 +452,10 @@ class ActiveMatrixService : Service() {
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.matrix.STOP"
         private const val EXTRA_WAKE_WORD = "dev.mascwa.pulse.jarvis.matrix.WAKE_WORD"
 
+        // Keyword-spotting grammar for the small wake model: the wake word, common lead-ins, and the
+        // unknown-word token. Vosk only emits words it's told about, so multi-word forms are explicit.
+        private const val WAKE_GRAMMAR =
+            "[\"jarvis\", \"hey jarvis\", \"ok jarvis\", \"okay jarvis\", \"hi jarvis\", \"[unk]\"]"
         // Near-homophones the STT model often produces for "jarvis"; matched leniently below.
         private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
         private const val TAG = "JarvisVoice"

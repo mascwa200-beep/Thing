@@ -2,6 +2,7 @@ package dev.mascwa.pulse.jarvis.voice
 
 import android.content.Context
 import android.util.Log
+import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,48 +32,75 @@ interface VoskListener {
 class VoskSpeech(context: Context) {
 
     private val appContext = context.applicationContext
-    private val store = SttModelStore(appContext)
+    // Two tiers: a small model for the always-on wake word (light, reliable) and the full model for
+    // accurate tap-to-talk dictation (downloaded on first use of the chat mic).
+    private val wakeStore = SttModelStore(appContext, SttModelStore.SMALL)
+    private val dictationStore = SttModelStore(appContext, SttModelStore.FULL)
 
-    @Volatile private var model: Model? = null
+    @Volatile private var wakeModel: Model? = null
+    @Volatile private var dictationModel: Model? = null
     @Volatile private var speechService: SpeechService? = null
 
-    /** Provisioning progress for the underlying speech model (download / unpack). */
-    val provisioning: StateFlow<SttModelStore.State> = store.state
+    /** Provisioning progress for the small wake model (shown in the resident notification). */
+    val wakeProvisioning: StateFlow<SttModelStore.State> = wakeStore.state
+    /** Provisioning progress for the full dictation model (shown in tap-to-talk). */
+    val dictationProvisioning: StateFlow<SttModelStore.State> = dictationStore.state
 
     /** True while the J.A.R.V.I.S. console owns the mic for tap-to-talk. The resident wake loop
      *  observes this and pauses, so the two never fight over the single shared recognizer. */
     val consoleActive = MutableStateFlow(false)
 
-    val isModelReady: Boolean get() = model != null
+    val isWakeModelReady: Boolean get() = wakeModel != null
+    val isDictationModelReady: Boolean get() = dictationModel != null
 
-    /** Download (if needed) and load the model. Safe to call repeatedly; returns success. */
-    suspend fun ensureModel(): Boolean {
-        if (model != null) return true
-        Log.i(TAG, "ensureModel: provisioning speech model…")
-        val result = store.ensure()
-        val dir = result.getOrElse {
-            Log.e(TAG, "ensureModel: model download/unpack failed", it)
+    init {
+        // Reclaim space from the previous single-model layout (jarvis/stt/<model> directly). Off the
+        // calling thread — this can delete up to ~1.8 GB and must not block construction.
+        Thread {
+            runCatching {
+                File(appContext.filesDir, "jarvis/stt").listFiles()
+                    ?.forEach { if (it.name != "small" && it.name != "full") it.deleteRecursively() }
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    /** Download (if needed) and load the small wake model. Safe to call repeatedly. */
+    suspend fun ensureWakeModel(): Boolean = ensure(wakeStore, wake = true)
+
+    /** Download (if needed) and load the full dictation model. Safe to call repeatedly. */
+    suspend fun ensureDictationModel(): Boolean = ensure(dictationStore, wake = false)
+
+    private suspend fun ensure(store: SttModelStore, wake: Boolean): Boolean {
+        val tag = if (wake) "wake" else "dictation"
+        if ((if (wake) wakeModel else dictationModel) != null) return true
+        Log.i(TAG, "ensureModel($tag): provisioning…")
+        val dir = store.ensure().getOrElse {
+            Log.e(TAG, "ensureModel($tag): download/unpack failed", it)
             return false
         }
-        Log.i(TAG, "ensureModel: model present at ${dir.absolutePath}; loading…")
+        Log.i(TAG, "ensureModel($tag): present at ${dir.absolutePath}; loading…")
         return withContext(Dispatchers.IO) {
             runCatching { Model(dir.absolutePath) }
-                .onSuccess { model = it; Log.i(TAG, "ensureModel: model loaded OK") }
-                .onFailure { Log.e(TAG, "ensureModel: Model() load failed (corrupt/too large?)", it) }
+                .onSuccess {
+                    if (wake) wakeModel = it else dictationModel = it
+                    Log.i(TAG, "ensureModel($tag): loaded OK")
+                }
+                .onFailure { Log.e(TAG, "ensureModel($tag): Model() load failed (corrupt/too large?)", it) }
                 .isSuccess
         }
     }
 
     /**
-     * Begin streaming recognition. [grammar] — a JSON array string like `["jarvis","[unk]"]` —
-     * constrains the vocabulary for keyword spotting; null means free-form transcription.
-     * [timeoutMs] > 0 ends the session and fires [VoskListener.onTimeout] after that idle window
-     * (0 = listen indefinitely). Returns false if the model isn't loaded or the mic can't open.
+     * Begin streaming recognition with the chosen tier ([dictation] = full model, else the small wake
+     * model). [grammar] — a JSON array string like `["jarvis","[unk]"]` — constrains the vocabulary
+     * for keyword spotting; null means free-form transcription. [timeoutMs] > 0 ends the session and
+     * fires [VoskListener.onTimeout] after that idle window (0 = listen indefinitely). Returns false
+     * if the requested model isn't loaded or the mic can't open.
      */
-    fun start(grammar: String? = null, timeoutMs: Int = 0, listener: VoskListener): Boolean {
-        val m = model
+    fun start(dictation: Boolean, grammar: String? = null, timeoutMs: Int = 0, listener: VoskListener): Boolean {
+        val m = if (dictation) dictationModel else wakeModel
         if (m == null) {
-            Log.w(TAG, "start: model not loaded — call ensureModel() first")
+            Log.w(TAG, "start: ${if (dictation) "dictation" else "wake"} model not loaded — call ensure first")
             return false
         }
         stop()
@@ -105,11 +133,13 @@ class VoskSpeech(context: Context) {
         speechService = null
     }
 
-    /** Release the model and any session (e.g. on full app shutdown). */
+    /** Release both models and any session (e.g. on full app shutdown). */
     fun shutdown() {
         stop()
-        runCatching { model?.close() }
-        model = null
+        runCatching { wakeModel?.close() }
+        runCatching { dictationModel?.close() }
+        wakeModel = null
+        dictationModel = null
     }
 
     private fun adapter(listener: VoskListener) = object : RecognitionListener {

@@ -13,11 +13,17 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
- * Provisions the offline Vosk speech model on demand: streams the (~1.8 GB) zip to private
- * storage and unpacks it, so voice input needs no bundled asset bloat and no Play Services.
- * The model stays in [Context.getFilesDir] and never leaves the device.
+ * Provisions an offline Vosk speech model on demand: streams the zip to private storage and unpacks
+ * it, so voice input needs no bundled asset bloat and no Play Services. The model stays in
+ * [Context.getFilesDir] and never leaves the device.
+ *
+ * One store per [Model]: a small model for the always-on wake word (light, fast download) and the
+ * full model for accurate tap-to-talk dictation — see [SttModelStore.SMALL] / [SttModelStore.FULL].
  */
-class SttModelStore(context: Context) {
+class SttModelStore(context: Context, private val model: Model) {
+
+    /** A provisionable Vosk model: where to fetch it, a version tag, and its private subdirectory. */
+    data class Model(val url: String, val version: String, val dirName: String)
 
     sealed interface State {
         data object Idle : State
@@ -28,7 +34,7 @@ class SttModelStore(context: Context) {
     }
 
     private val appContext = context.applicationContext
-    private val root: File = File(appContext.filesDir, "jarvis/stt").apply { mkdirs() }
+    private val root: File = File(appContext.filesDir, "jarvis/stt/${model.dirName}").apply { mkdirs() }
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -46,11 +52,11 @@ class SttModelStore(context: Context) {
         root.listFiles()?.firstOrNull { it.isDirectory && File(it, "conf").isDirectory }
 
     /** Ensure the model is unpacked, downloading it first if necessary. */
-    suspend fun ensure(url: String = DEFAULT_URL): Result<File> = withContext(Dispatchers.IO) {
-        // Re-provision when the bundled model version changes; otherwise reuse the unpacked one.
+    suspend fun ensure(url: String = model.url): Result<File> = withContext(Dispatchers.IO) {
+        // Re-provision when the model version changes; otherwise reuse the unpacked one.
         val versionFile = File(root, ".model_version")
         val installed = runCatching { versionFile.readText().trim() }.getOrNull()
-        if (installed == MODEL_VERSION) {
+        if (installed == model.version) {
             modelDir()?.let {
                 _state.value = State.Ready
                 return@withContext Result.success(it)
@@ -115,7 +121,7 @@ class SttModelStore(context: Context) {
                 unpacked.copyRecursively(finalDir, overwrite = true)
             }
             staging.deleteRecursively()
-            runCatching { versionFile.writeText(MODEL_VERSION) }
+            runCatching { versionFile.writeText(model.version) }
             _state.value = State.Ready
             Result.success(finalDir)
         } catch (t: Throwable) {
@@ -148,11 +154,20 @@ class SttModelStore(context: Context) {
     }
 
     companion object {
-        /** Full Vosk en-US 0.22 model (~1.8 GB) — the accurate, "big" model for dictation. It's a
-         *  static graph, so it does NOT support Vosk's runtime grammar; wake spotting falls back to
-         *  free-form recognition (see [VoskSpeech.start]). Stays fully on-device. */
-        const val DEFAULT_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip"
-        /** Bump when [DEFAULT_URL] changes to force a one-time re-provision of the new model. */
-        const val MODEL_VERSION = "en-us-0.22-full"
+        /** Small en-US model (~40 MB) for the always-on wake word: light, quick to download, and it
+         *  supports Vosk's runtime grammar for tight keyword spotting. Stays fully on-device. */
+        val SMALL = Model(
+            url = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
+            version = "small-en-us-0.15",
+            dirName = "small",
+        )
+
+        /** Full en-US 0.22 model (~1.8 GB) — the accurate model for deliberate tap-to-talk dictation.
+         *  It's a static graph (no runtime grammar). Downloaded on first use of the chat mic. */
+        val FULL = Model(
+            url = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip",
+            version = "en-us-0.22-full",
+            dirName = "full",
+        )
     }
 }
