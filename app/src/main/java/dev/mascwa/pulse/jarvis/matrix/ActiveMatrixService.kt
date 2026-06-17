@@ -21,7 +21,9 @@ import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
+import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
 import dev.mascwa.pulse.notifications.BreakingNewsPulse
@@ -51,6 +53,11 @@ class ActiveMatrixService : Service() {
     @Volatile private var waking = false
     @Volatile private var capturing = false
     @Volatile private var pollingNews = false
+
+    // Rolling spoken-conversation context for follow-up / conversation mode (reset on each new wake).
+    private val convo = ArrayDeque<ChatTurn>()
+    @Volatile private var convoTurns = 0
+    @Volatile private var convoStartedAt = 0L
 
     private val container get() = (application as? PulseApplication)?.container
 
@@ -176,6 +183,7 @@ class ActiveMatrixService : Service() {
             update("Paused — console has the mic.")
             return
         }
+        resetConvo() // back to idle: any open conversation is over
         capturing = false
         update("Listening for \"J.A.R.V.I.S.\"…")
         // Free-form recognition: the big STT model is a static graph (no runtime grammar), so we
@@ -234,29 +242,107 @@ class ActiveMatrixService : Service() {
 
     private suspend fun respond(vosk: VoskSpeech, command: String) {
         vosk.stop()
+        // Honour an explicit "stop" before doing anything else.
+        if (isStopCue(command)) {
+            endConversation(vosk, "Very good, sir.")
+            return
+        }
         update("One moment…")
         val engine = container?.inferenceEngine
         if (engine == null) {
-            listenForWake(vosk)
+            endConversation(vosk, null)
             return
         }
+        val jarvisSettings = runCatching { container?.settingsRepository?.current()?.jarvis }.getOrNull()
+        val followUp = jarvisSettings?.followUpMode == true
+        val conversation = jarvisSettings?.conversationMode == true
         try {
             runCatching { engine.ensureReady() }
-            val persona = JarvisPersona.compose(
+            var persona = JarvisPersona.compose(
                 runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
             )
+            // Only in conversation mode: let the model self-direct whether to keep the floor open.
+            // (Appended here, not to the global persona, so the markers never leak into the console.)
+            if (conversation) persona += CONVO_HINT
+
+            if (convoTurns == 0) convoStartedAt = System.currentTimeMillis()
+            val history = convo.toList()
+            convo.addLast(ChatTurn(Speaker.USER, command))
+
             val sb = StringBuilder()
-            engine.generate(command, emptyList(), persona).collect { sb.append(it) }
-            val reply = sb.toString().ifBlank { "Standing by, sir." }
+            engine.generate(command, history, persona).collect { sb.append(it) }
+            var reply = sb.toString().ifBlank { "Standing by, sir." }
+            // Autonomous floor-control: explicit markers win; otherwise a trailing "?" implies it
+            // expects an answer. Strip markers before showing/speaking either way.
+            val wantsClose = reply.contains(MARK_CLOSE)
+            val wantsOpen = reply.contains(MARK_OPEN) || reply.trimEnd().endsWith("?")
+            reply = stripMarkers(reply)
+            convo.addLast(ChatTurn(Speaker.JARVIS, reply))
+            convoTurns++
+            while (convo.size > CONVO_BUFFER) convo.removeFirst()
             update(reply.take(140))
-            runCatching { container?.textToSpeech?.speak(reply) }
+
+            val overLimit = convoTurns >= MAX_CONVO_TURNS ||
+                System.currentTimeMillis() - convoStartedAt > MAX_CONVO_MS
+            val keepOpen = !wantsClose && !overLimit && (followUp || (conversation && wantsOpen))
+
+            when {
+                // Keep the floor: reopen the mic (no wake word) once J.A.R.V.I.S. stops speaking.
+                keepOpen -> speakThen(reply) { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+                // Conversation mode decides to wind down (model closed, or we hit the safeguard): it
+                // says so, but checks first — if you keep talking it resumes; silence/"stop" ends it.
+                conversation && (wantsClose || overLimit) -> speakThen(reply) { wrapUp(vosk) }
+                // Plain answer: speak it and return to wake listening.
+                else -> speakThen(reply) { resetConvo(); listenForWake(vosk) }
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e // honour service teardown — don't re-arm the mic on a dying service
         } catch (e: Throwable) {
             update("I couldn't answer that one, sir.")
+            resetConvo()
+            listenForWake(vosk)
         }
-        listenForWake(vosk)
     }
+
+    /** Speak [text], then run [next] on the main thread once speech finishes (so the mic never picks
+     *  up J.A.R.V.I.S.'s own voice). Falls straight through to [next] if TTS is unavailable. */
+    private fun speakThen(text: String, next: () -> Unit) {
+        val tts = container?.textToSpeech
+        if (tts == null) { voiceScope.launch { next() } } else tts.speak(text) { voiceScope.launch { next() } }
+    }
+
+    /** J.A.R.V.I.S. signals it's winding down but leaves the floor open: it asks if that's all, then
+     *  listens once more. If you keep talking it resumes with a fresh budget; silence (or "stop") ends
+     *  it — so it never cuts you off while you still want to talk. */
+    private fun wrapUp(vosk: VoskSpeech) {
+        convoTurns = 0
+        convoStartedAt = System.currentTimeMillis() // fresh budget if the user carries on
+        speakThen("Will that be all, sir?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+    }
+
+    /** End any open conversation: optionally speak a closing line, then return to wake listening. */
+    private fun endConversation(vosk: VoskSpeech, closing: String?) {
+        resetConvo()
+        if (closing == null) { listenForWake(vosk); return }
+        update(closing)
+        speakThen(closing) { listenForWake(vosk) }
+    }
+
+    private fun resetConvo() {
+        convo.clear()
+        convoTurns = 0
+        convoStartedAt = 0L
+    }
+
+    /** A short, whole-utterance request to end the exchange (kept tight to avoid false positives). */
+    private fun isStopCue(text: String): Boolean {
+        val t = text.lowercase().trim().trim('.', '!', ',')
+        if (t.split(Regex("\\s+")).size > 5) return false
+        return STOP_CUES.any { t == it || t.endsWith(" $it") || t.startsWith("$it ") }
+    }
+
+    private fun stripMarkers(text: String): String =
+        text.replace(MARK_OPEN, "").replace(MARK_CLOSE, "").trim()
 
     private fun update(text: String) {
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
@@ -321,6 +407,25 @@ class ActiveMatrixService : Service() {
         private const val COMMAND_TIMEOUT_MS = 8000
         // Live breaking-news poll cadence — as fresh as Android allows without a push server.
         private const val LIVE_NEWS_INTERVAL_MS = 90_000L
+
+        // --- Follow-up / conversation mode ---
+        // Safeguards so an open conversation can't run forever (it then wraps up on its own).
+        private const val MAX_CONVO_TURNS = 8
+        private const val MAX_CONVO_MS = 5 * 60_000L
+        // How many recent turns of context to keep (Part A's input clamp trims further at render time).
+        private const val CONVO_BUFFER = 12
+        // Autonomous floor-control markers (stripped before display/speech).
+        private const val MARK_OPEN = "[[OPEN]]"
+        private const val MARK_CLOSE = "[[CLOSE]]"
+        private const val CONVO_HINT =
+            "\n\nYou are mid-conversation by voice; keep replies brief and natural. If you expect the " +
+                "user to respond, end with [[OPEN]]; if the conversation is naturally complete, end with [[CLOSE]]."
+        // Short whole-utterance phrases that end an exchange.
+        private val STOP_CUES = listOf(
+            "stop", "that's all", "thats all", "that is all", "thank you", "thanks",
+            "thank you jarvis", "thanks jarvis", "goodbye", "bye", "dismiss", "stand down",
+            "that'll be all", "thatll be all", "nevermind", "never mind", "cancel", "be quiet",
+        )
 
         fun start(context: Context, wakeWord: Boolean = false) {
             val intent = Intent(context, ActiveMatrixService::class.java)

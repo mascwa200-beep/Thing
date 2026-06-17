@@ -1,7 +1,10 @@
 package dev.mascwa.pulse.jarvis.voice
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
@@ -17,13 +20,29 @@ class TextToSpeechEngine(context: Context) {
 
     private val ready = AtomicBoolean(false)
     @Volatile private var engine: TextToSpeech? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    /** Fired (once, on the main thread) when the current utterance finishes or fails. */
+    @Volatile private var pendingDone: (() -> Unit)? = null
 
     init {
         val appContext = context.applicationContext
         engine = TextToSpeech(appContext) { status ->
             val e = engine
-            ready.set(status == TextToSpeech.SUCCESS && e != null && configure(e))
+            val ok = status == TextToSpeech.SUCCESS && e != null && configure(e)
+            if (ok) e?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) = fireDone()
+                override fun onError(utteranceId: String?) = fireDone()
+            })
+            ready.set(ok)
         }
+    }
+
+    /** Run and clear the completion callback on the main thread (TTS callbacks arrive off-thread). */
+    private fun fireDone() {
+        val cb = pendingDone ?: return
+        pendingDone = null
+        mainHandler.post(cb)
     }
 
     /** Give J.A.R.V.I.S. a British voice and a calm, measured cadence. Falls back to US English (and
@@ -53,11 +72,17 @@ class TextToSpeechEngine(context: Context) {
     /** True once an engine is bound and an English voice is available. */
     val isAvailable: Boolean get() = ready.get()
 
-    /** Speak [text], replacing anything already being spoken. No-op if unavailable. */
-    fun speak(text: String) {
+    /**
+     * Speak [text], replacing anything already being spoken. [onDone] runs (on the main thread) when
+     * the utterance finishes — or immediately if there's nothing to speak / no engine, so callers can
+     * safely sequence after speech (e.g. reopen the mic only once J.A.R.V.I.S. has stopped talking).
+     */
+    fun speak(text: String, onDone: () -> Unit = {}) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty() || !ready.get()) return
-        engine?.speak(trimmed.take(MAX_LEN), TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        if (trimmed.isEmpty() || !ready.get()) { onDone(); return }
+        pendingDone = onDone
+        val res = engine?.speak(trimmed.take(MAX_LEN), TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        if (res != TextToSpeech.SUCCESS) fireDone()
     }
 
     /** Stop the current utterance immediately. */

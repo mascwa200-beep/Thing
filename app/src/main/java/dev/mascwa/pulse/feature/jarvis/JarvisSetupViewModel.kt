@@ -54,6 +54,14 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. listens for its wake word while resident. */
     val wakeWord: StateFlow<Boolean> = _wakeWord.asStateFlow()
 
+    private val _followUp = MutableStateFlow(false)
+    /** Whether the mic reopens after a reply so the user can answer without the wake word. */
+    val followUpMode: StateFlow<Boolean> = _followUp.asStateFlow()
+
+    private val _conversation = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. autonomously keeps a spoken conversation going. */
+    val conversationMode: StateFlow<Boolean> = _conversation.asStateFlow()
+
     private val _agentTools = MutableStateFlow(false)
     /** Whether J.A.R.V.I.S. may use tools (web/GitHub-read/device/memory) in its agentic loop. */
     val agentTools: StateFlow<Boolean> = _agentTools.asStateFlow()
@@ -94,6 +102,8 @@ class JarvisSetupViewModel(
             _vitals.value = saved.vitalsTracking
             _voiceReplies.value = saved.voiceReplies
             _wakeWord.value = saved.wakeWord
+            _followUp.value = saved.followUpMode
+            _conversation.value = saved.conversationMode
             _agentTools.value = saved.agentToolsEnabled
             _selfEdit.value = saved.selfEditEnabled
             _githubToken.value = saved.githubToken
@@ -209,6 +219,24 @@ class JarvisSetupViewModel(
         _wakeWord.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(wakeWord = enabled)) }
+        }
+    }
+
+    fun setFollowUpMode(enabled: Boolean) {
+        _followUp.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(followUpMode = enabled)) }
+        }
+    }
+
+    fun setConversationMode(enabled: Boolean) {
+        _conversation.value = enabled
+        // Conversation mode rides on the follow-up loop; enabling it implies follow-up.
+        if (enabled) _followUp.value = true
+        viewModelScope.launch {
+            settings.update {
+                it.copy(jarvis = it.jarvis.copy(conversationMode = enabled, followUpMode = it.jarvis.followUpMode || enabled))
+            }
         }
     }
 

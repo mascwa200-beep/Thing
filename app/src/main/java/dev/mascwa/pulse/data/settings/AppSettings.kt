@@ -132,6 +132,12 @@ data class JarvisSettings(
     val voiceReplies: Boolean = false,
     /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
     val wakeWord: Boolean = false,
+    /** After a spoken reply, reopen the mic briefly so you can answer WITHOUT re-saying the wake word
+     *  (Alexa-style follow-up). Ends when you stay silent. Requires the wake word. */
+    val followUpMode: Boolean = false,
+    /** Let J.A.R.V.I.S. autonomously keep a spoken conversation going (when its reply expects a
+     *  response) and announce when it's wrapping up. Builds on follow-up; requires the wake word. */
+    val conversationMode: Boolean = false,
     /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */

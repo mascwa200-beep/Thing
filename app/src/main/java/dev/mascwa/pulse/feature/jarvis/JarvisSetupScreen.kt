@@ -66,6 +66,8 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val vitals by vm.vitals.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
+    val followUpMode by vm.followUpMode.collectAsState()
+    val conversationMode by vm.conversationMode.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
@@ -233,6 +235,23 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                         }
                     }
                 },
+            )
+
+            SettingToggle(
+                title = "FOLLOW-UP MODE",
+                subtitle = "After a spoken reply, listen again briefly so you can respond without " +
+                    "re-saying \"J.A.R.V.I.S.\" — ends when you go quiet. Requires the wake word.",
+                enabled = followUpMode,
+                onToggle = vm::setFollowUpMode,
+            )
+
+            SettingToggle(
+                title = "CONVERSATION MODE",
+                subtitle = "Let J.A.R.V.I.S. decide from the conversation whether to keep talking — it " +
+                    "stays listening when it expects a reply and tells you when it's wrapping up. You " +
+                    "can stop anytime (\"stop\" / \"that's all\"). Implies follow-up.",
+                enabled = conversationMode,
+                onToggle = vm::setConversationMode,
             )
 
             SettingToggle(
