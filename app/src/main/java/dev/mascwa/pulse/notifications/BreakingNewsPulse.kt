@@ -18,9 +18,11 @@ object BreakingNewsPulse {
     suspend fun check(container: AppContainer) = withContext(Dispatchers.IO) {
         val state = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
         val top = container.newsRepository.fetchCategory(NewsCategory.TOP, force = true).data
-        val currentUrls = top.take(20).map { it.url }
-        val firstRun = state.seenTopUrls.isEmpty()
-        val fresh = top.filter { it.url !in state.seenTopUrls }
+        // Dedup by TITLE, not URL: Google News RSS item URLs mutate between fetches (tracking/redirect
+        // params), so URL-keyed dedup re-fired the same headlines every poll. Titles are stable.
+        val seen = state.seenTopUrls.toSet() // field reused to hold seen titles
+        val firstRun = seen.isEmpty()
+        val fresh = top.filter { it.title.isNotBlank() && it.title !in seen }
         if (!firstRun && fresh.isNotEmpty()) {
             val lead = fresh.first()
             val extra = if (fresh.size > 1) " (+${fresh.size - 1} more)" else ""
@@ -30,6 +32,8 @@ object BreakingNewsPulse {
                 body = lead.title + extra,
             )
         }
-        container.diskCache.write(STATE_KEY, state.copy(seenTopUrls = currentUrls), NotifyState.serializer())
+        // Accumulate seen titles (bounded) so an item briefly leaving the top list won't re-alert.
+        val merged = (state.seenTopUrls + top.take(20).map { it.title }).filter { it.isNotBlank() }.distinct().takeLast(60)
+        container.diskCache.write(STATE_KEY, state.copy(seenTopUrls = merged), NotifyState.serializer())
     }
 }

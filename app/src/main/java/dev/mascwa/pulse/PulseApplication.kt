@@ -45,34 +45,23 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
     override fun newImageLoader(): ImageLoader = container.imageLoader
 
     /**
-     * React to OS memory pressure so the process is trimmed instead of silently killed. Under real
-     * pressure we drop the in-memory image cache; when critical/complete we also clear the disk cache
-     * and unload the heavy on-device LLM process.
+     * React to OS memory pressure so the process is trimmed instead of silently killed. We drop the
+     * in-memory image cache always, and the disk caches when backgrounded. We deliberately do NOT
+     * unload the on-device LLM here: it lives in a separate, OS-reclaimable process, and tearing it
+     * down mid-conversation is exactly what caused "inference fault: process lost". If the OS reclaims
+     * that process, the next message reloads it via ensureReady().
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        when (level) {
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
-            ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> freeMemory(aggressive = true)
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
-            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE,
-            ComponentCallbacks2.TRIM_MEMORY_MODERATE,
-            ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
-            ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> freeMemory(aggressive = false)
-            else -> {}
+        runCatching { container.imageLoader.memoryCache?.clear() }
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            appScope.launch { runCatching { container.diskCache.clear() } }
         }
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        freeMemory(aggressive = true)
-    }
-
-    private fun freeMemory(aggressive: Boolean) {
         runCatching { container.imageLoader.memoryCache?.clear() }
-        if (aggressive) {
-            appScope.launch { runCatching { container.diskCache.clear() } }
-            runCatching { container.inferenceEngine.reset() }
-        }
+        appScope.launch { runCatching { container.diskCache.clear() } }
     }
 }

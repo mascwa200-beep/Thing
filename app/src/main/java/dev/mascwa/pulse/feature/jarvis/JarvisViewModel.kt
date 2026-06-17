@@ -126,6 +126,9 @@ class JarvisViewModel(
                         speakIfEnabled(brief)
                     }
                     is JarvisIntent.Chat -> {
+                        // Reload the model if its (separate) process was reclaimed or faulted, so a
+                        // transient "process lost" self-heals instead of sticking on the persona core.
+                        runCatching { engine.ensureReady() }
                         val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
                         val reply = if (useAgent) {
                             generateWithAgent(intent.text)
