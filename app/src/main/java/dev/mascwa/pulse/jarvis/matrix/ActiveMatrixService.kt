@@ -24,10 +24,12 @@ import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
+import dev.mascwa.pulse.notifications.BreakingNewsPulse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -48,6 +50,7 @@ class ActiveMatrixService : Service() {
 
     @Volatile private var waking = false
     @Volatile private var capturing = false
+    @Volatile private var pollingNews = false
 
     private val container get() = (application as? PulseApplication)?.container
 
@@ -98,7 +101,38 @@ class ActiveMatrixService : Service() {
             waking = true
             startWakeWord()
         }
+        // Near-real-time breaking news while the resident assistant is up (opt-in; ~90s cadence).
+        // This is the only legitimate sub-15-minute path on Android (a periodic worker floors at 15m).
+        if (!pollingNews) {
+            pollingNews = true
+            scope.launch { liveNewsLoop() }
+        }
         return START_STICKY
+    }
+
+    /** Poll the TOP feed on a short interval and push genuinely new headlines immediately. Cheap and
+     *  guarded: it only fetches when the user has enabled live breaking news and isn't in quiet hours. */
+    private suspend fun liveNewsLoop() {
+        while (true) {
+            runCatching {
+                val c = container
+                val prefs = c?.settingsRepository?.current()?.notifications
+                if (c != null && prefs != null && prefs.masterEnabled && prefs.breakingNews &&
+                    prefs.liveBreakingNews && !inQuietNow(prefs)
+                ) {
+                    BreakingNewsPulse.check(c)
+                }
+            }
+            delay(LIVE_NEWS_INTERVAL_MS)
+        }
+    }
+
+    private fun inQuietNow(prefs: dev.mascwa.pulse.data.settings.NotificationPrefs): Boolean {
+        if (!prefs.quietHoursEnabled) return false
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val s = prefs.quietStartHour
+        val e = prefs.quietEndHour
+        return if (s <= e) hour in s until e else hour >= s || hour < e
     }
 
     private fun startForegroundCompat(notification: Notification, withMic: Boolean) {
@@ -284,6 +318,8 @@ class ActiveMatrixService : Service() {
         private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
         // Re-arm the wake loop if no command is spoken within this window after waking.
         private const val COMMAND_TIMEOUT_MS = 8000
+        // Live breaking-news poll cadence — as fresh as Android allows without a push server.
+        private const val LIVE_NEWS_INTERVAL_MS = 90_000L
 
         fun start(context: Context, wakeWord: Boolean = false) {
             val intent = Intent(context, ActiveMatrixService::class.java)

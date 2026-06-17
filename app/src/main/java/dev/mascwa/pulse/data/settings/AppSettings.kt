@@ -149,6 +149,9 @@ data class JarvisSettings(
 data class NotificationPrefs(
     val masterEnabled: Boolean = true,
     val breakingNews: Boolean = true,
+    /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
+     *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
+    val liveBreakingNews: Boolean = false,
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,

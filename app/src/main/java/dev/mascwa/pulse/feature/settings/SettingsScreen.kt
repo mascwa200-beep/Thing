@@ -178,6 +178,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     val on = s.notifications.masterEnabled
                     PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                    PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
+                        checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
                     PrefSwitch("Market & price alerts", checked = s.notifications.marketAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
                     PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,

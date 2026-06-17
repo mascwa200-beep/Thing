@@ -40,28 +40,16 @@ class RefreshWorker(
             return Result.success()
         }
 
-        var state = readState()
         val notifier = container.notifier
 
-        // --- Breaking news ---
+        // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
         if (prefs.breakingNews) {
-            runCatching {
-                val top = container.newsRepository.fetchCategory(NewsCategory.TOP, force = true).data
-                val currentUrls = top.take(20).map { it.url }
-                val firstRun = state.seenTopUrls.isEmpty()
-                val fresh = top.filter { it.url !in state.seenTopUrls }
-                if (!firstRun && fresh.isNotEmpty()) {
-                    val lead = fresh.first()
-                    val extra = if (fresh.size > 1) " (+${fresh.size - 1} more)" else ""
-                    notifier.notifyBreaking(
-                        id = 1001,
-                        title = "Breaking" + (lead.source.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
-                        body = lead.title + extra,
-                    )
-                }
-                state = state.copy(seenTopUrls = currentUrls)
-            }
+            runCatching { BreakingNewsPulse.check(container) }
         }
+
+        // Read the rest of the dedup state AFTER the breaking check so we don't clobber its
+        // seenTopUrls update when we persist the other sections below.
+        var state = readState()
 
         // --- Market / price alerts ---
         if (prefs.marketAlerts) {
