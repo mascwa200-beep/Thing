@@ -183,7 +183,7 @@ class ActiveMatrixService : Service() {
     /** After the wake word, capture one free-form command, answer it, and speak the reply.
      *  A timeout re-arms the wake loop if the user says nothing (so `capturing` never latches). */
     private fun captureCommand(vosk: VoskSpeech) {
-        update("Yes? Listening…")
+        update("Yes, sir? Listening…")
         vosk.start(grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
@@ -198,7 +198,7 @@ class ActiveMatrixService : Service() {
 
     private suspend fun respond(vosk: VoskSpeech, command: String) {
         vosk.stop()
-        update("Thinking…")
+        update("One moment…")
         val engine = container?.inferenceEngine
         if (engine == null) {
             listenForWake(vosk)
@@ -208,13 +208,13 @@ class ActiveMatrixService : Service() {
             runCatching { engine.ensureReady() }
             val sb = StringBuilder()
             engine.generate(command, emptyList(), JarvisPersona.SYSTEM_PROMPT).collect { sb.append(it) }
-            val reply = sb.toString().ifBlank { "Standing by." }
+            val reply = sb.toString().ifBlank { "Standing by, sir." }
             update(reply.take(140))
             runCatching { container?.textToSpeech?.speak(reply) }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e // honour service teardown — don't re-arm the mic on a dying service
         } catch (e: Throwable) {
-            update("Couldn't answer that.")
+            update("I couldn't answer that one, sir.")
         }
         listenForWake(vosk)
     }

@@ -54,12 +54,12 @@ class IsolatedInferenceEngine(
 
         override fun onServiceDisconnected(name: ComponentName?) {
             service = null
-            _state.value = EngineState.Error("Inference process crashed — the model may be too heavy for this device.")
+            _state.value = EngineState.Error("The inference process stopped — that model may be too heavy for this device, sir. Try a lighter one (Qwen 1.5B).")
         }
 
         override fun onBindingDied(name: ComponentName?) {
             service = null
-            _state.value = EngineState.Error("Inference process died.")
+            _state.value = EngineState.Error("The inference process died, sir.")
         }
     }
 
@@ -72,19 +72,19 @@ class IsolatedInferenceEngine(
         _state.value = EngineState.Preparing
         val svc = connect()
         if (svc == null) {
-            _state.value = EngineState.Error("Couldn't start the inference process.")
+            _state.value = EngineState.Error("I couldn't start the inference process, sir.")
             return
         }
         // load() blocks while the model is read in the other process; a native abort there throws
         // DeadObjectException here rather than crashing us.
         withContext(Dispatchers.IO) { runCatching { svc.load(modelManager.modelPath(), maxTokens) } }
             .onSuccess { ok ->
-                _state.value = if (ok) EngineState.Ready else EngineState.Error("Model failed to load.")
+                _state.value = if (ok) EngineState.Ready else EngineState.Error("The model failed to load, sir.")
             }
             .onFailure {
                 service = null
                 _state.value =
-                    EngineState.Error("Inference process crashed loading the model (likely too heavy for this device).")
+                    EngineState.Error("The model failed to load — it may be too heavy for this device, sir. Try Qwen 1.5B.")
             }
     }
 
