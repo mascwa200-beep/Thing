@@ -182,6 +182,11 @@ class AppContainer(private val appContext: Context) {
     val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {
         dev.mascwa.pulse.jarvis.voice.VoskSpeech(appContext)
     }
+    /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
+     *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
+    val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {
+        dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer(appContext)
+    }
 
     /** App-wide crash reporter backing the global handler + the SYS crash console. */
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {

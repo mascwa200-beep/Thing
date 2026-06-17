@@ -25,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
+import dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer
 import dev.mascwa.pulse.jarvis.voice.SttModelStore
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
@@ -272,16 +273,44 @@ class ActiveMatrixService : Service() {
     }
 
     /** After the wake word, capture one free-form command, answer it, and speak the reply.
-     *  A timeout re-arms the wake loop if the user says nothing (so `capturing` never latches). */
+     *  Prefer the device's on-device Google recognizer (far more accurate, private, no app memory);
+     *  fall back to the offline Vosk model where on-device recognition isn't available. A timeout
+     *  re-arms the wake loop if the user says nothing (so `capturing` never latches). */
     private fun captureCommand(vosk: VoskSpeech) {
+        val google = container?.deviceSpeech
+        if (google != null && google.available) {
+            update("Yes, sir? Listening…")
+            vosk.stop() // hand the mic to the system recognizer (no two-mic contention)
+            google.listen(COMMAND_TIMEOUT_MS, object : VoskListener {
+                override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
+                override fun onFinal(text: String) {
+                    Log.i(TAG, "command heard (on-device): \"$text\"")
+                    voiceScope.launch { if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk) }
+                }
+                override fun onError(message: String) {
+                    if (message == DeviceSpeechRecognizer.UNAVAILABLE) {
+                        Log.w(TAG, "on-device recognizer unavailable — falling back to Vosk")
+                        voiceScope.launch { captureCommandVosk(vosk) }
+                    } else {
+                        Log.w(TAG, "on-device command error: $message — re-arming wake")
+                        voiceScope.launch { listenForWake(vosk) }
+                    }
+                }
+                override fun onTimeout() { Log.i(TAG, "on-device command timeout — re-arming wake"); voiceScope.launch { listenForWake(vosk) } }
+            })
+        } else {
+            captureCommandVosk(vosk)
+        }
+    }
+
+    /** Offline fallback command capture on the Vosk wake model (used when on-device recognition
+     *  isn't available). Same 128 MB model as wake spotting, so it never loads the heavy model. */
+    private fun captureCommandVosk(vosk: VoskSpeech) {
         update("Yes, sir? Listening…")
-        // The resident assistant transcribes the command on the same 128 MB wake model, so it never
-        // loads the heavy 1.8 GB model alongside the ~2.5 GB LLM (which would exhaust memory). The
-        // chat mic uses the full model for the most accurate deliberate dictation.
         vosk.start(dictation = false, grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
-                Log.i(TAG, "command heard: \"$text\"")
+                Log.i(TAG, "command heard (vosk): \"$text\"")
                 voiceScope.launch {
                     if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk)
                 }
@@ -440,6 +469,7 @@ class ActiveMatrixService : Service() {
         observing = false
         waking = false
         runCatching { container?.voskSpeech?.stop() }
+        runCatching { container?.deviceSpeech?.cancel() } // release the system recognizer + mic
         voiceScope.cancel()
         scope.cancel()
         super.onDestroy()
