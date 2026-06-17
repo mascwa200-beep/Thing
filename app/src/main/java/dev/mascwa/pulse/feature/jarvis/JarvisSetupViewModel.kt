@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
+import dev.mascwa.pulse.jarvis.inference.CloudProvider
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.jarvis.inference.ModelManager
@@ -85,6 +86,21 @@ class JarvisSetupViewModel(
     /** Inference backend: 0=auto, 1=GPU, 2=CPU. */
     val inferenceBackend: StateFlow<Int> = _backend.asStateFlow()
 
+    private val _cloudEnabled = MutableStateFlow(false)
+    /** Whether chat uses a cloud AI instead of the on-device model. */
+    val cloudEnabled: StateFlow<Boolean> = _cloudEnabled.asStateFlow()
+
+    private val _cloudProvider = MutableStateFlow(CloudProvider.GEMINI)
+    /** Selected cloud provider (OpenAI-compatible). */
+    val cloudProvider: StateFlow<CloudProvider> = _cloudProvider.asStateFlow()
+
+    private val _cloudApiKey = MutableStateFlow("")
+    val cloudApiKey: StateFlow<String> = _cloudApiKey.asStateFlow()
+
+    private val _cloudModel = MutableStateFlow("")
+    /** Optional model override; blank uses the provider default. */
+    val cloudModel: StateFlow<String> = _cloudModel.asStateFlow()
+
     private val _knowledgeChunks = MutableStateFlow(0)
     /** Number of chunks stored in the knowledge library (docs RAG). */
     val knowledgeChunks: StateFlow<Int> = _knowledgeChunks.asStateFlow()
@@ -109,6 +125,10 @@ class JarvisSetupViewModel(
             _githubToken.value = saved.githubToken
             _chatFormat.value = saved.chatFormat
             _backend.value = saved.inferenceBackend
+            _cloudEnabled.value = saved.cloudEnabled
+            _cloudProvider.value = saved.cloudProvider
+            _cloudApiKey.value = saved.cloudApiKey
+            _cloudModel.value = saved.cloudModel
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
@@ -126,6 +146,38 @@ class JarvisSetupViewModel(
             settings.update { it.copy(jarvis = it.jarvis.copy(inferenceBackend = backend)) }
             engine.reset()
             runCatching { engine.ensureReady() }
+        }
+    }
+
+    /** Enable/disable the cloud AI brain; refresh engine state so the status flips immediately. */
+    fun setCloudEnabled(enabled: Boolean) {
+        _cloudEnabled.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(cloudEnabled = enabled)) }
+            runCatching { engine.ensureReady() }
+        }
+    }
+
+    fun setCloudProvider(provider: CloudProvider) {
+        _cloudProvider.value = provider
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(cloudProvider = provider)) }
+            runCatching { engine.ensureReady() }
+        }
+    }
+
+    fun onCloudKeyChange(value: String) {
+        _cloudApiKey.value = value
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(cloudApiKey = value.trim())) }
+            runCatching { engine.ensureReady() }
+        }
+    }
+
+    fun onCloudModelChange(value: String) {
+        _cloudModel.value = value
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(cloudModel = value.trim())) }
         }
     }
 

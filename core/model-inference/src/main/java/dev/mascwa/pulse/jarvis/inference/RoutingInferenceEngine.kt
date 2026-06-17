@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /**
  * The single engine the rest of the app depends on. It prefers the real LLM — now loaded in a
@@ -27,10 +29,13 @@ class RoutingInferenceEngine(
     private val onNativeCrash: suspend () -> Unit = {},
     /** The model's total token budget (input + output), read fresh at load time. */
     private val maxTokensProvider: suspend () -> Int = { maxTokens },
+    /** Resolved cloud config when the user has enabled a cloud AI + set a key; null = use on-device. */
+    private val cloudConfig: suspend () -> CloudConfig? = { null },
 ) : LocalInferenceEngine {
 
     private val appContext = context.applicationContext
     private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash, maxTokensProvider)
+    private val cloud = CloudInferenceEngine(cloudConfig)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Unavailable)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
@@ -45,6 +50,12 @@ class RoutingInferenceEngine(
     val isModelActive: Boolean get() = isolated.isReady
 
     override suspend fun ensureReady() {
+        // Cloud brain wins when configured: it needs no warmup and (crucially) we skip loading the
+        // heavy on-device model entirely, so cloud works even with no .task model and never risks OOM.
+        if (runCatching { cloudConfig() }.getOrNull() != null) {
+            _state.value = EngineState.Ready
+            return
+        }
         // Fast path only while the isolated process is genuinely alive + loaded.
         if (isolated.isReady) {
             _state.value = EngineState.Ready
@@ -68,10 +79,15 @@ class RoutingInferenceEngine(
         prompt: String,
         history: List<ChatTurn>,
         system: String?,
-    ): Flow<String> =
-        // Route by LIVE readiness: if the process died mid-session, fall back to the persona core
-        // rather than emitting an "offline" stub for every turn.
-        if (isolated.isReady) isolated.generate(prompt, history, system) else fallback.generate(prompt, history, system)
+    ): Flow<String> = flow {
+        // Cloud first when configured; otherwise route by LIVE on-device readiness — if the :inference
+        // process died mid-session, fall back to the persona core rather than an "offline" stub.
+        when {
+            runCatching { cloudConfig() }.getOrNull() != null -> emitAll(cloud.generate(prompt, history, system))
+            isolated.isReady -> emitAll(isolated.generate(prompt, history, system))
+            else -> emitAll(fallback.generate(prompt, history, system))
+        }
+    }
 
     /** Drop the loaded model (e.g. after the user deletes it) and revert to the core. */
     fun reset() {

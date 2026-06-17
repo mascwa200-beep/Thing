@@ -158,6 +158,22 @@ class AppContainer(private val appContext: Context) {
             // Total token budget (input + output), read fresh at load time. The engine reserves part
             // of this for the answer and clamps the input to the rest, so a long chat can't overflow.
             maxTokensProvider = { runCatching { settingsRepository.current().jarvis.maxTokens }.getOrDefault(2048) },
+            // Cloud brain: when the user has enabled it + set a key, chat routes to the provider's
+            // OpenAI-compatible endpoint (and the on-device model is never loaded).
+            cloudConfig = {
+                runCatching {
+                    val j = settingsRepository.current().jarvis
+                    if (j.cloudActive) {
+                        dev.mascwa.pulse.jarvis.inference.CloudConfig(
+                            baseUrl = j.cloudProvider.baseUrl,
+                            apiKey = j.cloudApiKey,
+                            model = j.cloudModel.ifBlank { j.cloudProvider.defaultModel },
+                        )
+                    } else {
+                        null
+                    }
+                }.getOrNull()
+            },
         )
     }
     /** Reads live device power/network/time context for proactive banter + status answers. */

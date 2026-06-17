@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.settings
 
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
+import dev.mascwa.pulse.jarvis.inference.CloudProvider
 import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -153,8 +154,19 @@ data class JarvisSettings(
     /** Let J.A.R.V.I.S. PROPOSE edits to its own persona/knowledge/tools + research (each applied only
      *  on your explicit approval in the Approvals screen). Opt-in; requires agent tools too. */
     val selfEditEnabled: Boolean = false,
+    /** Use a cloud AI for chat instead of the on-device model (opt-in). When on AND [cloudApiKey] is
+     *  set, chat + the agent loop call the provider — chat text leaves the device. Voice stays local. */
+    val cloudEnabled: Boolean = false,
+    /** Which cloud provider's OpenAI-compatible endpoint to call. */
+    val cloudProvider: CloudProvider = CloudProvider.GEMINI,
+    /** API key for [cloudProvider] (get one at its keyUrl). Stays on-device in settings. */
+    val cloudApiKey: String = "",
+    /** Optional model override; blank uses the provider's default model. */
+    val cloudModel: String = "",
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
+    /** Cloud chat is active when enabled and a key is present. */
+    val cloudActive get() = cloudEnabled && cloudApiKey.isNotBlank()
 }
 
 /** Notification preferences. */

@@ -46,7 +46,9 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
+import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
+import dev.mascwa.pulse.jarvis.inference.CloudProvider
 import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -72,6 +74,10 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
     val backend by vm.inferenceBackend.collectAsState()
+    val cloudEnabled by vm.cloudEnabled.collectAsState()
+    val cloudProvider by vm.cloudProvider.collectAsState()
+    val cloudApiKey by vm.cloudApiKey.collectAsState()
+    val cloudModel by vm.cloudModel.collectAsState()
     val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
@@ -124,6 +130,29 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             StatusPanel(engine, download, vm.modelSizeBytes())
+
+            // ---- Cloud AI brain (recommended): far smarter than the on-device model ----
+            SettingToggle(
+                title = "CLOUD AI  ·  smarter chat",
+                subtitle = "Use a cloud AI for chat instead of the on-device model — much higher quality. " +
+                    "Your chat messages are sent to the provider you choose. The wake word and all voice " +
+                    "stay on-device. Off = use the local model below.",
+                enabled = cloudEnabled,
+                onToggle = vm::setCloudEnabled,
+            )
+            if (cloudEnabled) {
+                FieldLabel("PROVIDER")
+                CloudProviderSelector(selected = cloudProvider, onSelect = vm::setCloudProvider)
+                Text(
+                    "Get a free key: ${cloudProvider.keyUrl}",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                    modifier = Modifier.clickable { openUrl(context, cloudProvider.keyUrl) },
+                )
+                FieldLabel("API KEY")
+                MonoField(cloudApiKey, vm::onCloudKeyChange, "paste your ${cloudProvider.label} key")
+                FieldLabel("MODEL  ·  optional, blank = ${cloudProvider.defaultModel}")
+                MonoField(cloudModel, vm::onCloudModelChange, cloudProvider.defaultModel)
+            }
 
             Text(
                 "Provision a local reasoning model. The file streams straight to this " +
@@ -443,6 +472,26 @@ private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudProviderSelector(selected: CloudProvider, onSelect: (CloudProvider) -> Unit) {
+    val c = Pulse.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CloudProvider.entries.forEach { provider ->
+            val on = provider == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(provider) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(provider.label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
             }
         }
     }
