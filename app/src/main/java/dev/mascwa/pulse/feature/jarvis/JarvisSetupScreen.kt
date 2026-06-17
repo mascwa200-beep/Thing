@@ -218,8 +218,8 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 title = "WAKE WORD · \"J.A.R.V.I.S.\"",
                 subtitle = "Listen for the wake word while resident, then take a spoken command — " +
                     "all on-device, nothing recorded or sent. Uses the mic and more battery. First use " +
-                    "downloads a small (~40 MB) speech model. (The chat mic uses a larger, more " +
-                    "accurate model, downloaded the first time you tap it.)",
+                    "downloads a ~128 MB speech model. (The chat mic uses a larger, more accurate " +
+                    "model, downloaded the first time you tap it.)",
                 enabled = wakeWord,
                 onToggle = { on ->
                     if (on) {

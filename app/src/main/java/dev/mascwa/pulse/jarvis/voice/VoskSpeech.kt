@@ -32,16 +32,17 @@ interface VoskListener {
 class VoskSpeech(context: Context) {
 
     private val appContext = context.applicationContext
-    // Two tiers: a small model for the always-on wake word (light, reliable) and the full model for
-    // accurate tap-to-talk dictation (downloaded on first use of the chat mic).
-    private val wakeStore = SttModelStore(appContext, SttModelStore.SMALL)
-    private val dictationStore = SttModelStore(appContext, SttModelStore.FULL)
+    // Two tiers: the 128 MB lgraph model for the always-on wake word (accurate enough for spoken
+    // commands, yet light enough to run beside the ~2.5 GB LLM) and the full 1.8 GB model for
+    // deliberate tap-to-talk dictation (downloaded on first use of the chat mic).
+    private val wakeStore = SttModelStore(appContext, SttModelStore.WAKE)
+    private val dictationStore = SttModelStore(appContext, SttModelStore.DICTATION)
 
     @Volatile private var wakeModel: Model? = null
     @Volatile private var dictationModel: Model? = null
     @Volatile private var speechService: SpeechService? = null
 
-    /** Provisioning progress for the small wake model (shown in the resident notification). */
+    /** Provisioning progress for the wake model (shown in the resident notification). */
     val wakeProvisioning: StateFlow<SttModelStore.State> = wakeStore.state
     /** Provisioning progress for the full dictation model (shown in tap-to-talk). */
     val dictationProvisioning: StateFlow<SttModelStore.State> = dictationStore.state
@@ -54,12 +55,13 @@ class VoskSpeech(context: Context) {
     val isDictationModelReady: Boolean get() = dictationModel != null
 
     init {
-        // Reclaim space from the previous single-model layout (jarvis/stt/<model> directly). Off the
-        // calling thread — this can delete up to ~1.8 GB and must not block construction.
+        // Reclaim space from earlier layouts (the single-model jarvis/stt/<model> dir, and the brief
+        // 40 MB "small" wake tier). Off the calling thread — can delete up to ~1.8 GB, so never block
+        // construction. Keep only the current tiers: "wake" (lgraph) and "full" (dictation).
         Thread {
             runCatching {
                 File(appContext.filesDir, "jarvis/stt").listFiles()
-                    ?.forEach { if (it.name != "small" && it.name != "full") it.deleteRecursively() }
+                    ?.forEach { if (it.name != "wake" && it.name != "full") it.deleteRecursively() }
             }
         }.apply { isDaemon = true }.start()
     }

@@ -18,7 +18,7 @@ import java.util.zip.ZipInputStream
  * [Context.getFilesDir] and never leaves the device.
  *
  * One store per [Model]: a small model for the always-on wake word (light, fast download) and the
- * full model for accurate tap-to-talk dictation — see [SttModelStore.SMALL] / [SttModelStore.FULL].
+ * full model for accurate tap-to-talk dictation — see [SttModelStore.WAKE] / [SttModelStore.DICTATION].
  */
 class SttModelStore(context: Context, private val model: Model) {
 
@@ -154,17 +154,20 @@ class SttModelStore(context: Context, private val model: Model) {
     }
 
     companion object {
-        /** Small en-US model (~40 MB) for the always-on wake word: light, quick to download, and it
-         *  supports Vosk's runtime grammar for tight keyword spotting. Stays fully on-device. */
-        val SMALL = Model(
-            url = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
-            version = "small-en-us-0.15",
-            dirName = "small",
+        /** en-US 0.22 "lgraph" model (~128 MB) for the whole wake-word flow (spotting AND the spoken
+         *  command). Far more accurate than the 40 MB small model — it has a real language model, so
+         *  many fewer phonetic mix-ups ("file"→"fire") — yet light enough to run always-on alongside
+         *  the ~2.5 GB on-device LLM without exhausting memory. Supports runtime grammar for spotting. */
+        val WAKE = Model(
+            url = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip",
+            version = "en-us-0.22-lgraph",
+            dirName = "wake",
         )
 
-        /** Full en-US 0.22 model (~1.8 GB) — the accurate model for deliberate tap-to-talk dictation.
-         *  It's a static graph (no runtime grammar). Downloaded on first use of the chat mic. */
-        val FULL = Model(
+        /** Full en-US 0.22 model (~1.8 GB) — the most accurate model, for deliberate tap-to-talk
+         *  dictation in the chat. Static graph (no runtime grammar). Downloaded on first chat-mic use.
+         *  Too heavy to also run on the always-on wake path beside the LLM. */
+        val DICTATION = Model(
             url = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip",
             version = "en-us-0.22-full",
             dirName = "full",

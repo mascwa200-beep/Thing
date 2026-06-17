@@ -175,7 +175,7 @@ class ActiveMatrixService : Service() {
         val vosk = container?.voskSpeech ?: return
         voiceScope.launch {
             // Reflect the model download/unpack so the user sees progress, not a frozen "standing by".
-            // The wake model is small (~40 MB) but the first run still downloads + unpacks it.
+            // The wake model is ~128 MB; the first run downloads + unpacks it (one time).
             update("Preparing voice model…")
             val progress = launch {
                 vosk.wakeProvisioning.collect { st ->
@@ -216,8 +216,8 @@ class ActiveMatrixService : Service() {
         resetConvo() // back to idle: any open conversation is over
         capturing = false
         update("Listening for \"J.A.R.V.I.S.\"…")
-        // Small wake model with a keyword grammar: cheap, tight spotting for an always-on mic. The
-        // lenient isWakePhrase below still catches the near-homophones the model emits.
+        // Wake model (128 MB lgraph) with a keyword grammar: tight, cheap spotting for an always-on
+        // mic. The lenient isWakePhrase below still catches the near-homophones the model emits.
         val started = vosk.start(dictation = false, grammar = WAKE_GRAMMAR, listener = object : VoskListener {
             override fun onPartial(text: String) { maybeWake(vosk, text) }
             override fun onFinal(text: String) { maybeWake(vosk, text) }
@@ -275,8 +275,9 @@ class ActiveMatrixService : Service() {
      *  A timeout re-arms the wake loop if the user says nothing (so `capturing` never latches). */
     private fun captureCommand(vosk: VoskSpeech) {
         update("Yes, sir? Listening…")
-        // The resident assistant stays on the small model end-to-end so it never loads the heavy
-        // dictation model alongside the LLM (the chat mic uses the full model for accurate dictation).
+        // The resident assistant transcribes the command on the same 128 MB wake model, so it never
+        // loads the heavy 1.8 GB model alongside the ~2.5 GB LLM (which would exhaust memory). The
+        // chat mic uses the full model for the most accurate deliberate dictation.
         vosk.start(dictation = false, grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
