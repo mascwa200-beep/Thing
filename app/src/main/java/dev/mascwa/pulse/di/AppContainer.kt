@@ -198,13 +198,19 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "add"),
             dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "edit"),
             dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "delete"),
+            dev.mascwa.pulse.jarvis.agent.ProposeResearchTool(selfEditStore),
             dev.mascwa.pulse.jarvis.agent.SelfInspectTool(selfEditStore, knowledgeStore, appContext),
         )
     }
 
-    /** The single applier of approved self-changes (called only from the Approvals UI tap). */
+    /** The single applier of approved self-changes (called only from the Approvals UI tap). RESEARCH
+     *  fetches via the vetted web-search tool — and only after the user approves. */
     val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate by lazy {
-        dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(selfEditStore, knowledgeStore)
+        dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(
+            selfEditStore,
+            knowledgeStore,
+            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
+        )
     }
 
     /** Live tool set resolved per agent run: base tools + (self-edit tools when enabled). M4 appends

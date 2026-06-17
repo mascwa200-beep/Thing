@@ -17,6 +17,9 @@ import dev.mascwa.pulse.data.selfedit.SelfEditStore
 class ApprovalGate(
     private val selfEdit: SelfEditStore,
     private val knowledge: KnowledgeStore,
+    /** Runs a web search for a topic (wired to the vetted WebSearchTool). Only invoked here, after
+     *  the user approves a RESEARCH proposal — never by the agent itself. */
+    private val research: suspend (String) -> String = { "" },
 ) {
     /** Apply an approved action, then remove it from the queue. Returns a short result message. */
     suspend fun apply(action: PendingAction): String {
@@ -42,6 +45,13 @@ class ApprovalGate(
                 snapshotDoc(title)
                 knowledge.deleteDocument(title)
                 "Deleted \"$title\"."
+            }
+            ActionType.RESEARCH -> {
+                // Only NOW (post-approval) do we touch the network, and only via the vetted search tool.
+                val topic = action.payload["topic"].orEmpty()
+                val summary = runCatching { research(topic) }.getOrElse { "Research failed: ${it.message}" }
+                val n = knowledge.addDocument("Research: $topic", summary, source = "research")
+                "Researched \"$topic\" — saved $n chunk(s)."
             }
             else -> "Unsupported action type: ${action.type}."
         }

@@ -69,6 +69,26 @@ class ProposeDocTool(private val selfEdit: SelfEditStore, private val mode: Stri
     }
 }
 
+class ProposeResearchTool(private val selfEdit: SelfEditStore) : JarvisTool {
+    override val name = "propose_research"
+    override val usage = "propose_research <topic> — suggest researching a topic and saving a summary (needs approval; never fetches on its own)"
+    override suspend fun run(arg: String): String {
+        val topic = arg.trim()
+        if (topic.isBlank()) return "What should I research?"
+        selfEdit.enqueue(
+            PendingAction(
+                id = UUID.randomUUID().toString(),
+                type = ActionType.RESEARCH,
+                title = "Research: $topic",
+                preview = "On approval, search the web for \"$topic\" and save a summary to your knowledge library.",
+                payload = mapOf("topic" to topic),
+                createdAt = System.currentTimeMillis(),
+            ),
+        )
+        return proposed("researching \"$topic\"")
+    }
+}
+
 class SelfInspectTool(
     private val selfEdit: SelfEditStore,
     private val knowledge: KnowledgeStore,
