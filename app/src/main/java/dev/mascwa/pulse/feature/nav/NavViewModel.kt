@@ -81,6 +81,11 @@ class NavViewModel(
         _selectedPoi.value = null
     }
 
+    /** Stop tracking the active waypoint (clears the marker + route from the map). */
+    fun clearWaypoint() {
+        viewModelScope.launch { runCatching { waypointStore.setActive(null) } }
+    }
+
     /** Smoothed true-north heading in degrees (0..360); drives the heading-up camera. */
     val headingDeg: StateFlow<Float> =
         compass.reading

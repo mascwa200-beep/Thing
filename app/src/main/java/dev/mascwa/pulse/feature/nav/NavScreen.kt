@@ -20,6 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -36,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -216,7 +222,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                 Modifier.align(Alignment.TopEnd).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MapControlButton("◎", active = follow, c = c) {
+                MapControlButton(active = follow, c = c, icon = Icons.Filled.MyLocation) {
                     follow = true
                     val loc = location
                     val m = map
@@ -224,10 +230,13 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                         m.animateCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading, nav3d, headingUp)))
                     }
                 }
-                MapControlButton("+", active = false, c = c) { map?.animateCamera(CameraUpdateFactory.zoomIn()) }
-                MapControlButton("−", active = false, c = c) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
-                MapControlButton(if (nav3d) "3D" else "2D", active = nav3d, c = c) { vm.set3d(!nav3d) }
-                MapControlButton("⟲", active = headingUp, c = c) { vm.setHeadingUp(!headingUp) }
+                MapControlButton(active = false, c = c, icon = Icons.Filled.Add) { map?.animateCamera(CameraUpdateFactory.zoomIn()) }
+                MapControlButton(active = false, c = c, icon = Icons.Filled.Remove) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
+                MapControlButton(active = nav3d, c = c, label = if (nav3d) "3D" else "2D") { vm.set3d(!nav3d) }
+                MapControlButton(active = headingUp, c = c, icon = Icons.Filled.Navigation) { vm.setHeadingUp(!headingUp) }
+                if (activeWaypoint != null) {
+                    MapControlButton(active = false, c = c, icon = Icons.Filled.Close) { vm.clearWaypoint() }
+                }
             }
 
             // Bottom stack: optional POI detail card above the filter bar.
@@ -445,9 +454,15 @@ private fun addPoiLayer(style: Style, c: NightwirePalette) {
     )
 }
 
-/** Square HUD-styled map control button (recenter / zoom / 2D-3D / rotate). */
+/** Square HUD-styled map control button — shows [icon] when given, otherwise the text [label]. */
 @Composable
-private fun MapControlButton(label: String, active: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+private fun MapControlButton(
+    active: Boolean,
+    c: NightwirePalette,
+    icon: ImageVector? = null,
+    label: String? = null,
+    onClick: () -> Unit,
+) {
     val tint = if (active) c.accent else c.ink
     Box(
         Modifier
@@ -458,7 +473,11 @@ private fun MapControlButton(label: String, active: Boolean, c: NightwirePalette
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
+        if (icon != null) {
+            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+        } else {
+            Text(label.orEmpty(), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
+        }
     }
 }
 
