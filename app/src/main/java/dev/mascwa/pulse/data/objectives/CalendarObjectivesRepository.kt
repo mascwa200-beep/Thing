@@ -44,13 +44,18 @@ class CalendarObjectivesRepository(private val context: Context) {
             CalendarContract.Instances.BEGIN,
         )
         val out = mutableListOf<Objective>()
+        // Cache by location string + cap distinct geocodes: Android's Geocoder rate-limits after a
+        // handful of rapid calls, so we never hammer it even with a calendar full of located events.
+        val geoCache = HashMap<String, Pair<Double, Double>?>()
         context.contentResolver.query(uri, projection, null, null, "${CalendarContract.Instances.BEGIN} ASC")?.use { cur ->
-            while (cur.moveToNext() && out.size < 40) {
+            while (cur.moveToNext() && out.size < 25 && geoCache.size < MAX_GEOCODES) {
                 val id = cur.getLong(0)
                 val title = cur.getString(1)?.takeIf { it.isNotBlank() } ?: continue
                 val loc = cur.getString(2)?.takeIf { it.isNotBlank() } ?: continue
                 val begin = cur.getLong(3)
-                val coords = geocode(loc) ?: continue
+                val coords = if (geoCache.containsKey(loc)) geoCache[loc]
+                    else geocode(loc).also { geoCache[loc] = it }
+                if (coords == null) continue
                 out += Objective(
                     id = "cal_${id}_$begin",
                     title = title,
@@ -83,5 +88,10 @@ class CalendarObjectivesRepository(private val context: Context) {
                 geocoder.getFromLocationName(place, 1)?.firstOrNull()?.let { it.latitude to it.longitude }
             }
         }.getOrNull()
+    }
+
+    private companion object {
+        // Hard cap on distinct geocode calls per refresh — the platform Geocoder is rate-limited.
+        const val MAX_GEOCODES = 20
     }
 }
