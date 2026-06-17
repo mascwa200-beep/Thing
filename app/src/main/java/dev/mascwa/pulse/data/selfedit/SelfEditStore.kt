@@ -67,6 +67,15 @@ class SelfEditStore(private val context: Context, private val json: Json) {
         s.copy(versions = (s.versions + ArtifactVersion(type, key, content, System.currentTimeMillis())).takeLast(MAX_VERSIONS))
     }
 
+    /** Register (or replace) an approved authored tool. */
+    suspend fun addAuthoredTool(tool: AuthoredTool) = update { s ->
+        s.copy(authoredTools = s.authoredTools.filterNot { it.name == tool.name } + tool)
+    }
+
+    suspend fun removeAuthoredTool(name: String) = update { s ->
+        s.copy(authoredTools = s.authoredTools.filterNot { it.name == name })
+    }
+
     private companion object {
         const val MAX_VERSIONS = 30
         const val MAX_PENDING = 50

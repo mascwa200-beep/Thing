@@ -199,7 +199,19 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "edit"),
             dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "delete"),
             dev.mascwa.pulse.jarvis.agent.ProposeResearchTool(selfEditStore),
+            dev.mascwa.pulse.jarvis.agent.ProposeToolTool(selfEditStore),
             dev.mascwa.pulse.jarvis.agent.SelfInspectTool(selfEditStore, knowledgeStore, appContext),
+        )
+    }
+
+    /** Vetted capability implementations an authored Lua tool may be granted (web/fetch/docs/recall).
+     *  Each delegates to an existing built-in tool — authored scripts get no raw fs/network. */
+    private val toolCapabilities: Map<String, suspend (String) -> String> by lazy {
+        mapOf<String, suspend (String) -> String>(
+            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(q) },
+            "fetch" to { q -> dev.mascwa.pulse.jarvis.agent.WebFetchTool(http).run(q) },
+            "docs" to { q -> dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore).run(q) },
+            "recall" to { q -> dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory).run(q) },
         )
     }
 
@@ -213,11 +225,20 @@ class AppContainer(private val appContext: Context) {
         )
     }
 
-    /** Live tool set resolved per agent run: base tools + (self-edit tools when enabled). M4 appends
-     *  approved authored tools here too. */
+    /** Live tool set resolved per agent run: base tools + (self-edit tools + approved authored Lua
+     *  tools, when self-edit is enabled). Resolved each run, so toggles / new tools apply at once. */
     private val agentToolsProvider: suspend () -> List<dev.mascwa.pulse.jarvis.agent.JarvisTool> = {
         val selfOn = runCatching { settingsRepository.current().jarvis.selfEditEnabled }.getOrDefault(false)
-        agentTools + (if (selfOn) selfEditTools else emptyList())
+        val authored = if (selfOn) {
+            runCatching {
+                selfEditStore.current().authoredTools
+                    .filter { it.enabled }
+                    .map { dev.mascwa.pulse.jarvis.agent.LuaScriptTool(it, toolCapabilities) }
+            }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        agentTools + (if (selfOn) selfEditTools else emptyList()) + authored
     }
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */

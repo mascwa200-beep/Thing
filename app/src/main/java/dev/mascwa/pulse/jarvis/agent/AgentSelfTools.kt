@@ -89,6 +89,34 @@ class ProposeResearchTool(private val selfEdit: SelfEditStore) : JarvisTool {
     }
 }
 
+class ProposeToolTool(private val selfEdit: SelfEditStore) : JarvisTool {
+    override val name = "propose_tool"
+    override val usage = "propose_tool <name> | <caps csv: web,fetch,docs,recall> | <lua defining run(arg) returning text> — propose a new sandboxed tool (needs approval)"
+    override suspend fun run(arg: String): String {
+        val parts = arg.split("|", limit = 3)
+        if (parts.size < 3) return "Use: <name> | <caps csv> | <lua script>"
+        val toolName = parts[0].trim().lowercase().replace(Regex("[^a-z0-9_]"), "")
+        val script = parts[2].trim()
+        if (toolName.isBlank() || script.isBlank()) return "A name and a script are required."
+        val caps = parts[1].split(",").map { it.trim().lowercase() }.filter { it in ALLOWED_CAPS }
+        selfEdit.enqueue(
+            PendingAction(
+                id = UUID.randomUUID().toString(),
+                type = ActionType.TOOL_REGISTER,
+                title = "New tool: $toolName",
+                preview = "Capabilities: ${if (caps.isEmpty()) "none (pure compute)" else caps.joinToString()}\n\nScript:\n" + script.take(800),
+                payload = mapOf("name" to toolName, "caps" to caps.joinToString(","), "script" to script),
+                createdAt = System.currentTimeMillis(),
+            ),
+        )
+        return proposed("a new tool \"$toolName\"")
+    }
+
+    private companion object {
+        val ALLOWED_CAPS = setOf("web", "fetch", "docs", "recall")
+    }
+}
+
 class SelfInspectTool(
     private val selfEdit: SelfEditStore,
     private val knowledge: KnowledgeStore,

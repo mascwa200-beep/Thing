@@ -37,6 +37,20 @@ data class PendingAction(
 )
 
 /**
+ * A user-approved, sandboxed Lua tool. The [script] runs in a locked LuaJ VM (no io/os/require) and
+ * may use only the host capabilities in [caps] (subset of: web, fetch, docs, recall). Registered only
+ * via an approved TOOL_REGISTER action.
+ */
+@Serializable
+data class AuthoredTool(
+    val name: String,
+    val usage: String,
+    val script: String,
+    val caps: List<String> = emptyList(),
+    val enabled: Boolean = true,
+)
+
+/**
  * The user-owned, on-device "interpreted layer" J.A.R.V.I.S. may edit (only via approved proposals).
  * Held as one serializable blob in its own DataStore file so adding fields never migrates or wipes the
  * main settings / Room data.
@@ -49,4 +63,6 @@ data class SelfEditState(
     val versions: List<ArtifactVersion> = emptyList(),
     /** Proposed self-changes awaiting the user's approval. */
     val pendingActions: List<PendingAction> = emptyList(),
+    /** Approved, sandboxed Lua tools the agent may call. */
+    val authoredTools: List<AuthoredTool> = emptyList(),
 )

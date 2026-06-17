@@ -3,6 +3,7 @@ package dev.mascwa.pulse.jarvis.selfedit
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.selfedit.ActionType
 import dev.mascwa.pulse.data.selfedit.ArtifactVersion
+import dev.mascwa.pulse.data.selfedit.AuthoredTool
 import dev.mascwa.pulse.data.selfedit.PendingAction
 import dev.mascwa.pulse.data.selfedit.SelfEditStore
 
@@ -52,6 +53,18 @@ class ApprovalGate(
                 val summary = runCatching { research(topic) }.getOrElse { "Research failed: ${it.message}" }
                 val n = knowledge.addDocument("Research: $topic", summary, source = "research")
                 "Researched \"$topic\" — saved $n chunk(s)."
+            }
+            ActionType.TOOL_REGISTER -> {
+                val toolName = action.payload["name"].orEmpty()
+                val script = action.payload["script"].orEmpty()
+                if (toolName.isBlank() || script.isBlank()) {
+                    "Invalid tool proposal."
+                } else {
+                    val caps = action.payload["caps"].orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    val usage = "$toolName <arg> — authored tool" + (if (caps.isEmpty()) "" else " (caps: ${caps.joinToString()})")
+                    selfEdit.addAuthoredTool(AuthoredTool(toolName, usage, script, caps, enabled = true))
+                    "Registered tool \"$toolName\"."
+                }
             }
             else -> "Unsupported action type: ${action.type}."
         }

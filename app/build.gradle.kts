@@ -161,6 +161,9 @@ dependencies {
     // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
     implementation(libs.maplibre.android)
 
+    // Pure-JVM Lua interpreter for sandboxed, user-approved tool authoring (no native / DEX loading).
+    implementation(libs.luaj.jse)
+
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)

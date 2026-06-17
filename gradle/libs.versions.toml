@@ -51,6 +51,9 @@ jna = "5.13.0"
 # Vector map engine (MapLibre — open-source, no Google; tiles from keyless OpenFreeMap)
 maplibre = "11.8.0"
 
+# Pure-JVM Lua interpreter for sandboxed, user-approved tool authoring (no native, no DEX loading)
+luaj = "3.0.1"
+
 # Testing
 junit = "4.13.2"
 
@@ -107,6 +110,9 @@ vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref =
 
 # Vector map engine (3D, custom-styleable; open-source MapLibre GL Native)
 maplibre-android = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
+
+# Pure-JVM Lua interpreter (sandboxed tool authoring)
+luaj-jse = { group = "org.luaj", name = "luaj-jse", version.ref = "luaj" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
