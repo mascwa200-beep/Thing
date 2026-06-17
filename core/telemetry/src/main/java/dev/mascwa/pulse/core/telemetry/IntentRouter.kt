@@ -8,6 +8,9 @@ sealed interface JarvisIntent {
     /** Drop to a locked-down, low-noise profile — executed by the app's device-control layer. */
     data object Lockdown : JarvisIntent
 
+    /** Speak a daily briefing (weather + objectives + news + markets), assembled from live data. */
+    data object Brief : JarvisIntent
+
     /** Anything else → hand the text to the language model / persona core. */
     data class Chat(val text: String) : JarvisIntent
 }
@@ -24,6 +27,7 @@ class IntentRouter {
         return when {
             t.isBlank() -> JarvisIntent.Chat(input)
             LOCKDOWN_HINTS.any { t.contains(it) } -> JarvisIntent.Lockdown
+            BRIEF_HINTS.any { t.contains(it) } -> JarvisIntent.Brief
             STATUS_HINTS.any { t.contains(it) } -> JarvisIntent.Status
             else -> JarvisIntent.Chat(input)
         }
@@ -35,5 +39,9 @@ class IntentRouter {
             "telemetry", "vitals", "how's the device", "device status",
         )
         val LOCKDOWN_HINTS = listOf("lockdown", "lock down", "go dark", "panic", "secure mode")
+        val BRIEF_HINTS = listOf(
+            "brief me", "briefing", "morning brief", "daily brief", "sitrep",
+            "catch me up", "what's happening", "whats happening", "the rundown",
+        )
     }
 }

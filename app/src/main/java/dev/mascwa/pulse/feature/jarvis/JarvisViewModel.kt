@@ -58,6 +58,7 @@ class JarvisViewModel(
     private val agent: AgentOrchestrator,
     private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
     private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
+    private val briefing: dev.mascwa.pulse.jarvis.BriefingBuilder,
 ) : ViewModel() {
 
     val messages: StateFlow<List<JarvisMessage>> =
@@ -119,6 +120,11 @@ class JarvisViewModel(
                         speakIfEnabled(report)
                     }
                     is JarvisIntent.Lockdown -> executeLockdown()
+                    is JarvisIntent.Brief -> {
+                        val brief = briefing.build()
+                        memory.append(Speaker.JARVIS, brief)
+                        speakIfEnabled(brief)
+                    }
                     is JarvisIntent.Chat -> {
                         val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
                         val reply = if (useAgent) {
@@ -138,6 +144,23 @@ class JarvisViewModel(
                 memory.append(Speaker.JARVIS, "// fault: ${e.message ?: "inference error"}")
             } finally {
                 _streaming.value = ""
+                _busy.value = false
+            }
+        }
+    }
+
+    /** Speak a daily brief from a console control (no fake user bubble). */
+    fun requestBrief() {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val brief = briefing.build()
+                memory.append(Speaker.JARVIS, brief)
+                speakIfEnabled(brief)
+            } catch (e: Exception) {
+                memory.append(Speaker.JARVIS, "// brief fault: ${e.message ?: "error"}")
+            } finally {
                 _busy.value = false
             }
         }

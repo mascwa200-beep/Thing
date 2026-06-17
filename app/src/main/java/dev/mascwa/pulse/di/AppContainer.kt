@@ -246,6 +246,14 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentToolsProvider, knowledgeStore)
     }
 
+    /** Builds J.A.R.V.I.S.'s spoken daily brief from live weather/objectives/news/markets. */
+    val briefingBuilder: dev.mascwa.pulse.jarvis.BriefingBuilder by lazy {
+        dev.mascwa.pulse.jarvis.BriefingBuilder(
+            weatherRepository, newsRepository, marketsRepository,
+            calendarObjectives, waypointStore, locationProvider, settingsRepository,
+        )
+    }
+
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
@@ -110,6 +111,9 @@ fun JarvisScreen(
                     contentDescription = if (voiceReplies) "Mute voice" else "Speak replies",
                     tint = if (voiceReplies) c.sky else c.muted,
                 )
+            }
+            IconButton(onClick = { vm.requestBrief() }, enabled = !busy) {
+                Icon(Icons.Filled.Campaign, contentDescription = "Brief me", tint = c.positive)
             }
             IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
                 Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
