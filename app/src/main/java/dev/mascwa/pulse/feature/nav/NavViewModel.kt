@@ -2,6 +2,9 @@ package dev.mascwa.pulse.feature.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.data.objectives.ObjectiveKind
+import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.sensors.CompassController
@@ -29,7 +32,12 @@ class NavViewModel(
     private val compass: CompassController,
     private val overpass: OverpassRepository,
     private val settings: SettingsRepository,
+    private val waypointStore: WaypointStore,
 ) : ViewModel() {
+
+    /** The objective/waypoint currently tracked on the map (gold/blue/white by kind), or null. */
+    val activeWaypoint: StateFlow<Waypoint?> =
+        waypointStore.active.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _location = MutableStateFlow<DeviceLocation?>(null)
     val location: StateFlow<DeviceLocation?> = _location.asStateFlow()
@@ -64,6 +72,14 @@ class NavViewModel(
     }
 
     fun selectPoi(place: Place?) { _selectedPoi.value = place }
+
+    /** Set the tapped POI as the active map waypoint (plain/white) and close the detail card. */
+    fun setWaypointFromPoi(place: Place) {
+        viewModelScope.launch {
+            runCatching { waypointStore.add(place.name, place.latitude, place.longitude, ObjectiveKind.PLAIN) }
+        }
+        _selectedPoi.value = null
+    }
 
     /** Smoothed true-north heading in degrees (0..360); drives the heading-up camera. */
     val headingDeg: StateFlow<Float> =

@@ -58,6 +58,9 @@ object Routes {
     // 3D cyberpunk navigation map
     const val NAV = "nav"
 
+    // Objectives / waypoint tracker (calendar + manual)
+    const val OBJECTIVES = "objectives"
+
     // Diagnostics
     const val CRASH_LOG = "crash_log"
 }

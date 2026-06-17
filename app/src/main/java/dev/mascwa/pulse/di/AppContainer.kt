@@ -83,6 +83,14 @@ class AppContainer(private val appContext: Context) {
     }
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
+
+    // NAV objectives: device-calendar events (geocoded) + manual waypoints persisted in settings.
+    val calendarObjectives: dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository by lazy {
+        dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository(appContext)
+    }
+    val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore by lazy {
+        dev.mascwa.pulse.data.objectives.WaypointStore(settingsRepository)
+    }
     val safetyRepository: dev.mascwa.pulse.data.safety.SafetyRepository by lazy {
         dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
     }

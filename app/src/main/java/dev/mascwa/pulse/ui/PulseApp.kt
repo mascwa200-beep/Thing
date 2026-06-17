@@ -266,6 +266,12 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.nav.NavScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            // ---- Objectives / waypoint tracker ----
+            composable(Routes.OBJECTIVES) {
+                val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.objectives.ObjectivesScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- Diagnostics ----
             composable(Routes.CRASH_LOG) {
                 val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)

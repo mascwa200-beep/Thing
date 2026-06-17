@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import kotlinx.serialization.Serializable
 
@@ -233,6 +234,10 @@ data class AppSettings(
     // NAV map view (persisted so the map opens how you left it).
     val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
     val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
+
+    // NAV objectives: manual waypoints + the one currently tracked on the map.
+    val waypoints: List<Waypoint> = emptyList(),
+    val activeWaypointId: String? = null,
 
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),

@@ -45,6 +45,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -79,6 +80,11 @@ private const val USER_SOURCE = "nav-user"
 private const val USER_LAYER = "nav-user-dot"
 private const val POI_SOURCE = "nav-poi"
 private const val POI_LAYER = "nav-poi-dot"
+private const val WAYPOINT_SOURCE = "nav-waypoint"
+private const val WAYPOINT_LAYER = "nav-waypoint-dot"
+private const val ROUTE_SOURCE = "nav-route"
+private const val ROUTE_LAYER = "nav-route-line"
+private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
 private val WATER = Color(0xFF06121F)   // deep navy so water reads as "off" against the red city
@@ -94,6 +100,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val nav3d by vm.nav3d.collectAsState()
     val headingUp by vm.headingUp.collectAsState()
     val selectedPoi by vm.selectedPoi.collectAsState()
+    val activeWaypoint by vm.activeWaypoint.collectAsState()
 
     DisposableEffect(Unit) {
         vm.start()
@@ -128,7 +135,9 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
             ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                 cyberpunkify(style, c)
                 ensureBuildingExtrusion(style, c)
+                addRouteLayer(style, c)
                 addPoiLayer(style, c)
+                addWaypointLayer(style, c)
                 addPlayerMarker(style, c)
             }
             ml.addOnCameraMoveStartedListener { reason ->
@@ -156,6 +165,13 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         val style = map?.style ?: return@LaunchedEffect
         val src = style.getSourceAs<GeoJsonSource>(POI_SOURCE) ?: return@LaunchedEffect
         src.setGeoJson(poiGeoJson(enabled, pois))
+    }
+
+    // Render the active objective waypoint (coloured by kind) + a route line from the player to it.
+    LaunchedEffect(activeWaypoint, location, map) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
+        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeGeoJson(activeWaypoint, location))
     }
 
     // While tracking, follow GPS in the current mode (3D/2D, heading-up/north-up).
@@ -220,7 +236,13 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 selectedPoi?.let { poi ->
-                    PoiDetailCard(poi = poi, location = location, c = c, onClose = { vm.selectPoi(null) })
+                    PoiDetailCard(
+                        poi = poi,
+                        location = location,
+                        c = c,
+                        onClose = { vm.selectPoi(null) },
+                        onSetWaypoint = { vm.setWaypointFromPoi(poi) },
+                    )
                 }
                 FilterBar(
                     enabled = enabled,
@@ -364,6 +386,50 @@ private fun addPlayerMarker(style: Style, c: NightwirePalette) {
     )
 }
 
+/** The route line from the player to the active waypoint (dashed accent). */
+private fun addRouteLayer(style: Style, c: NightwirePalette) {
+    if (style.getSource(ROUTE_SOURCE) != null) return
+    style.addSource(GeoJsonSource(ROUTE_SOURCE))
+    style.addLayer(
+        LineLayer(ROUTE_LAYER, ROUTE_SOURCE).withProperties(
+            PropertyFactory.lineColor(c.accent.toArgb()),
+            PropertyFactory.lineWidth(3f),
+            PropertyFactory.lineOpacity(0.75f),
+            PropertyFactory.lineDasharray(arrayOf(2f, 2f)),
+        ),
+    )
+}
+
+/** The active objective waypoint, coloured per-feature by objective kind (gold/blue/white). */
+private fun addWaypointLayer(style: Style, c: NightwirePalette) {
+    if (style.getSource(WAYPOINT_SOURCE) != null) return
+    style.addSource(GeoJsonSource(WAYPOINT_SOURCE))
+    style.addLayer(
+        CircleLayer(WAYPOINT_LAYER, WAYPOINT_SOURCE).withProperties(
+            PropertyFactory.circleColor(Expression.get("color")),
+            PropertyFactory.circleRadius(9f),
+            PropertyFactory.circleStrokeColor(c.void.toArgb()),
+            PropertyFactory.circleStrokeWidth(3f),
+        ),
+    )
+}
+
+/** GeoJSON for the active waypoint marker (coloured by kind), or an empty collection when none. */
+private fun waypointGeoJson(wp: Waypoint?): String {
+    if (wp == null) return EMPTY_FC
+    return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":" +
+        "{\"type\":\"Point\",\"coordinates\":[${wp.longitude},${wp.latitude}]}," +
+        "\"properties\":{\"color\":\"${wp.kind.colorHex}\"}}]}"
+}
+
+/** GeoJSON for the player→waypoint route line, or an empty collection when either point is missing. */
+private fun routeGeoJson(wp: Waypoint?, loc: DeviceLocation?): String {
+    if (wp == null || loc == null) return EMPTY_FC
+    return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":" +
+        "{\"type\":\"LineString\",\"coordinates\":[[${loc.longitude},${loc.latitude}],[${wp.longitude},${wp.latitude}]]}," +
+        "\"properties\":{}}]}"
+}
+
 /** Category POI markers, coloured per-feature via the data-driven "color" property. */
 private fun addPoiLayer(style: Style, c: NightwirePalette) {
     if (style.getSource(POI_SOURCE) != null) return
@@ -396,9 +462,15 @@ private fun MapControlButton(label: String, active: Boolean, c: NightwirePalette
     }
 }
 
-/** Detail card for a tapped POI: name, distance, address. (SET WAYPOINT arrives in Phase 3.) */
+/** Detail card for a tapped POI: name, distance, address, and a SET WAYPOINT action. */
 @Composable
-private fun PoiDetailCard(poi: Place, location: DeviceLocation?, c: NightwirePalette, onClose: () -> Unit) {
+private fun PoiDetailCard(
+    poi: Place,
+    location: DeviceLocation?,
+    c: NightwirePalette,
+    onClose: () -> Unit,
+    onSetWaypoint: () -> Unit,
+) {
     val dist = location?.let { Geo.formatDistance(Geo.distanceMeters(it.latitude, it.longitude, poi.latitude, poi.longitude)) }
     NeonPanel(Modifier.fillMaxWidth(), corners = true) {
         Column {
@@ -417,6 +489,17 @@ private fun PoiDetailCard(poi: Place, location: DeviceLocation?, c: NightwirePal
             }
             poi.address?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
+            }
+            Box(
+                Modifier
+                    .padding(top = 10.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(c.amber.copy(alpha = 0.16f))
+                    .border(1.dp, c.amber, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onSetWaypoint)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text("◢ SET WAYPOINT", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.amber)
             }
         }
     }
