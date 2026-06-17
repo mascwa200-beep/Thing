@@ -140,6 +140,9 @@ data class JarvisSettings(
      * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
      */
     val chatFormat: ChatFormat = ChatFormat.AUTO,
+    /** Let J.A.R.V.I.S. PROPOSE edits to its own persona/knowledge/tools + research (each applied only
+     *  on your explicit approval in the Approvals screen). Opt-in; requires agent tools too. */
+    val selfEditEnabled: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
 }

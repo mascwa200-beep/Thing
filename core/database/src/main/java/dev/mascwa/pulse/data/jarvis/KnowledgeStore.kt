@@ -49,6 +49,12 @@ class KnowledgeStore(db: JarvisDatabase) {
     /** Number of distinct source documents. */
     suspend fun documentCount(): Int = dao.docCount()
 
+    /** Distinct document titles (read-only self-inspection). */
+    suspend fun titles(): List<String> = dao.titles()
+
+    /** Reconstruct a document's full text from its chunks (for diff previews + rollback). */
+    suspend fun fullText(title: String): String = dao.textByTitle(title.trim()).joinToString("\n\n")
+
     suspend fun deleteDocument(title: String) = dao.deleteByTitle(title.trim())
 
     /** Remove only the docs from a given [source] (e.g. "bundled") — leaves user-added docs intact. */

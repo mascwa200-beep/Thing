@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.flow
 class AgentOrchestrator(
     private val engine: LocalInferenceEngine,
     private val memory: JarvisMemory,
-    private val tools: List<JarvisTool>,
+    private val toolsProvider: suspend () -> List<JarvisTool>,
     private val knowledge: KnowledgeStore,
 ) {
     enum class Kind { THINKING, TOOL, FINAL }
@@ -23,9 +23,13 @@ class AgentOrchestrator(
 
     /** Drives the loop, emitting progress [Step]s; the terminal step is [Kind.FINAL]. */
     fun run(query: String, persona: String): Flow<Step> = flow {
+        // Resolve the live tool set each run, so toggling self-edit / registering an authored tool
+        // takes effect without restarting.
+        val tools = runCatching { toolsProvider() }.getOrDefault(emptyList())
         val recalled = runCatching { memory.recall(query) }.getOrDefault(emptyList())
         val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
         val system = buildSystem(
+            tools,
             persona,
             recalled.map { it.noteText },
             docs.map { "[${it.title}] ${it.text}" },
@@ -80,6 +84,7 @@ class AgentOrchestrator(
         out.replace(Regex("(?im)^\\s*FINAL:\\s*"), "").trim()
 
     private fun buildSystem(
+        tools: List<JarvisTool>,
         persona: String,
         memoryNotes: List<String>,
         knowledgeChunks: List<String>,

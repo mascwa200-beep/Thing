@@ -80,6 +80,14 @@ interface KnowledgeDocDao {
     @Query("SELECT COUNT(DISTINCT title) FROM knowledge_docs")
     suspend fun docCount(): Int
 
+    /** Distinct document titles (for self-inspection / edit targeting). */
+    @Query("SELECT DISTINCT title FROM knowledge_docs ORDER BY title")
+    suspend fun titles(): List<String>
+
+    /** All chunk texts for a title, in storage order (to reconstruct a doc for diff/rollback). */
+    @Query("SELECT text FROM knowledge_docs WHERE title = :title ORDER BY id")
+    suspend fun textByTitle(title: String): List<String>
+
     @Query("DELETE FROM knowledge_docs WHERE title = :title")
     suspend fun deleteByTitle(title: String)
 

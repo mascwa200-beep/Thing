@@ -52,7 +52,23 @@ class SelfEditStore(private val context: Context, private val json: Json) {
         s.copy(charter = next, versions = versioned)
     }
 
+    /** Queue a proposed self-change for the user to approve (de-duped by id, bounded). */
+    suspend fun enqueue(action: PendingAction) = update { s ->
+        if (s.pendingActions.any { it.id == action.id }) s
+        else s.copy(pendingActions = (s.pendingActions + action).takeLast(MAX_PENDING))
+    }
+
+    suspend fun removePending(id: String) = update { s ->
+        s.copy(pendingActions = s.pendingActions.filterNot { it.id == id })
+    }
+
+    /** Snapshot an artifact for rollback. */
+    suspend fun pushVersion(type: String, key: String, content: String) = update { s ->
+        s.copy(versions = (s.versions + ArtifactVersion(type, key, content, System.currentTimeMillis())).takeLast(MAX_VERSIONS))
+    }
+
     private companion object {
         const val MAX_VERSIONS = 30
+        const val MAX_PENDING = 50
     }
 }

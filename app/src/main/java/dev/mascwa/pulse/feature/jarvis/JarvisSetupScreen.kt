@@ -67,6 +67,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val voiceReplies by vm.voiceReplies.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
+    val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
     val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
@@ -248,6 +249,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     "best-effort on the small on-device model.",
                 enabled = agentTools,
                 onToggle = vm::setAgentTools,
+            )
+
+            SettingToggle(
+                title = "SELF-EDIT (PROPOSE-ONLY)",
+                subtitle = "Let J.A.R.V.I.S. PROPOSE changes to its own persona, knowledge and tools, " +
+                    "plus research. Nothing is applied until you tap APPROVE in the Approvals screen — " +
+                    "even web/repo content can never change anything on its own. Requires Agent Tools.",
+                enabled = selfEditEnabled,
+                onToggle = vm::setSelfEdit,
             )
 
             FieldLabel("GITHUB TOKEN  ·  optional, for private repos")

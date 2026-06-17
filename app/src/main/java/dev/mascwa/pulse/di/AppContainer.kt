@@ -190,9 +190,33 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
         )
     }
-    /** Bounded ReAct loop wiring the on-device model to [agentTools] + durable memory + knowledge. */
+    /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user
+     *  has turned self-edit on. They never mutate anything — they queue a PendingAction for approval. */
+    private val selfEditTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
+        listOf(
+            dev.mascwa.pulse.jarvis.agent.ProposePersonaTool(selfEditStore),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "add"),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "edit"),
+            dev.mascwa.pulse.jarvis.agent.ProposeDocTool(selfEditStore, "delete"),
+            dev.mascwa.pulse.jarvis.agent.SelfInspectTool(selfEditStore, knowledgeStore, appContext),
+        )
+    }
+
+    /** The single applier of approved self-changes (called only from the Approvals UI tap). */
+    val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate by lazy {
+        dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(selfEditStore, knowledgeStore)
+    }
+
+    /** Live tool set resolved per agent run: base tools + (self-edit tools when enabled). M4 appends
+     *  approved authored tools here too. */
+    private val agentToolsProvider: suspend () -> List<dev.mascwa.pulse.jarvis.agent.JarvisTool> = {
+        val selfOn = runCatching { settingsRepository.current().jarvis.selfEditEnabled }.getOrDefault(false)
+        agentTools + (if (selfOn) selfEditTools else emptyList())
+    }
+
+    /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */
     val agentOrchestrator: dev.mascwa.pulse.jarvis.agent.AgentOrchestrator by lazy {
-        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentTools, knowledgeStore)
+        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentToolsProvider, knowledgeStore)
     }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */

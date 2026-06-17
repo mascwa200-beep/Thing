@@ -58,6 +58,10 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. may use tools (web/GitHub-read/device/memory) in its agentic loop. */
     val agentTools: StateFlow<Boolean> = _agentTools.asStateFlow()
 
+    private val _selfEdit = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. may PROPOSE self-edits/research/tools (each applied only on approval). */
+    val selfEditEnabled: StateFlow<Boolean> = _selfEdit.asStateFlow()
+
     private val _githubToken = MutableStateFlow("")
     val githubToken: StateFlow<String> = _githubToken.asStateFlow()
 
@@ -87,6 +91,7 @@ class JarvisSetupViewModel(
             _voiceReplies.value = saved.voiceReplies
             _wakeWord.value = saved.wakeWord
             _agentTools.value = saved.agentToolsEnabled
+            _selfEdit.value = saved.selfEditEnabled
             _githubToken.value = saved.githubToken
             _chatFormat.value = saved.chatFormat
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
@@ -133,6 +138,13 @@ class JarvisSetupViewModel(
         _agentTools.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(agentToolsEnabled = enabled)) }
+        }
+    }
+
+    fun setSelfEdit(enabled: Boolean) {
+        _selfEdit.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(selfEditEnabled = enabled)) }
         }
     }
 

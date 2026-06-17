@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
@@ -52,7 +53,12 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Unit = {}) {
+fun JarvisScreen(
+    vm: JarvisViewModel,
+    onBack: () -> Unit,
+    onOpenSetup: () -> Unit = {},
+    onOpenApprovals: () -> Unit = {},
+) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
     val streaming by vm.streaming.collectAsState()
@@ -107,6 +113,9 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
             }
             IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
                 Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
+            }
+            IconButton(onClick = onOpenApprovals) {
+                Icon(Icons.Filled.Checklist, contentDescription = "Approvals", tint = c.amber)
             }
             IconButton(onClick = onOpenSetup) {
                 Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
