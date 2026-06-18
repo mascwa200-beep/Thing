@@ -71,6 +71,10 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. speaks proactive context remarks aloud while resident. */
     val speakProactive: StateFlow<Boolean> = _speakProactive.asStateFlow()
 
+    private val _glassesHud = MutableStateFlow(false)
+    /** Whether the glasses HUD renders on a connected external display. */
+    val glassesHud: StateFlow<Boolean> = _glassesHud.asStateFlow()
+
     private val _agentTools = MutableStateFlow(false)
     /** Whether J.A.R.V.I.S. may use tools (web/GitHub-read/device/memory) in its agentic loop. */
     val agentTools: StateFlow<Boolean> = _agentTools.asStateFlow()
@@ -134,6 +138,7 @@ class JarvisSetupViewModel(
             _conversation.value = saved.conversationMode
             _voiceCloudInterpret.value = saved.voiceCloudInterpret
             _speakProactive.value = saved.speakProactive
+            _glassesHud.value = saved.glassesHud
             _agentTools.value = saved.agentToolsEnabled
             _selfEdit.value = saved.selfEditEnabled
             _githubToken.value = saved.githubToken
@@ -325,6 +330,13 @@ class JarvisSetupViewModel(
         _speakProactive.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(speakProactive = enabled)) }
+        }
+    }
+
+    fun setGlassesHud(enabled: Boolean) {
+        _glassesHud.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(glassesHud = enabled)) }
         }
     }
 
