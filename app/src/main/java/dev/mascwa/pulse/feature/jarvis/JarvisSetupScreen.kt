@@ -78,6 +78,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val conversationMode by vm.conversationMode.collectAsState()
     val voiceCloudInterpret by vm.voiceCloudInterpret.collectAsState()
     val speakProactive by vm.speakProactive.collectAsState()
+    val glassesHud by vm.glassesHud.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
@@ -336,6 +337,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     "console is open or you're mid-command. Needs the resident service + a TTS engine.",
                 enabled = speakProactive,
                 onToggle = vm::setSpeakProactive,
+            )
+
+            SettingToggle(
+                title = "GLASSES HUD",
+                subtitle = "Show a glanceable J.A.R.V.I.S. HUD (clock, brief, latest reply) on connected " +
+                    "display glasses or an external/wireless screen, while the app is open. Off by default; " +
+                    "appears only when an external display is detected.",
+                enabled = glassesHud,
+                onToggle = vm::setGlassesHud,
             )
 
             SettingToggle(

@@ -35,6 +35,9 @@ class MainActivity : ComponentActivity() {
 
     private val app get() = application as PulseApplication
 
+    /** Glasses HUD on a connected external display; lives only while the app is in the foreground. */
+    private var hud: dev.mascwa.pulse.feature.hud.HudController? = null
+
     private val requestNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
 
@@ -139,6 +142,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
+        hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
+    }
+
+    override fun onStop() {
+        runCatching { hud?.stop() }
+        hud = null
+        super.onStop()
     }
 
     companion object {

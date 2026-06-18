@@ -147,6 +147,10 @@ data class JarvisSettings(
      *  changes) — not just show them in the notification. Off by default; respects quiet hours and never
      *  speaks while the console is open or mid-command. Requires the resident service + a TTS engine. */
     val speakProactive: Boolean = false,
+    /** Show a glanceable J.A.R.V.I.S. HUD (clock, brief, latest reply) on connected display glasses / an
+     *  external or wireless display, via Android's Presentation API. Off by default; shows while the app
+     *  is open and only when an external "presentation" display is connected. */
+    val glassesHud: Boolean = false,
     /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
