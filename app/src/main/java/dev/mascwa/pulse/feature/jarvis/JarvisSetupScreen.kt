@@ -2,6 +2,10 @@ package dev.mascwa.pulse.feature.jarvis
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,6 +58,7 @@ import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -89,14 +94,19 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { VitalsTrackingService.start(context) }
 
-    // Import a text/markdown file into the knowledge library (read off the main thread).
-    val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    // Import a file from device storage / Drive / Google Docs into the knowledge library — you
+    // authorize the file via the system picker (no account login or key). Read off the main thread.
+    val docPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch(Dispatchers.IO) {
-            val name = uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null } ?: "Imported document"
-            val text = runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            }.getOrNull().orEmpty()
-            if (text.isNotBlank()) vm.addKnowledge(name, text)
+            val (name, text) = readPickedDocument(context, uri)
+            if (text.isNotBlank()) {
+                vm.addKnowledge(name, text)
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Imported \"$name\", sir.", Toast.LENGTH_SHORT).show() }
+            } else {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Couldn't read that — try a text file or a Google Doc, sir.", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -367,10 +377,18 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                             },
                         )
                         NeonButton(
-                            text = "IMPORT FILE",
+                            text = "IMPORT FILE / DRIVE",
                             enabled = true,
                             color = c.accent,
-                            onClick = { docPicker.launch("text/*") },
+                            onClick = {
+                                docPicker.launch(
+                                    arrayOf(
+                                        "text/*",
+                                        "application/json",
+                                        "application/vnd.google-apps.document",
+                                    ),
+                                )
+                            },
                         )
                         if (knowledgeChunks > 0) {
                             NeonButton(
@@ -497,6 +515,33 @@ private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
             }
         }
     }
+}
+
+private const val MAX_IMPORT_CHARS = 200_000
+
+/** Read a picked document into (title, text): text-like files & JSON directly, Google Docs exported to
+ *  plain text. Returns (name, "") for types we can't read as text. Call off the main thread. */
+private fun readPickedDocument(context: Context, uri: Uri): Pair<String, String> {
+    val resolver = context.contentResolver
+    val name = runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cur ->
+            if (cur.moveToFirst()) cur.getString(0) else null
+        }
+    }.getOrNull()?.ifBlank { null }
+        ?: uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null }
+        ?: "Imported document"
+    val mime = runCatching { resolver.getType(uri) }.getOrNull().orEmpty()
+    val text = runCatching {
+        when {
+            mime == "application/vnd.google-apps.document" ->
+                resolver.openTypedAssetFileDescriptor(uri, "text/plain", null)
+                    ?.createInputStream()?.bufferedReader()?.use { it.readText() }
+            mime.startsWith("text/") || mime == "application/json" || mime == "application/xml" ->
+                resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            else -> null
+        }
+    }.getOrNull().orEmpty()
+    return name to text.take(MAX_IMPORT_CHARS)
 }
 
 @Composable
