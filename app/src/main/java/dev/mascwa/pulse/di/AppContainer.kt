@@ -281,13 +281,7 @@ class AppContainer(private val appContext: Context) {
             selfEditStore,
             knowledgeStore,
             research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
-            commitCode = { action ->
-                selfCoder.commit(
-                    goal = action.payload["goal"].orEmpty(),
-                    path = action.payload["path"].orEmpty(),
-                    content = action.payload["content"].orEmpty(),
-                )
-            },
+            commitCode = { action -> selfCoder.commit(action) },
         )
     }
 
