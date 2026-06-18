@@ -67,6 +67,10 @@ class JarvisSetupViewModel(
     /** Whether the active cloud brain cleans up the wake-word transcript before acting. */
     val voiceCloudInterpret: StateFlow<Boolean> = _voiceCloudInterpret.asStateFlow()
 
+    private val _speakProactive = MutableStateFlow(false)
+    /** Whether J.A.R.V.I.S. speaks proactive context remarks aloud while resident. */
+    val speakProactive: StateFlow<Boolean> = _speakProactive.asStateFlow()
+
     private val _agentTools = MutableStateFlow(false)
     /** Whether J.A.R.V.I.S. may use tools (web/GitHub-read/device/memory) in its agentic loop. */
     val agentTools: StateFlow<Boolean> = _agentTools.asStateFlow()
@@ -129,6 +133,7 @@ class JarvisSetupViewModel(
             _followUp.value = saved.followUpMode
             _conversation.value = saved.conversationMode
             _voiceCloudInterpret.value = saved.voiceCloudInterpret
+            _speakProactive.value = saved.speakProactive
             _agentTools.value = saved.agentToolsEnabled
             _selfEdit.value = saved.selfEditEnabled
             _githubToken.value = saved.githubToken
@@ -313,6 +318,13 @@ class JarvisSetupViewModel(
         _voiceCloudInterpret.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(voiceCloudInterpret = enabled)) }
+        }
+    }
+
+    fun setSpeakProactive(enabled: Boolean) {
+        _speakProactive.value = enabled
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(speakProactive = enabled)) }
         }
     }
 

@@ -77,6 +77,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val followUpMode by vm.followUpMode.collectAsState()
     val conversationMode by vm.conversationMode.collectAsState()
     val voiceCloudInterpret by vm.voiceCloudInterpret.collectAsState()
+    val speakProactive by vm.speakProactive.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
@@ -326,6 +327,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     "understanding without a heavier model. Adds a brief pause; no effect without a cloud key.",
                 enabled = voiceCloudInterpret,
                 onToggle = vm::setVoiceCloudInterpret,
+            )
+
+            SettingToggle(
+                title = "SPEAK PROACTIVELY",
+                subtitle = "Say context remarks aloud while resident — a greeting when it comes online, and " +
+                    "reactions to power/network changes. Respects quiet hours and stays silent while the " +
+                    "console is open or you're mid-command. Needs the resident service + a TTS engine.",
+                enabled = speakProactive,
+                onToggle = vm::setSpeakProactive,
             )
 
             SettingToggle(

@@ -143,6 +143,10 @@ data class JarvisSettings(
      *  once to fix speech-to-text mishears before acting — better understanding without a heavier STT
      *  model. No effect unless [cloudActive]. On by default; adds one short cloud round-trip per command. */
     val voiceCloudInterpret: Boolean = true,
+    /** Speak proactive context remarks aloud while resident (greeting on start, reactions to power/network
+     *  changes) — not just show them in the notification. Off by default; respects quiet hours and never
+     *  speaks while the console is open or mid-command. Requires the resident service + a TTS engine. */
+    val speakProactive: Boolean = false,
     /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */

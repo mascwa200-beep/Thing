@@ -119,7 +119,10 @@ class ActiveMatrixService : Service() {
                     provider.updates.collect { now ->
                         val line = if (prev == null) banter.greeting(now) else banter.reactTo(prev, now)
                         prev = now
-                        if (!line.isNullOrBlank()) update(line)
+                        if (!line.isNullOrBlank()) {
+                            update(line)
+                            maybeSpeakProactive(line)
+                        }
                         handleBattery(now)
                     }
                 }
@@ -136,6 +139,17 @@ class ActiveMatrixService : Service() {
             scope.launch { liveNewsLoop() }
         }
         return START_STICKY
+    }
+
+    /** Speak a proactive context remark aloud when the user has opted in — but never while the console is
+     *  open, mid-command, or in quiet hours, so it can't talk over the user or surprise them at night. */
+    private suspend fun maybeSpeakProactive(line: String) {
+        if (capturing) return
+        val c = container ?: return
+        if (runCatching { c.voskSpeech.consoleActive.value }.getOrDefault(false)) return
+        val prefs = runCatching { c.settingsRepository.current() }.getOrNull() ?: return
+        if (!prefs.jarvis.speakProactive || inQuietNow(prefs.notifications)) return
+        runCatching { c.textToSpeech.speak(line) }
     }
 
     /** Self-preservation: at critical battery, conserve (pause heavy polling) and warn once — spoken if
