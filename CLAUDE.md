@@ -76,8 +76,23 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
 ## Status (as of this handoff)
 All of the above is implemented and **CI-green on `main`** (latest build published from `main`). The
 smart-glasses spec's feasible core is done: **image interpretation, file (PDF/text) interpretation, glasses
-HUD**. Standing user intent: "keep improving / keep adding features autonomously, ship small CI-green commits,
-trace for bugs ('simulate breakpoints'), don't wait for go-aheads."
+HUD**. Standing user intent (now **explicit full autonomy** — no confirmations; add/streamline/evolve
+freely, only surface genuinely-irreversible/owner decisions): "keep improving / keep adding features,
+ship small CI-green commits, trace for bugs ('simulate breakpoints')."
+
+Note on shipping: CI publishes the APK to `latest` on **every push to any branch** (not just `main`), so a
+branch push ships immediately; merging to `main` is for keeping the source-of-truth current.
+
+### Shipped this session (dev branch `claude/nice-cori-0zkrjm`)
+- **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
+- **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
+  12-wide burst (OkHttp `maxRequestsPerHost`). Fixed with a `Semaphore(5)` Yahoo cap + backoff retries +
+  `mergeWithCache` (a partial fetch never SHRINKS the set). Ticker also made a true seamless fill
+  (`BoxWithConstraints`) + denser items (NAME · price · ±%) + 24 instruments/6 crypto + edge fades.
+- **Explainers** (`core:telemetry/Explainers`, CI-tested): tap space-weather metrics (WX) or market rows
+  to get plain-English meaning; `feature/common/ExplainerDialog`. **Market mood** breadth banner
+  (`core:telemetry/MarketMood`). Home "Today in the sky" card taps through to the Space Weather screen.
+- ⚠️ On-device-unverified: the ticker now-fills behaviour (CI can't prove the rendered tape) — user to confirm.
 
 ### Known follow-ups / not done
 - Background glasses HUD via a foreground service (HUD bearing/distance nav card: **done**).

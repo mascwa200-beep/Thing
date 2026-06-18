@@ -72,6 +72,7 @@ class HomeNav(
     val openSettings: () -> Unit,
     val openAssistant: () -> Unit = {},
     val openRadar: () -> Unit = {},
+    val openSpaceWeather: () -> Unit = {},
 )
 
 private data class FeedChip(val label: String, val key: String)
@@ -168,7 +169,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
 
                 // Today in the sky
                 if (state.skyLines.isNotEmpty()) {
-                    item { SkyDigestCard(state.skyLines) }
+                    item { SkyDigestCard(state.skyLines, nav.openSpaceWeather) }
                 }
 
                 // Live aircraft overhead (only when there are any)
@@ -364,16 +365,16 @@ private fun FlightCard(data: dev.mascwa.pulse.data.radar.RadarData, onClick: () 
 }
 
 @Composable
-private fun SkyDigestCard(lines: List<String>) {
+private fun SkyDigestCard(lines: List<String>, onClick: () -> Unit = {}) {
     val c = Pulse.colors
     NeonPanel(
-        Modifier.fillMaxWidth().padding(top = 12.dp),
+        Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onClick() },
         corners = true,
         borderColor = c.violet.copy(alpha = 0.5f),
     ) {
         Column {
             DecryptText(
-                text = "TODAY IN THE SKY",
+                text = "TODAY IN THE SKY  ▸",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.violet,
             )
             lines.forEach { ln ->
