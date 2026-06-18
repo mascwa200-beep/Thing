@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -592,27 +595,33 @@ private fun <T> SingleChoiceRow(
 ) {
     var show by remember { mutableStateOf(false) }
     val current = options.firstOrNull { it.first == selected }?.second ?: selected.toString()
-    Row(
-        Modifier.fillMaxWidth()
-            .then(if (enabled) Modifier.clickable { show = true } else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(current, style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (show) {
-        AlertDialog(
-            onDismissRequest = { show = false },
-            confirmButton = { TextButton(onClick = { show = false }) { Text("Close") } },
-            title = { Text(title) },
-            text = {
-                PrefRadioGroup(options = options, selected = selected, onSelect = { onSelect(it); show = false })
-            },
-        )
+    // Anchored dropdown: it opens from the row you tapped (not a centred dialog).
+    Box {
+        Row(
+            Modifier.fillMaxWidth()
+                .then(if (enabled) Modifier.clickable { show = true } else Modifier)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("$current  ▾", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = show, onDismissRequest = { show = false }) {
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = { onSelect(value); show = false },
+                    trailingIcon = if (value == selected) {
+                        { Icon(Icons.Filled.Check, contentDescription = "Selected") }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
     }
 }
 
