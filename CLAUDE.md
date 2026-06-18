@@ -61,9 +61,11 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
 - **Image/file interpretation**: console attach buttons → `JarvisViewModel.sendImage`/`sendFile` →
   vision (images, PDFs via `PdfRenderer`→pages) or text read; cloud-only for vision.
 - **Glasses HUD** (`feature/hud/`): `HudController` + `HudPresentation` render a glanceable HUD (clock +
-  brief + latest reply) on a connected external/wireless display via the `Presentation` API; opt-in
-  (`glassesHud`), Activity-foreground-scoped, fully defensive. Follow-ups: background HUD (foreground
-  service), bearing/distance nav.
+  **active-waypoint nav card** + brief + latest reply) on a connected external/wireless display via the
+  `Presentation` API; opt-in (`glassesHud`), Activity-foreground-scoped, fully defensive. The nav card
+  shows a relative turn arrow + distance + "40° right"/cardinal to the tracked `WaypointStore.active`,
+  combining a polled GPS fix + the compass heading; relative-turn maths is `core:telemetry/NavGuidance`
+  (CI-unit-tested), great-circle maths is `core/util/Geo`. Follow-up: background HUD (foreground service).
 
 ## On-device setup the user must do
 - Add a **cloud key** (OpenRouter) in J.A.R.V.I.S. Setup → enables smartest chat, native tools, **vision**.
@@ -78,7 +80,7 @@ HUD**. Standing user intent: "keep improving / keep adding features autonomously
 trace for bugs ('simulate breakpoints'), don't wait for go-aheads."
 
 ### Known follow-ups / not done
-- Background glasses HUD via a foreground service; HUD bearing/distance navigation card.
+- Background glasses HUD via a foreground service (HUD bearing/distance nav card: **done**).
 - R8/minify on the shipped build (needs verified keep-rules for serialization/MediaPipe/Vosk/MapLibre).
 - Optional emulator-generated baseline profile (vs the hand-authored starter).
 - Text/PDF are handled; other binary file types decline honestly.
