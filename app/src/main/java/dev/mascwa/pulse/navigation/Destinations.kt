@@ -76,9 +76,9 @@ data class TopDestination(
 
 val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.HOME, "PULSE", Icons.Filled.Home, Icons.Outlined.Home),
-    TopDestination(Routes.NEWS, "WIRE", Icons.Filled.Article, Icons.Outlined.Article),
+    TopDestination(Routes.NEWS, "NEWS", Icons.Filled.Article, Icons.Outlined.Article),
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
-    TopDestination(Routes.GRID, "GRID", Icons.Filled.GridView, Icons.Outlined.GridView),
+    TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
