@@ -163,6 +163,8 @@ data class JarvisSettings(
     val cloudApiKey: String = "",
     /** Optional model override; blank uses the provider's default model. */
     val cloudModel: String = "",
+    /** How often J.A.R.V.I.S. asks a gap-filling "curiosity" question: 0 Off / 1 Low / 2 Medium / 3 High. */
+    val curiosityLevel: Int = 1,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */

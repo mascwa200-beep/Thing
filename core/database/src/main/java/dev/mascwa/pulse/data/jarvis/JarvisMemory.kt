@@ -70,6 +70,18 @@ class JarvisMemory(db: JarvisDatabase) {
     /** Most recent notes regardless of relevance. */
     suspend fun recentNotes(limit: Int = 10): List<AgentNoteEntity> = notes.recent(limit)
 
+    /** Live list of all durable notes, newest first — for the Memory manager screen. */
+    val notesFlow: Flow<List<AgentNoteEntity>> = notes.observeAll()
+
+    /** Edit a note's text in place (keeps id/source/timestamp). No-op if the note is gone. */
+    suspend fun updateNote(id: Long, text: String) {
+        val existing = notes.getById(id) ?: return
+        notes.update(existing.copy(noteText = text.trim()))
+    }
+
+    /** Delete a single note. */
+    suspend fun deleteNote(id: Long) = notes.deleteById(id)
+
     suspend fun clearNotes() = notes.clear()
 
     companion object {

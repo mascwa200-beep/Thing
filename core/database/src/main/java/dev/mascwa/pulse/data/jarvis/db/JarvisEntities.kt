@@ -58,6 +58,8 @@ object NoteSource {
     const val USER = "user"
     const val OBSERVATION = "observation"
     const val INFERENCE = "inference"
+    /** A fact the user taught J.A.R.V.I.S. by answering a curiosity question. */
+    const val LEARNED = "learned"
 }
 
 /**

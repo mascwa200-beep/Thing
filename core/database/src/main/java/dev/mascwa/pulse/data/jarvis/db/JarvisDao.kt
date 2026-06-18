@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Telemetry baselines / current operational state. */
@@ -53,6 +54,20 @@ interface AgentNoteDao {
 
     @Query("SELECT * FROM agent_notes ORDER BY timestamp DESC LIMIT :limit")
     suspend fun recent(limit: Int): List<AgentNoteEntity>
+
+    /** Live list of all notes, newest first (for the Memory manager screen). */
+    @Query("SELECT * FROM agent_notes ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<AgentNoteEntity>>
+
+    @Query("SELECT * FROM agent_notes WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): AgentNoteEntity?
+
+    /** Edit a note in place; Room's FTS triggers keep the lexical index in sync. */
+    @Update
+    suspend fun update(note: AgentNoteEntity)
+
+    @Query("DELETE FROM agent_notes WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Query("DELETE FROM agent_notes")
     suspend fun clear()
