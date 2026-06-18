@@ -42,7 +42,9 @@ class AgentOrchestrator(
         // than the text protocol on-device models need. Falls through to text-ReAct when unavailable.
         val toolEngine = engine as? ToolCallingEngine
         if (toolEngine != null && tools.isNotEmpty() && runCatching { toolEngine.supportsTools() }.getOrDefault(false)) {
-            val specs = tools.map { ToolSpec(it.name, it.usage) }
+            // Dedup by name: the OpenAI tools API rejects duplicate function names (an authored tool
+            // could collide with a built-in), whereas the text path just picks the first.
+            val specs = tools.distinctBy { it.name.lowercase() }.map { ToolSpec(it.name, it.usage) }
             val messages = ArrayList<ToolMessage>()
             messages.add(ToolMessage("system", buildNativeSystem(persona, memoryNotes, knowledgeChunks)))
             history.forEach { messages.add(ToolMessage(if (it.role.equals("user", true)) "user" else "assistant", it.text)) }
