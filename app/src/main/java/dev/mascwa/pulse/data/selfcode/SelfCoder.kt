@@ -79,7 +79,11 @@ class SelfCoder(
         )
         val summary = files.joinToString(", ") { (if (it.isNew) "new " else "") + "`${it.path.substringAfterLast('/')}`" }
         val newNote = if (files.any { it.isNew }) " (a new file compiles on its own; the edits wire it in.)" else ""
-        return Result(true, "Drafted $summary across ${files.size} file(s) — approve it to open the PR, sir.$newNote")
+        return Result(
+            true,
+            "Drafted $summary across ${files.size} file(s). Approve it and I'll open a PR; once CI builds " +
+                "it (a few minutes), install the new build from Settings → Software update to see the change, sir.$newNote",
+        )
     }
 
     /**
@@ -112,7 +116,8 @@ class SelfCoder(
                 body = "Autonomous change drafted by J.A.R.V.I.S.\n\n**Goal:** $goal\n\n**Files:**\n$fileList\n\n" +
                     "CI must pass before this can merge.",
             )
-            "Opened PR #${pr.number} — ${pr.url}"
+            "Opened PR #${pr.number} — ${pr.url}. CI is building it now; when it's green you'll be prompted " +
+                "to install the new build (Settings → Software update), and only then does the change take effect."
         }.getOrElse { "Couldn't open the PR: ${it.message}" }
     }
 
