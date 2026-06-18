@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
@@ -49,8 +51,7 @@ import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.StaleBanner
-import dev.mascwa.pulse.feature.common.Ticker
-import dev.mascwa.pulse.feature.common.TickerItem
+import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.news.ArticleRowCompact
 import dev.mascwa.pulse.ui.effects.DecryptText
@@ -138,8 +139,8 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         c.muted,
                     )
                 }
-                // ticker from live markets — tap to open the full Markets screen
-                Ticker(tickerItems(state.markets.data), onClick = nav.openMarkets)
+                // static, reliable markets strip — mood + each instrument's move; tap to open Markets
+                MarketsStrip(state.markets.data, nav.openMarkets)
             }
         },
     ) { innerPadding ->
@@ -236,31 +237,49 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
     }
 }
 
-/** Build the home market tape: one entry per instrument carrying NAME · price · ±change%, so the stream
- *  reads as dense, live market data. Every quote with a price is shown (an instrument is never dropped
- *  just because the % is briefly unavailable), keeping the tape full; the Ticker loops it endlessly. */
-private fun tickerItems(quotes: List<Quote>?): List<TickerItem> =
-    quotes.orEmpty().mapNotNull { q ->
-        val price = q.price ?: return@mapNotNull null
-        val pct = q.changePercent
-        val priceStr = Formatters.number(price, tickerPriceDigits(price))
-        TickerItem(
-            symbol = q.label.uppercase().take(14),
-            value = if (pct != null) "$priceStr  ${Formatters.signedPercent(pct)}" else priceStr,
-            color = when {
-                pct == null -> dev.mascwa.pulse.ui.theme.Ink2
-                pct >= 0 -> dev.mascwa.pulse.ui.theme.Positive
-                else -> dev.mascwa.pulse.ui.theme.Negative
-            },
-        )
+/**
+ * The home markets strip. Replaces the old auto-scrolling ticker (which could stall / show a half-empty
+ * bar) with a STATIC, user-swipeable row: a plain-English mood read + every loaded instrument's move.
+ * Reliable and clear — no animation, no fill bug — and taps through to the full Markets screen.
+ */
+@Composable
+private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val items = quotes.orEmpty().filter { it.changePercent != null }
+    if (items.isEmpty()) return
+    val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .background(c.carbon)
+            .clickable { onClick() }
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        mood?.let {
+            Text(
+                it.headline, fontFamily = JetBrainsMono, fontSize = 11.sp,
+                fontWeight = FontWeight.Medium, color = c.accent,
+            )
+        }
+        items.forEach { q ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(q.label.uppercase().take(12), fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                q.changePercent?.let { pct ->
+                    Text(
+                        Formatters.signedPercent(pct), fontFamily = JetBrainsMono, fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium, color = trendColor(pct >= 0),
+                    )
+                }
+            }
+        }
     }
-
-/** Compact price precision for the tape: whole numbers for large values (indices, BTC), cents for most
- *  stocks/commodities, more decimals for sub-1 values (some FX / low-priced coins). */
-private fun tickerPriceDigits(price: Double): Int = when {
-    kotlin.math.abs(price) >= 1000 -> 0
-    kotlin.math.abs(price) >= 1 -> 2
-    else -> 4
 }
 
 @Composable
