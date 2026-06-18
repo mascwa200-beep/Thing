@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Mic
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -192,7 +194,13 @@ fun JarvisScreen(
                 )
             }
 
-            InputBar(busy = busy, voice = voiceInput, onSend = vm::send, onMic = onMic)
+            InputBar(
+                busy = busy,
+                voice = voiceInput,
+                onSend = vm::send,
+                onMic = onMic,
+                onSendImage = { uri, cap -> vm.sendImage(context, uri, cap) },
+            )
         }
     }
 }
@@ -305,12 +313,27 @@ private fun Bubble(text: String, isUser: Boolean) {
 }
 
 @Composable
-private fun InputBar(busy: Boolean, voice: VoiceInputState, onSend: (String) -> Unit, onMic: () -> Unit) {
+private fun InputBar(
+    busy: Boolean,
+    voice: VoiceInputState,
+    onSend: (String) -> Unit,
+    onMic: () -> Unit,
+    onSendImage: (android.net.Uri, String) -> Unit,
+) {
     val c = Pulse.colors
     var input by remember { mutableStateOf("") }
     fun submit() {
         if (input.isNotBlank() && !busy) {
             onSend(input)
+            input = ""
+        }
+    }
+    // Free system photo picker (no permission). The current text becomes the caption/question.
+    val pickImage = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null && !busy) {
+            onSendImage(uri, input)
             input = ""
         }
     }
@@ -341,6 +364,16 @@ private fun InputBar(busy: Boolean, voice: VoiceInputState, onSend: (String) -> 
                     unfocusedTextColor = c.ink,
                 ),
             )
+            IconButton(
+                onClick = {
+                    pickImage.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                enabled = !busy,
+            ) {
+                Icon(Icons.Filled.Image, contentDescription = "Attach image for J.A.R.V.I.S. to analyze", tint = if (busy) c.muted else c.sky)
+            }
             val listening = voice is VoiceInputState.Listening || voice is VoiceInputState.Preparing
             IconButton(onClick = onMic) {
                 Icon(

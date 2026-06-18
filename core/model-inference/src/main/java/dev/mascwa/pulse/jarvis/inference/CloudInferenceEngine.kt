@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
@@ -45,7 +46,7 @@ data class CloudConfig(val baseUrl: String, val apiKey: String, val model: Strin
  */
 class CloudInferenceEngine(
     private val configProvider: suspend () -> CloudConfig?,
-) : LocalInferenceEngine, ToolCallingEngine {
+) : LocalInferenceEngine, ToolCallingEngine, VisionEngine {
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -106,6 +107,55 @@ class CloudInferenceEngine(
             if (!emittedAny) emit("…")
         }
     }.flowOn(Dispatchers.IO)
+
+    // --- Image understanding (VisionEngine) ---
+
+    override suspend fun supportsVision(): Boolean = isConfigured()
+
+    override fun generateWithImages(prompt: String, images: List<String>, system: String?): Flow<String> = flow {
+        val cfg = configProvider()
+        if (cfg == null) { emit("// cloud AI not configured"); return@flow }
+        if (images.isEmpty()) { emitAll(generate(prompt, emptyList(), system)); return@flow }
+        val payload = buildVisionRequest(cfg.model, prompt, images, system)
+        val request = Request.Builder()
+            .url(cfg.baseUrl.trimEnd('/') + "/chat/completions")
+            .addHeader("Authorization", "Bearer ${cfg.apiKey}")
+            .post(payload.toString().toRequestBody(JSON))
+            .build()
+        val response = runCatching { client.newCall(request).execute() }.getOrElse {
+            emit("// cloud error: ${it.message ?: "network failure"}"); return@flow
+        }
+        response.use { resp ->
+            if (!resp.isSuccessful) { emit(errorLine(resp.code, runCatching { resp.body?.string() }.getOrNull())); return@flow }
+            val source = resp.body?.source() ?: run { emit("// cloud error: empty response"); return@flow }
+            var emittedAny = false
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                val line = source.readUtf8Line() ?: break
+                if (!line.startsWith("data:")) continue
+                val data = line.removePrefix("data:").trim()
+                if (data == "[DONE]") break
+                val chunk = runCatching {
+                    JSONObject(data).getJSONArray("choices").getJSONObject(0).optJSONObject("delta")?.optString("content").orEmpty()
+                }.getOrDefault("")
+                if (chunk.isNotEmpty()) { emittedAny = true; emit(chunk) }
+            }
+            if (!emittedAny) emit("…")
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /** OpenAI-style multimodal user message: a text part plus one image_url part per data URL. */
+    private fun buildVisionRequest(model: String, prompt: String, images: List<String>, system: String?): JSONObject {
+        val messages = JSONArray()
+        if (!system.isNullOrBlank()) messages.put(msg("system", system))
+        val content = JSONArray()
+        content.put(JSONObject().put("type", "text").put("text", prompt.ifBlank { "Describe and analyze this image." }))
+        images.forEach { url ->
+            content.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", url)))
+        }
+        messages.put(JSONObject().put("role", "user").put("content", content))
+        return JSONObject().put("model", model).put("messages", messages).put("stream", true)
+    }
 
     // --- Native function-calling (ToolCallingEngine) ---
 
