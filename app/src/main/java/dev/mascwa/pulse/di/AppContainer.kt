@@ -284,6 +284,11 @@ class AppContainer(private val appContext: Context) {
         )
     }
 
+    /** Curious Learning: rate-limited, gap-driven questions over the durable memory store. */
+    val curiosityEngine: dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine by lazy {
+        dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine(jarvisMemory, inferenceEngine, settingsRepository)
+    }
+
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)
 

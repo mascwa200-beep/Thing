@@ -78,6 +78,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val cloudProvider by vm.cloudProvider.collectAsState()
     val cloudApiKey by vm.cloudApiKey.collectAsState()
     val cloudModel by vm.cloudModel.collectAsState()
+    val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
@@ -221,6 +222,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             Text(
                 "Saved on-device. A built-in safety rule is always appended in code and can't be " +
                     "overridden by the charter.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("CURIOSITY  ·  how often J.A.R.V.I.S. asks to learn about you")
+            CuriositySelector(selected = curiosityLevel, onSelect = vm::setCuriosityLevel)
+            Text(
+                "When curious, J.A.R.V.I.S. occasionally asks one question to fill a genuine gap, reflects " +
+                    "your answer back to confirm, then remembers it (manage saved facts in MEMORY). " +
+                    "Strictly rate-limited; OFF disables it.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
@@ -460,6 +470,27 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
 private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
     val c = Pulse.colors
     val options = listOf(0 to "AUTO", 1 to "GPU", 2 to "CPU")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { (value, label) ->
+            val on = value == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CuriositySelector(selected: Int, onSelect: (Int) -> Unit) {
+    val c = Pulse.colors
+    val options = listOf(0 to "OFF", 1 to "LOW", 2 to "MED", 3 to "HIGH")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (value, label) ->
             val on = value == selected

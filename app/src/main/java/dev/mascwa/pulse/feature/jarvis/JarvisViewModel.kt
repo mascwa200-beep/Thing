@@ -3,8 +3,10 @@ package dev.mascwa.pulse.feature.jarvis
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
+import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
@@ -60,7 +62,12 @@ class JarvisViewModel(
     private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
     private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
     private val briefing: dev.mascwa.pulse.jarvis.BriefingBuilder,
+    private val curiosity: CuriosityEngine,
 ) : ViewModel() {
+
+    /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
+    private data class PendingLearn(val question: String, val staged: String? = null)
+    private var pendingLearn: PendingLearn? = null
 
     val messages: StateFlow<List<JarvisMessage>> =
         memory.history
@@ -114,32 +121,8 @@ class JarvisViewModel(
             _streaming.value = ""
             memory.append(Speaker.USER, text)
             try {
-                when (val intent = router.route(text)) {
-                    is JarvisIntent.Status -> {
-                        val report = banter.statusReport(deviceContext.snapshot())
-                        memory.append(Speaker.JARVIS, report)
-                        speakIfEnabled(report)
-                    }
-                    is JarvisIntent.Lockdown -> executeLockdown()
-                    is JarvisIntent.Brief -> {
-                        val brief = briefing.build()
-                        memory.append(Speaker.JARVIS, brief)
-                        speakIfEnabled(brief)
-                    }
-                    is JarvisIntent.Chat -> {
-                        // Reload the model if its (separate) process was reclaimed or faulted, so a
-                        // transient "process lost" self-heals instead of sticking on the persona core.
-                        runCatching { engine.ensureReady() }
-                        val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
-                        val reply = if (useAgent) {
-                            generateWithAgent(intent.text)
-                        } else {
-                            generateDirect(intent.text)
-                        }
-                        memory.append(Speaker.JARVIS, reply)
-                        speakIfEnabled(reply)
-                    }
-                }
+                val pending = pendingLearn
+                if (pending != null) handleCuriosityReply(pending, text) else routeTurn(text)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -149,6 +132,80 @@ class JarvisViewModel(
             } finally {
                 _streaming.value = ""
                 _busy.value = false
+            }
+        }
+    }
+
+    /** Normal intent routing for a turn (also the path when a curiosity reply turns out to be a new
+     *  request rather than an answer). */
+    private suspend fun routeTurn(text: String) {
+        when (val intent = router.route(text)) {
+            is JarvisIntent.Status -> {
+                val report = banter.statusReport(deviceContext.snapshot())
+                sayJarvis(report)
+            }
+            is JarvisIntent.Lockdown -> executeLockdown()
+            is JarvisIntent.Brief -> {
+                val brief = briefing.build()
+                sayJarvis(brief)
+            }
+            is JarvisIntent.Chat -> {
+                // Reload the model if its (separate) process was reclaimed or faulted, so a
+                // transient "process lost" self-heals instead of sticking on the persona core.
+                runCatching { engine.ensureReady() }
+                val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
+                val reply = if (useAgent) generateWithAgent(intent.text) else generateDirect(intent.text)
+                memory.append(Speaker.JARVIS, reply)
+                speakIfEnabled(reply)
+                maybeBeCurious()
+            }
+        }
+    }
+
+    /** Append a J.A.R.V.I.S. line to history and speak it if voice replies are on. */
+    private suspend fun sayJarvis(text: String) {
+        memory.append(Speaker.JARVIS, text)
+        speakIfEnabled(text)
+    }
+
+    /** End-of-turn curiosity hook: ask one gap/follow-up question (rate-limited inside the engine). */
+    private suspend fun maybeBeCurious() {
+        if (pendingLearn != null) return
+        val turns = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
+        val question = runCatching { curiosity.nextPrompt(turns) }.getOrNull() ?: return
+        pendingLearn = PendingLearn(question = question)
+        sayJarvis(question)
+    }
+
+    /** Handle the user's reply to a curiosity question: capture the answer, reflect the fact back, then
+     *  save only on confirmation — so the user can correct it before it's stored. */
+    private suspend fun handleCuriosityReply(pending: PendingLearn, text: String) {
+        if (pending.staged == null) {
+            val fact = curiosity.distill(pending.question, text)
+            pendingLearn = pending.copy(staged = fact)
+            sayJarvis("Noted — I'll remember: \"$fact\". Shall I keep that, sir? (yes / no — or just correct me.)")
+            return
+        }
+        when (curiosity.classify(text)) {
+            CuriosityEngine.Confirm.AFFIRM -> {
+                runCatching { memory.remember(pending.staged, NoteSource.LEARNED) }
+                pendingLearn = null
+                sayJarvis("Committed to memory, sir.")
+            }
+            CuriosityEngine.Confirm.REJECT -> {
+                pendingLearn = null
+                sayJarvis("Forgotten, sir.")
+            }
+            CuriosityEngine.Confirm.CORRECTION -> {
+                val fact = curiosity.distill(pending.question, text)
+                runCatching { memory.remember(fact, NoteSource.LEARNED) }
+                pendingLearn = null
+                sayJarvis("Corrected — saved, sir.")
+            }
+            CuriosityEngine.Confirm.OTHER -> {
+                // Not an answer — don't hijack the conversation. Drop the staged fact and route normally.
+                pendingLearn = null
+                routeTurn(text)
             }
         }
     }
