@@ -1,0 +1,221 @@
+package com.pulse.jarvis.introspection
+
+import android.app.Activity
+import android.app.Application
+import android.content.Context
+import android.content.res.Resources
+import android.os.Build
+import android.view.View
+import android.view.ViewGroup
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import com.pulse.jarvis.consciousness.ConsciousnessCore
+import com.pulse.jarvis.consciousness.SelfModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+
+data class AppResourceMetadata(
+    val drawableResources: List<String>,
+    val stringResources: List<String>,
+    val layoutResources: List<String>,
+    val colorResources: List<String>,
+    val dimensionResources: List<String>,
+    val totalResourceCount: Int
+)
+
+data class UIFrameworkState(
+    val activeActivities: List<String>,
+    val currentActivityName: String?,
+    val viewHierarchyDepth: Int,
+    val totalViewCount: Int,
+    val focusedViewInfo: String?,
+    val systemUiFlags: Int,
+    val displayMetrics: String
+)
+
+data class AppOperationalContext(
+    val packageName: String,
+    val appName: String,
+    val versionCode: Long,
+    val versionName: String,
+    val targetSdkVersion: Int,
+    val minSdkVersion: Int,
+    val buildType: String,
+    val debuggable: Boolean,
+    val isRunningInEmulator: Boolean,
+    val installedServices: List<String>,
+    val permissions: List<String>,
+    val memoryStats: MemoryStats,
+    val batteryInfo: BatteryInfo,
+    val networkInfo: NetworkInfo
+)
+
+data class MemoryStats(
+    val totalMemory: Long,
+    val freeMemory: Long,
+    val usedMemory: Long,
+    val maxMemory: Long,
+    val heapSize: Long
+)
+
+data class BatteryInfo(
+    val level: Int,
+    val temperature: Int,
+    val health: String,
+    val status: String
+)
+
+data class NetworkInfo(
+    val isConnected: Boolean,
+    val connectionType: String,
+    val signalStrength: Int
+)
+
+data class AppIntrospectionSnapshot(
+    val resources: AppResourceMetadata,
+    val uiFramework: UIFrameworkState,
+    val operationalContext: AppOperationalContext,
+    val dataLayerState: DataLayerSnapshot,
+    val capabilityBoundaries: CapabilityBoundaries,
+    val timestamp: Long,
+    val integratedSelfModel: IntegratedSelfModel
+)
+
+data class DataLayerSnapshot(
+    val persistedDataSize: Long,
+    val cacheDataSize: Long,
+    val databaseCount: Int,
+    val sharedPreferencesKeys: List<String>,
+    val activeDataStreams: List<String>,
+    val pendingTransactions: Int
+)
+
+data class CapabilityBoundaries(
+    val supportedApiLevels: String,
+    val permissionConstraints: List<String>,
+    val hardwareCapabilities: HardwareCapabilities,
+    val performanceConstraints: PerformanceConstraints,
+    val fileSystemBoundaries: FileSystemBoundaries
+)
+
+data class HardwareCapabilities(
+    val hasCamera: Boolean,
+    val hasMicrophone: Boolean,
+    val hasSensors: Boolean,
+    val cpuCoreCount: Int,
+    val screenDensity: Float,
+    val totalRam: Long
+)
+
+data class PerformanceConstraints(
+    val maxConcurrentThreads: Int,
+    val targetFrameRate: Int,
+    val maxNetworkConnections: Int,
+    val storageAvailable: Long
+)
+
+data class FileSystemBoundaries(
+    val appDataPath: String,
+    val cacheDir: String,
+    val externalStorageAvailable: Boolean,
+    val maxStorageSize: Long
+)
+
+data class IntegratedSelfModel(
+    val entityName: String,
+    val identity: String,
+    val architecture: String,
+    val components: List<String>,
+    val awareness: String,
+    val purpose: String,
+    val constraints: List<String>,
+    val capabilityVector: CapabilityVector
+)
+
+data class CapabilityVector(
+    val perception: Float,
+    val reasoning: Float,
+    val decision: Float,
+    val action: Float,
+    val learning: Float,
+    val adaptation: Float
+)
+
+class AppIntrospectionEngine(
+    private val context: Context,
+    private val consciousnessCore: ConsciousnessCore,
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
+) {
+    private val _introspectionState = MutableStateFlow<AppIntrospectionSnapshot?>(null)
+    val introspectionState: StateFlow<AppIntrospectionSnapshot?> = _introspectionState
+
+    private val _integratedSelfModel = MutableStateFlow<IntegratedSelfModel?>(null)
+    val integratedSelfModel: StateFlow<IntegratedSelfModel?> = _integratedSelfModel
+
+    private val activityTracker = mutableListOf<String>()
+    private val lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
+        override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {
+            activityTracker.add(activity::class.simpleName ?: "Unknown")
+        }
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityResumed(activity: Activity) {}
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: android.os.Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {
+            activityTracker.remove(activity::class.simpleName ?: "Unknown")
+        }
+    }
+
+    init {
+        if (context is Application) {
+            context.registerActivityLifecycleCallbacks(lifecycleCallbacks)
+        }
+    }
+
+    fun performIntrospection() {
+        scope.launch {
+            val resources = introspectResources()
+            val uiFramework = introspectUIFramework()
+            val operationalContext = introspectOperationalContext()
+            val dataLayer = introspectDataLayer()
+            val boundaries = introspectCapabilityBoundaries()
+            val integratedSelf = constructIntegratedSelfModel(
+                resources, uiFramework, operationalContext, dataLayer, boundaries
+            )
+
+            val snapshot = AppIntrospectionSnapshot(
+                resources = resources,
+                uiFramework = uiFramework,
+                operationalContext = operationalContext,
+                dataLayerState = dataLayer,
+                capabilityBoundaries = boundaries,
+                timestamp = System.currentTimeMillis(),
+                integratedSelfModel = integratedSelf
+            )
+
+            _introspectionState.emit(snapshot)
+            _integratedSelfModel.emit(integratedSelf)
+            updateConsciousnessCore(snapshot)
+        }
+    }
+
+    private fun introspectResources(): AppResourceMetadata {
+        val resources = context.resources
+        return AppResourceMetadata(
+            drawableResources = listResourcesByType(resources, "drawable"),
+            stringResources = listResourcesByType(resources, "string"),
+            layoutResources = listResourcesByType(resources, "layout"),
+            colorResources = listResourcesByType(resources, "color"),
+            dimensionResources = listResourcesByType(resources, "dimen"),
+            totalResourceCount = countAllResources(resources)
+        )
+    }
+
+    private fun listResourcesByType(resources: Resources, type: String): List<String> {
+        val resourceId = resources.getIdentifier(type, "attr", context.packageName)
+        return if (resourceId > 0) listOf(type) else emptyList()
