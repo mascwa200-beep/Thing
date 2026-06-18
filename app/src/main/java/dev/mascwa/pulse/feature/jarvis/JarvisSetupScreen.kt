@@ -87,6 +87,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val cloudProvider by vm.cloudProvider.collectAsState()
     val cloudApiKey by vm.cloudApiKey.collectAsState()
     val cloudModel by vm.cloudModel.collectAsState()
+    val maxTokens by vm.maxTokens.collectAsState()
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
@@ -171,7 +172,27 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 MonoField(cloudApiKey, vm::onCloudKeyChange, "paste your ${cloudProvider.label} key")
                 FieldLabel("MODEL  ·  optional, blank = ${cloudProvider.defaultModel}")
                 MonoField(cloudModel, vm::onCloudModelChange, cloudProvider.defaultModel)
+                if (cloudProvider.creditsUrl.isNotBlank()) {
+                    Text(
+                        "Check your balance: ${cloudProvider.creditsUrl}",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                        modifier = Modifier.clickable { openUrl(context, cloudProvider.creditsUrl) },
+                    )
+                    Text(
+                        "A 402 error means low provider credits, not a bad key — top up a little, or lower " +
+                            "Model max tokens below.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    )
+                }
             }
+
+            FieldLabel("MODEL MAX TOKENS  ·  reply length budget")
+            MaxTokensSelector(selected = maxTokens, onSelect = vm::setMaxTokens)
+            Text(
+                "Caps how long a reply can be. Smaller = cheaper cloud requests and a smaller credit hold " +
+                    "(fixes most 402s); larger = longer answers. Applies to cloud and on-device.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
 
             Text(
                 "Provision a local reasoning model. The file streams straight to this " +
@@ -620,6 +641,27 @@ private fun CloudProviderSelector(selected: CloudProvider, onSelect: (CloudProvi
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text(provider.label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaxTokensSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val c = Pulse.colors
+    val presets = listOf(1024, 2048, 4096, 8192)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        presets.forEach { value ->
+            val on = value == selected
+            val tint = if (on) c.accent else c.muted
+            Box(
+                Modifier
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text("$value", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
             }
         }
     }

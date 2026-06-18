@@ -113,6 +113,10 @@ class JarvisSetupViewModel(
     /** Optional model override; blank uses the provider default. */
     val cloudModel: StateFlow<String> = _cloudModel.asStateFlow()
 
+    private val _maxTokens = MutableStateFlow(2048)
+    /** Reply-length budget (max_tokens) — caps the cloud reservation and the on-device answer. */
+    val maxTokens: StateFlow<Int> = _maxTokens.asStateFlow()
+
     private val _curiosityLevel = MutableStateFlow(1)
     /** How often J.A.R.V.I.S. asks gap-filling questions: 0 Off / 1 Low / 2 Med / 3 High. */
     val curiosityLevel: StateFlow<Int> = _curiosityLevel.asStateFlow()
@@ -148,6 +152,7 @@ class JarvisSetupViewModel(
             _cloudProvider.value = saved.cloudProvider
             _cloudApiKey.value = saved.cloudApiKey
             _cloudModel.value = saved.cloudModel
+            _maxTokens.value = saved.maxTokens
             _curiosityLevel.value = saved.curiosityLevel
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
@@ -198,6 +203,15 @@ class JarvisSetupViewModel(
         _cloudModel.value = value
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(cloudModel = value.trim())) }
+        }
+    }
+
+    /** Set the reply-length budget (max_tokens). Read fresh per generation, so it applies at once. */
+    fun setMaxTokens(value: Int) {
+        val clamped = value.coerceIn(256, 32_768)
+        _maxTokens.value = clamped
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(maxTokens = clamped)) }
         }
     }
 
