@@ -24,6 +24,10 @@ class ApprovalGate(
     /** Opens the GitHub PR for an approved CODE_PR proposal (wired to SelfCoder.commit). Only invoked
      *  here, after the user approves — so no self-code PR is ever opened without the user's tap. */
     private val commitCode: suspend (PendingAction) -> String = { "Self-coding isn't available." },
+    /** Folds an approved structural self-change (persona/character, a new self-authored tool) into
+     *  durable self-knowledge, so J.A.R.V.I.S. always knows what it now is and how it came to be that
+     *  way. (Approved code changes are recorded by [commitCode].) */
+    private val recordSelfChange: suspend (String) -> Unit = {},
 ) {
     /** Apply an approved action, then remove it from the queue. Returns a short result message. */
     suspend fun apply(action: PendingAction): String {
@@ -74,6 +78,15 @@ class ApprovalGate(
                 commitCode(action)
             }
             else -> "Unsupported action type: ${action.type}."
+        }
+        // Fold structural self-changes (character + capabilities) into durable self-knowledge.
+        runCatching {
+            when (action.type) {
+                ActionType.PERSONA_EDIT -> recordSelfChange("Your persona/charter was updated (approved by sir).")
+                ActionType.TOOL_REGISTER ->
+                    recordSelfChange("You gained a self-authored tool \"${action.payload["name"].orEmpty()}\" (approved by sir).")
+                else -> {}
+            }
         }
         selfEdit.removePending(action.id)
         return result

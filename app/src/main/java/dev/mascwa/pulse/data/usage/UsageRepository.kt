@@ -24,19 +24,27 @@ import java.util.Calendar
 private val Context.usageDataStore: DataStore<Preferences> by preferencesDataStore(name = "pulse_usage")
 
 /**
- * On-device, privacy-preserving usage store. Records only AGGREGATED signals — a per-feature visit
- * count, the last-seen time, and a 24-slot hour-of-day histogram. No screen content, no locations, no
- * PII; nothing ever leaves the device here.
+ * On-device, privacy-preserving usage store. Two views, one store:
  *
- * Performance: writes are coalesced. [record] is a cheap in-memory update; persistence is debounced
- * ([FLUSH_DELAY_MS]) so a burst of navigation produces a single DataStore write. The in-memory cache
- * also serves [snapshot] without touching disk after the first load.
+ *  1. AGGREGATES — per-feature visit counts + a 24-slot hour-of-day histogram (for tailored
+ *     recommendations); and
+ *  2. a real-time ACTIVITY LOG — a capped, time-ordered ring buffer of recent app events (navigation,
+ *     the assistant's tool calls, lifecycle), so J.A.R.V.I.S. can see what's been happening just now.
+ *
+ * Both record AGGREGATED / operational signals only — short category + label strings. No screen
+ * content, no message text, no credentials, no precise location, no PII; and nothing ever leaves the
+ * device here. That keeps "log everything about the app and usage" honest without turning the log into
+ * a surveillance trail.
+ *
+ * Performance: [record] / [log] are cheap in-memory updates; persistence is debounced ([FLUSH_DELAY_MS])
+ * and writes both views in a single DataStore edit, so a burst of activity is one disk write.
  */
 class UsageRepository(
     private val context: Context,
     private val json: Json,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
+    // ---- aggregates ----
     @Serializable
     private data class Stored(val features: Map<String, Feature> = emptyMap())
 
@@ -47,9 +55,21 @@ class UsageRepository(
         val hours: List<Int> = List(24) { 0 },
     )
 
+    // ---- activity log ----
+    @Serializable
+    private data class LogEntry(val t: Long, val cat: String, val label: String)
+
+    @Serializable
+    private data class StoredLog(val entries: List<LogEntry> = emptyList())
+
+    /** One real-time activity event (newest-first when returned). */
+    data class Event(val epochMs: Long, val category: String, val label: String)
+
     private val prefsKey = stringPreferencesKey("usage_json")
+    private val logKey = stringPreferencesKey("activity_json")
     private val mutex = Mutex()
     private var cache: MutableMap<String, Feature>? = null
+    private var logCache: ArrayDeque<LogEntry>? = null
     private var flushJob: Job? = null
 
     private suspend fun ensureLoaded(): MutableMap<String, Feature> = mutex.withLock {
@@ -59,6 +79,16 @@ class UsageRepository(
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it).features }.getOrNull() }
                 ?: emptyMap()
             HashMap(loaded).also { cache = it }
+        }
+    }
+
+    private suspend fun ensureLogLoaded(): ArrayDeque<LogEntry> = mutex.withLock {
+        logCache ?: run {
+            val raw = context.usageDataStore.data.first()[logKey]
+            val loaded = raw
+                ?.let { runCatching { json.decodeFromString(StoredLog.serializer(), it).entries }.getOrNull() }
+                ?: emptyList()
+            ArrayDeque(loaded.takeLast(LOG_CAP)).also { logCache = it }
         }
     }
 
@@ -83,6 +113,19 @@ class UsageRepository(
         }
     }
 
+    /** Append a real-time activity event. [label] is truncated and kept content-free by the caller. */
+    fun log(category: String, label: String) {
+        val cat = category.trim().lowercase().ifBlank { "event" }
+        scope.launch {
+            val buf = ensureLogLoaded()
+            mutex.withLock {
+                buf.addLast(LogEntry(System.currentTimeMillis(), cat, label.trim().take(LABEL_MAX)))
+                while (buf.size > LOG_CAP) buf.removeFirst()
+            }
+            scheduleFlush()
+        }
+    }
+
     private fun scheduleFlush() {
         flushJob?.cancel()
         flushJob = scope.launch {
@@ -92,13 +135,18 @@ class UsageRepository(
     }
 
     private suspend fun flush() {
-        val toWrite = mutex.withLock { cache?.let { Stored(HashMap(it)) } } ?: return
+        val aggregate = mutex.withLock { cache?.let { Stored(HashMap(it)) } }
+        val log = mutex.withLock { logCache?.let { StoredLog(it.toList()) } }
+        if (aggregate == null && log == null) return
         runCatching {
-            context.usageDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), toWrite) }
+            context.usageDataStore.edit { prefs ->
+                if (aggregate != null) prefs[prefsKey] = json.encodeToString(Stored.serializer(), aggregate)
+                if (log != null) prefs[logKey] = json.encodeToString(StoredLog.serializer(), log)
+            }
         }
     }
 
-    /** A point-in-time snapshot for the recommendation engine / assistant tool. */
+    /** A point-in-time snapshot of aggregates for the recommendation engine / assistant tool. */
     suspend fun snapshot(): UsageSnapshot {
         val map = ensureLoaded()
         val features = mutex.withLock {
@@ -110,13 +158,28 @@ class UsageRepository(
         )
     }
 
-    /** Forget everything recorded (the user's "reset" for usage data). */
+    /** The most recent [limit] activity events, newest first. */
+    suspend fun recentActivity(limit: Int = 40): List<Event> {
+        val buf = ensureLogLoaded()
+        return mutex.withLock {
+            buf.asReversed().take(limit).map { Event(it.t, it.cat, it.label) }
+        }
+    }
+
+    /** Forget everything recorded — both aggregates and the activity log. */
     suspend fun clear() {
-        mutex.withLock { cache = HashMap() }
-        runCatching { context.usageDataStore.edit { it.remove(prefsKey) } }
+        mutex.withLock {
+            cache = HashMap()
+            logCache = ArrayDeque()
+        }
+        runCatching {
+            context.usageDataStore.edit { it.remove(prefsKey); it.remove(logKey) }
+        }
     }
 
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
+        const val LOG_CAP = 300
+        const val LABEL_MAX = 120
     }
 }

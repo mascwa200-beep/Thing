@@ -236,6 +236,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
+            dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
@@ -302,6 +303,12 @@ class AppContainer(private val appContext: Context) {
                 }
                 result
             },
+            recordSelfChange = { note ->
+                runCatching {
+                    jarvisMemory.remember(note, dev.mascwa.pulse.data.jarvis.db.NoteSource.INFERENCE)
+                }
+                Unit
+            },
         )
     }
 
@@ -330,7 +337,9 @@ class AppContainer(private val appContext: Context) {
                 autoApply = { action -> approvalGate.apply(action) },
             ),
         ) else emptyList()
-        agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools
+        // Wrap every tool so each invocation lands in the on-device activity log (one place, all tools).
+        (agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools)
+            .map { dev.mascwa.pulse.jarvis.agent.LoggingTool(it, usageRepository) }
     }
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */

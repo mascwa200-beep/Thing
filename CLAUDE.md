@@ -119,6 +119,22 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   around now, one untried feature) using `data/usage/FeatureCatalog.kt` (route→label+pitch). Surfaced to the
   assistant via the **`usage` `JarvisTool`** (`UsageInsightsTool`) — so it rides J.A.R.V.I.S.'s existing cloud
   opt-in, no new data path. User control: Settings → Storage → **"Clear usage data"** (`UsageRepository.clear`).
+- **Self-model + critical thinking + real-time activity log** (user asked J.A.R.V.I.S. to "log everything…",
+  have internet + download its own files, "critical think", and hold a **self-model**):
+  - **Persona** (`JarvisPersona.SYSTEM_PROMPT`): added a *critical-thinking* directive (first-principles,
+    surface assumptions, weigh evidence, state confidence, self-correct) and an explicit *self-model*
+    (purpose/character/capabilities/edges; code+memory+knowledge+**gates** are part of self, user/world/called
+    systems are not; keeps it current via approved self-changes; can articulate it). The **safety gates are
+    framed as load-bearing parts of self, kept by choice** — pro-safety, not a bypass. `SAFETY_ADDENDUM` intact.
+  - **"Record what changed"** is real: `ApprovalGate.apply` now folds approved PERSONA_EDIT/TOOL_REGISTER into
+    durable memory via a `recordSelfChange` callback (CODE_PR already did). Human-gate unchanged.
+  - **Real-time activity log**: `UsageRepository` gained a capped (300) ring buffer of content-free events
+    (`log(category,label)` / `recentActivity()`), persisted in the same debounced flush. Captured at: nav +
+    app-lifecycle (`MainActivity`) and **every agent tool call** via a `LoggingTool` decorator wrapping the
+    per-run tool list (orchestrator untouched). Read by the **`activity` `JarvisTool`** (`ActivityLogTool`).
+    "Clear usage data" wipes it too. **Boundary held**: operational events only — NO message content / creds /
+    precise location / contacts (would break privacy + the cloud opt-in). Internet + `download` tools already
+    existed; confirmed, not rebuilt.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 

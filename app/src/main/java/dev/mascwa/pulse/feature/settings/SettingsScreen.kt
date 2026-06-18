@@ -573,8 +573,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
                     PrefClickable(
                         "Clear usage data",
-                        subtitle = "Forget the on-device feature-usage history (counts only) that powers " +
-                            "J.A.R.V.I.S.'s tailored tips. Never leaves your device.",
+                        subtitle = "Forget the on-device usage history & real-time activity log (feature " +
+                            "counts + recent events; no content) that power J.A.R.V.I.S.'s tailored tips. " +
+                            "Never leaves your device.",
                         onClick = { vm.clearUsageData() },
                     )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
