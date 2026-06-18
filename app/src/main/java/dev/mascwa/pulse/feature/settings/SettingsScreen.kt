@@ -117,7 +117,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         )
                         is UpdateUi.ReadyToInstall -> PrefClickable(
                             "Install now",
-                            subtitle = "Opens the system installer — you confirm the update.",
+                            subtitle = "Opens the system installer — you confirm the update. If it says " +
+                                "\"App not installed\", uninstall the old Pulse once (a one-time signing " +
+                                "change), then install — every update after that is seamless.",
                             onClick = { installApk(context, st.file) },
                         )
                         is UpdateUi.Error -> PrefClickable("Retry", onClick = { vm.downloadUpdate() })
