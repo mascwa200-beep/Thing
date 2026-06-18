@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -200,6 +201,7 @@ fun JarvisScreen(
                 onSend = vm::send,
                 onMic = onMic,
                 onSendImage = { uri, cap -> vm.sendImage(context, uri, cap) },
+                onSendFile = { uri, cap -> vm.sendFile(context, uri, cap) },
             )
         }
     }
@@ -319,6 +321,7 @@ private fun InputBar(
     onSend: (String) -> Unit,
     onMic: () -> Unit,
     onSendImage: (android.net.Uri, String) -> Unit,
+    onSendFile: (android.net.Uri, String) -> Unit,
 ) {
     val c = Pulse.colors
     var input by remember { mutableStateOf("") }
@@ -334,6 +337,13 @@ private fun InputBar(
     ) { uri ->
         if (uri != null && !busy) {
             onSendImage(uri, input)
+            input = ""
+        }
+    }
+    // Any file (PDF/text/code/image) — routed by type for J.A.R.V.I.S. to interpret.
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !busy) {
+            onSendFile(uri, input)
             input = ""
         }
     }
@@ -364,6 +374,9 @@ private fun InputBar(
                     unfocusedTextColor = c.ink,
                 ),
             )
+            IconButton(onClick = { pickFile.launch("*/*") }, enabled = !busy) {
+                Icon(Icons.Filled.AttachFile, contentDescription = "Attach a file for J.A.R.V.I.S. to interpret", tint = if (busy) c.muted else c.sky)
+            }
             IconButton(
                 onClick = {
                     pickImage.launch(
