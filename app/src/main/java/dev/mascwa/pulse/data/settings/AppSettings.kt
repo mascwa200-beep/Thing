@@ -305,25 +305,41 @@ data class AppSettings(
 /** Sensible International defaults for first launch. */
 object DefaultData {
     val watchlist = listOf(
+        // Indices
         WatchItem("^spx", "S&P 500", WatchType.INDEX),
         WatchItem("^ndq", "Nasdaq 100", WatchType.INDEX),
         WatchItem("^dji", "Dow Jones", WatchType.INDEX),
+        WatchItem("^rut", "Russell 2000", WatchType.INDEX),
         WatchItem("^ftm", "FTSE 100", WatchType.INDEX),
         WatchItem("^dax", "DAX", WatchType.INDEX),
+        WatchItem("^cac", "CAC 40", WatchType.INDEX),
         WatchItem("^nkx", "Nikkei 225", WatchType.INDEX),
+        WatchItem("^hsi", "Hang Seng", WatchType.INDEX),
+        WatchItem("^vix", "VIX", WatchType.INDEX),
+        // Stocks
         WatchItem("aapl.us", "Apple", WatchType.STOCK),
         WatchItem("msft.us", "Microsoft", WatchType.STOCK),
         WatchItem("nvda.us", "NVIDIA", WatchType.STOCK),
         WatchItem("googl.us", "Alphabet", WatchType.STOCK),
+        WatchItem("amzn.us", "Amazon", WatchType.STOCK),
+        WatchItem("meta.us", "Meta", WatchType.STOCK),
+        WatchItem("tsla.us", "Tesla", WatchType.STOCK),
+        // FX
         WatchItem("eurusd", "EUR/USD", WatchType.FOREX),
         WatchItem("gbpusd", "GBP/USD", WatchType.FOREX),
+        WatchItem("usdjpy", "USD/JPY", WatchType.FOREX),
+        // Commodities
         WatchItem("gc.f", "Gold", WatchType.COMMODITY),
+        WatchItem("si.f", "Silver", WatchType.COMMODITY),
         WatchItem("cl.f", "Crude Oil (WTI)", WatchType.COMMODITY),
+        WatchItem("cb.f", "Brent", WatchType.COMMODITY),
     )
     val crypto = listOf(
         WatchItem("bitcoin", "Bitcoin", WatchType.CRYPTO),
         WatchItem("ethereum", "Ethereum", WatchType.CRYPTO),
         WatchItem("solana", "Solana", WatchType.CRYPTO),
         WatchItem("ripple", "XRP", WatchType.CRYPTO),
+        WatchItem("binancecoin", "BNB", WatchType.CRYPTO),
+        WatchItem("dogecoin", "Dogecoin", WatchType.CRYPTO),
     )
 }
