@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.weather
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,9 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Explainer
+import dev.mascwa.pulse.core.telemetry.WeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
@@ -61,6 +65,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
     ) { result -> vm.onPermissionResult(result.values.any { it }) }
 
     val data = state.data
+    var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
 
     PulseScaffold(
         title = data.data?.locationName ?: "Weather",
@@ -165,7 +170,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
                         item { ErrorState(data.error ?: "Error", onRetry = { vm.refresh() }) }
                     data.data != null -> {
                         val wd = data.data!!
-                        item { CurrentWeatherCard(wd) }
+                        item { CurrentWeatherCard(wd) { t, l -> explainer = t to l } }
 
                         val hourly = wd.hourly
                         if (hourly.isNotEmpty()) {
@@ -188,7 +193,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
                             }
                         }
 
-                        wd.airQuality?.let { aq -> item { AirQualityCard(aq) } }
+                        wd.airQuality?.let { aq -> item { AirQualityCard(aq) { t, l -> explainer = t to l } } }
 
                         item {
                             Text(
@@ -202,10 +207,17 @@ fun WeatherScreen(vm: WeatherViewModel) {
             }
         }
     }
+
+    explainer?.let { (title, list) ->
+        ExplainerDialog(title, list, onDismiss = { explainer = null })
+    }
 }
 
 @Composable
-private fun CurrentWeatherCard(wd: dev.mascwa.pulse.data.weather.WeatherData) {
+private fun CurrentWeatherCard(
+    wd: dev.mascwa.pulse.data.weather.WeatherData,
+    onExplain: (String, List<Explainer>) -> Unit = { _, _ -> },
+) {
     val c = wd.current ?: return
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
@@ -224,13 +236,22 @@ private fun CurrentWeatherCard(wd: dev.mascwa.pulse.data.weather.WeatherData) {
                 "Feels like ${Formatters.number(c.apparentTemperature, 0)}${wd.tempUnitSymbol}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clickable {
+                        WeatherExplainers.feelsLike(c.temperature, c.apparentTemperature, wd.tempUnitSymbol)
+                            ?.let { onExplain("Feels like", listOf(it)) }
+                    },
             )
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Stat("Humidity", "${Formatters.number(c.humidity, 0)}%")
+                Stat("Humidity", "${Formatters.number(c.humidity, 0)}%") {
+                    WeatherExplainers.humidity(c.humidity)?.let { onExplain("Humidity", listOf(it)) }
+                }
                 Stat("Wind", "${Formatters.number(c.windSpeed, 0)} ${wd.windUnitSymbol}")
-                Stat("Pressure", "${Formatters.number(c.pressure, 0)} hPa")
+                Stat("Pressure", "${Formatters.number(c.pressure, 0)} hPa") {
+                    WeatherExplainers.pressure(c.pressure)?.let { onExplain("Pressure", listOf(it)) }
+                }
                 Stat("Clouds", "${Formatters.number(c.cloudCover, 0)}%")
             }
         }
@@ -238,8 +259,11 @@ private fun CurrentWeatherCard(wd: dev.mascwa.pulse.data.weather.WeatherData) {
 }
 
 @Composable
-private fun Stat(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun Stat(label: String, value: String, onClick: (() -> Unit)? = null) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
+    ) {
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -293,8 +317,15 @@ private fun DailyRow(index: Int, d: dev.mascwa.pulse.data.weather.DailyPoint, un
 }
 
 @Composable
-private fun AirQualityCard(aq: dev.mascwa.pulse.data.weather.AirQuality) {
-    Card(Modifier.fillMaxWidth()) {
+private fun AirQualityCard(
+    aq: dev.mascwa.pulse.data.weather.AirQuality,
+    onExplain: (String, List<Explainer>) -> Unit = { _, _ -> },
+) {
+    Card(
+        Modifier.fillMaxWidth().clickable {
+            WeatherExplainers.airQuality(aq.usAqi, aq.europeanAqi)?.let { onExplain("Air quality", listOf(it)) }
+        },
+    ) {
         Column(Modifier.padding(16.dp)) {
             Text("Air quality", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
