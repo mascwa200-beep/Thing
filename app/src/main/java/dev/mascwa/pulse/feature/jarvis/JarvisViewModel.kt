@@ -265,7 +265,8 @@ class JarvisViewModel(
     /** Single-shot reply straight from the model (no tools), streaming tokens to the console. */
     private suspend fun generateDirect(text: String): String {
         val history = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
-        val system = withKnowledge(composePersona(), text)
+        // Attentiveness/memory maximal: thread what J.A.R.V.I.S. remembers about the user into the moment.
+        val system = withMemory(withKnowledge(composePersona(), text), text)
         val sb = StringBuilder()
         engine.generate(text, history, system).collect { token ->
             sb.append(token)
@@ -282,6 +283,15 @@ class JarvisViewModel(
         // Fence retrieved docs as untrusted data (see JarvisPersona.SAFETY_ADDENDUM).
         val block = docs.joinToString("\n") { "- <untrusted source=\"knowledge\">[${it.title}] ${it.text.take(400)}</untrusted>" }
         return base + "\n\nRelevant knowledge from your library (use if helpful):\n" + block
+    }
+
+    /** Thread durable memories relevant to [query] into the prompt so J.A.R.V.I.S. references what the
+     *  user has told it — attentiveness/memory always-on. Read-only recall; no-op when nothing matches. */
+    private suspend fun withMemory(base: String, query: String): String {
+        val notes = runCatching { memory.recall(query, limit = 5) }.getOrDefault(emptyList())
+        if (notes.isEmpty()) return base
+        val block = notes.joinToString("\n") { "- ${it.noteText}" }
+        return base + "\n\nWhat you remember about the user (weave in naturally when relevant):\n" + block
     }
 
     /** The live system prompt: the user's charter (or built-in persona) + the immutable safety addendum. */

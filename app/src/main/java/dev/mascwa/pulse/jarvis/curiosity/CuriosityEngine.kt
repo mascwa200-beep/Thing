@@ -33,15 +33,23 @@ class CuriosityEngine(
         if (level <= 0) return null
         if (engine.state.value !is EngineState.Ready) return null
 
-        // Rate-limit: count turns since the last ask and require both a turn gap and a time gap.
         val turns = (memory.getState(KEY_TURNS)?.toIntOrNull() ?: 0) + 1
         val lastAsk = memory.getState(KEY_LAST_ASK)?.toLongOrNull() ?: 0L
-        val (minTurns, minIntervalMs) = when (level) {
-            3 -> 2 to 20 * 60_000L
-            2 -> 3 to 2 * 60 * 60_000L
-            else -> 6 to 6 * 60 * 60_000L
-        }
-        if (turns < minTurns || now - lastAsk < minIntervalMs) {
+
+        // Decouple intensity from interruption (the JARVIS character): levels 1–3 share the SAME hard
+        // time cap + daily cap, so the question rate stays low and courteous no matter the level. A
+        // higher level only lowers the turn-gap (readiness) and deepens attention — better-timed SINGLE
+        // questions, not more of them. MAX (4) deliberately relaxes the cap (breaks character; gated +
+        // warned in the UI).
+        val turnGap = when (level) { 4 -> 1; 3 -> 3; 2 -> 5; else -> 8 }
+        val minIntervalMs = if (level >= 4) MAX_MIN_INTERVAL_MS else HARD_MIN_INTERVAL_MS
+        val dailyCap = if (level >= 4) MAX_DAILY_CAP else HARD_DAILY_CAP
+
+        val today = now / DAY_MS
+        val sameDay = memory.getState(KEY_DAY)?.toLongOrNull() == today
+        val count = if (sameDay) (memory.getState(KEY_COUNT)?.toIntOrNull() ?: 0) else 0
+
+        if (count >= dailyCap || turns < turnGap || now - lastAsk < minIntervalMs) {
             memory.setState(KEY_TURNS, turns.toString())
             return null
         }
@@ -53,9 +61,11 @@ class CuriosityEngine(
             memory.setState(KEY_TURNS, turns.toString()) // keep counting; try again next turn
             return null
         }
-        // Commit the schedule + remember we asked it (so we don't repeat).
+        // Commit the schedule (turn counter, time cap, daily cap) + remember we asked it.
         memory.setState(KEY_TURNS, "0")
         memory.setState(KEY_LAST_ASK, now.toString())
+        memory.setState(KEY_DAY, today.toString())
+        memory.setState(KEY_COUNT, (count + 1).toString())
         recordAsked(question)
         return question
     }
@@ -92,10 +102,12 @@ class CuriosityEngine(
             (if (it.role.equals("user", true)) "User: " else "J.A.R.V.I.S.: ") + it.text.trim()
         }
         val known = knownDigest(recentTurns)
-        val sys = "You are J.A.R.V.I.S., a personal assistant getting to know your user. Propose AT MOST ONE " +
-            "short, natural question to learn something genuinely useful about the user that you don't " +
-            "already know and that fits the conversation. Never repeat anything already known. If there's " +
-            "nothing worth asking, output exactly: NONE. Output only the question (or NONE)."
+        val sys = "You are J.A.R.V.I.S. — precise, courteous and understated, and you pay very close " +
+            "attention. From the conversation and what you already know, infer ONE salient thing about the " +
+            "user you are not yet certain of, and ask a SINGLE anticipatory question to CONFIRM that " +
+            "inference — never a blank or generic prompt; it should feel like you were already paying " +
+            "attention. Phrase it warmly and in character, e.g. \"If I may, sir — I gather you're using X " +
+            "for Y. Is that right?\". One question only. If nothing is worth confirming, output exactly: NONE."
         val user = buildString {
             append("Recent conversation:\n").append(convo).append("\n\n")
             append("What you already know about the user:\n").append(known.ifBlank { "(nothing yet)" })
@@ -116,8 +128,9 @@ class CuriosityEngine(
             .filter { it.source == NoteSource.LEARNED && it.id.toString() !in revisited }
             .minByOrNull { it.timestamp } ?: return null // oldest not-yet-revisited learned fact
         memory.setState(KEY_REVISITED, (revisited + note.id.toString()).filter { it.isNotBlank() }.takeLast(50).joinToString("\n"))
-        val sys = "You are J.A.R.V.I.S. Ask the user ONE brief, warm follow-up question that references this " +
-            "fact you remember about them. Output only the question."
+        val sys = "You are J.A.R.V.I.S. — courteous and understated. Ask ONE brief, warm follow-up that " +
+            "references this fact you remember about the user, e.g. \"If I recall, sir, you mentioned X — " +
+            "how is that coming along?\". One question only; output only the question."
         val raw = engine.generate("Fact you remember: ${note.noteText}", emptyList(), sys).toList().joinToString("").trim().trim('"')
         return raw.lines().firstOrNull { it.isNotBlank() }?.takeIf { it.length in 3..200 && !it.startsWith("//") }
     }
@@ -154,6 +167,16 @@ class CuriosityEngine(
         const val KEY_LAST_ASK = "curiosity_last_ask"
         const val KEY_ASKED = "curiosity_asked"
         const val KEY_REVISITED = "curiosity_revisited"
+        const val KEY_DAY = "curiosity_day"
+        const val KEY_COUNT = "curiosity_count"
+        const val DAY_MS = 24 * 60 * 60_000L
+        // Hard cap shared by Low/Med/High so it can never become an interrogation (JARVIS character):
+        // at most one question per 45 min and a handful per day, regardless of level.
+        const val HARD_MIN_INTERVAL_MS = 45 * 60_000L
+        const val HARD_DAILY_CAP = 6
+        // MAX level only — deliberately frequent (breaks character); gated + warned in the UI.
+        const val MAX_MIN_INTERVAL_MS = 4 * 60_000L
+        const val MAX_DAILY_CAP = 200
         val AFFIRM = listOf("yes", "yeah", "yep", "yup", "sure", "ok", "okay", "correct", "right", "indeed", "exactly", "save", "keep", "do")
         val REJECT = listOf("no", "nope", "nah", "discard", "forget", "skip", "cancel", "wrong", "incorrect", "don't")
         val QUESTION_STARTS = listOf("what", "why", "how", "when", "where", "who", "which", "can", "could", "tell", "show", "set", "open", "play", "call", "text", "search", "status", "brief", "lockdown")

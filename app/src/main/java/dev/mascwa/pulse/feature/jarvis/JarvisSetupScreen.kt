@@ -228,14 +228,23 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
-            FieldLabel("CURIOSITY  ·  how often J.A.R.V.I.S. asks to learn about you")
+            FieldLabel("CURIOSITY  ·  J.A.R.V.I.S. attentiveness")
             CuriositySelector(selected = curiosityLevel, onSelect = vm::setCuriosityLevel)
             Text(
-                "When curious, J.A.R.V.I.S. occasionally asks one question to fill a genuine gap, reflects " +
-                    "your answer back to confirm, then remembers it (manage saved facts in MEMORY). " +
-                    "Strictly rate-limited; OFF disables it.",
+                "J.A.R.V.I.S. always pays close attention and remembers what matters. It asks rarely and " +
+                    "only at natural lulls — one courteous, anticipatory question to confirm something it " +
+                    "inferred, reflected back before it's saved (manage facts in MEMORY). Higher = deeper " +
+                    "attention and better-timed questions, NOT more of them; the rate is hard-capped. " +
+                    "OFF disables questions.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
+            if (curiosityLevel >= 4) {
+                Text(
+                    "⚠ MAX removes the rate cap — frequent questions that break the J.A.R.V.I.S. character. " +
+                        "Use LOW/MED/HIGH for the intended, restrained feel.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.magenta,
+                )
+            }
 
             SettingToggle(
                 title = "VOICE REPLIES",
@@ -493,7 +502,7 @@ private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun CuriositySelector(selected: Int, onSelect: (Int) -> Unit) {
     val c = Pulse.colors
-    val options = listOf(0 to "OFF", 1 to "LOW", 2 to "MED", 3 to "HIGH")
+    val options = listOf(0 to "OFF", 1 to "LOW", 2 to "MED", 3 to "HIGH", 4 to "MAX")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (value, label) ->
             val on = value == selected

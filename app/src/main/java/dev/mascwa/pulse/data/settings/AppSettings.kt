@@ -158,7 +158,7 @@ data class JarvisSettings(
      *  set, chat + the agent loop call the provider — chat text leaves the device. Voice stays local. */
     val cloudEnabled: Boolean = false,
     /** Which cloud provider's OpenAI-compatible endpoint to call. */
-    val cloudProvider: CloudProvider = CloudProvider.GEMINI,
+    val cloudProvider: CloudProvider = CloudProvider.OPENROUTER,
     /** API key for [cloudProvider] (get one at its keyUrl). Stays on-device in settings. */
     val cloudApiKey: String = "",
     /** Optional model override; blank uses the provider's default model. */
