@@ -223,8 +223,8 @@ data class AppSettings(
     val highContrast: Boolean = false,
     val accentColor: AccentColor = AccentColor.CYAN,
     val amoledBlack: Boolean = false,                 // true-black surfaces
-    val scanlines: Boolean = true,                    // CRT scanline overlay
-    val glitch: Boolean = true,                       // chromatic glitch FX
+    val scanlines: Boolean = false,                   // CRT scanline overlay (off: clean 2077-HUD look, lighter)
+    val glitch: Boolean = false,                      // chromatic glitch FX (off by default: no jank, less GPU/RAM)
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
     val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
