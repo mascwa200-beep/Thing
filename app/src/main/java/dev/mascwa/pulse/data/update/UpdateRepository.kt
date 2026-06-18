@@ -40,18 +40,22 @@ class UpdateRepository(context: Context, private val http: HttpClient) {
     val currentVersionCode: Int get() = BuildConfig.VERSION_CODE
     val currentVersionName: String get() = BuildConfig.VERSION_NAME
 
-    /** Returns an [UpdateInfo] when the `latest` release is a higher build than this one, else null. */
-    suspend fun check(): UpdateInfo? = runCatching {
+    /**
+     * Returns an [UpdateInfo] when the `latest` release is a higher build than this one, or null when
+     * we're already current / the release can't be parsed. **Throws** on a network/HTTP failure so the
+     * caller can distinguish "up to date" from "couldn't reach the server".
+     */
+    suspend fun check(): UpdateInfo? {
         // The release is a prerelease, so /releases/latest won't return it — fetch it by its tag.
         val rel = http.getJson("$API/releases/tags/$TAG", GhRelease.serializer())
         val code = BUILD_NUM.find(rel.name)?.groupValues?.getOrNull(1)?.toIntOrNull()
             ?: BUILD_NUM.find(rel.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: return@runCatching null
-        if (code <= BuildConfig.VERSION_CODE) return@runCatching null
+            ?: return null
+        if (code <= BuildConfig.VERSION_CODE) return null
         val apk = rel.assets.firstOrNull { it.browser_download_url.endsWith(".apk", ignoreCase = true) }
-            ?.browser_download_url ?: return@runCatching null
-        UpdateInfo(code, "1.0.$code", rel.body.ifBlank { rel.name }, apk)
-    }.getOrNull()
+            ?.browser_download_url ?: return null
+        return UpdateInfo(code, "1.0.$code", rel.body.ifBlank { rel.name }, apk)
+    }
 
     /** Stream the APK to cache, reporting 0..100 progress. Returns the file. */
     suspend fun download(url: String, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {

@@ -51,8 +51,10 @@ class SettingsViewModel(
         if (_update.value is UpdateUi.Checking || _update.value is UpdateUi.Downloading) return
         _update.value = UpdateUi.Checking
         viewModelScope.launch {
-            val info = runCatching { updates.check() }.getOrNull()
-            _update.value = if (info == null) UpdateUi.UpToDate else UpdateUi.Available(info)
+            _update.value = runCatching { updates.check() }.fold(
+                onSuccess = { info -> if (info == null) UpdateUi.UpToDate else UpdateUi.Available(info) },
+                onFailure = { UpdateUi.Error("Couldn't reach the update server — check your connection, sir.") },
+            )
         }
     }
 

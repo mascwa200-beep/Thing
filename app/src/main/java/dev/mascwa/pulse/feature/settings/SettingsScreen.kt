@@ -104,7 +104,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         "Check for updates",
                         value = "v${vm.installedVersion}",
                         subtitle = status,
-                        onClick = { vm.checkForUpdate() },
+                        onClick = {
+                            android.widget.Toast.makeText(context, "Checking for updates…", android.widget.Toast.LENGTH_SHORT).show()
+                            vm.checkForUpdate()
+                        },
                     )
                     when (val st = u) {
                         is UpdateUi.Available -> PrefClickable(
