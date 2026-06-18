@@ -177,6 +177,7 @@ class MarketsRepository(
             "^dji" to "^DJI",
             "^ftm" to "^FTSE",
             "^dax" to "^GDAXI",
+            "^cac" to "^FCHI",
             "^nkx" to "^N225",
             "cb.f" to "BZ=F", // Brent
         )
