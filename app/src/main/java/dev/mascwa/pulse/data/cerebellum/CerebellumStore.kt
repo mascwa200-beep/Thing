@@ -117,6 +117,7 @@ class CerebellumStore(
 
     /** Forget all learned skills. */
     suspend fun clear() {
+        flushJob?.cancel() // so a buffered write can't resurrect cleared skills after this returns
         mutex.withLock {
             state = CerebellumState.EMPTY
             lastAction = null
@@ -124,8 +125,15 @@ class CerebellumStore(
         runCatching { context.cerebellumDataStore.edit { it.remove(prefsKey) } }
     }
 
-    private fun scheduleFlush() {
+    /** Force buffered changes to disk now (e.g. on app stop). */
+    suspend fun flushNow() {
         flushJob?.cancel()
+        flush()
+    }
+
+    /** Trailing throttle (see UsageRepository): one flush per window, never deferred indefinitely. */
+    private fun scheduleFlush() {
+        if (flushJob?.isActive == true) return
         flushJob = scope.launch {
             delay(FLUSH_DELAY_MS)
             flush()

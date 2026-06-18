@@ -40,7 +40,10 @@ The user verifies on-device; there is **no Android SDK locally — CI is the com
   OpenAI-compatible, default **OpenRouter** `gpt-4o-mini`) when a key is set, else `IsolatedInferenceEngine`
   (MediaPipe in a `:inference` process) → `EchoInferenceEngine`. `ChatFormat.renderPrompt` budgets input
   tokens (fixed a long-chat native crash). Capabilities: **`ToolCallingEngine`** (native function-calling,
-  cloud), **`VisionEngine`** (image/PDF analysis, cloud). `maxTokens` is the TOTAL budget.
+  cloud), **`VisionEngine`** (image/PDF analysis, cloud). `maxTokens` is the TOTAL budget; it's also sent
+  as the cloud `max_tokens` (in `CloudConfig`) so credit-metered providers (OpenRouter) don't reserve the
+  model's full output and **402** on a small balance. Editable in J.A.R.V.I.S. Setup ("Model max tokens")
+  alongside a per-provider **"Check your balance"** link (`CloudProvider.creditsUrl`).
 - **Agent loop** (`jarvis/agent/AgentOrchestrator.kt`): native tool-calling on the cloud path (reliable),
   text-ReAct fallback on-device. Threads recent conversation (short-term memory). Tools = `JarvisTool`
   registry in `AppContainer.agentTools` (+ self-edit tools when `selfEditEnabled`, + `code`/`selfcode` when

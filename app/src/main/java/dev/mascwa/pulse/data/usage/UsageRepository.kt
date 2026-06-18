@@ -137,12 +137,21 @@ class UsageRepository(
         return out
     }
 
+    /** Trailing throttle: arm one flush per window. Unlike cancel-and-reschedule, a sustained burst
+     *  still flushes every [FLUSH_DELAY_MS] instead of being deferred indefinitely (which would lose
+     *  the whole burst on a process kill). */
     private fun scheduleFlush() {
-        flushJob?.cancel()
+        if (flushJob?.isActive == true) return
         flushJob = scope.launch {
             delay(FLUSH_DELAY_MS)
             flush()
         }
+    }
+
+    /** Force buffered changes to disk now (e.g. on app stop). */
+    suspend fun flushNow() {
+        flushJob?.cancel()
+        flush()
     }
 
     private suspend fun flush() {
@@ -179,6 +188,7 @@ class UsageRepository(
 
     /** Forget everything recorded — both aggregates and the activity log. */
     suspend fun clear() {
+        flushJob?.cancel() // so a buffered write can't resurrect cleared data after this returns
         mutex.withLock {
             cache = HashMap()
             logCache = ArrayDeque()

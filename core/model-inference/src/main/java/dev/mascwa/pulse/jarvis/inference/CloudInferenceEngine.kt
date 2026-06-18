@@ -28,11 +28,13 @@ enum class CloudProvider(
     val baseUrl: String,
     val defaultModel: String,
     val keyUrl: String,
+    /** Where to check/top-up a prepaid balance, for credit-metered providers (blank = free-tier). */
+    val creditsUrl: String = "",
 ) {
     GEMINI("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash", "https://aistudio.google.com/apikey"),
     GROQ("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", "https://console.groq.com/keys"),
-    OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4o-mini", "https://openrouter.ai/keys"),
-    OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys"),
+    OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4o-mini", "https://openrouter.ai/keys", "https://openrouter.ai/credits"),
+    OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys", "https://platform.openai.com/settings/organization/billing/overview"),
 }
 
 /** A resolved cloud config for one generation; null means cloud is off / no key set. */
