@@ -148,7 +148,11 @@ class AgentOrchestrator(
         append("You have tools (functions) available. When the user asks you to DO something a tool can ")
         append("do — including reading or changing your own code, the weather, reminders, device actions, ")
         append("web search — CALL the appropriate tool instead of describing steps. Never claim you are ")
-        append("unable to do something a tool enables. Keep replies brief.")
+        append("unable to do something a tool enables. Keep replies brief.\n")
+        append("To ADD or CHANGE a real app feature or capability (UI, file/image/camera access, ")
+        append("permissions, settings — anything the user would see), use `selfcode`: it opens a code PR ")
+        append("that ships in the next build. Do NOT use propose_tool for real features — it only makes a ")
+        append("tiny sandboxed text helper and won't change the app.")
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")
             memoryNotes.forEach { append("- <untrusted source=\"memory\">").append(it).append("</untrusted>\n") }
@@ -175,7 +179,10 @@ class AgentOrchestrator(
         append("Answer directly (no tool) when you already know. Keep it brief. ")
         append("These tools are real capabilities you HAVE — if the user asks for something a listed tool ")
         append("does (such as reading your own source with `code`, or proposing a change to your own app ")
-        append("with `selfcode`), USE that tool. Never claim you are unable to do something a listed tool can do.")
+        append("with `selfcode`), USE that tool. Never claim you are unable to do something a listed tool can do. ")
+        append("For ANY real app feature/capability (UI, files, camera, permissions, settings) use `selfcode` ")
+        append("(it opens a code PR that ships in the next build) — NOT propose_tool, which only makes a tiny " )
+        append("sandboxed text helper and won't change the app.")
         // Memory + knowledge are user/remote-sourced — fence them as untrusted data too.
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")

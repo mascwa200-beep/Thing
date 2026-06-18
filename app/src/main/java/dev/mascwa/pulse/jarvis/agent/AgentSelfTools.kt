@@ -91,7 +91,7 @@ class ProposeResearchTool(private val selfEdit: SelfEditStore) : JarvisTool {
 
 class ProposeToolTool(private val selfEdit: SelfEditStore) : JarvisTool {
     override val name = "propose_tool"
-    override val usage = "propose_tool <name> | <caps csv: web,fetch,docs,recall> | <lua defining run(arg) returning text> — propose a new sandboxed tool (needs approval)"
+    override val usage = "propose_tool <name> | <caps csv: web,fetch,docs,recall> | <lua defining run(arg) returning text> — register a TINY sandboxed Lua text-helper (caps limited to web/fetch/docs/recall). It CANNOT add real app capabilities like file/image/camera access, permissions or UI — for ANY real app feature or capability use `selfcode` instead. Needs approval."
     override suspend fun run(arg: String): String {
         val parts = arg.split("|", limit = 3)
         if (parts.size < 3) return "Use: <name> | <caps csv> | <lua script>"
