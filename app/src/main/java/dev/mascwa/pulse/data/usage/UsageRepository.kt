@@ -113,17 +113,28 @@ class UsageRepository(
         }
     }
 
-    /** Append a real-time activity event. [label] is truncated and kept content-free by the caller. */
+    /**
+     * Append a real-time activity event. [label] may contain user content (when detailed logging is on);
+     * raw credentials are always scrubbed here as a last line of defence, then it's truncated.
+     */
     fun log(category: String, label: String) {
         val cat = category.trim().lowercase().ifBlank { "event" }
         scope.launch {
             val buf = ensureLogLoaded()
             mutex.withLock {
-                buf.addLast(LogEntry(System.currentTimeMillis(), cat, label.trim().take(LABEL_MAX)))
+                buf.addLast(LogEntry(System.currentTimeMillis(), cat, scrubSecrets(label.trim()).take(LABEL_MAX)))
                 while (buf.size > LOG_CAP) buf.removeFirst()
             }
             scheduleFlush()
         }
+    }
+
+    /** Mask anything that looks like an API key / token, so a credential is never persisted even when
+     *  full-content logging is on. Targeted to known key shapes to avoid mangling ordinary text. */
+    private fun scrubSecrets(s: String): String {
+        var out = s
+        for (p in SECRET_PATTERNS) out = p.replace(out, "[redacted]")
+        return out
     }
 
     private fun scheduleFlush() {
@@ -180,6 +191,15 @@ class UsageRepository(
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
         const val LOG_CAP = 300
-        const val LABEL_MAX = 120
+        const val LABEL_MAX = 200
+
+        /** Known API-key / token shapes (OpenAI, GitHub, Google, Slack) + Bearer headers. */
+        val SECRET_PATTERNS = listOf(
+            Regex("(?i)\\bbearer\\s+[A-Za-z0-9._\\-]{10,}"),
+            Regex("\\bsk-[A-Za-z0-9]{16,}"),
+            Regex("\\bgh[pousr]_[A-Za-z0-9]{16,}"),
+            Regex("\\bAIza[0-9A-Za-z_\\-]{20,}"),
+            Regex("\\bxox[baprs]-[A-Za-z0-9\\-]{10,}"),
+        )
     }
 }

@@ -132,9 +132,14 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     (`log(category,label)` / `recentActivity()`), persisted in the same debounced flush. Captured at: nav +
     app-lifecycle (`MainActivity`) and **every agent tool call** via a `LoggingTool` decorator wrapping the
     per-run tool list (orchestrator untouched). Read by the **`activity` `JarvisTool`** (`ActivityLogTool`).
-    "Clear usage data" wipes it too. **Boundary held**: operational events only — NO message content / creds /
-    precise location / contacts (would break privacy + the cloud opt-in). Internet + `download` tools already
-    existed; confirmed, not rebuilt.
+    "Clear usage data" wipes it too. Internet + `download` tools already existed; confirmed, not rebuilt.
+  - **Full-content logging** (user explicitly chose "full content incl. cloud" via AskUserQuestion, for their
+    own single-user app): `JarvisSettings.verboseActivityLog` (**default ON**) makes the log capture chat
+    messages (`JarvisViewModel.logChat` on in/out) + tool-call args (`LoggingTool` verbose); the `activity`
+    tool can surface it to the cloud brain when cloud chat is on. **Tiny safety core kept**: `UsageRepository`
+    centrally **scrubs raw credentials** (OpenAI/GitHub/Google/Slack key shapes + Bearer) from every logged
+    label — a leaked key is transferable harm. Toggle: Settings → Storage → "Detailed activity log" (off =
+    operational-only). This is the one place the app logs user content; everything else stays aggregated.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 

@@ -571,11 +571,18 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    PrefSwitch(
+                        "Detailed activity log",
+                        "Log full content — your messages and the assistant's tool-call inputs — to the " +
+                            "on-device activity log, which your cloud brain can read when cloud chat is on. " +
+                            "Raw API keys & tokens are always scrubbed. Off = operational events only (no content).",
+                        checked = s.jarvis.verboseActivityLog,
+                        onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(verboseActivityLog = v)) } },
+                    )
                     PrefClickable(
                         "Clear usage data",
-                        subtitle = "Forget the on-device usage history & real-time activity log (feature " +
-                            "counts + recent events; no content) that power J.A.R.V.I.S.'s tailored tips. " +
-                            "Never leaves your device.",
+                        subtitle = "Forget the on-device usage history & real-time activity log that power " +
+                            "J.A.R.V.I.S.'s tailored tips and self-awareness. Never leaves your device.",
                         onClick = { vm.clearUsageData() },
                     )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",

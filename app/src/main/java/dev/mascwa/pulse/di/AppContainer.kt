@@ -338,8 +338,9 @@ class AppContainer(private val appContext: Context) {
             ),
         ) else emptyList()
         // Wrap every tool so each invocation lands in the on-device activity log (one place, all tools).
+        val verboseLog = runCatching { settingsRepository.current().jarvis.verboseActivityLog }.getOrDefault(true)
         (agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools)
-            .map { dev.mascwa.pulse.jarvis.agent.LoggingTool(it, usageRepository) }
+            .map { dev.mascwa.pulse.jarvis.agent.LoggingTool(it, usageRepository, verboseLog) }
     }
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */
