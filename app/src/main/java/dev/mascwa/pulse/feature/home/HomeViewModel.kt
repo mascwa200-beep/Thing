@@ -49,6 +49,8 @@ data class HomeUiState(
     val radar: Async<RadarData> = Async(loading = true),
     /** Staged self-code changes awaiting the user's approval (nudge on the home assistant card). */
     val pendingCode: Int = 0,
+    /** Tailored "for you" recommendations from on-device usage (empty until a pattern forms). */
+    val recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation> = emptyList(),
 )
 
 class HomeViewModel(
@@ -63,6 +65,7 @@ class HomeViewModel(
     private val space: SpaceWeatherRepository,
     private val radar: RadarRepository,
     private val selfEdit: SelfEditStore,
+    private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -86,6 +89,18 @@ class HomeViewModel(
             val s = settings.current()
             val sections = s.homeSections
             _state.update { it.copy(sections = sections, jarvisStatus = jarvisStatus(s)) }
+
+            // Tailored "for you" recommendations from on-device usage (no network).
+            launch {
+                val recs = runCatching {
+                    val snap = usage.snapshot()
+                    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                    dev.mascwa.pulse.core.telemetry.UsageInsights.recommend(
+                        snap, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
+                    )
+                }.getOrDefault(emptyList())
+                _state.update { it.copy(recommendations = recs) }
+            }
 
             // Above-the-fold first (instant from cache, snappier cold start)…
             if (HomeSection.HEADLINES in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TOP, f) }) { st, a -> st.copy(headlines = a) }

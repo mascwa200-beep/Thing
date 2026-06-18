@@ -74,6 +74,8 @@ class HomeNav(
     val openAssistant: () -> Unit = {},
     val openRadar: () -> Unit = {},
     val openSpaceWeather: () -> Unit = {},
+    /** Open any feature by its nav route (for tailored "for you" recommendations). */
+    val openRoute: (String) -> Unit = {},
 )
 
 private data class FeedChip(val label: String, val key: String)
@@ -162,6 +164,11 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
 
                 // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
                 item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
+
+                // Tailored "for you" recommendations from on-device usage (hidden until a pattern forms).
+                if (state.recommendations.isNotEmpty()) {
+                    item { ForYouCard(state.recommendations, nav.openRoute) }
+                }
 
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
@@ -401,6 +408,38 @@ private fun SkyDigestCard(lines: List<String>, onClick: () -> Unit = {}) {
                     ln, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
                     modifier = Modifier.padding(top = 5.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForYouCard(
+    recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation>,
+    openRoute: (String) -> Unit,
+) {
+    val c = Pulse.colors
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp),
+        corners = true,
+        borderColor = c.accent.copy(alpha = 0.5f),
+    ) {
+        Column {
+            DecryptText(
+                text = "FOR YOU  ▸",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.accent,
+            )
+            recommendations.forEach { rec ->
+                val rk = rec.routeKey
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(if (rk != null) Modifier.clickable { openRoute(rk) } else Modifier)
+                        .padding(top = 6.dp),
+                ) {
+                    Text(rec.headline, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+                    Text(rec.detail, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                }
             }
         }
     }

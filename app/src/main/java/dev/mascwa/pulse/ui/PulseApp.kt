@@ -144,6 +144,10 @@ fun PulseApp(
                         openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
                         openRadar = { navController.navigate(Routes.RADAR) { launchSingleTop = true } },
                         openSpaceWeather = { navController.navigate(Routes.SPACE_WX) { launchSingleTop = true } },
+                        openRoute = { route ->
+                            if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
+                            else navController.navigate(route) { launchSingleTop = true }
+                        },
                     ),
                 )
             }
