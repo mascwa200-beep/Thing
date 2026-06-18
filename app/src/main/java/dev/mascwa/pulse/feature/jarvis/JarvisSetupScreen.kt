@@ -176,8 +176,9 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             Text(
                 "Provision a local reasoning model. The file streams straight to this " +
                     "device's private storage and never leaves it — no account, no Google " +
-                    "services. Point me at a MediaPipe-compatible .task LLM (e.g. a Gemma " +
-                    ".task hosted on Hugging Face).",
+                    "services. Needs a MediaPipe/LiteRT bundle — a .task or .litertlm file (e.g. a " +
+                    "Gemma/Qwen/Phi .task on Hugging Face). Raw PyTorch/safetensors repos (e.g. " +
+                    "EleutherAI GPT-Neo) won't load — they aren't .task and the architecture isn't supported.",
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
             )
 
