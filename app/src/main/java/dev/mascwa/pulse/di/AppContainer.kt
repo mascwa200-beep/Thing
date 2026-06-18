@@ -194,6 +194,9 @@ class AppContainer(private val appContext: Context) {
                             baseUrl = j.cloudProvider.baseUrl,
                             apiKey = j.cloudApiKey,
                             model = j.cloudModel.ifBlank { j.cloudProvider.defaultModel },
+                            // Cap the reply length so credit-metered providers (OpenRouter) don't
+                            // pre-authorize the model's full output (e.g. 64k) and 402 on a small balance.
+                            maxTokens = j.maxTokens,
                         )
                     } else {
                         null
