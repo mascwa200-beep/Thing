@@ -136,7 +136,7 @@ fun JarvisScreen(
                 Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
             }
             IconButton(onClick = { vm.clearHistory() }) {
-                Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear", tint = c.muted)
+                Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear chat", tint = c.muted)
             }
         },
     ) { innerPadding ->
@@ -233,7 +233,7 @@ private fun CodeApprovalCard(
             if (!diff.isNullOrBlank()) {
                 dev.mascwa.pulse.feature.common.DiffText(diff, maxLines = 14)
                 Text(
-                    "Full diff in Approvals (✓)",
+                    "Full diff in the Approvals screen",
                     fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
                 )
             } else {
@@ -361,7 +361,7 @@ private fun InputBar(
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
                 placeholder = {
-                    Text("Speak to the Matrix…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
+                    Text("Message J.A.R.V.I.S. — or tap the mic", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
                 },
                 singleLine = true,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),

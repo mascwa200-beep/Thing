@@ -152,7 +152,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
 
             // ---- Cloud AI brain (recommended): far smarter than the on-device model ----
             SettingToggle(
-                title = "CLOUD AI  ·  smarter chat",
+                title = "CLOUD AI  ·  faster, smarter replies",
                 subtitle = "Use a cloud AI for chat instead of the on-device model — much higher quality. " +
                     "Your chat messages are sent to the provider you choose. The wake word and all voice " +
                     "stay on-device. Off = use the local model below.",
@@ -213,7 +213,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 }
             }
 
-            FieldLabel("CHAT TEMPLATE  ·  prompt format for the model")
+            FieldLabel("CHAT TEMPLATE  ·  auto-detected; only change if replies look wrong")
             ChatFormatSelector(selected = chatFormat, onSelect = vm::setChatFormat)
             Text(
                 "AUTO picks ChatML (Qwen) or Gemma turns from the model URL. If replies come out " +
@@ -323,7 +323,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
             )
 
             SettingToggle(
-                title = "CLOUD VOICE UNDERSTANDING",
+                title = "CLOUD SPEECH CLEANUP",
                 subtitle = "When a cloud key is set, run each wake-word command through the cloud AI once " +
                     "to fix speech-to-text mishears (\"fire\" → \"file\") before acting — better " +
                     "understanding without a heavier model. Adds a brief pause; no effect without a cloud key.",
@@ -394,7 +394,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            FieldLabel("KNOWLEDGE BASE  ·  docs J.A.R.V.I.S. can search (on-device RAG)")
+            FieldLabel("KNOWLEDGE BASE  ·  on-device docs J.A.R.V.I.S. searches for answers")
             NeonPanel {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(

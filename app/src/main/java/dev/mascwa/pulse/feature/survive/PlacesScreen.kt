@@ -85,7 +85,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                     }
                     res.isInitialLoading -> LoadingState()
                     res.isError -> ErrorState(res.error ?: "Error", onRetry = { vm.refresh() })
-                    res.data?.places.isNullOrEmpty() -> EmptyState("No ${state.category.title.lowercase()} found nearby.")
+                    res.data?.places.isNullOrEmpty() -> EmptyState("No ${state.category.title.lowercase()} found here — try zooming out or moving toward a town.")
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
