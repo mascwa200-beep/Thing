@@ -70,6 +70,7 @@ class HomeNav(
     val openInflation: () -> Unit,
     val openFuel: () -> Unit,
     val openSettings: () -> Unit,
+    val openAssistant: () -> Unit = {},
 )
 
 private data class FeedChip(val label: String, val key: String)
@@ -155,6 +156,9 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
 
                 // Greeting
                 item { Greeting() }
+
+                // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
+                item { AssistantCard(state.jarvisStatus, nav.openAssistant) }
 
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
@@ -266,6 +270,33 @@ private fun Greeting() {
             Text("Here's your ", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
             Text("world", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.accent)
             Text(".", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
+        }
+    }
+}
+
+@Composable
+private fun AssistantCard(status: String, onOpen: () -> Unit) {
+    val c = Pulse.colors
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onOpen() },
+        corners = true,
+        borderColor = c.accent.copy(alpha = 0.5f),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
+            Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                Text(
+                    "J.A.R.V.I.S.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 2.sp,
+                    fontWeight = FontWeight.Bold, color = c.accent,
+                )
+                Text(
+                    status.ifBlank { "Tap to talk" },
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.5.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Text("TALK ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
         }
     }
 }

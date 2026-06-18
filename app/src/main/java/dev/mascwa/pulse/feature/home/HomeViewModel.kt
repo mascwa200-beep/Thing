@@ -39,6 +39,8 @@ data class HomeUiState(
     val tech: Async<List<Article>> = Async(loading = true),
     val popculture: Async<List<Article>> = Async(loading = true),
     val skyLines: List<String> = emptyList(),
+    /** One-line J.A.R.V.I.S. status for the home assistant card (brain + resident/wake flags). */
+    val jarvisStatus: String = "",
 )
 
 class HomeViewModel(
@@ -64,7 +66,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val s = settings.current()
             val sections = s.homeSections
-            _state.update { it.copy(sections = sections) }
+            _state.update { it.copy(sections = sections, jarvisStatus = jarvisStatus(s)) }
 
             // Above-the-fold first (instant from cache, snappier cold start)…
             if (HomeSection.HEADLINES in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TOP, f) }) { st, a -> st.copy(headlines = a) }
@@ -84,6 +86,18 @@ class HomeViewModel(
                 loadSky(force, s)
             }
         }
+    }
+
+    /** One-line assistant status from settings (no engine dependency): which brain is active and whether
+     *  it's resident / listening for the wake word. */
+    private fun jarvisStatus(s: dev.mascwa.pulse.data.settings.AppSettings): String {
+        val j = s.jarvis
+        val brain = if (j.cloudActive) "CLOUD · ${j.cloudProvider.label.uppercase()}" else "ON-DEVICE"
+        val flags = buildList {
+            if (j.residentService) add("RESIDENT")
+            if (j.wakeWord) add("WAKE WORD")
+        }
+        return (listOf(brain) + flags).joinToString(" · ")
     }
 
     /** "Today in the sky" digest line — orbital + space weather (keyless). */

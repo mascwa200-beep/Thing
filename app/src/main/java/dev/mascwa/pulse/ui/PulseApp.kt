@@ -137,6 +137,7 @@ fun PulseApp(
                         openInflation = { navController.navigate(Routes.INFLATION) { launchSingleTop = true } },
                         openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
                         openSettings = { navigateTopLevel(Routes.SETTINGS) },
+                        openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
                     ),
                 )
             }
