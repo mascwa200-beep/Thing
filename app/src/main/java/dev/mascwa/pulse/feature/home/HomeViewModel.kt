@@ -15,6 +15,8 @@ import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.SkyDigest
+import dev.mascwa.pulse.data.radar.RadarData
+import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -41,6 +43,8 @@ data class HomeUiState(
     val skyLines: List<String> = emptyList(),
     /** One-line J.A.R.V.I.S. status for the home assistant card (brain + resident/wake flags). */
     val jarvisStatus: String = "",
+    /** Live aircraft near the user (TACNET/ADS-B) for the home flight card; null until fetched. */
+    val radar: Async<RadarData> = Async(loading = true),
 )
 
 class HomeViewModel(
@@ -53,6 +57,7 @@ class HomeViewModel(
     private val settings: SettingsRepository,
     private val orbital: OrbitalRepository,
     private val space: SpaceWeatherRepository,
+    private val radar: RadarRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -84,6 +89,7 @@ class HomeViewModel(
                 if (HomeSection.TECH in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TECH, f) }) { st, a -> st.copy(tech = a) }
                 if (HomeSection.POPCULTURE in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POPCULTURE, f) }) { st, a -> st.copy(popculture = a) }
                 loadSky(force, s)
+                loadRadar(force, s)
             }
         }
     }
@@ -113,6 +119,16 @@ class HomeViewModel(
         val sw = runCatching { space.fetch(false, lat, lon).data }.getOrNull()
         val lines = SkyDigest.lines(orb, sw, lat, lon)
         _state.update { it.copy(skyLines = lines) }
+    }
+
+    /** Live aircraft near the user — only when we have a real device-location origin (otherwise plotting
+     *  around a default point would be misleading, so the card stays hidden). */
+    private suspend fun loadRadar(force: Boolean, s: dev.mascwa.pulse.data.settings.AppSettings) {
+        if (!(s.useDeviceLocation && location.hasPermission())) return
+        val loc = location.current() ?: return
+        val flow = MutableStateFlow<Async<RadarData>>(Async(loading = true))
+        viewModelScope.launch { flow.collect { a -> _state.update { it.copy(radar = a) } } }
+        flow.load(force) { radar.fetch(loc.latitude, loc.longitude, it) }
     }
 
     private fun <T> launchInto(

@@ -71,6 +71,7 @@ class HomeNav(
     val openFuel: () -> Unit,
     val openSettings: () -> Unit,
     val openAssistant: () -> Unit = {},
+    val openRadar: () -> Unit = {},
 )
 
 private data class FeedChip(val label: String, val key: String)
@@ -168,6 +169,11 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // Today in the sky
                 if (state.skyLines.isNotEmpty()) {
                     item { SkyDigestCard(state.skyLines) }
+                }
+
+                // Live aircraft overhead (only when there are any)
+                state.radar.data?.takeIf { it.aircraftCount() > 0 }?.let { rd ->
+                    item { FlightCard(rd, nav.openRadar) }
                 }
 
                 // Breaking hero
@@ -297,6 +303,38 @@ private fun AssistantCard(status: String, onOpen: () -> Unit) {
                 )
             }
             Text("TALK ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
+        }
+    }
+}
+
+@Composable
+private fun FlightCard(data: dev.mascwa.pulse.data.radar.RadarData, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val count = data.aircraftCount()
+    val nearest = data.contacts
+        .filter { it.kind == dev.mascwa.pulse.data.radar.ContactKind.AIRCRAFT.name }
+        .minByOrNull { it.distanceMeters }
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onClick() },
+        corners = true,
+        borderColor = c.sky.copy(alpha = 0.4f),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("✈", fontSize = 18.sp)
+            Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                Text(
+                    "$count AIRCRAFT NEARBY",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.sky,
+                )
+                if (nearest != null) {
+                    Text(
+                        "Nearest: ${nearest.label.ifBlank { "—" }} · ${Formatters.number(nearest.distanceMeters / 1000.0, 1)} km",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+            Text("SCOPE ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
         }
     }
 }
