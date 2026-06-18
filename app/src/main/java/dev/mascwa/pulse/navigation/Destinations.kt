@@ -63,8 +63,12 @@ object Routes {
     // Objectives / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
 
-    // Diagnostics
+    // Diagnostics and Analytics
     const val CRASH_LOG = "crash_log"
+    const val USAGE_DATA = "usage_data"
+    const val DIAGNOSTICS = "diagnostics"
+    const val FEATURE_RECOMMENDATIONS = "feature_recommendations"
+    const val USER_FEEDBACK = "user_feedback"
 }
 
 data class TopDestination(
@@ -81,4 +85,8 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.USAGE_DATA, "USAGE DATA", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
+    TopDestination(Routes.DIAGNOSTICS, "DIAGNOSTICS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.FEATURE_RECOMMENDATIONS, "RECOMMENDATIONS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
+    TopDestination(Routes.USER_FEEDBACK, "FEEDBACK", Icons.Filled.Article, Icons.Outlined.Article),
 )
