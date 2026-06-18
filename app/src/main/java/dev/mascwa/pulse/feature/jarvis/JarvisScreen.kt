@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -135,7 +136,9 @@ fun JarvisScreen(
             }
         },
     ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+        // imePadding lifts the input bar above the soft keyboard — the window is edge-to-edge
+        // (MainActivity.enableEdgeToEdge), so it doesn't auto-resize for the IME on its own.
+        Column(Modifier.fillMaxSize().padding(innerPadding).imePadding()) {
             StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)
 
