@@ -63,7 +63,14 @@ class RefreshWorker(
             runCatching {
                 container.gitHubRepo.openSelfPrs().forEach { pr ->
                     if (container.gitHubRepo.checksState(pr.headSha) == "success") {
-                        container.gitHubRepo.merge(pr.number)
+                        // Merge closes the PR, so it won't reappear next cycle — notify once, no dedup state.
+                        if (container.gitHubRepo.merge(pr.number)) {
+                            notifier.notifyUpdate(
+                                id = 7402 + (pr.number and 0xFF),
+                                title = "J.A.R.V.I.S. shipped a change",
+                                body = "Merged PR #${pr.number} — a new build will follow; you'll be prompted to install it.",
+                            )
+                        }
                     }
                 }
             }
