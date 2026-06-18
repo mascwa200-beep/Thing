@@ -7,7 +7,9 @@ import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -41,9 +43,12 @@ class MarketsRepository(
         }
         return try {
             val quotes = coroutineScope {
-                s.watchlist.map { item ->
-                    async { runCatching { fetchYahoo(item) }.getOrNull() }
-                }.mapNotNull { it.await() }
+                // Fetch in small concurrent batches (not one big burst) with a retry, so Yahoo's anti-bot
+                // throttling on a large parallel request doesn't silently drop most of the watchlist —
+                // which left the home tape showing only the first few instruments.
+                s.watchlist.chunked(YAHOO_BATCH).flatMap { batch ->
+                    batch.map { item -> async { fetchYahooResilient(item) } }.awaitAll()
+                }.filterNotNull()
             }
             cache.write(key, quotes, ListSerializer(Quote.serializer()))
             Fetched(quotes, false)
@@ -96,6 +101,14 @@ class MarketsRepository(
     suspend fun quotesFor(items: List<WatchItem>): List<Quote> = coroutineScope {
         items.map { item -> async { runCatching { fetchYahoo(item) }.getOrNull() } }
             .mapNotNull { it.await() }
+    }
+
+    /** [fetchYahoo] with one jittered retry, so a transient throttle on a parallel burst doesn't drop the
+     *  instrument from the tape / markets list. Returns null only if both attempts fail. */
+    private suspend fun fetchYahooResilient(item: WatchItem): Quote? {
+        runCatching { fetchYahoo(item) }.getOrNull()?.let { return it }
+        delay(kotlin.random.Random.nextLong(250, 800))
+        return runCatching { fetchYahoo(item) }.getOrNull()
     }
 
     /** Yahoo Finance chart API — keyless. One call gives price, previous close,
@@ -166,6 +179,8 @@ class MarketsRepository(
     }
 
     private companion object {
+        /** Max concurrent Yahoo requests per batch — small enough to avoid the anti-bot throttle. */
+        const val YAHOO_BATCH = 8
         const val YAHOO_UA =
             "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/120.0.0.0 Mobile Safari/537.36"

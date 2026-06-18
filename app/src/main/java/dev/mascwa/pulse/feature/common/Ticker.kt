@@ -10,10 +10,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,14 +26,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlin.math.ceil
 import kotlin.math.max
 
 data class TickerItem(val symbol: String, val value: String, val color: Color)
@@ -40,8 +46,6 @@ data class TickerItem(val symbol: String, val value: String, val color: Color)
 fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     if (items.isEmpty()) return
     val c = Pulse.colors
-    var singleWidth by remember { mutableIntStateOf(0) }
-    var viewportWidth by remember { mutableIntStateOf(0) }
 
     val transition = rememberInfiniteTransition(label = "ticker")
     val progress by transition.animateFloat(
@@ -52,25 +56,43 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() 
         label = "tickerProgress",
     )
 
-    Box(
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .height(30.dp)
             .background(c.carbon)
             .let { if (onClick != null) it.clickable { onClick() } else it }
-            .clipToBounds()
-            .onSizeChanged { viewportWidth = it.width },
+            .clipToBounds(),
         contentAlignment = Alignment.CenterStart,
     ) {
-        // Tile enough identical copies to always overflow the viewport, so the loop (which shifts by ONE
-        // sequence width) never leaves a trailing gap — a continuous stream regardless of item count.
-        val repeats = if (singleWidth > 0) (viewportWidth / singleWidth + 2).coerceAtLeast(2) else 2
-        Row(Modifier.graphicsLayer { translationX = -progress * singleWidth }) {
-            TickerSequence(items, c.muted, Modifier.onSizeChanged { if (it.width > 0) singleWidth = it.width })
-            repeat(repeats - 1) { TickerSequence(items, c.muted, Modifier) }
+        // Viewport width is known up-front from the constraints (no measure race that could read 0 and
+        // leave the bar half-empty). seqPx = measured width of ONE item sequence; re-measured if items change.
+        val viewportPx = with(LocalDensity.current) { maxWidth.toPx() }
+        var seqPx by remember(items) { mutableIntStateOf(0) }
+
+        // Tile enough identical copies that the row spans the viewport PLUS one whole sequence, so shifting
+        // left by exactly one sequence loops seamlessly with NO blank — even when only a few instruments
+        // loaded (then it's the same few flowing nonstop, never a half-empty bar).
+        val copies = if (seqPx > 0) (ceil(viewportPx / seqPx).toInt() + 2).coerceAtLeast(2) else 2
+        Row(Modifier.graphicsLayer { translationX = -progress * seqPx }) {
+            TickerSequence(items, c.muted, Modifier.onSizeChanged { if (it.width > 0) seqPx = it.width })
+            repeat(copies - 1) { TickerSequence(items, c.muted, Modifier) }
         }
+        // Soft edge fades (into the carbon background) so items entering/leaving the viewport melt away
+        // instead of being chopped mid-word at the hard clip edge (e.g. "NASDAQ 100" → "ASDAQ 100").
+        Box(
+            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(EDGE_FADE)
+                .background(Brush.horizontalGradient(listOf(c.carbon, Color.Transparent))),
+        )
+        Box(
+            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(EDGE_FADE)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, c.carbon))),
+        )
     }
 }
+
+/** Width of the fade-out region at each end of the ticker viewport. */
+private val EDGE_FADE = 26.dp
 
 @Composable
 private fun TickerSequence(items: List<TickerItem>, symColor: Color, modifier: Modifier) {
