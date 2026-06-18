@@ -57,6 +57,10 @@ class ActiveMatrixService : Service() {
     @Volatile private var capturing = false
     @Volatile private var pollingNews = false
 
+    // Critical-battery care: conserve (pause heavy polling) + warn once until power recovers.
+    @Volatile private var lowPowerConserve = false
+    @Volatile private var batteryWarned = false
+
     // Rolling spoken-conversation context for follow-up / conversation mode (reset on each new wake).
     private val convo = ArrayDeque<ChatTurn>()
     @Volatile private var convoTurns = 0
@@ -115,6 +119,7 @@ class ActiveMatrixService : Service() {
                         val line = if (prev == null) banter.greeting(now) else banter.reactTo(prev, now)
                         prev = now
                         if (!line.isNullOrBlank()) update(line)
+                        handleBattery(now)
                     }
                 }
             }
@@ -132,6 +137,23 @@ class ActiveMatrixService : Service() {
         return START_STICKY
     }
 
+    /** Self-preservation: at critical battery, conserve (pause heavy polling) and warn once — spoken if
+     *  voice is available — then stand down quietly. Resets when charging or the level recovers. */
+    private fun handleBattery(ctx: DeviceContext) {
+        if (ctx.isCriticalBattery) {
+            lowPowerConserve = true
+            if (!batteryWarned) {
+                batteryWarned = true
+                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power, sir."
+                update("⚠ $msg")
+                runCatching { container?.textToSpeech?.speak(msg) }
+            }
+        } else if (ctx.isCharging || ctx.batteryPct >= BATTERY_RECOVER_PCT) {
+            lowPowerConserve = false
+            batteryWarned = false
+        }
+    }
+
     /** Poll the TOP feed on a short interval and push genuinely new headlines immediately. Cheap and
      *  guarded: it only fetches when the user has enabled live breaking news and isn't in quiet hours. */
     private suspend fun liveNewsLoop() {
@@ -140,7 +162,7 @@ class ActiveMatrixService : Service() {
                 val c = container
                 val prefs = c?.settingsRepository?.current()?.notifications
                 if (c != null && prefs != null && prefs.masterEnabled && prefs.breakingNews &&
-                    prefs.liveBreakingNews && !inQuietNow(prefs)
+                    prefs.liveBreakingNews && !inQuietNow(prefs) && !lowPowerConserve
                 ) {
                     BreakingNewsPulse.check(c)
                 }
@@ -496,6 +518,8 @@ class ActiveMatrixService : Service() {
         private const val WAKE_RETRY_MS = 4000L
         // Live breaking-news poll cadence — as fresh as Android allows without a push server.
         private const val LIVE_NEWS_INTERVAL_MS = 90_000L
+        // Battery % at which we leave conserve mode (when not charging).
+        private const val BATTERY_RECOVER_PCT = 25
 
         // --- Follow-up / conversation mode ---
         // Safeguards so an open conversation can't run forever (it then wraps up on its own).
