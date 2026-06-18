@@ -229,6 +229,8 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
+            dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
+            dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
             dev.mascwa.pulse.jarvis.agent.CallTool(appContext),
             dev.mascwa.pulse.jarvis.agent.SmsTool(appContext),
