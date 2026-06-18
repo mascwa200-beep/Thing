@@ -58,7 +58,12 @@ class SelfCoder(
                 createdAt = System.currentTimeMillis(),
             ),
         )
-        return Result(true, "Drafted a change to `$path` — approve it to open the PR, sir.")
+        return if (current == null) {
+            Result(true, "Drafted a NEW file `$path` — approve it to open the PR, sir. (A new file compiles " +
+                "on its own but may need wiring into the app to take effect.)")
+        } else {
+            Result(true, "Drafted a change to `$path` — approve it to open the PR, sir.")
+        }
     }
 
     /** Open the PR for an approved change. Called ONLY from [dev.mascwa.pulse.jarvis.selfedit.ApprovalGate]
@@ -84,28 +89,51 @@ class SelfCoder(
         }.getOrElse { "Couldn't open the PR: ${it.message}" }
     }
 
-    /** Ask the model which single file to change, given the repo's (editable) source tree. The reply is
-     *  validated against that list, so the model can't invent a path or escape the denylist. */
+    /** Ask the model which file to change, given the repo's (editable) source tree — either an existing
+     *  path to edit, or `NEW: <path>` to create a brand-new file. The reply is validated against the tree
+     *  and the denylist, so the model can't escape the protected paths or drop a file outside a source
+     *  root. */
     private suspend fun locate(goal: String): String? {
         val candidates = runCatching { repo.tree("main") }.getOrDefault(emptyList())
             .filter { it.endsWith(".kt") }
             .take(MAX_CANDIDATES)
         if (candidates.isEmpty()) return null
-        val sys = "You are J.A.R.V.I.S., picking which ONE file of your own Android app (Kotlin) to edit " +
-            "to accomplish a goal. Reply with ONLY one exact file path copied from the list — nothing else."
+        val sys = "You are J.A.R.V.I.S., deciding where to make a change in your own Android app (Kotlin). " +
+            "Either reply with ONE exact existing file path copied from the list (to edit it), OR — if the " +
+            "goal needs a brand-new file — reply with `NEW: <path>` using a path under " +
+            "app/src/main/java/… or core/<module>/src/main/java/… that is not already in the list. " +
+            "Reply with ONLY the path (or `NEW: <path>`), nothing else."
         val user = buildString {
-            append("Goal: ").append(goal).append("\n\nFiles you may edit:\n")
+            append("Goal: ").append(goal).append("\n\nExisting files:\n")
             candidates.forEach { append(it).append('\n') }
         }
-        val pick = runCatching {
+        val raw = runCatching {
             engine.generate(user, emptyList(), sys).toList().joinToString("")
         }.getOrDefault("")
-            .lineSequence().map { it.trim().trim('`', '"', '-', ' ') }.firstOrNull { it.isNotBlank() }
+            .lineSequence().map { it.trim() }.firstOrNull { it.isNotBlank() }
             .orEmpty()
+        if (raw.isBlank()) return null
+
+        // New-file proposal: validate it stays Kotlin, in a real source root, off the denylist, and unused.
+        Regex("(?i)^NEW:\\s*(.+)$").find(raw)?.let { m ->
+            val p = m.groupValues[1].trim().trim('`', '"').trimStart('/')
+            return if (isValidNewPath(p, candidates)) p else null
+        }
+
+        // Otherwise an existing path: accept only an exact or unambiguous suffix match.
+        val pick = raw.trim('`', '"', '-', ' ')
         if (pick.isBlank()) return null
-        // Accept only an exact or unambiguous suffix match against the candidate list.
         return candidates.firstOrNull { it == pick }
             ?: candidates.singleOrNull { pick.endsWith(it) || it.endsWith(pick) }
+    }
+
+    /** A model-proposed NEW file path is allowed only when it's Kotlin, sits under a real source root, is
+     *  not protected, and doesn't already exist — so a bad path fails closed instead of committing junk. */
+    private fun isValidNewPath(path: String, existing: List<String>): Boolean {
+        if (!path.endsWith(".kt") || path.contains("..")) return false
+        if (repo.isProtected(path) || existing.contains(path)) return false
+        return path.startsWith("app/src/main/java/") ||
+            Regex("^core/[^/]+/src/main/java/").containsMatchIn(path)
     }
 
     /** Ask the model for the complete new file contents (strips any code fences). */

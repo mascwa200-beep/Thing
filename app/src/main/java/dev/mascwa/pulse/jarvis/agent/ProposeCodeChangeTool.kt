@@ -13,8 +13,8 @@ import dev.mascwa.pulse.data.selfcode.SelfCoder
 class ProposeCodeChangeTool(private val selfCoder: SelfCoder) : JarvisTool {
     override val name = "selfcode"
     override val usage =
-        "selfcode <goal>  (or  selfcode <file path> | <goal>) — propose a change to your own app code; " +
-            "you pick the file and the user approves it before any PR is opened"
+        "selfcode <goal>  (or  selfcode <file path> | <goal>) — propose a change to (or a brand-new file " +
+            "in) your own app code; you pick or name the file and the user approves it before any PR opens"
 
     override suspend fun run(arg: String): String {
         val a = arg.trim()
