@@ -197,8 +197,10 @@ class CloudInferenceEngine(
                 val name = fn.optString("name")
                 if (name.isBlank()) continue
                 val rawArgs = fn.optString("arguments")
-                // Args is a JSON string like {"arg":"..."}; fall back to the raw string if it's not.
-                val arg = runCatching { JSONObject(rawArgs).optString("arg") }.getOrNull()?.ifBlank { null } ?: rawArgs
+                // `arguments` is normally a JSON object like {"arg":"..."}; take its "arg" (even when
+                // empty, e.g. a no-arg tool) and only fall back to the raw string when it isn't valid
+                // JSON. (Avoids turning an empty/no-arg call into the literal "{}".)
+                val arg = runCatching { JSONObject(rawArgs).optString("arg", "") }.getOrElse { rawArgs }
                 list.add(ToolInvocation(c.optString("id").ifBlank { "call_$i" }, name, arg))
             }
             if (list.isNotEmpty()) return AssistantTurn(message.optString("content"), list)
