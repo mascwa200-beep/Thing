@@ -107,7 +107,7 @@ class GitHubRepo(private val settings: SettingsRepository) {
         }
     }
 
-    /** Open PRs from `jarvis/*` branches (the self-coder's own). */
+    /** Open PRs from the self-coder's own `jarvis/…` branches. */
     suspend fun openSelfPrs(): List<Pr> {
         val list = arr("GET", "$API/pulls?state=open&per_page=30")
         return (0 until list.length()).mapNotNull { i ->
