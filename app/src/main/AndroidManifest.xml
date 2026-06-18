@@ -20,6 +20,9 @@
     <!-- Background refresh that survives reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Let J.A.R.V.I.S. set alarms/timers in the clock app (normal permission). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
     <!-- Active-Matrix: keep J.A.R.V.I.S. resident as a foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

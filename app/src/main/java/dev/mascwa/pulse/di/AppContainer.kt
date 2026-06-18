@@ -218,6 +218,19 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
+            // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
+            dev.mascwa.pulse.jarvis.agent.CallTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.SmsTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.EmailTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.CalendarEventTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.AlarmTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.TimerTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.CameraTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.ContactsTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.SpotifyTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.MapsTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.SettingsTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.OpenLinkTool(appContext),
         )
     }
     /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user
