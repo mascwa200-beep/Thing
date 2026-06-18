@@ -140,11 +140,27 @@ fun JarvisScreen(
             if (banter.isNotBlank()) BanterLine(banter)
 
             if (messages.isEmpty() && streaming.isEmpty()) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.fillMaxWidth().weight(1f).padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                ) {
                     Text(
-                        "J.A.R.V.I.S. MATRIX ONLINE\nEverything runs on this device.",
-                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
-                        textAlign = TextAlign.Center,
+                        "J.A.R.V.I.S. MATRIX",
+                        fontFamily = JetBrainsMono, fontSize = 13.sp, letterSpacing = 2.sp, color = c.accent,
+                    )
+                    Text("Try:", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                    listOf(
+                        "\"Brief me\" — your day at a glance",
+                        "\"Set an alarm for 7:30\"  ·  \"Text Alex I'm late\"  *",
+                        "\"Play Daft Punk\"  ·  \"Torch on\"  ·  \"Navigate home\"  *",
+                        "Tap the mic to talk — or say “Jarvis” when resident",
+                    ).forEach {
+                        Text("•  $it", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                    }
+                    Text(
+                        "* device actions need Agent Tools (Setup). Add a cloud key in Setup for the " +
+                            "smartest chat; tune Curiosity and review Memory there too.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                     )
                 }
             } else {
