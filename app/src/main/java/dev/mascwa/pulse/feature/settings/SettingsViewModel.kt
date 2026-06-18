@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.selfcode.SelfCoder
 import dev.mascwa.pulse.data.update.UpdateInfo
 import dev.mascwa.pulse.data.update.UpdateRepository
 import dev.mascwa.pulse.notifications.NotificationScheduler
@@ -24,7 +25,23 @@ class SettingsViewModel(
     private val diskCache: DiskCache,
     private val notifier: Notifier,
     private val updates: UpdateRepository,
+    private val selfCoder: SelfCoder,
 ) : ViewModel() {
+
+    private val _selfCode = MutableStateFlow("")
+    /** Status line for the self-coding "propose a change" action. */
+    val selfCodeStatus: StateFlow<String> = _selfCode
+
+    /** Have J.A.R.V.I.S. draft a change to [path] for [goal] and open a PR (no auto-merge here). */
+    fun proposeSelfChange(goal: String, path: String) {
+        if (goal.isBlank() || path.isBlank()) { _selfCode.value = "Enter a goal and a file path."; return }
+        _selfCode.value = "Drafting & opening a PR…"
+        viewModelScope.launch {
+            _selfCode.value = runCatching { selfCoder.propose(goal, path) }
+                .getOrElse { SelfCoder.Result(false, it.message ?: "failed") }
+                .message
+        }
+    }
 
     val settings: StateFlow<AppSettings> = repo.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())

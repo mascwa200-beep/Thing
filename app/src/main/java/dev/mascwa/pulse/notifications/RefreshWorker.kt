@@ -57,6 +57,18 @@ class RefreshWorker(
             }
         }
 
+        // --- Self-coding: auto-merge J.A.R.V.I.S.'s own PRs once CI is green (opt-in) ---
+        val jcfg = settings.jarvis
+        if (jcfg.selfCodingEnabled && jcfg.selfCodeAutoMerge) {
+            runCatching {
+                container.gitHubRepo.openSelfPrs().forEach { pr ->
+                    if (container.gitHubRepo.checksState(pr.headSha) == "success") {
+                        container.gitHubRepo.merge(pr.number)
+                    }
+                }
+            }
+        }
+
         // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
         if (prefs.breakingNews) {
             runCatching { BreakingNewsPulse.check(container) }

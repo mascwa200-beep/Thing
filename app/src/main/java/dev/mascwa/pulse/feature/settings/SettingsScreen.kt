@@ -127,6 +127,53 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
             }
             item { HorizontalDivider() }
 
+            // ----- Self-coding (experimental) -----
+            item {
+                val selfCodeStatus by vm.selfCodeStatus.collectAsStateWithLifecycle()
+                var goal by remember { mutableStateOf("") }
+                var path by remember { mutableStateOf("") }
+                PrefSection("Self-coding (experimental)") {
+                    PrefSwitch(
+                        "Enable self-coding",
+                        "Let J.A.R.V.I.S. draft changes to its own code and open GitHub PRs. Needs a " +
+                            "write-scoped GitHub token in J.A.R.V.I.S. Setup.",
+                        checked = s.jarvis.selfCodingEnabled,
+                        onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodingEnabled = v)) } },
+                    )
+                    if (s.jarvis.selfCodingEnabled) {
+                        PrefSwitch(
+                            "Auto-merge on green CI",
+                            "Merge its PRs automatically once the build passes — you still confirm the " +
+                                "install. Off = you review and merge each PR yourself.",
+                            checked = s.jarvis.selfCodeAutoMerge,
+                            onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
+                        )
+                        OutlinedTextField(
+                            goal, { goal = it }, label = { Text("Goal — what to change") },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                        OutlinedTextField(
+                            path, { path = it }, label = { Text("Target file (e.g. app/src/…/Foo.kt)") },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                        PrefClickable(
+                            "Propose change → open PR",
+                            subtitle = selfCodeStatus.ifBlank { "Drafts the change with the cloud model and opens a PR." },
+                            onClick = { vm.proposeSelfChange(goal, path) },
+                        )
+                        Text(
+                            "⚠ Experimental. The AI writes app code; CI must pass before anything can ship, " +
+                                "protected files (CI/signing/safety gates) are off-limits, and you confirm every " +
+                                "install. Turn this off to halt it.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Appearance -----
             item {
                 PrefSection("Appearance") {

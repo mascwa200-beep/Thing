@@ -165,6 +165,12 @@ data class JarvisSettings(
     val cloudModel: String = "",
     /** How often J.A.R.V.I.S. asks a gap-filling "curiosity" question: 0 Off / 1 Low / 2 Medium / 3 High. */
     val curiosityLevel: Int = 1,
+    /** Let J.A.R.V.I.S. draft changes to its OWN source and open GitHub PRs (experimental; needs a
+     *  write-scoped GitHub token). Off by default. */
+    val selfCodingEnabled: Boolean = false,
+    /** When self-coding is on, auto-merge its PRs once CI is green (then the updater offers the build,
+     *  which you still confirm). Off by default. Never merges on a red/pending build. */
+    val selfCodeAutoMerge: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */

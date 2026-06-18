@@ -36,6 +36,13 @@ class AppContainer(private val appContext: Context) {
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
         dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
     }
+    /** GitHub write client + self-coding brain (opt-in): J.A.R.V.I.S. drafts a change and opens a PR. */
+    val gitHubRepo: dev.mascwa.pulse.data.selfcode.GitHubRepo by lazy {
+        dev.mascwa.pulse.data.selfcode.GitHubRepo(settingsRepository)
+    }
+    val selfCoder: dev.mascwa.pulse.data.selfcode.SelfCoder by lazy {
+        dev.mascwa.pulse.data.selfcode.SelfCoder(inferenceEngine, gitHubRepo)
+    }
 
     /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,
      *  authored tools). Separate DataStore file so it never migrates/wipes settings or the Room DB. */
@@ -287,7 +294,10 @@ class AppContainer(private val appContext: Context) {
         } else {
             emptyList()
         }
-        agentTools + (if (selfOn) selfEditTools else emptyList()) + authored
+        // Self-coding tool is offered only when the user has enabled self-coding.
+        val codeOn = runCatching { settingsRepository.current().jarvis.selfCodingEnabled }.getOrDefault(false)
+        val codeTools = if (codeOn) listOf(dev.mascwa.pulse.jarvis.agent.ProposeCodeChangeTool(selfCoder)) else emptyList()
+        agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools
     }
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */
