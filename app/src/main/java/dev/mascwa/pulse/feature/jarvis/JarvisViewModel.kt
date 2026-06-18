@@ -1,7 +1,14 @@
 package dev.mascwa.pulse.feature.jarvis
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.withContext
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.jarvis.db.Speaker
@@ -148,6 +155,63 @@ class JarvisViewModel(
                 _busy.value = false
             }
         }
+    }
+
+    /** Analyze a picked image with J.A.R.V.I.S. (cloud vision). [caption] is the optional question/prompt
+     *  typed alongside it. Cloud-only — the on-device model can't see images. */
+    fun sendImage(context: Context, uri: Uri, caption: String) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            _streaming.value = ""
+            val cap = caption.trim()
+            memory.append(Speaker.USER, if (cap.isBlank()) "📎 [image]" else "📎 [image] $cap")
+            try {
+                val vision = engine as? dev.mascwa.pulse.jarvis.inference.VisionEngine
+                if (vision == null || !runCatching { vision.supportsVision() }.getOrDefault(false)) {
+                    sayJarvis("I need a cloud AI key (Setup) to see images, sir — the on-device model can't analyze pictures.")
+                    return@launch
+                }
+                val dataUrl = encodeImage(context, uri)
+                if (dataUrl == null) {
+                    sayJarvis("I couldn't read that image, sir.")
+                    return@launch
+                }
+                val prompt = cap.ifBlank { "Describe and analyze this image in detail, sir." }
+                val system = withMemory(composePersona(), prompt)
+                val sb = StringBuilder()
+                vision.generateWithImages(prompt, listOf(dataUrl), system).collect { tok ->
+                    sb.append(tok)
+                    _streaming.value = sb.toString()
+                }
+                val reply = sb.toString().ifBlank { "…" }
+                memory.append(Speaker.JARVIS, reply)
+                speakIfEnabled(reply)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                memory.append(Speaker.JARVIS, "// image fault: ${e.message ?: "error"}")
+            } finally {
+                _streaming.value = ""
+                _busy.value = false
+            }
+        }
+    }
+
+    /** Read [uri], downscale to a sane size, and JPEG-encode it as a base64 data URL for the vision API. */
+    private suspend fun encodeImage(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+            var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
+            val longest = maxOf(bmp.width, bmp.height)
+            if (longest > MAX_IMAGE_PX) {
+                val scale = MAX_IMAGE_PX.toFloat() / longest
+                bmp = Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)
+            }
+            val out = ByteArrayOutputStream()
+            bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+        }.getOrNull()
     }
 
     /** Normal intent routing for a turn (also the path when a curiosity reply turns out to be a new
@@ -466,5 +530,7 @@ class JarvisViewModel(
     private companion object {
         const val HISTORY_TURNS = 12
         const val TAP_TO_TALK_TIMEOUT_MS = 10_000
+        // Downscale the long edge of an uploaded image before sending to the vision API (token/cost cap).
+        const val MAX_IMAGE_PX = 1024
     }
 }

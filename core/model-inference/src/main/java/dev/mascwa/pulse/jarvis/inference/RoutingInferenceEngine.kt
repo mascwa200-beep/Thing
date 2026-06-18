@@ -31,7 +31,7 @@ class RoutingInferenceEngine(
     private val maxTokensProvider: suspend () -> Int = { maxTokens },
     /** Resolved cloud config when the user has enabled a cloud AI + set a key; null = use on-device. */
     private val cloudConfig: suspend () -> CloudConfig? = { null },
-) : LocalInferenceEngine, ToolCallingEngine {
+) : LocalInferenceEngine, ToolCallingEngine, VisionEngine {
 
     private val appContext = context.applicationContext
     private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash, maxTokensProvider)
@@ -95,6 +95,13 @@ class RoutingInferenceEngine(
 
     override suspend fun chatWithTools(messages: List<ToolMessage>, tools: List<ToolSpec>): AssistantTurn =
         cloud.chatWithTools(messages, tools)
+
+    // Image analysis is cloud-only (on-device can't see images).
+    override suspend fun supportsVision(): Boolean =
+        runCatching { cloudConfig() }.getOrNull() != null && cloud.supportsVision()
+
+    override fun generateWithImages(prompt: String, images: List<String>, system: String?): Flow<String> =
+        cloud.generateWithImages(prompt, images, system)
 
     /** Drop the loaded model (e.g. after the user deletes it) and revert to the core. */
     fun reset() {
