@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.markets
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.MarketExplainers
+import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.feature.common.ChangePill
@@ -78,6 +80,10 @@ fun MarketsScreen(vm: MarketsViewModel) {
 
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                         if (watch.stale || crypto.stale) item { StaleBanner(true) }
+
+                        MarketMood.summarize(all.mapNotNull { it.changePercent })?.let { mood ->
+                            item(key = "mood") { MoodBanner(mood) }
+                        }
 
                         if (gainers.isNotEmpty()) {
                             item(key = "h_gain") { SectionLabel("Top gainers") }
@@ -150,4 +156,21 @@ private fun SectionLabel(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
     )
+}
+
+@Composable
+private fun MoodBanner(mood: MarketMood.Mood) {
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
+        Text(
+            "MARKET MOOD",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(mood.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            mood.detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
