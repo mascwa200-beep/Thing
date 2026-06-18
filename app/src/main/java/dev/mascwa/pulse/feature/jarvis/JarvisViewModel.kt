@@ -78,6 +78,12 @@ class JarvisViewModel(
 
     val engineState: StateFlow<EngineState> = engine.state
 
+    /** The active cloud provider's label when the cloud brain is on (else null), for the status pill. */
+    val cloudStatus: StateFlow<String?> =
+        settings.settings
+            .map { if (it.jarvis.cloudActive) it.jarvis.cloudProvider.label else null }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     /** Whether replies are spoken aloud (mirrors the persisted Jarvis setting). */
     val voiceReplies: StateFlow<Boolean> =
         settings.settings

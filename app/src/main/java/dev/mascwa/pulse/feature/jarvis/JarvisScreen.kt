@@ -67,6 +67,7 @@ fun JarvisScreen(
     val streaming by vm.streaming.collectAsState()
     val busy by vm.busy.collectAsState()
     val engineState by vm.engineState.collectAsState()
+    val cloudStatus by vm.cloudStatus.collectAsState()
     val banter by vm.banterLine.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
     val voiceInput by vm.voiceInput.collectAsState()
@@ -135,7 +136,7 @@ fun JarvisScreen(
         },
     ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
-            StatusLine(engineState)
+            StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)
 
             if (messages.isEmpty() && streaming.isEmpty()) {
@@ -166,9 +167,11 @@ fun JarvisScreen(
 }
 
 @Composable
-private fun StatusLine(state: EngineState) {
+private fun StatusLine(state: EngineState, cloud: String?) {
     val c = Pulse.colors
-    val (label, color) = when (state) {
+    val (label, color) = if (cloud != null) {
+        "● CLOUD · ${cloud.uppercase(java.util.Locale.US)} ONLINE" to c.positive
+    } else when (state) {
         is EngineState.Ready -> "● MATRIX ONLINE" to c.positive
         is EngineState.Preparing -> "◌ PREPARING MODEL" to c.amber
         is EngineState.Downloading -> "↓ DOWNLOADING ${state.pct}%" to c.amber
