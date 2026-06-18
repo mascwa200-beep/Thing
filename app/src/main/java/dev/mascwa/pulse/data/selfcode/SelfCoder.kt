@@ -23,7 +23,7 @@ class SelfCoder(
     private val repo: GitHubRepo,
     private val selfEdit: SelfEditStore,
 ) {
-    data class Result(val ok: Boolean, val message: String)
+    data class Result(val ok: Boolean, val message: String, val action: PendingAction? = null)
 
     /** One file in a staged change. [isNew] just drives messaging — commit creates vs updates based on
      *  the live blob SHA either way. */
@@ -63,26 +63,26 @@ class SelfCoder(
             files.forEach { append(if (it.isNew) "NEW  " else "EDIT ").append(it.path).append('\n') }
             files.firstOrNull()?.let { append('\n').append(it.content.lineSequence().take(24).joinToString("\n")) }
         }
-        selfEdit.enqueue(
-            PendingAction(
-                id = UUID.randomUUID().toString(),
-                type = ActionType.CODE_PR,
-                title = "Code change · ${goal.take(60)}",
-                preview = preview,
-                payload = mapOf(
-                    "goal" to goal,
-                    "files" to json.encodeToString(ListSerializer(StagedFile.serializer()), files),
-                    "diff" to diffs.toString().take(MAX_DIFF_CHARS),
-                ),
-                createdAt = System.currentTimeMillis(),
+        val action = PendingAction(
+            id = UUID.randomUUID().toString(),
+            type = ActionType.CODE_PR,
+            title = "Code change · ${goal.take(60)}",
+            preview = preview,
+            payload = mapOf(
+                "goal" to goal,
+                "files" to json.encodeToString(ListSerializer(StagedFile.serializer()), files),
+                "diff" to diffs.toString().take(MAX_DIFF_CHARS),
             ),
+            createdAt = System.currentTimeMillis(),
         )
+        selfEdit.enqueue(action)
         val summary = files.joinToString(", ") { (if (it.isNew) "new " else "") + "`${it.path.substringAfterLast('/')}`" }
         val newNote = if (files.any { it.isNew }) " (a new file compiles on its own; the edits wire it in.)" else ""
         return Result(
             true,
             "Drafted $summary across ${files.size} file(s). Approve it and I'll open a PR; once CI builds " +
                 "it (a few minutes), install the new build from Settings → Software update to see the change, sir.$newNote",
+            action = action,
         )
     }
 

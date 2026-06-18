@@ -316,7 +316,13 @@ class AppContainer(private val appContext: Context) {
         val codeOn = runCatching { settingsRepository.current().jarvis.selfCodingEnabled }.getOrDefault(false)
         val codeTools = if (codeOn) listOf(
             dev.mascwa.pulse.jarvis.agent.SelfCodeReadTool(gitHubRepo),
-            dev.mascwa.pulse.jarvis.agent.ProposeCodeChangeTool(selfCoder),
+            dev.mascwa.pulse.jarvis.agent.ProposeCodeChangeTool(
+                selfCoder,
+                autonomous = {
+                    runCatching { settingsRepository.current().jarvis.autonomousSelfCoding }.getOrDefault(false)
+                },
+                autoApply = { action -> approvalGate.apply(action) },
+            ),
         ) else emptyList()
         agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools
     }

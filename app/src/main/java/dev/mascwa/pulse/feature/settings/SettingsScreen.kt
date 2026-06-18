@@ -150,6 +150,14 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             checked = s.jarvis.selfCodeAutoMerge,
                             onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
                         )
+                        PrefSwitch(
+                            "Autonomous self-coding",
+                            "Let J.A.R.V.I.S. OPEN its own PRs without approving each one. CI still has to " +
+                                "build it and you still install the build; its safety gate, CI and signing stay " +
+                                "off-limits. Hands over the review step — leave off unless you want that.",
+                            checked = s.jarvis.autonomousSelfCoding,
+                            onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(autonomousSelfCoding = v)) } },
+                        )
                         Text(
                             "Just tell J.A.R.V.I.S. what to build — in the console or by voice (e.g. \"read your " +
                                 "own code\" or \"add a … feature\"). It plans the files, drafts the change, and you " +

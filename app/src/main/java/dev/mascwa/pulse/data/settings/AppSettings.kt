@@ -183,6 +183,10 @@ data class JarvisSettings(
     /** When self-coding is on, auto-merge its PRs once CI is green (then the updater offers the build,
      *  which you still confirm). Off by default. Never merges on a red/pending build. */
     val selfCodeAutoMerge: Boolean = false,
+    /** When self-coding is on, let J.A.R.V.I.S. OPEN its own PRs without the per-change approval tap
+     *  (CI must still build it + you still install the build; its approval-gate/CI/signing remain
+     *  off-limits). Off by default — this hands over the human review step, so opt in deliberately. */
+    val autonomousSelfCoding: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */
