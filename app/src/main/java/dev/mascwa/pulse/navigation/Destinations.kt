@@ -56,6 +56,7 @@ object Routes {
     const val JARVIS_SETUP = "jarvis_setup"
     const val JARVIS_APPROVALS = "jarvis_approvals"
     const val JARVIS_MEMORY = "jarvis_memory"
+    const val JARVIS_PREFERENCES = "jarvis_preferences"
 
     // 3D cyberpunk navigation map
     const val NAV = "nav"
@@ -81,4 +82,5 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.JARVIS_PREFERENCES, "PREFERENCES", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
