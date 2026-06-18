@@ -35,6 +35,12 @@ class WeatherTool(
             if (now != null) {
                 append(WeatherCode.describe(now.weatherCode))
                 now.temperature?.let { append(", ").append(Formatters.number(it, 0)).append(unit) }
+                // "Feels like" only when it diverges enough to matter.
+                val feels = now.apparentTemperature
+                val temp = now.temperature
+                if (feels != null && temp != null && kotlin.math.abs(feels - temp) >= 3) {
+                    append(" (feels ").append(Formatters.number(feels, 0)).append(unit).append(")")
+                }
                 now.windSpeed?.let { append(", wind ").append(Formatters.number(it, 0)).append(" ").append(wd.windUnitSymbol) }
                 append(".")
             }
@@ -44,8 +50,20 @@ class WeatherTool(
                 today.precipProbabilityMax?.let { append(", ").append(it).append("% rain") }
                 append(".")
             }
+            // Surface air quality only when it's worth mentioning.
+            wd.airQuality?.usAqi?.let { aqi ->
+                if (aqi >= 100) append(" Air quality ").append(Formatters.number(aqi, 0)).append(" (").append(aqiLabel(aqi)).append(").")
+            }
         }.trim()
         return out.ifBlank { "No weather available for ${wd.locationName}, sir." }
+    }
+
+    /** Coarse US-AQI band label for the notable (>=100) range. */
+    private fun aqiLabel(aqi: Double): String = when {
+        aqi < 150 -> "unhealthy for sensitive groups"
+        aqi < 200 -> "unhealthy"
+        aqi < 300 -> "very unhealthy"
+        else -> "hazardous"
     }
 
     private suspend fun resolve(place: String): WeatherData? {
