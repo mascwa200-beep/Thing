@@ -78,11 +78,26 @@ class TextToSpeechEngine(context: Context) {
      * safely sequence after speech (e.g. reopen the mic only once J.A.R.V.I.S. has stopped talking).
      */
     fun speak(text: String, onDone: () -> Unit = {}) {
-        val trimmed = text.trim()
+        val trimmed = forSpeech(text)
         if (trimmed.isEmpty() || !ready.get()) { onDone(); return }
         pendingDone = onDone
         val res = engine?.speak(trimmed.take(MAX_LEN), TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
         if (res != TextToSpeech.SUCCESS) fireDone()
+    }
+
+    /** Strip Markdown markup so the engine doesn't read the symbols aloud (e.g. "**" as "star star").
+     *  Keeps the words; drops emphasis/code/heading/quote/bullet markers and turns links into their text. */
+    private fun forSpeech(raw: String): String {
+        var t = raw
+        t = t.replace(Regex("```[a-zA-Z0-9]*"), " ")            // code-fence markers
+        t = t.replace("`", "")                                   // inline code ticks
+        t = t.replace(Regex("\\[([^\\]]+)\\]\\([^)]*\\)"), "$1") // [text](url) -> text
+        t = t.replace("*", "")                                   // ** bold ** and * italic *
+        t = t.replace(Regex("(?m)^\\s{0,3}#{1,6}\\s*"), "")      // # headings
+        t = t.replace(Regex("(?m)^\\s{0,3}>\\s?"), "")           // > block quotes
+        t = t.replace(Regex("(?m)^\\s{0,3}[-•]\\s+"), "")        // - / • bullet markers
+        t = t.replace(Regex("[ \\t]{2,}"), " ")                  // collapse runs of spaces
+        return t.trim()
     }
 
     /** Stop the current utterance immediately. */
