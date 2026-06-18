@@ -10,6 +10,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -33,6 +35,11 @@ class MarketsRepository(
 ) {
     private val ttl = 5 * 60 * 1000L
 
+    /** Hard cap on simultaneous Yahoo requests, shared across ALL Yahoo fetches (watchlist + fuel). The
+     *  OkHttp client allows 12/host, but Yahoo's anti-bot wall 429s a burst that large — which silently
+     *  dropped most of the watchlist, leaving the home tape showing only the first few instruments. */
+    private val yahooGate = Semaphore(YAHOO_CONCURRENCY)
+
     suspend fun fetchWatchlist(force: Boolean): Fetched<List<Quote>> {
         val s = settings.current()
         val key = "markets_watchlist_${s.currencyCode}"
@@ -43,12 +50,9 @@ class MarketsRepository(
         }
         return try {
             val quotes = coroutineScope {
-                // Fetch in small concurrent batches (not one big burst) with a retry, so Yahoo's anti-bot
-                // throttling on a large parallel request doesn't silently drop most of the watchlist —
-                // which left the home tape showing only the first few instruments.
-                s.watchlist.chunked(YAHOO_BATCH).flatMap { batch ->
-                    batch.map { item -> async { fetchYahooResilient(item) } }.awaitAll()
-                }.filterNotNull()
+                // Launch all in parallel; the shared yahooGate caps how many actually hit Yahoo at once,
+                // and each call retries with backoff — so the WHOLE set loads instead of just the first few.
+                s.watchlist.map { item -> async { fetchYahooResilient(item) } }.awaitAll().filterNotNull()
             }
             cache.write(key, quotes, ListSerializer(Quote.serializer()))
             Fetched(quotes, false)
@@ -75,7 +79,9 @@ class MarketsRepository(
                 val url = "https://api.coingecko.com/api/v3/coins/markets" +
                     "?vs_currency=$vs&ids=$ids&order=market_cap_desc&per_page=100&page=1" +
                     "&price_change_percentage=24h&sparkline=true"
-                val coins = http.getJson(url, ListSerializer(CoinMarket.serializer()))
+                // Retry with backoff so a CoinGecko rate-limit doesn't drop crypto from the combined tape.
+                val coins = retrying { http.getJson(url, ListSerializer(CoinMarket.serializer())) }
+                    ?: error("CoinGecko fetch failed for $ids")
                 val byId = coins.associateBy { it.id }
                 s.cryptoList.mapNotNull { item -> byId[item.id]?.toQuote(item, s.currencyCode) }
             }
@@ -99,24 +105,33 @@ class MarketsRepository(
 
     /** Fetch arbitrary instruments (used by the Fuel screen). */
     suspend fun quotesFor(items: List<WatchItem>): List<Quote> = coroutineScope {
-        items.map { item -> async { runCatching { fetchYahoo(item) }.getOrNull() } }
-            .mapNotNull { it.await() }
+        items.map { item -> async { fetchYahooResilient(item) } }.awaitAll().filterNotNull()
     }
 
-    /** [fetchYahoo] with one jittered retry, so a transient throttle on a parallel burst doesn't drop the
-     *  instrument from the tape / markets list. Returns null only if both attempts fail. */
-    private suspend fun fetchYahooResilient(item: WatchItem): Quote? {
-        runCatching { fetchYahoo(item) }.getOrNull()?.let { return it }
-        delay(kotlin.random.Random.nextLong(250, 800))
-        return runCatching { fetchYahoo(item) }.getOrNull()
+    /** Run [block], retrying with jittered exponential backoff up to [YAHOO_ATTEMPTS] times. Returns null
+     *  only if every attempt fails — used so a transient throttle (429) doesn't permanently drop a quote. */
+    private suspend fun <T : Any> retrying(block: suspend () -> T): T? {
+        var backoff = 350L
+        repeat(YAHOO_ATTEMPTS) { attempt ->
+            runCatching { block() }.getOrNull()?.let { return it }
+            if (attempt < YAHOO_ATTEMPTS - 1) {
+                delay(backoff + kotlin.random.Random.nextLong(0, 250))
+                backoff *= 2
+            }
+        }
+        return null
     }
+
+    /** [fetchYahoo] with backoff retries, so a transient throttle doesn't drop the instrument. */
+    private suspend fun fetchYahooResilient(item: WatchItem): Quote? = retrying { fetchYahoo(item) }
 
     /** Yahoo Finance chart API — keyless. One call gives price, previous close,
-     *  day range, currency and a 1-month close series for the sparkline. */
+     *  day range, currency and a 1-month close series for the sparkline. The network call goes through
+     *  [yahooGate] so we never exceed [YAHOO_CONCURRENCY] simultaneous Yahoo requests. */
     private suspend fun fetchYahoo(item: WatchItem): Quote {
         val sym = URLEncoder.encode(yahooSymbol(item), "UTF-8")
         val url = "https://query1.finance.yahoo.com/v8/finance/chart/$sym?interval=1d&range=1mo"
-        val text = http.getString(url, mapOf("User-Agent" to YAHOO_UA))
+        val text = yahooGate.withPermit { http.getString(url, mapOf("User-Agent" to YAHOO_UA)) }
         val result = http.json.parseToJsonElement(text).jsonObject["chart"]?.jsonObject
             ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject ?: error("No data for ${item.id}")
         val meta = result["meta"]?.jsonObject ?: error("No meta for ${item.id}")
@@ -179,8 +194,10 @@ class MarketsRepository(
     }
 
     private companion object {
-        /** Max concurrent Yahoo requests per batch — small enough to avoid the anti-bot throttle. */
-        const val YAHOO_BATCH = 8
+        /** Max simultaneous Yahoo requests — small enough to stay under the anti-bot throttle. */
+        const val YAHOO_CONCURRENCY = 5
+        /** Attempts per instrument (1 initial + retries) before giving up on it for this refresh. */
+        const val YAHOO_ATTEMPTS = 4
         const val YAHOO_UA =
             "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/120.0.0.0 Mobile Safari/537.36"
