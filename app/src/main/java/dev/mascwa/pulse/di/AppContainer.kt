@@ -34,7 +34,7 @@ class AppContainer(private val appContext: Context) {
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
-        dev.mascwa.pulse.data.update.UpdateRepository(appContext, http)
+        dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
     }
 
     /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,

@@ -53,7 +53,14 @@ class SettingsViewModel(
         viewModelScope.launch {
             _update.value = runCatching { updates.check() }.fold(
                 onSuccess = { info -> if (info == null) UpdateUi.UpToDate else UpdateUi.Available(info) },
-                onFailure = { UpdateUi.Error("Couldn't reach the update server — check your connection, sir.") },
+                onFailure = {
+                    val msg = if (updates.token() == null) {
+                        "Your repo is private — add a GitHub token (repo scope) in J.A.R.V.I.S. Setup, or make the repo public, sir."
+                    } else {
+                        "Couldn't reach the update server — check your connection or token, sir."
+                    }
+                    UpdateUi.Error(msg)
+                },
             )
         }
     }
@@ -64,7 +71,7 @@ class SettingsViewModel(
             ?: (_update.value as? UpdateUi.ReadyToInstall)?.info ?: return
         _update.value = UpdateUi.Downloading(0)
         viewModelScope.launch {
-            val file = runCatching { updates.download(info.apkUrl) { pct -> _update.value = UpdateUi.Downloading(pct) } }.getOrNull()
+            val file = runCatching { updates.download(info) { pct -> _update.value = UpdateUi.Downloading(pct) } }.getOrNull()
             _update.value = if (file != null) UpdateUi.ReadyToInstall(info, file) else UpdateUi.Error("Download failed — try again, sir.")
         }
     }
