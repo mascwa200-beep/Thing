@@ -72,6 +72,7 @@ class JarvisViewModel(
     private val curiosity: CuriosityEngine,
     private val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
+    private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -349,6 +350,12 @@ class JarvisViewModel(
                 val reply = if (useAgent) generateWithAgent(intent.text) else generateDirect(intent.text)
                 memory.append(Speaker.JARVIS, reply)
                 logChat("chat-out", reply)
+                // Cerebellum: learn whether the agent vs. direct path reliably handles requests like this.
+                val sig = dev.mascwa.pulse.core.telemetry.Cerebellum.signature(intent.text)
+                if (sig.isNotBlank()) {
+                    val ok = reply.isNotBlank() && !reply.trimStart().startsWith("//")
+                    cerebellum.observe("req:$sig", if (useAgent) "agent" else "direct", ok)
+                }
                 speakIfEnabled(reply)
                 maybeBeCurious()
             }
