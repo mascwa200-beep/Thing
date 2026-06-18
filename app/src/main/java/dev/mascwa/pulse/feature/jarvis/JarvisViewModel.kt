@@ -157,8 +157,8 @@ class JarvisViewModel(
         }
     }
 
-    /** Analyze a picked image with J.A.R.V.I.S. (cloud vision). [caption] is the optional question/prompt
-     *  typed alongside it. Cloud-only — the on-device model can't see images. */
+    /** Analyze a picked image with J.A.R.V.I.S. (cloud vision). [caption] is the optional question typed
+     *  alongside it. Cloud-only — the on-device model can't see images. */
     fun sendImage(context: Context, uri: Uri, caption: String) {
         if (_busy.value) return
         viewModelScope.launch {
@@ -167,26 +167,9 @@ class JarvisViewModel(
             val cap = caption.trim()
             memory.append(Speaker.USER, if (cap.isBlank()) "📎 [image]" else "📎 [image] $cap")
             try {
-                val vision = engine as? dev.mascwa.pulse.jarvis.inference.VisionEngine
-                if (vision == null || !runCatching { vision.supportsVision() }.getOrDefault(false)) {
-                    sayJarvis("I need a cloud AI key (Setup) to see images, sir — the on-device model can't analyze pictures.")
-                    return@launch
-                }
                 val dataUrl = encodeImage(context, uri)
-                if (dataUrl == null) {
-                    sayJarvis("I couldn't read that image, sir.")
-                    return@launch
-                }
-                val prompt = cap.ifBlank { "Describe and analyze this image in detail, sir." }
-                val system = withMemory(composePersona(), prompt)
-                val sb = StringBuilder()
-                vision.generateWithImages(prompt, listOf(dataUrl), system).collect { tok ->
-                    sb.append(tok)
-                    _streaming.value = sb.toString()
-                }
-                val reply = sb.toString().ifBlank { "…" }
-                memory.append(Speaker.JARVIS, reply)
-                speakIfEnabled(reply)
+                if (dataUrl == null) sayJarvis("I couldn't read that image, sir.")
+                else analyzeImages(cap.ifBlank { "Describe and analyze this image in detail, sir." }, listOf(dataUrl))
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -198,20 +181,144 @@ class JarvisViewModel(
         }
     }
 
-    /** Read [uri], downscale to a sane size, and JPEG-encode it as a base64 data URL for the vision API. */
+    /** Analyze a picked file: images & PDFs go to the vision model (PDFs rendered to page images),
+     *  text/code/CSV/JSON are read and reasoned over. [caption] is the optional question. */
+    fun sendFile(context: Context, uri: Uri, caption: String) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            _streaming.value = ""
+            val cap = caption.trim()
+            val name = fileName(context, uri)
+            memory.append(Speaker.USER, "📎 [file${name?.let { ": $it" } ?: ""}]" + if (cap.isBlank()) "" else " $cap")
+            try {
+                val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty().lowercase()
+                val prompt = cap.ifBlank { "Interpret and summarize this file, sir." }
+                when {
+                    mime.startsWith("image/") -> {
+                        val d = encodeImage(context, uri)
+                        if (d == null) sayJarvis("I couldn't read that image, sir.") else analyzeImages(prompt, listOf(d))
+                    }
+                    mime == "application/pdf" || name?.endsWith(".pdf", true) == true -> {
+                        val pages = renderPdf(context, uri)
+                        if (pages.isEmpty()) sayJarvis("I couldn't read that PDF, sir.") else analyzeImages(prompt, pages)
+                    }
+                    isTextual(mime, name) -> {
+                        val text = readTextFile(context, uri)
+                        if (text.isNullOrBlank()) {
+                            sayJarvis("That file looks empty or unreadable, sir.")
+                        } else {
+                            runCatching { engine.ensureReady() }
+                            val full = "$prompt\n\nFile \"${name ?: "document"}\" contents:\n${text.take(MAX_FILE_CHARS)}"
+                            val sb = StringBuilder()
+                            engine.generate(full, emptyList(), withMemory(composePersona(), prompt)).collect { tok ->
+                                sb.append(tok)
+                                _streaming.value = sb.toString()
+                            }
+                            val reply = sb.toString().ifBlank { "…" }
+                            memory.append(Speaker.JARVIS, reply)
+                            speakIfEnabled(reply)
+                        }
+                    }
+                    else -> sayJarvis("I can't read that file type, sir — try an image, a PDF, or a text/code file.")
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                memory.append(Speaker.JARVIS, "// file fault: ${e.message ?: "error"}")
+            } finally {
+                _streaming.value = ""
+                _busy.value = false
+            }
+        }
+    }
+
+    /** Stream a vision analysis of [dataUrls] into the chat (caller owns _busy). Cloud-only. */
+    private suspend fun analyzeImages(prompt: String, dataUrls: List<String>) {
+        val vision = engine as? dev.mascwa.pulse.jarvis.inference.VisionEngine
+        if (vision == null || !runCatching { vision.supportsVision() }.getOrDefault(false)) {
+            sayJarvis("I need a cloud AI key (Setup) to see images or PDFs, sir — the on-device model can't.")
+            return
+        }
+        if (dataUrls.isEmpty()) { sayJarvis("Nothing to analyze, sir."); return }
+        val sb = StringBuilder()
+        vision.generateWithImages(prompt, dataUrls, withMemory(composePersona(), prompt)).collect { tok ->
+            sb.append(tok)
+            _streaming.value = sb.toString()
+        }
+        val reply = sb.toString().ifBlank { "…" }
+        memory.append(Speaker.JARVIS, reply)
+        speakIfEnabled(reply)
+    }
+
+    /** Read [uri], downscale, and JPEG-encode it as a base64 data URL for the vision API. */
     private suspend fun encodeImage(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
         runCatching {
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
-            var bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
-            val longest = maxOf(bmp.width, bmp.height)
-            if (longest > MAX_IMAGE_PX) {
-                val scale = MAX_IMAGE_PX.toFloat() / longest
-                bmp = Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)
-            }
-            val out = ByteArrayOutputStream()
-            bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@runCatching null
+            encodeBitmap(downscale(bmp))
         }.getOrNull()
+    }
+
+    /** Render up to [MAX_PDF_PAGES] PDF pages to page images (data URLs) for the vision model. */
+    private suspend fun renderPdf(context: Context, uri: Uri): List<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val out = ArrayList<String>()
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                val renderer = android.graphics.pdf.PdfRenderer(pfd)
+                try {
+                    val pages = minOf(renderer.pageCount, MAX_PDF_PAGES)
+                    for (i in 0 until pages) {
+                        val page = renderer.openPage(i)
+                        try {
+                            val scale = MAX_IMAGE_PX.toFloat() / maxOf(page.width, page.height).coerceAtLeast(1)
+                            val w = (page.width * scale).toInt().coerceAtLeast(1)
+                            val h = (page.height * scale).toInt().coerceAtLeast(1)
+                            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                            bmp.eraseColor(android.graphics.Color.WHITE) // PDFs render onto transparency
+                            page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            out.add(encodeBitmap(bmp))
+                        } finally {
+                            page.close()
+                        }
+                    }
+                } finally {
+                    renderer.close()
+                }
+            }
+            out
+        }.getOrDefault(emptyList())
+    }
+
+    private suspend fun readTextFile(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.UTF_8) }
+        }.getOrNull()
+    }
+
+    private fun fileName(context: Context, uri: Uri): String? = runCatching {
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+    }.getOrNull()
+
+    private fun isTextual(mime: String, name: String?): Boolean {
+        if (mime.startsWith("text/")) return true
+        if (mime in TEXT_MIMES) return true
+        val n = name?.lowercase() ?: return false
+        return TEXT_EXTS.any { n.endsWith(it) }
+    }
+
+    private fun downscale(bmp: Bitmap): Bitmap {
+        val longest = maxOf(bmp.width, bmp.height)
+        if (longest <= MAX_IMAGE_PX) return bmp
+        val scale = MAX_IMAGE_PX.toFloat() / longest
+        return Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)
+    }
+
+    private fun encodeBitmap(bmp: Bitmap): String {
+        val out = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
+        return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     }
 
     /** Normal intent routing for a turn (also the path when a curiosity reply turns out to be a new
@@ -532,5 +639,18 @@ class JarvisViewModel(
         const val TAP_TO_TALK_TIMEOUT_MS = 10_000
         // Downscale the long edge of an uploaded image before sending to the vision API (token/cost cap).
         const val MAX_IMAGE_PX = 1024
+        // PDF: render at most this many pages to the vision model (cost cap).
+        const val MAX_PDF_PAGES = 3
+        // Text file: characters of content fed to the model (cost cap).
+        const val MAX_FILE_CHARS = 30_000
+        val TEXT_MIMES = setOf(
+            "application/json", "application/xml", "application/csv", "application/x-yaml",
+            "application/javascript", "application/x-sh", "application/sql",
+        )
+        val TEXT_EXTS = listOf(
+            ".txt", ".md", ".json", ".csv", ".tsv", ".xml", ".yml", ".yaml", ".log", ".ini", ".toml",
+            ".kt", ".java", ".py", ".js", ".ts", ".c", ".cpp", ".h", ".cs", ".go", ".rs", ".rb", ".php",
+            ".html", ".css", ".sh", ".gradle", ".properties", ".sql",
+        )
     }
 }
