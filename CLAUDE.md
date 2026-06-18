@@ -140,6 +140,17 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     centrally **scrubs raw credentials** (OpenAI/GitHub/Google/Slack key shapes + Bearer) from every logged
     label — a leaked key is transferable harm. Toggle: Settings → Storage → "Detailed activity log" (off =
     operational-only). This is the one place the app logs user content; everything else stays aggregated.
+- **Virtual cerebellum** (user: "give J.A.R.V.I.S. a virtual cerebellum") — a subconscious procedural-skill +
+  forward-model layer beneath the deliberate agent loop. Pure, CI-tested core in `core:telemetry/Cerebellum.kt`
+  (`Skill`/`CerebellumState`/`Prediction`; EWMA reinforcement `learn`, reflex `recall` [practiced + reliable →
+  automatic], forward-model `predict` with a **deviation/error signal**, `signature()` for request cues; capped
+  + LRU-evicted). On-device `data/cerebellum/CerebellumStore.kt` (debounced flush like UsageRepository) is fed
+  by the **`LoggingTool` decorator** — every tool call trains it as a *motor action* (`observeAction`: per-tool
+  reliability + `after:<prev>` sequence coordination) — and by `JarvisViewModel` at request level (`observe`:
+  agent-vs-direct path success per request signature). Consultative only: J.A.R.V.I.S. reads it via the
+  **`reflex` `JarvisTool`** (`reflex` / `reflex after <tool>` / `reflex predict <tool>`); persona says it
+  *informs but never replaces* deliberate choice (control-flow invariant intact). Cues/actions are tool names /
+  transitions / normalized signatures — no raw content. Control: Settings → Storage → **"Reset learned reflexes"**.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 

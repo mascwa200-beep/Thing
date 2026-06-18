@@ -75,6 +75,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.usage.UsageRepository(appContext, json)
     }
 
+    /** Virtual cerebellum: procedural-skill learning + forward-model error correction (on-device). */
+    val cerebellumStore: dev.mascwa.pulse.data.cerebellum.CerebellumStore by lazy {
+        dev.mascwa.pulse.data.cerebellum.CerebellumStore(appContext, json)
+    }
+
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
 
     val newsRepository: NewsRepository by lazy {
@@ -237,6 +242,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
+            dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
@@ -337,10 +343,10 @@ class AppContainer(private val appContext: Context) {
                 autoApply = { action -> approvalGate.apply(action) },
             ),
         ) else emptyList()
-        // Wrap every tool so each invocation lands in the on-device activity log (one place, all tools).
+        // Wrap every tool so each invocation lands in the activity log AND trains the cerebellum.
         val verboseLog = runCatching { settingsRepository.current().jarvis.verboseActivityLog }.getOrDefault(true)
         (agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools)
-            .map { dev.mascwa.pulse.jarvis.agent.LoggingTool(it, usageRepository, verboseLog) }
+            .map { dev.mascwa.pulse.jarvis.agent.LoggingTool(it, usageRepository, cerebellumStore, verboseLog) }
     }
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */

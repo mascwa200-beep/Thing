@@ -1,18 +1,23 @@
 package dev.mascwa.pulse.jarvis.agent
 
+import dev.mascwa.pulse.data.cerebellum.CerebellumStore
 import dev.mascwa.pulse.data.usage.UsageRepository
 
 /**
- * Transparent decorator that records each tool invocation to the on-device activity log, then
- * delegates. Wrapping the tool list (rather than editing the orchestrator) keeps the loop untouched
- * and means EVERY tool — base, self-edit and self-coding — is logged in one place.
+ * Transparent decorator around every tool. Two side-effects, then it delegates:
+ *  1. records the invocation to the on-device activity log, and
+ *  2. feeds the outcome to the virtual cerebellum as a *motor action* (so it learns each tool's
+ *     reliability and how tool-use chains together).
  *
- * When [verbose] (detailed logging on), the tool argument (which can carry user content) is logged too;
- * otherwise just the name + outcome. Either way [UsageRepository.log] scrubs raw credentials.
+ * Wrapping the tool list (rather than editing the orchestrator) keeps the loop untouched and means
+ * EVERY tool — base, self-edit and self-coding — is covered in one place. When [verbose] (detailed
+ * logging on), the tool argument (which can carry user content) is logged too; either way
+ * [UsageRepository.log] scrubs raw credentials. The cerebellum only ever sees the tool *name*.
  */
 class LoggingTool(
     private val delegate: JarvisTool,
     private val repo: UsageRepository,
+    private val cerebellum: CerebellumStore,
     private val verbose: Boolean = false,
 ) : JarvisTool {
     override val name: String get() = delegate.name
@@ -29,6 +34,7 @@ class LoggingTool(
             "${delegate.name}: $outcome"
         }
         repo.log("tool", label)
+        cerebellum.observeAction(delegate.name, ok)
         return result
     }
 }
