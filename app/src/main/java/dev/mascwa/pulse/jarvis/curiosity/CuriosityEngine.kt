@@ -84,13 +84,17 @@ class CuriosityEngine(
         return if (out.length in 3..240 && !out.startsWith("//")) out else contextualize(question, raw)
     }
 
-    /** Classify the user's reply to a "shall I remember this?" reflection. */
+    /** Classify the user's reply to a curiosity question / "shall I remember this?" reflection.
+     *  OTHER means "this isn't an answer" (a command or new question) — the caller should not capture it. */
     fun classify(text: String): Confirm {
         val t = text.lowercase().trim().trim('.', '!', ',', ' ')
+        if (t.isBlank()) return Confirm.OTHER
         val words = t.split(Regex("\\s+"))
-        if (words.size <= 3 && AFFIRM.any { t == it || t.startsWith("$it ") || t.endsWith(" $it") }) return Confirm.AFFIRM
-        if (words.size <= 3 && REJECT.any { t == it || t.startsWith("$it ") || t.endsWith(" $it") }) return Confirm.REJECT
-        if (t.endsWith("?") || QUESTION_STARTS.any { t == it || t.startsWith("$it ") }) return Confirm.OTHER
+        val first = words.first()
+        // A command or a fresh question is not an answer — check this FIRST so it's never mis-saved.
+        if (t.endsWith("?") || first in QUESTION_STARTS) return Confirm.OTHER
+        if (first in AFFIRM && words.size <= 4) return Confirm.AFFIRM
+        if (first in REJECT) return if (words.size <= 2) Confirm.REJECT else Confirm.CORRECTION
         return Confirm.CORRECTION
     }
 
@@ -177,8 +181,12 @@ class CuriosityEngine(
         // MAX level only — deliberately frequent (breaks character); gated + warned in the UI.
         const val MAX_MIN_INTERVAL_MS = 4 * 60_000L
         const val MAX_DAILY_CAP = 200
-        val AFFIRM = listOf("yes", "yeah", "yep", "yup", "sure", "ok", "okay", "correct", "right", "indeed", "exactly", "save", "keep", "do")
+        val AFFIRM = listOf("yes", "yeah", "yep", "yup", "sure", "ok", "okay", "correct", "right", "indeed", "exactly", "save", "keep")
         val REJECT = listOf("no", "nope", "nah", "discard", "forget", "skip", "cancel", "wrong", "incorrect", "don't")
-        val QUESTION_STARTS = listOf("what", "why", "how", "when", "where", "who", "which", "can", "could", "tell", "show", "set", "open", "play", "call", "text", "search", "status", "brief", "lockdown")
+        val QUESTION_STARTS = listOf(
+            "what", "why", "how", "when", "where", "who", "which", "can", "could", "would", "do", "does",
+            "tell", "show", "set", "open", "play", "call", "text", "email", "search", "remind", "navigate",
+            "copy", "clip", "torch", "alarm", "timer", "status", "brief", "lockdown",
+        )
     }
 }

@@ -187,6 +187,13 @@ class JarvisViewModel(
      *  save only on confirmation — so the user can correct it before it's stored. */
     private suspend fun handleCuriosityReply(pending: PendingLearn, text: String) {
         if (pending.staged == null) {
+            // If the user issued a command / new question instead of answering, don't capture it as the
+            // answer — drop the pending question and handle the message normally.
+            if (curiosity.classify(text) == CuriosityEngine.Confirm.OTHER) {
+                pendingLearn = null
+                routeTurn(text)
+                return
+            }
             val fact = curiosity.distill(pending.question, text)
             pendingLearn = pending.copy(staged = fact)
             sayJarvis("Noted — I'll remember: \"$fact\". Shall I keep that, sir? (yes / no — or just correct me.)")
