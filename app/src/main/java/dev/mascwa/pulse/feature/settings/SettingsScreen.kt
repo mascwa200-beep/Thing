@@ -531,6 +531,40 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
             }
             item { HorizontalDivider() }
 
+            // ----- Backup & restore (local, offline) -----
+            item {
+                val backupStatus by vm.backupStatus.collectAsStateWithLifecycle()
+                val exportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/json"),
+                ) { uri -> if (uri != null) vm.exportSettings(context, uri) }
+                val importLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri -> if (uri != null) vm.importSettings(context, uri) }
+                PrefSection("Backup & restore") {
+                    PrefClickable(
+                        "Back up settings",
+                        subtitle = "Save your watchlist, locations, emergency card, waypoints & preferences " +
+                            "to a file. API keys & tokens are left out for safety.",
+                        onClick = { exportLauncher.launch("pulse-backup.json") },
+                    )
+                    PrefClickable(
+                        "Restore from backup",
+                        subtitle = "Load settings from a backup file. Your current API keys & tokens are kept. " +
+                            "Handy after the one-time reinstall.",
+                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    )
+                    if (backupStatus.isNotBlank()) {
+                        Text(
+                            backupStatus,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Storage & about -----
             item {
                 PrefSection("Storage & about") {

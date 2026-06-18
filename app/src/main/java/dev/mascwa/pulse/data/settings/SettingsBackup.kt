@@ -1,0 +1,72 @@
+package dev.mascwa.pulse.data.settings
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * Local, offline backup/restore of [AppSettings] — written to / read from a user-chosen file via
+ * the Storage Access Framework. No network, nothing leaves the device unless the user shares the file.
+ *
+ * Sideloaded Pulse occasionally needs a one-time uninstall (after a signing change), which wipes all
+ * config; a backup lets the user keep their watchlist, saved locations, emergency card, waypoints and
+ * preferences across that reinstall.
+ *
+ * Credentials are deliberately excluded: export blanks the API keys + model/GitHub/cloud tokens so a
+ * backup file never carries secrets, and restore keeps whatever credentials the device already has.
+ */
+object SettingsBackup {
+    const val APP = "pulse"
+    const val VERSION = 1
+
+    /** Pretty, self-describing JSON; [encodeDefaults] so the header is always present and the file is
+     *  readable. Lenient on the way back in so older/newer backups still load (unknown keys ignored,
+     *  out-of-range enums coerced to defaults). */
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        explicitNulls = false
+        encodeDefaults = true
+        prettyPrint = true
+    }
+
+    @Serializable
+    data class Envelope(
+        val app: String = APP,
+        val version: Int = VERSION,
+        val exportedAtMs: Long = 0L,
+        val settings: AppSettings = AppSettings(),
+    )
+
+    /** Returns a copy with every credential blanked — safe to write to a shared/backed-up file. */
+    fun redactSecrets(s: AppSettings): AppSettings = s.copy(
+        apiKeys = ApiKeys(),
+        jarvis = s.jarvis.copy(modelToken = "", githubToken = "", cloudApiKey = ""),
+    )
+
+    /** Lay a restored backup over the device's CURRENT settings, preserving the device's existing
+     *  credentials (the backup never carries them). */
+    fun merge(restored: AppSettings, current: AppSettings): AppSettings = restored.copy(
+        apiKeys = current.apiKeys,
+        jarvis = restored.jarvis.copy(
+            modelToken = current.jarvis.modelToken,
+            githubToken = current.jarvis.githubToken,
+            cloudApiKey = current.jarvis.cloudApiKey,
+        ),
+    )
+
+    /** Serialize a redacted backup of [current] settings, stamped [nowMs]. */
+    fun encode(current: AppSettings, nowMs: Long): String =
+        json.encodeToString(
+            Envelope.serializer(),
+            Envelope(version = VERSION, exportedAtMs = nowMs, settings = redactSecrets(current)),
+        )
+
+    /** Parse a backup file's [text] into settings to apply, merged over [current] (keeps device
+     *  credentials). Throws if the text isn't a Pulse backup. */
+    fun decode(text: String, current: AppSettings): AppSettings {
+        val env = json.decodeFromString(Envelope.serializer(), text)
+        require(env.app == APP) { "That file isn't a Pulse backup." }
+        return merge(env.settings, current)
+    }
+}
