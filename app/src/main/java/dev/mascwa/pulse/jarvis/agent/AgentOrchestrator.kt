@@ -2,6 +2,7 @@ package dev.mascwa.pulse.jarvis.agent
 
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
+import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -21,8 +22,10 @@ class AgentOrchestrator(
     enum class Kind { THINKING, TOOL, FINAL }
     data class Step(val kind: Kind, val text: String)
 
-    /** Drives the loop, emitting progress [Step]s; the terminal step is [Kind.FINAL]. */
-    fun run(query: String, persona: String): Flow<Step> = flow {
+    /** Drives the loop, emitting progress [Step]s; the terminal step is [Kind.FINAL]. [history] is the
+     *  recent conversation (prior turns) so the model keeps short-term/conversational context — the engine
+     *  layers turn it into prior chat messages. */
+    fun run(query: String, persona: String, history: List<ChatTurn> = emptyList()): Flow<Step> = flow {
         // Resolve the live tool set each run, so toggling self-edit / registering an authored tool
         // takes effect without restarting.
         val tools = runCatching { toolsProvider() }.getOrDefault(emptyList())
@@ -39,7 +42,7 @@ class AgentOrchestrator(
         while (step < MAX_STEPS) {
             step++
             emit(Step(Kind.THINKING, "reasoning…"))
-            val out = collect(engine.generate(scratch.toString(), emptyList(), system)).trim()
+            val out = collect(engine.generate(scratch.toString(), history, system)).trim()
             val call = parseToolCall(out)
             if (call == null) {
                 emit(Step(Kind.FINAL, stripFinal(out)))
@@ -62,7 +65,7 @@ class AgentOrchestrator(
         }
         // Iterations exhausted — force a final answer from what we have.
         scratch.append("\nProvide your FINAL answer now using what you have.")
-        val out = collect(engine.generate(scratch.toString(), emptyList(), system)).trim()
+        val out = collect(engine.generate(scratch.toString(), history, system)).trim()
         emit(Step(Kind.FINAL, stripFinal(out).ifBlank { "I couldn't complete that with the tools available." }))
     }
 

@@ -324,10 +324,19 @@ class JarvisViewModel(
     private suspend fun composePersona(): String =
         JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
 
-    /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. */
+    /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. Recent
+     *  conversation is threaded in so the agent keeps short-term context (the durable-memory recall is
+     *  injected inside the loop separately). */
     private suspend fun generateWithAgent(text: String): String {
+        val recent = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
+        // Drop the just-appended current user turn — it's already the agent's query.
+        val history = if (recent.lastOrNull()?.let { it.role.equals("user", true) && it.text == text } == true) {
+            recent.dropLast(1)
+        } else {
+            recent
+        }
         val sb = StringBuilder()
-        agent.run(text, composePersona()).collect { step ->
+        agent.run(text, composePersona(), history).collect { step ->
             when (step.kind) {
                 AgentOrchestrator.Kind.THINKING -> _streaming.value = "◌ reasoning…"
                 AgentOrchestrator.Kind.TOOL -> _streaming.value = "⚙ ${step.text}"
