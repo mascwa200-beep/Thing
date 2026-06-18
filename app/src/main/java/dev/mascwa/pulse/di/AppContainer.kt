@@ -32,6 +32,10 @@ class AppContainer(private val appContext: Context) {
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
+    /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
+    val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
+        dev.mascwa.pulse.data.update.UpdateRepository(appContext, http)
+    }
 
     /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,
      *  authored tools). Separate DataStore file so it never migrates/wipes settings or the Room DB. */

@@ -9,6 +9,8 @@ import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import java.io.File
 
 /** Shares plain text (a link, coordinates, etc.) via the system share sheet. */
 fun shareText(context: Context, text: String, title: String = "Share") {
@@ -137,6 +139,34 @@ fun openSpotifySearch(context: Context, query: String): Boolean =
 /** Opens a maps app searching for [query] (place name / address). */
 fun searchMaps(context: Context, query: String): Boolean =
     launch(context, Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(query.trim()))))
+
+/** Whether this app may install APKs (the user has granted "install unknown apps"). */
+fun canInstallApks(context: Context): Boolean = context.packageManager.canRequestPackageInstalls()
+
+/** Send the user to grant "install unknown apps" for this app. */
+fun requestInstallPermission(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+/** Launch the system installer for [file] (an APK). Returns false (and routes to the unknown-sources
+ *  screen) when the install permission isn't granted yet; the installer itself is the user's confirm. */
+fun installApk(context: Context, file: File): Boolean {
+    if (!canInstallApks(context)) {
+        requestInstallPermission(context)
+        return false
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    return runCatching { context.startActivity(intent); true }.getOrDefault(false)
+}
 
 /** Opens a system settings panel by [which] (wifi/bluetooth/location/display/sound/battery/data/nfc/apps),
  *  or the main Settings screen when blank/unknown. */
