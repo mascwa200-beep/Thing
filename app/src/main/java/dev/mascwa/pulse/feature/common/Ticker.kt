@@ -11,9 +11,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -69,8 +72,21 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() 
             TickerSequence(items, c.muted, Modifier.onSizeChanged { if (it.width > 0) singleWidth = it.width })
             repeat(repeats - 1) { TickerSequence(items, c.muted, Modifier) }
         }
+        // Soft edge fades (into the carbon background) so items entering/leaving the viewport melt away
+        // instead of being chopped mid-word at the hard clip edge (e.g. "NASDAQ 100" → "ASDAQ 100").
+        Box(
+            Modifier.align(Alignment.CenterStart).fillMaxHeight().width(EDGE_FADE)
+                .background(Brush.horizontalGradient(listOf(c.carbon, Color.Transparent))),
+        )
+        Box(
+            Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(EDGE_FADE)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, c.carbon))),
+        )
     }
 }
+
+/** Width of the fade-out region at each end of the ticker viewport. */
+private val EDGE_FADE = 26.dp
 
 @Composable
 private fun TickerSequence(items: List<TickerItem>, symColor: Color, modifier: Modifier) {
