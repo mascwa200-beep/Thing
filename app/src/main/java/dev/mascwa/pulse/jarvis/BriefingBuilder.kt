@@ -12,7 +12,7 @@ import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.data.weather.WeatherData
 import dev.mascwa.pulse.data.weather.WeatherRepository
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
 import kotlin.math.abs
 
@@ -45,8 +45,8 @@ class BriefingBuilder(
         }
 
         runCatching {
-            val active = waypoints.active.first()
-            val manual = waypoints.waypoints.first().size
+            val active = waypoints.active.firstOrNull()
+            val manual = waypoints.waypoints.firstOrNull()?.size ?: 0
             val cal = runCatching { calendar.upcoming(1) }.getOrDefault(emptyList()).size
             if (active != null) parts += "You're tracking \"${active.label}\"."
             val total = manual + cal
