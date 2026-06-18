@@ -47,20 +47,27 @@ class MainActivity : ComponentActivity() {
         val gateResult = DeviceGate.evaluate()
         val startRoute = intent?.getStringExtra(EXTRA_ROUTE)
 
-        // Schedule the background refresh worker per the user's settings.
+        // Schedule the background refresh worker per the user's settings. Guarded so a startup
+        // hiccup (settings read, scheduling, or a service start) can never crash the launch.
         lifecycleScope.launch {
-            val settings = app.container.settingsRepository.current()
-            if (settings.notifications.masterEnabled) {
-                app.container.notificationScheduler.schedule(
-                    settings.refreshIntervalMinutes, settings.refreshOnlyOnWifi,
-                )
-            }
-            // Bring J.A.R.V.I.S. back online if the user left it resident.
-            if (settings.jarvis.residentService) {
-                dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(this@MainActivity)
-            }
-            if (settings.jarvis.vitalsTracking) {
-                dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity)
+            runCatching {
+                val settings = app.container.settingsRepository.current()
+                if (settings.notifications.masterEnabled) {
+                    app.container.notificationScheduler.schedule(
+                        settings.refreshIntervalMinutes, settings.refreshOnlyOnWifi,
+                    )
+                }
+                // Bring J.A.R.V.I.S. back online if the user left it resident.
+                if (settings.jarvis.residentService) {
+                    runCatching {
+                        dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService.start(
+                            this@MainActivity, wakeWord = settings.jarvis.wakeWord,
+                        )
+                    }
+                }
+                if (settings.jarvis.vitalsTracking) {
+                    runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }
+                }
             }
         }
 
@@ -72,6 +79,9 @@ class MainActivity : ComponentActivity() {
                 androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             val kp by hudVm.kp.collectAsStateWithLifecycle()
             val auroraPct by hudVm.auroraPct.collectAsStateWithLifecycle()
+            val solarWind by hudVm.solarWindKmS.collectAsStateWithLifecycle()
+            val bz by hudVm.bz.collectAsStateWithLifecycle()
+            val stormLevel by hudVm.stormLevel.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -98,6 +108,10 @@ class MainActivity : ComponentActivity() {
                         hasLocation = app.container.locationProvider.hasPermission(),
                         enabled = settings.hudStrip,
                         auroraPct = auroraPct,
+                        solarWindKmS = solarWind,
+                        bz = bz,
+                        stormLevel = stormLevel,
+                        dataStream = settings.hudDataStream,
                     ),
                 ) {
                 Box(Modifier.fillMaxSize()) {

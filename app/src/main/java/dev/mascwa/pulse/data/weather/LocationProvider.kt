@@ -111,9 +111,30 @@ class LocationProvider(private val context: Context) {
     private fun formatCoords(lat: Double, lon: Double): String =
         "%.3f, %.3f".format(lat, lon)
 
+    /** Forward geocode: place/address text -> coordinates. Online-only; null on failure/offline. */
+    suspend fun geocode(place: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
+        if (place.isBlank() || !Geocoder.isPresent()) return@withContext null
+        val geocoder = Geocoder(context, Locale.getDefault())
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                withTimeoutOrNull(4_000) {
+                    suspendCancellableCoroutine { cont: CancellableContinuation<Pair<Double, Double>?> ->
+                        geocoder.getFromLocationName(place, 1) { results ->
+                            cont.resume(results.firstOrNull()?.let { it.latitude to it.longitude })
+                        }
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocationName(place, 1)?.firstOrNull()?.let { it.latitude to it.longitude }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Online-only place name; returns null offline so the caller uses coordinates. */
-    private suspend fun reverseGeocode(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {
-        if (!Geocoder.isPresent()) return@withContext null
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {        if (!Geocoder.isPresent()) return@withContext null
         val geocoder = Geocoder(context, Locale.getDefault())
         try {
             if (Build.VERSION.SDK_INT >= 33) {

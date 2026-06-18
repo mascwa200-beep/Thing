@@ -90,7 +90,7 @@ fun WeatherScreen(vm: WeatherViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    items(state.searchResults, key = { "${it.name}_${it.latitude}" }) { loc ->
+                    items(state.searchResults.distinctBy { "${it.name}_${it.latitude}" }, key = { "${it.name}_${it.latitude}" }) { loc ->
                         Row(
                             Modifier.fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))

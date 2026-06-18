@@ -137,6 +137,8 @@ fun PulseApp(
                         openInflation = { navController.navigate(Routes.INFLATION) { launchSingleTop = true } },
                         openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
                         openSettings = { navigateTopLevel(Routes.SETTINGS) },
+                        openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
+                        openRadar = { navController.navigate(Routes.RADAR) { launchSingleTop = true } },
                     ),
                 )
             }
@@ -154,7 +156,7 @@ fun PulseApp(
             }
             composable(Routes.SETTINGS) {
                 val vm: SettingsViewModel = viewModel(factory = factory)
-                SettingsScreen(vm)
+                SettingsScreen(vm, onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } })
             }
             composable(Routes.ECONOMY) {
                 val vm: EconomyViewModel = viewModel(factory = factory)
@@ -253,11 +255,39 @@ fun PulseApp(
                     vm,
                     onBack = { navController.popBackStack() },
                     onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
+                    onOpenApprovals = { navController.navigate(Routes.JARVIS_APPROVALS) },
+                    onOpenMemory = { navController.navigate(Routes.JARVIS_MEMORY) },
                 )
             }
             composable(Routes.JARVIS_SETUP) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.JARVIS_APPROVALS) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisApprovalsScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.JARVIS_MEMORY) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisMemoryScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- 3D cyberpunk navigation map ----
+            composable(Routes.NAV) {
+                val vm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.nav.NavScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Objectives / waypoint tracker ----
+            composable(Routes.OBJECTIVES) {
+                val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.objectives.ObjectivesScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Diagnostics ----
+            composable(Routes.CRASH_LOG) {
+                val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.diagnostics.CrashLogScreen(vm, onBack = { navController.popBackStack() })
             }
         }
     }

@@ -14,6 +14,10 @@ val releaseKeyAlias = (project.findProperty("PULSE_RELEASE_KEY_ALIAS") as String
 val releaseKeyPassword = (project.findProperty("PULSE_RELEASE_KEY_PASSWORD") as String?).orEmpty()
 val hasReleaseSigning = releaseStoreFile.isNotBlank() && file(releaseStoreFile).exists()
 
+// CI passes -PPULSE_VERSION_CODE=<github run number> so each published build has a higher
+// versionCode than the last — Android blocks downgrades, so this keeps in-place updates working.
+val pulseBuildNumber = (project.findProperty("PULSE_VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+
 android {
     namespace = "dev.mascwa.pulse"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -22,8 +26,8 @@ android {
         applicationId = "dev.mascwa.pulse"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = pulseBuildNumber
+        versionName = "1.0.$pulseBuildNumber"
 
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en")
@@ -35,6 +39,15 @@ android {
     }
 
     signingConfigs {
+        // Pin the debug key to a committed keystore so every CI build is signed identically.
+        // Without this each runner generates a throwaway debug key, which makes Android reject
+        // the new APK as a signature change and forces an uninstall (wiping the model + data).
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (hasReleaseSigning) {
             create("release") {
                 storeFile = file(releaseStoreFile)
@@ -52,8 +65,17 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // This is the SHIPPED sideload build. It keeps the same package id + signing key as the
+            // previously-installed debug build (applicationIdSuffix ".debug" + the debug keystore
+            // fallback), so it updates IN PLACE — the on-device model and settings are preserved — while
+            // being non-debuggable so ART honours the baseline profile (the PGO-equivalent AOT win).
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            // R8 is intentionally OFF: baseline profiles don't need it, and minification risks runtime
+            // breakage (serialization/MediaPipe/Vosk/MapLibre/reflection) that CI can't catch. It can be
+            // enabled later once keep-rules are verified on-device.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -140,9 +162,23 @@ dependencies {
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
 
+    // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
+    // native libraries are packaged; the plain jar lacks them.
+    implementation(libs.vosk.android)
+    implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
+
+    // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
+    implementation(libs.maplibre.android)
+
+    // Pure-JVM Lua interpreter for sandboxed, user-approved tool authoring (no native / DEX loading).
+    implementation(libs.luaj.jse)
+
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    // Baseline Profiles: installs the app's + AndroidX libraries' profiles so ART AOT-compiles hot paths
+    // (faster cold start / less jank) on the non-debuggable shipped build.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,15 +16,23 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,10 +41,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.jarvis.inference.EngineState
@@ -43,14 +56,45 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Unit = {}) {
+fun JarvisScreen(
+    vm: JarvisViewModel,
+    onBack: () -> Unit,
+    onOpenSetup: () -> Unit = {},
+    onOpenApprovals: () -> Unit = {},
+    onOpenMemory: () -> Unit = {},
+) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
     val streaming by vm.streaming.collectAsState()
     val busy by vm.busy.collectAsState()
     val engineState by vm.engineState.collectAsState()
+    val cloudStatus by vm.cloudStatus.collectAsState()
     val banter by vm.banterLine.collectAsState()
+    val voiceReplies by vm.voiceReplies.collectAsState()
+    val voiceInput by vm.voiceInput.collectAsState()
+    val pendingCode by vm.pendingCode.collectAsState()
     val listState = rememberLazyListState()
+
+    val context = LocalContext.current
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.startVoiceInput() }
+    val onMic = {
+        val active = voiceInput is VoiceInputState.Listening || voiceInput is VoiceInputState.Preparing
+        when {
+            active -> vm.stopVoiceInput()
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED -> vm.startVoiceInput()
+            else -> micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // While the console is on-screen it owns the mic (tap-to-talk); the resident wake loop
+    // pauses and auto-resumes when we leave — so the two never fight over the recognizer.
+    DisposableEffect(Unit) {
+        vm.setConsoleActive(true)
+        onDispose { vm.setConsoleActive(false) }
+    }
 
     // Keep the latest turn in view as messages arrive / stream.
     LaunchedEffect(messages.size, streaming) {
@@ -66,8 +110,24 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
             }
         },
         actions = {
+            IconButton(onClick = { vm.setVoiceReplies(!voiceReplies) }) {
+                Icon(
+                    if (voiceReplies) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                    contentDescription = if (voiceReplies) "Mute voice" else "Speak replies",
+                    tint = if (voiceReplies) c.sky else c.muted,
+                )
+            }
+            IconButton(onClick = { vm.requestBrief() }, enabled = !busy) {
+                Icon(Icons.Filled.Campaign, contentDescription = "Brief me", tint = c.positive)
+            }
             IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
                 Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
+            }
+            IconButton(onClick = onOpenApprovals) {
+                Icon(Icons.Filled.Checklist, contentDescription = "Approvals", tint = c.amber)
+            }
+            IconButton(onClick = onOpenMemory) {
+                Icon(Icons.Filled.Psychology, contentDescription = "Memory", tint = c.positive)
             }
             IconButton(onClick = onOpenSetup) {
                 Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
@@ -77,16 +137,36 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
             }
         },
     ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(innerPadding)) {
-            StatusLine(engineState)
+        // imePadding lifts the input bar above the soft keyboard — the window is edge-to-edge
+        // (MainActivity.enableEdgeToEdge), so it doesn't auto-resize for the IME on its own.
+        Column(Modifier.fillMaxSize().padding(innerPadding).imePadding()) {
+            StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)
 
             if (messages.isEmpty() && streaming.isEmpty()) {
-                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.fillMaxWidth().weight(1f).padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                ) {
                     Text(
-                        "J.A.R.V.I.S. MATRIX ONLINE\nEverything runs on this device.",
-                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
-                        textAlign = TextAlign.Center,
+                        "J.A.R.V.I.S. MATRIX",
+                        fontFamily = JetBrainsMono, fontSize = 13.sp, letterSpacing = 2.sp, color = c.accent,
+                    )
+                    Text("Try:", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                    listOf(
+                        "\"Brief me\"  ·  \"What's the weather?\"  ·  \"Where am I?\"",
+                        "\"Remind me to stretch in 20 min\"  ·  \"Set an alarm for 7:30\"  *",
+                        "\"Text Alex I'm late\"  ·  \"Play Daft Punk\"  ·  \"Torch on\"  *",
+                        "\"Read your own code\"  ·  \"Add a feature that…\"  †",
+                        "Tap the mic to talk — or say “Jarvis” when resident",
+                    ).forEach {
+                        Text("•  $it", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                    }
+                    Text(
+                        "* device actions need Agent Tools (Setup).  † self-coding (Setup) lets J.A.R.V.I.S. " +
+                            "read & change its own code — you approve every change. Add a cloud key for the " +
+                            "smartest chat; tune Curiosity and review Memory in Setup too.",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                     )
                 }
             } else {
@@ -103,15 +183,76 @@ fun JarvisScreen(vm: JarvisViewModel, onBack: () -> Unit, onOpenSetup: () -> Uni
                 }
             }
 
-            InputBar(busy = busy, onSend = vm::send)
+            pendingCode?.let { action ->
+                CodeApprovalCard(
+                    action = action,
+                    onApprove = { vm.approveCode(action) },
+                    onReject = { vm.rejectCode(action) },
+                    enabled = !busy,
+                )
+            }
+
+            InputBar(busy = busy, voice = voiceInput, onSend = vm::send, onMic = onMic)
+        }
+    }
+}
+
+/** Inline approve/reject for a self-code change J.A.R.V.I.S. has staged — so the user can ship a code
+ *  change without leaving the console. The PR opens only on APPROVE (via the shared ApprovalGate). */
+@Composable
+private fun CodeApprovalCard(
+    action: dev.mascwa.pulse.data.selfedit.PendingAction,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    enabled: Boolean,
+) {
+    val c = Pulse.colors
+    NeonPanel(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        borderColor = c.amber.copy(alpha = 0.6f),
+        background = c.panel,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "◆ ${action.title}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber,
+            )
+            val diff = action.payload["diff"]
+            if (!diff.isNullOrBlank()) {
+                dev.mascwa.pulse.feature.common.DiffText(diff, maxLines = 14)
+                Text(
+                    "Full diff in Approvals (✓)",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+            } else {
+                Text(
+                    action.preview.take(280),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onApprove, enabled = enabled) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Approve & open PR", tint = c.positive)
+                }
+                IconButton(onClick = onReject, enabled = enabled) {
+                    Icon(Icons.Filled.DeleteSweep, contentDescription = "Reject", tint = c.magenta)
+                }
+                Text(
+                    "Approve → open PR",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun StatusLine(state: EngineState) {
+private fun StatusLine(state: EngineState, cloud: String?) {
     val c = Pulse.colors
-    val (label, color) = when (state) {
+    val (label, color) = if (cloud != null) {
+        "● CLOUD · ${cloud.uppercase(java.util.Locale.US)} ONLINE" to c.positive
+    } else when (state) {
         is EngineState.Ready -> "● MATRIX ONLINE" to c.positive
         is EngineState.Preparing -> "◌ PREPARING MODEL" to c.amber
         is EngineState.Downloading -> "↓ DOWNLOADING ${state.pct}%" to c.amber
@@ -164,7 +305,7 @@ private fun Bubble(text: String, isUser: Boolean) {
 }
 
 @Composable
-private fun InputBar(busy: Boolean, onSend: (String) -> Unit) {
+private fun InputBar(busy: Boolean, voice: VoiceInputState, onSend: (String) -> Unit, onMic: () -> Unit) {
     val c = Pulse.colors
     var input by remember { mutableStateOf("") }
     fun submit() {
@@ -173,37 +314,65 @@ private fun InputBar(busy: Boolean, onSend: (String) -> Unit) {
             input = ""
         }
     }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextField(
-            value = input,
-            onValueChange = { input = it },
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text("Speak to the Matrix…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
-            },
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submit() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = c.panel,
-                unfocusedContainerColor = c.panel,
-                focusedIndicatorColor = c.accent,
-                unfocusedIndicatorColor = c.lineSoft,
-                cursorColor = c.accent,
-                focusedTextColor = c.ink,
-                unfocusedTextColor = c.ink,
-            ),
-        )
-        IconButton(onClick = { submit() }, enabled = !busy) {
-            Icon(
-                Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Send",
-                tint = if (busy) c.muted else c.accent,
+    Column {
+        VoiceLine(voice)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text("Speak to the Matrix…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
+                },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submit() }),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = c.panel,
+                    unfocusedContainerColor = c.panel,
+                    focusedIndicatorColor = c.accent,
+                    unfocusedIndicatorColor = c.lineSoft,
+                    cursorColor = c.accent,
+                    focusedTextColor = c.ink,
+                    unfocusedTextColor = c.ink,
+                ),
             )
+            val listening = voice is VoiceInputState.Listening || voice is VoiceInputState.Preparing
+            IconButton(onClick = onMic) {
+                Icon(
+                    if (listening) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (listening) "Stop listening" else "Speak",
+                    tint = if (listening) c.magenta else c.sky,
+                )
+            }
+            IconButton(onClick = { submit() }, enabled = !busy) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (busy) c.muted else c.accent,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun VoiceLine(voice: VoiceInputState) {
+    val c = Pulse.colors
+    val (text, color) = when (voice) {
+        is VoiceInputState.Preparing -> ("◌ " + voice.status.ifBlank { "PREPARING VOICE…" }.uppercase()) to c.amber
+        is VoiceInputState.Listening ->
+            ("● LISTENING… " + voice.partial.ifBlank { "(speak now)" }) to c.magenta
+        is VoiceInputState.Error -> "✕ ${voice.message}" to c.magenta
+        is VoiceInputState.Idle -> return
+    }
+    Text(
+        text,
+        fontFamily = JetBrainsMono, fontSize = 10.sp, color = color,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }

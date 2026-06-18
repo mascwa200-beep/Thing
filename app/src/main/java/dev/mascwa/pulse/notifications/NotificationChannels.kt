@@ -14,6 +14,7 @@ object NotificationChannels {
     const val SPACE = "channel_space"
     const val SAFETY = "channel_safety"
     const val FLIGHT = "channel_flight"
+    const val REMINDERS = "channel_reminders"
 
     fun ensure(context: Context) {
         val mgr = context.getSystemService<NotificationManager>() ?: return
@@ -53,6 +54,11 @@ object NotificationChannels {
                 context.getString(R.string.channel_flight_name),
                 NotificationManager.IMPORTANCE_LOW,
             ).apply { description = context.getString(R.string.channel_flight_desc) },
+            NotificationChannel(
+                REMINDERS,
+                context.getString(R.string.channel_reminders_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { description = context.getString(R.string.channel_reminders_desc) },
         )
         mgr.createNotificationChannels(channels)
     }

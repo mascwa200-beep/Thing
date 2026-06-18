@@ -15,6 +15,10 @@ import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.SkyDigest
+import dev.mascwa.pulse.data.radar.RadarData
+import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.selfedit.ActionType
+import dev.mascwa.pulse.data.selfedit.SelfEditStore
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -39,6 +43,12 @@ data class HomeUiState(
     val tech: Async<List<Article>> = Async(loading = true),
     val popculture: Async<List<Article>> = Async(loading = true),
     val skyLines: List<String> = emptyList(),
+    /** One-line J.A.R.V.I.S. status for the home assistant card (brain + resident/wake flags). */
+    val jarvisStatus: String = "",
+    /** Live aircraft near the user (TACNET/ADS-B) for the home flight card; null until fetched. */
+    val radar: Async<RadarData> = Async(loading = true),
+    /** Staged self-code changes awaiting the user's approval (nudge on the home assistant card). */
+    val pendingCode: Int = 0,
 )
 
 class HomeViewModel(
@@ -51,12 +61,23 @@ class HomeViewModel(
     private val settings: SettingsRepository,
     private val orbital: OrbitalRepository,
     private val space: SpaceWeatherRepository,
+    private val radar: RadarRepository,
+    private val selfEdit: SelfEditStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    init { load(force = false) }
+    init {
+        load(force = false)
+        // Live count of self-code changes awaiting approval, surfaced on the assistant card.
+        viewModelScope.launch {
+            selfEdit.state.collect { se ->
+                val n = se.pendingActions.count { it.type == ActionType.CODE_PR }
+                _state.update { it.copy(pendingCode = n) }
+            }
+        }
+    }
 
     fun refresh() = load(force = true)
 
@@ -64,7 +85,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val s = settings.current()
             val sections = s.homeSections
-            _state.update { it.copy(sections = sections) }
+            _state.update { it.copy(sections = sections, jarvisStatus = jarvisStatus(s)) }
 
             // Above-the-fold first (instant from cache, snappier cold start)…
             if (HomeSection.HEADLINES in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TOP, f) }) { st, a -> st.copy(headlines = a) }
@@ -82,8 +103,22 @@ class HomeViewModel(
                 if (HomeSection.TECH in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.TECH, f) }) { st, a -> st.copy(tech = a) }
                 if (HomeSection.POPCULTURE in sections) launchInto(force, { f -> news.fetchCategory(NewsCategory.POPCULTURE, f) }) { st, a -> st.copy(popculture = a) }
                 loadSky(force, s)
+                loadRadar(force, s)
             }
         }
+    }
+
+    /** One-line assistant status from settings (no engine dependency): which brain is active and whether
+     *  it's resident / listening for the wake word. */
+    private fun jarvisStatus(s: dev.mascwa.pulse.data.settings.AppSettings): String {
+        val j = s.jarvis
+        val brain = if (j.cloudActive) "CLOUD · ${j.cloudProvider.label.uppercase()}" else "ON-DEVICE"
+        val flags = buildList {
+            if (j.residentService) add("RESIDENT")
+            if (j.wakeWord) add("WAKE WORD")
+            if (j.selfCodingEnabled) add("SELF-CODING")
+        }
+        return (listOf(brain) + flags).joinToString(" · ")
     }
 
     /** "Today in the sky" digest line — orbital + space weather (keyless). */
@@ -99,6 +134,16 @@ class HomeViewModel(
         val sw = runCatching { space.fetch(false, lat, lon).data }.getOrNull()
         val lines = SkyDigest.lines(orb, sw, lat, lon)
         _state.update { it.copy(skyLines = lines) }
+    }
+
+    /** Live aircraft near the user — only when we have a real device-location origin (otherwise plotting
+     *  around a default point would be misleading, so the card stays hidden). */
+    private suspend fun loadRadar(force: Boolean, s: dev.mascwa.pulse.data.settings.AppSettings) {
+        if (!(s.useDeviceLocation && location.hasPermission())) return
+        val loc = location.current() ?: return
+        val flow = MutableStateFlow<Async<RadarData>>(Async(loading = true))
+        viewModelScope.launch { flow.collect { a -> _state.update { it.copy(radar = a) } } }
+        flow.load(force) { radar.fetch(loc.latitude, loc.longitude, it) }
     }
 
     private fun <T> launchInto(

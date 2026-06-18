@@ -70,6 +70,8 @@ class HomeNav(
     val openInflation: () -> Unit,
     val openFuel: () -> Unit,
     val openSettings: () -> Unit,
+    val openAssistant: () -> Unit = {},
+    val openRadar: () -> Unit = {},
 )
 
 private data class FeedChip(val label: String, val key: String)
@@ -135,8 +137,8 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         c.muted,
                     )
                 }
-                // ticker from live markets
-                Ticker(tickerItems(state.markets.data))
+                // ticker from live markets — tap to open the full Markets screen
+                Ticker(tickerItems(state.markets.data), onClick = nav.openMarkets)
             }
         },
     ) { innerPadding ->
@@ -156,9 +158,22 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // Greeting
                 item { Greeting() }
 
+                // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
+                item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
+
+                // Compact weather (temp + rain) above the sky digest.
+                if (state.weather.data?.current != null) {
+                    item { WeatherMiniWidget(state.weather, nav.openWeather) }
+                }
+
                 // Today in the sky
                 if (state.skyLines.isNotEmpty()) {
                     item { SkyDigestCard(state.skyLines) }
+                }
+
+                // Live aircraft overhead (only when there are any)
+                state.radar.data?.takeIf { it.aircraftCount() > 0 }?.let { rd ->
+                    item { FlightCard(rd, nav.openRadar) }
                 }
 
                 // Breaking hero
@@ -186,7 +201,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                     "pol" -> state.politics.data
                     "cult" -> state.popculture.data
                     else -> state.headlines.data
-                }.orEmpty().take(12)
+                }.orEmpty().distinctBy { it.url }.take(12)
                 if (feed.isEmpty()) {
                     item {
                         Text(
@@ -206,10 +221,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                     item { SectionBar("Markets", trailing = "VIEW ▸", onTrailing = nav.openMarkets) }
                     item { MarketsSnapshot(state.markets, nav.openMarkets) }
                 }
-                if (HomeSection.WEATHER in sections) {
-                    item { SectionBar("Weather", trailing = "VIEW ▸", onTrailing = nav.openWeather) }
-                    item { WeatherSnapshot(state.weather, nav.openWeather) }
-                }
+                // Weather already shown by the hero WeatherMiniWidget above — no duplicate section here.
                 if (HomeSection.INFLATION in sections || HomeSection.ECONOMY in sections) {
                     item { SectionBar("Economy", trailing = "VIEW ▸", onTrailing = nav.openEconomy) }
                     item { EconomySnapshot(state, nav.openEconomy) }
@@ -264,6 +276,72 @@ private fun Greeting() {
             Text("Here's your ", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
             Text("world", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.accent)
             Text(".", fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 23.sp, color = c.ink)
+        }
+    }
+}
+
+@Composable
+private fun AssistantCard(status: String, pendingCode: Int, onOpen: () -> Unit) {
+    val c = Pulse.colors
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onOpen() },
+        corners = true,
+        borderColor = if (pendingCode > 0) c.amber.copy(alpha = 0.6f) else c.accent.copy(alpha = 0.5f),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
+            Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                Text(
+                    "J.A.R.V.I.S.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 2.sp,
+                    fontWeight = FontWeight.Bold, color = c.accent,
+                )
+                Text(
+                    status.ifBlank { "Tap to talk" },
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.5.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                if (pendingCode > 0) {
+                    Text(
+                        "◆ $pendingCode change${if (pendingCode == 1) "" else "s"} awaiting your approval",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+            Text(if (pendingCode > 0) "REVIEW ▸" else "TALK ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
+        }
+    }
+}
+
+@Composable
+private fun FlightCard(data: dev.mascwa.pulse.data.radar.RadarData, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val count = data.aircraftCount()
+    val nearest = data.contacts
+        .filter { it.kind == dev.mascwa.pulse.data.radar.ContactKind.AIRCRAFT.name }
+        .minByOrNull { it.distanceMeters }
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onClick() },
+        corners = true,
+        borderColor = c.sky.copy(alpha = 0.4f),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("✈", fontSize = 18.sp)
+            Column(Modifier.padding(start = 10.dp).weight(1f)) {
+                Text(
+                    "$count AIRCRAFT NEARBY",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.sky,
+                )
+                if (nearest != null) {
+                    Text(
+                        "Nearest: ${nearest.label.ifBlank { "—" }} · ${Formatters.number(nearest.distanceMeters / 1000.0, 1)} km",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+            Text("SCOPE ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
         }
     }
 }
@@ -363,21 +441,30 @@ private fun MarketsSnapshot(async: Async<List<Quote>>, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WeatherSnapshot(async: Async<dev.mascwa.pulse.data.weather.WeatherData>, onClick: () -> Unit) {
+private fun WeatherMiniWidget(async: Async<dev.mascwa.pulse.data.weather.WeatherData>, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
-        val wd = async.data
-        val cur = wd?.current
-        if (cur == null) {
-            Text(if (async.loading) "Loading…" else "—", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(WeatherCode.emoji(cur.weatherCode, cur.isDay), fontSize = 34.sp)
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text("${Formatters.number(cur.temperature, 0)}${wd.tempUnitSymbol} · ${WeatherCode.describe(cur.weatherCode)}",
-                        fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = c.ink)
-                    Text(wd.locationName.uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-                }
+    val wd = async.data ?: return
+    val cur = wd.current ?: return
+    val rain = wd.hourly.take(6).mapNotNull { it.precipProbability }.maxOrNull()
+    NeonPanel(Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onClick() }, corners = true) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(WeatherCode.emoji(cur.weatherCode, cur.isDay), fontSize = 22.sp)
+            Text(
+                "${Formatters.number(cur.temperature, 0)}${wd.tempUnitSymbol}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = c.ink,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+            Text(
+                WeatherCode.describe(cur.weatherCode),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+                modifier = Modifier.padding(start = 10.dp).weight(1f),
+            )
+            if (rain != null) {
+                Text(
+                    "☂ $rain%",
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    color = if (rain >= 50) c.sky else c.muted,
+                )
             }
         }
     }

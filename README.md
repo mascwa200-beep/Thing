@@ -61,16 +61,22 @@ say to it is transmitted. Open it from the grid tile.
 
 - **On-device LLM** — answers come from a local **MediaPipe LLM Inference** model
   (standalone, no Google Play Services). Provision a model in **Setup**: paste a
-  direct URL to a MediaPipe `.task` model (e.g. a Gemma `.task` on Hugging Face,
-  with an optional access token for gated hosts) and it streams to private app
-  storage. Until then — or with all networking off — the assistant answers from a
-  deterministic **persona core** that never fabricates facts. Conversation history
-  persists locally (Room).
+  direct URL to a MediaPipe-compatible model — a `.task` bundle **or** a LiteRT-LM
+  `.litertlm` (e.g. a Gemma `.litertlm` on Hugging Face, with an optional access
+  token for gated hosts) — and it streams to private app storage under the matching
+  filename so the runtime detects the format. Until then — or with all networking
+  off — the assistant answers from a deterministic **persona core** that never
+  fabricates facts. Conversation history persists locally (Room).
+- **Voice (on-device)** — optional spoken replies via the device's text-to-speech,
+  **tap-to-talk** speech input, and an opt-in **"J.A.R.V.I.S." wake word**, all
+  processed on the phone (Vosk for recognition — no Play Services, no account). The
+  small speech model downloads on first use; audio is never recorded or transmitted.
 - **Proactive context (banter)** — it narrates *real* device state (battery,
   charging, power-save, network, time) and reacts to threshold crossings; ask for
   "status" and it answers from live telemetry, not the model.
 - **Active-Matrix** — an opt-in foreground service that keeps the assistant
-  resident and surfaces proactive remarks in an ongoing notification.
+  resident and surfaces proactive remarks in an ongoing notification; it also hosts
+  the wake word when that's enabled.
 - **Vitals (opt-in)** — pair a Bluetooth LE heart-rate strap (GATT `0x180D`/`0x2A37`)
   and it checks in if your heart rate spikes **without** a rise in movement. Honest
   no-op when no strap is connected.
@@ -84,8 +90,13 @@ Built as Gradle modules: `:core:database` (Room state + memory),
 `:core:model-inference` (the inference abstraction + MediaPipe engine + downloader),
 `:core:telemetry` (device context, banter, intent router, vitals analyzer), and `:app`.
 
-> **Privacy & honesty:** no model is bundled; the model you provide stays on-device;
+> **Privacy & honesty:** no LLM is bundled; the model you provide stays on-device;
 > infeasible actions are surfaced as "needs Settings"/"unsupported" rather than faked.
+
+> **Resilience:** an app-wide crash guard logs any uncaught fault to an on-device
+> **crash console** (SYS → Storage & about → Crash log; view/share/clear), and the
+> risky paths (model load, foreground services, BLE, mic) fail soft instead of
+> crashing. Native C++ crashes inside the LLM remain outside the JVM's reach.
 
 ## Tech stack
 

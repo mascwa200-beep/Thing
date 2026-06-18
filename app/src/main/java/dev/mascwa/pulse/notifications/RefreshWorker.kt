@@ -40,28 +40,50 @@ class RefreshWorker(
             return Result.success()
         }
 
-        var state = readState()
         val notifier = container.notifier
 
-        // --- Breaking news ---
-        if (prefs.breakingNews) {
+        // --- App update available? (in-app updater; dedup by build number) ---
+        if (prefs.updateChecks) {
             runCatching {
-                val top = container.newsRepository.fetchCategory(NewsCategory.TOP, force = true).data
-                val currentUrls = top.take(20).map { it.url }
-                val firstRun = state.seenTopUrls.isEmpty()
-                val fresh = top.filter { it.url !in state.seenTopUrls }
-                if (!firstRun && fresh.isNotEmpty()) {
-                    val lead = fresh.first()
-                    val extra = if (fresh.size > 1) " (+${fresh.size - 1} more)" else ""
-                    notifier.notifyBreaking(
-                        id = 1001,
-                        title = "Breaking" + (lead.source.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
-                        body = lead.title + extra,
+                val info = container.updateRepository.check()
+                if (info != null && info.versionCode > settings.lastUpdateNotifiedCode) {
+                    notifier.notifyUpdate(
+                        id = 7401,
+                        title = "J.A.R.V.I.S. update available",
+                        body = "Build #${info.versionCode} is ready — tap to download & install.",
                     )
+                    container.settingsRepository.update { it.copy(lastUpdateNotifiedCode = info.versionCode) }
                 }
-                state = state.copy(seenTopUrls = currentUrls)
             }
         }
+
+        // --- Self-coding: auto-merge J.A.R.V.I.S.'s own PRs once CI is green (opt-in) ---
+        val jcfg = settings.jarvis
+        if (jcfg.selfCodingEnabled && jcfg.selfCodeAutoMerge) {
+            runCatching {
+                container.gitHubRepo.openSelfPrs().forEach { pr ->
+                    if (container.gitHubRepo.checksState(pr.headSha) == "success") {
+                        // Merge closes the PR, so it won't reappear next cycle — notify once, no dedup state.
+                        if (container.gitHubRepo.merge(pr.number)) {
+                            notifier.notifyUpdate(
+                                id = 7402 + (pr.number and 0xFF),
+                                title = "J.A.R.V.I.S. shipped a change",
+                                body = "Merged PR #${pr.number} — a new build will follow; you'll be prompted to install it.",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
+        if (prefs.breakingNews) {
+            runCatching { BreakingNewsPulse.check(container) }
+        }
+
+        // Read the rest of the dedup state AFTER the breaking check so we don't clobber its
+        // seenTopUrls update when we persist the other sections below.
+        var state = readState()
 
         // --- Market / price alerts ---
         if (prefs.marketAlerts) {

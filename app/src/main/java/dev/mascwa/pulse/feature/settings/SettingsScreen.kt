@@ -32,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +43,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.core.util.installApk
+import dev.mascwa.pulse.feature.settings.SettingsViewModel.UpdateUi
 import dev.mascwa.pulse.data.settings.CustomFeed
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.PrecipUnit
@@ -54,7 +57,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel) {
+fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -82,6 +85,89 @@ fun SettingsScreen(vm: SettingsViewModel) {
     PulseScaffold(title = "Settings") { innerPadding ->
         LazyColumn(modifier = Modifier.padding(innerPadding), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
 
+            // ----- Software update (in-app updater) -----
+            item {
+                val u by vm.updateState.collectAsStateWithLifecycle()
+                // Auto-check on open so arriving from the update notification lands on the action.
+                LaunchedEffect(Unit) { vm.checkForUpdate() }
+                PrefSection("Software update") {
+                    val status = when (val st = u) {
+                        is UpdateUi.Checking -> "Checking for a newer build…"
+                        is UpdateUi.UpToDate -> "You're on the latest build."
+                        is UpdateUi.Available -> "Update available — build #${st.info.versionCode}."
+                        is UpdateUi.Downloading -> "Downloading ${st.pct}%…"
+                        is UpdateUi.ReadyToInstall -> "Downloaded — tap Install now."
+                        is UpdateUi.Error -> st.message
+                        else -> "Tap to check for a new version."
+                    }
+                    PrefClickable(
+                        "Check for updates",
+                        value = "v${vm.installedVersion}",
+                        subtitle = status,
+                        onClick = {
+                            android.widget.Toast.makeText(context, "Checking for updates…", android.widget.Toast.LENGTH_SHORT).show()
+                            vm.checkForUpdate()
+                        },
+                    )
+                    when (val st = u) {
+                        is UpdateUi.Available -> PrefClickable(
+                            "Download & install",
+                            subtitle = st.info.notes.take(140).ifBlank { "Get build #${st.info.versionCode}" },
+                            onClick = { vm.downloadUpdate() },
+                        )
+                        is UpdateUi.ReadyToInstall -> PrefClickable(
+                            "Install now",
+                            subtitle = "Opens the system installer — you confirm the update. If it says " +
+                                "\"App not installed\", uninstall the old Pulse once (a one-time signing " +
+                                "change), then install — every update after that is seamless.",
+                            onClick = { installApk(context, st.file) },
+                        )
+                        is UpdateUi.Error -> PrefClickable("Retry", onClick = { vm.downloadUpdate() })
+                        else -> {}
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
+            // ----- Self-coding (experimental) -----
+            item {
+                PrefSection("Self-coding (experimental)") {
+                    PrefSwitch(
+                        "Enable self-coding",
+                        "Let J.A.R.V.I.S. read and change its own code and open GitHub PRs. Needs a " +
+                            "write-scoped GitHub token in J.A.R.V.I.S. Setup.",
+                        checked = s.jarvis.selfCodingEnabled,
+                        onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodingEnabled = v)) } },
+                    )
+                    if (s.jarvis.selfCodingEnabled) {
+                        PrefSwitch(
+                            "Auto-merge on green CI",
+                            "Merge its PRs automatically once the build passes — you still confirm the " +
+                                "install. Off = you review and merge each PR yourself.",
+                            checked = s.jarvis.selfCodeAutoMerge,
+                            onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
+                        )
+                        Text(
+                            "Just tell J.A.R.V.I.S. what to build — in the console or by voice (e.g. \"read your " +
+                                "own code\" or \"add a … feature\"). It plans the files, drafts the change, and you " +
+                                "approve it in chat or the Approvals screen before any PR opens.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                        Text(
+                            "⚠ Experimental. The AI writes app code; CI must pass before anything can ship, " +
+                                "protected files (CI/signing/safety gates) are off-limits, and you confirm every " +
+                                "install. Turn this off to halt it.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Appearance -----
             item {
                 PrefSection("Appearance") {
@@ -100,6 +186,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     }
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
+                    }
+                    PrefSwitch("HUD data-stream", "Second-row live telemetry marquee + tap-to-scan", s.hudDataStream) { v ->
+                        vm.update { it.copy(hudDataStream = v) }
                     }
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
@@ -175,6 +264,9 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     val on = s.notifications.masterEnabled
                     PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                    PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
+                        checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
                     PrefSwitch("Market & price alerts", checked = s.notifications.marketAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
                     PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,
@@ -189,6 +281,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
+                    PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(updateChecks = v)) } })
                     SingleChoiceRow(
                         "Digest time", s.notifications.digestHour,
                         (0..23).map { it to "%02d:00".format(it) }, enabled = on && s.notifications.dailyDigest,
@@ -432,6 +526,8 @@ fun SettingsScreen(vm: SettingsViewModel) {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
+                        onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
                         onClick = { vm.resetToDefaults() })
                     Text(

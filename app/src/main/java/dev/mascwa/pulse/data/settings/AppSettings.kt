@@ -1,5 +1,8 @@
 package dev.mascwa.pulse.data.settings
 
+import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.jarvis.inference.ChatFormat
+import dev.mascwa.pulse.jarvis.inference.CloudProvider
 import kotlinx.serialization.Serializable
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -119,14 +122,67 @@ data class JarvisSettings(
     val modelUrl: String = "",
     /** Optional Bearer token for gated hosts (e.g. a Hugging Face access token). */
     val modelToken: String = "",
-    /** Max tokens generated per turn. */
-    val maxTokens: Int = 1024,
+    /** Model's total token budget (input context + output). The engine reserves part for the answer
+     *  and clamps the input to the rest, so a long chat can't overflow the context and crash. */
+    val maxTokens: Int = 2048,
     /** Keep J.A.R.V.I.S. resident via the Active-Matrix foreground service. */
     val residentService: Boolean = false,
     /** Monitor a paired BLE heart-rate strap and check in on anomalies (opt-in). */
     val vitalsTracking: Boolean = false,
+    /** Speak replies aloud using the device's on-device text-to-speech engine. */
+    val voiceReplies: Boolean = false,
+    /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
+    val wakeWord: Boolean = false,
+    /** After a spoken reply, reopen the mic briefly so you can answer WITHOUT re-saying the wake word
+     *  (Alexa-style follow-up). Ends when you stay silent. Requires the wake word. */
+    val followUpMode: Boolean = false,
+    /** Let J.A.R.V.I.S. autonomously keep a spoken conversation going (when its reply expects a
+     *  response) and announce when it's wrapping up. Builds on follow-up; requires the wake word. */
+    val conversationMode: Boolean = false,
+    /** When a cloud brain (e.g. OpenRouter) is active, pass the wake-word command transcript through it
+     *  once to fix speech-to-text mishears before acting — better understanding without a heavier STT
+     *  model. No effect unless [cloudActive]. On by default; adds one short cloud round-trip per command. */
+    val voiceCloudInterpret: Boolean = true,
+    /** Speak proactive context remarks aloud while resident (greeting on start, reactions to power/network
+     *  changes) — not just show them in the notification. Off by default; respects quiet hours and never
+     *  speaks while the console is open or mid-command. Requires the resident service + a TTS engine. */
+    val speakProactive: Boolean = false,
+    /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
+    val agentToolsEnabled: Boolean = false,
+    /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
+    val githubToken: String = "",
+    /**
+     * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
+     * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
+     */
+    val chatFormat: ChatFormat = ChatFormat.AUTO,
+    /** MediaPipe inference backend: 0=auto (let it choose), 1=GPU, 2=CPU. Auto-falls back to CPU if a
+     *  GPU decode crashes the inference process. CPU is slower but far more compatible. */
+    val inferenceBackend: Int = 0,
+    /** Let J.A.R.V.I.S. PROPOSE edits to its own persona/knowledge/tools + research (each applied only
+     *  on your explicit approval in the Approvals screen). Opt-in; requires agent tools too. */
+    val selfEditEnabled: Boolean = false,
+    /** Use a cloud AI for chat instead of the on-device model (opt-in). When on AND [cloudApiKey] is
+     *  set, chat + the agent loop call the provider — chat text leaves the device. Voice stays local. */
+    val cloudEnabled: Boolean = false,
+    /** Which cloud provider's OpenAI-compatible endpoint to call. */
+    val cloudProvider: CloudProvider = CloudProvider.OPENROUTER,
+    /** API key for [cloudProvider] (get one at its keyUrl). Stays on-device in settings. */
+    val cloudApiKey: String = "",
+    /** Optional model override; blank uses the provider's default model. */
+    val cloudModel: String = "",
+    /** How often J.A.R.V.I.S. asks a gap-filling "curiosity" question: 0 Off / 1 Low / 2 Medium / 3 High. */
+    val curiosityLevel: Int = 1,
+    /** Let J.A.R.V.I.S. draft changes to its OWN source and open GitHub PRs (experimental; needs a
+     *  write-scoped GitHub token). Off by default. */
+    val selfCodingEnabled: Boolean = false,
+    /** When self-coding is on, auto-merge its PRs once CI is green (then the updater offers the build,
+     *  which you still confirm). Off by default. Never merges on a red/pending build. */
+    val selfCodeAutoMerge: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
+    /** Cloud chat is active when enabled and a key is present. */
+    val cloudActive get() = cloudEnabled && cloudApiKey.isNotBlank()
 }
 
 /** Notification preferences. */
@@ -134,6 +190,9 @@ data class JarvisSettings(
 data class NotificationPrefs(
     val masterEnabled: Boolean = true,
     val breakingNews: Boolean = true,
+    /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
+     *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
+    val liveBreakingNews: Boolean = false,
     val marketAlerts: Boolean = true,
     val weatherAlerts: Boolean = true,
     val spaceAlerts: Boolean = true,
@@ -141,6 +200,8 @@ data class NotificationPrefs(
     val safetyAlerts: Boolean = true,
     val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
     val dailyDigest: Boolean = true,
+    /** Notify when a newer app build is available to download/install in Settings. */
+    val updateChecks: Boolean = true,
     val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,
     val quietStartHour: Int = 22,
@@ -162,6 +223,7 @@ data class AppSettings(
     val glitch: Boolean = true,                       // chromatic glitch FX
     val bootAnimation: Boolean = true,                // terminal boot sequence on launch
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
+    val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
 
     // Locale / region (International defaults; everything overridable here)
@@ -215,6 +277,14 @@ data class AppSettings(
     val monitoredPlaces: List<SavedLocation> = emptyList(),
     val safetyRadiusKm: Int = 50,
 
+    // NAV map view (persisted so the map opens how you left it).
+    val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
+    val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
+
+    // NAV objectives: manual waypoints + the one currently tracked on the map.
+    val waypoints: List<Waypoint> = emptyList(),
+    val activeWaypointId: String? = null,
+
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),
 
@@ -224,6 +294,8 @@ data class AppSettings(
     // Bookkeeping
     val onboardingComplete: Boolean = false,
     val deviceGateAcknowledged: Boolean = false,
+    /** Highest build number we've already shown an "update available" notification for (dedupe). */
+    val lastUpdateNotifiedCode: Int = 0,
 )
 
 /** Sensible International defaults for first launch. */

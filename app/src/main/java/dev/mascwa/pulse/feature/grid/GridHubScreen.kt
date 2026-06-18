@@ -13,10 +13,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Radar
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.HubTile
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -45,26 +48,40 @@ private data class GridEntry(
     val offlineCapable: Boolean,
 )
 
+private data class GridSection(val title: String, val entries: List<GridEntry>)
+
 @Composable
 fun GridHubScreen(onOpenRoute: (String) -> Unit) {
     val context = LocalContext.current
     val online = remember(context) { isOnline(context) }
     val c = Pulse.colors
 
-    val entries = listOf(
-        GridEntry("J.A.R.V.I.S.", "On-device assistant · private", Icons.Filled.SmartToy, Routes.JARVIS, true),
-        GridEntry("Sky", "Space wx · orbital · compass", Icons.Filled.Rocket, Routes.SKY, true),
-        GridEntry("Tacnet", "Live radar · flight telemetry · vitals", Icons.Filled.Radar, Routes.TACNET, true),
-        GridEntry("Survive", "Nearest help · SOS · offline guides", Icons.Filled.HealthAndSafety, Routes.SURVIVE, true),
-        GridEntry("Compass", "Heading · offline", Icons.Filled.Explore, Routes.COMPASS, true),
-        GridEntry("Space Weather", "Kp · aurora · alerts", Icons.Filled.Bolt, Routes.SPACE_WX, false),
-        GridEntry("Orbital", "ISS · sun · moon · NEOs", Icons.Filled.Public, Routes.ORBITAL, false),
-        GridEntry("Economy", "Inflation · GDP · jobs", Icons.Filled.AccountBalance, Routes.ECONOMY, false),
-        GridEntry("Inflation", "CPI history", Icons.Filled.Percent, Routes.INFLATION, false),
-        GridEntry("Fuel & Energy", "Benchmarks · pump prices", Icons.Filled.LocalGasStation, Routes.FUEL, false),
-        GridEntry("Social", "Lemmy · Mastodon · Hacker News", Icons.Filled.Forum, Routes.SOCIAL, false),
-        GridEntry("Search", "DuckDuckGo / Google / Brave", Icons.Filled.TravelExplore, Routes.SEARCH, false),
-        GridEntry("Images", "Search the web or your own sites", Icons.Filled.Image, Routes.IMAGES, false),
+    val sections = listOf(
+        GridSection("ASSISTANT", listOf(
+            GridEntry("J.A.R.V.I.S.", "On-device assistant · private", Icons.Filled.SmartToy, Routes.JARVIS, true),
+        )),
+        GridSection("NAVIGATION & FIELD", listOf(
+            GridEntry("Nav", "3D cyber-map · heading-up · trail", Icons.Filled.Map, Routes.NAV, false),
+            GridEntry("Objectives", "Missions · waypoints · calendar", Icons.Filled.Flag, Routes.OBJECTIVES, true),
+            GridEntry("Compass", "Heading · offline", Icons.Filled.Explore, Routes.COMPASS, true),
+            GridEntry("Survive", "Nearest help · SOS · offline guides", Icons.Filled.HealthAndSafety, Routes.SURVIVE, true),
+            GridEntry("Tacnet", "Live radar · flight telemetry · vitals", Icons.Filled.Radar, Routes.TACNET, true),
+        )),
+        GridSection("SKY & SPACE", listOf(
+            GridEntry("Sky", "Space wx · orbital · compass", Icons.Filled.Rocket, Routes.SKY, true),
+            GridEntry("Space Weather", "Kp · aurora · alerts", Icons.Filled.Bolt, Routes.SPACE_WX, false),
+            GridEntry("Orbital", "ISS · sun · moon · NEOs", Icons.Filled.Public, Routes.ORBITAL, false),
+        )),
+        GridSection("MARKETS & ECONOMY", listOf(
+            GridEntry("Economy", "Inflation · GDP · jobs", Icons.Filled.AccountBalance, Routes.ECONOMY, false),
+            GridEntry("Inflation", "CPI history", Icons.Filled.Percent, Routes.INFLATION, false),
+            GridEntry("Fuel & Energy", "Benchmarks · pump prices", Icons.Filled.LocalGasStation, Routes.FUEL, false),
+        )),
+        GridSection("INFO & MEDIA", listOf(
+            GridEntry("Social", "Lemmy · Mastodon · Hacker News", Icons.Filled.Forum, Routes.SOCIAL, false),
+            GridEntry("Search", "DuckDuckGo / Google / Brave", Icons.Filled.TravelExplore, Routes.SEARCH, false),
+            GridEntry("Images", "Search the web or your own sites", Icons.Filled.Image, Routes.IMAGES, false),
+        )),
     )
 
     PulseScaffold(title = "Grid") { innerPadding ->
@@ -84,14 +101,19 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
                     )
                 }
             }
-            items(entries.size, key = { entries[it].route }) { i ->
-                val e = entries[i]
-                HubTile(
-                    title = e.title, subtitle = e.subtitle, icon = e.icon,
-                    onClick = { onOpenRoute(e.route) },
-                    accent = if (!online && e.offlineCapable) c.positive else c.accent,
-                    badge = if (!online && e.offlineCapable) "OFFLINE OK" else null,
-                )
+            sections.forEach { section ->
+                item(span = { GridItemSpan(maxLineSpan) }, key = "hdr_${section.title}") {
+                    SectionBar(section.title)
+                }
+                items(section.entries.size, key = { section.entries[it].route }) { i ->
+                    val e = section.entries[i]
+                    HubTile(
+                        title = e.title, subtitle = e.subtitle, icon = e.icon,
+                        onClick = { onOpenRoute(e.route) },
+                        accent = if (!online && e.offlineCapable) c.positive else c.accent,
+                        badge = if (!online && e.offlineCapable) "OFFLINE OK" else null,
+                    )
+                }
             }
         }
     }

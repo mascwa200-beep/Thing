@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!-- Including only datastore/ already excludes everything else (cache, model, etc.). -->
     <cloud-backup>
         <include domain="file" path="datastore/" />
-        <exclude domain="file" path="pulse_cache/" />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="datastore/" />
-        <exclude domain="file" path="pulse_cache/" />
     </device-transfer>
 </data-extraction-rules>

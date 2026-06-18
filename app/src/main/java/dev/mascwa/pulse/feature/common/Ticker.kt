@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,12 +35,13 @@ import kotlin.math.max
 
 data class TickerItem(val symbol: String, val value: String, val color: Color)
 
-/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. */
+/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. Optional [onClick] (e.g. open Markets). */
 @Composable
-fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
+fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     if (items.isEmpty()) return
     val c = Pulse.colors
     var singleWidth by remember { mutableIntStateOf(0) }
+    var viewportWidth by remember { mutableIntStateOf(0) }
 
     val transition = rememberInfiniteTransition(label = "ticker")
     val progress by transition.animateFloat(
@@ -55,12 +57,17 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(30.dp)
             .background(c.carbon)
-            .clipToBounds(),
+            .let { if (onClick != null) it.clickable { onClick() } else it }
+            .clipToBounds()
+            .onSizeChanged { viewportWidth = it.width },
         contentAlignment = Alignment.CenterStart,
     ) {
+        // Tile enough identical copies to always overflow the viewport, so the loop (which shifts by ONE
+        // sequence width) never leaves a trailing gap — a continuous stream regardless of item count.
+        val repeats = if (singleWidth > 0) (viewportWidth / singleWidth + 2).coerceAtLeast(2) else 2
         Row(Modifier.graphicsLayer { translationX = -progress * singleWidth }) {
             TickerSequence(items, c.muted, Modifier.onSizeChanged { if (it.width > 0) singleWidth = it.width })
-            TickerSequence(items, c.muted, Modifier)
+            repeat(repeats - 1) { TickerSequence(items, c.muted, Modifier) }
         }
     }
 }

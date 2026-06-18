@@ -26,7 +26,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 HomeViewModel(
                     c.newsRepository, c.marketsRepository, c.weatherRepository,
                     c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
-                    c.orbitalRepository, c.spaceWeatherRepository,
+                    c.orbitalRepository, c.spaceWeatherRepository, c.radarRepository, c.selfEditStore,
                 )
             modelClass.isAssignableFrom(NewsViewModel::class.java) ->
                 NewsViewModel(c.newsRepository, c.settingsRepository)
@@ -69,14 +69,28 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisViewModel(
                     c.jarvisMemory, c.inferenceEngine, c.deviceContextProvider, c.banterEngine,
-                    c.intentRouter, c.actionOrchestrator,
+                    c.intentRouter, c.actionOrchestrator, c.textToSpeech, c.settingsRepository,
+                    c.voskSpeech, c.agentOrchestrator, c.knowledgeStore, c.selfEditStore, c.briefingBuilder,
+                    c.curiosityEngine, c.approvalGate,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
-                dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(c.modelManager, c.inferenceEngine, c.settingsRepository)
+                dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(
+                    c.modelManager, c.inferenceEngine, c.settingsRepository, c.knowledgeStore, c.selfEditStore,
+                )
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel::class.java) ->
+                dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel(c.jarvisMemory)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel::class.java) ->
+                dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel(c.selfEditStore, c.approvalGate)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier)
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
+                dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.nav.NavViewModel::class.java) ->
+                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
+                dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T

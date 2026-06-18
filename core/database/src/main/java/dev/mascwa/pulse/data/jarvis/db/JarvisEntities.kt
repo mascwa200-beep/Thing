@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.jarvis.db
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.PrimaryKey
 
 /**
@@ -32,3 +33,54 @@ object Speaker {
     const val JARVIS = "jarvis"
     const val SYSTEM = "system"
 }
+
+/**
+ * Durable notes/facts the agent can save and later retrieve (the on-device "memory"/RAG store).
+ * Retrieval is lexical via the FTS4 mirror [AgentNoteFts] — no embeddings on-device.
+ */
+@Entity(tableName = "agent_notes")
+data class AgentNoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "note_text") val noteText: String,
+    @ColumnInfo(name = "source") val source: String = "user", // user | observation | inference
+)
+
+/** Full-text index over [AgentNoteEntity.noteText] (external-content FTS; rowid = note id). */
+@Fts4(contentEntity = AgentNoteEntity::class)
+@Entity(tableName = "agent_notes_fts")
+data class AgentNoteFts(
+    @ColumnInfo(name = "note_text") val noteText: String,
+)
+
+/** Sources for [AgentNoteEntity.source]. */
+object NoteSource {
+    const val USER = "user"
+    const val OBSERVATION = "observation"
+    const val INFERENCE = "inference"
+    /** A fact the user taught J.A.R.V.I.S. by answering a curiosity question. */
+    const val LEARNED = "learned"
+}
+
+/**
+ * The on-device knowledge library (the "docs RAG"): user-loaded documents, split into chunks so the
+ * relevant pieces can be lexically retrieved (via the FTS4 mirror [KnowledgeDocFts]) and injected
+ * into the model's prompt at question time. This is retrieval — the frozen model is never trained.
+ * Each row is one chunk; [title] groups the chunks of a single source document.
+ */
+@Entity(tableName = "knowledge_docs")
+data class KnowledgeDocEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "source") val source: String = "", // url, filename, or "paste"
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "text") val text: String,
+)
+
+/** Full-text index over [KnowledgeDocEntity] title + text (external-content FTS; rowid = doc id). */
+@Fts4(contentEntity = KnowledgeDocEntity::class)
+@Entity(tableName = "knowledge_docs_fts")
+data class KnowledgeDocFts(
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "text") val text: String,
+)
