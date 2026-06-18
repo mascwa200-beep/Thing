@@ -139,6 +139,10 @@ data class JarvisSettings(
     /** Let J.A.R.V.I.S. autonomously keep a spoken conversation going (when its reply expects a
      *  response) and announce when it's wrapping up. Builds on follow-up; requires the wake word. */
     val conversationMode: Boolean = false,
+    /** When a cloud brain (e.g. OpenRouter) is active, pass the wake-word command transcript through it
+     *  once to fix speech-to-text mishears before acting — better understanding without a heavier STT
+     *  model. No effect unless [cloudActive]. On by default; adds one short cloud round-trip per command. */
+    val voiceCloudInterpret: Boolean = true,
     /** Let J.A.R.V.I.S. use tools (web/GitHub-read/device/memory) in a bounded agentic loop. */
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */

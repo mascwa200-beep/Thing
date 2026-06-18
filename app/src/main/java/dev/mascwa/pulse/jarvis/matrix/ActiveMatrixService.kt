@@ -307,7 +307,9 @@ class ActiveMatrixService : Service() {
                 override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
                 override fun onFinal(text: String) {
                     Log.i(TAG, "command heard (on-device): \"$text\"")
-                    voiceScope.launch { if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk) }
+                    voiceScope.launch {
+                        if (text.isBlank()) listenForWake(vosk) else respond(vosk, interpret(text))
+                    }
                 }
                 override fun onError(message: String) {
                     if (message == DeviceSpeechRecognizer.UNAVAILABLE) {
@@ -334,12 +336,43 @@ class ActiveMatrixService : Service() {
             override fun onFinal(text: String) {
                 Log.i(TAG, "command heard (vosk): \"$text\"")
                 voiceScope.launch {
-                    if (text.isNotBlank()) respond(vosk, text) else listenForWake(vosk)
+                    if (text.isBlank()) listenForWake(vosk) else respond(vosk, interpret(text))
                 }
             }
             override fun onError(message: String) { Log.w(TAG, "command error: $message"); voiceScope.launch { listenForWake(vosk) } }
             override fun onTimeout() { Log.i(TAG, "command timeout — re-arming wake"); voiceScope.launch { listenForWake(vosk) } }
         })
+    }
+
+    /** When a cloud brain (OpenRouter etc.) is active, run the raw STT transcript through it once to
+     *  repair mishears before acting — "understand better" without a heavier STT model. Returns the raw
+     *  text unchanged when cloud is off, the feature is disabled, generation fails, or the rewrite looks
+     *  wrong (so the user's words are never replaced by a hallucination). Routes to the cloud provider
+     *  automatically via the same RoutingInferenceEngine the console uses. */
+    private suspend fun interpret(raw: String): String {
+        val text = raw.trim()
+        if (text.isBlank()) return raw
+        val j = runCatching { container?.settingsRepository?.current()?.jarvis }.getOrNull() ?: return raw
+        if (!j.cloudActive || !j.voiceCloudInterpret) return raw
+        val engine = container?.inferenceEngine ?: return raw
+        val cleaned = runCatching {
+            val sb = StringBuilder()
+            engine.generate(text, emptyList(), CORRECTION_SYS).collect { sb.append(it) }
+            sanitizeInterpretation(sb.toString())
+        }.getOrNull().orEmpty()
+        // Reject empty or wildly-divergent rewrites — keep the user's words rather than a hallucination.
+        if (cleaned.isBlank() || cleaned.length > text.length * 4 + 40) return raw
+        if (!cleaned.equals(text, ignoreCase = true)) Log.i(TAG, "interpreted \"$text\" → \"$cleaned\"")
+        return cleaned
+    }
+
+    /** Keep only the first non-blank line, drop floor-control markers / wrapping quotes, and cap length —
+     *  the model occasionally adds a stray note or quotes despite the prompt. */
+    private fun sanitizeInterpretation(s: String): String {
+        var t = s.replace(MARK_OPEN, "").replace(MARK_CLOSE, "").trim()
+        t = t.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        if (t.length >= 2 && t.first() == '"' && t.last() == '"') t = t.substring(1, t.length - 1).trim()
+        return t.take(240)
     }
 
     private suspend fun respond(vosk: VoskSpeech, command: String) {
@@ -533,6 +566,12 @@ class ActiveMatrixService : Service() {
         private const val CONVO_HINT =
             "\n\nYou are mid-conversation by voice; keep replies brief and natural. If you expect the " +
                 "user to respond, end with [[OPEN]]; if the conversation is naturally complete, end with [[CLOSE]]."
+        // System prompt for the cloud transcript-repair pass (Increment 2): fix STT mishears only.
+        private const val CORRECTION_SYS =
+            "You repair speech-to-text errors in a single short voice command to an assistant. The text " +
+                "may contain mishearings (for example \"fire\" instead of \"file\"). Return ONLY the most " +
+                "likely intended command — no quotes, no explanation, no preamble. If it already looks " +
+                "correct, return it unchanged."
         // Short whole-utterance phrases that end an exchange.
         private val STOP_CUES = listOf(
             "stop", "that's all", "thats all", "that is all", "thank you", "thanks",

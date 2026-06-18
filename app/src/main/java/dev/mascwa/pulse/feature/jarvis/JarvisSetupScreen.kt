@@ -76,6 +76,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val wakeWord by vm.wakeWord.collectAsState()
     val followUpMode by vm.followUpMode.collectAsState()
     val conversationMode by vm.conversationMode.collectAsState()
+    val voiceCloudInterpret by vm.voiceCloudInterpret.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
@@ -316,6 +317,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     "can stop anytime (\"stop\" / \"that's all\"). Implies follow-up.",
                 enabled = conversationMode,
                 onToggle = vm::setConversationMode,
+            )
+
+            SettingToggle(
+                title = "CLOUD VOICE UNDERSTANDING",
+                subtitle = "When a cloud key is set, run each wake-word command through the cloud AI once " +
+                    "to fix speech-to-text mishears (\"fire\" → \"file\") before acting — better " +
+                    "understanding without a heavier model. Adds a brief pause; no effect without a cloud key.",
+                enabled = voiceCloudInterpret,
+                onToggle = vm::setVoiceCloudInterpret,
             )
 
             SettingToggle(
