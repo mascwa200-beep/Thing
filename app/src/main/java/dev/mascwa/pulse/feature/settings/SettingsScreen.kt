@@ -571,6 +571,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
                     PrefClickable("Clear cache", onClick = { vm.clearCache() })
+                    PrefClickable(
+                        "Clear usage data",
+                        subtitle = "Forget the on-device feature-usage history (counts only) that powers " +
+                            "J.A.R.V.I.S.'s tailored tips. Never leaves your device.",
+                        onClick = { vm.clearUsageData() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",

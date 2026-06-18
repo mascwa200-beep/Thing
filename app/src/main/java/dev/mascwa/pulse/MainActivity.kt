@@ -130,7 +130,12 @@ class MainActivity : ComponentActivity() {
                             onExit = { finish() },
                         )
                     } else {
-                        PulseApp(factory = factory, startRoute = startRoute, isOnline = online)
+                        PulseApp(
+                            factory = factory,
+                            startRoute = startRoute,
+                            isOnline = online,
+                            onRouteVisit = { route -> app.container.usageRepository.record(route) },
+                        )
                         // Terminal boot sequence, once per launch.
                         if (settings.bootAnimation && !booted) {
                             BootScreen(onFinished = { booted = true })
