@@ -116,7 +116,9 @@ class AgentOrchestrator(
 
     private companion object {
         const val MAX_STEPS = 4
-        const val MAX_OBS = 1500
+        // Per-observation cap. Generous enough that reading a source file (the `code` tool) is useful;
+        // the on-device prompt builder still clamps total input, and cloud context is large.
+        const val MAX_OBS = 6000
         val TOOL_RE = Regex("(?im)^\\s*TOOL\\s+(\\w+)\\s*(.*)$")
     }
 }

@@ -31,6 +31,7 @@ class SelfCodeReadTool(private val repo: GitHubRepo) : JarvisTool {
 
     private companion object {
         const val MAX_TREE = 400
-        const val MAX_FILE = 4000
+        // Aligned with the agent's per-observation cap so a file read isn't double-truncated.
+        const val MAX_FILE = 6000
     }
 }
