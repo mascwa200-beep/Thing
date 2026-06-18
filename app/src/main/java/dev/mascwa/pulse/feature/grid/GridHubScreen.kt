@@ -84,7 +84,7 @@ fun GridHubScreen(onOpenRoute: (String) -> Unit) {
         )),
     )
 
-    PulseScaffold(title = "Grid") { innerPadding ->
+    PulseScaffold(title = "Tools") { innerPadding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.padding(innerPadding),
