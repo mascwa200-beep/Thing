@@ -1,9 +1,12 @@
 package dev.mascwa.pulse.feature.settings
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.data.settings.AppSettings
+import dev.mascwa.pulse.data.settings.SettingsBackup
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.selfcode.SelfCoder
 import dev.mascwa.pulse.data.update.UpdateInfo
@@ -14,10 +17,12 @@ import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsViewModel(
     private val repo: SettingsRepository,
@@ -124,6 +129,40 @@ class SettingsViewModel(
 
     fun resetToDefaults() {
         viewModelScope.launch { repo.replace(AppSettings()) }
+    }
+
+    private val _backup = MutableStateFlow("")
+    /** Status line for the local backup / restore actions. */
+    val backupStatus: StateFlow<String> = _backup
+
+    /** Write a credential-free backup of the current settings to the user-chosen [uri]. */
+    fun exportSettings(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _backup.value = runCatching {
+                val text = SettingsBackup.encode(repo.current(), System.currentTimeMillis())
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        it.write(text.toByteArray(Charsets.UTF_8))
+                    } ?: error("couldn't open the file")
+                }
+                "Backup saved. API keys & tokens were left out for safety — re-add them after a restore."
+            }.getOrElse { "Backup failed: ${it.message}" }
+        }
+    }
+
+    /** Restore settings from the backup file at [uri], keeping the device's existing credentials. */
+    fun importSettings(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            _backup.value = runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        String(it.readBytes(), Charsets.UTF_8)
+                    } ?: error("couldn't open the file")
+                }
+                repo.replace(SettingsBackup.decode(text, repo.current()))
+                "Settings restored. Your current API keys & tokens were kept."
+            }.getOrElse { "Restore failed: ${it.message}" }
+        }
     }
 
     fun refreshCacheSize() {

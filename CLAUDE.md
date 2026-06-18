@@ -105,6 +105,11 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   RAM-heavy FX): retired the flaky home auto-ticker → static swipeable **`MarketsStrip`**; defaulted
   `scanlines`+`glitch` OFF; Settings enum pickers are now **anchored dropdowns** (not centre dialogs);
   nav labels WIRE→NEWS, GRID→TOOLS.
+- **Settings backup & restore** (local, offline; Settings → "Backup & restore"): export/import the whole
+  `AppSettings` to a user-chosen JSON file via SAF. Fixes the real sideload pain — the one-time uninstall
+  after a signing change wipes config. Logic in `data/settings/SettingsBackup.kt` (`Envelope` + `redactSecrets`
+  + `merge`): export **blanks all credentials** (apiKeys + jarvis model/github/cloud tokens) so a backup file
+  never carries secrets; restore **keeps the device's current credentials** and lays the rest over. No network.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 
