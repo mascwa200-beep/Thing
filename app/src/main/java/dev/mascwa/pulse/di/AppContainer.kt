@@ -281,7 +281,20 @@ class AppContainer(private val appContext: Context) {
             selfEditStore,
             knowledgeStore,
             research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
-            commitCode = { action -> selfCoder.commit(action) },
+            commitCode = { action ->
+                val result = selfCoder.commit(action)
+                // Record shipped self-changes to durable memory so J.A.R.V.I.S. can recall what it has
+                // changed about itself ("what have you changed?").
+                if (result.startsWith("Opened PR")) {
+                    runCatching {
+                        jarvisMemory.remember(
+                            "Self-code change you shipped: ${action.payload["goal"].orEmpty().take(120)} — $result",
+                            dev.mascwa.pulse.data.jarvis.db.NoteSource.INFERENCE,
+                        )
+                    }
+                }
+                result
+            },
         )
     }
 
