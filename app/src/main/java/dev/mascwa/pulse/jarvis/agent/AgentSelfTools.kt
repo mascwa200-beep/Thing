@@ -148,7 +148,7 @@ class SelfInspectTool(
                 val files = runCatching { context.assets.list("knowledge")?.toList() }.getOrNull().orEmpty()
                 if (files.isEmpty()) "No bundled assets found." else "Bundled assets:\n" + files.joinToString("\n") { "- $it" }
             }
-            else -> "Inspect what? Try: persona, knowledge, assets, tools. (Source code isn't on the device, so it can't be read.)"
+            else -> "Inspect what? Try: persona, knowledge, assets, tools. (To read your own source code, use the `code` tool when self-coding is on.)"
         }
     }
 }

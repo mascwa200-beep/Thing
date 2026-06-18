@@ -298,9 +298,12 @@ class AppContainer(private val appContext: Context) {
         } else {
             emptyList()
         }
-        // Self-coding tool is offered only when the user has enabled self-coding.
+        // Self-coding tools (read your own source + propose a change) — only when self-coding is on.
         val codeOn = runCatching { settingsRepository.current().jarvis.selfCodingEnabled }.getOrDefault(false)
-        val codeTools = if (codeOn) listOf(dev.mascwa.pulse.jarvis.agent.ProposeCodeChangeTool(selfCoder)) else emptyList()
+        val codeTools = if (codeOn) listOf(
+            dev.mascwa.pulse.jarvis.agent.SelfCodeReadTool(gitHubRepo),
+            dev.mascwa.pulse.jarvis.agent.ProposeCodeChangeTool(selfCoder),
+        ) else emptyList()
         agentTools + (if (selfOn) selfEditTools else emptyList()) + authored + codeTools
     }
 

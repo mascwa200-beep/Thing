@@ -129,13 +129,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
 
             // ----- Self-coding (experimental) -----
             item {
-                val selfCodeStatus by vm.selfCodeStatus.collectAsStateWithLifecycle()
-                var goal by remember { mutableStateOf("") }
-                var path by remember { mutableStateOf("") }
                 PrefSection("Self-coding (experimental)") {
                     PrefSwitch(
                         "Enable self-coding",
-                        "Let J.A.R.V.I.S. draft changes to its own code and open GitHub PRs. Needs a " +
+                        "Let J.A.R.V.I.S. read and change its own code and open GitHub PRs. Needs a " +
                             "write-scoped GitHub token in J.A.R.V.I.S. Setup.",
                         checked = s.jarvis.selfCodingEnabled,
                         onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodingEnabled = v)) } },
@@ -148,22 +145,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             checked = s.jarvis.selfCodeAutoMerge,
                             onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
                         )
-                        OutlinedTextField(
-                            goal, { goal = it }, label = { Text("Goal — what to change (plain language)") },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                        OutlinedTextField(
-                            path, { path = it }, label = { Text("Target file (optional — blank: I'll pick)") },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                        PrefClickable(
-                            "Propose change → review & approve",
-                            subtitle = selfCodeStatus.ifBlank {
-                                "Drafts the change with the cloud model and stages it — approve it (here in " +
-                                    "Approvals, or in the J.A.R.V.I.S. console) to open the PR. You can also just " +
-                                    "ask J.A.R.V.I.S. in chat or by voice."
-                            },
-                            onClick = { vm.proposeSelfChange(goal, path) },
+                        Text(
+                            "Just tell J.A.R.V.I.S. what to build — in the console or by voice (e.g. \"read your " +
+                                "own code\" or \"add a … feature\"). It plans the files, drafts the change, and you " +
+                                "approve it in chat or the Approvals screen before any PR opens.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         )
                         Text(
                             "⚠ Experimental. The AI writes app code; CI must pass before anything can ship, " +
