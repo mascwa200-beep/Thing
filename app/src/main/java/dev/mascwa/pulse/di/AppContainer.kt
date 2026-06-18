@@ -224,6 +224,7 @@ class AppContainer(private val appContext: Context) {
         listOf(
             dev.mascwa.pulse.jarvis.agent.WebSearchTool(http),
             dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
+            dev.mascwa.pulse.jarvis.agent.DownloadTool(appContext, http),
             dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.RememberTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),

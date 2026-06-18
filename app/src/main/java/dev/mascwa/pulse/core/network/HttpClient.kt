@@ -51,6 +51,39 @@ class HttpClient(
         return json.decodeFromString(deserializer, text)
     }
 
+    /** Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?). */
+    suspend fun download(
+        url: String,
+        dest: File,
+        maxBytes: Long,
+        headers: Map<String, String> = emptyMap(),
+    ): Pair<Long, String?> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .headers(defaultHeaders(headers).toHeaders())
+            .get()
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
+            val body = resp.body ?: throw IOException("empty response")
+            val type = resp.header("Content-Type")
+            dest.outputStream().use { out ->
+                body.byteStream().use { input ->
+                    val buf = ByteArray(1 shl 16)
+                    var total = 0L
+                    var n = input.read(buf)
+                    while (n >= 0) {
+                        total += n
+                        if (total > maxBytes) throw IOException("file exceeds the ${maxBytes / (1024 * 1024)} MB limit")
+                        out.write(buf, 0, n)
+                        n = input.read(buf)
+                    }
+                    total to type
+                }
+            }
+        }
+    }
+
     private fun defaultHeaders(extra: Map<String, String>): Map<String, String> {
         // A real UA avoids 403s from feeds (e.g. Google News, Stooq) that reject
         // empty/default clients.
