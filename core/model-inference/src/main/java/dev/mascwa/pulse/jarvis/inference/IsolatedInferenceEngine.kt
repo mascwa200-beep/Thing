@@ -138,10 +138,20 @@ class IsolatedInferenceEngine(
         val cfg = promptConfig()
         // Reserve part of the model's total budget for the answer; clamp the input to the rest so a
         // long chat can't overflow the context and abort generation natively.
-        val inputBudget = (activeMaxTokens * INPUT_BUDGET_PCT) / 100
+        val inputBudget = ((activeMaxTokens * INPUT_BUDGET_PCT) / 100).coerceAtLeast(MIN_INPUT_TOKENS)
         val full = renderPrompt(ChatFormat.resolve(cfg.format, cfg.modelUrl), prompt, history, system, maxInputTokens = inputBudget)
         val response = withContext(Dispatchers.IO) {
-            genMutex.withLock { runCatching { svc.generate(full) }.getOrNull() }
+            genMutex.withLock {
+                // Rethrow cancellation (don't let runCatching turn a clean cancel into a false "process
+                // died" fault); treat any other failure as a lost process.
+                try {
+                    svc.generate(full)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    null
+                }
+            }
         }
         // The model itself reported the prompt was too long (caught in the service, returns a marker
         // rather than aborting): surface it plainly instead of as a fault bubble.
@@ -203,5 +213,8 @@ class IsolatedInferenceEngine(
         const val BACKEND_CPU = 2
         // Share of the total token budget reserved for the *input*; the remainder is for the answer.
         const val INPUT_BUDGET_PCT = 60
+        // Floor so a very small total budget can't compute a 0-token input allowance (which would drop
+        // the whole prompt and silently produce an empty/broken generation).
+        const val MIN_INPUT_TOKENS = 256
     }
 }
