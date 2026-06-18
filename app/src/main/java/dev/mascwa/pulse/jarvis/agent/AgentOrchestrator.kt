@@ -96,7 +96,10 @@ class AgentOrchestrator(
         tools.forEach { append("- ").append(it.usage).append('\n') }
         append("After each tool you'll see 'OBSERVATION: ...'. ")
         append("When you have enough, reply: FINAL: <answer>. ")
-        append("Answer directly (no tool) when you already know. Keep it brief.")
+        append("Answer directly (no tool) when you already know. Keep it brief. ")
+        append("These tools are real capabilities you HAVE — if the user asks for something a listed tool ")
+        append("does (such as reading your own source with `code`, or proposing a change to your own app ")
+        append("with `selfcode`), USE that tool. Never claim you are unable to do something a listed tool can do.")
         // Memory + knowledge are user/remote-sourced — fence them as untrusted data too.
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")

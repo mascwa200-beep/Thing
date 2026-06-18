@@ -167,7 +167,12 @@ class JarvisViewModel(
                 // Reload the model if its (separate) process was reclaimed or faulted, so a
                 // transient "process lost" self-heals instead of sticking on the persona core.
                 runCatching { engine.ensureReady() }
-                val useAgent = runCatching { settings.current().jarvis.agentToolsEnabled }.getOrDefault(false)
+                // Self-coding / self-edit live only inside the agent loop, so enabling either implies the
+                // tool loop even if "Agent Tools" itself is off — otherwise J.A.R.V.I.S. has no tools and
+                // wrongly insists it can't read or change its own code.
+                val jcfg = runCatching { settings.current().jarvis }.getOrNull()
+                val useAgent = jcfg != null &&
+                    (jcfg.agentToolsEnabled || jcfg.selfCodingEnabled || jcfg.selfEditEnabled)
                 val reply = if (useAgent) generateWithAgent(intent.text) else generateDirect(intent.text)
                 memory.append(Speaker.JARVIS, reply)
                 speakIfEnabled(reply)
