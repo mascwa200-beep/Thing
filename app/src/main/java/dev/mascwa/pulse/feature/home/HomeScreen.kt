@@ -135,8 +135,8 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         c.muted,
                     )
                 }
-                // ticker from live markets
-                Ticker(tickerItems(state.markets.data))
+                // ticker from live markets — tap to open the full Markets screen
+                Ticker(tickerItems(state.markets.data), onClick = nav.openMarkets)
             }
         },
     ) { innerPadding ->

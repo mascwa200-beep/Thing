@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,9 +35,9 @@ import kotlin.math.max
 
 data class TickerItem(val symbol: String, val value: String, val color: Color)
 
-/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. */
+/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. Optional [onClick] (e.g. open Markets). */
 @Composable
-fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
+fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     if (items.isEmpty()) return
     val c = Pulse.colors
     var singleWidth by remember { mutableIntStateOf(0) }
@@ -56,6 +57,7 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(30.dp)
             .background(c.carbon)
+            .let { if (onClick != null) it.clickable { onClick() } else it }
             .clipToBounds()
             .onSizeChanged { viewportWidth = it.width },
         contentAlignment = Alignment.CenterStart,
