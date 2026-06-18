@@ -235,6 +235,8 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.MapsTool(appContext),
             dev.mascwa.pulse.jarvis.agent.SettingsTool(appContext),
             dev.mascwa.pulse.jarvis.agent.OpenLinkTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.TorchTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.ClipboardTool(appContext),
         )
     }
     /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user

@@ -152,3 +152,27 @@ class OpenLinkTool(private val context: Context) : JarvisTool {
         return "Opening ${arg.trim()}, sir."
     }
 }
+
+class TorchTool(context: Context) : JarvisTool {
+    private val tools = dev.mascwa.pulse.data.sensors.SurvivalTools(context)
+    override val name = "torch"
+    override val usage = "torch <on|off> — turn the flashlight on or off"
+    override suspend fun run(arg: String): String {
+        if (!tools.torchAvailable()) return "No flashlight on this device, sir."
+        val off = arg.lowercase().trim().let { it == "off" || it == "false" || it == "0" || it == "stop" }
+        tools.setTorch(!off)
+        return if (off) "Flashlight off, sir." else "Flashlight on, sir."
+    }
+}
+
+class ClipboardTool(private val context: Context) : JarvisTool {
+    override val name = "clip"
+    override val usage = "clip <text> — copy text to the clipboard"
+    override suspend fun run(arg: String): String {
+        if (arg.isBlank()) return "Give me something to copy."
+        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+            ?: return "Clipboard unavailable."
+        runCatching { cm.setPrimaryClip(android.content.ClipData.newPlainText("J.A.R.V.I.S.", arg.trim())) }
+        return "Copied to the clipboard, sir."
+    }
+}
