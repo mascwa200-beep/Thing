@@ -591,6 +591,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             "J.A.R.V.I.S. has learned from its own actions. It relearns from scratch.",
                         onClick = { vm.resetReflexes() },
                     )
+                    PrefClickable(
+                        "Clear remembered profile",
+                        subtitle = "Forget the preferences, interests & projects J.A.R.V.I.S. has " +
+                            "remembered about you. On-device only.",
+                        onClick = { vm.clearProfile() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
