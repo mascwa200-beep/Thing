@@ -20,6 +20,7 @@ import android.widget.TextView
 class HudPresentation(context: Context, display: Display) : Presentation(context, display) {
 
     private var clock: TextView? = null
+    private var nav: TextView? = null
     private var brief: TextView? = null
     private var reply: TextView? = null
 
@@ -35,6 +36,7 @@ class HudPresentation(context: Context, display: Display) : Presentation(context
             )
         }
         clock = line(ctx, 52f, NEON_GREEN, bold = true).also { column.addView(it) }
+        nav = line(ctx, 34f, NEON_CYAN, bold = true).also { column.addView(it) }
         brief = line(ctx, 24f, Color.WHITE).also { column.addView(it) }
         reply = line(ctx, 24f, NEON_AMBER).also { column.addView(it) }
         val scroll = ScrollView(ctx).apply {
@@ -52,10 +54,13 @@ class HudPresentation(context: Context, display: Display) : Presentation(context
             if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
 
-    /** Update the HUD. Safe to call before/after the window exists. */
-    fun render(clockText: String, briefText: String, replyText: String?) {
+    /** Update the HUD. Safe to call before/after the window exists. [navText] is the active-waypoint
+     *  guidance line (arrow + distance + bearing), hidden when there's no tracked waypoint/fix. */
+    fun render(clockText: String, navText: String?, briefText: String, replyText: String?) {
         runCatching {
             clock?.text = clockText
+            nav?.text = navText?.takeIf { it.isNotBlank() } ?: ""
+            nav?.visibility = if (navText.isNullOrBlank()) View.GONE else View.VISIBLE
             brief?.text = briefText
             reply?.text = replyText?.takeIf { it.isNotBlank() }?.let { "J.A.R.V.I.S.: $it" } ?: ""
             reply?.visibility = if (replyText.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -65,5 +70,6 @@ class HudPresentation(context: Context, display: Display) : Presentation(context
     private companion object {
         val NEON_GREEN = Color.parseColor("#7CFFB2")
         val NEON_AMBER = Color.parseColor("#FFD166")
+        val NEON_CYAN = Color.parseColor("#5EE7FF")
     }
 }
