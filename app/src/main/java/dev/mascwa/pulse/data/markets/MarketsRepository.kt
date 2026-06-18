@@ -49,11 +49,15 @@ class MarketsRepository(
             }
         }
         return try {
-            val quotes = coroutineScope {
+            val fresh = coroutineScope {
                 // Launch all in parallel; the shared yahooGate caps how many actually hit Yahoo at once,
                 // and each call retries with backoff — so the WHOLE set loads instead of just the first few.
                 s.watchlist.map { item -> async { fetchYahooResilient(item) } }.awaitAll().filterNotNull()
             }
+            // Never let a partial fetch (some symbols still throttled, e.g. amid the home cold-start burst)
+            // SHRINK the set: union the fresh quotes over the last-good cache, keep only current-watchlist
+            // ids, in watchlist order. This is what keeps the home tape full once the set has loaded once.
+            val quotes = mergeWithCache(key, fresh, s.watchlist)
             cache.write(key, quotes, ListSerializer(Quote.serializer()))
             Fetched(quotes, false)
         } catch (e: Exception) {
@@ -85,14 +89,28 @@ class MarketsRepository(
                 val byId = coins.associateBy { it.id }
                 s.cryptoList.mapNotNull { item -> byId[item.id]?.toQuote(item, s.currencyCode) }
             }
-            cache.write(key, quotes, ListSerializer(Quote.serializer()))
-            Fetched(quotes, false)
+            val merged = mergeWithCache(key, quotes, s.cryptoList)
+            cache.write(key, merged, ListSerializer(Quote.serializer()))
+            Fetched(merged, false)
         } catch (e: Exception) {
             cache.readAny(key, ListSerializer(Quote.serializer()))?.let {
                 return Fetched(it.value, true, it.savedAtMs)
             }
             throw e
         }
+    }
+
+    /** Union [fresh] quotes over whatever is in the [key] cache, then keep only ids still in [items], in
+     *  [items] order. Ensures a partial/throttled fetch never drops an instrument that loaded before —
+     *  the displayed set only ever grows toward the full list and never shrinks. */
+    private suspend fun mergeWithCache(key: String, fresh: List<Quote>, items: List<WatchItem>): List<Quote> {
+        val prior = runCatching { cache.readAny(key, ListSerializer(Quote.serializer()))?.value }
+            .getOrNull().orEmpty()
+        val byId = HashMap<String, Quote>().apply {
+            prior.forEach { put(it.id, it) }
+            fresh.forEach { put(it.id, it) }
+        }
+        return items.mapNotNull { byId[it.id] }
     }
 
     /** Combined view used by the Markets screen and Home card. */
