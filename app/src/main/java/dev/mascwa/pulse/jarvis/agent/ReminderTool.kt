@@ -34,7 +34,7 @@ class ReminderTool(
         if (whenText.isBlank()) return "When should I remind you, sir? e.g. \"in 20 minutes | …\" or \"7:30 | …\"."
         val delayMs = parseDelayMs(whenText)
             ?: return "I couldn't read that time, sir — try \"in 30 minutes\" or \"3pm\"."
-        if (delayMs < 1_000 || delayMs > MAX_DELAY_MS) return "Pick a time from a minute out to ~24 hours, sir."
+        if (delayMs < 1_000 || delayMs > MAX_DELAY_MS) return "Pick a time from a minute out to about a week, sir."
 
         val id = (System.currentTimeMillis() and 0xFFFFFF).toInt()
         val req = OneTimeWorkRequestBuilder<ReminderWorker>()
@@ -45,20 +45,26 @@ class ReminderTool(
         runCatching { WorkManager.getInstance(context).enqueue(req) }
             .onFailure { return "I couldn't schedule that reminder, sir." }
 
-        val label = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis() + delayMs))
+        val pattern = if (delayMs > 12L * 3_600_000L) "EEE h:mm a" else "h:mm a"
+        val label = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(System.currentTimeMillis() + delayMs))
         runCatching { memory.remember("Reminder at $label: $message", NoteSource.INFERENCE) }
         return "Reminder set for $label — \"$message\", sir."
     }
 
-    /** Delay (ms) from now for a "when" phrase: relative ("in 30 min", "2 hours") or a clock time
-     *  ("3pm", "7:30" → next occurrence today/tomorrow). Null if unparseable. */
+    /** Delay (ms) from now for a "when" phrase: relative ("in 30 min", "2 hours", "in 3 days") or a clock
+     *  time ("3pm", "7:30", "tomorrow 8am", "tonight" → next occurrence). Null if unparseable. */
     private fun parseDelayMs(text: String): Long? {
-        val t = text.lowercase().trim()
+        var t = text.lowercase().trim()
         if (t.isBlank()) return null
-        if (t.contains("in ") || !t.contains(":")) {
-            Regex("(\\d+)\\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|[smh])\\b").find(t)?.let { m ->
+        // Normalise a few common word forms so the numeric parsing below catches them.
+        t = t.replace("half an hour", "30 minutes").replace("half hour", "30 minutes").replace("an hour", "1 hour")
+        val tomorrow = t.contains("tomorrow")
+        // Relative ("in 30 min", "2 hours", "3 days") — unless an explicit clock time or "tomorrow" is given.
+        if (!tomorrow && (t.contains("in ") || !t.contains(":"))) {
+            Regex("(\\d+)\\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|[smhd])\\b").find(t)?.let { m ->
                 val n = m.groupValues[1].toLongOrNull() ?: return@let
                 val unitMs = when {
+                    m.groupValues[2].startsWith("d") -> 86_400_000L
                     m.groupValues[2].startsWith("h") -> 3_600_000L
                     m.groupValues[2].startsWith("s") -> 1_000L
                     else -> 60_000L
@@ -66,14 +72,21 @@ class ReminderTool(
                 return n * unitMs
             }
         }
-        val tm = parseClock(t) ?: return null
+        // Absolute clock time, or a coarse part-of-day keyword.
+        val tm = parseClock(t) ?: when {
+            t.contains("tonight") || t.contains("evening") -> 20 to 0
+            t.contains("noon") -> 12 to 0
+            t.contains("morning") -> 8 to 0
+            else -> null
+        } ?: return null
         val cal = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, tm.first)
             set(Calendar.MINUTE, tm.second)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        if (cal.timeInMillis <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_MONTH, 1)
+        if (tomorrow) cal.add(Calendar.DAY_OF_MONTH, 1)
+        else if (cal.timeInMillis <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_MONTH, 1)
         return cal.timeInMillis - System.currentTimeMillis()
     }
 
@@ -90,6 +103,6 @@ class ReminderTool(
     }
 
     private companion object {
-        const val MAX_DELAY_MS = 24L * 3_600_000L
+        const val MAX_DELAY_MS = 7L * 24L * 3_600_000L
     }
 }
