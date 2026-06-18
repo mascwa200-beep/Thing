@@ -50,12 +50,17 @@ class AgentOrchestrator(
             history.forEach { messages.add(ToolMessage(if (it.role.equals("user", true)) "user" else "assistant", it.text)) }
             messages.add(ToolMessage("user", query.trim()))
             var nStep = 0
+            var nativeBroke = false
             while (nStep < MAX_STEPS) {
                 nStep++
                 emit(Step(Kind.THINKING, "reasoning…"))
                 val turn = runCatching { toolEngine.chatWithTools(messages, specs) }
                     .getOrElse { AssistantTurn("// cloud error: ${it.message}") }
                 if (turn.toolCalls.isEmpty()) {
+                    // If the very first tool-call attempt hard-errors (e.g. the chosen model doesn't
+                    // support function-calling), fall back to the text-ReAct path instead of surfacing
+                    // a cryptic error — the user still gets an answer.
+                    if (nStep == 1 && turn.text.trimStart().startsWith("// cloud error")) { nativeBroke = true; break }
                     emit(Step(Kind.FINAL, turn.text.ifBlank { "…" }))
                     return@flow
                 }
@@ -71,11 +76,14 @@ class AgentOrchestrator(
                     messages.add(ToolMessage("tool", obs.take(MAX_OBS), toolCallId = call.id, name = call.name))
                 }
             }
-            // Out of tool steps — ask once more for a plain final answer.
-            messages.add(ToolMessage("user", "Give your final answer now using what you have."))
-            val finalTurn = runCatching { toolEngine.chatWithTools(messages, emptyList()) }.getOrNull()
-            emit(Step(Kind.FINAL, (finalTurn?.text ?: "").ifBlank { "I couldn't complete that with the tools available." }))
-            return@flow
+            if (!nativeBroke) {
+                // Out of tool steps — ask once more for a plain final answer.
+                messages.add(ToolMessage("user", "Give your final answer now using what you have."))
+                val finalTurn = runCatching { toolEngine.chatWithTools(messages, emptyList()) }.getOrNull()
+                emit(Step(Kind.FINAL, (finalTurn?.text ?: "").ifBlank { "I couldn't complete that with the tools available." }))
+                return@flow
+            }
+            // else: native tool-calling unavailable for this model — fall through to text-ReAct below.
         }
 
         // --- Text-ReAct fallback (on-device models, which have no native function-calling) ---
