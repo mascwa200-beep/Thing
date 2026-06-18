@@ -130,7 +130,10 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            StatusPanel(engine, download, vm.modelSizeBytes())
+            StatusPanel(
+                engine, download, vm.modelSizeBytes(),
+                cloudLabel = if (cloudEnabled && cloudApiKey.isNotBlank()) cloudProvider.label else null,
+            )
 
             // ---- Cloud AI brain (recommended): far smarter than the on-device model ----
             SettingToggle(
@@ -552,14 +555,16 @@ private fun ChatFormatSelector(selected: ChatFormat, onSelect: (ChatFormat) -> U
 }
 
 @Composable
-private fun StatusPanel(engine: EngineState, download: ModelDownloadState, sizeBytes: Long) {
+private fun StatusPanel(engine: EngineState, download: ModelDownloadState, sizeBytes: Long, cloudLabel: String?) {
     val c = Pulse.colors
-    val (engineLabel, engineColor) = when (engine) {
-        is EngineState.Ready -> "LLM LOADED · REASONING ONLINE" to c.positive
-        is EngineState.Preparing -> "LOADING MODEL…" to c.amber
-        is EngineState.Downloading -> "DOWNLOADING ${engine.pct}%" to c.amber
-        is EngineState.Unavailable -> "PERSONA CORE (no model)" to c.muted
-        is EngineState.Error -> "ERROR · ${engine.message}" to c.magenta
+    val (engineLabel, engineColor) = when {
+        cloudLabel != null -> "CLOUD · ${cloudLabel.uppercase(Locale.US)} · REASONING ONLINE" to c.positive
+        engine is EngineState.Ready -> "LLM LOADED · REASONING ONLINE" to c.positive
+        engine is EngineState.Preparing -> "LOADING MODEL…" to c.amber
+        engine is EngineState.Downloading -> "DOWNLOADING ${engine.pct}%" to c.amber
+        engine is EngineState.Unavailable -> "PERSONA CORE (no model)" to c.muted
+        engine is EngineState.Error -> "ERROR · ${engine.message}" to c.magenta
+        else -> "PERSONA CORE" to c.muted
     }
     val (modelLabel, modelColor) = when (download) {
         is ModelDownloadState.Done -> "PRESENT · ${formatMb(sizeBytes)}" to c.positive
