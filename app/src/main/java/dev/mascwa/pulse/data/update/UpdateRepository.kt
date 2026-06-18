@@ -52,9 +52,10 @@ class UpdateRepository(
     val currentVersionCode: Int get() = BuildConfig.VERSION_CODE
     val currentVersionName: String get() = BuildConfig.VERSION_NAME
 
-    /** The configured GitHub token, or null when unset. */
+    /** The configured GitHub token, or null when unset. Trimmed — pasted tokens often carry a trailing
+     *  space/newline, which would corrupt the `Bearer` header and 401 the request. */
     suspend fun token(): String? =
-        runCatching { settings.current().jarvis.githubToken }.getOrNull()?.ifBlank { null }
+        runCatching { settings.current().jarvis.githubToken }.getOrNull()?.trim()?.ifBlank { null }
 
     /**
      * Returns an [UpdateInfo] when the `latest` release is a higher build than this one, or null when

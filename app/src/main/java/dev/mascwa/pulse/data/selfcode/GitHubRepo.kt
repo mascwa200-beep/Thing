@@ -31,7 +31,7 @@ class GitHubRepo(private val settings: SettingsRepository) {
     data class Pr(val number: Int, val url: String, val headSha: String, val headRef: String)
 
     suspend fun token(): String? =
-        runCatching { settings.current().jarvis.githubToken }.getOrNull()?.ifBlank { null }
+        runCatching { settings.current().jarvis.githubToken }.getOrNull()?.trim()?.ifBlank { null }
 
     /** Paths the autonomous editor may never modify (so it can't disable CI / signing / its own gates). */
     fun isProtected(path: String): Boolean {

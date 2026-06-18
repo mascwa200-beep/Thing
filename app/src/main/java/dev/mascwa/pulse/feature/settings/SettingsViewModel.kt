@@ -71,11 +71,19 @@ class SettingsViewModel(
         viewModelScope.launch {
             _update.value = runCatching { updates.check() }.fold(
                 onSuccess = { info -> if (info == null) UpdateUi.UpToDate else UpdateUi.Available(info) },
-                onFailure = {
-                    val msg = if (updates.token() == null) {
-                        "Your repo is private — add a GitHub token (repo scope) in J.A.R.V.I.S. Setup, or make the repo public, sir."
-                    } else {
-                        "Couldn't reach the update server — check your connection or token, sir."
+                onFailure = { e ->
+                    val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
+                    val msg = when {
+                        updates.token() == null ->
+                            "Your repo is private — add a GitHub token (repo scope) in J.A.R.V.I.S. Setup, or make the repo public, sir."
+                        code == 401 ->
+                            "GitHub rejected the token (401). Re-paste it with no spaces — a classic token needs the 'repo' scope (or a fine-grained one with Contents: read on this repo), sir."
+                        code == 403 ->
+                            "GitHub refused the request (403) — the token is rate-limited or lacks scope, sir."
+                        code == 404 ->
+                            "Release or repo not found (404) — the token can't see this private repo. A classic token needs the 'repo' scope, sir."
+                        else ->
+                            "Couldn't reach the update server${code?.let { " ($it)" } ?: ""} — check your connection, sir."
                     }
                     UpdateUi.Error(msg)
                 },

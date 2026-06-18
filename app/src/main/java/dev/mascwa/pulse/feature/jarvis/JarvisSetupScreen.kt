@@ -363,8 +363,15 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 onToggle = vm::setSelfEdit,
             )
 
-            FieldLabel("GITHUB TOKEN  ·  optional, for private repos")
-            MonoField(githubToken, vm::onGithubTokenChange, "ghp_…  (read-only repo access)")
+            FieldLabel("GITHUB TOKEN  ·  private-repo updates + self-coding")
+            MonoField(githubToken, vm::onGithubTokenChange, "ghp_…  (classic 'repo' scope)")
+            Text(
+                "Needed to reach this private repo. Read access is enough for software updates; self-coding " +
+                    "(opening PRs) needs write — a classic token with the 'repo' scope covers both. Paste " +
+                    "with no extra spaces.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
 
             FieldLabel("KNOWLEDGE BASE  ·  docs J.A.R.V.I.S. can search (on-device RAG)")
             NeonPanel {
