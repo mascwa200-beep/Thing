@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
@@ -59,6 +60,7 @@ fun JarvisScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit = {},
     onOpenApprovals: () -> Unit = {},
+    onOpenMemory: () -> Unit = {},
 ) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
@@ -120,6 +122,9 @@ fun JarvisScreen(
             }
             IconButton(onClick = onOpenApprovals) {
                 Icon(Icons.Filled.Checklist, contentDescription = "Approvals", tint = c.amber)
+            }
+            IconButton(onClick = onOpenMemory) {
+                Icon(Icons.Filled.Psychology, contentDescription = "Memory", tint = c.positive)
             }
             IconButton(onClick = onOpenSetup) {
                 Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)

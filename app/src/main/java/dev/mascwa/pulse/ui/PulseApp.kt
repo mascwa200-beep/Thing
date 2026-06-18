@@ -254,6 +254,7 @@ fun PulseApp(
                     onBack = { navController.popBackStack() },
                     onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
                     onOpenApprovals = { navController.navigate(Routes.JARVIS_APPROVALS) },
+                    onOpenMemory = { navController.navigate(Routes.JARVIS_MEMORY) },
                 )
             }
             composable(Routes.JARVIS_SETUP) {
@@ -263,6 +264,10 @@ fun PulseApp(
             composable(Routes.JARVIS_APPROVALS) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.jarvis.JarvisApprovalsScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.JARVIS_MEMORY) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisMemoryScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- 3D cyberpunk navigation map ----

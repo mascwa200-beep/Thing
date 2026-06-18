@@ -77,6 +77,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(
                     c.modelManager, c.inferenceEngine, c.settingsRepository, c.knowledgeStore, c.selfEditStore,
                 )
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel::class.java) ->
+                dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel(c.jarvisMemory)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel(c.selfEditStore, c.approvalGate)
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
