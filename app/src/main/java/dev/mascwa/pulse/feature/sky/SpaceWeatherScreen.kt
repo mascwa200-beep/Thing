@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.sky
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,14 +19,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Explainer
+import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.space.SpaceWeather
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LineChart
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -41,6 +48,8 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val c = Pulse.colors
+    // Tap any metric → plain-language explanation (title + Explainer list).
+    var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
 
     PulseScaffold(
         title = "Space Weather",
@@ -64,10 +73,24 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                     ) {
                         if (state.stale) item { StaleBanner(true) }
                         item {
+                            Text(
+                                "Tap any metric below for a plain-English explanation.",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                            )
+                        }
+                        item {
                             val kp = sw?.kp
                             val storm = sw?.stormLevel ?: "—"
                             val stormy = (kp ?: 0.0) >= 5
-                            NeonPanel(Modifier.fillMaxWidth(), borderColor = if (stormy) c.magenta else c.lineSoft, corners = true) {
+                            NeonPanel(
+                                Modifier.fillMaxWidth().clickable(enabled = sw != null) {
+                                    explainer = "Planetary K-index" to buildList {
+                                        kp?.let { add(SpaceWeatherExplainers.kp(it)) }
+                                        add(SpaceWeatherExplainers.stormScale(storm))
+                                    }
+                                },
+                                borderColor = if (stormy) c.magenta else c.lineSoft, corners = true,
+                            ) {
                                 Column {
                                     Text("PLANETARY K-INDEX", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                                     Text(
@@ -86,16 +109,25 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                         item {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 StatTile("Solar wind", sw?.solarWindSpeed?.let { "${it.toInt()} km/s" } ?: "—",
-                                    Modifier.weight(1f))
+                                    Modifier.weight(1f).clickable(enabled = sw?.solarWindSpeed != null) {
+                                        explainer = "Solar wind" to listOf(SpaceWeatherExplainers.solarWind(sw!!.solarWindSpeed!!))
+                                    })
                                 StatTile("Bz (IMF)", sw?.bz?.let { "%+.1f nT".format(it) } ?: "—",
-                                    Modifier.weight(1f),
+                                    Modifier.weight(1f).clickable(enabled = sw?.bz != null) {
+                                        explainer = "Bz (IMF)" to listOf(SpaceWeatherExplainers.bz(sw!!.bz!!))
+                                    },
                                     valueColor = if ((sw?.bz ?: 0.0) < -5) c.magenta else c.ink)
                             }
                         }
                         item {
                             val pct = sw?.auroraProbabilityPct
                             val bright = (pct ?: 0) >= 25
-                            NeonPanel(Modifier.fillMaxWidth(), borderColor = if (bright) c.violet else c.lineSoft) {
+                            NeonPanel(
+                                Modifier.fillMaxWidth().clickable(enabled = pct != null) {
+                                    explainer = "Aurora chance" to listOf(SpaceWeatherExplainers.aurora(pct!!))
+                                },
+                                borderColor = if (bright) c.violet else c.lineSoft,
+                            ) {
                                 Column {
                                     Text("AURORA CHANCE", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                                     Text(sw?.auroraChance ?: "—", style = MaterialTheme.typography.titleMedium, color = c.sky)
@@ -145,5 +177,9 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                 }
             }
         }
+    }
+
+    explainer?.let { (title, items) ->
+        ExplainerDialog(title, items, onDismiss = { explainer = null })
     }
 }
