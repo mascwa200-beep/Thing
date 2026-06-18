@@ -47,6 +47,9 @@ class Notifier(private val context: Context) {
     fun notifyUpdate(id: Int, title: String, body: String) =
         post(NotificationChannels.DIGEST, id, "UPDATE", title, body, "settings", NotificationCompat.PRIORITY_DEFAULT)
 
+    fun notifyReminder(id: Int, title: String, body: String) =
+        post(NotificationChannels.REMINDERS, id, "REMINDER", title, body, "home", NotificationCompat.PRIORITY_HIGH)
+
     fun notifyDigest(id: Int, title: String, body: String, lines: List<String>) {
         val joined = lines.joinToString("\n").ifBlank { body }
         post(NotificationChannels.DIGEST, id, "DAILY DIGEST", title, joined, "home", NotificationCompat.PRIORITY_LOW)

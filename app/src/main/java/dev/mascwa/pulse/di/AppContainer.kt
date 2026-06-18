@@ -238,6 +238,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.CalendarEventTool(appContext),
             dev.mascwa.pulse.jarvis.agent.AlarmTool(appContext),
             dev.mascwa.pulse.jarvis.agent.TimerTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.ReminderTool(appContext, jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.CameraTool(appContext),
             dev.mascwa.pulse.jarvis.agent.ContactsTool(appContext),
             dev.mascwa.pulse.jarvis.agent.SpotifyTool(appContext),
