@@ -33,6 +33,7 @@ class SettingsViewModel(
     private val selfCoder: SelfCoder,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
+    private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
 ) : ViewModel() {
 
     private val _selfCode = MutableStateFlow("")
@@ -186,6 +187,11 @@ class SettingsViewModel(
     /** Forget everything the virtual cerebellum has learned (practiced skills / reflexes). */
     fun resetReflexes() {
         viewModelScope.launch { cerebellum.clear() }
+    }
+
+    /** Forget the structured user profile (durable preferences / interests / projects). */
+    fun clearProfile() {
+        viewModelScope.launch { profile.clear() }
     }
 
     fun sendTestNotification() {

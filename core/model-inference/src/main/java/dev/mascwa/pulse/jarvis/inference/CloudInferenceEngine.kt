@@ -36,7 +36,15 @@ enum class CloudProvider(
 }
 
 /** A resolved cloud config for one generation; null means cloud is off / no key set. */
-data class CloudConfig(val baseUrl: String, val apiKey: String, val model: String)
+data class CloudConfig(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String,
+    /** Cap on the completion length sent as `max_tokens`. Without it, providers assume the model's
+     *  FULL output capacity (e.g. 64k for Claude), and credit-metered providers like OpenRouter
+     *  pre-authorize that worst-case cost and reject with 402 on a modest balance. */
+    val maxTokens: Int = 2048,
+)
 
 /**
  * A cloud chat brain speaking the OpenAI-compatible streaming `/chat/completions` API — a drop-in
@@ -69,7 +77,7 @@ class CloudInferenceEngine(
             emit("// cloud AI not configured")
             return@flow
         }
-        val payload = buildRequest(cfg.model, prompt, history, system)
+        val payload = buildRequest(cfg.model, prompt, history, system, cfg.maxTokens)
         val request = Request.Builder()
             .url(cfg.baseUrl.trimEnd('/') + "/chat/completions")
             .addHeader("Authorization", "Bearer ${cfg.apiKey}")
@@ -116,7 +124,7 @@ class CloudInferenceEngine(
         val cfg = configProvider()
         if (cfg == null) { emit("// cloud AI not configured"); return@flow }
         if (images.isEmpty()) { emitAll(generate(prompt, emptyList(), system)); return@flow }
-        val payload = buildVisionRequest(cfg.model, prompt, images, system)
+        val payload = buildVisionRequest(cfg.model, prompt, images, system, cfg.maxTokens)
         val request = Request.Builder()
             .url(cfg.baseUrl.trimEnd('/') + "/chat/completions")
             .addHeader("Authorization", "Bearer ${cfg.apiKey}")
@@ -145,7 +153,7 @@ class CloudInferenceEngine(
     }.flowOn(Dispatchers.IO)
 
     /** OpenAI-style multimodal user message: a text part plus one image_url part per data URL. */
-    private fun buildVisionRequest(model: String, prompt: String, images: List<String>, system: String?): JSONObject {
+    private fun buildVisionRequest(model: String, prompt: String, images: List<String>, system: String?, maxTokens: Int): JSONObject {
         val messages = JSONArray()
         if (!system.isNullOrBlank()) messages.put(msg("system", system))
         val content = JSONArray()
@@ -154,7 +162,8 @@ class CloudInferenceEngine(
             content.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", url)))
         }
         messages.put(JSONObject().put("role", "user").put("content", content))
-        return JSONObject().put("model", model).put("messages", messages).put("stream", true)
+        return JSONObject().put("model", model).put("messages", messages)
+            .put("max_tokens", maxTokens.coerceAtLeast(MIN_MAX_TOKENS)).put("stream", true)
     }
 
     // --- Native function-calling (ToolCallingEngine) ---
@@ -167,6 +176,7 @@ class CloudInferenceEngine(
             val payload = JSONObject()
                 .put("model", cfg.model)
                 .put("messages", toApiMessages(messages))
+                .put("max_tokens", cfg.maxTokens.coerceAtLeast(MIN_MAX_TOKENS))
                 .put("stream", false)
             if (tools.isNotEmpty()) {
                 payload.put("tools", toApiTools(tools))
@@ -258,7 +268,7 @@ class CloudInferenceEngine(
         return AssistantTurn(message.optString("content").ifBlank { "…" })
     }
 
-    private fun buildRequest(model: String, prompt: String, history: List<ChatTurn>, system: String?): JSONObject {
+    private fun buildRequest(model: String, prompt: String, history: List<ChatTurn>, system: String?, maxTokens: Int): JSONObject {
         val messages = JSONArray()
         if (!system.isNullOrBlank()) messages.put(msg("system", system))
         history.forEach { messages.put(msg(if (it.role.equals("user", ignoreCase = true)) "user" else "assistant", it.text)) }
@@ -266,6 +276,7 @@ class CloudInferenceEngine(
         return JSONObject()
             .put("model", model)
             .put("messages", messages)
+            .put("max_tokens", maxTokens.coerceAtLeast(MIN_MAX_TOKENS))
             .put("stream", true)
     }
 
@@ -273,6 +284,8 @@ class CloudInferenceEngine(
 
     private fun errorLine(code: Int, body: String?): String = when (code) {
         401, 403 -> "// cloud error $code: check your API key, sir."
+        402 -> "// cloud error 402: insufficient provider credits (not your key) — add a little credit, " +
+            "or lower \"Model max tokens\" in Setup, sir."
         404 -> "// cloud error 404: that model isn't available for this key."
         429 -> "// cloud error 429: rate limit reached — give it a moment, sir."
         else -> "// cloud error $code" + (body?.take(140)?.let { ": $it" } ?: "")
@@ -280,5 +293,6 @@ class CloudInferenceEngine(
 
     private companion object {
         val JSON = "application/json; charset=utf-8".toMediaType()
+        const val MIN_MAX_TOKENS = 256
     }
 }

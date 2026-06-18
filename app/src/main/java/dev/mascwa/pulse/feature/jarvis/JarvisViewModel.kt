@@ -73,6 +73,7 @@ class JarvisViewModel(
     private val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
+    private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -144,6 +145,8 @@ class JarvisViewModel(
             _streaming.value = ""
             memory.append(Speaker.USER, text)
             logChat("chat-in", text)
+            // Always-on profile capture: keep a clear self-declaration (preference/interest/project).
+            profile.detectAndAdd(text)
             try {
                 val pending = pendingLearn
                 if (pending != null) handleCuriosityReply(pending, text) else routeTurn(text)
@@ -510,9 +513,15 @@ class JarvisViewModel(
         return base + "\n\nWhat you remember about the user (weave in naturally when relevant):\n" + block
     }
 
-    /** The live system prompt: the user's charter (or built-in persona) + the immutable safety addendum. */
-    private suspend fun composePersona(): String =
-        JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
+    /** The live system prompt: the user's charter (or built-in persona) + the immutable safety addendum,
+     *  plus the always-on user-profile digest (durable preferences/interests/projects) so tailoring is
+     *  proactive on every turn, not gated on a keyword recall. */
+    private suspend fun composePersona(): String {
+        val base = JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
+        val digest = runCatching { profile.digest() }.getOrDefault("")
+        return if (digest.isBlank()) base
+        else base + "\n\nThe user's profile (tailor your help to it; keep it current via the `profile` tool):\n" + digest
+    }
 
     /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. Recent
      *  conversation is threaded in so the agent keeps short-term context (the durable-memory recall is

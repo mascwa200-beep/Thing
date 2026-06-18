@@ -80,6 +80,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.cerebellum.CerebellumStore(appContext, json)
     }
 
+    /** Structured user profile: durable preferences / interests / projects, injected into context. */
+    val profileStore: dev.mascwa.pulse.data.profile.ProfileStore by lazy {
+        dev.mascwa.pulse.data.profile.ProfileStore(appContext, json)
+    }
+
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
 
     val newsRepository: NewsRepository by lazy {
@@ -189,6 +194,9 @@ class AppContainer(private val appContext: Context) {
                             baseUrl = j.cloudProvider.baseUrl,
                             apiKey = j.cloudApiKey,
                             model = j.cloudModel.ifBlank { j.cloudProvider.defaultModel },
+                            // Cap the reply length so credit-metered providers (OpenRouter) don't
+                            // pre-authorize the model's full output (e.g. 64k) and 402 on a small balance.
+                            maxTokens = j.maxTokens,
                         )
                     } else {
                         null
@@ -243,6 +251,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
+            dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).

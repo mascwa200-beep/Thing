@@ -151,6 +151,17 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   **`reflex` `JarvisTool`** (`reflex` / `reflex after <tool>` / `reflex predict <tool>`); persona says it
   *informs but never replaces* deliberate choice (control-flow invariant intact). Cues/actions are tool names /
   transitions / normalized signatures — no raw content. Control: Settings → Storage → **"Reset learned reflexes"**.
+- **Expanded contextual awareness — structured user profile** (user asked J.A.R.V.I.S. to better remember
+  preferences/interests/projects for tailored help): durable, *categorized* profile memory, separate from the
+  flat note store, woven into context **every turn** (proactive, not search-gated). Pure CI-tested core in
+  `core:telemetry/UserProfile.kt` (`ProfileCategory`/`ProfileEntry`; `classify`, `detect` [confident
+  first-person self-declaration only], `merge` [dedupe + weight reinforcement + cap/evict], `digest`
+  [compact per-category block]). On-device `data/profile/ProfileStore.kt` (DataStore + debounced flush).
+  Injected into the system prompt via `JarvisViewModel.composePersona` (both chat + agent paths) under "The
+  user's profile…". Capture: always-on `profile.detectAndAdd(text)` in `send()` (works even on the non-agent
+  path) **+** the **`profile` `JarvisTool`** (`profile <fact>` / `profile list` / `profile forget <fact>`).
+  Persona directs J.A.R.V.I.S. to tailor to it + keep it current. Control: Settings → Storage → **"Clear
+  remembered profile"** (`ProfileStore.clear`). On-device only.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 
