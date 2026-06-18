@@ -186,6 +186,8 @@ data class NotificationPrefs(
     val safetyAlerts: Boolean = true,
     val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
     val dailyDigest: Boolean = true,
+    /** Notify when a newer app build is available to download/install in Settings. */
+    val updateChecks: Boolean = true,
     val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,
     val quietStartHour: Int = 22,
@@ -278,6 +280,8 @@ data class AppSettings(
     // Bookkeeping
     val onboardingComplete: Boolean = false,
     val deviceGateAcknowledged: Boolean = false,
+    /** Highest build number we've already shown an "update available" notification for (dedupe). */
+    val lastUpdateNotifiedCode: Int = 0,
 )
 
 /** Sensible International defaults for first launch. */

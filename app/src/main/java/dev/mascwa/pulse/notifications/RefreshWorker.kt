@@ -42,6 +42,21 @@ class RefreshWorker(
 
         val notifier = container.notifier
 
+        // --- App update available? (in-app updater; dedup by build number) ---
+        if (prefs.updateChecks) {
+            runCatching {
+                val info = container.updateRepository.check()
+                if (info != null && info.versionCode > settings.lastUpdateNotifiedCode) {
+                    notifier.notifyUpdate(
+                        id = 7401,
+                        title = "J.A.R.V.I.S. update available",
+                        body = "Build #${info.versionCode} is ready — tap to download & install.",
+                    )
+                    container.settingsRepository.update { it.copy(lastUpdateNotifiedCode = info.versionCode) }
+                }
+            }
+        }
+
         // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
         if (prefs.breakingNews) {
             runCatching { BreakingNewsPulse.check(container) }

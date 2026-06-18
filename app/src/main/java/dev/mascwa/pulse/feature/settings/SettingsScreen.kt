@@ -237,6 +237,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
+                    PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(updateChecks = v)) } })
                     SingleChoiceRow(
                         "Digest time", s.notifications.digestHour,
                         (0..23).map { it to "%02d:00".format(it) }, enabled = on && s.notifications.dailyDigest,
