@@ -1,0 +1,17 @@
+# Baseline profile (hand-authored starter) — Android's profile-guided AOT, the equivalent of PGO.
+# ART pre-compiles these on the non-debuggable shipped build (via androidx.profileinstaller), cutting
+# cold-start and first-run jank. AndroidX/Compose ship their own profiles too; this adds the app's hot
+# path. Lines that don't match a class/method are warned-and-skipped by AGP, never fatal. A future
+# emulator-generated profile (androidx.baselineprofile plugin) can replace this with an optimal one.
+
+# Startup entry points — compile every method (HSPL = hot/startup/post-startup).
+HSPLdev/mascwa/pulse/MainActivity;->**(**)**
+HSPLdev/mascwa/pulse/PulseApplication;->**(**)**
+
+# App-wide UI scaffolding + the first screen the user sees.
+HSPLdev/mascwa/pulse/ui/**->**(**)**
+HSPLdev/mascwa/pulse/feature/common/**->**(**)**
+HSPLdev/mascwa/pulse/feature/home/**->**(**)**
+
+# Load the rest of the app's classes (class-presence rule, no per-method AOT).
+Ldev/mascwa/pulse/**

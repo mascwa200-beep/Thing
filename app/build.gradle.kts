@@ -65,8 +65,17 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // This is the SHIPPED sideload build. It keeps the same package id + signing key as the
+            // previously-installed debug build (applicationIdSuffix ".debug" + the debug keystore
+            // fallback), so it updates IN PLACE — the on-device model and settings are preserved — while
+            // being non-debuggable so ART honours the baseline profile (the PGO-equivalent AOT win).
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            // R8 is intentionally OFF: baseline profiles don't need it, and minification risks runtime
+            // breakage (serialization/MediaPipe/Vosk/MapLibre/reflection) that CI can't catch. It can be
+            // enabled later once keep-rules are verified on-device.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -167,6 +176,9 @@ dependencies {
     // Storage / background / images / location
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
+    // Baseline Profiles: installs the app's + AndroidX libraries' profiles so ART AOT-compiles hot paths
+    // (faster cold start / less jank) on the non-debuggable shipped build.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
 

@@ -42,17 +42,17 @@ jobs:
       - name: Run unit tests
         run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest --stacktrace --no-daemon
 
-      - name: Build debug APK
-        # Pass the run number as the versionCode so each published build out-versions the last
-        # (Android blocks downgrades); combined with the pinned debug key this enables in-place
-        # updates that preserve the user's settings + downloaded model.
-        run: ./gradlew assembleDebug -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
+      - name: Build release APK
+        # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
+        # for PGO-style AOT) but kept on the same package id + debug keystore as before, so it updates in
+        # place. The run number is the versionCode so each build out-versions the last (no downgrades).
+        run: ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
 
-      - name: Upload debug APK artifact
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pulse-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: pulse-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       - name: Publish APK to 'latest' release
@@ -62,5 +62,5 @@ jobs:
           tag_name: latest
           name: "Pulse — debug build #${{ github.run_number }}"
           prerelease: true
-          body: "Auto-built debug APK (build #${{ github.run_number }}) from commit ${{ github.sha }}. Sideload on a Pixel 10 Pro XL (allow 'install unknown apps'). Installs as an in-place UPDATE over a previous build — your settings and downloaded model are kept. (One-time: if you have an older differently-signed build, uninstall it once before installing this.)"
-          files: app/build/outputs/apk/debug/app-debug.apk
+          body: "Auto-built APK (build #${{ github.run_number }}) from commit ${{ github.sha }}. Non-debuggable, baseline-profile optimized (faster cold start). Sideload on a Pixel 10 Pro XL (allow 'install unknown apps'). Installs as an in-place UPDATE over a previous build — your settings and downloaded model are kept. (One-time: if you have an older differently-signed build, uninstall it once before installing this.)"
+          files: app/build/outputs/apk/release/app-release.apk
