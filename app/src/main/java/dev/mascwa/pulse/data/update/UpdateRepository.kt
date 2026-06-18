@@ -47,7 +47,12 @@ class UpdateRepository(
     private data class GhRelease(val name: String = "", val body: String = "", val assets: List<GhAsset> = emptyList())
 
     @Serializable
-    private data class GhAsset(val name: String = "", val url: String = "", val browser_download_url: String = "")
+    private data class GhAsset(
+        val name: String = "",
+        val url: String = "",
+        val browser_download_url: String = "",
+        val created_at: String = "",
+    )
 
     val currentVersionCode: Int get() = BuildConfig.VERSION_CODE
     val currentVersionName: String get() = BuildConfig.VERSION_NAME
@@ -70,7 +75,12 @@ class UpdateRepository(
             ?: BUILD_NUM.find(rel.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
             ?: return null
         if (code <= BuildConfig.VERSION_CODE) return null
-        val asset = rel.assets.firstOrNull { it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true) }
+        // Pick the NEWEST .apk — the rolling release can briefly hold a stale asset (e.g. after the
+        // published filename changed), and grabbing the first one would serve an old/downgrade build.
+        // created_at is ISO-8601, so lexical max == most recent.
+        val asset = rel.assets
+            .filter { it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true) }
+            .maxByOrNull { it.created_at }
             ?: return null
         return UpdateInfo(code, "1.0.$code", rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url)
     }
