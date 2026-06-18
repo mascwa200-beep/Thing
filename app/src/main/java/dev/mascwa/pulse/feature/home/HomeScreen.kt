@@ -211,10 +211,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                     item { SectionBar("Markets", trailing = "VIEW ▸", onTrailing = nav.openMarkets) }
                     item { MarketsSnapshot(state.markets, nav.openMarkets) }
                 }
-                if (HomeSection.WEATHER in sections) {
-                    item { SectionBar("Weather", trailing = "VIEW ▸", onTrailing = nav.openWeather) }
-                    item { WeatherSnapshot(state.weather, nav.openWeather) }
-                }
+                // Weather already shown by the hero WeatherMiniWidget above — no duplicate section here.
                 if (HomeSection.INFLATION in sections || HomeSection.ECONOMY in sections) {
                     item { SectionBar("Economy", trailing = "VIEW ▸", onTrailing = nav.openEconomy) }
                     item { EconomySnapshot(state, nav.openEconomy) }
@@ -392,27 +389,6 @@ private fun WeatherMiniWidget(async: Async<dev.mascwa.pulse.data.weather.Weather
                     fontFamily = JetBrainsMono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     color = if (rain >= 50) c.sky else c.muted,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeatherSnapshot(async: Async<dev.mascwa.pulse.data.weather.WeatherData>, onClick: () -> Unit) {
-    val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, corners = true) {
-        val wd = async.data
-        val cur = wd?.current
-        if (cur == null) {
-            Text(if (async.loading) "Loading…" else "—", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(WeatherCode.emoji(cur.weatherCode, cur.isDay), fontSize = 34.sp)
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text("${Formatters.number(cur.temperature, 0)}${wd.tempUnitSymbol} · ${WeatherCode.describe(cur.weatherCode)}",
-                        fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = c.ink)
-                    Text(wd.locationName.uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-                }
             }
         }
     }

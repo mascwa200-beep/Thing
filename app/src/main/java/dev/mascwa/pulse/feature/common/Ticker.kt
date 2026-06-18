@@ -40,6 +40,7 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
     if (items.isEmpty()) return
     val c = Pulse.colors
     var singleWidth by remember { mutableIntStateOf(0) }
+    var viewportWidth by remember { mutableIntStateOf(0) }
 
     val transition = rememberInfiniteTransition(label = "ticker")
     val progress by transition.animateFloat(
@@ -55,12 +56,16 @@ fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(30.dp)
             .background(c.carbon)
-            .clipToBounds(),
+            .clipToBounds()
+            .onSizeChanged { viewportWidth = it.width },
         contentAlignment = Alignment.CenterStart,
     ) {
+        // Tile enough identical copies to always overflow the viewport, so the loop (which shifts by ONE
+        // sequence width) never leaves a trailing gap — a continuous stream regardless of item count.
+        val repeats = if (singleWidth > 0) (viewportWidth / singleWidth + 2).coerceAtLeast(2) else 2
         Row(Modifier.graphicsLayer { translationX = -progress * singleWidth }) {
             TickerSequence(items, c.muted, Modifier.onSizeChanged { if (it.width > 0) singleWidth = it.width })
-            TickerSequence(items, c.muted, Modifier)
+            repeat(repeats - 1) { TickerSequence(items, c.muted, Modifier) }
         }
     }
 }
