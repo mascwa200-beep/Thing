@@ -159,7 +159,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 item { Greeting() }
 
                 // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
-                item { AssistantCard(state.jarvisStatus, nav.openAssistant) }
+                item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
 
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
@@ -281,12 +281,12 @@ private fun Greeting() {
 }
 
 @Composable
-private fun AssistantCard(status: String, onOpen: () -> Unit) {
+private fun AssistantCard(status: String, pendingCode: Int, onOpen: () -> Unit) {
     val c = Pulse.colors
     NeonPanel(
         Modifier.fillMaxWidth().padding(top = 12.dp).clickable { onOpen() },
         corners = true,
-        borderColor = c.accent.copy(alpha = 0.5f),
+        borderColor = if (pendingCode > 0) c.amber.copy(alpha = 0.6f) else c.accent.copy(alpha = 0.5f),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
@@ -301,8 +301,15 @@ private fun AssistantCard(status: String, onOpen: () -> Unit) {
                     fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.5.sp, color = c.muted,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+                if (pendingCode > 0) {
+                    Text(
+                        "◆ $pendingCode change${if (pendingCode == 1) "" else "s"} awaiting your approval",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
             }
-            Text("TALK ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
+            Text(if (pendingCode > 0) "REVIEW ▸" else "TALK ▸", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.sky)
         }
     }
 }

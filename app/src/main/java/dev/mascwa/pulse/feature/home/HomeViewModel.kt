@@ -17,6 +17,8 @@ import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.SkyDigest
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.selfedit.ActionType
+import dev.mascwa.pulse.data.selfedit.SelfEditStore
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -45,6 +47,8 @@ data class HomeUiState(
     val jarvisStatus: String = "",
     /** Live aircraft near the user (TACNET/ADS-B) for the home flight card; null until fetched. */
     val radar: Async<RadarData> = Async(loading = true),
+    /** Staged self-code changes awaiting the user's approval (nudge on the home assistant card). */
+    val pendingCode: Int = 0,
 )
 
 class HomeViewModel(
@@ -58,12 +62,22 @@ class HomeViewModel(
     private val orbital: OrbitalRepository,
     private val space: SpaceWeatherRepository,
     private val radar: RadarRepository,
+    private val selfEdit: SelfEditStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    init { load(force = false) }
+    init {
+        load(force = false)
+        // Live count of self-code changes awaiting approval, surfaced on the assistant card.
+        viewModelScope.launch {
+            selfEdit.state.collect { se ->
+                val n = se.pendingActions.count { it.type == ActionType.CODE_PR }
+                _state.update { it.copy(pendingCode = n) }
+            }
+        }
+    }
 
     fun refresh() = load(force = true)
 
