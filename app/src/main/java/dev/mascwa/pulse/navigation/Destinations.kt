@@ -65,6 +65,13 @@ object Routes {
 
     // Diagnostics
     const val CRASH_LOG = "crash_log"
+
+    // Accessibility Enhancements
+    const val ACCESSIBILITY_DASHBOARD = "accessibility_dashboard"
+    const val USAGE_DATA = "usage_data"
+    const val AUTONOMOUS_DIAGNOSTICS = "autonomous_diagnostics"
+    const val FEATURE_RECOMMENDATIONS = "feature_recommendations"
+    const val LEARNING_CAPABILITIES = "learning_capabilities"
 }
 
 data class TopDestination(
@@ -81,4 +88,5 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.ACCESSIBILITY_DASHBOARD, "ACCESSIBILITY", Icons.Filled.AccessibilityNew, Icons.Outlined.AccessibilityNew)
 )
