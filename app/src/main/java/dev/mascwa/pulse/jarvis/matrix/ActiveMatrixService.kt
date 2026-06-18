@@ -24,6 +24,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
+import dev.mascwa.pulse.jarvis.agent.AgentOrchestrator
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer
 import dev.mascwa.pulse.jarvis.voice.SttModelStore
@@ -404,8 +405,24 @@ class ActiveMatrixService : Service() {
             val history = convo.toList()
             convo.addLast(ChatTurn(Speaker.USER, command))
 
+            // When tools/self-coding are on, answer spoken commands through the agent loop so voice can
+            // actually DO things (weather, location, reminders, read/change its own code) — not just chat.
+            // Otherwise stream a plain reply. Either way the recent conversation is threaded in.
+            val useAgent = jarvisSettings != null &&
+                (jarvisSettings.agentToolsEnabled || jarvisSettings.selfCodingEnabled || jarvisSettings.selfEditEnabled)
+            val orchestrator = if (useAgent) container?.agentOrchestrator else null
             val sb = StringBuilder()
-            engine.generate(command, history, persona).collect { sb.append(it) }
+            if (orchestrator != null) {
+                orchestrator.run(command, persona, history).collect { step ->
+                    when (step.kind) {
+                        AgentOrchestrator.Kind.TOOL -> update("⚙ ${step.text}")
+                        AgentOrchestrator.Kind.FINAL -> sb.append(step.text)
+                        else -> {}
+                    }
+                }
+            } else {
+                engine.generate(command, history, persona).collect { sb.append(it) }
+            }
             var reply = sb.toString().ifBlank { "Standing by, sir." }
             // Autonomous floor-control: explicit markers win; otherwise a trailing "?" implies it
             // expects an answer. Strip markers before showing/speaking either way.
