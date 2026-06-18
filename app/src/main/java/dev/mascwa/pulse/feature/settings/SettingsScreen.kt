@@ -32,6 +32,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +43,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.core.util.installApk
+import dev.mascwa.pulse.feature.settings.SettingsViewModel.UpdateUi
 import dev.mascwa.pulse.data.settings.CustomFeed
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.settings.PrecipUnit
@@ -81,6 +84,45 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
 
     PulseScaffold(title = "Settings") { innerPadding ->
         LazyColumn(modifier = Modifier.padding(innerPadding), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
+
+            // ----- Software update (in-app updater) -----
+            item {
+                val u by vm.updateState.collectAsStateWithLifecycle()
+                // Auto-check on open so arriving from the update notification lands on the action.
+                LaunchedEffect(Unit) { vm.checkForUpdate() }
+                PrefSection("Software update") {
+                    val status = when (val st = u) {
+                        is UpdateUi.Checking -> "Checking for a newer build…"
+                        is UpdateUi.UpToDate -> "You're on the latest build."
+                        is UpdateUi.Available -> "Update available — build #${st.info.versionCode}."
+                        is UpdateUi.Downloading -> "Downloading ${st.pct}%…"
+                        is UpdateUi.ReadyToInstall -> "Downloaded — tap Install now."
+                        is UpdateUi.Error -> st.message
+                        else -> "Tap to check for a new version."
+                    }
+                    PrefClickable(
+                        "Check for updates",
+                        value = "v${vm.installedVersion}",
+                        subtitle = status,
+                        onClick = { vm.checkForUpdate() },
+                    )
+                    when (val st = u) {
+                        is UpdateUi.Available -> PrefClickable(
+                            "Download & install",
+                            subtitle = st.info.notes.take(140).ifBlank { "Get build #${st.info.versionCode}" },
+                            onClick = { vm.downloadUpdate() },
+                        )
+                        is UpdateUi.ReadyToInstall -> PrefClickable(
+                            "Install now",
+                            subtitle = "Opens the system installer — you confirm the update.",
+                            onClick = { installApk(context, st.file) },
+                        )
+                        is UpdateUi.Error -> PrefClickable("Retry", onClick = { vm.downloadUpdate() })
+                        else -> {}
+                    }
+                }
+            }
+            item { HorizontalDivider() }
 
             // ----- Appearance -----
             item {
