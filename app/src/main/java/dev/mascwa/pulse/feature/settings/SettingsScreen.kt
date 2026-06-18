@@ -149,16 +149,20 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
                         )
                         OutlinedTextField(
-                            goal, { goal = it }, label = { Text("Goal — what to change") },
+                            goal, { goal = it }, label = { Text("Goal — what to change (plain language)") },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                         )
                         OutlinedTextField(
-                            path, { path = it }, label = { Text("Target file (e.g. app/src/…/Foo.kt)") },
+                            path, { path = it }, label = { Text("Target file (optional — blank: I'll pick)") },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                         )
                         PrefClickable(
-                            "Propose change → open PR",
-                            subtitle = selfCodeStatus.ifBlank { "Drafts the change with the cloud model and opens a PR." },
+                            "Propose change → review & approve",
+                            subtitle = selfCodeStatus.ifBlank {
+                                "Drafts the change with the cloud model and stages it — approve it (here in " +
+                                    "Approvals, or in the J.A.R.V.I.S. console) to open the PR. You can also just " +
+                                    "ask J.A.R.V.I.S. in chat or by voice."
+                            },
                             onClick = { vm.proposeSelfChange(goal, path) },
                         )
                         Text(

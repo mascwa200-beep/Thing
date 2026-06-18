@@ -19,6 +19,7 @@ object ActionType {
     const val DOC_DELETE = "DOC_DELETE"
     const val RESEARCH = "RESEARCH"       // M3
     const val TOOL_REGISTER = "TOOL_REGISTER" // M4
+    const val CODE_PR = "CODE_PR"         // self-coding: open a GitHub PR with the drafted file change
 }
 
 /**

@@ -63,6 +63,7 @@ class JarvisViewModel(
     private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
     private val briefing: dev.mascwa.pulse.jarvis.BriefingBuilder,
     private val curiosity: CuriosityEngine,
+    private val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -114,6 +115,13 @@ class JarvisViewModel(
     private val _voiceInput = MutableStateFlow<VoiceInputState>(VoiceInputState.Idle)
     /** Tap-to-talk voice-input state (Idle → Preparing → Listening → back to Idle on a result). */
     val voiceInput: StateFlow<VoiceInputState> = _voiceInput.asStateFlow()
+
+    /** The newest staged self-code change awaiting approval — surfaced inline in the console so the user
+     *  can approve/reject without leaving the chat. Null when nothing is pending. */
+    val pendingCode: StateFlow<dev.mascwa.pulse.data.selfedit.PendingAction?> =
+        selfEdit.state
+            .map { st -> st.pendingActions.lastOrNull { it.type == dev.mascwa.pulse.data.selfedit.ActionType.CODE_PR } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch { engine.ensureReady() }
@@ -403,6 +411,30 @@ class JarvisViewModel(
     fun setConsoleActive(active: Boolean) {
         voskSpeech.consoleActive.value = active
         if (!active) stopVoiceInput()
+    }
+
+    /** Approve a staged self-code change from the console: opens the PR via the same ApprovalGate the
+     *  Approvals screen uses (the only code that performs the change), then reports the result. */
+    fun approveCode(action: dev.mascwa.pulse.data.selfedit.PendingAction) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                sayJarvis(approvalGate.apply(action))
+            } catch (e: Throwable) {
+                memory.append(Speaker.JARVIS, "// self-code fault: ${e.message ?: "error"}")
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    /** Reject a staged self-code change from the console (nothing is pushed). */
+    fun rejectCode(action: dev.mascwa.pulse.data.selfedit.PendingAction) {
+        viewModelScope.launch {
+            runCatching { approvalGate.reject(action.id) }
+            sayJarvis("Dropped that change, sir.")
+        }
     }
 
     fun clearHistory() {

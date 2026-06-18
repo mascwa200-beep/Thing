@@ -72,6 +72,7 @@ fun JarvisScreen(
     val banter by vm.banterLine.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
     val voiceInput by vm.voiceInput.collectAsState()
+    val pendingCode by vm.pendingCode.collectAsState()
     val listState = rememberLazyListState()
 
     val context = LocalContext.current
@@ -180,7 +181,57 @@ fun JarvisScreen(
                 }
             }
 
+            pendingCode?.let { action ->
+                CodeApprovalCard(
+                    action = action,
+                    onApprove = { vm.approveCode(action) },
+                    onReject = { vm.rejectCode(action) },
+                    enabled = !busy,
+                )
+            }
+
             InputBar(busy = busy, voice = voiceInput, onSend = vm::send, onMic = onMic)
+        }
+    }
+}
+
+/** Inline approve/reject for a self-code change J.A.R.V.I.S. has staged — so the user can ship a code
+ *  change without leaving the console. The PR opens only on APPROVE (via the shared ApprovalGate). */
+@Composable
+private fun CodeApprovalCard(
+    action: dev.mascwa.pulse.data.selfedit.PendingAction,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    enabled: Boolean,
+) {
+    val c = Pulse.colors
+    NeonPanel(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        borderColor = c.amber.copy(alpha = 0.6f),
+        background = c.panel,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "◆ ${action.title}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber,
+            )
+            Text(
+                action.preview.take(280),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onApprove, enabled = enabled) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Approve & open PR", tint = c.positive)
+                }
+                IconButton(onClick = onReject, enabled = enabled) {
+                    Icon(Icons.Filled.DeleteSweep, contentDescription = "Reject", tint = c.magenta)
+                }
+                Text(
+                    "Approve → open PR",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            }
         }
     }
 }

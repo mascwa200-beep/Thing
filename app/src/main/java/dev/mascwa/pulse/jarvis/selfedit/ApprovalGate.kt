@@ -21,6 +21,9 @@ class ApprovalGate(
     /** Runs a web search for a topic (wired to the vetted WebSearchTool). Only invoked here, after
      *  the user approves a RESEARCH proposal — never by the agent itself. */
     private val research: suspend (String) -> String = { "" },
+    /** Opens the GitHub PR for an approved CODE_PR proposal (wired to SelfCoder.commit). Only invoked
+     *  here, after the user approves — so no self-code PR is ever opened without the user's tap. */
+    private val commitCode: suspend (PendingAction) -> String = { "Self-coding isn't available." },
 ) {
     /** Apply an approved action, then remove it from the queue. Returns a short result message. */
     suspend fun apply(action: PendingAction): String {
@@ -65,6 +68,10 @@ class ApprovalGate(
                     selfEdit.addAuthoredTool(AuthoredTool(toolName, usage, script, caps, enabled = true))
                     "Registered tool \"$toolName\"."
                 }
+            }
+            ActionType.CODE_PR -> {
+                // Only NOW (post-approval) do we write to GitHub — and only via SelfCoder.commit.
+                commitCode(action)
             }
             else -> "Unsupported action type: ${action.type}."
         }

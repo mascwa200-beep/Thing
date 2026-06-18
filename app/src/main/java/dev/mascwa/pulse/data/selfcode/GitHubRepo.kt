@@ -61,6 +61,22 @@ class GitHubRepo(private val settings: SettingsRepository) {
     suspend fun headSha(branch: String = "main"): String =
         obj("GET", "$API/git/ref/heads/$branch").getJSONObject("object").getString("sha")
 
+    /** Every source-file (blob) path in the repo tree at [ref], recursively, with protected paths
+     *  dropped. Lets the model pick WHICH file to change from a goal (the "knows where to do it" step).
+     *  Takes a commit/branch sha — the trees API resolves it to that commit's tree. */
+    suspend fun tree(ref: String = "main"): List<String> {
+        val sha = runCatching { headSha(ref) }.getOrElse { ref }
+        val nodes = obj("GET", "$API/git/trees/$sha?recursive=1").optJSONArray("tree") ?: return emptyList()
+        val out = ArrayList<String>(nodes.length())
+        for (i in 0 until nodes.length()) {
+            val node = nodes.getJSONObject(i)
+            if (node.optString("type") != "blob") continue
+            val path = node.optString("path")
+            if (path.isNotBlank() && !isProtected(path)) out.add(path)
+        }
+        return out
+    }
+
     suspend fun createBranch(name: String, fromSha: String) {
         obj("POST", "$API/git/refs", JSONObject().put("ref", "refs/heads/$name").put("sha", fromSha))
     }

@@ -32,10 +32,11 @@ class SettingsViewModel(
     /** Status line for the self-coding "propose a change" action. */
     val selfCodeStatus: StateFlow<String> = _selfCode
 
-    /** Have J.A.R.V.I.S. draft a change to [path] for [goal] and open a PR (no auto-merge here). */
+    /** Have J.A.R.V.I.S. draft a change for [goal] and stage it for approval. [path] is optional — leave
+     *  it blank and J.A.R.V.I.S. picks the file itself; approve the staged change to open the PR. */
     fun proposeSelfChange(goal: String, path: String) {
-        if (goal.isBlank() || path.isBlank()) { _selfCode.value = "Enter a goal and a file path."; return }
-        _selfCode.value = "Drafting & opening a PR…"
+        if (goal.isBlank()) { _selfCode.value = "Enter a goal."; return }
+        _selfCode.value = "Drafting a change…"
         viewModelScope.launch {
             _selfCode.value = runCatching { selfCoder.propose(goal, path) }
                 .getOrElse { SelfCoder.Result(false, it.message ?: "failed") }

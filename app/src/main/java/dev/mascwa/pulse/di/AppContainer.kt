@@ -41,7 +41,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.selfcode.GitHubRepo(settingsRepository)
     }
     val selfCoder: dev.mascwa.pulse.data.selfcode.SelfCoder by lazy {
-        dev.mascwa.pulse.data.selfcode.SelfCoder(inferenceEngine, gitHubRepo)
+        dev.mascwa.pulse.data.selfcode.SelfCoder(inferenceEngine, gitHubRepo, selfEditStore)
     }
 
     /** On-device editable "interpreted layer" (persona charter + version history; later: approvals,
@@ -278,6 +278,13 @@ class AppContainer(private val appContext: Context) {
             selfEditStore,
             knowledgeStore,
             research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
+            commitCode = { action ->
+                selfCoder.commit(
+                    goal = action.payload["goal"].orEmpty(),
+                    path = action.payload["path"].orEmpty(),
+                    content = action.payload["content"].orEmpty(),
+                )
+            },
         )
     }
 
