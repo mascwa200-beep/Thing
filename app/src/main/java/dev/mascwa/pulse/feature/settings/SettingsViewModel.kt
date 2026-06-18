@@ -31,6 +31,7 @@ class SettingsViewModel(
     private val notifier: Notifier,
     private val updates: UpdateRepository,
     private val selfCoder: SelfCoder,
+    private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
 ) : ViewModel() {
 
     private val _selfCode = MutableStateFlow("")
@@ -174,6 +175,11 @@ class SettingsViewModel(
             diskCache.clear()
             refreshCacheSize()
         }
+    }
+
+    /** Wipe the on-device usage history that powers J.A.R.V.I.S.'s tailored recommendations. */
+    fun clearUsageData() {
+        viewModelScope.launch { usage.clear() }
     }
 
     fun sendTestNotification() {

@@ -64,12 +64,16 @@ fun PulseApp(
     factory: ViewModelProvider.Factory,
     startRoute: String?,
     isOnline: Boolean = true,
+    onRouteVisit: (String) -> Unit = {},
 ) {
     val navController = rememberNavController()
     var offlineDismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(isOnline) { if (isOnline) offlineDismissed = false }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // Single, privacy-safe point to record which feature the user opened (aggregated counts only).
+    LaunchedEffect(currentRoute) { currentRoute?.let(onRouteVisit) }
 
     fun navigateTopLevel(route: String) {
         navController.navigate(route) {

@@ -70,6 +70,11 @@ class AppContainer(private val appContext: Context) {
 
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(appContext, json) }
 
+    /** On-device, aggregated feature-usage store (counts + hour-of-day; no content/PII). */
+    val usageRepository: dev.mascwa.pulse.data.usage.UsageRepository by lazy {
+        dev.mascwa.pulse.data.usage.UsageRepository(appContext, json)
+    }
+
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
 
     val newsRepository: NewsRepository by lazy {
@@ -230,6 +235,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
+            dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).

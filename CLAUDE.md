@@ -110,6 +110,15 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   after a signing change wipes config. Logic in `data/settings/SettingsBackup.kt` (`Envelope` + `redactSecrets`
   + `merge`): export **blanks all credentials** (apiKeys + jarvis model/github/cloud tokens) so a backup file
   never carries secrets; restore **keeps the device's current credentials** and lays the rest over. No network.
+- **Usage insights → tailored recommendations** (the "AI integration" the user asked for, built privacy-first):
+  an **on-device, aggregated** usage store (`data/usage/UsageRepository.kt`, separate `pulse_usage` DataStore) —
+  per-feature visit **counts + a 24-slot hour-of-day histogram only; no content, no locations, no PII**.
+  Recorded at ONE point: a `LaunchedEffect(currentRoute)` in `PulseApp` → `onRouteVisit` → `usageRepository.record`
+  (wired from `MainActivity`). Performance: in-memory cache + **debounced** flush (2s) so nav bursts = one write.
+  Pure, CI-tested heuristics in `core:telemetry/UsageInsights.kt` (`recommend()`: go-to feature, what you open
+  around now, one untried feature) using `data/usage/FeatureCatalog.kt` (route→label+pitch). Surfaced to the
+  assistant via the **`usage` `JarvisTool`** (`UsageInsightsTool`) — so it rides J.A.R.V.I.S.'s existing cloud
+  opt-in, no new data path. User control: Settings → Storage → **"Clear usage data"** (`UsageRepository.clear`).
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 
