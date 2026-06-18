@@ -127,7 +127,12 @@ private fun ApprovalCard(
     NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = c.accent.copy(alpha = 0.6f)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(action.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
-            Text(action.preview.take(600), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2)
+            val diff = action.payload["diff"]
+            if (action.type == dev.mascwa.pulse.data.selfedit.ActionType.CODE_PR && !diff.isNullOrBlank()) {
+                dev.mascwa.pulse.feature.common.DiffText(diff, maxLines = 400)
+            } else {
+                Text(action.preview.take(600), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ActionButton("APPROVE", c.positive, onApprove)
                 ActionButton("REJECT", c.magenta, onReject)

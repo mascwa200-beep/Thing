@@ -215,10 +215,19 @@ private fun CodeApprovalCard(
                 "◆ ${action.title}",
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber,
             )
-            Text(
-                action.preview.take(280),
-                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-            )
+            val diff = action.payload["diff"]
+            if (!diff.isNullOrBlank()) {
+                dev.mascwa.pulse.feature.common.DiffText(diff, maxLines = 14)
+                Text(
+                    "Full diff in Approvals (✓)",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+            } else {
+                Text(
+                    action.preview.take(280),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = onApprove, enabled = enabled) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Approve & open PR", tint = c.positive)

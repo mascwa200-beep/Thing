@@ -48,9 +48,12 @@ class SelfCoder(
         val targets = planFiles(goal, pathHint?.trim()?.trimStart('/')?.ifBlank { null })
         if (targets.isEmpty()) return Result(false, "I couldn't work out which files to change for that, sir — try naming the area.")
 
+        val diffs = StringBuilder()
         val files = targets.mapNotNull { t ->
             val current = if (t.isNew) null else runCatching { repo.getFile(t.path, "main") }.getOrNull()
             val content = draftFile(goal, t.path, targets.map { it.path }, current) ?: return@mapNotNull null
+            if (diffs.isNotEmpty()) diffs.append("\n\n")
+            diffs.append(LineDiff.diff(current, content, t.path))
             StagedFile(t.path, content, t.isNew)
         }
         if (files.isEmpty()) return Result(false, "I couldn't draft valid contents for that change, sir.")
@@ -66,7 +69,11 @@ class SelfCoder(
                 type = ActionType.CODE_PR,
                 title = "Code change · ${goal.take(60)}",
                 preview = preview,
-                payload = mapOf("goal" to goal, "files" to json.encodeToString(ListSerializer(StagedFile.serializer()), files)),
+                payload = mapOf(
+                    "goal" to goal,
+                    "files" to json.encodeToString(ListSerializer(StagedFile.serializer()), files),
+                    "diff" to diffs.toString().take(MAX_DIFF_CHARS),
+                ),
                 createdAt = System.currentTimeMillis(),
             ),
         )
@@ -249,5 +256,7 @@ class SelfCoder(
         const val MAX_CANDIDATES = 600
         // Cap files per change so one proposal can't balloon (keeps drafting + the PR reviewable).
         const val MAX_FILES = 4
+        // Cap the stored preview diff so the approval payload stays bounded.
+        const val MAX_DIFF_CHARS = 12_000
     }
 }
