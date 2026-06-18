@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -44,7 +45,7 @@ data class CloudConfig(val baseUrl: String, val apiKey: String, val model: Strin
  */
 class CloudInferenceEngine(
     private val configProvider: suspend () -> CloudConfig?,
-) : LocalInferenceEngine {
+) : LocalInferenceEngine, ToolCallingEngine {
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -105,6 +106,105 @@ class CloudInferenceEngine(
             if (!emittedAny) emit("…")
         }
     }.flowOn(Dispatchers.IO)
+
+    // --- Native function-calling (ToolCallingEngine) ---
+
+    override suspend fun supportsTools(): Boolean = isConfigured()
+
+    override suspend fun chatWithTools(messages: List<ToolMessage>, tools: List<ToolSpec>): AssistantTurn =
+        withContext(Dispatchers.IO) {
+            val cfg = configProvider() ?: return@withContext AssistantTurn("// cloud AI not configured")
+            val payload = JSONObject()
+                .put("model", cfg.model)
+                .put("messages", toApiMessages(messages))
+                .put("stream", false)
+            if (tools.isNotEmpty()) {
+                payload.put("tools", toApiTools(tools))
+                payload.put("tool_choice", "auto")
+            }
+            val request = Request.Builder()
+                .url(cfg.baseUrl.trimEnd('/') + "/chat/completions")
+                .addHeader("Authorization", "Bearer ${cfg.apiKey}")
+                .post(payload.toString().toRequestBody(JSON))
+                .build()
+            val resp = runCatching { client.newCall(request).execute() }.getOrElse {
+                return@withContext AssistantTurn("// cloud error: ${it.message ?: "network failure"}")
+            }
+            resp.use { r ->
+                val body = runCatching { r.body?.string() }.getOrNull().orEmpty()
+                if (!r.isSuccessful) AssistantTurn(errorLine(r.code, body)) else parseAssistant(body)
+            }
+        }
+
+    /** Each JarvisTool → an OpenAI function with one string `arg` param (matching `run(arg)`). */
+    private fun toApiTools(tools: List<ToolSpec>): JSONArray {
+        val arr = JSONArray()
+        for (t in tools) {
+            val params = JSONObject()
+                .put("type", "object")
+                .put("properties", JSONObject().put("arg", JSONObject().put("type", "string").put("description", t.description)))
+                .put("required", JSONArray().put("arg"))
+            arr.put(
+                JSONObject().put("type", "function").put(
+                    "function",
+                    JSONObject().put("name", t.name).put("description", t.description).put("parameters", params),
+                ),
+            )
+        }
+        return arr
+    }
+
+    private fun toApiMessages(messages: List<ToolMessage>): JSONArray {
+        val arr = JSONArray()
+        for (m in messages) {
+            val o = JSONObject().put("role", m.role)
+            // An assistant turn that only requests tools may have no content — send null, not "".
+            if (m.toolCalls.isNotEmpty() && m.content.isBlank()) o.put("content", JSONObject.NULL) else o.put("content", m.content)
+            if (m.role == "tool") {
+                m.toolCallId?.let { o.put("tool_call_id", it) }
+                m.name?.let { o.put("name", it) }
+            }
+            if (m.toolCalls.isNotEmpty()) {
+                val tc = JSONArray()
+                for (call in m.toolCalls) {
+                    tc.put(
+                        JSONObject()
+                            .put("id", call.id)
+                            .put("type", "function")
+                            .put(
+                                "function",
+                                JSONObject().put("name", call.name).put("arguments", JSONObject().put("arg", call.arg).toString()),
+                            ),
+                    )
+                }
+                o.put("tool_calls", tc)
+            }
+            arr.put(o)
+        }
+        return arr
+    }
+
+    private fun parseAssistant(body: String): AssistantTurn {
+        val message = runCatching {
+            JSONObject(body).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+        }.getOrNull() ?: return AssistantTurn("…")
+        val calls = message.optJSONArray("tool_calls")
+        if (calls != null && calls.length() > 0) {
+            val list = ArrayList<ToolInvocation>(calls.length())
+            for (i in 0 until calls.length()) {
+                val c = calls.getJSONObject(i)
+                val fn = c.optJSONObject("function") ?: continue
+                val name = fn.optString("name")
+                if (name.isBlank()) continue
+                val rawArgs = fn.optString("arguments")
+                // Args is a JSON string like {"arg":"..."}; fall back to the raw string if it's not.
+                val arg = runCatching { JSONObject(rawArgs).optString("arg") }.getOrNull()?.ifBlank { null } ?: rawArgs
+                list.add(ToolInvocation(c.optString("id").ifBlank { "call_$i" }, name, arg))
+            }
+            if (list.isNotEmpty()) return AssistantTurn(message.optString("content"), list)
+        }
+        return AssistantTurn(message.optString("content").ifBlank { "…" })
+    }
 
     private fun buildRequest(model: String, prompt: String, history: List<ChatTurn>, system: String?): JSONObject {
         val messages = JSONArray()

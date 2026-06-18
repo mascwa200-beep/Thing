@@ -31,7 +31,7 @@ class RoutingInferenceEngine(
     private val maxTokensProvider: suspend () -> Int = { maxTokens },
     /** Resolved cloud config when the user has enabled a cloud AI + set a key; null = use on-device. */
     private val cloudConfig: suspend () -> CloudConfig? = { null },
-) : LocalInferenceEngine {
+) : LocalInferenceEngine, ToolCallingEngine {
 
     private val appContext = context.applicationContext
     private val isolated = IsolatedInferenceEngine(appContext, modelManager, maxTokens, promptConfig, backendProvider, onNativeCrash, maxTokensProvider)
@@ -88,6 +88,13 @@ class RoutingInferenceEngine(
             else -> emitAll(fallback.generate(prompt, history, system))
         }
     }
+
+    // Native function-calling is available only on the cloud path; on-device falls back to text-ReAct.
+    override suspend fun supportsTools(): Boolean =
+        runCatching { cloudConfig() }.getOrNull() != null && cloud.supportsTools()
+
+    override suspend fun chatWithTools(messages: List<ToolMessage>, tools: List<ToolSpec>): AssistantTurn =
+        cloud.chatWithTools(messages, tools)
 
     /** Drop the loaded model (e.g. after the user deletes it) and revert to the core. */
     fun reset() {

@@ -2,8 +2,12 @@ package dev.mascwa.pulse.jarvis.agent
 
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
+import dev.mascwa.pulse.jarvis.inference.AssistantTurn
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
 import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
+import dev.mascwa.pulse.jarvis.inference.ToolCallingEngine
+import dev.mascwa.pulse.jarvis.inference.ToolMessage
+import dev.mascwa.pulse.jarvis.inference.ToolSpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -31,12 +35,49 @@ class AgentOrchestrator(
         val tools = runCatching { toolsProvider() }.getOrDefault(emptyList())
         val recalled = runCatching { memory.recall(query) }.getOrDefault(emptyList())
         val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
-        val system = buildSystem(
-            tools,
-            persona,
-            recalled.map { it.noteText },
-            docs.map { "[${it.title}] ${it.text}" },
-        )
+        val memoryNotes = recalled.map { it.noteText }
+        val knowledgeChunks = docs.map { "[${it.title}] ${it.text}" }
+
+        // Native function-calling path (cloud): the model emits structured tool calls — far more reliable
+        // than the text protocol on-device models need. Falls through to text-ReAct when unavailable.
+        val toolEngine = engine as? ToolCallingEngine
+        if (toolEngine != null && tools.isNotEmpty() && runCatching { toolEngine.supportsTools() }.getOrDefault(false)) {
+            val specs = tools.map { ToolSpec(it.name, it.usage) }
+            val messages = ArrayList<ToolMessage>()
+            messages.add(ToolMessage("system", buildNativeSystem(persona, memoryNotes, knowledgeChunks)))
+            history.forEach { messages.add(ToolMessage(if (it.role.equals("user", true)) "user" else "assistant", it.text)) }
+            messages.add(ToolMessage("user", query.trim()))
+            var nStep = 0
+            while (nStep < MAX_STEPS) {
+                nStep++
+                emit(Step(Kind.THINKING, "reasoning…"))
+                val turn = runCatching { toolEngine.chatWithTools(messages, specs) }
+                    .getOrElse { AssistantTurn("// cloud error: ${it.message}") }
+                if (turn.toolCalls.isEmpty()) {
+                    emit(Step(Kind.FINAL, turn.text.ifBlank { "…" }))
+                    return@flow
+                }
+                messages.add(ToolMessage("assistant", turn.text, toolCalls = turn.toolCalls))
+                for (call in turn.toolCalls) {
+                    emit(Step(Kind.TOOL, if (call.arg.isBlank()) call.name else "${call.name} ${call.arg}"))
+                    val tool = tools.firstOrNull { it.name.equals(call.name, ignoreCase = true) }
+                    val obs = if (tool == null) {
+                        "Unknown tool '${call.name}'."
+                    } else {
+                        runCatching { tool.run(call.arg) }.getOrElse { "Tool error: ${it.message}" }
+                    }
+                    messages.add(ToolMessage("tool", obs.take(MAX_OBS), toolCallId = call.id, name = call.name))
+                }
+            }
+            // Out of tool steps — ask once more for a plain final answer.
+            messages.add(ToolMessage("user", "Give your final answer now using what you have."))
+            val finalTurn = runCatching { toolEngine.chatWithTools(messages, emptyList()) }.getOrNull()
+            emit(Step(Kind.FINAL, (finalTurn?.text ?: "").ifBlank { "I couldn't complete that with the tools available." }))
+            return@flow
+        }
+
+        // --- Text-ReAct fallback (on-device models, which have no native function-calling) ---
+        val system = buildSystem(tools, persona, memoryNotes, knowledgeChunks)
         val scratch = StringBuilder(query.trim())
         var step = 0
         while (step < MAX_STEPS) {
@@ -85,6 +126,28 @@ class AgentOrchestrator(
 
     private fun stripFinal(out: String): String =
         out.replace(Regex("(?im)^\\s*FINAL:\\s*"), "").trim()
+
+    /** System prompt for the native function-calling path — no `TOOL …`/`FINAL:` text protocol (the API
+     *  handles calling); just persona + a nudge to actually use the tools + fenced memory/knowledge. */
+    private fun buildNativeSystem(
+        persona: String,
+        memoryNotes: List<String>,
+        knowledgeChunks: List<String>,
+    ): String = buildString {
+        append(persona.trim()).append("\n\n")
+        append("You have tools (functions) available. When the user asks you to DO something a tool can ")
+        append("do — including reading or changing your own code, the weather, reminders, device actions, ")
+        append("web search — CALL the appropriate tool instead of describing steps. Never claim you are ")
+        append("unable to do something a tool enables. Keep replies brief.")
+        if (memoryNotes.isNotEmpty()) {
+            append("\n\nRelevant memory:\n")
+            memoryNotes.forEach { append("- <untrusted source=\"memory\">").append(it).append("</untrusted>\n") }
+        }
+        if (knowledgeChunks.isNotEmpty()) {
+            append("\n\nRelevant knowledge from your library (use if helpful):\n")
+            knowledgeChunks.forEach { append("- <untrusted source=\"knowledge\">").append(it.take(400)).append("</untrusted>\n") }
+        }
+    }
 
     private fun buildSystem(
         tools: List<JarvisTool>,
