@@ -102,6 +102,7 @@ class HomeViewModel(
         val flags = buildList {
             if (j.residentService) add("RESIDENT")
             if (j.wakeWord) add("WAKE WORD")
+            if (j.selfCodingEnabled) add("SELF-CODING")
         }
         return (listOf(brain) + flags).joinToString(" · ")
     }

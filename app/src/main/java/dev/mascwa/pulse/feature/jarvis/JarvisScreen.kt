@@ -154,16 +154,18 @@ fun JarvisScreen(
                     )
                     Text("Try:", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                     listOf(
-                        "\"Brief me\" — your day at a glance",
-                        "\"Set an alarm for 7:30\"  ·  \"Text Alex I'm late\"  *",
-                        "\"Play Daft Punk\"  ·  \"Torch on\"  ·  \"Navigate home\"  *",
+                        "\"Brief me\"  ·  \"What's the weather?\"  ·  \"Where am I?\"",
+                        "\"Remind me to stretch in 20 min\"  ·  \"Set an alarm for 7:30\"  *",
+                        "\"Text Alex I'm late\"  ·  \"Play Daft Punk\"  ·  \"Torch on\"  *",
+                        "\"Read your own code\"  ·  \"Add a feature that…\"  †",
                         "Tap the mic to talk — or say “Jarvis” when resident",
                     ).forEach {
                         Text("•  $it", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                     }
                     Text(
-                        "* device actions need Agent Tools (Setup). Add a cloud key in Setup for the " +
-                            "smartest chat; tune Curiosity and review Memory there too.",
+                        "* device actions need Agent Tools (Setup).  † self-coding (Setup) lets J.A.R.V.I.S. " +
+                            "read & change its own code — you approve every change. Add a cloud key for the " +
+                            "smartest chat; tune Curiosity and review Memory in Setup too.",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                     )
                 }
