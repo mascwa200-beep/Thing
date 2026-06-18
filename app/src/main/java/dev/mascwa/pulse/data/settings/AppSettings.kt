@@ -187,6 +187,11 @@ data class JarvisSettings(
      *  (CI must still build it + you still install the build; its approval-gate/CI/signing remain
      *  off-limits). Off by default — this hands over the human review step, so opt in deliberately. */
     val autonomousSelfCoding: Boolean = false,
+    /** Detailed activity log: record full content — your chat messages and the arguments to the
+     *  assistant's tool calls — to the on-device activity log (which a cloud brain can read when cloud
+     *  chat is on), not just operational events. Raw API keys / tokens are ALWAYS scrubbed regardless.
+     *  On by default per the owner's explicit choice; turn off for operational-only (no content). */
+    val verboseActivityLog: Boolean = true,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */

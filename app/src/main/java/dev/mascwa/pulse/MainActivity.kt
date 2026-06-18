@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
         val factory = PulseViewModelFactory(app.container)
         val gateResult = DeviceGate.evaluate()
         val startRoute = intent?.getStringExtra(EXTRA_ROUTE)
+        runCatching { app.container.usageRepository.log("lifecycle", "app opened") }
 
         // Schedule the background refresh worker per the user's settings. Guarded so a startup
         // hiccup (settings read, scheduling, or a service start) can never crash the launch.
@@ -134,7 +135,10 @@ class MainActivity : ComponentActivity() {
                             factory = factory,
                             startRoute = startRoute,
                             isOnline = online,
-                            onRouteVisit = { route -> app.container.usageRepository.record(route) },
+                            onRouteVisit = { route ->
+                                app.container.usageRepository.record(route)
+                                app.container.usageRepository.log("nav", route)
+                            },
                         )
                         // Terminal boot sequence, once per launch.
                         if (settings.bootAnimation && !booted) {

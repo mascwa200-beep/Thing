@@ -71,6 +71,7 @@ class JarvisViewModel(
     private val briefing: dev.mascwa.pulse.jarvis.BriefingBuilder,
     private val curiosity: CuriosityEngine,
     private val approvalGate: dev.mascwa.pulse.jarvis.selfedit.ApprovalGate,
+    private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -141,6 +142,7 @@ class JarvisViewModel(
             _busy.value = true
             _streaming.value = ""
             memory.append(Speaker.USER, text)
+            logChat("chat-in", text)
             try {
                 val pending = pendingLearn
                 if (pending != null) handleCuriosityReply(pending, text) else routeTurn(text)
@@ -346,6 +348,7 @@ class JarvisViewModel(
                     (jcfg.agentToolsEnabled || jcfg.selfCodingEnabled || jcfg.selfEditEnabled)
                 val reply = if (useAgent) generateWithAgent(intent.text) else generateDirect(intent.text)
                 memory.append(Speaker.JARVIS, reply)
+                logChat("chat-out", reply)
                 speakIfEnabled(reply)
                 maybeBeCurious()
             }
@@ -355,7 +358,16 @@ class JarvisViewModel(
     /** Append a J.A.R.V.I.S. line to history and speak it if voice replies are on. */
     private suspend fun sayJarvis(text: String) {
         memory.append(Speaker.JARVIS, text)
+        logChat("chat-out", text)
         speakIfEnabled(text)
+    }
+
+    /** Record a chat turn to the on-device activity log: full text when detailed logging is on,
+     *  otherwise a content-free marker so the timeline still shows a turn happened. Credentials are
+     *  scrubbed downstream by [UsageRepository]. */
+    private suspend fun logChat(direction: String, text: String) {
+        val verbose = runCatching { settings.current().jarvis.verboseActivityLog }.getOrDefault(true)
+        usage.log(direction, if (verbose) text else "(message)")
     }
 
     /** End-of-turn curiosity hook: ask one gap/follow-up question (rate-limited inside the engine). */
