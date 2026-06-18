@@ -162,6 +162,12 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         runCatching { hud?.stop() }
         hud = null
+        // Best-effort: persist any buffered on-device learning before the process may be reclaimed.
+        lifecycleScope.launch {
+            runCatching { app.container.usageRepository.flushNow() }
+            runCatching { app.container.cerebellumStore.flushNow() }
+            runCatching { app.container.profileStore.flushNow() }
+        }
         super.onStop()
     }
 

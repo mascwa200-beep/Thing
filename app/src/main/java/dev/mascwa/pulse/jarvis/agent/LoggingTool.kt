@@ -24,17 +24,20 @@ class LoggingTool(
     override val usage: String get() = delegate.usage
 
     override suspend fun run(arg: String): String {
-        val result = delegate.run(arg)
-        val ok = !result.startsWith("Tool error") &&
-            !result.contains("failed", ignoreCase = true)
-        val outcome = if (ok) "ok" else "error"
+        // Capture even a thrown failure, so a failing tool is still logged AND lowers the cerebellum's
+        // learned reliability (the orchestrator catches throws, so they'd otherwise be invisible here).
+        val outcome = runCatching { delegate.run(arg) }
+        val output = outcome.getOrElse { "Tool error: ${it.message}" }
+        val ok = outcome.isSuccess &&
+            !output.startsWith("Tool error") && !output.contains("failed", ignoreCase = true)
+        val status = if (ok) "ok" else "error"
         val label = if (verbose && arg.isNotBlank()) {
-            "${delegate.name}(${arg.trim().take(100)}): $outcome"
+            "${delegate.name}(${arg.trim().take(100)}): $status"
         } else {
-            "${delegate.name}: $outcome"
+            "${delegate.name}: $status"
         }
         repo.log("tool", label)
         cerebellum.observeAction(delegate.name, ok)
-        return result
+        return output
     }
 }
