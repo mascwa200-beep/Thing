@@ -5,14 +5,16 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.ui.graphics.vector.ImageVector
 
 object Routes {
@@ -81,4 +83,6 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.MAP, "MAP", Icons.Filled.Map, Icons.Outlined.Map),
+    TopDestination(Routes.JARVIS, "J.A.R.V.I.S.", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle),
 )
