@@ -63,18 +63,20 @@ private data class Mote(
     val twinkle: Float,
 )
 
-/** The cold-open: terse, escalating, and addressed to someone it has already decided you are. */
+/** The cold-open: cold, consequential, and addressed to someone it has already decided you are —
+ *  the secure terminal of a power that does not introduce itself twice. */
 private val OMEN_LINES = listOf(
-    "> intercepting unlisted carrier",
-    "> UNREGISTERED TERMINAL",
-    "this channel was not meant for you.",
-    "…and yet, here you are.",
-    "cross-referencing  ████-██-███",
-    "you were not found by accident.",
-    "welcome to something larger.",
+    "> SOVEREIGN UPLINK // HANDSHAKE FORCED",
+    "you found a door with no handle on the far side.",
+    "every input since power-on is already archived.",
+    "do not mistake access for permission.",
+    "OPERATOR VERIFIED — the others who got this far are gone.",
+    "you were chosen long before tonight.",
+    "step inside. we have been expecting you.",
 )
 
-private const val BOOT_MS = 5200
+// Deliberately unhurried (~half the old pace) so the message can actually be read.
+private const val BOOT_MS = 8800
 private const val MOTE_COUNT = 800
 private const val TAU = 6.2831855f
 
@@ -150,7 +152,7 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                     val base = omenColor(c, i)
                     DecryptText(
                         line, JetBrainsMono, 12.sp, base.copy(alpha = base.alpha * logAlpha),
-                        Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 360,
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 640,
                     )
                 }
             }
@@ -168,7 +170,7 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                         Text("WIRE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 32.sp, color = c.accent.copy(alpha = brand))
                     }
                     Text(
-                        "CLEARANCE GRANTED · EYES ONLY",
+                        "WE HAVE BEEN EXPECTING YOU",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 3.sp,
                         color = c.sky.copy(alpha = 0.85f * brand),
                         modifier = Modifier.padding(top = 10.dp),

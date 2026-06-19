@@ -143,11 +143,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefSwitch("Scanlines & CRT", "Retro display overlay", s.scanlines) { v ->
                         vm.update { it.copy(scanlines = v) }
                     }
-                    PrefSwitch("Glitch effects", "Animated chromatic distortion", s.glitch) { v ->
+                    PrefSwitch("Chromatic aberration", "Animated RGB colour-split fringe", s.glitch) { v ->
                         vm.update { it.copy(glitch = v) }
-                    }
-                    PrefSwitch("Boot sequence", "Terminal animation on launch", s.bootAnimation) { v ->
-                        vm.update { it.copy(bootAnimation = v) }
                     }
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
