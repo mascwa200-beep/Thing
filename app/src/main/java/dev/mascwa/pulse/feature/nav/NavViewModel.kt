@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -65,6 +66,12 @@ class NavViewModel(
     private val _selectedPoi = MutableStateFlow<Place?>(null)
     val selectedPoi: StateFlow<Place?> = _selectedPoi.asStateFlow()
 
+    /** The objective icon the user tapped on the map (drives its detail card); null = none. */
+    private val _selectedWaypointId = MutableStateFlow<String?>(null)
+    val selectedWaypoint: StateFlow<Waypoint?> =
+        combine(_selectedWaypointId, waypointStore.waypoints) { id, list -> list.firstOrNull { it.id == id } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     /** One-shot camera target from a successful place search (screen consumes it). */
     private val _flyTo = MutableStateFlow<Pair<Double, Double>?>(null)
     val flyTo: StateFlow<Pair<Double, Double>?> = _flyTo.asStateFlow()
@@ -92,6 +99,20 @@ class NavViewModel(
     }
 
     fun selectPoi(place: Place?) { _selectedPoi.value = place }
+
+    /** Select/deselect a tapped objective icon (its detail card). */
+    fun selectWaypoint(id: String?) { _selectedWaypointId.value = id }
+
+    /** Make a tapped objective the active tracked waypoint (route + halo follow it). */
+    fun trackWaypoint(id: String) {
+        viewModelScope.launch { runCatching { waypointStore.setActive(id) } }
+    }
+
+    /** Delete a tapped objective and close its card. */
+    fun removeWaypoint(id: String) {
+        _selectedWaypointId.value = null
+        viewModelScope.launch { runCatching { waypointStore.remove(id) } }
+    }
 
     /** Search for a place by name/address: geocode it, drop a (white) waypoint there, and fly to it. */
     fun search(query: String) {
