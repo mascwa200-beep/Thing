@@ -166,8 +166,8 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
 
                 // Tailored "for you" recommendations + profile highlight (hidden until something's known).
-                if (state.recommendations.isNotEmpty() || state.profileHighlight != null) {
-                    item { ForYouCard(state.recommendations, state.profileHighlight, nav.openRoute) }
+                if (state.recommendations.isNotEmpty() || state.profileHighlight != null || state.taskFocus != null) {
+                    item { ForYouCard(state.recommendations, state.profileHighlight, state.taskFocus, nav.openRoute) }
                 }
 
                 // Compact weather (temp + rain) above the sky digest.
@@ -417,6 +417,7 @@ private fun SkyDigestCard(lines: List<String>, onClick: () -> Unit = {}) {
 private fun ForYouCard(
     recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation>,
     profileHighlight: String?,
+    taskFocus: String?,
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
@@ -430,6 +431,16 @@ private fun ForYouCard(
                 text = "FOR YOU  ▸",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.accent,
             )
+            if (taskFocus != null) {
+                Text(
+                    taskFocus,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openRoute("jarvis") }
+                        .padding(top = 6.dp),
+                )
+            }
             if (profileHighlight != null) {
                 Text(
                     profileHighlight,

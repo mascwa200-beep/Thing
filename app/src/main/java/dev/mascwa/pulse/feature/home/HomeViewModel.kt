@@ -53,6 +53,8 @@ data class HomeUiState(
     val recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation> = emptyList(),
     /** A one-line profile highlight ("Working on: …" / "Following: …"); null when unknown. */
     val profileHighlight: String? = null,
+    /** A one-line top-task nudge ("In progress: …" / "To do: …"); null when nothing is pending. */
+    val taskFocus: String? = null,
 )
 
 class HomeViewModel(
@@ -69,6 +71,7 @@ class HomeViewModel(
     private val selfEdit: SelfEditStore,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
+    private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -105,7 +108,10 @@ class HomeViewModel(
                 val highlight = runCatching {
                     dev.mascwa.pulse.core.telemetry.UserProfile.highlight(profile.all())
                 }.getOrNull()
-                _state.update { it.copy(recommendations = recs, profileHighlight = highlight) }
+                val taskFocus = runCatching {
+                    dev.mascwa.pulse.core.telemetry.TaskBoard.focus(tasks.all())
+                }.getOrNull()
+                _state.update { it.copy(recommendations = recs, profileHighlight = highlight, taskFocus = taskFocus) }
             }
 
             // Above-the-fold first (instant from cache, snappier cold start)…
