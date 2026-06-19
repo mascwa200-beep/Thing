@@ -2,6 +2,8 @@ package dev.mascwa.pulse.feature.jarvis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.data.jarvis.JarvisMemory
+import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.jarvis.inference.ChatFormat
 import dev.mascwa.pulse.jarvis.inference.CloudProvider
@@ -9,6 +11,9 @@ import dev.mascwa.pulse.jarvis.inference.EngineState
 import dev.mascwa.pulse.jarvis.inference.ModelDownloadState
 import dev.mascwa.pulse.jarvis.inference.ModelManager
 import dev.mascwa.pulse.jarvis.inference.RoutingInferenceEngine
+import dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator
+import dev.mascwa.pulse.jarvis.orchestrator.CommandStatus
+import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +30,8 @@ class JarvisSetupViewModel(
     private val settings: SettingsRepository,
     private val knowledge: dev.mascwa.pulse.data.jarvis.KnowledgeStore,
     private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
+    private val jarvisMemory: JarvisMemory,
+    private val orchestrator: ActionOrchestrator,
 ) : ViewModel() {
 
     /** Download lifecycle (Idle → Running → Done/Failed). Pre-seeded to Done if a model already exists. */
@@ -32,6 +39,35 @@ class JarvisSetupViewModel(
 
     /** Live engine state — Ready once the real model is loaded, Unavailable on the persona core. */
     val engineState: StateFlow<EngineState> = engine.state
+
+    // ---- Console controls relocated here from the J.A.R.V.I.S. top bar ----
+
+    /** Clear the conversation history. The console reflects it live (shared memory flow). */
+    fun clearChat() {
+        viewModelScope.launch { jarvisMemory.clearHistory() }
+    }
+
+    /** Run the Lockdown macro and log an honest per-command result to the conversation. */
+    fun runLockdown() {
+        viewModelScope.launch {
+            val results = orchestrator.executeLockdownSequence()
+            jarvisMemory.append(Speaker.JARVIS, formatLockdown(results))
+        }
+    }
+
+    private fun formatLockdown(results: List<LockdownResult>): String = buildString {
+        append("Lockdown sequence:\n")
+        results.forEach { r ->
+            val chip = when (r.status) {
+                CommandStatus.DONE -> "✓"
+                CommandStatus.NEEDS_PERMISSION -> "⚠"
+                CommandStatus.UNSUPPORTED -> "✕"
+            }
+            append(chip).append(' ').append(r.label)
+            if (r.detail.isNotBlank()) append(" — ").append(r.detail)
+            append('\n')
+        }
+    }
 
     private val _url = MutableStateFlow("")
     val url: StateFlow<String> = _url.asStateFlow()
