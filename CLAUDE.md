@@ -278,6 +278,46 @@ host under a new shell, re-wire `FEED_TABS`/nav, keep standalone routes for Home
   CRT FX (global scanlines/tube curvature — trades readability), a STATUS Vault-Boy condition figure + an
   HP/AP-style bottom bar with live telemetry, and removing the now-unused osmdroid gradle dep.
 
+### Pip-Boy build-out + objectives overhaul + auto-update (this session cont., #79–#93 all merged)
+Owner drove a long Fallout-Pip-Boy run via screenshots, then an objectives redesign; all CI-green slices,
+squash-merged to `main`, re-synced into the dev branch each time (`git merge origin/main`, my authorship).
+- **PIP-BOY look (#79–#85, owner-verified as they went):** greened the whole TOOLS subtree; redesigned the
+  feeds to the Pip-Boy idiom (drawn backgrounds/shapes, framed panels) via `feature/common/PipUi.kt`
+  (`PipFrame` corner-bracket box + `PipHeader` rule line + `PipStatTile`); RADIO became a **real internet
+  radio** (`feature/tacnet/RadioBody.kt` + `RadioViewModel` MediaPlayer + `data/radio/RadioStation.kt`
+  SomaFM stations); **Space WX moved into DATA** mixed with orbital (`DataBody`); STAT chrome got **HP/AP/LVL
+  bars from real device data, bars-only no figure** (owner's AskUserQuestion choice — battery/free-mem/
+  versionCode); radar **sweep-driven blips** (#85 — contacts hold position, update only as the sweep hand
+  passes). IP line held: original homage, no trademarked Vault-Boy/Fallout art.
+- **Cold-open boot retext (owner):** wordmark → contractor name **ARGUS DYNAMICS / "ADVANCED SIGNALS
+  DIVISION"**; bottom log → standard boot diagnostics (POST/secure-boot/crypto), not villain prose.
+- **Updater (#86/#87):** only signal an update when the CI run is **GREEN** (not orange/in-progress) —
+  `UpdateRepository.isBuildGreen(code, headers)` checks the Actions API run by `run_number`; plus opt-in
+  auto-update.
+- **J.A.R.V.I.S. bottom nav (#88):** added JARVIS to the bottom nav (`TOP_DESTINATIONS`); removed the
+  top-of-Home shortcut (one entry point now).
+- **Radar feed (#89):** dropped space-weather from the MAP feed's SKY panel; flight detail now drops down
+  **under** the tapped row (accordion `ContactDetail`), not pinned at top.
+- **Auto-update finalised (#90, task 7):** owner — "as soon as it's green, install it, show the installer
+  thing so I can tap." Already did green-check → auto-download → system installer (one tap is the Android
+  floor for a sideload — no device-owner = no silent install). Made it **default ON** (`AppSettings.autoUpdate
+  = true`) and **foreground-responsive**: extracted `MainActivity.maybeAutoUpdate()`, called from `onStart()`
+  so it fires on cold launch AND every return; throttled 15 min; green-gate + `lastAutoUpdateCode` dedupe kept.
+- **OBJECTIVES → NAV map (task 6, #91/#92/#93):** the objective system folded into the navigational map.
+  **6a (#91):** every tracked waypoint renders as a per-kind **Canvas-drawn bitmap icon** (★ MAIN gold / ◆ SIDE
+  blue / ● PLAIN white) on an `OBJECTIVE_SOURCE` SymbolLayer — bitmaps via `style.addImage`, **no glyph-font
+  dependency**; active one gets a coloured halo + larger icon (`NavViewModel.allWaypoints`/`activeWaypointId`).
+  **6b (#92):** OBJECTIVES dropped from `FEED_TABS` (6→5) and folded into NAV as an internal **`MAP|OBJECTIVES`
+  segmented switch** (map stays composed; OBJECTIVES draws an opaque `ObjectivesPanel` over it). Extracted
+  scaffold-free `ObjectivesPanel` (reused by the kept standalone `ObjectivesScreen` for deep-links); NAV route
+  now builds `ObjectivesViewModel` too (shared `WaypointStore` keeps icons+list in sync). **6c (#93):** tap an
+  objective icon → `WaypointDetailCard` (name/kind/distance/note) with one-tap **TRACK**/**REMOVE**; map click
+  listener checks the objective layer first (user pins beat POIs); empty-map tap dismisses cards. ⚠️ All
+  on-device-unverified (CI compile-gates only) — owner should eyeball icons/sub-tab/tap-cards on the Pixel.
+- **Open / steerable:** heavier CRT FX (global scanlines/tube curvature — trades readability); a STATUS
+  condition figure; removing the unused osmdroid gradle dep; the Mnemosyne reflection WorkManager pass (still
+  needs owner on-device Haiku 4.5 verification). Auto-update's one tap is the hard Android floor (documented).
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
