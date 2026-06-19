@@ -71,32 +71,26 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/**
- * Fallout Pip-Boy phosphor-green palette for the TACNET scope — a monochrome CRT look. Contact types
- * are told apart by glyph + brightness rather than hue (emergencies get the one off-green accent).
- */
-private object Pip {
-    val bg = Color(0xFF04130A)        // deep CRT green-black
-    val gridSoft = Color(0xFF0C2415) // faint grid
-    val grid = Color(0xFF15462A)      // range rings / ticks
-    val dim = Color(0xFF2E8F52)       // secondary text
-    val mid = Color(0xFF3FCB74)       // standard contact
-    val bright = Color(0xFF5BFF9B)    // sweep / primary
-    val glow = Color(0xFF9CFFC4)      // brightest highlight (ISS/selected text)
-    val alert = Color(0xFFE6FF66)     // emergency — off-green amber, still in-palette
-}
-
-/** Tiled dark horizontal lines over the scope for a CRT scanline texture. */
-private fun DrawScope.crtScanlines(color: Color, gap: Float = 3f) {
-    var y = 0f
-    while (y < size.height) {
-        drawLine(color, Offset(0f, y), Offset(size.width, y), 1f)
-        y += gap
+@Composable
+fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
+    PulseScaffold(
+        title = "RADSCOPE",
+        navigationIcon = {
+            if (onBack != null) IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            }
+        },
+        actions = {
+            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
+        },
+    ) { innerPadding ->
+        RadarBody(vm, Modifier.padding(innerPadding))
     }
 }
 
+/** The MAP feed body (RADSCOPE), scaffold-free for hosting as a PIP-BOY sub-tab. */
 @Composable
-fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
+fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
     val rangeKm by vm.rangeKm.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
@@ -132,30 +126,19 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
         }
     }
 
-    PulseScaffold(
-        title = "RADSCOPE",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-            }
-        },
-        actions = {
-            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
-        },
-    ) { innerPadding ->
-        when {
-            state.isInitialLoading -> LoadingState(Modifier.padding(innerPadding))
-            needsPermission && state.data == null -> PermissionPanel(Modifier.padding(innerPadding)) {
-                permLauncher.launch(
-                    arrayOf(
-                        android.Manifest.permission.ACCESS_FINE_LOCATION,
-                        android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                    ),
-                )
-            }
-            state.isError -> ErrorState(state.error ?: "Error", { vm.refresh() }, Modifier.padding(innerPadding))
-            else -> {
-                val d = state.data ?: return@PulseScaffold
+    when {
+        state.isInitialLoading -> LoadingState(modifier)
+        needsPermission && state.data == null -> PermissionPanel(modifier) {
+            permLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
+        state.isError -> ErrorState(state.error ?: "Error", { vm.refresh() }, modifier)
+        else -> {
+            val d = state.data ?: return
                 val rangeM = rangeKm * 1000.0
                 val filtered = d.contacts
                     .filter { it.distanceMeters <= rangeM }
@@ -163,7 +146,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                 val airCount = filtered.count { it.kind == ContactKind.AIRCRAFT.name }
                 val selectedContact = filtered.firstOrNull { it.id == selected }
                 LazyColumn(
-                    modifier = Modifier.padding(innerPadding),
+                    modifier = modifier,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -221,7 +204,6 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
         }
-    }
 }
 
 @Composable

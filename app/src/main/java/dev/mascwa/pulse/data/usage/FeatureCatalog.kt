@@ -21,7 +21,7 @@ object FeatureCatalog {
         FeatureMeta(Routes.OBJECTIVES, "Objectives", "Track waypoints & calendar missions."),
         FeatureMeta(Routes.COMPASS, "Compass", "Offline heading."),
         FeatureMeta(Routes.SURVIVE, "Survive", "Nearest help, SOS & offline guides."),
-        FeatureMeta(Routes.TACNET, "Tacnet", "Live radar, flight telemetry & vitals."),
+        FeatureMeta(Routes.TACNET, "Pip-Boy", "Radar, telemetry, orbital & space weather."),
         FeatureMeta(Routes.ECONOMY, "Economy", "Inflation, GDP & jobs."),
         FeatureMeta(Routes.FUEL, "Fuel & Energy", "Benchmarks & pump prices."),
         FeatureMeta(Routes.SOCIAL, "Social", "Lemmy, Mastodon & Hacker News."),

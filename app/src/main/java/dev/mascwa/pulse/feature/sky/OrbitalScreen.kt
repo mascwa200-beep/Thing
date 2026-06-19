@@ -41,20 +41,27 @@ import java.util.Locale
 
 @Composable
 fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val c = Pulse.colors
-
     PulseScaffold(
         title = "Orbital",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = state.loading && state.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        OrbitalBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The DATA feed body (orbital), scaffold-free for hosting as a PIP-BOY sub-tab. */
+@Composable
+fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+
+    PullToRefreshBox(
+        isRefreshing = state.loading && state.data != null,
+        onRefresh = { vm.refresh() },
+        modifier = modifier,
+    ) {
             when {
                 state.isInitialLoading -> LoadingState()
                 state.isError -> ErrorState(state.error ?: "Error", onRetry = { vm.refresh() })
@@ -155,7 +162,6 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
         }
-    }
 }
 
 @Composable

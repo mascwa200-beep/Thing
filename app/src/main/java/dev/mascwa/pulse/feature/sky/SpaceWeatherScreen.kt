@@ -46,22 +46,29 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val c = Pulse.colors
-    // Tap any metric → plain-language explanation (title + Explainer list).
-    var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
-
     PulseScaffold(
         title = "Space Weather",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = state.loading && state.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        SpaceWeatherBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The RADIO feed body (space weather), scaffold-free for hosting as a PIP-BOY sub-tab. */
+@Composable
+fun SpaceWeatherBody(vm: SpaceWeatherViewModel, modifier: Modifier = Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+    // Tap any metric → plain-language explanation (title + Explainer list).
+    var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
+
+    PullToRefreshBox(
+        isRefreshing = state.loading && state.data != null,
+        onRefresh = { vm.refresh() },
+        modifier = modifier,
+    ) {
             when {
                 state.isInitialLoading -> LoadingState()
                 state.isError -> ErrorState(state.error ?: "Error", onRetry = { vm.refresh() })
@@ -177,7 +184,6 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
                 }
             }
         }
-    }
 
     explainer?.let { (title, items) ->
         ExplainerDialog(title, items, onDismiss = { explainer = null })
