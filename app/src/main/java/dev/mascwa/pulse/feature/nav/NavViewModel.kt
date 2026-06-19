@@ -44,6 +44,14 @@ class NavViewModel(
     val activeWaypoint: StateFlow<Waypoint?> =
         waypointStore.active.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Every saved objective/waypoint — rendered on the map as a per-kind icon (active one emphasised). */
+    val allWaypoints: StateFlow<List<Waypoint>> =
+        waypointStore.waypoints.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The active waypoint's id (drives icon emphasis without re-deriving from the list). */
+    val activeWaypointId: StateFlow<String?> =
+        waypointStore.activeId.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _location = MutableStateFlow<DeviceLocation?>(null)
     val location: StateFlow<DeviceLocation?> = _location.asStateFlow()
 
