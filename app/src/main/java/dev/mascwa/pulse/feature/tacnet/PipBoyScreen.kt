@@ -31,9 +31,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.PulseScaffold
-import dev.mascwa.pulse.feature.sky.OrbitalBody
+import dev.mascwa.pulse.feature.sky.DataBody
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
-import dev.mascwa.pulse.feature.sky.SpaceWeatherBody
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -56,6 +55,7 @@ fun PipBoyScreen(
     telemetryVm: TelemetryViewModel,
     orbitalVm: OrbitalViewModel,
     spaceWxVm: SpaceWeatherViewModel,
+    radioVm: RadioViewModel,
     onBack: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
@@ -70,9 +70,9 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
-                    PipTab.DATA -> orbitalVm.refresh()
+                    PipTab.DATA -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> radarVm.refresh()
-                    PipTab.RADIO -> spaceWxVm.refresh()
+                    PipTab.RADIO -> Unit // the radio has its own tuner controls
                 }
             }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
@@ -86,9 +86,9 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
-                        PipTab.DATA -> OrbitalBody(orbitalVm)
+                        PipTab.DATA -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> RadarBody(radarVm)
-                        PipTab.RADIO -> SpaceWeatherBody(spaceWxVm)
+                        PipTab.RADIO -> RadioBody(radioVm)
                     }
                 }
 

@@ -268,7 +268,8 @@ fun PulseApp(
                 val telemetryVm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
                 val orbitalVm: dev.mascwa.pulse.feature.sky.OrbitalViewModel = viewModel(factory = factory)
                 val spaceWxVm: dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm)
+                val radioVm: dev.mascwa.pulse.feature.tacnet.RadioViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm)
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
