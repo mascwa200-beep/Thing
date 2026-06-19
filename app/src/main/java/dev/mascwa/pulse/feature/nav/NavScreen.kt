@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -98,6 +99,8 @@ private const val WAYPOINT_SOURCE = "nav-waypoint"
 private const val WAYPOINT_LAYER = "nav-waypoint-dot"
 private const val ROUTE_SOURCE = "nav-route"
 private const val ROUTE_LAYER = "nav-route-line"
+private const val INCIDENT_SOURCE = "nav-incident"
+private const val INCIDENT_LAYER = "nav-incident-dot"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
@@ -122,6 +125,8 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val activeWaypoint by vm.activeWaypoint.collectAsState()
     val flyTo by vm.flyTo.collectAsState()
     val searchMessage by vm.searchMessage.collectAsState()
+    val incidents by vm.incidents.collectAsState()
+    val showIncidents by vm.showIncidents.collectAsState()
     var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -159,6 +164,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                 ensureBuildingExtrusion(style)
                 addRouteLayer(style, c)
                 addPoiLayer(style, c)
+                addIncidentLayer(style, c)
                 addWaypointLayer(style, c)
                 addPlayerMarker(style, c)
             }
@@ -194,6 +200,13 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
         style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeGeoJson(activeWaypoint, location))
+    }
+
+    // Render nearby safety incidents (amber) when the overlay is lit.
+    LaunchedEffect(incidents, showIncidents, map) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(INCIDENT_SOURCE)
+            ?.setGeoJson(incidentGeoJson(if (showIncidents) incidents else emptyList()))
     }
 
     // While tracking, follow GPS in the current mode (3D/2D, heading-up/north-up).
@@ -286,6 +299,9 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                 MapControlButton(active = false, c = c, icon = Icons.Filled.Remove) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
                 MapControlButton(active = nav3d, c = c, label = if (nav3d) "3D" else "2D") { vm.set3d(!nav3d) }
                 MapControlButton(active = headingUp, c = c, icon = Icons.Filled.Navigation) { vm.setHeadingUp(!headingUp) }
+                MapControlButton(active = showIncidents, c = c, icon = Icons.Filled.Warning) {
+                    centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
+                }
                 if (activeWaypoint != null) {
                     MapControlButton(active = false, c = c, icon = Icons.Filled.Close) { vm.clearWaypoint() }
                 }
@@ -510,6 +526,33 @@ private fun addPoiLayer(style: Style, c: NightwirePalette) {
             PropertyFactory.circleOpacity(0.95f),
         ),
     )
+}
+
+/** Amber incident markers — larger + ringed so they read as hazards apart from the POI dots. */
+private fun addIncidentLayer(style: Style, c: NightwirePalette) {
+    if (style.getSource(INCIDENT_SOURCE) != null) return
+    style.addSource(GeoJsonSource(INCIDENT_SOURCE))
+    style.addLayer(
+        CircleLayer(INCIDENT_LAYER, INCIDENT_SOURCE).withProperties(
+            PropertyFactory.circleColor(c.amber.toArgb()),
+            PropertyFactory.circleRadius(7f),
+            PropertyFactory.circleStrokeColor(c.void.toArgb()),
+            PropertyFactory.circleStrokeWidth(2f),
+            PropertyFactory.circleOpacity(0.9f),
+        ),
+    )
+}
+
+/** FeatureCollection for the incident overlay (empty when the overlay is off). */
+private fun incidentGeoJson(incidents: List<IncidentMarker>): String {
+    val features = StringBuilder()
+    incidents.forEachIndexed { i, it ->
+        if (i > 0) features.append(',')
+        features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
+            .append(it.longitude).append(',').append(it.latitude)
+            .append("]},\"properties\":{\"name\":").append(jsonString(it.title)).append("}}")
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
 
 /** Square HUD-styled map control button — shows [icon] when given, otherwise the text [label]. */

@@ -7,6 +7,7 @@ import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
+import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
@@ -27,12 +28,16 @@ import kotlinx.coroutines.launch
  * heading for the heading-up camera, and the toggleable POI "legend" (Overpass categories rendered
  * as map markers). Sensors/poll run only while the screen calls [start]/[stop].
  */
+/** A nearby safety incident pinned on the NAV map (folded in from the old Map screen). */
+data class IncidentMarker(val latitude: Double, val longitude: Double, val title: String)
+
 class NavViewModel(
     private val locationProvider: LocationProvider,
     private val compass: CompassController,
     private val overpass: OverpassRepository,
     private val settings: SettingsRepository,
     private val waypointStore: WaypointStore,
+    private val safety: SafetyRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold/blue/white by kind), or null. */
@@ -131,10 +136,37 @@ class NavViewModel(
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
+    /** Nearby safety incidents + whether the overlay is lit (folded in from the old Map screen). */
+    private val _incidents = MutableStateFlow<List<IncidentMarker>>(emptyList())
+    val incidents: StateFlow<List<IncidentMarker>> = _incidents.asStateFlow()
+    private val _showIncidents = MutableStateFlow(false)
+    val showIncidents: StateFlow<Boolean> = _showIncidents.asStateFlow()
+    private var incidentJob: Job? = null
+
     private var pollJob: Job? = null
     private var scanJob: Job? = null
 
     fun hasPermission(): Boolean = locationProvider.hasPermission()
+
+    /** Toggle the incident overlay; fetch around [lat],[lon] the first time it's lit. */
+    fun toggleIncidents(lat: Double, lon: Double) {
+        val now = !_showIncidents.value
+        _showIncidents.value = now
+        if (now && _incidents.value.isEmpty()) scanIncidents(lat, lon)
+    }
+
+    /** Fetch nearby safety incidents (quakes/disasters/alerts) around [lat],[lon]. */
+    fun scanIncidents(lat: Double, lon: Double) {
+        incidentJob?.cancel()
+        incidentJob = viewModelScope.launch {
+            _incidents.value = runCatching {
+                safety.fetch(lat, lon, false).data.incidents
+                    .filter { it.distanceMeters > 0 }
+                    .take(40)
+                    .map { IncidentMarker(it.latitude, it.longitude, it.title) }
+            }.getOrDefault(emptyList())
+        }
+    }
 
     /** Toggle a category and (re)scan the area around [lat],[lon] for the enabled set. */
     fun toggle(category: NavCategory, lat: Double, lon: Double) {
