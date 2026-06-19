@@ -61,7 +61,7 @@ class SettingsViewModel(
     sealed interface UpdateUi {
         data object Idle : UpdateUi
         data object Checking : UpdateUi
-        data object UpToDate : UpdateUi
+        data class UpToDate(val latest: String?) : UpdateUi
         data class Available(val info: UpdateInfo) : UpdateUi
         data class Downloading(val pct: Int) : UpdateUi
         data class ReadyToInstall(val info: UpdateInfo, val file: File) : UpdateUi
@@ -80,7 +80,10 @@ class SettingsViewModel(
         _update.value = UpdateUi.Checking
         viewModelScope.launch {
             _update.value = runCatching { updates.check() }.fold(
-                onSuccess = { info -> if (info == null) UpdateUi.UpToDate else UpdateUi.Available(info) },
+                onSuccess = { result ->
+                    val info = result.available
+                    if (info == null) UpdateUi.UpToDate(result.latestVersionName) else UpdateUi.Available(info)
+                },
                 onFailure = { e ->
                     val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
                     val msg = when {

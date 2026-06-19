@@ -45,7 +45,7 @@ class RefreshWorker(
         // --- App update available? (in-app updater; dedup by build number) ---
         if (prefs.updateChecks) {
             runCatching {
-                val info = container.updateRepository.check()
+                val info = container.updateRepository.check().available
                 if (info != null && info.versionCode > settings.lastUpdateNotifiedCode) {
                     notifier.notifyUpdate(
                         id = 7401,
