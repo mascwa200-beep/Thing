@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -37,6 +38,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -52,6 +54,7 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
     val reading by vm.reading.collectAsStateWithLifecycle()
     val location by vm.location.collectAsStateWithLifecycle()
     val needsPermission by vm.needsPermission.collectAsStateWithLifecycle()
+    val activeWp by vm.activeWaypoint.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -90,9 +93,18 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val animated by animateFloatAsState(reading.trueAzimuth, label = "azimuth")
+            val loc = location
+            val wp = activeWp
+            val wpBearing: Float? = if (loc != null && wp != null)
+                Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude).toFloat() else null
+            val wpDistance: Double? = if (loc != null && wp != null)
+                Geo.distanceMeters(loc.latitude, loc.longitude, wp.latitude, wp.longitude) else null
+            val sunAz: Float? = remember(loc) {
+                if (loc != null) SunCalc.azimuth(loc.latitude, loc.longitude).toFloat() else null
+            }
 
             Box(Modifier.fillMaxWidth(0.86f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                CompassDial(rotationDeg = -animated)
+                CompassDial(rotationDeg = -animated, waypointBearing = wpBearing, sunAz = sunAz)
                 // Center read-out (fixed).
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -113,6 +125,18 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
+            if (wp != null && wpBearing != null && wpDistance != null) {
+                NeonPanel(Modifier.fillMaxWidth(), borderColor = c.magenta) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("WAYPOINT", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.magenta)
+                        Text(wp.label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink)
+                        Row2("Distance", Geo.formatDistance(wpDistance))
+                        Row2("Bearing", "${Geo.cardinal(wpBearing.toDouble())} ${wpBearing.roundToInt()}°")
+                        NavGuidance.turnHint(wpBearing.toDouble(), reading.trueAzimuth.toDouble())?.let { Row2("Turn", it) }
+                    }
+                }
+            }
+
             if (!reading.hasSensor) {
                 NeonPanel(Modifier.fillMaxWidth()) {
                     Text("No compass sensor detected on this device.",
@@ -130,7 +154,7 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row2("Magnetic", "${reading.magneticAzimuth.roundToInt() % 360}° ${Geo.cardinal(reading.magneticAzimuth.toDouble())}")
                     Row2("Declination", "${"%+.1f".format(reading.declination)}° (${if (reading.declination >= 0) "E" else "W"})")
-                    val loc = location
+                    sunAz?.let { Row2("Sun", "${Geo.cardinal(it.toDouble())} ${it.roundToInt()}°") }
                     if (loc != null) {
                         Row2("Latitude", "%.5f".format(loc.latitude))
                         Row2("Longitude", "%.5f".format(loc.longitude))
@@ -173,7 +197,7 @@ private fun Row2(label: String, value: String) {
 }
 
 @Composable
-private fun CompassDial(rotationDeg: Float) {
+private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Float?) {
     val c = Pulse.colors
     val tickColor = c.line.toArgb()
     val inkColor = c.ink.toArgb()
@@ -213,6 +237,21 @@ private fun CompassDial(rotationDeg: Float) {
                 paint.color = if (label == "N") northColor else if (label == "E" || label == "S" || label == "W") inkColor else tickColor
                 drawText(label, x, y, paint)
             }
+        }
+
+        // Sun marker — amber dot near the rim (rotates with the dial → its true azimuth).
+        sunAz?.let { sa ->
+            val rad = Math.toRadians(sa.toDouble())
+            val mr = r * 0.90f
+            drawCircle(c.amber, r * 0.045f, Offset(cx + (mr * sin(rad)).toFloat(), cy - (mr * cos(rad)).toFloat()))
+        }
+        // Waypoint needle — magenta line + dot to the tracked waypoint.
+        waypointBearing?.let { wb ->
+            val rad = Math.toRadians(wb.toDouble())
+            val ex = cx + (r * 0.9f * sin(rad)).toFloat()
+            val ey = cy - (r * 0.9f * cos(rad)).toFloat()
+            drawLine(c.magenta.copy(alpha = 0.7f), Offset(cx, cy), Offset(ex, ey), 2.5f)
+            drawCircle(c.magenta, r * 0.05f, Offset(ex, ey))
         }
     }
 }
