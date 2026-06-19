@@ -165,9 +165,9 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
                 item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
 
-                // Tailored "for you" recommendations from on-device usage (hidden until a pattern forms).
-                if (state.recommendations.isNotEmpty()) {
-                    item { ForYouCard(state.recommendations, nav.openRoute) }
+                // Tailored "for you" recommendations + profile highlight (hidden until something's known).
+                if (state.recommendations.isNotEmpty() || state.profileHighlight != null) {
+                    item { ForYouCard(state.recommendations, state.profileHighlight, nav.openRoute) }
                 }
 
                 // Compact weather (temp + rain) above the sky digest.
@@ -416,6 +416,7 @@ private fun SkyDigestCard(lines: List<String>, onClick: () -> Unit = {}) {
 @Composable
 private fun ForYouCard(
     recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation>,
+    profileHighlight: String?,
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
@@ -429,6 +430,13 @@ private fun ForYouCard(
                 text = "FOR YOU  ▸",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.accent,
             )
+            if (profileHighlight != null) {
+                Text(
+                    profileHighlight,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             recommendations.forEach { rec ->
                 val rk = rec.routeKey
                 Column(

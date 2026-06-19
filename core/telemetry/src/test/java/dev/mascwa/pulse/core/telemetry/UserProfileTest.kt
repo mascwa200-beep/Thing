@@ -104,4 +104,24 @@ class UserProfileTest {
     fun digestEmptyWhenNoEntries() {
         assertEquals("", UserProfile.digest(emptyList()))
     }
+
+    @Test
+    fun highlightPrefersProjectThenInterest() {
+        val both = listOf(
+            entry(ProfileCategory.INTEREST, "astronomy", weight = 9),
+            entry(ProfileCategory.PROJECT, "Pulse app", weight = 1),
+        )
+        assertEquals("Working on: Pulse app", UserProfile.highlight(both))
+
+        val interestOnly = listOf(entry(ProfileCategory.INTEREST, "cycling", weight = 2))
+        assertEquals("Following: cycling", UserProfile.highlight(interestOnly))
+
+        // Preferences/facts alone don't produce a highlight.
+        val neither = listOf(
+            entry(ProfileCategory.PREFERENCE, "concise answers"),
+            entry(ProfileCategory.FACT, "lives in Berlin"),
+        )
+        assertNull(UserProfile.highlight(neither))
+        assertNull(UserProfile.highlight(emptyList()))
+    }
 }
