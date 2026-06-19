@@ -19,18 +19,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,10 +59,13 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val localStatus by vm.localStatus.collectAsStateWithLifecycle()
     val localPlace by vm.localPlace.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val searchResults by vm.searchResults.collectAsStateWithLifecycle()
+    val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
     val c = Pulse.colors
     val tuned = state.tuned
     val context = LocalContext.current
     val favUrls = remember(favorites) { favorites.mapTo(HashSet()) { it.streamUrl } }
+    var query by remember { mutableStateOf("") }
 
     // Look up nearby stations the first time the dial is opened.
     LaunchedEffect(Unit) { vm.loadLocal() }
@@ -96,6 +107,49 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
                 )
             }
+        }
+
+        // ---- SEARCH any station ----
+        PipHeader("Search")
+        PipFrame(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("⌕", fontFamily = JetBrainsMono, fontSize = 16.sp, color = c.accent)
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 14.sp),
+                    cursorBrush = SolidColor(c.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),
+                    modifier = Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 10.dp),
+                    decorationBox = { inner ->
+                        if (query.isEmpty()) {
+                            Text("Station name…", fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.muted)
+                        }
+                        inner()
+                    },
+                )
+                if (query.isNotEmpty() || searchStatus != RadioViewModel.SearchStatus.IDLE) {
+                    Text(
+                        "✕", fontFamily = JetBrainsMono, fontSize = 15.sp, color = c.muted,
+                        modifier = Modifier.clickable { query = ""; vm.clearSearch() }.padding(6.dp),
+                    )
+                }
+            }
+        }
+        when (searchStatus) {
+            RadioViewModel.SearchStatus.SEARCHING ->
+                Text("··· SEARCHING", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 4.dp))
+            RadioViewModel.SearchStatus.EMPTY ->
+                Text("No stations match \"$query\".", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 4.dp))
+            RadioViewModel.SearchStatus.ERROR ->
+                Text("Search unavailable — check your connection.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, modifier = Modifier.padding(top = 4.dp))
+            RadioViewModel.SearchStatus.READY ->
+                searchResults.forEach { st ->
+                    StationRow(st, state, c, isFavorite = st.streamUrl in favUrls, onFavorite = { vm.toggleFavorite(st) }) { vm.toggle(context, st) }
+                }
+            RadioViewModel.SearchStatus.IDLE -> Unit
         }
 
         // ---- FAVOURITES (starred; persisted) ----

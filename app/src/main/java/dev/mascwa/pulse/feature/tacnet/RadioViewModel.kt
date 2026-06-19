@@ -31,6 +31,9 @@ class RadioViewModel(
     /** Lifecycle of the on-demand local-station lookup (drives the LOCAL section's header/hint). */
     enum class LocalStatus { IDLE, LOADING, READY, EMPTY, ERROR, NO_LOCATION }
 
+    /** Lifecycle of a name search (drives the SEARCH RESULTS section). */
+    enum class SearchStatus { IDLE, SEARCHING, READY, EMPTY, ERROR }
+
     /** The always-present curated streams. */
     val curatedStations: List<RadioStation> = DEFAULT_STATIONS
 
@@ -67,8 +70,35 @@ class RadioViewModel(
     private val _localPlace = MutableStateFlow<String?>(null)
     val localPlace: StateFlow<String?> = _localPlace.asStateFlow()
 
+    private val _searchResults = MutableStateFlow<List<RadioStation>>(emptyList())
+    val searchResults: StateFlow<List<RadioStation>> = _searchResults.asStateFlow()
+    private val _searchStatus = MutableStateFlow(SearchStatus.IDLE)
+    val searchStatus: StateFlow<SearchStatus> = _searchStatus.asStateFlow()
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     /** Process-wide playback state (survives this ViewModel — playback continues in the background). */
     val state: StateFlow<RadioController.RadioState> get() = RadioController.state
+
+    /** Search any station worldwide by name. Blank query clears the results. */
+    fun search(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) { clearSearch(); return }
+        val browser = radioBrowser
+        if (browser == null) { _searchStatus.value = SearchStatus.ERROR; return }
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _searchStatus.value = SearchStatus.SEARCHING
+            val list = runCatching { browser.searchStations(q) }.getOrDefault(emptyList())
+            _searchResults.value = list
+            _searchStatus.value = if (list.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
+        }
+    }
+
+    fun clearSearch() {
+        searchJob?.cancel()
+        _searchResults.value = emptyList()
+        _searchStatus.value = SearchStatus.IDLE
+    }
 
     /** Tap a station: tune it (in the foreground-service-backed player), or stop if already playing it. */
     fun toggle(context: Context, station: RadioStation) = RadioController.toggle(context, station)
