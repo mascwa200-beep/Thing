@@ -23,6 +23,14 @@ import kotlin.coroutines.resume
 
 data class DeviceLocation(val latitude: Double, val longitude: Double, val name: String)
 
+/** Reverse-geocoded administrative context for a coordinate (for region-scoped lookups like radio). */
+data class GeoPlace(
+    val countryCode: String?, // ISO 3166-1 alpha-2, e.g. "US"
+    val country: String?,     // human-readable, e.g. "United States"
+    val state: String?,       // admin area, e.g. "California"
+    val locality: String?,    // city/town, e.g. "San Francisco"
+)
+
 /**
  * GPS-first, offline-capable location. A satellite fix needs no internet (only
  * the runtime location permission), so this prefers GPS and falls back to the
@@ -150,6 +158,35 @@ class LocationProvider(private val context: Context) {
                 val results = geocoder.getFromLocation(lat, lon, 1)
                 results?.firstOrNull()?.let { it.locality ?: it.subAdminArea ?: it.adminArea }
             }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Reverse-geocode a coordinate to its administrative context (country code/name, state, locality).
+     * Online-only (uses the platform [Geocoder]); returns null offline or on failure.
+     */
+    suspend fun describePlace(lat: Double, lon: Double): GeoPlace? = withContext(Dispatchers.IO) {
+        if (!Geocoder.isPresent()) return@withContext null
+        val geocoder = Geocoder(context, Locale.getDefault())
+        try {
+            val address = if (Build.VERSION.SDK_INT >= 33) {
+                withTimeoutOrNull(4_000) {
+                    suspendCancellableCoroutine { cont: CancellableContinuation<android.location.Address?> ->
+                        geocoder.getFromLocation(lat, lon, 1) { results -> cont.resume(results.firstOrNull()) }
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()
+            } ?: return@withContext null
+            GeoPlace(
+                countryCode = address.countryCode?.takeIf { it.isNotBlank() },
+                country = address.countryName?.takeIf { it.isNotBlank() },
+                state = address.adminArea?.takeIf { it.isNotBlank() },
+                locality = (address.locality ?: address.subAdminArea)?.takeIf { it.isNotBlank() },
+            )
         } catch (_: Exception) {
             null
         }
