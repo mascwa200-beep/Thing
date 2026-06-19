@@ -1,15 +1,20 @@
 package dev.mascwa.pulse.feature.jarvis
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -148,12 +153,30 @@ fun JarvisScreen(
 
             if (messages.isEmpty() && streaming.isEmpty()) {
                 Column(
-                    Modifier.fillMaxWidth().weight(1f).padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                    Modifier.fillMaxWidth().weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    HudReactor(
+                        color = c.sky, accent = c.accent, active = false,
+                        modifier = Modifier.size(168.dp).align(Alignment.CenterHorizontally),
+                    )
                     Text(
-                        "J.A.R.V.I.S. MATRIX",
-                        fontFamily = JetBrainsMono, fontSize = 13.sp, letterSpacing = 2.sp, color = c.accent,
+                        "J.A.R.V.I.S.",
+                        fontFamily = JetBrainsMono, fontSize = 20.sp, letterSpacing = 8.sp, color = c.sky,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    Text(
+                        "STARK HUD INTERFACE · ONLINE",
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 3.sp, color = c.muted,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    Spacer(
+                        Modifier.align(Alignment.CenterHorizontally)
+                            .padding(vertical = 4.dp)
+                            .fillMaxWidth(0.5f).height(1.dp)
+                            .background(c.sky.copy(alpha = 0.25f)),
                     )
                     Text("Try:", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                     listOf(
@@ -272,11 +295,23 @@ private fun StatusLine(state: EngineState, cloud: String?) {
         is EngineState.Unavailable -> "○ PERSONA CORE (no model)" to c.muted
         is EngineState.Error -> "✕ ${state.message}" to c.magenta
     }
-    Text(
-        label,
-        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = color,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-    )
+    // Spin the HUD up while a model/cloud brain is live; tick over otherwise.
+    val live = cloud != null || state is EngineState.Ready
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        HudReactor(color = c.sky, accent = c.accent, active = live, modifier = Modifier.size(34.dp))
+        Column {
+            Text(
+                "J.A.R.V.I.S. // STARK HUD",
+                fontFamily = JetBrainsMono, fontSize = 7.sp, letterSpacing = 2.sp,
+                color = c.sky.copy(alpha = 0.65f),
+            )
+            Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = color)
+        }
+    }
 }
 
 @Composable
@@ -298,7 +333,7 @@ private fun Bubble(text: String, isUser: Boolean) {
     ) {
         NeonPanel(
             modifier = Modifier.widthIn(max = 300.dp),
-            borderColor = if (isUser) c.accent.copy(alpha = 0.5f) else c.lineSoft,
+            borderColor = if (isUser) c.accent.copy(alpha = 0.5f) else c.sky.copy(alpha = 0.4f),
             background = if (isUser) c.raise else c.panel,
         ) {
             Column {
