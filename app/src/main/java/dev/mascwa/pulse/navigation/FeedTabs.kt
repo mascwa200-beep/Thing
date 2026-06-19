@@ -7,12 +7,12 @@ import androidx.compose.runtime.compositionLocalOf
  * tab row (route → label, in display order). The TOOLS bottom-nav opens straight into the first
  * feed and each tab jumps directly to its feed — no in-between launcher.
  *
- * (J.A.R.V.I.S. is deliberately not a tab — it has its own Stark-HUD area and is reached from Home.)
+ * (J.A.R.V.I.S. is deliberately not a tab — it has its own Stark-HUD area and is reached from Home.
+ *  OBJECTIVES is no longer a tab either — it's folded into the NAV map as a MAP|OBJECTIVES sub-tab.)
  */
 val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.TACNET to "PIP-BOY",
     Routes.NAV to "NAV",
-    Routes.OBJECTIVES to "OBJECTIVES",
     Routes.SURVIVE to "SURVIVE",
     Routes.SOCIAL to "SOCIAL",
     Routes.SEARCH to "SEARCH",
