@@ -145,9 +145,15 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     injected in `withMemory(query)` alongside the flat-note recall — top-k by recency·importance·relevance,
     touched-on-recall so recall keeps a memory fresh. Settings → Storage **"Clear episodic memory"**. ⚠️
     On-device-unverified (CI compile-gates only): capture/recall/injection behaviour + the Settings clear.
-  - **Next (Phase 2c / Phase 3):** a WorkManager **reflection** pass (`shouldReflect`→`reflectionSeeds`→LLM
-    synthesis → store as REFLECTION memories); a Memory-screen surface for the stream; then Phase 3 temporal
-    reasoning (elapsed/ordering/"what changed since…") over the same timestamped store. Owner-verified.
+  - **Phase 3 temporal core (PR #50):** `core:telemetry/TemporalReasoner.kt` (+ tests, CI-gated) — pure
+    time-aware reasoning over the stream: `chronological`/`since`/`inWindow`/`newest`/`oldest`/`spanMs`,
+    `elapsedMs` (clamped), `describeElapsed` (calendar-free "3 hours ago"/"yesterday"/"2 years ago"),
+    `timeline` (newest-first, relative-stamped). NL window parsing ("last Tuesday") stays in the LLM; the
+    core does deterministic filtering + labelling. Doc: `docs/TEMPORAL_DESIGN.md`.
+  - **Next (Phase 2c / 3b):** wire it — stamp `MemoryStreamStore.digest` recall lines with `describeWhen`
+    ("yesterday: …"); a temporal recall path/tool; a WorkManager **reflection** pass
+    (`shouldReflect`→`reflectionSeeds`→LLM synthesis → REFLECTION memories); a Memory-screen surface. The
+    reflection pass needs a working cloud backend — **pending owner on-device verification of Haiku 4.5**.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
