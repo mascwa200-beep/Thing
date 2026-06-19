@@ -309,6 +309,12 @@ data class AppSettings(
     val deviceGateAcknowledged: Boolean = false,
     /** Highest build number we've already shown an "update available" notification for (dedupe). */
     val lastUpdateNotifiedCode: Int = 0,
+    /** Opt-in: on launch, auto-download a green update and launch the installer (the system still
+     *  requires a one-tap confirm — a sideloaded app can't install fully silently). Default off. */
+    val autoUpdate: Boolean = false,
+    /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
+     *  installer on every open after the user dismisses it). */
+    val lastAutoUpdateCode: Int = 0,
 )
 
 /** Sensible International defaults for first launch. */

@@ -72,6 +72,20 @@ class MainActivity : ComponentActivity() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }
                 }
+                // Opt-in auto-update: if a GREEN update (gated in UpdateRepository) is newer than the
+                // one we last auto-prompted, download it and launch the installer. The system still
+                // requires the one-tap "Update" confirm — a sideloaded app can't install silently or
+                // self-reopen without device-owner privileges; this automates everything up to that tap.
+                if (settings.autoUpdate) {
+                    runCatching {
+                        val info = app.container.updateRepository.check().available
+                        if (info != null && info.versionCode > settings.lastAutoUpdateCode) {
+                            val file = app.container.updateRepository.download(info) { }
+                            app.container.settingsRepository.update { it.copy(lastAutoUpdateCode = info.versionCode) }
+                            dev.mascwa.pulse.core.util.installApk(this@MainActivity, file)
+                        }
+                    }
+                }
             }
         }
 
