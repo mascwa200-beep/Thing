@@ -114,9 +114,9 @@ class SpaceWeatherRepository(
     }
 
     /** Latest solar-wind bulk speed (km/s) from the DSCOVR/ACE plasma feed.
-     *  The `products/summary/*` objects were going empty ("—"); the real-time
-     *  array feeds are the canonical, reliable source. Header row + array-of-
-     *  arrays; speed is column 2; take the most recent row with a real value. */
+     *  The summary-product objects were going empty ("—"); the real-time array
+     *  feeds are the canonical, reliable source. Header row + array-of-arrays;
+     *  speed is column 2; take the most recent row with a real value. */
     private suspend fun loadWindSpeed(): Double? =
         lastNumericInColumn(SOLAR_WIND_PLASMA, column = 2)
 
