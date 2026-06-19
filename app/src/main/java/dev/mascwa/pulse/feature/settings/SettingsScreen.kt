@@ -133,53 +133,6 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
             }
             item { HorizontalDivider() }
 
-            // ----- Self-coding (experimental) -----
-            item {
-                PrefSection("Self-coding (experimental)") {
-                    PrefSwitch(
-                        "Enable self-coding",
-                        "Let J.A.R.V.I.S. read and change its own code and open GitHub PRs. Needs a " +
-                            "write-scoped GitHub token in J.A.R.V.I.S. Setup.",
-                        checked = s.jarvis.selfCodingEnabled,
-                        onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodingEnabled = v)) } },
-                    )
-                    if (s.jarvis.selfCodingEnabled) {
-                        PrefSwitch(
-                            "Auto-merge on green CI",
-                            "Merge its PRs automatically once the build passes — you still confirm the " +
-                                "install. Off = you review and merge each PR yourself.",
-                            checked = s.jarvis.selfCodeAutoMerge,
-                            onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(selfCodeAutoMerge = v)) } },
-                        )
-                        PrefSwitch(
-                            "Autonomous self-coding",
-                            "Let J.A.R.V.I.S. OPEN its own PRs without approving each one. CI still has to " +
-                                "build it and you still install the build; its safety gate, CI and signing stay " +
-                                "off-limits. Hands over the review step — leave off unless you want that.",
-                            checked = s.jarvis.autonomousSelfCoding,
-                            onChange = { v -> vm.update { it.copy(jarvis = it.jarvis.copy(autonomousSelfCoding = v)) } },
-                        )
-                        Text(
-                            "Just tell J.A.R.V.I.S. what to build — in the console or by voice (e.g. \"read your " +
-                                "own code\" or \"add a … feature\"). It plans the files, drafts the change, and you " +
-                                "approve it in chat or the Approvals screen before any PR opens.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                        )
-                        Text(
-                            "⚠ Experimental. The AI writes app code; CI must pass before anything can ship, " +
-                                "protected files (CI/signing/safety gates) are off-limits, and you confirm every " +
-                                "install. Turn this off to halt it.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-            }
-            item { HorizontalDivider() }
-
             // ----- Appearance -----
             item {
                 PrefSection("Appearance") {

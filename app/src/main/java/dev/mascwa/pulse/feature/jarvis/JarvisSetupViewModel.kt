@@ -83,6 +83,11 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. may PROPOSE self-edits/research/tools (each applied only on approval). */
     val selfEditEnabled: StateFlow<Boolean> = _selfEdit.asStateFlow()
 
+    private val _selfCoding = MutableStateFlow(false)
+    /** The single autonomous-self-coding switch: on = J.A.R.V.I.S. opens PRs, auto-merges on green CI
+     *  and ships without per-change approval (drives all three underlying self-code flags together). */
+    val selfCoding: StateFlow<Boolean> = _selfCoding.asStateFlow()
+
     private val _githubToken = MutableStateFlow("")
     val githubToken: StateFlow<String> = _githubToken.asStateFlow()
 
@@ -145,6 +150,7 @@ class JarvisSetupViewModel(
             _glassesHud.value = saved.glassesHud
             _agentTools.value = saved.agentToolsEnabled
             _selfEdit.value = saved.selfEditEnabled
+            _selfCoding.value = saved.selfCodingEnabled
             _githubToken.value = saved.githubToken
             _chatFormat.value = saved.chatFormat
             _backend.value = saved.inferenceBackend
@@ -256,6 +262,25 @@ class JarvisSetupViewModel(
         _agentTools.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(agentToolsEnabled = enabled)) }
+        }
+    }
+
+    /** The single autonomous-self-coding switch. ON enables self-coding AND auto-merge-on-green AND
+     *  per-change-free autonomy at once; OFF clears all three. The human-gate invariant is intact: this
+     *  switch IS the user's deliberate opt-in, and protected paths (CI/signing/manifest/gate) + the CI
+     *  build remain off-limits and required regardless. */
+    fun setSelfCoding(enabled: Boolean) {
+        _selfCoding.value = enabled
+        viewModelScope.launch {
+            settings.update {
+                it.copy(
+                    jarvis = it.jarvis.copy(
+                        selfCodingEnabled = enabled,
+                        selfCodeAutoMerge = enabled,
+                        autonomousSelfCoding = enabled,
+                    ),
+                )
+            }
         }
     }
 
