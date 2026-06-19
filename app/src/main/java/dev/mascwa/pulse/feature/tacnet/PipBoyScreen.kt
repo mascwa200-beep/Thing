@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.data.sensors.Telemetry
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.sky.DataBody
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
@@ -38,6 +41,7 @@ import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.LocalNightwire
 import dev.mascwa.pulse.ui.theme.pipBoyPalette
+import kotlin.math.roundToInt
 
 /**
  * The combined PIP-BOY tab — radar, phone telemetry, orbital and space weather under one Fallout
@@ -59,6 +63,9 @@ fun PipBoyScreen(
     onBack: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
+    // Live device readouts for the persistent STAT strip (STATUS is the default tab, so telemetry
+    // starts on open; values persist across sub-tabs).
+    val telem by telemetryVm.telemetry.collectAsStateWithLifecycle()
     PulseScaffold(
         title = "PIP-BOY",
         navigationIcon = {
@@ -81,6 +88,7 @@ fun PipBoyScreen(
         // (also provided app-wide for the TOOLS section; kept here so PIP-BOY is self-contained).
         CompositionLocalProvider(LocalNightwire provides pipBoyPalette) {
             Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
+                PipStatHeader(telem)
                 PipTabRail(tab) { tab = it }
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -92,7 +100,7 @@ fun PipBoyScreen(
                     }
                 }
 
-                PipStatusBar(tab)
+                PipStatBar(telem, tab)
             }
         }
     }
@@ -125,21 +133,56 @@ private fun PipTabRail(current: PipTab, onSelect: (PipTab) -> Unit) {
     }
 }
 
-/** A thin Pip-Boy footer strip — the HP/AP-style status line, kept glanceable. */
+/** Free memory as a 0–100 %, used for the AP gauge. */
+private fun freeMemPercent(t: Telemetry): Float =
+    if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100f) / t.memTotalMb).coerceIn(0f, 100f) else 0f
+
+/** The top STAT readout strip (persistent across sub-tabs) — live device data in Fallout STAT style. */
 @Composable
-private fun PipStatusBar(tab: PipTab) {
+private fun PipStatHeader(t: Telemetry) {
+    val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     Row(
-        Modifier.fillMaxWidth().background(Pip.bg).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            "VAULT-TEC ⬢ NIGHTWIRE",
-            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim,
-        )
-        Text(
-            "▸ ${tab.label}",
-            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.mid,
-        )
+        Text("STAT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 2.sp, color = Pip.glow)
+        Text("HP $bat%${if (t.charging) " ⚡" else ""}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.mid)
+        Text("AP ${freeMemPercent(t).roundToInt()}%", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.mid)
+        if (t.netType.isNotBlank()) Text(t.netType, fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim)
+    }
+}
+
+/** The bottom Pip-Boy status bar — HP (battery) and AP (free memory) gauges flanking the level. */
+@Composable
+private fun PipStatBar(t: Telemetry, tab: PipTab) {
+    val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
+    val freeMem = freeMemPercent(t)
+    val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
+    Column(Modifier.fillMaxWidth().background(Pip.bg).padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
+            Text("LVL $level", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Pip.glow)
+            StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("ARGUS DYNAMICS", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
+            Text("▸ ${tab.label}", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.mid)
+        }
+    }
+}
+
+/** One labelled HP/AP-style gauge: label + value over a thin filled bar. */
+@Composable
+private fun StatGauge(label: String, value: String, fraction: Float, modifier: Modifier) {
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim)
+            Text(value, fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.mid)
+        }
+        Canvas(Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp)) {
+            drawRect(Pip.gridSoft)
+            drawRect(Pip.bright, size = androidx.compose.ui.geometry.Size(size.width * fraction.coerceIn(0f, 1f), size.height))
+        }
     }
 }
