@@ -164,7 +164,8 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   user's profile…". Capture: always-on `profile.detectAndAdd(text)` in `send()` (works even on the non-agent
   path) **+** the **`profile` `JarvisTool`** (`profile <fact>` / `profile list` / `profile forget <fact>`).
   Persona directs J.A.R.V.I.S. to tailor to it + keep it current. Control: Settings → Storage → **"Clear
-  remembered profile"** (`ProfileStore.clear`). On-device only.
+  remembered profile"** (`ProfileStore.clear`); **viewable + per-item curatable in the Memory screen**
+  (`ProfileStore.entriesFlow` → `JarvisMemoryViewModel.profile`, FORGET / CLEAR PROFILE). On-device only.
 - ⚠️ On-device-unverified (CI can't render): the markets strip, the no-glitch look, dropdowns, nav labels.
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 

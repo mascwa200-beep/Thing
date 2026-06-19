@@ -32,6 +32,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -45,6 +46,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     val notes by vm.notes.collectAsState()
+    val profile by vm.profile.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -74,6 +76,39 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     MemButton("CLEAR ALL", c.magenta) { vm.clearAll() }
                 }
             }
+
+            item { SectionBar("PROFILE · ${profile.size}") }
+            if (profile.isEmpty()) {
+                item {
+                    Text(
+                        "No preferences, interests or projects remembered yet. Tell J.A.R.V.I.S. things " +
+                            "like \"I prefer concise answers\" or \"I'm building an app\" and they'll appear here.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(profile, key = { it.category.name + "·" + it.text }) { entry ->
+                ProfileCard(entry, c, onForget = { vm.forgetProfile(entry.text) })
+            }
+            if (profile.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR PROFILE", c.magenta) { vm.clearProfile() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(entry: ProfileEntry, c: NightwirePalette, onForget: () -> Unit) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                entry.category.name,
+                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.accent,
+            )
+            Text(entry.text, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            MemButton("FORGET", c.magenta, onForget)
         }
     }
 }
