@@ -139,9 +139,16 @@ fun PulseApp(
             }
         },
     ) { innerPadding ->
-        val feedCtx = if (currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES)
-            dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
-        androidx.compose.runtime.CompositionLocalProvider(dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx) {
+        val isFeed = currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
+        val feedCtx = if (isFeed) dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
+        // The whole TOOLS section wears the Fallout Pip-Boy phosphor-green palette; everything else
+        // keeps the NIGHTWIRE theme. Provided once around the NavHost so feed screens re-theme with
+        // no per-screen edits (the bottom nav stays base — it reads `nw` captured above the provider).
+        val feedPalette = if (isFeed) dev.mascwa.pulse.ui.theme.pipBoyPalette else nw
+        androidx.compose.runtime.CompositionLocalProvider(
+            dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx,
+            dev.mascwa.pulse.ui.theme.LocalNightwire provides feedPalette,
+        ) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,

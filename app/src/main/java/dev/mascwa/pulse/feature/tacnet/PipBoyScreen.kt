@@ -38,6 +38,7 @@ import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.LocalNightwire
+import dev.mascwa.pulse.ui.theme.pipBoyPalette
 
 /**
  * The combined PIP-BOY tab — radar, phone telemetry, orbital and space weather under one Fallout
@@ -76,8 +77,9 @@ fun PipBoyScreen(
             }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
-        // Re-theme the whole subtree to phosphor green so the four feeds read as one Pip-Boy unit.
-        CompositionLocalProvider(LocalNightwire provides PipPalette) {
+        // Re-theme the whole subtree to phosphor green so the four feeds read as one Pip-Boy unit
+        // (also provided app-wide for the TOOLS section; kept here so PIP-BOY is self-contained).
+        CompositionLocalProvider(LocalNightwire provides pipBoyPalette) {
             Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
                 PipTabRail(tab) { tab = it }
 
