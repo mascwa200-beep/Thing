@@ -318,6 +318,36 @@ squash-merged to `main`, re-synced into the dev branch each time (`git merge ori
   condition figure; removing the unused osmdroid gradle dep; the Mnemosyne reflection WorkManager pass (still
   needs owner on-device Haiku 4.5 verification). Auto-update's one tap is the hard Android floor (documented).
 
+### Radio overhaul + cleanups (this session cont., #94–#98 all merged)
+Owner: "add the ability for the radio to connect to local stations and play local stuff," then "yes,
+autonomously." The PIP-BOY **RADIO** tab grew from a fixed SomaFM list into a full subsystem; all CI-green
+slices, squash-merged to `main`, re-synced into the dev branch each time.
+- **#94 — docs handoff** (the #79–#93 batch recorded in this file).
+- **#95 — LOCAL stations:** `data/radio/RadioBrowserRepository.kt` queries the free, keyless **Radio Browser**
+  community API by ISO country code (most-clicked first; user's state floated to the top), de-duped by stream,
+  fully defensive. `LocationProvider.describePlace()` reverse-geocodes a fix → country code/country/state/
+  locality (new `GeoPlace`). `RadioViewModel` gained a LOCAL group (loaded on demand: location → reverse-
+  geocode → Radio Browser) with a `LocalStatus` lifecycle; `RadioBody` renders LOCAL (region + count /
+  "enable location" / retry) then CURATED. **Manifest: `usesCleartextTraffic=true`** — most radio streams are
+  plain http, which API 35 blocks by default (required for local stations to play).
+- **#96 — background playback + osmdroid removal:** playback moved into a process-wide `RadioController`
+  (object; owns the `MediaPlayer`, tuned-by-identity state) kept alive by **`RadioService`** — a
+  `mediaPlayback` foreground service with a Stop-action media notification (channel `radio_playback`).
+  `RadioViewModel` is now a thin delegate (playback survives leaving the PIP-BOY/app). Manifest gained
+  `FOREGROUND_SERVICE_MEDIA_PLAYBACK` + the service entry. Also dropped the dead **osmdroid** gradle dep
+  (unused since #74). The one tap to Stop / the notification are the standard sideload-media pattern.
+- **#97 — favourites:** `RadioStation` is now `@Serializable`; `AppSettings.favoriteRadio` persists starred
+  stations (in the existing settings JSON blob). `RadioViewModel.favorites`/`toggleFavorite` over
+  `SettingsRepository`; `RadioBody` shows a FAVOURITES section + a ★/☆ on every card.
+- **#98 — search:** `RadioBrowserRepository.searchStations(name)` (URL-encoded, popularity-ordered);
+  `RadioViewModel.search`/`clearSearch` + `searchResults`/`searchStatus`; a SEARCH bar under the tuner →
+  tunable + favouritable result cards. **Radio is now local · favourites · search · background · curated.**
+- ⚠️ All on-device-unverified (CI compile-gates only — no device/network/render): the Radio Browser fetches,
+  reverse-geocode, cleartext + **foreground-service playback / notification**, and the favourites/search UI.
+  The FGS media path especially wants a real run on the Pixel. **Open / steerable next:** background-play for
+  the curated SomaFM too (already covered — same controller), a sleep timer, station logos (Radio Browser
+  `favicon`), or pivot off radio.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
