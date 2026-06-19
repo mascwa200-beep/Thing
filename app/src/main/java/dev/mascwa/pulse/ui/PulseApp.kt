@@ -320,6 +320,12 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.objectives.ObjectivesScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            // ---- Quests — the objectives/quest log as its own Pip-Boy feed tab ----
+            composable(Routes.QUESTS) {
+                val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.objectives.QuestsScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- Diagnostics ----
             composable(Routes.CRASH_LOG) {
                 val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)
