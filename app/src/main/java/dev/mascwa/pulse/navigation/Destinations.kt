@@ -43,7 +43,6 @@ object Routes {
     // Social & search (Phase 3)
     const val SOCIAL = "social"
     const val SEARCH = "search"
-    const val IMAGES = "images"
 
     // Tacnet (real-time radar + telemetry)
     const val TACNET = "tacnet"
