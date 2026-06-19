@@ -90,6 +90,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
     }
 
+    /** Episodic memory stream: timestamped observations, recalled by recency·importance·relevance. */
+    val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore by lazy {
+        dev.mascwa.pulse.data.memory.MemoryStreamStore(appContext, json)
+    }
+
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
 
     val newsRepository: NewsRepository by lazy {

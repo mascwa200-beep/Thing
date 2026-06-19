@@ -168,6 +168,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.cerebellumStore.flushNow() }
             runCatching { app.container.profileStore.flushNow() }
             runCatching { app.container.taskStore.flushNow() }
+            runCatching { app.container.memoryStream.flushNow() }
         }
         super.onStop()
     }

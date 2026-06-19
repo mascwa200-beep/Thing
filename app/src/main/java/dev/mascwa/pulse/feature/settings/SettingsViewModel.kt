@@ -35,6 +35,7 @@ class SettingsViewModel(
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
     private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
+    private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
 ) : ViewModel() {
 
     private val _selfCode = MutableStateFlow("")
@@ -198,6 +199,11 @@ class SettingsViewModel(
     /** Forget the tracked task board (the user's ongoing & completed tasks/goals). */
     fun clearTasks() {
         viewModelScope.launch { tasks.clear() }
+    }
+
+    /** Forget the episodic memory stream (timestamped observations & reflections). */
+    fun clearMemoryStream() {
+        viewModelScope.launch { memoryStream.clear() }
     }
 
     fun sendTestNotification() {
