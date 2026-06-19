@@ -227,39 +227,39 @@ fun PulseApp(
                 OrbitalScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Survive (Phase 2) ----
+            // ---- Survive (Phase 2) — all in the Pip-Boy green palette (matches PIP-BOY/QUESTS) ----
             composable(Routes.SURVIVE) {
-                SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
+                PipGreen { SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.PLACES) {
                 val vm: PlacesViewModel = viewModel(factory = factory)
-                PlacesScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SURVIVAL) {
                 val vm: GuidesViewModel = viewModel(factory = factory)
-                GuidesScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { GuidesScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
-                ToolsScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { ToolsScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SOS) {
                 val vm: SosViewModel = viewModel(factory = factory)
-                SosScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { SosScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SAFETY) {
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
             }
 
-            // ---- Social & search (Phase 3) ----
+            // ---- Social & search (Phase 3) — Pip-Boy green ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
+                PipGreen { dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() }) }
             }
 
             // ---- Tacnet (real-time radar + telemetry) ----
@@ -355,4 +355,14 @@ fun PulseApp(
             navigateTopLevel(startRoute)
         }
     }
+}
+
+/** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH
+ *  feeds (and their sub-screens) in the same Fallout look as the PIP-BOY and QUESTS tabs. */
+@Composable
+private fun PipGreen(content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.pipBoyPalette,
+        content = content,
+    )
 }
