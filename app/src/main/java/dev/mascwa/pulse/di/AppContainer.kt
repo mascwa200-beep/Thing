@@ -126,6 +126,11 @@ class AppContainer(private val appContext: Context) {
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
 
+    /** Local / regional internet radio (Radio Browser community API; free, keyless). */
+    val radioBrowserRepository: dev.mascwa.pulse.data.radio.RadioBrowserRepository by lazy {
+        dev.mascwa.pulse.data.radio.RadioBrowserRepository(http)
+    }
+
     // NAV objectives: device-calendar events (geocoded) + manual waypoints persisted in settings.
     val calendarObjectives: dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository by lazy {
         dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository(appContext)
