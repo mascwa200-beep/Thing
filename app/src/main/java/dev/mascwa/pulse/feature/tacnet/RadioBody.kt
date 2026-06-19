@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +51,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val localPlace by vm.localPlace.collectAsStateWithLifecycle()
     val c = Pulse.colors
     val tuned = state.tuned
+    val context = LocalContext.current
 
     // Look up nearby stations the first time the dial is opened.
     LaunchedEffect(Unit) { vm.loadLocal() }
@@ -66,18 +68,18 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val label = when (state.status) {
-                        RadioViewModel.Status.ON_AIR -> "▸ ON AIR"
-                        RadioViewModel.Status.TUNING -> "··· TUNING"
-                        RadioViewModel.Status.ERROR -> "✕ NO SIGNAL"
-                        RadioViewModel.Status.IDLE -> "○ STANDBY"
+                        RadioController.Status.ON_AIR -> "▸ ON AIR"
+                        RadioController.Status.TUNING -> "··· TUNING"
+                        RadioController.Status.ERROR -> "✕ NO SIGNAL"
+                        RadioController.Status.IDLE -> "○ STANDBY"
                     }
                     val labelColor = when (state.status) {
-                        RadioViewModel.Status.ERROR -> c.amber
-                        RadioViewModel.Status.ON_AIR -> c.accent
+                        RadioController.Status.ERROR -> c.amber
+                        RadioController.Status.ON_AIR -> c.accent
                         else -> c.muted
                     }
                     Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.5.sp, color = labelColor)
-                    if (state.status == RadioViewModel.Status.ON_AIR) {
+                    if (state.status == RadioController.Status.ON_AIR) {
                         SignalBars(c.accent, Modifier.padding(start = 10.dp).size(width = 26.dp, height = 14.dp))
                     }
                 }
@@ -103,13 +105,13 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             onRetry = { vm.loadLocal() },
         )
         localStations.forEach { st ->
-            StationRow(st, state, c) { vm.toggle(st) }
+            StationRow(st, state, c) { vm.toggle(context, st) }
         }
 
         // ---- CURATED streams (always available) ----
         PipHeader("Stations")
         vm.curatedStations.forEach { st ->
-            StationRow(st, state, c) { vm.toggle(st) }
+            StationRow(st, state, c) { vm.toggle(context, st) }
         }
 
         Text(
@@ -124,10 +126,10 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 
 /** One tunable station card — play/pause glyph + name + band tag, lit when it's the tuned one. */
 @Composable
-private fun StationRow(st: RadioStation, state: RadioViewModel.RadioState, c: NightwirePalette, onClick: () -> Unit) {
+private fun StationRow(st: RadioStation, state: RadioController.RadioState, c: NightwirePalette, onClick: () -> Unit) {
     val active = state.tuned?.streamUrl == st.streamUrl
-    val onAir = active && state.status == RadioViewModel.Status.ON_AIR
-    val tuningThis = active && state.status == RadioViewModel.Status.TUNING
+    val onAir = active && state.status == RadioController.Status.ON_AIR
+    val tuningThis = active && state.status == RadioController.Status.TUNING
     PipFrame(
         Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(onClick = onClick),
         accent = if (active) c.accent else c.line,
