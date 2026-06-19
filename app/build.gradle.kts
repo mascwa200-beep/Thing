@@ -181,7 +181,4 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
-
-    // Keyless OpenStreetMap map view
-    implementation(libs.osmdroid.android)
 }

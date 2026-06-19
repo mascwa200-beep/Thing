@@ -33,6 +33,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Only used while the opt-in "J.A.R.V.I.S." wake word is enabled. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- PIP-BOY radio: keep streaming while the app is backgrounded. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
@@ -132,6 +134,12 @@
             android:name=".jarvis.vitals.VitalsTrackingService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- PIP-BOY radio playback — keeps the stream alive when the app is backgrounded. -->
+        <service
+            android:name=".feature.tacnet.RadioService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->
