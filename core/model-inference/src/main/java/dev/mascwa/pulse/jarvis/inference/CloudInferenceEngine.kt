@@ -33,7 +33,7 @@ enum class CloudProvider(
 ) {
     GEMINI("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash", "https://aistudio.google.com/apikey"),
     GROQ("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", "https://console.groq.com/keys"),
-    OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4o-mini", "https://openrouter.ai/keys", "https://openrouter.ai/credits"),
+    OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "anthropic/claude-haiku-4.5", "https://openrouter.ai/keys", "https://openrouter.ai/credits"),
     OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini", "https://platform.openai.com/api-keys", "https://platform.openai.com/settings/organization/billing/overview"),
 }
 
