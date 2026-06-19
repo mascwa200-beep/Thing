@@ -67,10 +67,33 @@ import dev.mascwa.pulse.feature.common.Sparkline
 import dev.mascwa.pulse.ui.effects.rememberHaptics
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
-import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+/**
+ * Fallout Pip-Boy phosphor-green palette for the TACNET scope — a monochrome CRT look. Contact types
+ * are told apart by glyph + brightness rather than hue (emergencies get the one off-green accent).
+ */
+private object Pip {
+    val bg = Color(0xFF04130A)        // deep CRT green-black
+    val gridSoft = Color(0xFF0C2415) // faint grid
+    val grid = Color(0xFF15462A)      // range rings / ticks
+    val dim = Color(0xFF2E8F52)       // secondary text
+    val mid = Color(0xFF3FCB74)       // standard contact
+    val bright = Color(0xFF5BFF9B)    // sweep / primary
+    val glow = Color(0xFF9CFFC4)      // brightest highlight (ISS/selected text)
+    val alert = Color(0xFFE6FF66)     // emergency — off-green amber, still in-palette
+}
+
+/** Tiled dark horizontal lines over the scope for a CRT scanline texture. */
+private fun DrawScope.crtScanlines(color: Color, gap: Float = 3f) {
+    var y = 0f
+    while (y < size.height) {
+        drawLine(color, Offset(0f, y), Offset(size.width, y), 1f)
+        y += gap
+    }
+}
 
 @Composable
 fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
@@ -83,7 +106,6 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     val emergOnly by vm.emergOnly.collectAsStateWithLifecycle()
     val countHistory by vm.countHistory.collectAsStateWithLifecycle()
     val online = LocalIsOnline.current
-    val c = Pulse.colors
     val haptic = rememberHaptics()
     val onSelect: (String) -> Unit = { id -> haptic(HapticFeedbackType.TextHandleMove); vm.select(id) }
 
@@ -110,14 +132,14 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     }
 
     PulseScaffold(
-        title = "Radar",
+        title = "RADSCOPE",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
             }
         },
         actions = {
-            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = c.accent) }
+            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
         when {
@@ -178,7 +200,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                             Text(
                                 "// NO CONTACTS IN RANGE",
                                 fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp,
-                                color = c.muted, modifier = Modifier.padding(top = 6.dp),
+                                color = Pip.dim, modifier = Modifier.padding(top = 6.dp),
                             )
                         }
                     } else {
@@ -190,7 +212,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                         Text(
                             "Live aircraft: ${d.source.ifBlank { "ADS-B" }} (keyless community ADS-B) · ISS: wheretheiss.at · quakes: USGS. " +
                                 "Coverage depends on nearby feeders.",
-                            style = MaterialTheme.typography.labelSmall, color = c.muted,
+                            style = MaterialTheme.typography.labelSmall, color = Pip.dim,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
@@ -209,18 +231,18 @@ private fun RadarScope(
     online: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    val c = Pulse.colors
-    val accent = c.accent
-    val ring = c.line
-    val ringSoft = c.lineSoft
-    val violet = c.violet
-    val amber = c.amber
-    val magenta = c.magenta
-    val positive = c.positive
-    val backdrop = c.void
-    val cardinalN = c.magenta.toArgb()
-    val cardinalInk = c.ink2.toArgb()
-    val labelArgb = c.muted.toArgb()
+    // Pip-Boy phosphor monochrome — variable names kept so the drawing code below is unchanged.
+    val accent = Pip.bright
+    val ring = Pip.grid
+    val ringSoft = Pip.gridSoft
+    val violet = Pip.glow      // ISS / orbital — brightest
+    val amber = Pip.dim        // seismic — dim
+    val magenta = Pip.alert    // emergency — the one off-green accent
+    val positive = Pip.bright  // military — bright
+    val backdrop = Pip.bg
+    val cardinalN = Pip.alert.toArgb()
+    val cardinalInk = Pip.dim.toArgb()
+    val labelArgb = Pip.dim.toArgb()
 
     val transition = rememberInfiniteTransition(label = "radar")
     val sweep by transition.animateFloat(
@@ -322,6 +344,10 @@ private fun RadarScope(
                 if (ct.id == selectedId) drawCircle(magenta, 14f, pos, style = Stroke(2f))
             }
 
+            // CRT scanline texture + a soft phosphor edge glow (Pip-Boy tube feel).
+            crtScanlines(Pip.bg.copy(alpha = 0.6f))
+            drawCircle(Pip.bright.copy(alpha = 0.06f), r, center, style = Stroke(7f))
+
             // Cardinal letters + ring distance labels (native canvas, unrotated).
             val pC = Paint().apply {
                 isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = r * 0.075f
@@ -356,8 +382,7 @@ private fun RadarScope(
 
 @Composable
 private fun StatusLine(d: RadarData, contacts: Int, aircraft: Int, history: List<Int>) {
-    val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.grid) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 StatCell("CONTACTS", "$contacts")
@@ -368,7 +393,7 @@ private fun StatusLine(d: RadarData, contacts: Int, aircraft: Int, history: List
                 Sparkline(
                     history.map { it.toDouble() },
                     Modifier.fillMaxWidth().height(26.dp).padding(top = 8.dp),
-                    color = c.accent,
+                    color = Pip.bright,
                 )
             }
         }
@@ -377,30 +402,31 @@ private fun StatusLine(d: RadarData, contacts: Int, aircraft: Int, history: List
 
 @Composable
 private fun StatCell(label: String, value: String) {
-    val c = Pulse.colors
     Column {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = c.muted)
-        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = c.ink)
+        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = Pip.dim)
+        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Pip.glow)
     }
 }
 
 @Composable
 private fun ContactRow(ct: Contact, selected: Boolean, onClick: () -> Unit) {
-    val c = Pulse.colors
     val tint = when {
-        ct.emergency -> c.magenta
-        ct.kind == ContactKind.ISS.name -> c.violet
-        ct.kind == ContactKind.QUAKE.name -> c.amber
-        ct.military -> c.positive
-        else -> c.accent
+        ct.emergency -> Pip.alert
+        ct.kind == ContactKind.ISS.name -> Pip.glow
+        ct.kind == ContactKind.QUAKE.name -> Pip.dim
+        ct.military -> Pip.bright
+        else -> Pip.mid
     }
     NeonPanel(
         Modifier.fillMaxWidth().clickable { onClick() },
-        borderColor = if (selected || ct.emergency) c.magenta else c.lineSoft,
+        borderColor = if (selected || ct.emergency) Pip.alert else Pip.grid,
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.padding(end = 8.dp)) {
-                Text(ct.label, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = c.ink)
+                Text(
+                    "${glyph(ct)} ${ct.label}",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Pip.glow,
+                )
                 Text(
                     tagLabel(ct), fontFamily = JetBrainsMono, fontSize = 8.sp,
                     letterSpacing = 1.sp, color = tint,
@@ -409,30 +435,37 @@ private fun ContactRow(ct: Contact, selected: Boolean, onClick: () -> Unit) {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     "${Geo.formatDistance(ct.distanceMeters)} · ${Geo.cardinal(ct.bearingDeg)} ${ct.bearingDeg.roundToInt()}°",
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.bright,
                 )
                 Text(
-                    telemetryLine(ct), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    telemetryLine(ct), fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
                 )
             }
         }
     }
 }
 
+/** Pip-Boy contact glyph by kind. */
+private fun glyph(ct: Contact): String = when {
+    ct.emergency -> "⚠"
+    ct.kind == ContactKind.ISS.name -> "⬡"
+    ct.kind == ContactKind.QUAKE.name -> "◇"
+    else -> "✈"
+}
+
 @Composable
 private fun PermissionPanel(modifier: Modifier, onGrant: () -> Unit) {
-    val c = Pulse.colors
     Column(modifier.padding(16.dp).fillMaxWidth()) {
-        NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+        NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.grid) {
             Column {
-                Text("LOCATION REQUIRED", fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.5.sp, color = c.accent)
+                Text("LOCATION REQUIRED", fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.5.sp, color = Pip.bright)
                 Text(
                     "The radar centres on your live GPS position to plot aircraft, the ISS and nearby quakes by range and bearing.",
-                    style = MaterialTheme.typography.bodyMedium, color = c.ink2, modifier = Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium, color = Pip.mid, modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
                     "GRANT LOCATION",
-                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.accent,
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = Pip.bright,
                     modifier = Modifier.padding(top = 14.dp).fillMaxWidth().clickable { onGrant() },
                 )
             }
@@ -470,22 +503,21 @@ private fun passesFilter(
 
 @Composable
 private fun ContactDetail(ct: Contact) {
-    val c = Pulse.colors
     NeonPanel(
         Modifier.fillMaxWidth(),
         corners = true,
-        borderColor = if (ct.emergency) c.magenta else c.accent,
+        borderColor = if (ct.emergency) Pip.alert else Pip.grid,
     ) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(ct.label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = c.ink)
+                Text("${glyph(ct)} ${ct.label}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Pip.glow)
                 Text(tagLabel(ct), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp,
-                    color = if (ct.emergency) c.magenta else c.accent)
+                    color = if (ct.emergency) Pip.alert else Pip.bright)
             }
             if (ct.emergency) {
                 Text(
                     "EMERGENCY SQUAWK — ${squawkMeaning(ct.squawk)}",
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.magenta,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.alert,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -507,10 +539,9 @@ private fun ContactDetail(ct: Contact) {
 
 @Composable
 private fun DetailRow(label: String, value: String) {
-    val c = Pulse.colors
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-        Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+        Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim)
+        Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.glow)
     }
 }
 
