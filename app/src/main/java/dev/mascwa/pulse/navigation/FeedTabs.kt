@@ -23,7 +23,6 @@ val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.FUEL to "FUEL",
     Routes.SOCIAL to "SOCIAL",
     Routes.SEARCH to "SEARCH",
-    Routes.IMAGES to "IMAGES",
 )
 
 /** Routes that count as "feeds" — the TOOLS tab highlights on any of them and the tab bar shows. */

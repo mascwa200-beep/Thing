@@ -144,10 +144,6 @@ class AppContainer(private val appContext: Context) {
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
         dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
     }
-    val imageRepository: dev.mascwa.pulse.data.images.ImageRepository by lazy {
-        dev.mascwa.pulse.data.images.ImageRepository(http)
-    }
-
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
         dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
     }

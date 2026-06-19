@@ -26,7 +26,6 @@ object FeatureCatalog {
         FeatureMeta(Routes.FUEL, "Fuel & Energy", "Benchmarks & pump prices."),
         FeatureMeta(Routes.SOCIAL, "Social", "Lemmy, Mastodon & Hacker News."),
         FeatureMeta(Routes.SEARCH, "Search", "Private web search."),
-        FeatureMeta(Routes.IMAGES, "Images", "Search the web or your own sites."),
         FeatureMeta(Routes.SKY, "Sky", "Space weather, orbital & compass."),
         FeatureMeta(Routes.ORBITAL, "Orbital", "ISS, sun, moon & near-Earth objects."),
         FeatureMeta(Routes.SETTINGS, "Settings", "Tune Pulse to your taste."),

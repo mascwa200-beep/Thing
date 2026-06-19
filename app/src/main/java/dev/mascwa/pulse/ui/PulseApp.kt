@@ -256,10 +256,6 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
             }
-            composable(Routes.IMAGES) {
-                val vm: dev.mascwa.pulse.feature.images.ImageViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.images.ImageScreen(vm, onBack = { navController.popBackStack() })
-            }
 
             // ---- Tacnet (real-time radar + telemetry) ----
             composable(Routes.TACNET) {
