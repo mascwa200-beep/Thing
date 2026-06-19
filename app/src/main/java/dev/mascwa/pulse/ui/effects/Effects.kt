@@ -80,8 +80,10 @@ fun ScanlineOverlay(
 }
 
 /**
- * NIGHTWIRE brand text with an occasional chromatic glitch. When [glitch] is
- * on, two offset coloured copies flash for a beat every few seconds.
+ * NIGHTWIRE brand text with a working **chromatic aberration**: two colour-split copies (a warm
+ * channel pushed right, a cool channel pushed left) ride constantly behind the text with a gentle
+ * breathing offset and an occasional stronger burst — the misregistered-RGB look, not an occasional
+ * flicker. Off renders plain. Cheap: two extra text layers + two animated floats.
  */
 @Composable
 fun GlitchText(
@@ -96,22 +98,68 @@ fun GlitchText(
         Text(text, style = style, color = baseColor)
         return
     }
-    val transition = rememberInfiniteTransition(label = "glitch")
-    val t by transition.animateFloat(
+    val transition = rememberInfiniteTransition(label = "aberration")
+    val wob by transition.animateFloat(
         initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(6500, easing = LinearEasing), RepeatMode.Restart),
-        label = "glitchT",
+        animationSpec = infiniteRepeatable(tween(1700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "wob",
     )
-    // Active only in a short window near the end of each cycle.
-    val active = t > 0.95f
-    val off = if (t > 0.975f) -1.6f else 1.6f
+    val burst by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(5200, easing = LinearEasing), RepeatMode.Restart),
+        label = "burst",
+    )
+    val off = 1.1f + 0.9f * wob + if (burst > 0.94f) 3.4f else 0f
     Box {
-        if (active) {
-            Text(text, style = style.copy(fontWeight = FontWeight.Bold), color = magenta.copy(alpha = 0.8f),
-                modifier = Modifier.graphicsLayer { translationX = off })
-            Text(text, style = style.copy(fontWeight = FontWeight.Bold), color = accent.copy(alpha = 0.8f),
-                modifier = Modifier.graphicsLayer { translationX = -off })
-        }
+        Text(
+            text, style = style.copy(fontWeight = FontWeight.Bold), color = magenta.copy(alpha = 0.55f),
+            modifier = Modifier.graphicsLayer { translationX = off },
+        )
+        Text(
+            text, style = style.copy(fontWeight = FontWeight.Bold), color = accent.copy(alpha = 0.55f),
+            modifier = Modifier.graphicsLayer { translationX = -off },
+        )
         Text(text, style = style, color = baseColor)
+    }
+}
+
+/**
+ * Full-screen chromatic-aberration fringe — subtle red/cyan colour separation that intensifies
+ * toward the screen edges (as real lenses do), gently breathing. Drawn above content, never blocks
+ * touch. Cheap: four gradient rects per frame, no retained buffers (well under the FX RAM budget).
+ */
+@Composable
+fun ChromaticAberrationOverlay(enabled: Boolean, modifier: Modifier = Modifier) {
+    if (!enabled) return
+    val transition = rememberInfiniteTransition(label = "ca")
+    val breathe by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse),
+        label = "breathe",
+    )
+    val red = Color(0xFFFF2A4D)
+    val cyan = Color(0xFF22E0FF)
+    Box(modifier.fillMaxSize().zIndex(40f)) {
+        Canvas(Modifier.fillMaxSize()) {
+            val amp = 0.05f + 0.045f * breathe
+            val ex = size.width * 0.085f
+            val ey = size.height * 0.06f
+            drawRect(
+                Brush.horizontalGradient(0f to red.copy(alpha = amp), 1f to Color.Transparent, startX = 0f, endX = ex),
+                topLeft = Offset(0f, 0f), size = Size(ex, size.height),
+            )
+            drawRect(
+                Brush.horizontalGradient(0f to Color.Transparent, 1f to cyan.copy(alpha = amp), startX = size.width - ex, endX = size.width),
+                topLeft = Offset(size.width - ex, 0f), size = Size(ex, size.height),
+            )
+            drawRect(
+                Brush.verticalGradient(0f to red.copy(alpha = amp * 0.6f), 1f to Color.Transparent, startY = 0f, endY = ey),
+                topLeft = Offset(0f, 0f), size = Size(size.width, ey),
+            )
+            drawRect(
+                Brush.verticalGradient(0f to Color.Transparent, 1f to cyan.copy(alpha = amp * 0.6f), startY = size.height - ey, endY = size.height),
+                topLeft = Offset(0f, size.height - ey), size = Size(size.width, ey),
+            )
+        }
     }
 }

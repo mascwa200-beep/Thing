@@ -140,13 +140,16 @@ class MainActivity : ComponentActivity() {
                                 app.container.usageRepository.log("nav", route)
                             },
                         )
-                        // Terminal boot sequence, once per launch.
-                        if (settings.bootAnimation && !booted) {
-                            BootScreen(onFinished = { booted = true })
-                        }
                     }
                     // CRT scanline + sweep overlay above everything (never blocks touch).
                     ScanlineOverlay(scanlines = settings.scanlines)
+                    // Chromatic-aberration fringe (Settings → Glitch effects); above content, no touch.
+                    dev.mascwa.pulse.ui.effects.ChromaticAberrationOverlay(enabled = settings.glitch)
+                    // Cold-open: permanent + always topmost, so it draws first and masks everything
+                    // (app, gate, overlays) until it fades. No off-switch by design.
+                    if (!booted) {
+                        BootScreen(onFinished = { booted = true })
+                    }
                 }
                 }
             }
