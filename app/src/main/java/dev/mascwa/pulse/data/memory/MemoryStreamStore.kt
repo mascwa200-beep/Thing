@@ -171,6 +171,20 @@ class MemoryStreamStore(
 
     suspend fun all(): List<Memory> = ensureLoaded()
 
+    /** Forget a single memory by id (user curation from the Memory screen). */
+    suspend fun forget(id: Long) {
+        ensureLoaded()
+        val changed = mutex.withLock {
+            val current = memories ?: emptyList()
+            val after = current.filterNot { it.id == id }
+            if (after.size == current.size) return@withLock false
+            memories = after
+            _memoriesFlow.value = after
+            true
+        }
+        if (changed) scheduleFlush()
+    }
+
     suspend fun clear() {
         flushJob?.cancel() // so a buffered write can't resurrect cleared memories after this returns
         mutex.withLock { memories = emptyList(); _memoriesFlow.value = emptyList() }

@@ -2,11 +2,13 @@ package dev.mascwa.pulse.feature.jarvis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.Memory
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
+import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.profile.ProfileStore
 import dev.mascwa.pulse.data.tasks.TaskStore
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +26,7 @@ class JarvisMemoryViewModel(
     private val memory: JarvisMemory,
     private val profileStore: ProfileStore,
     private val taskStore: TaskStore,
+    private val memoryStream: MemoryStreamStore,
 ) : ViewModel() {
 
     val notes: StateFlow<List<AgentNoteEntity>> =
@@ -37,10 +40,16 @@ class JarvisMemoryViewModel(
         .map { TaskBoard.pending(it) + TaskBoard.completed(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Live episodic memory stream (newest first) — what J.A.R.V.I.S. has observed, view + curate. */
+    val episodic: StateFlow<List<Memory>> = memoryStream.memoriesFlow
+        .map { list -> list.sortedByDescending { it.createdMs } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
-        // Trigger a load so the profile + task flows populate when the screen opens.
+        // Trigger a load so the profile + task + episodic flows populate when the screen opens.
         viewModelScope.launch { runCatching { profileStore.all() } }
         viewModelScope.launch { runCatching { taskStore.all() } }
+        viewModelScope.launch { runCatching { memoryStream.all() } }
     }
 
     fun edit(id: Long, text: String) {
@@ -74,5 +83,15 @@ class JarvisMemoryViewModel(
     /** Forget the whole task board. */
     fun clearTasks() {
         viewModelScope.launch { runCatching { taskStore.clear() } }
+    }
+
+    /** Forget a single episodic memory. */
+    fun forgetMemory(id: Long) {
+        viewModelScope.launch { runCatching { memoryStream.forget(id) } }
+    }
+
+    /** Forget the whole episodic stream. */
+    fun clearEpisodic() {
+        viewModelScope.launch { runCatching { memoryStream.clear() } }
     }
 }

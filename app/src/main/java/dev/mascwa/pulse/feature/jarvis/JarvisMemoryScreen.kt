@@ -32,6 +32,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.Memory
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task
 import dev.mascwa.pulse.core.telemetry.TaskStatus
@@ -50,6 +51,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val notes by vm.notes.collectAsState()
     val profile by vm.profile.collectAsState()
     val tasks by vm.tasks.collectAsState()
+    val episodic by vm.episodic.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -117,6 +119,51 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     MemButton("CLEAR TASKS", c.magenta) { vm.clearTasks() }
                 }
             }
+
+            item { SectionBar("EPISODIC · ${episodic.size}") }
+            if (episodic.isEmpty()) {
+                item {
+                    Text(
+                        "No episodic memories yet. As you talk, J.A.R.V.I.S. records significant moments " +
+                            "(time-stamped) and recalls the relevant ones later. They appear here to review " +
+                            "and forget.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(episodic, key = { it.id }) { mem ->
+                EpisodicCard(mem, c, onForget = { vm.forgetMemory(mem.id) })
+            }
+            if (episodic.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR EPISODIC", c.magenta) { vm.clearEpisodic() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodicCard(mem: Memory, c: NightwirePalette, onForget: () -> Unit) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    mem.kind.name,
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp,
+                    color = if (mem.kind.name == "REFLECTION") c.violet else c.accent,
+                )
+                Text(
+                    DateUtils.getRelativeTimeSpanString(mem.createdMs).toString(),
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+                Text(
+                    "importance ${mem.importance}",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+            }
+            Text(mem.text, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            MemButton("FORGET", c.magenta, onForget)
         }
     }
 }
