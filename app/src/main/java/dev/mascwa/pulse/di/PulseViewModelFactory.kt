@@ -62,7 +62,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.TelemetryViewModel::class.java) ->
                 dev.mascwa.pulse.feature.tacnet.TelemetryViewModel(c.newTelemetryController(), c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.RadioViewModel::class.java) ->
-                dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository)
+                dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository, c.settingsRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.common.HudViewModel::class.java) ->
                 dev.mascwa.pulse.feature.common.HudViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisViewModel::class.java) ->

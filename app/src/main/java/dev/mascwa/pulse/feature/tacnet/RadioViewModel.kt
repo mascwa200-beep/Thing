@@ -6,10 +6,14 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.radio.DEFAULT_STATIONS
 import dev.mascwa.pulse.data.radio.RadioBrowserRepository
 import dev.mascwa.pulse.data.radio.RadioStation
+import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -21,6 +25,7 @@ import kotlinx.coroutines.launch
 class RadioViewModel(
     private val locationProvider: LocationProvider? = null,
     private val radioBrowser: RadioBrowserRepository? = null,
+    private val settings: SettingsRepository? = null,
 ) : ViewModel() {
 
     /** Lifecycle of the on-demand local-station lookup (drives the LOCAL section's header/hint). */
@@ -28,6 +33,29 @@ class RadioViewModel(
 
     /** The always-present curated streams. */
     val curatedStations: List<RadioStation> = DEFAULT_STATIONS
+
+    /** Favourited stations (local or curated), persisted across launches; shown as a FAVOURITES section. */
+    val favorites: StateFlow<List<RadioStation>> =
+        settings?.settings?.map { it.favoriteRadio }?.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+            ?: MutableStateFlow<List<RadioStation>>(emptyList())
+
+    /** Star/unstar a station (matched by stream URL). No-op if settings aren't wired. */
+    fun toggleFavorite(station: RadioStation) {
+        val repo = settings ?: return
+        viewModelScope.launch {
+            runCatching {
+                repo.update { s ->
+                    val exists = s.favoriteRadio.any { it.streamUrl == station.streamUrl }
+                    val next = if (exists) {
+                        s.favoriteRadio.filterNot { it.streamUrl == station.streamUrl }
+                    } else {
+                        s.favoriteRadio + station
+                    }
+                    s.copy(favoriteRadio = next)
+                }
+            }
+        }
+    }
 
     private val _local = MutableStateFlow<List<RadioStation>>(emptyList())
     val localStations: StateFlow<List<RadioStation>> = _local.asStateFlow()
