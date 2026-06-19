@@ -63,19 +63,48 @@ private data class Mote(
     val twinkle: Float,
 )
 
-/** The boot log — standard secure power-on analysis that decrypts in line by line, the kind of
- *  diagnostic roll a hardened terminal prints while it brings its subsystems up. */
-private val BOOT_LINES = listOf(
-    "> POWER-ON SELF TEST .............. OK",
-    "secure boot chain verified — signatures valid",
-    "mounting encrypted volume /vault ... OK",
-    "crypto services online (AES-256-GCM · RNG seeded)",
-    "calibrating inertial + magnetometer arrays",
-    "runtime heap allocated 15575 MB",
-    "loading geospatial · telemetry · signals subsystems",
-    "system integrity self-check ....... PASS",
-    "all subsystems nominal — operator handoff",
-)
+private fun hex(r: Random, digits: Int): String =
+    buildString { repeat(digits) { append("0123456789ABCDEF"[r.nextInt(16)]) } }
+
+/**
+ * The boot log is **procedurally generated, unique on every launch** — not a fixed list read from a
+ * file. A fresh `Random` (seeded from the wall clock) fills secure power-on diagnostics with new hex
+ * addresses, module names, seeds, sizes and pass/fail tokens, then a random handful of middle lines is
+ * shuffled in, so the terminal "decrypts" a different roll each cold start. POST opens it; the operator
+ * handoff always closes it.
+ */
+private fun generateBootLog(): List<String> {
+    val r = Random(System.nanoTime() xor System.currentTimeMillis())
+    val modules = listOf("kern", "vault", "telemetry", "geo", "signals", "crypto", "sensorhub", "netd",
+        "rtc", "dma", "mmu", "sched", "gnss", "baseband", "watchdog", "keystore")
+    val sensors = listOf("inertial", "magnetometer", "barometric", "gyroscopic", "photometric", "proximity")
+    val subsystems = listOf("geospatial", "telemetry", "signals-intel", "navigation", "cryptographic", "diagnostics")
+    val volumes = listOf("vault", "core", "cache", "secure", "ramdisk", "enclave")
+    val ifaces = listOf("eth0", "wlan0", "rmnet0", "mesh0")
+    val ok = listOf("OK", "PASS", "READY", "NOMINAL", "ONLINE")
+
+    val head = mutableListOf(
+        "> POWER-ON SELF TEST .............. ${ok.random(r)}",
+        "boot rom 0x${hex(r, 8)} · stage-2 loader 0x${hex(r, 4)}",
+        "secure boot chain verified — ${2 + r.nextInt(4)} signatures valid",
+        "mounting encrypted volume /${volumes.random(r)} ... ${ok.random(r)}",
+        "crypto online (AES-256-GCM · RNG seeded 0x${hex(r, 8)})",
+    )
+    val mids = mutableListOf<String>()
+    repeat(3 + r.nextInt(3)) { mids += "init ${modules.random(r)} @ 0x${hex(r, 8)} ... ${ok.random(r)}" }
+    mids += "calibrating ${sensors.random(r)} array (${256 + r.nextInt(2048)} samples)"
+    mids += "runtime heap allocated ${8192 + r.nextInt(8192)} MB"
+    mids += "link ${ifaces.random(r)} up — ${50 + r.nextInt(950)} Mbit/s"
+    mids += "${1 shl (10 + r.nextInt(6))} sectors verified · CRC 0x${hex(r, 8)}"
+    mids += "loading ${subsystems.random(r)} subsystem ... ${ok.random(r)}"
+    mids.shuffle(r)
+
+    return head + mids.take(4 + r.nextInt(3)) +
+        listOf(
+            "system integrity self-check ....... ${ok.random(r)}",
+            "all subsystems nominal — operator handoff",
+        )
+}
 
 // Deliberately unhurried (~half the old pace) so the message can actually be read.
 private const val BOOT_MS = 8800
@@ -104,6 +133,9 @@ fun BootScreen(onFinished: () -> Unit) {
         0f, 1f, infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse",
     )
 
+    // Fresh, unique boot log generated once for this launch.
+    val bootLines = remember { generateBootLog() }
+
     val motes = remember {
         val r = Random(20260619)
         List(MOTE_COUNT) {
@@ -131,26 +163,26 @@ fun BootScreen(onFinished: () -> Unit) {
     }
 
     AnimatedVisibility(visible = visible, enter = EnterTransition.None, exit = fadeOut(tween(580))) {
-        BootContent(c, progress.value, swirl, pulse, motes)
+        BootContent(c, progress.value, swirl, pulse, motes, bootLines)
     }
 }
 
 @Composable
-private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>) {
+private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>, bootLines: List<String>) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) { drawOmenField(c, p, swirl, pulse, motes) }
 
         // Force the decrypt effect regardless of the user's reduced-motion setting — the
         // cold-open is a deliberate, one-time cinematic.
         CompositionLocalProvider(LocalGlitchEnabled provides true) {
-            val shown = (((p - 0.05f) / 0.70f) * BOOT_LINES.size).toInt().coerceIn(0, BOOT_LINES.size)
+            val shown = (((p - 0.05f) / 0.70f) * bootLines.size).toInt().coerceIn(0, bootLines.size)
             val logAlpha = (1f - (p - 0.80f) / 0.10f).coerceIn(0f, 1f)
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 72.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                BOOT_LINES.take(shown).forEachIndexed { i, line ->
-                    val base = bootLineColor(c, i, BOOT_LINES.size)
+                bootLines.take(shown).forEachIndexed { i, line ->
+                    val base = bootLineColor(c, i, bootLines.size)
                     DecryptText(
                         line, JetBrainsMono, 12.sp, base.copy(alpha = base.alpha * logAlpha),
                         Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 640,
