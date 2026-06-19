@@ -102,6 +102,10 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
 - **Home "For you" task nudge** (PR #43) — `TaskBoard.focus()` surfaces the top pending task as a tappable
   line in the existing home `ForYouCard` (taps open the J.A.R.V.I.S. console); the card now shows when a
   recommendation, profile highlight **or** a pending task exists.
+- **Tasks viewable + curatable in the Memory screen** (PR #44) — a `TASKS` section (parity with `PROFILE`),
+  ordered pending-first via `TaskBoard.pending`+`completed`, each card status-coloured with a FORGET
+  button + a CLEAR TASKS button (`TaskStore.tasksFlow` → `JarvisMemoryViewModel.tasks` / `forgetTask` /
+  `clearTasks`). Completes the task board's lifecycle: capture → use → see/curate. On-device only.
 - ⚠️ On-device-unverified (CI can't render/run inference): the "For you" task line, the Settings clear
   control, and the live prompt-injection/auto-capture behaviour — conservative, mirrors established patterns.
 
