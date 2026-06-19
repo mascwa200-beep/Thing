@@ -113,6 +113,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             vm.checkForUpdate()
                         },
                     )
+                    PrefSwitch(
+                        "Auto-update",
+                        "On launch, download a verified (green) build and open the installer automatically. " +
+                            "You still tap once to confirm — Android can't install a sideloaded app silently.",
+                        s.autoUpdate,
+                    ) { v -> vm.update { it.copy(autoUpdate = v) } }
                     when (val st = u) {
                         is UpdateUi.Available -> PrefClickable(
                             "Download & install",
