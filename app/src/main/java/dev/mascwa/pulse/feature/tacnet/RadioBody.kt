@@ -9,6 +9,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -61,6 +65,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val searchResults by vm.searchResults.collectAsStateWithLifecycle()
     val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
+    val sleepMinutes by vm.sleepMinutes.collectAsStateWithLifecycle()
     val c = Pulse.colors
     val tuned = state.tuned
     val context = LocalContext.current
@@ -105,6 +110,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                 Text(
                     tuned?.band ?: "LOCAL & FREE LISTENER-SUPPORTED STREAMS",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
+                )
+                SleepTimerRow(
+                    active = sleepMinutes,
+                    c = c,
+                    onSelect = { vm.setSleep(context, it) },
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
         }
@@ -186,6 +197,29 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
         )
+    }
+}
+
+/** A compact sleep-timer selector inside the tuner: OFF · 15 · 30 · 60 min (auto-stops playback). */
+@Composable
+private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("☾ SLEEP", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.muted)
+        listOf<Pair<String, Int?>>("OFF" to null, "15" to 15, "30" to 30, "60" to 60).forEach { (label, mins) ->
+            val on = active == mins
+            Text(
+                label,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                color = if (on) c.void else c.ink2,
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (on) c.accent else c.panel)
+                    .border(1.dp, if (on) c.accent else c.line, RoundedCornerShape(6.dp))
+                    .clickable { onSelect(mins) }
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
+            )
+        }
     }
 }
 
