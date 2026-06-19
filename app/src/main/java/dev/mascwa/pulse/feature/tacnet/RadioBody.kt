@@ -13,13 +13,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -43,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -157,21 +164,17 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             RadioViewModel.SearchStatus.ERROR ->
                 Text("Search unavailable — check your connection.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, modifier = Modifier.padding(top = 4.dp))
             RadioViewModel.SearchStatus.READY ->
-                searchResults.forEach { st ->
-                    StationRow(st, state, c, isFavorite = st.streamUrl in favUrls, onFavorite = { vm.toggleFavorite(st) }) { vm.toggle(context, st) }
-                }
+                StationStrip(searchResults, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
             RadioViewModel.SearchStatus.IDLE -> Unit
         }
 
         // ---- FAVOURITES (starred; persisted) ----
         if (favorites.isNotEmpty()) {
             PipHeader("Favourites")
-            favorites.forEach { st ->
-                StationRow(st, state, c, isFavorite = true, onFavorite = { vm.toggleFavorite(st) }) { vm.toggle(context, st) }
-            }
+            StationStrip(favorites, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
-        // ---- LOCAL signals (region-scoped, on-demand) ----
+        // ---- LOCAL signals (geo-sourced, on-demand) ----
         PipHeader("Local Signals", trailing = localPlace?.takeIf { localStatus == RadioViewModel.LocalStatus.READY })
         LocalStatusLine(
             status = localStatus,
@@ -180,23 +183,42 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             onEnableLocation = { locationPerm.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
             onRetry = { vm.loadLocal() },
         )
-        localStations.forEach { st ->
-            StationRow(st, state, c, isFavorite = st.streamUrl in favUrls, onFavorite = { vm.toggleFavorite(st) }) { vm.toggle(context, st) }
+        if (localStations.isNotEmpty()) {
+            StationStrip(localStations, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
         // ---- CURATED streams (always available) ----
         PipHeader("Stations")
-        vm.curatedStations.forEach { st ->
-            StationRow(st, state, c, isFavorite = st.streamUrl in favUrls, onFavorite = { vm.toggleFavorite(st) }) { vm.toggle(context, st) }
-        }
+        StationStrip(vm.curatedStations, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
 
         Text(
-            "Tap ★ to save a station to Favourites. Local stations via Radio Browser (community-run, free); " +
-                "curated streams: SomaFM — free & listener-supported. Playback keeps going in the background " +
+            "Swipe each rail to browse · tap a card to tune · ★ saves it. Local stations via Radio Browser " +
+                "(community-run, free); curated streams: SomaFM. Playback keeps going in the background " +
                 "(a notification with Stop). Needs a connection; nearby stations need location.",
             fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
         )
+    }
+}
+
+/** A horizontally-scrollable rail of station cards — slide left/right to browse, tap to tune. */
+@Composable
+private fun StationStrip(
+    stations: List<RadioStation>,
+    state: RadioController.RadioState,
+    c: NightwirePalette,
+    favUrls: Set<String>,
+    onFavorite: (RadioStation) -> Unit,
+    onTune: (RadioStation) -> Unit,
+) {
+    LazyRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp),
+    ) {
+        items(stations, key = { it.streamUrl }) { st ->
+            StationCard(st, state, c, st.streamUrl in favUrls, { onFavorite(st) }) { onTune(st) }
+        }
     }
 }
 
@@ -223,9 +245,10 @@ private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) ->
     }
 }
 
-/** One tunable station card — play/pause glyph + name + band tag + a star to favourite it. */
+/** A rounded station "cube" for the horizontal rails: a play/EQ glyph + ★ up top, then the station
+ *  name and a tiny metadata line (genre/region — the slot a now-playing track would sit in). */
 @Composable
-private fun StationRow(
+private fun StationCard(
     st: RadioStation,
     state: RadioController.RadioState,
     c: NightwirePalette,
@@ -236,28 +259,42 @@ private fun StationRow(
     val active = state.tuned?.streamUrl == st.streamUrl
     val onAir = active && state.status == RadioController.Status.ON_AIR
     val tuningThis = active && state.status == RadioController.Status.TUNING
-    PipFrame(
-        Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(onClick = onClick),
-        accent = if (active) c.accent else c.line,
+    Box(
+        Modifier
+            .width(168.dp)
+            .height(104.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (active) c.accent.copy(alpha = 0.14f) else c.panel.copy(alpha = 0.45f))
+            .border(1.dp, if (active) c.accent else c.line, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (onAir || tuningThis) "❚❚" else "▶",
-                fontFamily = JetBrainsMono, fontSize = 14.sp,
-                color = if (active) c.accent else c.muted,
-            )
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onAir) {
+                    SignalBars(c.accent, Modifier.size(width = 22.dp, height = 12.dp))
+                } else {
+                    Text(
+                        if (tuningThis) "···" else "▶",
+                        fontFamily = JetBrainsMono, fontSize = 13.sp, color = if (active) c.accent else c.muted,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
                 Text(
-                    st.name, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
-                    color = if (active) c.ink else c.ink2,
+                    if (isFavorite) "★" else "☆",
+                    fontFamily = JetBrainsMono, fontSize = 16.sp, color = if (isFavorite) c.amber else c.muted,
+                    modifier = Modifier.clickable(onClick = onFavorite),
                 )
-                Text(st.band, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted)
             }
+            Spacer(Modifier.weight(1f))
             Text(
-                if (isFavorite) "★" else "☆",
-                fontFamily = JetBrainsMono, fontSize = 18.sp,
-                color = if (isFavorite) c.amber else c.muted,
-                modifier = Modifier.clickable(onClick = onFavorite).padding(start = 8.dp, top = 4.dp, bottom = 4.dp, end = 2.dp),
+                st.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                color = if (active) c.ink else c.ink2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                lineHeight = 16.sp,
+            )
+            Text(
+                st.band, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = c.muted,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
