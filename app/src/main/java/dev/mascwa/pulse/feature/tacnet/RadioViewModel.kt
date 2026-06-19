@@ -79,6 +79,12 @@ class RadioViewModel(
     /** Process-wide playback state (survives this ViewModel — playback continues in the background). */
     val state: StateFlow<RadioController.RadioState> get() = RadioController.state
 
+    /** Active sleep-timer minutes, or null when off. */
+    val sleepMinutes: StateFlow<Int?> get() = RadioController.sleepMinutes
+
+    /** Arm/clear the sleep timer (null/0 clears) — auto-stops playback after the chosen minutes. */
+    fun setSleep(context: android.content.Context, minutes: Int?) = RadioController.setSleep(context, minutes)
+
     /** Search any station worldwide by name. Blank query clears the results. */
     fun search(query: String) {
         val q = query.trim()

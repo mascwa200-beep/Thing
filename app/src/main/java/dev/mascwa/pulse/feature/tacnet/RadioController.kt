@@ -6,9 +6,14 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.data.radio.RadioStation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Process-wide radio playback: one [MediaPlayer] that keeps playing after the PIP-BOY — or the whole
@@ -27,7 +32,28 @@ object RadioController {
     private val _state = MutableStateFlow(RadioState())
     val state: StateFlow<RadioState> = _state.asStateFlow()
 
+    /** Active sleep-timer duration in minutes, or null when off. Playback auto-stops when it elapses. */
+    private val _sleepMinutes = MutableStateFlow<Int?>(null)
+    val sleepMinutes: StateFlow<Int?> = _sleepMinutes.asStateFlow()
+
+    private val scope = CoroutineScope(SupervisorJob())
+    private var sleepJob: Job? = null
     private var player: MediaPlayer? = null
+
+    /** Arm (or clear, with null/0) a sleep timer that stops playback after [minutes]. */
+    fun setSleep(context: Context, minutes: Int?) {
+        sleepJob?.cancel()
+        if (minutes == null || minutes <= 0) {
+            _sleepMinutes.value = null
+            return
+        }
+        _sleepMinutes.value = minutes
+        val app = context.applicationContext
+        sleepJob = scope.launch {
+            delay(minutes * 60_000L)
+            stop(app)
+        }
+    }
 
     /** Tap a station: tune it, or stop if it's the one already tuning/on air. */
     fun toggle(context: Context, station: RadioStation) {
@@ -63,6 +89,8 @@ object RadioController {
     }
 
     fun stop(context: Context) {
+        sleepJob?.cancel()
+        _sleepMinutes.value = null
         releasePlayer()
         _state.value = RadioState(null, Status.IDLE)
         runCatching {
