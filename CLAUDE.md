@@ -92,10 +92,11 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   12-wide burst (OkHttp `maxRequestsPerHost`). Fixed with a `Semaphore(5)` Yahoo cap + backoff retries +
   `mergeWithCache` (a partial fetch never SHRINKS the set). Ticker also made a true seamless fill
   (`BoxWithConstraints`) + denser items (NAME · price · ±%) + 24 instruments/6 crypto + edge fades.
-- **Explainers** (`core:telemetry/Explainers` + `WeatherExplainers`, CI-tested): tap space-weather (WX),
-  market rows, or weather metrics (feels-like/humidity/pressure/AQI) for plain-English meaning; shared
-  `feature/common/ExplainerDialog`. **Market mood** breadth banner (`core:telemetry/MarketMood`). Home
-  "Today in the sky" card taps through to Space Weather.
+- **Explainers** (`core:telemetry/Explainers` + `WeatherExplainers` + `EconomyExplainers`, CI-tested): tap
+  space-weather (WX), market rows, weather metrics (feels-like/humidity/pressure/AQI), or **Economy
+  indicator cards** (World Bank codes → plain-English meaning + value bands) for plain-English meaning;
+  shared `feature/common/ExplainerDialog`. **Market mood** breadth banner (`core:telemetry/MarketMood`).
+  Home "Today in the sky" card taps through to Space Weather.
 - **J.A.R.V.I.S. = tutor + translator**: persona now teaches at university level across any subject
   (first-principles, checks understanding) and translates fluently. (Best on the cloud brain.)
 - **Self-modification expanded** (user wants this; chose "wide scope, keep tiny safety core"):
