@@ -130,6 +130,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
     val nav3d by vm.nav3d.collectAsState()
     val headingUp by vm.headingUp.collectAsState()
     val selectedPoi by vm.selectedPoi.collectAsState()
+    val selectedWaypoint by vm.selectedWaypoint.collectAsState()
     val activeWaypoint by vm.activeWaypoint.collectAsState()
     val allWaypoints by vm.allWaypoints.collectAsState()
     val activeWaypointId by vm.activeWaypointId.collectAsState()
@@ -186,8 +187,16 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
             }
             ml.addOnMapClickListener { latLng ->
                 val pt = ml.projection.toScreenLocation(latLng)
+                // Objective icons are the user's own pins — they take tap priority over POIs.
+                val objId = ml.queryRenderedFeatures(pt, OBJECTIVE_LAYER).firstOrNull()?.getStringProperty("id")
+                if (objId != null) {
+                    vm.selectPoi(null)
+                    vm.selectWaypoint(objId)
+                    return@addOnMapClickListener true
+                }
                 val name = ml.queryRenderedFeatures(pt, POI_LAYER).firstOrNull()?.getStringProperty("name")
                 val hit = name?.let { n -> vm.pois.value.values.flatten().firstOrNull { it.name == n } }
+                vm.selectWaypoint(null)
                 vm.selectPoi(hit)
                 hit != null
             }
@@ -335,6 +344,17 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    selectedWaypoint?.let { wp ->
+                        WaypointDetailCard(
+                            waypoint = wp,
+                            location = location,
+                            active = wp.id == activeWaypointId,
+                            c = c,
+                            onClose = { vm.selectWaypoint(null) },
+                            onTrack = { vm.trackWaypoint(wp.id) },
+                            onRemove = { vm.removeWaypoint(wp.id) },
+                        )
+                    }
                     selectedPoi?.let { poi ->
                         PoiDetailCard(
                             poi = poi,
@@ -662,7 +682,8 @@ private fun objectiveGeoJson(waypoints: List<Waypoint>, activeId: String?): Stri
         features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
             .append(wp.longitude).append(',').append(wp.latitude)
             .append("]},\"properties\":{\"icon\":\"").append(icon)
-            .append("\",\"active\":").append(wp.id == activeId).append("}}")
+            .append("\",\"id\":").append(jsonString(wp.id))
+            .append(",\"active\":").append(wp.id == activeId).append("}}")
     }
     return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
@@ -790,6 +811,71 @@ private fun PoiDetailCard(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text("◢ SET WAYPOINT", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.amber)
+            }
+        }
+    }
+}
+
+/** Detail card for a tapped objective icon: name, kind, distance, and TRACK / REMOVE actions. */
+@Composable
+private fun WaypointDetailCard(
+    waypoint: Waypoint,
+    location: DeviceLocation?,
+    active: Boolean,
+    c: NightwirePalette,
+    onClose: () -> Unit,
+    onTrack: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val kindColor = Color(waypoint.kind.colorArgb)
+    val dist = location?.let {
+        Geo.formatDistance(Geo.distanceMeters(it.latitude, it.longitude, waypoint.latitude, waypoint.longitude))
+    }
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = kindColor) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(kindColor))
+                Text(
+                    waypoint.label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = c.ink, modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+                Text(
+                    "✕", fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.muted,
+                    modifier = Modifier.clickable(onClick = onClose).padding(4.dp),
+                )
+            }
+            val meta = buildString {
+                append(waypoint.kind.name)
+                dist?.let { append(" · ").append(it) }
+            }
+            Text(meta, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.sky, modifier = Modifier.padding(top = 2.dp))
+            waypoint.note?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
+            }
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background((if (active) c.amber else c.accent).copy(alpha = 0.16f))
+                        .border(1.dp, if (active) c.amber else c.accent, RoundedCornerShape(8.dp))
+                        .clickable(enabled = !active, onClick = onTrack)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        if (active) "◉ TRACKED" else "◢ TRACK",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        color = if (active) c.amber else c.accent,
+                    )
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, c.muted, RoundedCornerShape(8.dp))
+                        .clickable(onClick = onRemove)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text("✕ REMOVE", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.muted)
+                }
             }
         }
     }
