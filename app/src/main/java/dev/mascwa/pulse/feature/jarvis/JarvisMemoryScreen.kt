@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
+import dev.mascwa.pulse.core.telemetry.Task
+import dev.mascwa.pulse.core.telemetry.TaskStatus
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -47,6 +49,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     val notes by vm.notes.collectAsState()
     val profile by vm.profile.collectAsState()
+    val tasks by vm.tasks.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -95,6 +98,48 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     MemButton("CLEAR PROFILE", c.magenta) { vm.clearProfile() }
                 }
             }
+
+            item { SectionBar("TASKS · ${tasks.size}") }
+            if (tasks.isEmpty()) {
+                item {
+                    Text(
+                        "No tasks tracked yet. Say things like \"I need to finish the report\" or ask " +
+                            "J.A.R.V.I.S. to track a task, and your open tasks appear here.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(tasks, key = { it.title }) { task ->
+                TaskCard(task, c, onForget = { vm.forgetTask(task.title) })
+            }
+            if (tasks.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR TASKS", c.magenta) { vm.clearTasks() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskCard(task: Task, c: NightwirePalette, onForget: () -> Unit) {
+    val statusColor = when (task.status) {
+        TaskStatus.ACTIVE -> c.positive
+        TaskStatus.BLOCKED -> c.magenta
+        TaskStatus.DONE -> c.muted
+        TaskStatus.OPEN -> c.accent
+    }
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                task.status.name,
+                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = statusColor,
+            )
+            Text(task.title, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            if (task.note.isNotBlank()) {
+                Text(task.note, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            MemButton("FORGET", c.magenta, onForget)
         }
     }
 }
