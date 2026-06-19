@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -39,11 +40,16 @@ class ObjectivesViewModel(
     val activeId: StateFlow<String?> =
         waypoints.activeId.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    /** Merged, distance-sorted objectives (manual waypoints + geocoded calendar events). */
+    /** Merged, distance-sorted objectives (manual waypoints + geocoded calendar events). A calendar
+     *  event that's already been tracked (i.e. has a matching saved waypoint) is shown ONCE — the
+     *  manual/tracked copy wins — so tracking never leaves a duplicate twin in the list. */
     val objectives: StateFlow<List<Objective>> =
         combine(waypoints.waypoints, _calendar, _loc) { wps, cal, loc ->
             val manual = wps.map { it.toObjective(loc) }
-            val calendarWithDist = cal.map { it.withDistance(loc) }
+            val manualKeys = wps.map { coordKey(it.label, it.latitude, it.longitude) }.toSet()
+            val calendarWithDist = cal
+                .filterNot { coordKey(it.title, it.latitude, it.longitude) in manualKeys }
+                .map { it.withDistance(loc) }
             (manual + calendarWithDist).sortedBy { it.distanceMeters ?: Double.MAX_VALUE }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -59,13 +65,17 @@ class ObjectivesViewModel(
         }
     }
 
-    /** Track an objective → it becomes the active map waypoint. */
+    /** Track an objective → it becomes the active map waypoint. Idempotent: tracking a calendar event
+     *  that's already a saved waypoint just re-activates it instead of creating a duplicate. */
     fun track(o: Objective) {
         viewModelScope.launch {
             if (o.source == ObjectiveSource.MANUAL) {
                 waypoints.setActive(o.id)
             } else {
-                waypoints.add(o.title, o.latitude, o.longitude, o.kind, o.whenLabel)
+                val key = coordKey(o.title, o.latitude, o.longitude)
+                val existing = waypoints.waypoints.first().firstOrNull { coordKey(it.label, it.latitude, it.longitude) == key }
+                if (existing != null) waypoints.setActive(existing.id)
+                else waypoints.add(o.title, o.latitude, o.longitude, o.kind, o.whenLabel)
             }
         }
     }
@@ -98,4 +108,9 @@ class ObjectivesViewModel(
     private fun Objective.withDistance(loc: DeviceLocation?): Objective =
         if (loc == null) this
         else copy(distanceMeters = Geo.distanceMeters(loc.latitude, loc.longitude, latitude, longitude))
+
+    /** Identity for de-dup: title + coordinates rounded to ~11 m, so a calendar event and the waypoint
+     *  it was tracked into collapse to one entry. */
+    private fun coordKey(title: String, lat: Double, lon: Double): String =
+        "${title.trim().lowercase()}@${"%.4f".format(lat)},${"%.4f".format(lon)}"
 }
