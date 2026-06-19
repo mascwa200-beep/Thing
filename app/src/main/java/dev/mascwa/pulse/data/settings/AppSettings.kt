@@ -309,9 +309,12 @@ data class AppSettings(
     val deviceGateAcknowledged: Boolean = false,
     /** Highest build number we've already shown an "update available" notification for (dedupe). */
     val lastUpdateNotifiedCode: Int = 0,
-    /** Opt-in: on launch, auto-download a green update and launch the installer (the system still
-     *  requires a one-tap confirm — a sideloaded app can't install fully silently). Default off. */
-    val autoUpdate: Boolean = false,
+    /** On launch AND on every foreground return, auto-download a GREEN (CI-passed) update newer than
+     *  the running build and launch the installer for the user's one-tap confirm. A sideloaded app
+     *  can't install fully silently (no device-owner), so the single Android "Update" tap is the floor;
+     *  everything up to it is automatic. Default ON — the user asked for "as soon as it's green, install
+     *  it, show the installer thing so I can tap." Off = never check. */
+    val autoUpdate: Boolean = true,
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
