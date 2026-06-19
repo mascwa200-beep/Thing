@@ -53,8 +53,6 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 SosViewModel(c.emergencyService, c.settingsRepository, c.locationProvider, c.survivalTools)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.safety.SafetyViewModel::class.java) ->
                 dev.mascwa.pulse.feature.safety.SafetyViewModel(c.safetyRepository, c.locationProvider)
-            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.map.MapViewModel::class.java) ->
-                dev.mascwa.pulse.feature.map.MapViewModel(c.safetyRepository, c.overpassRepository, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.social.SocialViewModel::class.java) ->
                 dev.mascwa.pulse.feature.social.SocialViewModel(c.socialRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.search.SearchViewModel::class.java) ->
@@ -89,7 +87,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.nav.NavViewModel::class.java) ->
-                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore)
+                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
