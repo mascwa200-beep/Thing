@@ -131,9 +131,15 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     `recencyDecay` (24h half-life on *last access*), `retrieve` (min-max-normalized recency+importance+
     relevance composite, top-k, weights), `estimateImportance` (offline poignancy heuristic 1–10),
     reflection (`recentImportanceSum`/`shouldReflect`/`reflectionSeeds`), `capped` eviction. Design in
-    `docs/MEMORY_DESIGN.md`. **Next (Phase 2b):** app-layer wiring — on-device embeddings (ONNX/MediaPipe),
-    a `MemoryStreamStore` (mirrors the established store pattern), retrieval injection + a recall tool,
-    WorkManager reflection pass. All owner-verified on the Pixel (CI can't run embeddings/inference).
+    `docs/MEMORY_DESIGN.md`.
+  - **Phase 2 embedder (PR #48):** `core:telemetry/LexicalEmbedder.kt` (+ tests, CI-gated) — a
+    dependency-free feature-hashing embedder (unigram+bigram → L2-normalized vector; cosine ≈ lexical
+    overlap). Ships on-device embeddings now with **zero new deps / APK-size cost**; honestly lexical,
+    not a transformer. **Owner decision deferred:** upgrading to a sentence-transformer (ONNX/MediaPipe,
+    +native dep +model blob) for semantic paraphrase — a clean drop-in (anything → vector → `cosine`).
+  - **Next (Phase 2b):** app-layer wiring — a `MemoryStreamStore` (mirrors the established store pattern)
+    that embeds memories via `LexicalEmbedder`, a capture path, retrieval injection into `composePersona`
+    + a recall `JarvisTool`, and a WorkManager reflection pass. Owner-verified on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

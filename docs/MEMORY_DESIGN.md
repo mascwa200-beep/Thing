@@ -15,13 +15,25 @@ periodic **reflection** pass that synthesises higher-level memories.
 | Concern | Where | CI-gated? |
 |---|---|---|
 | Scoring maths: cosine relevance, recency decay, min-max-normalized composite retrieval, importance heuristic, reflection trigger/seed selection, capacity eviction | **`core:telemetry/MemoryStream.kt`** (pure Kotlin) + `MemoryStreamTest.kt` | **Yes** — this is the part that's easy to get subtly wrong, so CI owns it. |
-| On-device embedding generation (text → vector) | app layer, Phase 2b — small sentence-transformer (all-MiniLM / gte-small) via ONNX Runtime Mobile or MediaPipe Text Embedder | No (native; owner-verified) |
+| On-device embedding generation (text → vector) | **`core:telemetry/LexicalEmbedder.kt`** (shipped) — a dependency-free feature-hashing embedder; **upgrade path:** a sentence-transformer (all-MiniLM / gte-small) via ONNX Runtime Mobile or MediaPipe, an owner decision (adds a native dep + model blob → APK size) | **Yes** for the lexical embedder (pure Kotlin); the transformer would be native/owner-verified |
 | Persistence (timestamped `events` store + vectors) | app layer — a `MemoryStreamStore` mirroring the established store pattern (in-memory cache + Mutex + debounced flush to its own DataStore; `flushNow()` on stop; `clear()` cancels flush first) | No (compile-gated) |
 | Reflection synthesis (LLM call over the seeds) | app layer — uses the existing cloud opt-in; `MemoryStream.reflectionSeeds` picks what to feed it | No |
 | Retrieval injection into the prompt + a `memory`/recall tool | app layer — threads top-k into `composePersona`/recall, like the profile/task digests | No |
 
 This PR lands **only the pure core + tests + this doc** — the foundation, before any on-device wiring,
 matching how TaskBoard / UserProfile / Cerebellum were built (core first, CI-green, then store + tool).
+
+### Embedding mechanism — shipping a dependency-free lexical embedder first
+
+`PHASE0_FINDINGS` chose **on-device embeddings**. The *mechanism* is a genuine fork for a sideloaded,
+privacy-first app: a learned sentence-transformer gives the best semantic relevance but needs a native
+runtime (ONNX/MediaPipe) **plus a model blob** (real APK-size + dependency cost); cloud embeddings cost
+per-call. To ship the whole stream now — on-device, free, offline, **zero new dependencies**, and fully
+CI-testable — Phase 2 uses **`LexicalEmbedder`** (feature-hashing of unigrams + bigrams → L2-normalized
+vector, so cosine ≈ weighted lexical overlap). It is honestly *lexical*, not semantic-paraphrase, but
+combined with recency + importance it is a serviceable recall signal, and it carries no size/dep cost.
+**Anything that produces a vector plugs into the same `MemoryStream.cosine` path**, so a transformer is a
+clean drop-in upgrade if/when the owner wants the quality bump and accepts the APK-size tradeoff.
 
 ## Data model (`Memory`)
 
