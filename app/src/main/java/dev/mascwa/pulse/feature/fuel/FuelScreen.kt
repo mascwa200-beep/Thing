@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.fuel
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,13 +21,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.MarketExplainers
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
@@ -35,6 +42,7 @@ import dev.mascwa.pulse.feature.markets.QuoteRow
 @Composable
 fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
+    var selected by remember { mutableStateOf<Quote?>(null) }
 
     PulseScaffold(
         title = "Fuel & Energy",
@@ -58,7 +66,9 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
                         if (state.stale) item { StaleBanner(true) }
 
                         item { SectionLabel("Energy benchmarks (live)") }
-                        items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) { QuoteRow(it) }
+                        items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) {
+                            QuoteRow(it, Modifier.clickable { selected = it })
+                        }
                         if (data?.benchmarks.isNullOrEmpty()) {
                             item {
                                 Text(
@@ -113,6 +123,17 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
         }
+    }
+
+    selected?.let { q ->
+        ExplainerDialog(
+            q.label,
+            buildList {
+                add(MarketExplainers.instrument(q.id, q.label, q.type))
+                q.changePercent?.let { add(MarketExplainers.changePercent(it)) }
+            },
+            onDismiss = { selected = null },
+        )
     }
 }
 
