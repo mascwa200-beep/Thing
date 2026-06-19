@@ -62,6 +62,9 @@ object Routes {
     // Objectives / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
 
+    // Quests — the objectives/quest log as its own Pip-Boy feed tab
+    const val QUESTS = "quests"
+
     // Diagnostics
     const val CRASH_LOG = "crash_log"
 }

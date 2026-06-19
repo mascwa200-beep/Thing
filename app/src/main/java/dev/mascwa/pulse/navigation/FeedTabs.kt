@@ -13,6 +13,7 @@ import androidx.compose.runtime.compositionLocalOf
 val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.TACNET to "PIP-BOY",
     Routes.NAV to "NAV",
+    Routes.QUESTS to "QUESTS",
     Routes.SURVIVE to "SURVIVE",
     Routes.SOCIAL to "SOCIAL",
     Routes.SEARCH to "SEARCH",
