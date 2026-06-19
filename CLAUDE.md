@@ -108,6 +108,22 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   `clearTasks`). Completes the task board's lifecycle: capture → use → see/curate. On-device only.
 - ⚠️ On-device-unverified (CI can't render/run inference): the "For you" task line, the Settings clear
   control, and the live prompt-injection/auto-capture behaviour — conservative, mirrors established patterns.
+- **NEW PROJECT DIRECTION — "Mnemosyne" brief accepted (Phase 0 done, `docs/PHASE0_FINDINGS.md`).** Owner
+  pasted a multi-phase brief: a persistent, time-aware, self-extending agent. Via AskUserQuestion the owner
+  chose **(1) evolve Pulse** (build it into J.A.R.V.I.S.'s cognitive stack, not greenfield) and **(2) the
+  GitHub-PR gate** as the self-mod execution model (reuse `SelfCoder`/`ApprovalGate`/CI; no remote VM).
+  Honest scoping (in the doc): NOT consciousness/sapience — it's an *engineered* time-reasoning subsystem +
+  episodic memory + bounded self-mod. **Phase-0 verified facts:** OpenRouter slug **`anthropic/claude-haiku-4.5`**
+  (dot, not dash), 200K ctx, 64K max out, $1/$5, streaming + native tools ✓. **Correction to the brief:**
+  OpenRouter now *does* offer an embeddings endpoint — but we still choose **on-device embeddings** (privacy/
+  offline/free), cloud as documented fallback. Prior-art verdict: nothing matches the full spec; closest is
+  Nous Research **Hermes Agent** (a server, not on-device) + memory engines as design refs; **Pulse is the
+  base.** Mapping: P1 (OpenRouter chat) + P4 (human-gated self-code) **already exist**; the new work is an
+  **embedding-scored episodic-memory stream** (recency·importance·relevance + reflection) and a **temporal
+  subsystem** — pure logic in `core:telemetry` so CI gates it, mirroring TaskBoard/UserProfile/Cerebellum.
+  Next slices: default cloud model → Haiku 4.5 + cost meter; then Phase-2 memory-stream core + `MEMORY_DESIGN.md`.
+  Invariants unchanged (human-gate, `isProtected` denylist, credential scrub). DECLINED-and-standing
+  "no-safety-protocols" framing is NOT what this brief asks — its self-mod is bounded + gated, so compatible.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
