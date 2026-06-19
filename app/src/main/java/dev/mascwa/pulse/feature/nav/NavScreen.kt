@@ -43,7 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -246,6 +250,14 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
             NavChrome(hasFix = location != null, c = c)
+
+            // Compass readout (folded in from the old Compass screen): live true-north heading.
+            NavCompass(
+                heading = heading,
+                headingUp = headingUp,
+                c = c,
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 64.dp),
+            )
 
             // Search bar — geocode a place, drop a waypoint, fly there.
             NavSearchBar(
@@ -619,6 +631,39 @@ private fun FilterBar(
 }
 
 /** The cyberpunk HUD frame: corner brackets + a GPS-acquiring notice. */
+/** A compact heading readout — the compass feature, folded onto the NAV map. */
+@Composable
+private fun NavCompass(heading: Float, headingUp: Boolean, c: NightwirePalette, modifier: Modifier = Modifier) {
+    // In heading-up mode the map rotates, so North on screen sits at -heading; north-up keeps N up.
+    val northRotation = if (headingUp) -heading else 0f
+    Row(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(c.panel.copy(alpha = 0.9f))
+            .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Canvas(Modifier.size(26.dp)) {
+            val r = size.minDimension / 2f
+            val ctr = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(c.line, radius = r, center = ctr, style = Stroke(width = 1.5.dp.toPx()))
+            rotate(northRotation, ctr) {
+                drawLine(c.magenta, ctr, Offset(ctr.x, ctr.y - r * 0.85f), strokeWidth = 2.dp.toPx())
+                drawLine(c.muted, ctr, Offset(ctr.x, ctr.y + r * 0.7f), strokeWidth = 1.5.dp.toPx())
+            }
+        }
+        Column {
+            Text(
+                "${heading.roundToInt() % 360}°",
+                fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink, fontWeight = FontWeight.Medium,
+            )
+            Text(Geo.cardinal(heading.toDouble()), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
+        }
+    }
+}
+
 @Composable
 private fun NavChrome(hasFix: Boolean, c: NightwirePalette) {
     Box(Modifier.fillMaxSize()) {
