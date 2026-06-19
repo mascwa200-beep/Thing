@@ -11,6 +11,7 @@ import dev.mascwa.pulse.core.telemetry.Memory
 import dev.mascwa.pulse.core.telemetry.MemoryKind
 import dev.mascwa.pulse.core.telemetry.MemoryStream
 import dev.mascwa.pulse.core.telemetry.ScoredMemory
+import dev.mascwa.pulse.core.telemetry.TemporalReasoner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -155,12 +156,18 @@ class MemoryStreamStore(
         return scored
     }
 
-    /** A compact, recall-ranked block of relevant past memories for the prompt (empty when none). */
+    /** A compact, recall-ranked block of relevant past memories — each stamped with its relative time
+     *  (so "yesterday: …") — for the prompt. Empty when none. */
     suspend fun digest(query: String, topK: Int = DEFAULT_DIGEST_K): String {
         val scored = recall(query, topK)
         if (scored.isEmpty()) return ""
-        return scored.joinToString("\n") { "- ${it.memory.text}" }
+        val now = System.currentTimeMillis()
+        return scored.joinToString("\n") { "- ${TemporalReasoner.describeWhen(it.memory, now)}: ${it.memory.text}" }
     }
+
+    /** A newest-first chronological digest of recent memories, each stamped with its relative time. */
+    suspend fun timeline(max: Int = TemporalReasoner.DEFAULT_TIMELINE): String =
+        TemporalReasoner.timeline(ensureLoaded(), System.currentTimeMillis(), max)
 
     suspend fun all(): List<Memory> = ensureLoaded()
 
