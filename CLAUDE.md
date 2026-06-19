@@ -249,6 +249,35 @@ Owner pasted Fallout Pip-Boy refs + a 4-part ask. Verdict + what shipped:
   (needs on-device Haiku 4.5 verification). ⚠️ On-device-unverify the **feed-tabs nav** (tab switching, TOOLS
   highlight, back behaviour) + the compass markers — biggest/most-behavioural, CI only compile-gates.
 
+### Tab redesign + cleanups (this session cont., #69–#76 all merged)
+Two autonomous follow-ups first: **Moon azimuth** on the compass (#69, `feature/compass/MoonCalc.kt` —
+offline Schlyter lunar position w/ the main perturbations; pale `c.sky` dial marker + Moon read-out, mirrors
+SunCalc), and **deleting the orphaned GRID hub** (#70 — `GridHubScreen`/`Routes.GRID` gone; TOOLS bottom-nav
+re-anchored on `Routes.RADAR`, later `Routes.TACNET`). Then the owner pasted Fallout Pip-Boy refs + a big
+tab-redesign ask, shipped in **CI-green slices** (each: extract scaffold-free `*Body` like the Markets hub,
+host under a new shell, re-wire `FEED_TABS`/nav, keep standalone routes for Home/hub deep-links):
+- **#71 — image search removed** (`feature/images` + `data/images` deleted; J.A.R.V.I.S. vision `sendImage`
+  path is separate, untouched).
+- **#72 — Economy/Inflation/Fuel folded into MARKETS** as a sub-tab hub (`MarketsBody`/`EconomyBody`/
+  `InflationBody`/`FuelBody` + a `NeonChip` rail; standalone screens kept as thin wrappers). Dropped from tabs.
+- **#73 — Compass folded onto the NAV map** (a heading-readout overlay — north needle + true azimuth +
+  cardinal — using the NAV's existing `headingDeg`; COMPASS tab dropped; full dial still on Sky/Survive hubs).
+- **#74 — incidents map folded into NAV; standalone Map deleted** (`NavViewModel` now fetches
+  `SafetyRepository` incidents → an amber GeoJSON `INCIDENT_LAYER`, toggled by a ⚠ control button; osmdroid
+  `feature/map` + `Routes.MAP` gone, Survive "Map" tile → NAV; osmdroid gradle dep left for a later cleanup).
+- **#75/#76 — the centerpiece: PIP-BOY STAT tab.** Radar+Telemetry+Orbital+Space-WX collapse into ONE feed
+  tab (`Routes.TACNET`, label "PIP-BOY", now `FEED_HOME`). New `feature/tacnet/PipBoyScreen.kt` hosts the four
+  scaffold-free bodies under the literal Fallout sections **STATUS** (telemetry) · **DATA** (orbital) ·
+  **MAP** (RADSCOPE) · **RADIO** (space wx) in a green CRT chrome (section rail + footer). Shared `Pip`
+  palette + `crtScanlines` extracted to `feature/tacnet/PipBoyTheme.kt`; old `TacnetHubScreen` deleted. #76
+  re-themes the whole subtree phosphor-green by providing a green-mapped `NightwirePalette` (`PipPalette`)
+  over `LocalNightwire` — every `NeonPanel`/`Text` in the bodies re-themes with **zero per-screen edits**.
+- **Result: feed tab bar 14 → 6** (PIP-BOY · NAV · OBJECTIVES · SURVIVE · SOCIAL · SEARCH). ⚠️ All on-device-
+  unverified (CI compile-gates only): PIP-BOY sub-tab switching + green legibility, the MARKETS sub-tabs,
+  NAV's incident toggle + compass readout. Owner should eyeball on the Pixel. Possible follow-ups: heavier
+  CRT FX (global scanlines/tube curvature — trades readability), a STATUS Vault-Boy condition figure + an
+  HP/AP-style bottom bar with live telemetry, and removing the now-unused osmdroid gradle dep.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
