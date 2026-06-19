@@ -102,9 +102,12 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
             val sunAz: Float? = remember(loc) {
                 if (loc != null) SunCalc.azimuth(loc.latitude, loc.longitude).toFloat() else null
             }
+            val moonAz: Float? = remember(loc) {
+                if (loc != null) MoonCalc.azimuth(loc.latitude, loc.longitude).toFloat() else null
+            }
 
             Box(Modifier.fillMaxWidth(0.86f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                CompassDial(rotationDeg = -animated, waypointBearing = wpBearing, sunAz = sunAz)
+                CompassDial(rotationDeg = -animated, waypointBearing = wpBearing, sunAz = sunAz, moonAz = moonAz)
                 // Center read-out (fixed).
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -155,6 +158,7 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
                     Row2("Magnetic", "${reading.magneticAzimuth.roundToInt() % 360}° ${Geo.cardinal(reading.magneticAzimuth.toDouble())}")
                     Row2("Declination", "${"%+.1f".format(reading.declination)}° (${if (reading.declination >= 0) "E" else "W"})")
                     sunAz?.let { Row2("Sun", "${Geo.cardinal(it.toDouble())} ${it.roundToInt()}°") }
+                    moonAz?.let { Row2("Moon", "${Geo.cardinal(it.toDouble())} ${it.roundToInt()}°") }
                     if (loc != null) {
                         Row2("Latitude", "%.5f".format(loc.latitude))
                         Row2("Longitude", "%.5f".format(loc.longitude))
@@ -197,7 +201,7 @@ private fun Row2(label: String, value: String) {
 }
 
 @Composable
-private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Float?) {
+private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Float?, moonAz: Float?) {
     val c = Pulse.colors
     val tickColor = c.line.toArgb()
     val inkColor = c.ink.toArgb()
@@ -244,6 +248,14 @@ private fun CompassDial(rotationDeg: Float, waypointBearing: Float?, sunAz: Floa
             val rad = Math.toRadians(sa.toDouble())
             val mr = r * 0.90f
             drawCircle(c.amber, r * 0.045f, Offset(cx + (mr * sin(rad)).toFloat(), cy - (mr * cos(rad)).toFloat()))
+        }
+        // Moon marker — pale cool dot near the rim (cooler than the amber sun).
+        moonAz?.let { ma ->
+            val rad = Math.toRadians(ma.toDouble())
+            val mr = r * 0.90f
+            val center = Offset(cx + (mr * sin(rad)).toFloat(), cy - (mr * cos(rad)).toFloat())
+            drawCircle(c.sky.copy(alpha = 0.35f), r * 0.05f, center)
+            drawCircle(c.sky, r * 0.04f, center, style = Stroke(2f))
         }
         // Waypoint needle — magenta line + dot to the tracked waypoint.
         waypointBearing?.let { wb ->
