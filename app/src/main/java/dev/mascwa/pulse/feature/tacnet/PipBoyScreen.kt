@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import dev.mascwa.pulse.feature.sky.SpaceWeatherBody
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.LocalNightwire
 
 /**
  * The combined PIP-BOY tab — radar, phone telemetry, orbital and space weather under one Fallout
@@ -74,19 +76,22 @@ fun PipBoyScreen(
             }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
-        Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
-            PipTabRail(tab) { tab = it }
+        // Re-theme the whole subtree to phosphor green so the four feeds read as one Pip-Boy unit.
+        CompositionLocalProvider(LocalNightwire provides PipPalette) {
+            Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
+                PipTabRail(tab) { tab = it }
 
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (tab) {
-                    PipTab.STATUS -> TelemetryBody(telemetryVm)
-                    PipTab.DATA -> OrbitalBody(orbitalVm)
-                    PipTab.MAP -> RadarBody(radarVm)
-                    PipTab.RADIO -> SpaceWeatherBody(spaceWxVm)
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (tab) {
+                        PipTab.STATUS -> TelemetryBody(telemetryVm)
+                        PipTab.DATA -> OrbitalBody(orbitalVm)
+                        PipTab.MAP -> RadarBody(radarVm)
+                        PipTab.RADIO -> SpaceWeatherBody(spaceWxVm)
+                    }
                 }
-            }
 
-            PipStatusBar(tab)
+                PipStatusBar(tab)
+            }
         }
     }
 }
