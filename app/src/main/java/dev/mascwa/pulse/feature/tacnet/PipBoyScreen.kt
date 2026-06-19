@@ -142,7 +142,7 @@ private fun freeMemPercent(t: Telemetry): Float =
 private fun PipStatHeader(t: Telemetry) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     Row(
-        Modifier.fillMaxWidth().background(Pip.bg).padding(horizontal = 16.dp, top = 8.dp, bottom = 2.dp),
+        Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
