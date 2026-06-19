@@ -14,7 +14,6 @@ val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.TELEMETRY to "TELEM",
     Routes.ORBITAL to "ORBITAL",
     Routes.SPACE_WX to "SPACE WX",
-    Routes.COMPASS to "COMPASS",
     Routes.NAV to "NAV",
     Routes.OBJECTIVES to "OBJECTIVES",
     Routes.SURVIVE to "SURVIVE",
