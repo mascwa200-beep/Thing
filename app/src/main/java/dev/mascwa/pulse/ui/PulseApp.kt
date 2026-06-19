@@ -174,8 +174,10 @@ fun PulseApp(
                 NewsScreen(vm)
             }
             composable(Routes.MARKETS) {
-                val vm: MarketsViewModel = viewModel(factory = factory)
-                MarketsScreen(vm)
+                val marketsVm: MarketsViewModel = viewModel(factory = factory)
+                val economyVm: EconomyViewModel = viewModel(factory = factory)
+                val fuelVm: FuelViewModel = viewModel(factory = factory)
+                MarketsScreen(marketsVm, economyVm, fuelVm)
             }
             composable(Routes.WEATHER) {
                 val vm: WeatherViewModel = viewModel(factory = factory)

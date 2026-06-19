@@ -41,9 +41,6 @@ import dev.mascwa.pulse.feature.markets.QuoteRow
 
 @Composable
 fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    var selected by remember { mutableStateOf<Quote?>(null) }
-
     PulseScaffold(
         title = "Fuel & Energy",
         navigationIcon = {
@@ -52,11 +49,21 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
             }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = state.loading && state.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        FuelBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The Fuel & Energy feed body, scaffold-free so it can be hosted as a Markets sub-tab. */
+@Composable
+fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    var selected by remember { mutableStateOf<Quote?>(null) }
+
+    PullToRefreshBox(
+        isRefreshing = state.loading && state.data != null,
+        onRefresh = { vm.refresh() },
+        modifier = modifier,
+    ) {
             when {
                 state.isInitialLoading -> LoadingState()
                 state.isError -> ErrorState(state.error ?: "Error", onRetry = { vm.refresh() })
@@ -123,7 +130,6 @@ fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
         }
-    }
 
     selected?.let { q ->
         ExplainerDialog(
