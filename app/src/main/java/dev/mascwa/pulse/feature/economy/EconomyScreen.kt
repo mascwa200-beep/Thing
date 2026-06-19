@@ -32,10 +32,6 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 
 @Composable
 fun EconomyScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val dash = state.dashboard
-    var explain by remember { mutableStateOf<IndicatorSeries?>(null) }
-
     PulseScaffold(
         title = "Economy",
         navigationIcon = {
@@ -44,46 +40,56 @@ fun EconomyScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
             }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = dash.loading && dash.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            when {
-                dash.isInitialLoading -> LoadingState()
-                dash.isError -> ErrorState(dash.error ?: "Error", onRetry = { vm.refresh() })
-                else -> {
-                    val data = dash.data
-                    LazyColumn(
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        if (dash.stale) item { StaleBanner(true) }
-                        item {
-                            CountryPicker(
-                                current = state.country,
-                                onSelect = { vm.setCountry(it) },
-                                modifier = Modifier.padding(top = 8.dp, start = 4.dp),
-                            )
-                        }
-                        item {
-                            Text(
-                                data?.countryName ?: state.country,
-                                style = MaterialTheme.typography.headlineSmall,
-                                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp),
-                            )
-                        }
-                        items(data?.series.orEmpty().filter { it.points.isNotEmpty() }, key = { it.indicatorId }) {
-                            IndicatorCard(it, Modifier.clickable { explain = it })
-                        }
-                        item {
-                            Text(
-                                "Source: World Bank Open Data (annual). Some indicators lag by 1–2 years.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(8.dp),
-                            )
-                        }
+        EconomyBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The Economy feed body, scaffold-free so it can be hosted as a Markets sub-tab. */
+@Composable
+fun EconomyBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val dash = state.dashboard
+    var explain by remember { mutableStateOf<IndicatorSeries?>(null) }
+
+    PullToRefreshBox(
+        isRefreshing = dash.loading && dash.data != null,
+        onRefresh = { vm.refresh() },
+        modifier = modifier,
+    ) {
+        when {
+            dash.isInitialLoading -> LoadingState()
+            dash.isError -> ErrorState(dash.error ?: "Error", onRetry = { vm.refresh() })
+            else -> {
+                val data = dash.data
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (dash.stale) item { StaleBanner(true) }
+                    item {
+                        CountryPicker(
+                            current = state.country,
+                            onSelect = { vm.setCountry(it) },
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+                        )
+                    }
+                    item {
+                        Text(
+                            data?.countryName ?: state.country,
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp),
+                        )
+                    }
+                    items(data?.series.orEmpty().filter { it.points.isNotEmpty() }, key = { it.indicatorId }) {
+                        IndicatorCard(it, Modifier.clickable { explain = it })
+                    }
+                    item {
+                        Text(
+                            "Source: World Bank Open Data (annual). Some indicators lag by 1–2 years.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp),
+                        )
                     }
                 }
             }

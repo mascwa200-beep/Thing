@@ -18,9 +18,6 @@ val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.NAV to "NAV",
     Routes.OBJECTIVES to "OBJECTIVES",
     Routes.SURVIVE to "SURVIVE",
-    Routes.ECONOMY to "ECONOMY",
-    Routes.INFLATION to "INFLATION",
-    Routes.FUEL to "FUEL",
     Routes.SOCIAL to "SOCIAL",
     Routes.SEARCH to "SEARCH",
 )

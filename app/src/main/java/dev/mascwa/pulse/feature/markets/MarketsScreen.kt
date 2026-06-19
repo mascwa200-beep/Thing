@@ -1,12 +1,15 @@
 package dev.mascwa.pulse.feature.markets
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -37,21 +40,67 @@ import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.NeonChip
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.feature.economy.EconomyBody
+import dev.mascwa.pulse.feature.economy.EconomyViewModel
+import dev.mascwa.pulse.feature.economy.InflationBody
+import dev.mascwa.pulse.feature.fuel.FuelBody
+import dev.mascwa.pulse.feature.fuel.FuelViewModel
+
+/** The Markets hub: live quotes plus Economy / Inflation / Fuel folded in as sub-tab feeds. */
+private enum class MarketsTab(val label: String) {
+    MARKETS("MARKETS"), ECONOMY("ECONOMY"), INFLATION("INFLATION"), FUEL("FUEL")
+}
 
 @Composable
-fun MarketsScreen(vm: MarketsViewModel) {
+fun MarketsScreen(
+    marketsVm: MarketsViewModel,
+    economyVm: EconomyViewModel,
+    fuelVm: FuelViewModel,
+) {
+    var tab by remember { mutableStateOf(MarketsTab.MARKETS) }
+    PulseScaffold(
+        title = "Markets",
+        actions = {
+            IconButton(onClick = {
+                when (tab) {
+                    MarketsTab.MARKETS -> marketsVm.refresh()
+                    MarketsTab.ECONOMY, MarketsTab.INFLATION -> economyVm.refresh()
+                    MarketsTab.FUEL -> fuelVm.refresh()
+                }
+            }) { Icon(Icons.Filled.Refresh, "Refresh") }
+        },
+    ) { innerPadding ->
+        Column(Modifier.padding(innerPadding)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MarketsTab.entries.forEach { t ->
+                    NeonChip(t.label, selected = t == tab, onClick = { tab = t })
+                }
+            }
+            when (tab) {
+                MarketsTab.MARKETS -> MarketsBody(marketsVm)
+                MarketsTab.ECONOMY -> EconomyBody(economyVm)
+                MarketsTab.INFLATION -> InflationBody(economyVm)
+                MarketsTab.FUEL -> FuelBody(fuelVm)
+            }
+        }
+    }
+}
+
+/** The live-quotes feed body, scaffold-free so it can be hosted as a Markets sub-tab. */
+@Composable
+fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
     // Tap a row → what this instrument is + what today's move means.
     var selected by remember { mutableStateOf<Quote?>(null) }
 
-    PulseScaffold(
-        title = "Markets",
-        actions = {
-            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh") }
-        },
-    ) { innerPadding ->
+    Box(modifier) {
         val watch = state.watchlist
         val crypto = state.crypto
         val anyLoadingInitial = watch.isInitialLoading && crypto.isInitialLoading
@@ -60,7 +109,6 @@ fun MarketsScreen(vm: MarketsViewModel) {
         PullToRefreshBox(
             isRefreshing = (watch.loading || crypto.loading) && (watch.data != null || crypto.data != null),
             onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
         ) {
             when {
                 anyLoadingInitial -> LoadingState()

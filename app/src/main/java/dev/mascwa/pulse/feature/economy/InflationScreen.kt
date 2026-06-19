@@ -76,9 +76,6 @@ private fun ExplainBlock(title: String, body: String) {
 
 @Composable
 fun InflationScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val infl = state.inflation
-
     PulseScaffold(
         title = "Inflation",
         navigationIcon = {
@@ -87,11 +84,21 @@ fun InflationScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
             }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = infl.loading && infl.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        InflationBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The Inflation feed body, scaffold-free so it can be hosted as a Markets sub-tab. */
+@Composable
+fun InflationBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val infl = state.inflation
+
+    PullToRefreshBox(
+        isRefreshing = infl.loading && infl.data != null,
+        onRefresh = { vm.refresh() },
+        modifier = modifier,
+    ) {
             when {
                 infl.isInitialLoading -> LoadingState()
                 infl.isError -> ErrorState(infl.error ?: "Error", onRetry = { vm.refresh() })
@@ -181,4 +188,3 @@ fun InflationScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
             }
         }
     }
-}
