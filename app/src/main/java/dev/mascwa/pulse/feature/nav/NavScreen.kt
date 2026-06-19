@@ -60,6 +60,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
@@ -97,6 +98,8 @@ private const val POI_SOURCE = "nav-poi"
 private const val POI_LAYER = "nav-poi-dot"
 private const val WAYPOINT_SOURCE = "nav-waypoint"
 private const val WAYPOINT_LAYER = "nav-waypoint-dot"
+private const val OBJECTIVE_SOURCE = "nav-objective"
+private const val OBJECTIVE_LAYER = "nav-objective-icon"
 private const val ROUTE_SOURCE = "nav-route"
 private const val ROUTE_LAYER = "nav-route-line"
 private const val INCIDENT_SOURCE = "nav-incident"
@@ -123,6 +126,8 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val headingUp by vm.headingUp.collectAsState()
     val selectedPoi by vm.selectedPoi.collectAsState()
     val activeWaypoint by vm.activeWaypoint.collectAsState()
+    val allWaypoints by vm.allWaypoints.collectAsState()
+    val activeWaypointId by vm.activeWaypointId.collectAsState()
     val flyTo by vm.flyTo.collectAsState()
     val searchMessage by vm.searchMessage.collectAsState()
     val incidents by vm.incidents.collectAsState()
@@ -166,6 +171,8 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
                 addPoiLayer(style, c)
                 addIncidentLayer(style, c)
                 addWaypointLayer(style, c)
+                addObjectiveIcons(style)
+                addObjectiveLayer(style)
                 addPlayerMarker(style, c)
             }
             ml.addOnCameraMoveStartedListener { reason ->
@@ -200,6 +207,12 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
         style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeGeoJson(activeWaypoint, location))
+    }
+
+    // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● PLAIN), active emphasised.
+    LaunchedEffect(allWaypoints, activeWaypointId, map) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(OBJECTIVE_SOURCE)?.setGeoJson(objectiveGeoJson(allWaypoints, activeWaypointId))
     }
 
     // Render nearby safety incidents (amber) when the overlay is lit.
@@ -483,18 +496,120 @@ private fun addRouteLayer(style: Style, c: NightwirePalette) {
     )
 }
 
-/** The active objective waypoint, coloured per-feature by objective kind (gold/blue/white). */
+/** A soft coloured halo behind the ACTIVE objective's icon — its "you are tracking this" emphasis. */
 private fun addWaypointLayer(style: Style, c: NightwirePalette) {
     if (style.getSource(WAYPOINT_SOURCE) != null) return
     style.addSource(GeoJsonSource(WAYPOINT_SOURCE))
     style.addLayer(
         CircleLayer(WAYPOINT_LAYER, WAYPOINT_SOURCE).withProperties(
             PropertyFactory.circleColor(Expression.get("color")),
-            PropertyFactory.circleRadius(9f),
-            PropertyFactory.circleStrokeColor(c.void.toArgb()),
-            PropertyFactory.circleStrokeWidth(3f),
+            PropertyFactory.circleRadius(20f),
+            PropertyFactory.circleOpacity(0.22f),
+            PropertyFactory.circleStrokeColor(Expression.get("color")),
+            PropertyFactory.circleStrokeWidth(2f),
+            PropertyFactory.circleStrokeOpacity(0.85f),
         ),
     )
+}
+
+/** Register the three procedurally-drawn objective glyphs (★ MAIN gold, ◆ SIDE blue, ● PLAIN white).
+ *  Bitmaps, not a glyph font — robust on any map style (no font-stack dependency) and crisp at any zoom. */
+private fun addObjectiveIcons(style: Style) {
+    if (style.getImage("obj-main") != null) return
+    style.addImage("obj-main", objectiveBitmap(ObjectiveKind.MAIN))
+    style.addImage("obj-side", objectiveBitmap(ObjectiveKind.SIDE))
+    style.addImage("obj-plain", objectiveBitmap(ObjectiveKind.PLAIN))
+}
+
+/** Every tracked objective as its per-kind icon; the active one is scaled up for emphasis. */
+private fun addObjectiveLayer(style: Style) {
+    if (style.getSource(OBJECTIVE_SOURCE) != null) return
+    style.addSource(GeoJsonSource(OBJECTIVE_SOURCE))
+    style.addLayer(
+        SymbolLayer(OBJECTIVE_LAYER, OBJECTIVE_SOURCE).withProperties(
+            PropertyFactory.iconImage(Expression.get("icon")),
+            PropertyFactory.iconSize(
+                Expression.switchCase(
+                    Expression.eq(Expression.get("active"), Expression.literal(true)), Expression.literal(1.2f),
+                    Expression.literal(0.85f),
+                ),
+            ),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+        ),
+    )
+}
+
+/** Draw a single objective glyph bitmap: a filled shape with a dark contrast outline. */
+private fun objectiveBitmap(kind: ObjectiveKind): android.graphics.Bitmap {
+    val size = 84
+    val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    val cx = size / 2f
+    val cy = size / 2f
+    val r = size * 0.32f
+    val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = kind.colorArgb.toInt()
+        style = android.graphics.Paint.Style.FILL
+    }
+    val outline = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF06121A.toInt() // void-navy contrast ring so the icon reads on the dark map
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = size * 0.085f
+        strokeJoin = android.graphics.Paint.Join.ROUND
+    }
+    when (kind) {
+        ObjectiveKind.MAIN -> {
+            val path = starPath(cx, cy, r, r * 0.42f)
+            canvas.drawPath(path, outline); canvas.drawPath(path, fill)
+        }
+        ObjectiveKind.SIDE -> {
+            val path = android.graphics.Path().apply {
+                moveTo(cx, cy - r); lineTo(cx + r, cy); lineTo(cx, cy + r); lineTo(cx - r, cy); close()
+            }
+            canvas.drawPath(path, outline); canvas.drawPath(path, fill)
+        }
+        ObjectiveKind.PLAIN -> {
+            val dot = r * 0.78f
+            canvas.drawCircle(cx, cy, dot, outline); canvas.drawCircle(cx, cy, dot, fill)
+        }
+    }
+    return bmp
+}
+
+/** A 5-point star path centred at [cx],[cy] (outer/inner radii), top point up. */
+private fun starPath(cx: Float, cy: Float, outer: Float, inner: Float): android.graphics.Path {
+    val path = android.graphics.Path()
+    val points = 5
+    val step = Math.PI / points
+    var angle = -Math.PI / 2 // start at the top
+    for (i in 0 until points * 2) {
+        val rad = if (i % 2 == 0) outer else inner
+        val x = cx + (rad * Math.cos(angle)).toFloat()
+        val y = cy + (rad * Math.sin(angle)).toFloat()
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        angle += step
+    }
+    path.close()
+    return path
+}
+
+/** GeoJSON for ALL tracked objectives: each carries its per-kind icon name + an active flag. */
+private fun objectiveGeoJson(waypoints: List<Waypoint>, activeId: String?): String {
+    val features = StringBuilder()
+    waypoints.forEachIndexed { i, wp ->
+        if (i > 0) features.append(',')
+        val icon = when (wp.kind) {
+            ObjectiveKind.MAIN -> "obj-main"
+            ObjectiveKind.SIDE -> "obj-side"
+            ObjectiveKind.PLAIN -> "obj-plain"
+        }
+        features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
+            .append(wp.longitude).append(',').append(wp.latitude)
+            .append("]},\"properties\":{\"icon\":\"").append(icon)
+            .append("\",\"active\":").append(wp.id == activeId).append("}}")
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
 
 /** GeoJSON for the active waypoint marker (coloured by kind), or an empty collection when none. */
