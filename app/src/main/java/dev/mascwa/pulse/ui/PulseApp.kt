@@ -83,6 +83,19 @@ fun PulseApp(
         }
     }
 
+    // Pip-Boy feed tabs: tapping a tab replaces the current feed (shallow back stack).
+    val openTab: (String) -> Unit = { route ->
+        if (route != currentRoute) navController.navigate(route) {
+            launchSingleTop = true
+            currentRoute?.let { popUpTo(it) { inclusive = true } }
+        }
+    }
+    // The TOOLS bottom-nav returns to the last feed viewed.
+    var lastFeed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(dev.mascwa.pulse.navigation.FEED_HOME) }
+    androidx.compose.runtime.LaunchedEffect(currentRoute) {
+        if (currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES) lastFeed = currentRoute
+    }
+
     val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -94,10 +107,13 @@ fun PulseApp(
                 tonalElevation = 0.dp,
             ) {
                 TOP_DESTINATIONS.forEach { dest ->
-                    val selected = currentRoute == dest.route
+                    // TOOLS now opens the Pip-Boy feed tabs; it highlights on any feed route.
+                    val isTools = dest.route == Routes.GRID
+                    val selected = if (isTools) currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
+                        else currentRoute == dest.route
                     NavigationBarItem(
                         selected = selected,
-                        onClick = { navigateTopLevel(dest.route) },
+                        onClick = { navigateTopLevel(if (isTools) lastFeed else dest.route) },
                         icon = {
                             Icon(
                                 if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -124,6 +140,9 @@ fun PulseApp(
             }
         },
     ) { innerPadding ->
+        val feedCtx = if (currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES)
+            dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
+        androidx.compose.runtime.CompositionLocalProvider(dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
@@ -250,16 +269,7 @@ fun PulseApp(
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.RadarScreen(
-                    vm,
-                    onBack = { navController.popBackStack() },
-                    onOpenTab = { route ->
-                        if (route != Routes.RADAR) navController.navigate(route) {
-                            popUpTo(Routes.RADAR) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    },
-                )
+                dev.mascwa.pulse.feature.tacnet.RadarScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.TELEMETRY) {
                 val vm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
@@ -310,6 +320,7 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.diagnostics.CrashLogScreen(vm, onBack = { navController.popBackStack() })
             }
+        }
         }
     }
 

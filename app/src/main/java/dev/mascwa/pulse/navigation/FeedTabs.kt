@@ -1,0 +1,38 @@
+package dev.mascwa.pulse.navigation
+
+import androidx.compose.runtime.compositionLocalOf
+
+/**
+ * The Fallout Pip-Boy feed tabs that replace the old Tools grid: a single horizontally-scrolling
+ * tab row (route → label, in display order). The TOOLS bottom-nav opens straight into the first
+ * feed and each tab jumps directly to its feed — no in-between launcher.
+ *
+ * (J.A.R.V.I.S. is deliberately not a tab — it has its own Stark-HUD area and is reached from Home.)
+ */
+val FEED_TABS: List<Pair<String, String>> = listOf(
+    Routes.RADAR to "RADAR",
+    Routes.TELEMETRY to "TELEM",
+    Routes.ORBITAL to "ORBITAL",
+    Routes.SPACE_WX to "SPACE WX",
+    Routes.COMPASS to "COMPASS",
+    Routes.NAV to "NAV",
+    Routes.OBJECTIVES to "OBJECTIVES",
+    Routes.SURVIVE to "SURVIVE",
+    Routes.ECONOMY to "ECONOMY",
+    Routes.INFLATION to "INFLATION",
+    Routes.FUEL to "FUEL",
+    Routes.SOCIAL to "SOCIAL",
+    Routes.SEARCH to "SEARCH",
+    Routes.IMAGES to "IMAGES",
+)
+
+/** Routes that count as "feeds" — the TOOLS tab highlights on any of them and the tab bar shows. */
+val FEED_ROUTES: Set<String> = FEED_TABS.map { it.first }.toSet()
+
+/** The feed the TOOLS bottom-nav lands on by default. */
+const val FEED_HOME: String = Routes.RADAR
+
+/** The active feed-tab context, provided once around the NavHost; null on non-feed screens. */
+class FeedTabState(val current: String, val onSelect: (String) -> Unit)
+
+val LocalFeedTabs = compositionLocalOf<FeedTabState?> { null }

@@ -11,6 +11,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import dev.mascwa.pulse.navigation.LocalFeedTabs
 
 /**
  * Standard per-screen scaffold. The host (PulseApp) owns the bottom navigation
@@ -39,6 +40,8 @@ fun PulseScaffold(
                     actions = actions,
                     scrollBehavior = scrollBehavior,
                 )
+                // Fallout Pip-Boy feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
+                LocalFeedTabs.current?.let { FeedTabBar(it) }
                 // Always-on cockpit telemetry strip (no-op when disabled in Settings).
                 HudStrip()
             }

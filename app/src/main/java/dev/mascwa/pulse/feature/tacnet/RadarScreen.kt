@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -59,7 +58,6 @@ import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.radar.Contact
 import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarData
-import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonChip
@@ -98,7 +96,7 @@ private fun DrawScope.crtScanlines(color: Color, gap: Float = 3f) {
 }
 
 @Composable
-fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null, onOpenTab: (String) -> Unit = {}) {
+fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val rangeKm by vm.rangeKm.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
@@ -145,11 +143,9 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null, onOpenTab: (St
             IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(innerPadding)) {
-            TacnetTabBar(current = Routes.RADAR, onSelect = onOpenTab)
-            when {
-            state.isInitialLoading -> LoadingState(Modifier)
-            needsPermission && state.data == null -> PermissionPanel(Modifier) {
+        when {
+            state.isInitialLoading -> LoadingState(Modifier.padding(innerPadding))
+            needsPermission && state.data == null -> PermissionPanel(Modifier.padding(innerPadding)) {
                 permLauncher.launch(
                     arrayOf(
                         android.Manifest.permission.ACCESS_FINE_LOCATION,
@@ -157,7 +153,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null, onOpenTab: (St
                     ),
                 )
             }
-            state.isError -> ErrorState(state.error ?: "Error", { vm.refresh() }, Modifier)
+            state.isError -> ErrorState(state.error ?: "Error", { vm.refresh() }, Modifier.padding(innerPadding))
             else -> {
                 val d = state.data ?: return@PulseScaffold
                 val rangeM = rangeKm * 1000.0
@@ -167,7 +163,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null, onOpenTab: (St
                 val airCount = filtered.count { it.kind == ContactKind.AIRCRAFT.name }
                 val selectedContact = filtered.firstOrNull { it.id == selected }
                 LazyColumn(
-                    modifier = Modifier,
+                    modifier = Modifier.padding(innerPadding),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -224,46 +220,6 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null, onOpenTab: (St
                     }
                 }
             }
-            }
-        }
-    }
-}
-
-private val TACNET_TABS = listOf(
-    Routes.RADAR to "RADAR",
-    Routes.SKY to "SKY",
-    Routes.ORBITAL to "ORBITAL",
-    Routes.SPACE_WX to "SPACE WX",
-    Routes.TELEMETRY to "TELEM",
-)
-
-/**
- * Fallout Pip-Boy style top tab strip across the TACNET group (RADAR · SKY · ORBITAL · SPACE WX ·
- * TELEM). The active tab is bright; tapping another navigates there — the caller replaces the screen
- * so the group reads as one tabbed interface.
- */
-@Composable
-private fun TacnetTabBar(current: String, onSelect: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            TACNET_TABS.forEach { (route, label) ->
-                val active = route == current
-                Text(
-                    label,
-                    fontFamily = JetBrainsMono, fontSize = 13.sp, letterSpacing = 1.5.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) Pip.bright else Pip.dim,
-                    modifier = Modifier
-                        .clickable(enabled = !active) { onSelect(route) }
-                        .padding(vertical = 8.dp),
-                )
-            }
-        }
-        Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
-            drawLine(Pip.grid, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 2f)
         }
     }
 }
