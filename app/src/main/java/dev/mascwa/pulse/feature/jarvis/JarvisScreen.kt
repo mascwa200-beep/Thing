@@ -25,11 +25,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
@@ -71,8 +68,6 @@ fun JarvisScreen(
     vm: JarvisViewModel,
     onBack: () -> Unit,
     onOpenSetup: () -> Unit = {},
-    onOpenApprovals: () -> Unit = {},
-    onOpenMemory: () -> Unit = {},
 ) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
@@ -131,20 +126,9 @@ fun JarvisScreen(
             IconButton(onClick = { vm.requestBrief() }, enabled = !busy) {
                 Icon(Icons.Filled.Campaign, contentDescription = "Brief me", tint = c.positive)
             }
-            IconButton(onClick = { vm.runLockdown() }, enabled = !busy) {
-                Icon(Icons.Filled.Lock, contentDescription = "Lockdown", tint = c.magenta)
-            }
-            IconButton(onClick = onOpenApprovals) {
-                Icon(Icons.Filled.Checklist, contentDescription = "Approvals", tint = c.amber)
-            }
-            IconButton(onClick = onOpenMemory) {
-                Icon(Icons.Filled.Psychology, contentDescription = "Memory", tint = c.positive)
-            }
+            // Everything else (Approvals, Memory, Lockdown, Clear chat) now lives in Setup.
             IconButton(onClick = onOpenSetup) {
-                Icon(Icons.Filled.Tune, contentDescription = "Model setup", tint = c.sky)
-            }
-            IconButton(onClick = { vm.clearHistory() }) {
-                Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear chat", tint = c.muted)
+                Icon(Icons.Filled.Tune, contentDescription = "J.A.R.V.I.S. settings", tint = c.sky)
             }
         },
     ) { innerPadding ->

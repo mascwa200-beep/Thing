@@ -264,13 +264,16 @@ fun PulseApp(
                     vm,
                     onBack = { navController.popBackStack() },
                     onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
-                    onOpenApprovals = { navController.navigate(Routes.JARVIS_APPROVALS) },
-                    onOpenMemory = { navController.navigate(Routes.JARVIS_MEMORY) },
                 )
             }
             composable(Routes.JARVIS_SETUP) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.jarvis.JarvisSetupScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenApprovals = { navController.navigate(Routes.JARVIS_APPROVALS) },
+                    onOpenMemory = { navController.navigate(Routes.JARVIS_MEMORY) },
+                )
             }
             composable(Routes.JARVIS_APPROVALS) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisApprovalsViewModel = viewModel(factory = factory)

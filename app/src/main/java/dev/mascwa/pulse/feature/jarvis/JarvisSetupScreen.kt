@@ -64,7 +64,12 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
-fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
+fun JarvisSetupScreen(
+    vm: JarvisSetupViewModel,
+    onBack: () -> Unit,
+    onOpenApprovals: () -> Unit = {},
+    onOpenMemory: () -> Unit = {},
+) {
     val c = Pulse.colors
     val url by vm.url.collectAsState()
     val token by vm.token.collectAsState()
@@ -151,6 +156,21 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                 engine, download, vm.modelSizeBytes(),
                 cloudLabel = if (cloudEnabled && cloudApiKey.isNotBlank()) cloudProvider.label else null,
             )
+
+            // ---- Console controls (moved out of the J.A.R.V.I.S. top bar to declutter it) ----
+            FieldLabel("CONSOLE  ·  J.A.R.V.I.S. controls")
+            NeonPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NeonButton(text = "APPROVALS", enabled = true, color = c.amber, onClick = onOpenApprovals)
+                        NeonButton(text = "MEMORY", enabled = true, color = c.positive, onClick = onOpenMemory)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NeonButton(text = "LOCKDOWN", enabled = true, color = c.magenta, onClick = vm::runLockdown)
+                        NeonButton(text = "CLEAR CHAT", enabled = true, color = c.muted, onClick = vm::clearChat)
+                    }
+                }
+            }
 
             // ---- Cloud AI brain (recommended): far smarter than the on-device model ----
             SettingToggle(
