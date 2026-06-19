@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -240,6 +241,12 @@ private fun RadarScope(
         label = "pulse",
     )
 
+    // Sweep-driven blips: a contact's drawn position is frozen until the sweep hand crosses its
+    // bearing, then snaps to the latest data — so blips only refresh as the hand passes over them.
+    // Plain (non-State) holders mutated in the draw pass: no recomposition, just per-frame redraw.
+    val displayed = remember { LinkedHashMap<String, Contact>() }
+    val lastSweep = remember { floatArrayOf(0f) }
+
     Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.TopCenter) {
         Canvas(
             Modifier.fillMaxWidth().aspectRatio(1f).pointerInput(contacts, rangeKm) {
@@ -249,7 +256,9 @@ private fun RadarScope(
                     val r = minOf(size.width, size.height) / 2f * 0.9f
                     var best: String? = null
                     var bestD = Float.MAX_VALUE
-                    contacts.forEach { ct ->
+                    // Hit-test against the visible (frozen) blip positions.
+                    val src: Collection<Contact> = if (displayed.isEmpty()) contacts else displayed.values
+                    src.forEach { ct ->
                         val frac = (ct.distanceMeters / rangeM).toFloat().coerceIn(0f, 1f)
                         val pos = polar(cx, cy, r, ct.bearingDeg, frac)
                         val dd = (pos - tap).getDistance()
@@ -303,8 +312,21 @@ private fun RadarScope(
             drawLine(accent, center, Offset(cx + (r * sin(sr)).toFloat(), cy - (r * cos(sr)).toFloat()), 2.5f)
             drawCircle(accent, 3.5f, center)
 
-            // Blips.
+            // Refresh the frozen blip snapshots: a contact's drawn position only updates when the
+            // sweep has just crossed its bearing (or on first sight); drop contacts no longer present.
+            val prevSweep = lastSweep[0]
+            val liveIds = HashSet<String>(contacts.size)
             contacts.forEach { ct ->
+                liveIds.add(ct.id)
+                if (ct.id !in displayed || sweepPassed(prevSweep, sweep, ct.bearingDeg.toFloat())) {
+                    displayed[ct.id] = ct
+                }
+            }
+            displayed.keys.retainAll(liveIds)
+            lastSweep[0] = sweep
+
+            // Blips (drawn from the frozen snapshots).
+            displayed.values.forEach { ct ->
                 val frac = (ct.distanceMeters / rangeM).toFloat().coerceIn(0f, 1f)
                 val pos = polar(cx, cy, r, ct.bearingDeg, frac)
                 val diff = (((sweep - ct.bearingDeg) % 360) + 360) % 360
@@ -628,6 +650,12 @@ private fun telemetryLine(ct: Contact): String = when (ct.kind) {
 private fun polar(cx: Float, cy: Float, r: Float, bearingDeg: Double, frac: Float): Offset {
     val rad = Math.toRadians(bearingDeg)
     return Offset(cx + (r * frac * sin(rad)).toFloat(), cy - (r * frac * cos(rad)).toFloat())
+}
+
+/** True if the sweep angle moved past [target] going from [prev] to [cur] (degrees, wrapping at 360). */
+private fun sweepPassed(prev: Float, cur: Float, target: Float): Boolean {
+    val t = ((target % 360f) + 360f) % 360f
+    return if (cur >= prev) t > prev && t <= cur else t > prev || t <= cur
 }
 
 private fun DrawScope.drawAircraft(pos: Offset, trackDeg: Double, color: Color) {
