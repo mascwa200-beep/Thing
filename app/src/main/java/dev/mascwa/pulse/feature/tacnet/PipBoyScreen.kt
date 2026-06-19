@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -98,6 +99,9 @@ fun PipBoyScreen(
                         PipTab.MAP -> RadarBody(radarVm)
                         PipTab.RADIO -> RadioBody(radioVm)
                     }
+                    // A faint CRT scanline tube over every feed — decorative, so it passes touches
+                    // through (no pointer input) and stays low-alpha to keep text readable.
+                    Canvas(Modifier.matchParentSize()) { crtScanlines(Color.Black.copy(alpha = 0.12f), gap = 3f) }
                 }
 
                 PipStatBar(telem, tab)
