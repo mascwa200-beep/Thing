@@ -27,8 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.pulse.feature.common.NeonPanel
-import dev.mascwa.pulse.feature.common.SectionBar
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -44,8 +44,8 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
-        SectionBar("Tuner")
-        NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+        PipHeader("Tuner")
+        PipFrame(Modifier.fillMaxWidth()) {
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val label = when (state.status) {
@@ -76,14 +76,14 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        SectionBar("Stations")
+        PipHeader("Stations")
         vm.stations.forEachIndexed { i, st ->
             val active = state.index == i
             val onAir = active && state.status == RadioViewModel.Status.ON_AIR
             val tuningThis = active && state.status == RadioViewModel.Status.TUNING
-            NeonPanel(
+            PipFrame(
                 Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { vm.toggle(i) },
-                borderColor = if (active) c.accent else c.lineSoft,
+                accent = if (active) c.accent else c.line,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(

@@ -30,9 +30,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.sensors.Telemetry
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
-import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -80,8 +80,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-            SectionBar("Vitals")
-            NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+            PipHeader("Vitals")
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     GaugeBar("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
                     GaugeBar("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
@@ -95,8 +95,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            SectionBar("Sensors")
-            NeonPanel(Modifier.fillMaxWidth()) {
+            PipHeader("Sensors")
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     KV("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
                     KV("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
@@ -106,8 +106,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            SectionBar("System")
-            NeonPanel(Modifier.fillMaxWidth()) {
+            PipHeader("System")
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     KV("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
                     KV("Power", if (t.charging) "Charging" else "On battery")
@@ -117,8 +117,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            SectionBar("Position")
-            NeonPanel(Modifier.fillMaxWidth()) {
+            PipHeader("Position")
+            PipFrame(Modifier.fillMaxWidth()) {
                 val loc = gps
                 if (loc != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -134,8 +134,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            SectionBar("Data stream")
-            NeonPanel(Modifier.fillMaxWidth(), background = c.carbon) {
+            PipHeader("Data stream")
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column {
                     if (log.isEmpty()) {
                         Text("// initialising sensors…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
