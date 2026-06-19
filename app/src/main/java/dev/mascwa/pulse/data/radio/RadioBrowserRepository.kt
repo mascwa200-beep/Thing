@@ -54,6 +54,21 @@ class RadioBrowserRepository(private val http: HttpClient) {
         return ordered.take(limit).map { it.station }
     }
 
+    /** Search any station worldwide by name (most-clicked first), de-duped by stream. */
+    suspend fun searchStations(query: String, limit: Int = 30): List<RadioStation> {
+        val q = query.trim()
+        if (q.isBlank()) return emptyList()
+        val encoded = java.net.URLEncoder.encode(q, "UTF-8")
+        val url = "https://all.api.radio-browser.info/json/stations/search" +
+            "?name=$encoded&order=clickcount&reverse=true&hidebroken=true&limit=$limit"
+        val raw = http.getJson(url, ListSerializer(ApiStation.serializer()))
+        val seen = HashSet<String>()
+        return raw.asSequence()
+            .mapNotNull { it.toStation()?.station }
+            .filter { seen.add(it.streamUrl) }
+            .toList()
+    }
+
     /** A mapped station plus its lower-cased state key (for the "near me" partition). */
     private data class Mapped(val station: RadioStation, val stateKey: String) {
         val streamUrl get() = station.streamUrl
