@@ -35,11 +35,11 @@ import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LineChart
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.PipStatTile
 import dev.mascwa.pulse.feature.common.PulseScaffold
-import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.StaleBanner
-import dev.mascwa.pulse.feature.common.StatTile
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -106,14 +106,14 @@ fun LazyListScope.spaceWeatherSections(
         val kp = sw?.kp
         val storm = sw?.stormLevel ?: "—"
         val stormy = (kp ?: 0.0) >= 5
-        NeonPanel(
+        PipFrame(
             Modifier.fillMaxWidth().clickable(enabled = sw != null) {
                 onExplain("Planetary K-index", buildList {
                     kp?.let { add(SpaceWeatherExplainers.kp(it)) }
                     add(SpaceWeatherExplainers.stormScale(storm))
                 })
             },
-            borderColor = if (stormy) c.magenta else c.lineSoft, corners = true,
+            accent = if (stormy) c.magenta else c.accent,
         ) {
             Column {
                 Text("PLANETARY K-INDEX", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
@@ -132,11 +132,11 @@ fun LazyListScope.spaceWeatherSections(
     }
     item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile("Solar wind", sw?.solarWindSpeed?.let { "${it.toInt()} km/s" } ?: "—",
+            PipStatTile("Solar wind", sw?.solarWindSpeed?.let { "${it.toInt()} km/s" } ?: "—",
                 Modifier.weight(1f).clickable(enabled = sw?.solarWindSpeed != null) {
                     onExplain("Solar wind", listOf(SpaceWeatherExplainers.solarWind(sw!!.solarWindSpeed!!)))
                 })
-            StatTile("Bz (IMF)", sw?.bz?.let { "%+.1f nT".format(it) } ?: "—",
+            PipStatTile("Bz (IMF)", sw?.bz?.let { "%+.1f nT".format(it) } ?: "—",
                 Modifier.weight(1f).clickable(enabled = sw?.bz != null) {
                     onExplain("Bz (IMF)", listOf(SpaceWeatherExplainers.bz(sw!!.bz!!)))
                 },
@@ -146,11 +146,11 @@ fun LazyListScope.spaceWeatherSections(
     item {
         val pct = sw?.auroraProbabilityPct
         val bright = (pct ?: 0) >= 25
-        NeonPanel(
+        PipFrame(
             Modifier.fillMaxWidth().clickable(enabled = pct != null) {
                 onExplain("Aurora chance", listOf(SpaceWeatherExplainers.aurora(pct!!)))
             },
-            borderColor = if (bright) c.violet else c.lineSoft,
+            accent = if (bright) c.violet else c.accent,
         ) {
             Column {
                 Text("AURORA CHANCE", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
@@ -172,7 +172,7 @@ fun LazyListScope.spaceWeatherSections(
             }
         }
     }
-    item { SectionBar("Active alerts") }
+    item { PipHeader("Active alerts") }
     val alerts = sw?.alerts.orEmpty()
     if (alerts.isEmpty()) {
         item {
@@ -181,7 +181,7 @@ fun LazyListScope.spaceWeatherSections(
         }
     } else {
         items(alerts.distinctBy { it.title + it.issued }, key = { it.title + it.issued }) { a ->
-            NeonPanel(Modifier.fillMaxWidth()) {
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text(a.title, style = MaterialTheme.typography.titleSmall, color = c.amber)
                     if (a.issued.isNotBlank())
