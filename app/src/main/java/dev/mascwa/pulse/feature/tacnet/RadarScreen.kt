@@ -145,7 +145,6 @@ fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
                     .filter { it.distanceMeters <= rangeM }
                     .filter { passesFilter(it, altFilter, milOnly, emergOnly) }
                 val airCount = filtered.count { it.kind == ContactKind.AIRCRAFT.name }
-                val selectedContact = filtered.firstOrNull { it.id == selected }
                 LazyColumn(
                     modifier = modifier,
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -178,9 +177,6 @@ fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
                     }
                     item { StatusLine(d, filtered.size, airCount, countHistory) }
                     item { SkyPanel(sky) }
-                    if (selectedContact != null) {
-                        item { ContactDetail(selectedContact) }
-                    }
                     if (filtered.isEmpty()) {
                         item {
                             Text(
@@ -191,7 +187,11 @@ fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
                         }
                     } else {
                         items(filtered, key = { it.id }) { ct ->
-                            ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                            Column {
+                                ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                                // Tap a contact: its detail drops down right beneath the row.
+                                if (ct.id == selected) ContactDetail(ct)
+                            }
                         }
                     }
                     item {
@@ -423,7 +423,7 @@ private fun StatCell(label: String, value: String) {
 private fun SkyPanel(sky: RadarViewModel.SkyState) {
     NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.grid) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text("SKY · SPACE WX", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = Pip.bright)
+            Text("SKY", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = Pip.bright)
 
             sky.moon?.let { m ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -459,23 +459,7 @@ private fun SkyPanel(sky: RadarViewModel.SkyState) {
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
                 )
             }
-
-            val sw = sky.space
-            if (sw != null) {
-                val parts = buildList {
-                    sw.kp?.let { add("KP ${it.roundToInt()}") }
-                    if (sw.stormLevel != "None" && sw.stormLevel != "—") add(sw.stormLevel.uppercase())
-                    sw.auroraProbabilityPct?.let { add("AURORA $it%") }
-                    sw.solarWindSpeed?.let { add("WIND ${it.roundToInt()} KM/S") }
-                }
-                Text(
-                    parts.joinToString("  ·  ").ifBlank { "SPACE WX // NO DATA" },
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp,
-                    color = if ((sw.kp ?: 0.0) >= 5) Pip.alert else Pip.bright,
-                )
-            } else {
-                Text("SPACE WX // NO LINK", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim)
-            }
+            // Space weather lives in the DATA tab now — removed from the MAP feed.
         }
     }
 }
