@@ -30,7 +30,6 @@ import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.economy.InflationScreen
 import dev.mascwa.pulse.feature.fuel.FuelScreen
 import dev.mascwa.pulse.feature.fuel.FuelViewModel
-import dev.mascwa.pulse.feature.grid.GridHubScreen
 import dev.mascwa.pulse.feature.sky.OrbitalScreen
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
 import dev.mascwa.pulse.feature.sky.SkyHubScreen
@@ -108,7 +107,7 @@ fun PulseApp(
             ) {
                 TOP_DESTINATIONS.forEach { dest ->
                     // TOOLS now opens the Pip-Boy feed tabs; it highlights on any feed route.
-                    val isTools = dest.route == Routes.GRID
+                    val isTools = dest.route == Routes.RADAR
                     val selected = if (isTools) currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
                         else currentRoute == dest.route
                     NavigationBarItem(
@@ -199,11 +198,10 @@ fun PulseApp(
                 FuelScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Grid hub + Sky (Phase 1) ----
+            // ---- Sky + hubs (Phase 1) ----
             val openRoute: (String) -> Unit = { route ->
                 navController.navigate(route) { launchSingleTop = true }
             }
-            composable(Routes.GRID) { GridHubScreen(onOpenRoute = openRoute) }
             composable(Routes.SKY) {
                 SkyHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
             }

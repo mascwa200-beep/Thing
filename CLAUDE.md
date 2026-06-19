@@ -238,8 +238,9 @@ Owner pasted Fallout Pip-Boy refs + a 4-part ask. Verdict + what shipped:
   feed route). Reverted the radar's one-off `TacnetTabBar` (#59) → uses the shared bar. **Note:** `String? in
   Set<String>` doesn't compile — null-guard (`currentRoute != null && currentRoute in FEED_ROUTES`). This
   subsumed the planned A (Tools restyle, #65 **closed/superseded**) and B (radar tabs). Old `GridHubScreen`/
-  `Routes.GRID` left **orphaned, not deleted**. **J.A.R.V.I.S. deliberately NOT a tab** (own cyan HUD; green
-  bar would clash; reached from Home) — owner may want it added.
+  `Routes.GRID` **deleted (#70)** — the TOOLS bottom-nav item now anchors on `Routes.RADAR` (= `FEED_HOME`)
+  and stays a pseudo-destination (opens the feed tabs, highlights on any feed route). **J.A.R.V.I.S.
+  deliberately NOT a tab** (own cyan HUD; green bar would clash; reached from Home) — owner may want it added.
 - **Compass → nav instrument (#67):** active-waypoint guidance (`WaypointStore` → label/distance/bearing +
   `NavGuidance` turn hint + a magenta dial needle) + **sun azimuth** (`feature/compass/SunCalc.kt`, offline
   Schlyter solar position like PlanetCalc; amber dial marker + Sun read-out). Moon azimuth = follow-up.
@@ -333,8 +334,8 @@ Owner pasted Fallout Pip-Boy refs + a 4-part ask. Verdict + what shipped:
   ⚠️ User decision pending: whether to flip **Autonomous self-coding ON**.
 
 ### Known follow-ups / not done
-- UI clarity pass continues: organize the **TOOLS hub** (`feature/.../GridHubScreen`) + any remaining
-  cryptic screens so they're clear without taking more space (per the 2077-HUD direction).
+- UI clarity pass continues: the TOOLS hub is now the Pip-Boy feed-tab bar (`GridHubScreen` deleted #70);
+  declutter any remaining cryptic screens so they're clear without taking more space (per the 2077-HUD direction).
 - Background glasses HUD via a foreground service (HUD bearing/distance nav card: **done**).
 - R8/minify on the shipped build (needs verified keep-rules for serialization/MediaPipe/Vosk/MapLibre).
 - Optional emulator-generated baseline profile (vs the hand-authored starter).

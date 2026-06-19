@@ -25,8 +25,7 @@ object Routes {
     const val INFLATION = "inflation"
     const val FUEL = "fuel"
 
-    // Grid hub + Sky (Phase 1)
-    const val GRID = "grid"
+    // Sky (Phase 1)
     const val SKY = "sky"
     const val COMPASS = "compass"
     const val SPACE_WX = "space_wx"
@@ -79,6 +78,8 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.NEWS, "NEWS", Icons.Filled.Article, Icons.Outlined.Article),
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
-    TopDestination(Routes.GRID, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
+    // TOOLS is a pseudo-destination: it opens the Pip-Boy feed tabs (FEED_HOME) and highlights on
+    // any feed route — handled specially in PulseApp. RADAR is the feed home / anchor.
+    TopDestination(Routes.RADAR, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
