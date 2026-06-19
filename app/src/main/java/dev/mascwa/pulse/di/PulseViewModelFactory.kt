@@ -27,7 +27,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                     c.newsRepository, c.marketsRepository, c.weatherRepository,
                     c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
                     c.orbitalRepository, c.spaceWeatherRepository, c.radarRepository, c.selfEditStore,
-                    c.usageRepository,
+                    c.usageRepository, c.profileStore,
                 )
             modelClass.isAssignableFrom(NewsViewModel::class.java) ->
                 NewsViewModel(c.newsRepository, c.settingsRepository)

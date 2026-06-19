@@ -112,6 +112,16 @@ object UserProfile {
         return entries.filterNot { normalize(it.text) == key }
     }
 
+    /**
+     * A single tailored highlight line for surfaces like the home "for you" card: the strongest ongoing
+     * project, else the strongest interest. Null when neither is known.
+     */
+    fun highlight(entries: List<ProfileEntry>): String? {
+        inCategory(entries, ProfileCategory.PROJECT).firstOrNull()?.let { return "Working on: ${it.text}" }
+        inCategory(entries, ProfileCategory.INTEREST).firstOrNull()?.let { return "Following: ${it.text}" }
+        return null
+    }
+
     /** Entries in a category, strongest (then most-recent) first. */
     fun inCategory(entries: List<ProfileEntry>, category: ProfileCategory): List<ProfileEntry> =
         entries.filter { it.category == category }

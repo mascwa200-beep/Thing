@@ -51,6 +51,8 @@ data class HomeUiState(
     val pendingCode: Int = 0,
     /** Tailored "for you" recommendations from on-device usage (empty until a pattern forms). */
     val recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation> = emptyList(),
+    /** A one-line profile highlight ("Working on: …" / "Following: …"); null when unknown. */
+    val profileHighlight: String? = null,
 )
 
 class HomeViewModel(
@@ -66,6 +68,7 @@ class HomeViewModel(
     private val radar: RadarRepository,
     private val selfEdit: SelfEditStore,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
+    private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -90,7 +93,7 @@ class HomeViewModel(
             val sections = s.homeSections
             _state.update { it.copy(sections = sections, jarvisStatus = jarvisStatus(s)) }
 
-            // Tailored "for you" recommendations from on-device usage (no network).
+            // Tailored "for you" recommendations + profile highlight from on-device data (no network).
             launch {
                 val recs = runCatching {
                     val snap = usage.snapshot()
@@ -99,7 +102,10 @@ class HomeViewModel(
                         snap, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
                     )
                 }.getOrDefault(emptyList())
-                _state.update { it.copy(recommendations = recs) }
+                val highlight = runCatching {
+                    dev.mascwa.pulse.core.telemetry.UserProfile.highlight(profile.all())
+                }.getOrNull()
+                _state.update { it.copy(recommendations = recs, profileHighlight = highlight) }
             }
 
             // Above-the-fold first (instant from cache, snappier cold start)…
