@@ -3,13 +3,15 @@ package dev.mascwa.pulse.data.objectives
 import kotlinx.serialization.Serializable
 
 /**
- * Cyberpunk objective tiers — colour-coded on the map and in the tracker.
- * MAIN = orange/gold (current mission), SIDE = cyber-blue (side missions), PLAIN = white (waypoint).
+ * Objective tiers — colour-coded on the map and in the quest tracker:
+ *  - MAIN = **gold** — a main objective (you classify it as main),
+ *  - SIDE = **white** — a side location you placed yourself,
+ *  - WORK = **green** — from work / your calendar.
  */
 enum class ObjectiveKind(val colorArgb: Long) {
     MAIN(0xFFFFC542),
-    SIDE(0xFF5AD1FF),
-    PLAIN(0xFFE6EFFA),
+    SIDE(0xFFEDF2FA),
+    WORK(0xFF5BFF9B),
     ;
 
     val colorHex: String get() = "#%06X".format(colorArgb and 0xFFFFFF)
@@ -25,7 +27,7 @@ data class Waypoint(
     val label: String,
     val latitude: Double,
     val longitude: Double,
-    val kind: ObjectiveKind = ObjectiveKind.PLAIN,
+    val kind: ObjectiveKind = ObjectiveKind.SIDE,
     val note: String? = null,
 )
 
