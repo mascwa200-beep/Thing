@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,11 +43,34 @@ import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.StatusDot
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
 
+/**
+ * Standalone OBJECTIVES screen (kept for deep-links). The day-to-day surface is now the NAV map's
+ * OBJECTIVES sub-tab, which embeds [ObjectivesPanel] directly over the map.
+ */
 @Composable
 fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
+    PulseScaffold(
+        title = "OBJECTIVES",
+        navigationIcon = {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.ink) }
+        },
+        actions = { IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = c.ink) } },
+    ) { innerPadding ->
+        ObjectivesPanel(vm, c, Modifier.fillMaxSize().padding(innerPadding))
+    }
+}
+
+/**
+ * The scaffold-free objectives manager: link-calendar prompt, manual add form, and the tracked list
+ * (each row tracks → becomes the active map waypoint). Reused by the standalone screen and the NAV
+ * map's OBJECTIVES sub-tab. [modifier] sets the surface (size/background); content insets are internal.
+ */
+@Composable
+fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modifier = Modifier) {
     val objectives by vm.objectives.collectAsState()
     val activeId by vm.activeId.collectAsState()
     val needsPerm by vm.needsCalendarPermission.collectAsState()
@@ -58,90 +82,84 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
     var label by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf(ObjectiveKind.PLAIN) }
 
-    PulseScaffold(
-        title = "OBJECTIVES",
-        navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.ink) }
-        },
-        actions = { IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = c.ink) } },
-    ) { innerPadding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (needsPerm) {
-                item {
-                    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = c.amber.copy(alpha = 0.6f)) {
-                        Column {
-                            Text("LINK CALENDAR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
-                            Text(
-                                "Grant calendar access to surface events with a location as objectives on the map.",
-                                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, modifier = Modifier.padding(top = 4.dp),
-                            )
-                            Text(
-                                "◢ GRANT ACCESS",
-                                fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.accent,
-                                modifier = Modifier.padding(top = 10.dp).clickable { calendarPerm.launch(Manifest.permission.READ_CALENDAR) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Manual add.
+    LazyColumn(
+        modifier,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (needsPerm) {
             item {
-                NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+                NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = c.amber.copy(alpha = 0.6f)) {
                     Column {
-                        Text("ADD WAYPOINT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
-                        OutlinedTextField(
-                            value = label,
-                            onValueChange = { label = it },
-                            label = { Text("Place or address") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        )
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            NeonChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
-                            NeonChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
-                            NeonChip("Plain", kind == ObjectiveKind.PLAIN, onClick = { kind = ObjectiveKind.PLAIN })
-                        }
+                        Text("LINK CALENDAR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                         Text(
-                            "◢ ADD",
-                            fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                            color = if (label.isBlank()) c.muted else c.accent,
-                            modifier = Modifier.padding(top = 10.dp).clickable(enabled = label.isNotBlank()) {
-                                vm.addManual(label.trim(), kind)
-                                label = ""
-                            },
+                            "Grant calendar access to surface events with a location as objectives on the map.",
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, modifier = Modifier.padding(top = 4.dp),
+                        )
+                        Text(
+                            "◢ GRANT ACCESS",
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.accent,
+                            modifier = Modifier.padding(top = 10.dp).clickable { calendarPerm.launch(Manifest.permission.READ_CALENDAR) },
                         )
                     }
                 }
             }
+        }
 
-            item { SectionBar("TRACKED · ${objectives.size}") }
-
-            if (objectives.isEmpty()) {
-                item {
+        // Manual add.
+        item {
+            NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+                Column {
+                    Text("ADD WAYPOINT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+                    OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it },
+                        label = { Text("Place or address") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NeonChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
+                        NeonChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
+                        NeonChip("Plain", kind == ObjectiveKind.PLAIN, onClick = { kind = ObjectiveKind.PLAIN })
+                    }
                     Text(
-                        "No objectives yet. Add a waypoint above, or link your calendar.",
-                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                        "◢ ADD",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        color = if (label.isBlank()) c.muted else c.accent,
+                        modifier = Modifier.padding(top = 10.dp).clickable(enabled = label.isNotBlank()) {
+                            vm.addManual(label.trim(), kind)
+                            label = ""
+                        },
                     )
                 }
             }
+        }
 
-            items(objectives, key = { it.id }) { o ->
-                ObjectiveRow(
-                    o = o,
-                    active = o.id == activeId,
-                    c = c,
-                    onTrack = { vm.track(o) },
-                    onRemove = if (o.source == ObjectiveSource.MANUAL) ({ vm.remove(o.id) }) else null,
+        item { SectionBar("TRACKED · ${objectives.size}") }
+
+        if (objectives.isEmpty()) {
+            item {
+                Text(
+                    "No objectives yet. Add a waypoint above, or link your calendar. Tracked objectives " +
+                        "appear on the map as ★ main / ◆ side / ● plain markers.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 )
             }
+        }
+
+        items(objectives, key = { it.id }) { o ->
+            ObjectiveRow(
+                o = o,
+                active = o.id == activeId,
+                c = c,
+                onTrack = { vm.track(o) },
+                onRemove = if (o.source == ObjectiveSource.MANUAL) ({ vm.remove(o.id) }) else null,
+            )
         }
     }
 }
@@ -150,7 +168,7 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
 private fun ObjectiveRow(
     o: Objective,
     active: Boolean,
-    c: dev.mascwa.pulse.ui.theme.NightwirePalette,
+    c: NightwirePalette,
     onTrack: () -> Unit,
     onRemove: (() -> Unit)?,
 ) {

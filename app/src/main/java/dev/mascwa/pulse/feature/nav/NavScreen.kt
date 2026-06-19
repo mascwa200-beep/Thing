@@ -67,6 +67,8 @@ import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
+import dev.mascwa.pulse.feature.objectives.ObjectivesPanel
+import dev.mascwa.pulse.feature.objectives.ObjectivesViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -114,8 +116,11 @@ private val BUILDING = Color(0xFFFF2A4E)       // red building mass
 private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
 private val ROAD = Color(0xFF2DE2E6)           // glowing cyan road network
 
+/** The NAV map's internal views: the live map, or the objectives manager folded in as a sub-tab. */
+private enum class NavSubTab(val label: String) { MAP("MAP"), OBJECTIVES("OBJECTIVES") }
+
 @Composable
-fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
+fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     val location by vm.location.collectAsState()
     val heading by vm.headingDeg.collectAsState()
@@ -133,6 +138,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val incidents by vm.incidents.collectAsState()
     val showIncidents by vm.showIncidents.collectAsState()
     var query by remember { mutableStateOf("") }
+    var subTab by remember { mutableStateOf(NavSubTab.MAP) }
 
     DisposableEffect(Unit) {
         vm.start()
@@ -274,75 +280,124 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            // The map stays composed in both sub-tabs (cheap to keep, costly to recreate); the
+            // OBJECTIVES sub-tab simply draws an opaque manager panel over it.
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-            NavChrome(hasFix = location != null, c = c)
 
-            // Compass readout (folded in from the old Compass screen): live true-north heading.
-            NavCompass(
-                heading = heading,
-                headingUp = headingUp,
-                c = c,
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 64.dp),
-            )
+            if (subTab == NavSubTab.MAP) {
+                NavChrome(hasFix = location != null, c = c)
 
-            // Search bar — geocode a place, drop a waypoint, fly there.
-            NavSearchBar(
-                query = query,
-                onQuery = { query = it; vm.clearSearchMessage() },
-                onSearch = { if (query.isNotBlank()) vm.search(query) },
-                message = searchMessage,
-                c = c,
-                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 12.dp, end = 64.dp, top = 8.dp),
-            )
+                // Compass readout (folded in from the old Compass screen): live true-north heading.
+                NavCompass(
+                    heading = heading,
+                    headingUp = headingUp,
+                    c = c,
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 104.dp),
+                )
 
-            // Right-edge control cluster.
-            Column(
-                Modifier.align(Alignment.TopEnd).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MapControlButton(active = follow, c = c, icon = Icons.Filled.MyLocation) {
-                    follow = true
-                    val loc = location
-                    val m = map
-                    if (loc != null && m != null) {
-                        m.animateCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading, nav3d, headingUp)))
+                // Search bar — geocode a place, drop a waypoint, fly there.
+                NavSearchBar(
+                    query = query,
+                    onQuery = { query = it; vm.clearSearchMessage() },
+                    onSearch = { if (query.isNotBlank()) vm.search(query) },
+                    message = searchMessage,
+                    c = c,
+                    modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 12.dp, end = 64.dp, top = 52.dp),
+                )
+
+                // Right-edge control cluster.
+                Column(
+                    Modifier.align(Alignment.TopEnd).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MapControlButton(active = follow, c = c, icon = Icons.Filled.MyLocation) {
+                        follow = true
+                        val loc = location
+                        val m = map
+                        if (loc != null && m != null) {
+                            m.animateCamera(CameraUpdateFactory.newCameraPosition(followCamera(loc.latitude, loc.longitude, heading, nav3d, headingUp)))
+                        }
+                    }
+                    MapControlButton(active = false, c = c, icon = Icons.Filled.Add) { map?.animateCamera(CameraUpdateFactory.zoomIn()) }
+                    MapControlButton(active = false, c = c, icon = Icons.Filled.Remove) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
+                    MapControlButton(active = nav3d, c = c, label = if (nav3d) "3D" else "2D") { vm.set3d(!nav3d) }
+                    MapControlButton(active = headingUp, c = c, icon = Icons.Filled.Navigation) { vm.setHeadingUp(!headingUp) }
+                    MapControlButton(active = showIncidents, c = c, icon = Icons.Filled.Warning) {
+                        centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
+                    }
+                    if (activeWaypoint != null) {
+                        MapControlButton(active = false, c = c, icon = Icons.Filled.Close) { vm.clearWaypoint() }
                     }
                 }
-                MapControlButton(active = false, c = c, icon = Icons.Filled.Add) { map?.animateCamera(CameraUpdateFactory.zoomIn()) }
-                MapControlButton(active = false, c = c, icon = Icons.Filled.Remove) { map?.animateCamera(CameraUpdateFactory.zoomOut()) }
-                MapControlButton(active = nav3d, c = c, label = if (nav3d) "3D" else "2D") { vm.set3d(!nav3d) }
-                MapControlButton(active = headingUp, c = c, icon = Icons.Filled.Navigation) { vm.setHeadingUp(!headingUp) }
-                MapControlButton(active = showIncidents, c = c, icon = Icons.Filled.Warning) {
-                    centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
-                }
-                if (activeWaypoint != null) {
-                    MapControlButton(active = false, c = c, icon = Icons.Filled.Close) { vm.clearWaypoint() }
-                }
-            }
 
-            // Bottom stack: optional POI detail card above the filter bar.
-            Column(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                selectedPoi?.let { poi ->
-                    PoiDetailCard(
-                        poi = poi,
-                        location = location,
+                // Bottom stack: optional POI detail card above the filter bar.
+                Column(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    selectedPoi?.let { poi ->
+                        PoiDetailCard(
+                            poi = poi,
+                            location = location,
+                            c = c,
+                            onClose = { vm.selectPoi(null) },
+                            onSetWaypoint = { vm.setWaypointFromPoi(poi) },
+                        )
+                    }
+                    FilterBar(
+                        enabled = enabled,
+                        counts = pois.mapValues { it.value.size },
+                        scanning = scanning,
+                        onScan = { centerOf(map, location)?.let { vm.scan(it.first, it.second) } },
+                        onToggle = { cat -> centerOf(map, location)?.let { vm.toggle(cat, it.first, it.second) } },
                         c = c,
-                        onClose = { vm.selectPoi(null) },
-                        onSetWaypoint = { vm.setWaypointFromPoi(poi) },
                     )
                 }
-                FilterBar(
-                    enabled = enabled,
-                    counts = pois.mapValues { it.value.size },
-                    scanning = scanning,
-                    onScan = { centerOf(map, location)?.let { vm.scan(it.first, it.second) } },
-                    onToggle = { cat -> centerOf(map, location)?.let { vm.toggle(cat, it.first, it.second) } },
+            } else {
+                // OBJECTIVES sub-tab: opaque manager panel over the (still-alive) map. Refresh on entry.
+                LaunchedEffect(Unit) { objectivesVm.refresh() }
+                ObjectivesPanel(
+                    vm = objectivesVm,
                     c = c,
+                    modifier = Modifier.fillMaxSize().background(c.void).padding(top = 48.dp),
                 )
             }
+
+            // The MAP | OBJECTIVES sub-tab switch, always above either view.
+            NavSubTabBar(
+                current = subTab,
+                onSelect = { subTab = it },
+                c = c,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** The MAP | OBJECTIVES segmented switch that lives on the NAV map (cyberpunk-styled, not Pip green). */
+@Composable
+private fun NavSubTabBar(current: NavSubTab, onSelect: (NavSubTab) -> Unit, c: NightwirePalette, modifier: Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(c.panel.copy(alpha = 0.92f))
+            .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        NavSubTab.entries.forEach { tab ->
+            val active = tab == current
+            Text(
+                tab.label,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.2.sp,
+                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                color = if (active) c.void else c.ink,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (active) c.accent else Color.Transparent)
+                    .clickable(enabled = !active) { onSelect(tab) }
+                    .padding(horizontal = 16.dp, vertical = 7.dp),
+            )
         }
     }
 }
