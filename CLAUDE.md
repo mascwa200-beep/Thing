@@ -216,9 +216,37 @@ mixes `vertical` with `end`; use `top/bottom/end`).
 - **Mnemosyne (accepted brief) is paused** under the visual run — Phase 3b stash (`stash@{0}`: temporal
   recall stamp + `HistoryTool`) still un-shipped; reflection WorkManager + Memory-screen stream surface +
   Phase 4 skills still pending (reflection needs the owner's on-device Haiku 4.5 verification).
-- **Open / next:** owner's "more HUD design" (≤590 kB) polish on the console (in tension with the declutter —
-  read as *premium framing*, not more content); mirror the tab bar onto Sky/Orbital/Space WX/Telemetry +
-  Pip-Boy-theme them; restore the Phase 3b stash.
+- **Mnemosyne resumed (#62, #63 merged):** Phase 3b/3c temporal recall — `MemoryStreamStore.digest()` now
+  time-stamps recalled lines via `TemporalReasoner.describeWhen` ("yesterday: …"); new `timeline()` +
+  **`history` JarvisTool** (registered in `agentTools`); **episodic stream now viewable/curatable in the
+  Memory screen** (new EPISODIC section + `MemoryStreamStore.forget(id)`, parity with PROFILE/TASKS).
+
+### Owner batch — Pip-Boy nav + fixes (this session cont., #64–#67 all merged)
+Owner pasted Fallout Pip-Boy refs + a 4-part ask. Verdict + what shipped:
+- **Space Weather fix (#64):** Solar Wind + Bz showed "—" — the NOAA `products/summary/solar-wind-*` objects
+  go empty. Switched to the canonical real-time DSCOVR feeds (`solar-wind/plasma-5-minute.json` speed col 2,
+  `mag-5-minute.json` bz_gsm col 3), newest finite row. ⚠️ CI failure first try: `products/summary/*` in a
+  KDoc — Kotlin **nested block comments** mean `/*` opened a nested comment that commented out the next
+  function ("unresolved reference" cascade). **Never put `/*` in a KDoc.**
+- **TOOLS → Pip-Boy feed tabs (#66), replacing the grid** (owner via AskUserQuestion chose "scrolling tabs =
+  feeds"). One horizontally-scrolling phosphor-green tab row; TOOLS opens straight into it; each tab jumps
+  direct to its feed (no in-between launcher). Implemented WITHOUT touching the feed screens:
+  `navigation/FeedTabs.kt` (FEED_TABS/FEED_ROUTES/FEED_HOME + `LocalFeedTabs` CompositionLocal + `FeedTabState`),
+  `feature/common/FeedTabBar.kt` (the bar), **`PulseScaffold` auto-renders it** when `LocalFeedTabs` is set,
+  and **`PulseApp` provides the ctx once around the NavHost** (keyed on currentRoute) + `openTab` (tab-replace
+  nav: `popUpTo(current){inclusive}`) + repointed the TOOLS bottom-nav to the last feed (highlights on any
+  feed route). Reverted the radar's one-off `TacnetTabBar` (#59) → uses the shared bar. **Note:** `String? in
+  Set<String>` doesn't compile — null-guard (`currentRoute != null && currentRoute in FEED_ROUTES`). This
+  subsumed the planned A (Tools restyle, #65 **closed/superseded**) and B (radar tabs). Old `GridHubScreen`/
+  `Routes.GRID` left **orphaned, not deleted**. **J.A.R.V.I.S. deliberately NOT a tab** (own cyan HUD; green
+  bar would clash; reached from Home) — owner may want it added.
+- **Compass → nav instrument (#67):** active-waypoint guidance (`WaypointStore` → label/distance/bearing +
+  `NavGuidance` turn hint + a magenta dial needle) + **sun azimuth** (`feature/compass/SunCalc.kt`, offline
+  Schlyter solar position like PlanetCalc; amber dial marker + Sun read-out). Moon azimuth = follow-up.
+- **Open / owner-steerable:** the "more HUD" (≤590 kB) console polish (read as *premium framing*, not more
+  content); whether J.A.R.V.I.S. should be a feed tab; delete the orphaned grid; reflection WorkManager pass
+  (needs on-device Haiku 4.5 verification). ⚠️ On-device-unverify the **feed-tabs nav** (tab switching, TOOLS
+  highlight, back behaviour) + the compass markers — biggest/most-behavioural, CI only compile-gates.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
