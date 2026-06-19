@@ -380,7 +380,7 @@ private fun InputBar(
             BasicTextField(
                 value = input,
                 onValueChange = { input = it },
-                modifier = Modifier.weight(1f).padding(vertical = 14.dp, end = 6.dp),
+                modifier = Modifier.weight(1f).padding(top = 14.dp, bottom = 14.dp, end = 6.dp),
                 textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
                 cursorBrush = SolidColor(c.sky),
                 singleLine = true,
