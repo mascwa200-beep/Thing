@@ -105,6 +105,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     val milOnly by vm.milOnly.collectAsStateWithLifecycle()
     val emergOnly by vm.emergOnly.collectAsStateWithLifecycle()
     val countHistory by vm.countHistory.collectAsStateWithLifecycle()
+    val sky by vm.sky.collectAsStateWithLifecycle()
     val online = LocalIsOnline.current
     val haptic = rememberHaptics()
     val onSelect: (String) -> Unit = { id -> haptic(HapticFeedbackType.TextHandleMove); vm.select(id) }
@@ -192,6 +193,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
                         }
                     }
                     item { StatusLine(d, filtered.size, airCount, countHistory) }
+                    item { SkyPanel(sky) }
                     if (selectedContact != null) {
                         item { ContactDetail(selectedContact) }
                     }
@@ -406,6 +408,82 @@ private fun StatCell(label: String, value: String) {
         Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = Pip.dim)
         Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Pip.glow)
     }
+}
+
+/**
+ * Pip-Boy sky & space-weather readout — the Moon, naked-eye planets above the
+ * horizon (offline ephemeris, az/elevation) and the NOAA space-weather picture,
+ * grouped into the same scope screen as the aircraft / ISS / quakes.
+ */
+@Composable
+private fun SkyPanel(sky: RadarViewModel.SkyState) {
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.grid) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("SKY · SPACE WX", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = Pip.bright)
+
+            sky.moon?.let { m ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        "${m.emoji} ${m.phaseName.uppercase()}",
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Pip.glow,
+                    )
+                    Text(
+                        "${(m.illumination * 100).roundToInt()}% LIT",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim,
+                    )
+                }
+            }
+
+            if (sky.planets.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    sky.planets.take(5).forEach { p ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                "${planetGlyph(p.name)} ${p.name.uppercase()}",
+                                fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid,
+                            )
+                            Text(
+                                "${Geo.cardinal(p.azimuthDeg)} ${p.azimuthDeg.roundToInt()}° · ALT ${p.altitudeDeg.roundToInt()}° · m${"%.1f".format(p.magnitude)}",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    "// NO NAKED-EYE PLANETS ABOVE HORIZON",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+                )
+            }
+
+            val sw = sky.space
+            if (sw != null) {
+                val parts = buildList {
+                    sw.kp?.let { add("KP ${it.roundToInt()}") }
+                    if (sw.stormLevel != "None" && sw.stormLevel != "—") add(sw.stormLevel.uppercase())
+                    sw.auroraProbabilityPct?.let { add("AURORA $it%") }
+                    sw.solarWindSpeed?.let { add("WIND ${it.roundToInt()} KM/S") }
+                }
+                Text(
+                    parts.joinToString("  ·  ").ifBlank { "SPACE WX // NO DATA" },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp,
+                    color = if ((sw.kp ?: 0.0) >= 5) Pip.alert else Pip.bright,
+                )
+            } else {
+                Text("SPACE WX // NO LINK", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim)
+            }
+        }
+    }
+}
+
+/** Astronomical symbol for a naked-eye planet (Pip-Boy contact glyph). */
+private fun planetGlyph(name: String): String = when (name) {
+    "Mercury" -> "☿"
+    "Venus" -> "♀"
+    "Mars" -> "♂"
+    "Jupiter" -> "♃"
+    "Saturn" -> "♄"
+    else -> "✦"
 }
 
 @Composable
