@@ -160,6 +160,7 @@ fun JarvisScreen(
                         "\"Brief me\"  ·  \"What's the weather?\"  ·  \"Where am I?\"",
                         "\"Teach me how RSA encryption works\"  ·  \"Explain this like I'm 12\"",
                         "\"Translate ‘where's the station?’ into Japanese\"  ·  \"What does this say?\"",
+                        "\"What do you remember about me?\"  ·  \"What are you, and what have you changed?\"",
                         "\"Remind me to stretch in 20 min\"  ·  \"Set an alarm for 7:30\"  *",
                         "\"Text Alex I'm late\"  ·  \"Play Daft Punk\"  ·  \"Torch on\"  *",
                         "\"Read your own code\"  ·  \"Add a feature that…\"  †",
