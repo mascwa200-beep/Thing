@@ -1,6 +1,8 @@
 package dev.mascwa.pulse.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
@@ -76,6 +78,7 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.NEWS, "NEWS", Icons.Filled.Article, Icons.Outlined.Article),
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
+    TopDestination(Routes.JARVIS, "JARVIS", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
     // TOOLS is a pseudo-destination: it opens the Pip-Boy feed tabs (FEED_HOME) and highlights on
     // any feed route — handled specially in PulseApp. TACNET (the PIP-BOY screen) is the feed home.
     TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
