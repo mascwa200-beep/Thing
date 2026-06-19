@@ -75,6 +75,7 @@ class JarvisViewModel(
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
+    private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -150,6 +151,9 @@ class JarvisViewModel(
             profile.detectAndAdd(text)
             // Always-on task capture: track a clear self-assigned task ("I need to …", "todo: …").
             taskStore.detectAndCapture(text)
+            // Episodic memory: record a significant turn as a timestamped observation (recalled later
+            // by recency·importance·relevance). Trivial chatter is filtered out in the store.
+            memoryStream.captureObservation(text)
             try {
                 val pending = pendingLearn
                 if (pending != null) handleCuriosityReply(pending, text) else routeTurn(text)
@@ -510,10 +514,18 @@ class JarvisViewModel(
     /** Thread durable memories relevant to [query] into the prompt so J.A.R.V.I.S. references what the
      *  user has told it — attentiveness/memory always-on. Read-only recall; no-op when nothing matches. */
     private suspend fun withMemory(base: String, query: String): String {
+        var prompt = base
         val notes = runCatching { memory.recall(query, limit = 5) }.getOrDefault(emptyList())
-        if (notes.isEmpty()) return base
-        val block = notes.joinToString("\n") { "- ${it.noteText}" }
-        return base + "\n\nWhat you remember about the user (weave in naturally when relevant):\n" + block
+        if (notes.isNotEmpty()) {
+            val block = notes.joinToString("\n") { "- ${it.noteText}" }
+            prompt += "\n\nWhat you remember about the user (weave in naturally when relevant):\n" + block
+        }
+        // Episodic recall: the most relevant past moments by recency·importance·relevance.
+        val episodes = runCatching { memoryStream.digest(query) }.getOrDefault("")
+        if (episodes.isNotBlank()) {
+            prompt += "\n\nFrom your episodic memory (relevant moments from earlier; reference naturally):\n" + episodes
+        }
+        return prompt
     }
 
     /** The live system prompt: the user's charter (or built-in persona) + the immutable safety addendum,

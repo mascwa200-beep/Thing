@@ -603,6 +603,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             "On-device only.",
                         onClick = { vm.clearTasks() },
                     )
+                    PrefClickable(
+                        "Clear episodic memory",
+                        subtitle = "Forget the timestamped moments J.A.R.V.I.S. remembers from your " +
+                            "conversations (recalled by recency, importance & relevance). On-device only.",
+                        onClick = { vm.clearMemoryStream() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",

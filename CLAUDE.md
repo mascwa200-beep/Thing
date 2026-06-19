@@ -137,9 +137,17 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     overlap). Ships on-device embeddings now with **zero new deps / APK-size cost**; honestly lexical,
     not a transformer. **Owner decision deferred:** upgrading to a sentence-transformer (ONNX/MediaPipe,
     +native dep +model blob) for semantic paraphrase — a clean drop-in (anything → vector → `cosine`).
-  - **Next (Phase 2b):** app-layer wiring — a `MemoryStreamStore` (mirrors the established store pattern)
-    that embeds memories via `LexicalEmbedder`, a capture path, retrieval injection into `composePersona`
-    + a recall `JarvisTool`, and a WorkManager reflection pass. Owner-verified on the Pixel.
+  - **Phase 2b store + capture + recall (PR #49):** `data/memory/MemoryStreamStore.kt` (mirrors
+    ProfileStore: in-memory + Mutex + debounced flush; flush-on-stop; clear-cancels-flush). Embeddings are
+    DERIVED not stored — persist text+metadata, re-embed on load via the deterministic `LexicalEmbedder`
+    (compact, no vectors on disk). **Always-on capture** in `send()` (`captureObservation`, gated by a
+    significance floor so chatter is dropped) → records user turns as OBSERVATIONS. **Episodic recall**
+    injected in `withMemory(query)` alongside the flat-note recall — top-k by recency·importance·relevance,
+    touched-on-recall so recall keeps a memory fresh. Settings → Storage **"Clear episodic memory"**. ⚠️
+    On-device-unverified (CI compile-gates only): capture/recall/injection behaviour + the Settings clear.
+  - **Next (Phase 2c / Phase 3):** a WorkManager **reflection** pass (`shouldReflect`→`reflectionSeeds`→LLM
+    synthesis → store as REFLECTION memories); a Memory-screen surface for the stream; then Phase 3 temporal
+    reasoning (elapsed/ordering/"what changed since…") over the same timestamped store. Owner-verified.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
