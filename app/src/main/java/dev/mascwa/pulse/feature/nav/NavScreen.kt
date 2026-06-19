@@ -103,7 +103,11 @@ private const val WAYPOINT_LAYER = "nav-waypoint-dot"
 private const val OBJECTIVE_SOURCE = "nav-objective"
 private const val OBJECTIVE_LAYER = "nav-objective-icon"
 private const val ROUTE_SOURCE = "nav-route"
+private const val ROUTE_CASING_LAYER = "nav-route-casing"
 private const val ROUTE_LAYER = "nav-route-line"
+// Navigation path colours (Cyberpunk-style): a bright gold line over a white casing.
+private val ROUTE_GOLD = Color(0xFFFFD23F)
+private val ROUTE_CASING = Color(0xFFEAF2FF)
 private const val INCIDENT_SOURCE = "nav-incident"
 private const val INCIDENT_LAYER = "nav-incident-dot"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
@@ -174,7 +178,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
             ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                 cyberpunkify(style, c)
                 ensureBuildingExtrusion(style)
-                addRouteLayer(style, c)
+                addRouteLayer(style)
                 addPoiLayer(style, c)
                 addIncidentLayer(style, c)
                 addWaypointLayer(style, c)
@@ -557,16 +561,30 @@ private fun addPlayerMarker(style: Style, c: NightwirePalette) {
     )
 }
 
-/** The route line from the player to the active waypoint (dashed accent). */
-private fun addRouteLayer(style: Style, c: NightwirePalette) {
+/** The navigation path from the player to the active waypoint: a bright gold line over a white casing
+ *  (the Cyberpunk/Fallout nav-route look — rounded, glowing, no minimap). Two layers on one source. */
+private fun addRouteLayer(style: Style) {
     if (style.getSource(ROUTE_SOURCE) != null) return
     style.addSource(GeoJsonSource(ROUTE_SOURCE))
+    // White casing underneath (wider) — reads as the route outline.
+    style.addLayer(
+        LineLayer(ROUTE_CASING_LAYER, ROUTE_SOURCE).withProperties(
+            PropertyFactory.lineColor(ROUTE_CASING.toArgb()),
+            PropertyFactory.lineWidth(8f),
+            PropertyFactory.lineOpacity(0.85f),
+            PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND),
+        ),
+    )
+    // Gold path on top (narrower) with a soft glow.
     style.addLayer(
         LineLayer(ROUTE_LAYER, ROUTE_SOURCE).withProperties(
-            PropertyFactory.lineColor(c.accent.toArgb()),
-            PropertyFactory.lineWidth(3f),
-            PropertyFactory.lineOpacity(0.75f),
-            PropertyFactory.lineDasharray(arrayOf(2f, 2f)),
+            PropertyFactory.lineColor(ROUTE_GOLD.toArgb()),
+            PropertyFactory.lineWidth(4.5f),
+            PropertyFactory.lineOpacity(0.95f),
+            PropertyFactory.lineBlur(1.5f),
+            PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND),
         ),
     )
 }
