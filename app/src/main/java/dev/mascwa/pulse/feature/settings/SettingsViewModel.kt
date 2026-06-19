@@ -34,6 +34,7 @@ class SettingsViewModel(
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
+    private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
 ) : ViewModel() {
 
     private val _selfCode = MutableStateFlow("")
@@ -192,6 +193,11 @@ class SettingsViewModel(
     /** Forget the structured user profile (durable preferences / interests / projects). */
     fun clearProfile() {
         viewModelScope.launch { profile.clear() }
+    }
+
+    /** Forget the tracked task board (the user's ongoing & completed tasks/goals). */
+    fun clearTasks() {
+        viewModelScope.launch { tasks.clear() }
     }
 
     fun sendTestNotification() {

@@ -85,6 +85,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.profile.ProfileStore(appContext, json)
     }
 
+    /** Task board: the user's ongoing tasks / goals, with pending ones injected into context each turn. */
+    val taskStore: dev.mascwa.pulse.data.tasks.TaskStore by lazy {
+        dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
+    }
+
     private val worldBank: WorldBankClient by lazy { WorldBankClient(http) }
 
     val newsRepository: NewsRepository by lazy {
@@ -252,6 +257,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
+            dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).

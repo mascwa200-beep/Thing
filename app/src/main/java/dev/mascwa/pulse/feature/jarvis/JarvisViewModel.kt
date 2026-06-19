@@ -74,6 +74,7 @@ class JarvisViewModel(
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
     private val cerebellum: dev.mascwa.pulse.data.cerebellum.CerebellumStore,
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
+    private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
 ) : ViewModel() {
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
@@ -147,6 +148,8 @@ class JarvisViewModel(
             logChat("chat-in", text)
             // Always-on profile capture: keep a clear self-declaration (preference/interest/project).
             profile.detectAndAdd(text)
+            // Always-on task capture: track a clear self-assigned task ("I need to …", "todo: …").
+            taskStore.detectAndCapture(text)
             try {
                 val pending = pendingLearn
                 if (pending != null) handleCuriosityReply(pending, text) else routeTurn(text)
@@ -518,9 +521,16 @@ class JarvisViewModel(
      *  proactive on every turn, not gated on a keyword recall. */
     private suspend fun composePersona(): String {
         val base = JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
+        var prompt = base
         val digest = runCatching { profile.digest() }.getOrDefault("")
-        return if (digest.isBlank()) base
-        else base + "\n\nThe user's profile (tailor your help to it; keep it current via the `profile` tool):\n" + digest
+        if (digest.isNotBlank()) {
+            prompt += "\n\nThe user's profile (tailor your help to it; keep it current via the `profile` tool):\n" + digest
+        }
+        val tasks = runCatching { taskStore.digest() }.getOrDefault("")
+        if (tasks.isNotBlank()) {
+            prompt += "\n\nThe user's open tasks you're tracking (follow up proactively; keep current via the `task` tool):\n" + tasks
+        }
+        return prompt
     }
 
     /** Run the bounded agentic loop, surfacing tool/reasoning steps in the streaming line. Recent
