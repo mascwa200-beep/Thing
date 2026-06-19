@@ -172,6 +172,54 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   - **Next slices:** move the memory/data controls (clears + detailed-log) into the J.A.R.V.I.S. area;
     declutter SYS; restyle `JarvisScreen` console (HUD header/status/bubbles/input). Owner verifies on Pixel.
 
+### Shipped this session — visual overhaul (dev branch `claude/loving-edison-bd65oa`, #53–#60 all merged)
+Owner drove a run of look-and-feel work via screenshots; all CI-green, squash-merged to `main`, on-device-
+verified by the owner as they went. **Workflow note:** the dev branch kept diverging from `main`'s squash
+commits (the "don't fast-forward onto the github merge commit" rule) — surfaced as a `JarvisScreen` merge
+conflict on #57. Fix pattern now standard: after each squash merge, `git merge origin/main` back into the
+dev branch (my authorship, not a FF) to stay conflict-free; resolve any overlap by taking the dev version
+(it's the superset). One CI failure all session (#57: `Modifier.padding(vertical=, end=)` — no overload
+mixes `vertical` with `end`; use `top/bottom/end`).
+- **Pip-Boy radar** (#53 restyle, #54 sky readout, #59 tabs): `feature/tacnet/RadarScreen.kt` → a single
+  monochrome **phosphor-green CRT** (`Pip` palette object) where every contact (aircraft/ISS/quakes/mil/
+  emergency) is told apart by **glyph + brightness**, not hue; CRT scanlines + tube edge-glow; title
+  "RADSCOPE". #54 added a **SKY · SPACE WX** panel (offline Moon phase + `PlanetCalc` naked-eye planets
+  above-horizon w/ az/el + NOAA Kp/storm/aurora/wind) — `RadarViewModel` gained `spaceWeatherRepository`
+  (factory) + a `SkyState` flow (moon/planets offline, space-wx best-effort). #59 added a **Fallout top tab
+  bar** (`TacnetTabBar`: RADAR·SKY·ORBITAL·SPACE WX·TELEM, `Routes`-mapped, pinned above the scope,
+  tab-replace nav via `popUpTo(RADAR){inclusive}`) — tabs live ON the radar; siblings not yet themed.
+- **J.A.R.V.I.S. Stark-HUD console** (#55, #57, #58): #55 added `feature/jarvis/HudReactor.kt` — an animated
+  arc-reactor (counter-rotating arc rings + tick ring + pulsing tri-coil core); **animation state = 3 Floats**,
+  procedural Canvas, zero retained buffers (owner's ≤1 kB rule). Cyan `c.sky` (#5AD1FF) is the HUD primary
+  (doesn't fight the theme accent). #57 **decluttered the idle state** (dropped the hint list → reactor +
+  wordmark) and rebuilt the input as **one wide rounded HUD chat box** (`BasicTextField`) with attach-file +
+  attach-image **combined into a ⊕ plus-in-circle pop-out** + inline mic/send. #58 **decluttered the top bar**
+  to **Sound · Briefer · Settings**; Lockdown/Approvals/Memory/Clear-chat moved into a **CONSOLE section in
+  J.A.R.V.I.S. Setup** — `JarvisSetupViewModel` gained the shared `JarvisMemory` + `ActionOrchestrator` and
+  exposes `clearChat()`/`runLockdown()` (the console's `messages` is a reactive projection of `memory.history`,
+  so clears reflect live; same singletons = identical behaviour). ⚠️ The wide chat box + ⊕ pop-out + top-bar
+  declutter are the most interaction-changing — owner should eyeball on the Pixel.
+- **Cinematic cold-open boot** (#56, then #60): replaced the friendly `NIGHTWIRE [OK]` boot with an ominous
+  "you weren't meant to see this / you were chosen" sequence — a swirling **~800 analytic motes** (params-only,
+  positions computed in the draw pass = no per-frame alloc) drawn into a waking eye/seal + escalating
+  "clearance" arc + decrypting log. #60 (owner asked) made it **~half speed** (`BOOT_MS` 5200→8800, decrypt
+  360→640) for readability, **rewrote the lines** to be consequential/villainous ("evil-lair" secure terminal),
+  made it **PERMANENT** (removed the Settings "Boot sequence" toggle), and **always topmost** in MainActivity
+  (draws first, masks app/gate/overlays until it fades). `bootAnimation` kept in `AppSettings` (unused) to
+  avoid a settings migration.
+- **Glitch → working chromatic aberration** (#60): `ui/effects/Effects.kt` — `GlitchText` is now a **constant
+  RGB colour-split** (warm right / cool left, breathing offset + occasional burst) instead of an occasional
+  flicker; new full-screen **`ChromaticAberrationOverlay`** (red/cyan edge fringe, gradient draw, no buffers)
+  wired in MainActivity, gated by the renamed **"Chromatic aberration"** Settings toggle. Deliberately a
+  gradient edge-fringe, **not** an AGSL per-pixel `RuntimeShader` — a bad shader crashes at runtime (ships
+  past CI) and there's no local device to verify; the per-pixel version is a flagged, API-gated follow-up.
+- **Mnemosyne (accepted brief) is paused** under the visual run — Phase 3b stash (`stash@{0}`: temporal
+  recall stamp + `HistoryTool`) still un-shipped; reflection WorkManager + Memory-screen stream surface +
+  Phase 4 skills still pending (reflection needs the owner's on-device Haiku 4.5 verification).
+- **Open / next:** owner's "more HUD design" (≤590 kB) polish on the console (in tension with the declutter —
+  read as *premium framing*, not more content); mirror the tab bar onto Sky/Orbital/Space WX/Telemetry +
+  Pip-Boy-theme them; restore the Phase 3b stash.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
