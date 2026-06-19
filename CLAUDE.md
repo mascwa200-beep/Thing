@@ -121,9 +121,19 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
   base.** Mapping: P1 (OpenRouter chat) + P4 (human-gated self-code) **already exist**; the new work is an
   **embedding-scored episodic-memory stream** (recency·importance·relevance + reflection) and a **temporal
   subsystem** — pure logic in `core:telemetry` so CI gates it, mirroring TaskBoard/UserProfile/Cerebellum.
-  Next slices: default cloud model → Haiku 4.5 + cost meter; then Phase-2 memory-stream core + `MEMORY_DESIGN.md`.
   Invariants unchanged (human-gate, `isProtected` denylist, credential scrub). DECLINED-and-standing
   "no-safety-protocols" framing is NOT what this brief asks — its self-mod is bounded + gated, so compatible.
+  - **Phase 1 (PR #46, merged):** OpenRouter provider default model → `anthropic/claude-haiku-4.5`
+    (`CloudInferenceEngine`); still overridable in Setup; `max_tokens` cap mitigates 402. Cost surface
+    (balance link + max-tokens + 402 explainer) already exists; a per-response token meter is a Phase-5 item.
+  - **Phase 2 core (PR #47):** `core:telemetry/MemoryStream.kt` (+ 18-case test, CI-gated) — the
+    Generative-Agents episodic stream as PURE logic: `Memory`/`MemoryKind`; `cosine` relevance,
+    `recencyDecay` (24h half-life on *last access*), `retrieve` (min-max-normalized recency+importance+
+    relevance composite, top-k, weights), `estimateImportance` (offline poignancy heuristic 1–10),
+    reflection (`recentImportanceSum`/`shouldReflect`/`reflectionSeeds`), `capped` eviction. Design in
+    `docs/MEMORY_DESIGN.md`. **Next (Phase 2b):** app-layer wiring — on-device embeddings (ONNX/MediaPipe),
+    a `MemoryStreamStore` (mirrors the established store pattern), retrieval injection + a recall tool,
+    WorkManager reflection pass. All owner-verified on the Pixel (CI can't run embeddings/inference).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
