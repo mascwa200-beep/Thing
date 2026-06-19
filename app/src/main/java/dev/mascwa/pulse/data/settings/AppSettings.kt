@@ -298,6 +298,9 @@ data class AppSettings(
     val waypoints: List<Waypoint> = emptyList(),
     val activeWaypointId: String? = null,
 
+    // PIP-BOY radio: favourited stations (local or curated), surfaced as a FAVOURITES section.
+    val favoriteRadio: List<dev.mascwa.pulse.data.radio.RadioStation> = emptyList(),
+
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),
 
