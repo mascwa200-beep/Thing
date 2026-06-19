@@ -1,13 +1,16 @@
 package dev.mascwa.pulse.feature.tacnet
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,7 +22,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -83,14 +87,14 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GaugeBar("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
-                    GaugeBar("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
+                    FalloutGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
+                    FalloutGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
                         if (t.memTotalMb > 0) t.memUsedMb.toFloat() / t.memTotalMb else 0f, c.violet)
-                    GaugeBar("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
+                    FalloutGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
                         min(1f, (t.lightLux ?: 0f) / 2000f), c.amber)
-                    GaugeBar("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
+                    FalloutGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
                         min(1f, (t.magneticUt ?: 0f) / 100f), c.sky)
-                    GaugeBar("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
+                    FalloutGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
                         min(1f, (t.accelG ?: 0f) / 2f), c.magenta)
                 }
             }
@@ -98,22 +102,22 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipHeader("Sensors")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    KV("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
-                    KV("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
-                    KV("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                    KV("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                    KV("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
+                    FalloutStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
+                    FalloutStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
+                    FalloutStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                    FalloutStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                    FalloutStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
                 }
             }
 
             PipHeader("System")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    KV("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
-                    KV("Power", if (t.charging) "Charging" else "On battery")
-                    KV("Network", t.netType)
-                    KV("Signal", t.netSignal)
-                    KV("Memory used", "${t.memUsedMb} MB")
+                    FalloutStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
+                    FalloutStatRow("Power", if (t.charging) "Charging" else "On battery")
+                    FalloutStatRow("Network", t.netType)
+                    FalloutStatRow("Signal", t.netSignal)
+                    FalloutStatRow("Memory used", "${t.memUsedMb} MB")
                 }
             }
 
@@ -122,9 +126,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 val loc = gps
                 if (loc != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        KV("Latitude", "%.5f".format(loc.latitude))
-                        KV("Longitude", "%.5f".format(loc.longitude))
-                        KV("Place", loc.name)
+                        FalloutStatRow("Latitude", "%.5f".format(loc.latitude))
+                        FalloutStatRow("Longitude", "%.5f".format(loc.longitude))
+                        FalloutStatRow("Place", loc.name)
                     }
                 } else {
                     Text(
@@ -160,30 +164,55 @@ private fun batteryText(t: Telemetry): String {
     return if (t.charging) "$pct ⚡" else pct
 }
 
+/** A VITALS gauge in the Fallout HP/AP idiom: a green-banded label/value header over a notched,
+ *  segment-lit bar (Pip-Boy SPECIAL/condition bars are segmented, not smooth). */
 @Composable
-private fun GaugeBar(label: String, value: String, fraction: Float, color: Color) {
+private fun FalloutGauge(label: String, value: String, fraction: Float, color: Color) {
     val c = Pulse.colors
     val frac = fraction.coerceIn(0f, 1f)
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted)
-            Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = c.ink)
-        }
-        Canvas(Modifier.fillMaxWidth().height(7.dp).padding(top = 3.dp)) {
-            val r = CornerRadius(size.height / 2, size.height / 2)
-            drawRoundRect(c.lineSoft, cornerRadius = r)
-            if (frac > 0f) {
-                drawRoundRect(color, size = Size(size.width * frac, size.height), cornerRadius = r)
+    Box(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(c.accent.copy(alpha = 0.07f))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.ink2)
+                Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
+            }
+            Canvas(Modifier.fillMaxWidth().height(8.dp).padding(top = 4.dp)) {
+                val segs = 24
+                val gap = 2f
+                val segW = (size.width - gap * (segs - 1)) / segs
+                val lit = (frac * segs).roundToInt()
+                val dim = c.lineSoft.copy(alpha = 0.35f)
+                for (i in 0 until segs) {
+                    drawRect(
+                        if (i < lit) color else dim,
+                        topLeft = Offset(i * (segW + gap), 0f),
+                        size = Size(segW, size.height),
+                    )
+                }
             }
         }
     }
 }
 
+/** A SENSORS/SYSTEM/POSITION readout as a Fallout DATA>STATS banded row: a faint green band, label
+ *  left, value right in bright phosphor. */
 @Composable
-private fun KV(label: String, value: String) {
+private fun FalloutStatRow(label: String, value: String) {
     val c = Pulse.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = c.ink)
+    Box(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(c.accent.copy(alpha = 0.07f))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.ink2)
+            Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.accent)
+        }
     }
 }
