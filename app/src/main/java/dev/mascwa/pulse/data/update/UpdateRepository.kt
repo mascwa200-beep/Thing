@@ -61,6 +61,12 @@ class UpdateRepository(
         val created_at: String = "",
     )
 
+    @Serializable
+    private data class RunList(val workflow_runs: List<WorkflowRun> = emptyList())
+
+    @Serializable
+    private data class WorkflowRun(val run_number: Int = 0, val status: String = "", val conclusion: String? = null)
+
     val currentVersionCode: Int get() = BuildConfig.VERSION_CODE
     val currentVersionName: String get() = BuildConfig.VERSION_NAME
 
@@ -89,6 +95,12 @@ class UpdateRepository(
             ?: return UpdateCheck(null, null)
         val latestName = "1.0.$code"
         if (code <= BuildConfig.VERSION_CODE) return UpdateCheck(latestName, null)
+        // Only offer the update once the CI run that produced it is GREEN — never while it's still
+        // building (orange) or if it failed. The rolling `latest` release picks up the new APK + run
+        // number mid-workflow, so without this gate we'd offer a build that isn't finished/verified.
+        // Best-effort: false = confirmed not-green (suppress); true/null (green, or run too old / API
+        // unavailable) falls through so old or flaky cases never hide a real update.
+        if (isBuildGreen(code, headers) == false) return UpdateCheck(latestName, null)
         // Pick the NEWEST .apk — the rolling release can briefly hold a stale asset (e.g. after the
         // published filename changed), and grabbing the first one would serve an old/downgrade build.
         // created_at is ISO-8601, so lexical max == most recent.
@@ -100,6 +112,21 @@ class UpdateRepository(
             latestName,
             UpdateInfo(code, latestName, rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url),
         )
+    }
+
+    /**
+     * Whether the workflow run that produced build [code] finished green. The shipped build's
+     * `versionCode == github.run_number`, so the run with `run_number == code` is the one that built
+     * this release. Returns **true** = completed successfully, **false** = present but not success
+     * (queued / in-progress / failed / cancelled), **null** = couldn't determine (run too old to be in
+     * the recent page, or the API call failed) — the caller treats null as "don't suppress".
+     */
+    private suspend fun isBuildGreen(code: Int, headers: Map<String, String>): Boolean? {
+        val runs = runCatching {
+            http.getJson("$API/actions/runs?per_page=30", RunList.serializer(), headers)
+        }.getOrNull() ?: return null
+        val run = runs.workflow_runs.firstOrNull { it.run_number == code } ?: return null
+        return run.status == "completed" && run.conclusion == "success"
     }
 
     /** Stream the APK to cache, reporting 0..100 progress. Private repos: fetch the asset API URL with the
