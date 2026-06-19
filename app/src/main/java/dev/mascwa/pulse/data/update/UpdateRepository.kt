@@ -23,6 +23,13 @@ data class UpdateInfo(
     val apkAssetUrl: String,
 )
 
+/** The result of an update check: the latest published version name (null = unknown/unparseable), and
+ *  the installable update when it's newer than this build ([available] = null means already current). */
+data class UpdateCheck(
+    val latestVersionName: String?,
+    val available: UpdateInfo?,
+)
+
 /**
  * Checks the project's rolling `latest` GitHub release (published by CI on every green build, versioned
  * by the run number) and downloads the APK. The repo is private, so the GitHub token from Settings is
@@ -63,26 +70,36 @@ class UpdateRepository(
         runCatching { settings.current().jarvis.githubToken }.getOrNull()?.trim()?.ifBlank { null }
 
     /**
-     * Returns an [UpdateInfo] when the `latest` release is a higher build than this one, or null when
-     * we're already current / unparseable. **Throws** on a network/HTTP failure (e.g. 404 for a private
-     * repo with no token) so the caller can distinguish "up to date" from "couldn't reach the server".
+     * Checks the `latest` release and reports the latest published version + an [UpdateInfo] when it's
+     * newer than this build. **Throws** on a network/HTTP failure (e.g. 404 for a private repo with no
+     * token) so the caller can distinguish "up to date" from "couldn't reach the server".
      */
-    suspend fun check(): UpdateInfo? {
-        val headers = token()?.let { mapOf("Authorization" to "Bearer $it") } ?: emptyMap()
+    suspend fun check(): UpdateCheck {
+        // An update check must always see the LIVE release, never a cached one. GitHub serves
+        // authenticated API responses with `Cache-Control: max-age=60` and OkHttp honours it, so without
+        // this a freshly-published build is missed and we wrongly report "you're on the latest build".
+        val headers = buildMap {
+            token()?.let { put("Authorization", "Bearer $it") }
+            put("Cache-Control", "no-cache")
+        }
         // The release is a prerelease, so /releases/latest won't return it — fetch it by its tag.
         val rel = http.getJson("$API/releases/tags/$TAG", GhRelease.serializer(), headers)
         val code = BUILD_NUM.find(rel.name)?.groupValues?.getOrNull(1)?.toIntOrNull()
             ?: BUILD_NUM.find(rel.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: return null
-        if (code <= BuildConfig.VERSION_CODE) return null
+            ?: return UpdateCheck(null, null)
+        val latestName = "1.0.$code"
+        if (code <= BuildConfig.VERSION_CODE) return UpdateCheck(latestName, null)
         // Pick the NEWEST .apk — the rolling release can briefly hold a stale asset (e.g. after the
         // published filename changed), and grabbing the first one would serve an old/downgrade build.
         // created_at is ISO-8601, so lexical max == most recent.
         val asset = rel.assets
             .filter { it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true) }
             .maxByOrNull { it.created_at }
-            ?: return null
-        return UpdateInfo(code, "1.0.$code", rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url)
+            ?: return UpdateCheck(latestName, null)
+        return UpdateCheck(
+            latestName,
+            UpdateInfo(code, latestName, rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url),
+        )
     }
 
     /** Stream the APK to cache, reporting 0..100 progress. Private repos: fetch the asset API URL with the
