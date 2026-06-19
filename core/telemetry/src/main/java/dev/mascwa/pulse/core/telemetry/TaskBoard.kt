@@ -180,6 +180,22 @@ object TaskBoard {
     }
 
     /**
+     * A single glanceable nudge for a surface like the home "for you" card: the top pending task,
+     * labelled by status, with a count of the rest. Null when nothing is pending.
+     */
+    fun focus(tasks: List<Task>): String? {
+        val open = pending(tasks)
+        val top = open.firstOrNull() ?: return null
+        val prefix = when (top.status) {
+            TaskStatus.ACTIVE -> "In progress: "
+            TaskStatus.BLOCKED -> "Blocked: "
+            else -> "To do: "
+        }
+        val more = if (open.size > 1) " (+${open.size - 1} more)" else ""
+        return prefix + top.title + more
+    }
+
+    /**
      * Return a cleaned task title only when [text] clearly reads as the user assigning *themselves* a
      * task (so questions and passing remarks are ignored). Conservative by design — precision over
      * recall — for always-on auto-capture; the model and the user can always add/drop tasks explicitly.

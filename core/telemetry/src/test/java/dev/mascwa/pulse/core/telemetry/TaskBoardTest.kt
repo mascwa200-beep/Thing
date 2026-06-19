@@ -200,6 +200,19 @@ class TaskBoardTest {
     }
 
     @Test
+    fun focusSurfacesTopPendingWithCount() {
+        assertNull(TaskBoard.focus(emptyList()))
+        assertNull(TaskBoard.focus(listOf(task("done", TaskStatus.DONE))))
+        val tasks = listOf(
+            task("Ship release", TaskStatus.ACTIVE, updated = 2),
+            task("Buy milk", TaskStatus.OPEN, updated = 1),
+        )
+        assertEquals("In progress: Ship release (+1 more)", TaskBoard.focus(tasks))
+        assertEquals("To do: Buy milk", TaskBoard.focus(listOf(task("Buy milk", TaskStatus.OPEN))))
+        assertEquals("Blocked: Renew passport", TaskBoard.focus(listOf(task("Renew passport", TaskStatus.BLOCKED))))
+    }
+
+    @Test
     fun normalizeStripsPunctuationAndCase() {
         assertEquals("buy milk", TaskBoard.normalize("  Buy Milk.  "))
         assertEquals("buy milk", TaskBoard.normalize("buy   milk"))

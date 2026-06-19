@@ -86,7 +86,26 @@ ship small CI-green commits, trace for bugs ('simulate breakpoints')."
 Note on shipping: CI publishes the APK to `latest` on **every push to any branch** (not just `main`), so a
 branch push ships immediately; merging to `main` is for keeping the source-of-truth current.
 
-### Shipped this session (dev branch `claude/nice-cori-0zkrjm`)
+### Shipped this session (dev branch `claude/loving-edison-bd65oa`)
+- **J.A.R.V.I.S. task board** (PR #42, merged) — the *deliberate-goal* layer of the on-device cognitive
+  stack, beside the descriptive **profile** and procedural **cerebellum**. Pure CI-tested core in
+  `core:telemetry/TaskBoard.kt` (`Task`/`TaskStatus` OPEN/ACTIVE/BLOCKED/DONE; `add` [dedupe by title,
+  re-add reopens, cap evicts DONE-first then stalest], `setStatus`/`remove` [match exact then substring,
+  pending preferred], `pending` ordering, `digest` [pending block for the prompt], `focus` [one-line
+  nudge], `summary`, and a conservative `detect` for self-assigned tasks). On-device
+  `data/tasks/TaskStore.kt` mirrors `ProfileStore` (in-memory + Mutex + debounced flush; flush-on-stop;
+  clear-cancels-flush; `tasksFlow` for a future UI). The **`task` JarvisTool** (`task <title>` /
+  `list` / `start`/`block`/`done`/`open`/`drop <title>`, `|`-note) keeps it current; pending tasks are
+  injected into `composePersona` **every turn** (chat + agent) so J.A.R.V.I.S. stays oriented and follows
+  up proactively. Always-on capture in `send()` ("I need to …", "todo: …"), mirroring profile capture.
+  Persona directive added; **Settings → Storage → "Clear tracked tasks"** (`TaskStore.clear`).
+- **Home "For you" task nudge** (PR #43) — `TaskBoard.focus()` surfaces the top pending task as a tappable
+  line in the existing home `ForYouCard` (taps open the J.A.R.V.I.S. console); the card now shows when a
+  recommendation, profile highlight **or** a pending task exists.
+- ⚠️ On-device-unverified (CI can't render/run inference): the "For you" task line, the Settings clear
+  control, and the live prompt-injection/auto-capture behaviour — conservative, mirrors established patterns.
+
+### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
   12-wide burst (OkHttp `maxRequestsPerHost`). Fixed with a `Semaphore(5)` Yahoo cap + backoff retries +
@@ -179,7 +198,8 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
 - Text/PDF are handled; other binary file types decline honestly.
 
 ## How to continue (new session)
-Open this repo (default branch `main` has everything). Read this file. Continue development on
-`claude/modest-ramanujan-0r3iz8`, push small CI-green commits, open a draft PR → `main`, verify green, merge.
+Open this repo (default branch `main` has everything). Read this file. Continue development on the
+session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
+open a draft PR → `main`, verify green, merge.
 Honor the constraints above (human-gate for self-code, protected paths, commit trailers, no model id in
 artifacts, on-device verification for anything CI can't prove — esp. R8, the HUD-on-glasses, and voice).
