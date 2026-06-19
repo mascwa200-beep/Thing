@@ -129,14 +129,13 @@ class RadioViewModel(
                 _localStatus.value = LocalStatus.NO_LOCATION
                 return@launch
             }
+            // Truly location-sourced: geo search around the fix, country/state only as a fallback.
             val place = runCatching { locator.describePlace(loc.latitude, loc.longitude) }.getOrNull()
-            val cc = place?.countryCode
-            if (cc.isNullOrBlank()) {
-                _localStatus.value = LocalStatus.ERROR
-                return@launch
-            }
-            _localPlace.value = listOfNotNull(place.country ?: cc, place.state).joinToString(" · ")
-            val list = runCatching { browser.localStations(cc, place.state) }.getOrDefault(emptyList())
+            _localPlace.value = listOfNotNull(place?.country ?: place?.countryCode, place?.state)
+                .joinToString(" · ").ifBlank { "Near you" }
+            val list = runCatching {
+                browser.localStations(loc.latitude, loc.longitude, place?.countryCode, place?.state)
+            }.getOrDefault(emptyList())
             _local.value = list
             _localStatus.value = if (list.isEmpty()) LocalStatus.EMPTY else LocalStatus.READY
         }
