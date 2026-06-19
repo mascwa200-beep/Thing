@@ -250,7 +250,16 @@ fun PulseApp(
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.RadarScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.tacnet.RadarScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenTab = { route ->
+                        if (route != Routes.RADAR) navController.navigate(route) {
+                            popUpTo(Routes.RADAR) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                )
             }
             composable(Routes.TELEMETRY) {
                 val vm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
