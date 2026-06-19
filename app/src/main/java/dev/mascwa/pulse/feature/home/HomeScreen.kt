@@ -162,8 +162,8 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // Greeting
                 item { Greeting() }
 
-                // J.A.R.V.I.S. quick card — assistant status + tap to open the console.
-                item { AssistantCard(state.jarvisStatus, state.pendingCode, nav.openAssistant) }
+                // (J.A.R.V.I.S. now lives in the bottom nav — the Home quick card was removed so there's
+                // a single shortcut to the console.)
 
                 // Tailored "for you" recommendations + profile highlight (hidden until something's known).
                 if (state.recommendations.isNotEmpty() || state.profileHighlight != null || state.taskFocus != null) {
