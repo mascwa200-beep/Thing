@@ -115,8 +115,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     )
                     PrefSwitch(
                         "Auto-update",
-                        "On launch, download a verified (green) build and open the installer automatically. " +
-                            "You still tap once to confirm — Android can't install a sideloaded app silently.",
+                        "When a build passes CI (turns green), download it and open the installer automatically " +
+                            "— on launch and whenever you return to the app. You tap \"Update\" once to confirm; " +
+                            "Android can't install a sideloaded app fully silently.",
                         s.autoUpdate,
                     ) { v -> vm.update { it.copy(autoUpdate = v) } }
                     when (val st = u) {

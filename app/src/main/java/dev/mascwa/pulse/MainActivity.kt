@@ -41,6 +41,33 @@ class MainActivity : ComponentActivity() {
     private val requestNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
 
+    /** Wall-clock of the last auto-update check, so a quick app-switch doesn't re-hit GitHub each resume. */
+    private var lastAutoUpdateCheckMs = 0L
+
+    /**
+     * If auto-update is on, check for a GREEN (CI-passed) build newer than what we last prompted to
+     * install — and if found, download it and launch the system installer (the user taps "Update" once).
+     * Fully defensive (never crashes the launch/resume) and throttled so foreground churn isn't chatty.
+     * Runs on cold launch and on every foreground return so an update lands "as soon as it's green."
+     */
+    private fun maybeAutoUpdate() {
+        val now = System.currentTimeMillis()
+        if (now - lastAutoUpdateCheckMs < AUTO_UPDATE_MIN_INTERVAL_MS) return
+        lastAutoUpdateCheckMs = now
+        lifecycleScope.launch {
+            runCatching {
+                val settings = app.container.settingsRepository.current()
+                if (!settings.autoUpdate) return@runCatching
+                val info = app.container.updateRepository.check().available
+                if (info != null && info.versionCode > settings.lastAutoUpdateCode) {
+                    val file = app.container.updateRepository.download(info) { }
+                    app.container.settingsRepository.update { it.copy(lastAutoUpdateCode = info.versionCode) }
+                    dev.mascwa.pulse.core.util.installApk(this@MainActivity, file)
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -72,22 +99,9 @@ class MainActivity : ComponentActivity() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }
                 }
-                // Opt-in auto-update: if a GREEN update (gated in UpdateRepository) is newer than the
-                // one we last auto-prompted, download it and launch the installer. The system still
-                // requires the one-tap "Update" confirm — a sideloaded app can't install silently or
-                // self-reopen without device-owner privileges; this automates everything up to that tap.
-                if (settings.autoUpdate) {
-                    runCatching {
-                        val info = app.container.updateRepository.check().available
-                        if (info != null && info.versionCode > settings.lastAutoUpdateCode) {
-                            val file = app.container.updateRepository.download(info) { }
-                            app.container.settingsRepository.update { it.copy(lastAutoUpdateCode = info.versionCode) }
-                            dev.mascwa.pulse.core.util.installApk(this@MainActivity, file)
-                        }
-                    }
-                }
             }
         }
+        // Auto-update runs from onStart (fires on cold launch + every foreground return).
 
         setContent {
             val settings by app.container.settingsRepository.settings
@@ -174,6 +188,8 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
+        // Catch a build that turned green while the app was backgrounded — prompt the install on return.
+        maybeAutoUpdate()
     }
 
     override fun onStop() {
@@ -192,5 +208,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ROUTE = "pulse.extra.route"
+        /** Don't re-check GitHub more than once per ~15 min of foregrounding (covers fast app-switches). */
+        private const val AUTO_UPDATE_MIN_INTERVAL_MS = 15 * 60 * 1000L
     }
 }
