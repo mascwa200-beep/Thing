@@ -14,6 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -51,6 +54,10 @@ class ProfileStore(
     private var entries: List<ProfileEntry>? = null
     private var flushJob: Job? = null
 
+    private val _entriesFlow = MutableStateFlow<List<ProfileEntry>>(emptyList())
+    /** Live view of the profile for the Memory screen (so the user can see + curate it). */
+    val entriesFlow: StateFlow<List<ProfileEntry>> = _entriesFlow.asStateFlow()
+
     private fun ProfileEntry.stored() =
         StoredEntry(category.name, text, createdMs, lastSeenMs, weight)
 
@@ -69,7 +76,7 @@ class ProfileStore(
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
                 ?.entries.orEmpty()
                 .map { it.domain() }
-            loaded.also { entries = it }
+            loaded.also { entries = it; _entriesFlow.value = it }
         }
     }
 
@@ -81,6 +88,7 @@ class ProfileStore(
             val cat = category ?: UserProfile.classify(text)
             mutex.withLock {
                 entries = UserProfile.merge(entries ?: emptyList(), text, cat, System.currentTimeMillis())
+                _entriesFlow.value = entries ?: emptyList()
             }
             scheduleFlush()
         }
@@ -97,7 +105,10 @@ class ProfileStore(
         if (text.isBlank()) return
         scope.launch {
             ensureLoaded()
-            mutex.withLock { entries = UserProfile.forget(entries ?: emptyList(), text) }
+            mutex.withLock {
+                entries = UserProfile.forget(entries ?: emptyList(), text)
+                _entriesFlow.value = entries ?: emptyList()
+            }
             scheduleFlush()
         }
     }
@@ -109,7 +120,7 @@ class ProfileStore(
 
     suspend fun clear() {
         flushJob?.cancel() // so a buffered write can't resurrect cleared profile facts after this returns
-        mutex.withLock { entries = emptyList() }
+        mutex.withLock { entries = emptyList(); _entriesFlow.value = emptyList() }
         runCatching { context.profileDataStore.edit { it.remove(prefsKey) } }
     }
 
