@@ -4,9 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
+import dev.mascwa.pulse.data.orbital.MoonInfo
+import dev.mascwa.pulse.data.orbital.MoonPhase
+import dev.mascwa.pulse.data.orbital.Planet
+import dev.mascwa.pulse.data.orbital.PlanetCalc
 import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.space.SpaceWeather
+import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.Job
@@ -20,6 +26,7 @@ import kotlinx.coroutines.launch
 class RadarViewModel(
     private val repo: RadarRepository,
     private val location: LocationProvider,
+    private val spaceWeather: SpaceWeatherRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<Async<RadarData>>(Async(loading = true))
@@ -46,12 +53,23 @@ class RadarViewModel(
     private val _countHistory = MutableStateFlow<List<Int>>(emptyList())
     val countHistory: StateFlow<List<Int>> = _countHistory.asStateFlow()
 
+    private val _sky = MutableStateFlow(SkyState())
+    val sky: StateFlow<SkyState> = _sky.asStateFlow()
+
     private var lastLoc: DeviceLocation? = null
     private var auto: Job? = null
 
     val ranges = listOf(50, 100, 250, 500)
 
     enum class AltFilter { ALL, LOW, MID, HIGH }
+
+    /** The sky/space picture grouped with the scope: Moon, naked-eye planets
+     *  above the horizon (offline ephemeris), and NOAA space weather. */
+    data class SkyState(
+        val moon: MoonInfo? = null,
+        val planets: List<Planet> = emptyList(),
+        val space: SpaceWeather? = null,
+    )
 
     fun setAltFilter(f: AltFilter) { _altFilter.value = f }
     fun toggleMil() { _milOnly.value = !_milOnly.value }
@@ -94,11 +112,29 @@ class RadarViewModel(
                 return@launch
             }
             lastLoc = loc
+            // Sky bodies + space weather only refresh on the real loads (initial /
+            // manual / permission grant), not the 15s aircraft auto-refresh — planets
+            // barely move and space weather has its own 15-min cache.
+            if (refetchLocation) refreshSky(loc, force)
             _state.load(force) { repo.fetch(loc.latitude, loc.longitude, it) }
             _state.value.data?.let { d ->
                 val n = d.contacts.count { it.kind == ContactKind.AIRCRAFT.name }
                 _countHistory.value = (_countHistory.value + n).takeLast(40)
             }
+        }
+    }
+
+    /** Moon + planets are pure offline computations from the GPS fix; space
+     *  weather is best-effort over the network and never disturbs the scope. */
+    private fun refreshSky(loc: DeviceLocation, force: Boolean) {
+        val planets = PlanetCalc.planetsNow(loc.latitude, loc.longitude)
+            .filter { it.aboveHorizon }
+            .sortedBy { it.magnitude }
+        _sky.update { it.copy(moon = MoonPhase.at(), planets = planets) }
+        viewModelScope.launch {
+            runCatching {
+                spaceWeather.fetch(force = force, lat = loc.latitude, lon = loc.longitude).data
+            }.getOrNull()?.let { sw -> _sky.update { it.copy(space = sw) } }
         }
     }
 }
