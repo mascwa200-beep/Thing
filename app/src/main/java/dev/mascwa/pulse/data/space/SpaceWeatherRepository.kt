@@ -35,8 +35,8 @@ class SpaceWeatherRepository(
         return try {
             val data = coroutineScope {
                 val kpD = async { runCatching { loadKp() }.getOrDefault(emptyList()) }
-                val windD = async { runCatching { loadSummary(SOLAR_WIND_SPEED, "WindSpeed") }.getOrNull() }
-                val bzD = async { runCatching { loadSummary(SOLAR_WIND_MAG, "Bz") }.getOrNull() }
+                val windD = async { runCatching { loadWindSpeed() }.getOrNull() }
+                val bzD = async { runCatching { loadBz() }.getOrNull() }
                 val alertsD = async { runCatching { loadAlerts() }.getOrDefault(emptyList()) }
                 val auroraD = async {
                     if (lat != null && lon != null) auroraFor(lat, lon) else null
@@ -113,11 +113,27 @@ class SpaceWeatherRepository(
         }
     }
 
-    /** Simple SWPC summary objects, e.g. {"WindSpeed":"399.0","TimeStamp":...}. */
-    private suspend fun loadSummary(url: String, field: String): Double? {
-        val text = http.getString(url)
-        return http.json.parseToJsonElement(text).jsonObject[field]
-            ?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+    /** Latest solar-wind bulk speed (km/s) from the DSCOVR/ACE plasma feed.
+     *  The `products/summary/*` objects were going empty ("—"); the real-time
+     *  array feeds are the canonical, reliable source. Header row + array-of-
+     *  arrays; speed is column 2; take the most recent row with a real value. */
+    private suspend fun loadWindSpeed(): Double? =
+        lastNumericInColumn(SOLAR_WIND_PLASMA, column = 2)
+
+    /** Latest IMF Bz (nT, GSM) from the magnetometer feed; bz_gsm is column 3. */
+    private suspend fun loadBz(): Double? =
+        lastNumericInColumn(SOLAR_WIND_MAG, column = 3)
+
+    /** From a NOAA array-of-arrays product (row 0 is a header), the newest row whose [column]
+     *  parses as a finite Double — recent rows are occasionally blank/null. */
+    private suspend fun lastNumericInColumn(url: String, column: Int): Double? {
+        val arr = http.json.parseToJsonElement(http.getString(url)).jsonArray
+        for (i in arr.indices.reversed()) {
+            if (i == 0) break // header row
+            val v = arr[i].jsonArray.getOrNull(column)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+            if (v != null && v.isFinite()) return v
+        }
+        return null
     }
 
     private suspend fun loadAlerts(): List<SpaceAlert> {
@@ -137,7 +153,7 @@ class SpaceWeatherRepository(
     }
 
     companion object {
-        private const val SOLAR_WIND_SPEED = "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json"
-        private const val SOLAR_WIND_MAG = "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json"
+        private const val SOLAR_WIND_PLASMA = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
+        private const val SOLAR_WIND_MAG = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
     }
 }
