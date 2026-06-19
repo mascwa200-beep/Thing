@@ -77,7 +77,7 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     // TOOLS is a pseudo-destination: it opens the Pip-Boy feed tabs (FEED_HOME) and highlights on
-    // any feed route — handled specially in PulseApp. RADAR is the feed home / anchor.
-    TopDestination(Routes.RADAR, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
+    // any feed route — handled specially in PulseApp. TACNET (the PIP-BOY screen) is the feed home.
+    TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
 )

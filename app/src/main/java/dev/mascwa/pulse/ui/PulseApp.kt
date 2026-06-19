@@ -107,7 +107,7 @@ fun PulseApp(
             ) {
                 TOP_DESTINATIONS.forEach { dest ->
                     // TOOLS now opens the Pip-Boy feed tabs; it highlights on any feed route.
-                    val isTools = dest.route == Routes.RADAR
+                    val isTools = dest.route == Routes.TACNET
                     val selected = if (isTools) currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
                         else currentRoute == dest.route
                     NavigationBarItem(
@@ -257,7 +257,11 @@ fun PulseApp(
 
             // ---- Tacnet (real-time radar + telemetry) ----
             composable(Routes.TACNET) {
-                dev.mascwa.pulse.feature.tacnet.TacnetHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
+                val radarVm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
+                val telemetryVm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
+                val orbitalVm: dev.mascwa.pulse.feature.sky.OrbitalViewModel = viewModel(factory = factory)
+                val spaceWxVm: dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm)
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)

@@ -41,6 +41,19 @@ import kotlin.math.roundToInt
 
 @Composable
 fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
+    PulseScaffold(
+        title = "Telemetry",
+        navigationIcon = {
+            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        },
+    ) { innerPadding ->
+        TelemetryBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The STATUS feed body (phone telemetry), scaffold-free for hosting as a PIP-BOY sub-tab. */
+@Composable
+fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val t by vm.telemetry.collectAsStateWithLifecycle()
     val gps by vm.gps.collectAsStateWithLifecycle()
     val log by vm.log.collectAsStateWithLifecycle()
@@ -63,16 +76,10 @@ fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
         }
     }
 
-    PulseScaffold(
-        title = "Telemetry",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-        },
-    ) { innerPadding ->
-        Column(
-            Modifier.padding(innerPadding).padding(horizontal = 16.dp).fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-        ) {
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
             SectionBar("Vitals")
             NeonPanel(Modifier.fillMaxWidth(), corners = true) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -146,7 +153,6 @@ fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
                 modifier = Modifier.padding(top = 14.dp, bottom = 24.dp),
             )
         }
-    }
 }
 
 private fun batteryText(t: Telemetry): String {
