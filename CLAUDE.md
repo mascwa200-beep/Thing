@@ -348,6 +348,38 @@ slices, squash-merged to `main`, re-synced into the dev branch each time.
   the curated SomaFM too (already covered — same controller), a sleep timer, station logos (Radio Browser
   `favicon`), or pivot off radio.
 
+### Radio sleep timer + screenshot-driven Fallout batch (this session cont., #100–#106 all merged)
+- **#100 — radio sleep timer:** `RadioController` got its own `CoroutineScope` + `setSleep(minutes)` (a
+  delay → `stop()`); `stop()`/clear cancels it. `RadioViewModel.sleepMinutes`/`setSleep`; a `☾ SLEEP ·
+  OFF/15/30/60` selector in the tuner. Radio is now local · favourites · search · background · sleep · curated.
+- Owner then pasted on-device screenshots + Fallout Pip-Boy refs with a multi-part ask; shipped in CI-green
+  slices, each squash-merged + re-synced:
+  - **#101 — objectives dedup BUG FIX:** tracking a *calendar* objective always `waypoints.add()`'d → a PIN
+    twin every tap (the reported "duplicates again and again"). `ObjectivesViewModel.track` is now idempotent
+    (re-activates an existing match by title+coords rounded ~11 m via `coordKey`); the merged `objectives`
+    list de-dupes calendar events that already have a waypoint twin. Tracks once, shows once.
+  - **#102 — radio TRULY location-based:** `RadioBrowserRepository.localStations(lat,lon,country?,state?)`
+    now does real **geo search** (`geo_lat`/`geo_long`/`geo_distance` ~200 km + `has_geo_info`), parses each
+    station's coords, sorts by true distance; falls back to country/state popularity only when nothing
+    geo-tagged is near. Reuses `core/util/Geo`. `RadioViewModel` passes the GPS fix; label → "Near you".
+  - **#103 — radio horizontal rails:** stations are now a left-to-right swipeable `LazyRow` of rounded
+    `StationCard` cubes (play/EQ + ★ up top, name, tiny genre/region line) per section (Favourites/Search/
+    Local/Curated) instead of full-width vertical rows — frees vertical space. Follow-up: live now-playing
+    track text needs ICY stream metadata (MediaPlayer doesn't surface it).
+  - **#104 — QUESTS tab + Fallout quest-tracker:** `ObjectivesPanel` restyled into a quest log (grouped MAIN/
+    SIDE/MISC, ◆/◇ diamond markers, TRACKING flag, hairline rules; palette-agnostic). New **`Routes.QUESTS`**
+    feed tab (`FEED_TABS` 5→6: PIP-BOY·NAV·QUESTS·SURVIVE·SOCIAL·SEARCH) — `QuestsScreen` wraps the shared
+    `ObjectivesPanel` in `pipBoyPalette`; same `ObjectivesViewModel`/`WaypointStore` as the NAV sub-tab so
+    both stay in sync. NAV's OBJECTIVES sub-tab gets the same quest-tracker look (cyberpunk-hued).
+  - **#105 — STATUS/telemetry Fallout restyle:** `TelemetryScreen` VITALS gauges → green-banded rows with a
+    **24-segment notched bar** (Pip-Boy HP/AP look); SENSORS/SYSTEM/POSITION → Fallout **DATA>STATS banded
+    rows** (faint green band, dim label / bright value). Renders in the PIP-BOY green palette.
+  - **#106 — NAV gold path line:** the player→objective route is now a **gold line over a white casing**
+    (round-capped, soft glow; two `LineLayer`s on the route source), under the markers — the Cyberpunk/Fallout
+    nav-line look, no minimap. Straight great-circle path (road-snapped routing would need a routing API).
+- ⚠️ All #100–#106 on-device-unverified (CI compile-gates only). **Open / steerable:** live now-playing
+  (ICY metadata) in the station cards; a STATUS Vault-Boy condition figure; turn-by-turn road routing.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
