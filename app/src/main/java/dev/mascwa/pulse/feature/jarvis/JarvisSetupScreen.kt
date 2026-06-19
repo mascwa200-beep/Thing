@@ -81,6 +81,7 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
     val glassesHud by vm.glassesHud.collectAsState()
     val agentTools by vm.agentTools.collectAsState()
     val selfEditEnabled by vm.selfEditEnabled.collectAsState()
+    val selfCoding by vm.selfCoding.collectAsState()
     val chatFormat by vm.chatFormat.collectAsState()
     val backend by vm.inferenceBackend.collectAsState()
     val cloudEnabled by vm.cloudEnabled.collectAsState()
@@ -413,6 +414,18 @@ fun JarvisSetupScreen(vm: JarvisSetupViewModel, onBack: () -> Unit) {
                     "with no extra spaces.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                 modifier = Modifier.padding(horizontal = 4.dp),
+            )
+
+            SettingToggle(
+                title = "AUTONOMOUS SELF-CODING",
+                subtitle = "One switch, full loop: tell J.A.R.V.I.S. to build a real feature (\"add a … " +
+                    "feature\", \"read your own code\") and it plans the files, opens a PR, lets CI test it, " +
+                    "and — once green — merges it; you just install the update. No per-change approval. " +
+                    "Needs the write-scoped GitHub token above. Its safety gate, CI and signing stay " +
+                    "off-limits and CI must pass before anything ships. Default off — flip on to hand over " +
+                    "the loop, off to halt it.",
+                enabled = selfCoding,
+                onToggle = vm::setSelfCoding,
             )
 
             FieldLabel("KNOWLEDGE BASE  ·  on-device docs J.A.R.V.I.S. searches for answers")

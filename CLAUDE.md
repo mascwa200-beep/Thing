@@ -155,6 +155,23 @@ branch push ships immediately; merging to `main` is for keeping the source-of-tr
     (`shouldReflect`→`reflectionSeeds`→LLM synthesis → REFLECTION memories); a Memory-screen surface. The
     reflection pass needs a working cloud backend — **pending owner on-device verification of Haiku 4.5**.
 
+### Owner-reported this session (updater fix + J.A.R.V.I.S. redesign — in progress)
+- **Updater fix (PR #51, merged):** the in-app update check went through the shared OkHttp disk cache;
+  GitHub serves authenticated API responses with `max-age=60`, so a fresh build was missed and it wrongly
+  said "you're on the latest build." Fix: `UpdateRepository.check()` sends `Cache-Control: no-cache` (always
+  live) and returns `UpdateCheck{latestVersionName, available}` so the UI shows the latest build number even
+  when current. Pipeline confirmed healthy (run_number advances; CI publishes to `latest` on every push).
+- **J.A.R.V.I.S. redesign (owner asked, multi-slice, mostly on-device-unverified):** consolidate self-coding
+  to ONE switch + move J.A.R.V.I.S. settings/memory into the J.A.R.V.I.S. area + restyle the console to the
+  Tony-Stark-J.A.R.V.I.S. HUD look.
+  - **Slice 1 (PR #52):** the three self-coding toggles (enable / auto-merge / autonomous) → ONE
+    **"AUTONOMOUS SELF-CODING"** switch in **J.A.R.V.I.S. Setup** (moved out of SYS Settings). The 3 underlying
+    `JarvisSettings` flags are kept (so RefreshWorker/AppContainer/JarvisViewModel/ActiveMatrixService gating
+    is untouched); `JarvisSetupViewModel.setSelfCoding(v)` flips all three together. **Human-gate invariant
+    intact** — the one switch IS the opt-in; protected paths + CI gate unchanged; default OFF.
+  - **Next slices:** move the memory/data controls (clears + detailed-log) into the J.A.R.V.I.S. area;
+    declutter SYS; restyle `JarvisScreen` console (HUD header/status/bubbles/input). Owner verifies on Pixel.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
