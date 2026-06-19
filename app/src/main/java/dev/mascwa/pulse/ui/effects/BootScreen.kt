@@ -63,16 +63,18 @@ private data class Mote(
     val twinkle: Float,
 )
 
-/** The cold-open: cold, consequential, and addressed to someone it has already decided you are —
- *  the secure terminal of a power that does not introduce itself twice. */
-private val OMEN_LINES = listOf(
-    "> SOVEREIGN UPLINK // HANDSHAKE FORCED",
-    "you found a door with no handle on the far side.",
-    "every input since power-on is already archived.",
-    "do not mistake access for permission.",
-    "OPERATOR VERIFIED — the others who got this far are gone.",
-    "you were chosen long before tonight.",
-    "step inside. we have been expecting you.",
+/** The boot log — standard secure power-on analysis that decrypts in line by line, the kind of
+ *  diagnostic roll a hardened terminal prints while it brings its subsystems up. */
+private val BOOT_LINES = listOf(
+    "> POWER-ON SELF TEST .............. OK",
+    "secure boot chain verified — signatures valid",
+    "mounting encrypted volume /vault ... OK",
+    "crypto services online (AES-256-GCM · RNG seeded)",
+    "calibrating inertial + magnetometer arrays",
+    "runtime heap allocated 15575 MB",
+    "loading geospatial · telemetry · signals subsystems",
+    "system integrity self-check ....... PASS",
+    "all subsystems nominal — operator handoff",
 )
 
 // Deliberately unhurried (~half the old pace) so the message can actually be read.
@@ -81,12 +83,11 @@ private const val MOTE_COUNT = 800
 private const val TAU = 6.2831855f
 
 /**
- * Cinematic cold-open shown once per launch. A swirling field of motes is drawn inward
- * into a waking eye / seal while an escalating "clearance" arc fills and an ominous log
- * decrypts in — the feeling of stumbling onto a channel meant for someone bigger than you,
- * which already knows your name. Deliberately **unskippable** (no tap handler), then fades
- * into the app. All-procedural vector + analytic motes — kilobytes of state, well under the
- * 2 MB budget.
+ * Cinematic secure-boot sequence shown once per launch. A swirling field of motes is drawn
+ * inward into a waking eye / seal while an escalating "clearance" arc fills and the power-on
+ * diagnostic log decrypts in — the contractor terminal bringing its subsystems up, then naming
+ * itself. Deliberately **unskippable** (no tap handler), then fades into the app. All-procedural
+ * vector + analytic motes — kilobytes of state, well under the 2 MB budget.
  */
 @Composable
 fun BootScreen(onFinished: () -> Unit) {
@@ -142,14 +143,14 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
         // Force the decrypt effect regardless of the user's reduced-motion setting — the
         // cold-open is a deliberate, one-time cinematic.
         CompositionLocalProvider(LocalGlitchEnabled provides true) {
-            val shown = (((p - 0.05f) / 0.70f) * OMEN_LINES.size).toInt().coerceIn(0, OMEN_LINES.size)
+            val shown = (((p - 0.05f) / 0.70f) * BOOT_LINES.size).toInt().coerceIn(0, BOOT_LINES.size)
             val logAlpha = (1f - (p - 0.80f) / 0.10f).coerceIn(0f, 1f)
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 72.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                OMEN_LINES.take(shown).forEachIndexed { i, line ->
-                    val base = omenColor(c, i)
+                BOOT_LINES.take(shown).forEachIndexed { i, line ->
+                    val base = bootLineColor(c, i, BOOT_LINES.size)
                     DecryptText(
                         line, JetBrainsMono, 12.sp, base.copy(alpha = base.alpha * logAlpha),
                         Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 640,
@@ -157,7 +158,7 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                 }
             }
 
-            // The reveal — the channel naming itself, over the open eye.
+            // The reveal — the contractor naming itself, over the open eye.
             val brand = ((p - 0.82f) / 0.16f).coerceIn(0f, 1f)
             if (brand > 0f) {
                 Column(
@@ -166,11 +167,11 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Row {
-                        Text("NIGHT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 32.sp, color = c.ink.copy(alpha = brand))
-                        Text("WIRE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 32.sp, color = c.accent.copy(alpha = brand))
+                        Text("ARGUS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = 2.sp, color = c.ink.copy(alpha = brand))
+                        Text(" DYNAMICS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = 2.sp, color = c.accent.copy(alpha = brand))
                     }
                     Text(
-                        "WE HAVE BEEN EXPECTING YOU",
+                        "ADVANCED SIGNALS DIVISION",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 3.sp,
                         color = c.sky.copy(alpha = 0.85f * brand),
                         modifier = Modifier.padding(top = 10.dp),
@@ -181,12 +182,12 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
     }
 }
 
-private fun omenColor(c: NightwirePalette, i: Int): Color = when (i) {
-    0, 1 -> c.sky.copy(alpha = 0.85f)
-    2, 3 -> c.accent
-    4 -> c.amber
-    5 -> c.accent
-    else -> c.sky
+/** Calm, readable boot-log colouring: the header line and the final handoff stand out; the rest is
+ *  even mono text, the way a real diagnostic roll reads. */
+private fun bootLineColor(c: NightwirePalette, i: Int, total: Int): Color = when (i) {
+    0 -> c.sky.copy(alpha = 0.9f)
+    total - 1 -> c.accent
+    else -> c.ink2.copy(alpha = 0.92f)
 }
 
 private fun DrawScope.drawOmenField(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>) {
