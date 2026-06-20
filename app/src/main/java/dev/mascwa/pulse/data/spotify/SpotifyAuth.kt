@@ -36,15 +36,18 @@ object SpotifyAuth {
     private const val AUTH_URL = "https://accounts.spotify.com/authorize"
     private const val TOKEN_URL = "https://accounts.spotify.com/api/token"
 
-    /** `streaming` powers the in-app Web Playback SDK device; the rest read the profile and read/control
-     *  playback (now-playing + transport). */
+    /** Read the profile, read/control playback (now-playing + transport), and read the user's library
+     *  (playlists + recently-played). A scope change requires the user to re-link to take effect; until
+     *  then the library calls 403 and the sections degrade to empty. */
     val SCOPES = listOf(
-        "streaming",
         "user-read-email",
         "user-read-private",
         "user-read-playback-state",
         "user-modify-playback-state",
         "user-read-currently-playing",
+        "user-read-recently-played",
+        "playlist-read-private",
+        "playlist-read-collaborative",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
