@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.core.content.ContextCompat
+import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -36,8 +37,13 @@ object RadioController {
     private val _sleepMinutes = MutableStateFlow<Int?>(null)
     val sleepMinutes: StateFlow<Int?> = _sleepMinutes.asStateFlow()
 
+    /** Live "Artist - Song" for the tuned station (ICY stream metadata), or null when unavailable. */
+    private val _nowPlaying = MutableStateFlow<String?>(null)
+    val nowPlaying: StateFlow<String?> = _nowPlaying.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob())
     private var sleepJob: Job? = null
+    private var metaJob: Job? = null
     private var player: MediaPlayer? = null
 
     /** Arm (or clear, with null/0) a sleep timer that stops playback after [minutes]. */
@@ -69,6 +75,7 @@ object RadioController {
         val app = context.applicationContext
         releasePlayer()
         _state.value = RadioState(station, Status.TUNING)
+        startMetaPolling(station)
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
         // FGS start just means foreground-only playback, never a crash).
         runCatching { ContextCompat.startForegroundService(app, Intent(app, RadioService::class.java)) }
@@ -91,11 +98,26 @@ object RadioController {
     fun stop(context: Context) {
         sleepJob?.cancel()
         _sleepMinutes.value = null
+        metaJob?.cancel()
+        _nowPlaying.value = null
         releasePlayer()
         _state.value = RadioState(null, Status.IDLE)
         runCatching {
             val app = context.applicationContext
             app.stopService(Intent(app, RadioService::class.java))
+        }
+    }
+
+    /** Poll the tuned station's ICY now-playing title every ~25 s while it's the current one. */
+    private fun startMetaPolling(station: RadioStation) {
+        metaJob?.cancel()
+        _nowPlaying.value = null
+        metaJob = scope.launch {
+            while (_state.value.tuned?.streamUrl == station.streamUrl) {
+                val title = runCatching { IcyMetadata.nowPlaying(station.streamUrl) }.getOrNull()
+                if (_state.value.tuned?.streamUrl == station.streamUrl) _nowPlaying.value = title
+                delay(25_000)
+            }
         }
     }
 
