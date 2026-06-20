@@ -18,6 +18,7 @@ import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.data.weather.WeatherRepository
+import dev.mascwa.pulse.jarvis.agent.ToolChain
 import dev.mascwa.pulse.notifications.NotificationScheduler
 import dev.mascwa.pulse.notifications.Notifier
 import kotlinx.serialization.json.Json
@@ -344,6 +345,11 @@ class AppContainer(private val appContext: Context) {
                 Unit
             },
         )
+    }
+
+    /** Helper that pipes tool outputs as inputs to subsequent tools in a sequence. */
+    val toolChain: ToolChain by lazy {
+        ToolChain()
     }
 
     /** Live tool set resolved per agent run: base tools + (self-edit tools + approved authored Lua
