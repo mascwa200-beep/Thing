@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -177,16 +179,24 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
         CompositionLocalProvider(LocalGlitchEnabled provides true) {
             val shown = (((p - 0.05f) / 0.70f) * bootLines.size).toInt().coerceIn(0, bootLines.size)
             val logAlpha = (1f - (p - 0.80f) / 0.10f).coerceIn(0f, 1f)
-            Column(
-                Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 72.dp),
-                verticalArrangement = Arrangement.Bottom,
+            // The decrypt log lives in its OWN bottom-anchored, clipped frame so it can never grow up into
+            // the centre eye / brand reveal. However many lines the procedural roll produces, the text stays
+            // inside this maintained box — overflow clips at the top, terminal-style — keeping the visuals clear.
+            Box(
+                Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 56.dp),
+                contentAlignment = Alignment.BottomStart,
             ) {
-                bootLines.take(shown).forEachIndexed { i, line ->
-                    val base = bootLineColor(c, i, bootLines.size)
-                    DecryptText(
-                        line, JetBrainsMono, 12.sp, base.copy(alpha = base.alpha * logAlpha),
-                        Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 640,
-                    )
+                Column(
+                    Modifier.fillMaxWidth().fillMaxHeight(0.40f).clipToBounds(),
+                    verticalArrangement = Arrangement.Bottom,
+                ) {
+                    bootLines.take(shown).forEachIndexed { i, line ->
+                        val base = bootLineColor(c, i, bootLines.size)
+                        DecryptText(
+                            line, JetBrainsMono, 12.sp, base.copy(alpha = base.alpha * logAlpha),
+                            Modifier.fillMaxWidth().padding(vertical = 3.dp), durationMs = 640,
+                        )
+                    }
                 }
             }
 

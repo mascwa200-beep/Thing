@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
+import dev.mascwa.pulse.data.radio.StreamResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -74,6 +75,11 @@ object RadioController {
     private var metaJob: Job? = null
     private var player: ExoPlayer? = null
 
+    // Auto-recover from a brief live-stream drop (a momentary STATE_ENDED / IO blip) by re-preparing a
+    // couple of times before surfacing an error — many live mounts hiccup but recover. Reset per tune.
+    private var retries = 0
+    private const val MAX_RETRIES = 2
+
     // Connection-limited commercial CDNs: a second listener connection makes them drop the audio, so we
     // never run the side metadata poll for these (they keep playing; just no track text).
     private val SINGLE_CONNECTION_HOSTS = listOf("streamtheworld", "amperwave")
@@ -107,62 +113,105 @@ object RadioController {
         }
     }
 
-    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     fun play(context: Context, station: RadioStation) {
         val app = context.applicationContext
         _state.value = RadioState(station, Status.TUNING)
         _nowPlaying.value = null
-        startMetaPolling(station)
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
         // FGS start just means foreground-only playback, never a crash).
         runCatching { ContextCompat.startForegroundService(app, Intent(app, RadioService::class.java)) }
-        runOnMain {
-            releasePlayerInternal()
-            runCatching {
-                val httpFactory = DefaultHttpDataSource.Factory()
-                    .setUserAgent(STREAM_UA)
-                    .setAllowCrossProtocolRedirects(true)
-                    .setConnectTimeoutMs(20_000)
-                    .setReadTimeoutMs(20_000)
-                // NOTE: we deliberately do NOT request ICY metadata (`Icy-MetaData: 1`). On these
-                // StreamTheWorld/Triton AAC mounts that header makes the server interleave metadata that
-                // ExoPlayer doesn't strip here, breaking the container parse
-                // (ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED). A single audio-only connection parses and
-                // plays continuously; live now-playing text is a follow-up (needs proper IcyDataSource wiring).
-                val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
-                val exo = ExoPlayer.Builder(app)
-                    .setMediaSourceFactory(sourceFactory)
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(C.USAGE_MEDIA)
-                            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                            .build(),
-                        /* handleAudioFocus = */ true,
-                    )
-                    .build()
-                exo.setMediaItem(MediaItem.fromUri(station.streamUrl))
-                exo.addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (_state.value.tuned?.streamUrl != station.streamUrl) return
-                        when (playbackState) {
-                            Player.STATE_READY -> _state.value = RadioState(station, Status.ON_AIR)
-                            // A live stream shouldn't end; if it does the source dried up — show it instead
-                            // of going silent with no indication.
-                            Player.STATE_ENDED -> _state.value = RadioState(station, Status.ERROR, "stream dropped")
-                            else -> {}
-                        }
-                    }
+        // Resolve playlist URLs (.pls/.m3u/.asx → the real stream) off the main thread BEFORE building the
+        // player, so a directory's playlist entry doesn't get "played" as a text file (the dropped-stream
+        // bug). Direct streams / HLS resolve to themselves instantly.
+        scope.launch {
+            val audioUrl = StreamResolver.resolve(station.streamUrl)
+            if (_state.value.tuned?.streamUrl != station.streamUrl) return@launch // re-tuned while resolving
+            startMetaPolling(station, audioUrl)
+            runOnMain { startPlayer(app, station, audioUrl) }
+        }
+    }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        if (_state.value.tuned?.streamUrl == station.streamUrl) {
-                            _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
-                        }
+    /** Build (or rebuild) the ExoPlayer for [station] on the tuned [audioUrl]. Main thread only. */
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    private fun startPlayer(app: Context, station: RadioStation, audioUrl: String) {
+        retries = 0
+        releasePlayerInternal()
+        runCatching {
+            val httpFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent(STREAM_UA)
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(20_000)
+                .setReadTimeoutMs(20_000)
+            // NOTE: we deliberately do NOT request ICY metadata (`Icy-MetaData: 1`). On these
+            // StreamTheWorld/Triton AAC mounts that header makes the server interleave metadata that
+            // ExoPlayer doesn't strip here, breaking the container parse
+            // (ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED). A single audio-only connection parses and
+            // plays continuously; live now-playing text comes from the separate ICY poll.
+            val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
+            val exo = ExoPlayer.Builder(app)
+                .setMediaSourceFactory(sourceFactory)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    /* handleAudioFocus = */ true,
+                )
+                .build()
+            exo.setMediaItem(MediaItem.fromUri(audioUrl))
+            exo.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (_state.value.tuned?.streamUrl != station.streamUrl) return
+                    when (playbackState) {
+                        Player.STATE_READY -> _state.value = RadioState(station, Status.ON_AIR)
+                        // A live stream shouldn't end; a brief drop often recovers on a re-prepare, so
+                        // retry a couple of times before surfacing it.
+                        Player.STATE_ENDED -> retryOrFail(station, audioUrl, "stream ended")
+                        else -> {}
                     }
-                })
-                exo.playWhenReady = true
-                exo.prepare()
-                player = exo
-            }.onFailure { _state.value = RadioState(station, Status.ERROR, it.message) }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    if (_state.value.tuned?.streamUrl != station.streamUrl) return
+                    // Transient network errors recover on a re-prepare; permanent ones (bad status, parse,
+                    // decoder) won't, so fail fast on those with a readable code.
+                    if (isTransient(error)) retryOrFail(station, audioUrl, error.errorCodeName)
+                    else _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
+                }
+            })
+            exo.playWhenReady = true
+            exo.prepare()
+            player = exo
+        }.onFailure { _state.value = RadioState(station, Status.ERROR, it.message) }
+    }
+
+    /** Network/IO errors are worth a retry; container-parse / decoder / bad-HTTP errors are not. */
+    private fun isTransient(error: PlaybackException): Boolean =
+        error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+
+    /** Re-prepare the stream after a short delay, up to [MAX_RETRIES]; otherwise show [reason]. */
+    private fun retryOrFail(station: RadioStation, audioUrl: String, reason: String) {
+        if (retries >= MAX_RETRIES) {
+            _state.value = RadioState(station, Status.ERROR, reason)
+            return
+        }
+        retries++
+        _state.value = RadioState(station, Status.TUNING, "reconnecting…")
+        scope.launch {
+            delay(1_500)
+            runOnMain {
+                if (_state.value.tuned?.streamUrl != station.streamUrl) return@runOnMain
+                val exo = player
+                if (exo == null) {
+                    _state.value = RadioState(station, Status.ERROR, reason)
+                    return@runOnMain
+                }
+                runCatching {
+                    exo.setMediaItem(MediaItem.fromUri(audioUrl))
+                    exo.prepare()
+                    exo.playWhenReady = true
+                }.onFailure { _state.value = RadioState(station, Status.ERROR, reason) }
+            }
         }
     }
 
@@ -182,13 +231,13 @@ object RadioController {
     /** Poll the tuned station's ICY now-playing title on a separate brief connection — but only for
      *  stations that tolerate a second connection (skipped for the single-connection commercial CDNs so
      *  their audio is never disturbed). A short initial delay lets the audio connection settle first. */
-    private fun startMetaPolling(station: RadioStation) {
+    private fun startMetaPolling(station: RadioStation, audioUrl: String) {
         metaJob?.cancel()
-        if (SINGLE_CONNECTION_HOSTS.any { station.streamUrl.contains(it, ignoreCase = true) }) return
+        if (SINGLE_CONNECTION_HOSTS.any { audioUrl.contains(it, ignoreCase = true) }) return
         metaJob = scope.launch {
             delay(6_000)
             while (_state.value.tuned?.streamUrl == station.streamUrl) {
-                val title = runCatching { IcyMetadata.nowPlaying(station.streamUrl) }.getOrNull()
+                val title = runCatching { IcyMetadata.nowPlaying(audioUrl) }.getOrNull()
                 if (_state.value.tuned?.streamUrl == station.streamUrl) _nowPlaying.value = title
                 delay(30_000)
             }
