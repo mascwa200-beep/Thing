@@ -73,6 +73,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val searchResults by vm.searchResults.collectAsStateWithLifecycle()
     val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
     val sleepMinutes by vm.sleepMinutes.collectAsStateWithLifecycle()
+    val nowPlaying by vm.nowPlaying.collectAsStateWithLifecycle()
     val c = Pulse.colors
     val tuned = state.tuned
     val context = LocalContext.current
@@ -118,6 +119,15 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                     tuned?.band ?: "LOCAL & FREE LISTENER-SUPPORTED STREAMS",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
                 )
+                // Live now-playing track (ICY metadata) when the tuned station is on air.
+                if (state.status == RadioController.Status.ON_AIR && !nowPlaying.isNullOrBlank()) {
+                    Text(
+                        "♪ $nowPlaying",
+                        fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
                 SleepTimerRow(
                     active = sleepMinutes,
                     c = c,
@@ -164,14 +174,14 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             RadioViewModel.SearchStatus.ERROR ->
                 Text("Search unavailable — check your connection.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber, modifier = Modifier.padding(top = 4.dp))
             RadioViewModel.SearchStatus.READY ->
-                StationStrip(searchResults, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
+                StationStrip(searchResults, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
             RadioViewModel.SearchStatus.IDLE -> Unit
         }
 
         // ---- FAVOURITES (starred; persisted) ----
         if (favorites.isNotEmpty()) {
             PipHeader("Favourites")
-            StationStrip(favorites, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
+            StationStrip(favorites, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
         // ---- LOCAL signals (geo-sourced, on-demand) ----
@@ -184,12 +194,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             onRetry = { vm.loadLocal() },
         )
         if (localStations.isNotEmpty()) {
-            StationStrip(localStations, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
+            StationStrip(localStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
         // ---- CURATED streams (always available) ----
         PipHeader("Stations")
-        StationStrip(vm.curatedStations, state, c, favUrls, vm::toggleFavorite) { vm.toggle(context, it) }
+        StationStrip(vm.curatedStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
 
         Text(
             "Swipe each rail to browse · tap a card to tune · ★ saves it. Local stations via Radio Browser " +
@@ -208,6 +218,7 @@ private fun StationStrip(
     state: RadioController.RadioState,
     c: NightwirePalette,
     favUrls: Set<String>,
+    nowPlaying: String?,
     onFavorite: (RadioStation) -> Unit,
     onTune: (RadioStation) -> Unit,
 ) {
@@ -217,7 +228,7 @@ private fun StationStrip(
         contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp),
     ) {
         items(stations, key = { it.streamUrl }) { st ->
-            StationCard(st, state, c, st.streamUrl in favUrls, { onFavorite(st) }) { onTune(st) }
+            StationCard(st, state, c, st.streamUrl in favUrls, nowPlaying, { onFavorite(st) }) { onTune(st) }
         }
     }
 }
@@ -253,12 +264,14 @@ private fun StationCard(
     state: RadioController.RadioState,
     c: NightwirePalette,
     isFavorite: Boolean,
+    nowPlaying: String?,
     onFavorite: () -> Unit,
     onClick: () -> Unit,
 ) {
     val active = state.tuned?.streamUrl == st.streamUrl
     val onAir = active && state.status == RadioController.Status.ON_AIR
     val tuningThis = active && state.status == RadioController.Status.TUNING
+    val track = if (onAir && !nowPlaying.isNullOrBlank()) nowPlaying else null
     Box(
         Modifier
             .width(168.dp)
@@ -293,7 +306,9 @@ private fun StationCard(
                 lineHeight = 16.sp,
             )
             Text(
-                st.band, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = c.muted,
+                track?.let { "♪ $it" } ?: st.band,
+                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp,
+                color = if (track != null) c.accent else c.muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
             )
         }
