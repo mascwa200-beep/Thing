@@ -265,6 +265,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.HistoryTool(memoryStream),
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.ArchitectureTool(knowledgeStore, gitHubRepo),
+            dev.mascwa.pulse.jarvis.agent.CiTool(gitHubRepo),
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
