@@ -3,6 +3,7 @@ package dev.mascwa.pulse.di
 import android.content.Context
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.data.context.ContextMonitor
 import dev.mascwa.pulse.data.economy.EconomyRepository
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.fuel.FuelRepository
@@ -156,6 +157,11 @@ class AppContainer(private val appContext: Context) {
     }
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
         dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
+    }
+
+    // ---- Context Monitoring (proactive context shift detection) ----
+    val contextMonitor: ContextMonitor by lazy {
+        ContextMonitor(appContext, usageRepository, locationProvider, memoryStream, settingsRepository)
     }
 
     // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
