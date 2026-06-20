@@ -6,6 +6,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.settings.SpotifyAuthState
+import dev.mascwa.pulse.data.spotify.PlaybackResult
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
@@ -45,6 +46,10 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
     private val _searchStatus = MutableStateFlow(SearchStatus.IDLE)
     val searchStatus: StateFlow<SearchStatus> = _searchStatus.asStateFlow()
+
+    /** A transient one-line explanation of the last control result (e.g. Premium / no device), or null. */
+    private val _status = MutableStateFlow<String?>(null)
+    val status: StateFlow<String?> = _status.asStateFlow()
 
     private var searchJob: Job? = null
 
@@ -90,35 +95,69 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
     private suspend fun refreshPlayback() { _playback.value = repo.currentlyPlaying() }
 
+    /** A device to target when nothing is active: the active one, else the first available (so playback
+     *  actually starts on, e.g., the only Connect speaker, instead of 404-ing with "no active device"). */
+    private suspend fun ensureDevice(): String? {
+        val devs = repo.devices()
+        _devices.value = devs
+        return devs.firstOrNull { it.isActive }?.id ?: devs.firstOrNull()?.id
+    }
+
     // Transport routes to the App Remote player when it's connected (audio in the Spotify app), else to
-    // the Web API (controls whatever Connect device is active).
+    // the Web API (controls whatever Connect device is active — falling back to the first device).
 
     fun togglePlayPause() {
         if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.togglePlayPause(); return }
         viewModelScope.launch {
-            if (_playback.value?.isPlaying == true) repo.pause() else repo.resume()
+            val res = if (_playback.value?.isPlaying == true) {
+                repo.pause()
+            } else {
+                // Resuming with no active device → target one so it actually starts.
+                val target = if (_playback.value == null) ensureDevice() else null
+                repo.resume(target)
+            }
+            reportStatus(res)
             delay(400); refreshPlayback()
         }
     }
 
     fun next() {
         if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.next(); return }
-        viewModelScope.launch { repo.next(); delay(600); refreshPlayback() }
+        viewModelScope.launch { reportStatus(repo.next()); delay(600); refreshPlayback() }
     }
 
     fun previous() {
         if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.previous(); return }
-        viewModelScope.launch { repo.previous(); delay(600); refreshPlayback() }
+        viewModelScope.launch { reportStatus(repo.previous()); delay(600); refreshPlayback() }
     }
 
     fun transferTo(device: SpotifyDevice) = viewModelScope.launch {
-        repo.transferTo(device.id); delay(800); refreshPlayback(); _devices.value = repo.devices()
+        reportStatus(repo.transferTo(device.id)); delay(800); refreshPlayback(); _devices.value = repo.devices()
     }
 
     fun play(track: SpotifyTrack) {
         if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.playUri(track.uri); return }
-        viewModelScope.launch { repo.playUri(track.uri); delay(600); refreshPlayback() }
+        viewModelScope.launch {
+            // Start on the active device, or the first available — Web API play() no-ops without a target.
+            val target = ensureDevice()
+            reportStatus(repo.playUri(track.uri, target), targetWasNull = target == null)
+            delay(600); refreshPlayback()
+        }
     }
+
+    /** Map a control outcome to a one-line UI message (cleared on success). */
+    private fun reportStatus(res: PlaybackResult, targetWasNull: Boolean = false) {
+        _status.value = when (res) {
+            PlaybackResult.OK -> null
+            PlaybackResult.NO_DEVICE ->
+                if (targetWasNull) "No device found. Open Spotify on a phone, desktop or speaker first."
+                else "Couldn't reach that device — open Spotify on it."
+            PlaybackResult.NEEDS_PREMIUM -> "Spotify Premium is required to control playback from here."
+            PlaybackResult.FAILED -> "Couldn't control playback — check the connection and try again."
+        }
+    }
+
+    fun clearStatus() { _status.value = null }
 
     fun search(query: String) {
         searchJob?.cancel()
