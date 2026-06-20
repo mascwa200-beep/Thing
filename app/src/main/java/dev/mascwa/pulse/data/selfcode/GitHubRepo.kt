@@ -180,6 +180,57 @@ class GitHubRepo(private val settings: SettingsRepository) {
     suspend fun deleteBranch(name: String): Boolean =
         runCatching { raw("DELETE", "$API/git/refs/heads/$name"); true }.getOrDefault(false)
 
+    data class RunInfo(val id: Long, val branch: String, val status: String, val conclusion: String, val sha: String)
+
+    /** Recent Android-build workflow runs (push events), newest first — id, branch, status, conclusion. */
+    suspend fun recentRuns(limit: Int = 20): List<RunInfo> = runCatching {
+        val runs = obj("GET", "$API/actions/runs?per_page=$limit&event=push").optJSONArray("workflow_runs")
+            ?: return emptyList()
+        (0 until runs.length()).map { i ->
+            val r = runs.getJSONObject(i)
+            RunInfo(
+                r.optLong("id"), r.optString("head_branch"),
+                r.optString("status"), r.optString("conclusion"), r.optString("head_sha"),
+            )
+        }
+    }.getOrDefault(emptyList())
+
+    /** The compile-error / failure lines from a failed run, by reading its failed job's plain-text log and
+     *  extracting the meaningful lines (kotlinc `e:` errors, Gradle "What went wrong", etc.). This is the
+     *  self-correction feedback loop: J.A.R.V.I.S. can see exactly why its self-code PR didn't compile. */
+    suspend fun runErrors(runId: Long): String {
+        return try {
+            val jobs = obj("GET", "$API/actions/runs/$runId/jobs").optJSONArray("jobs")
+                ?: return "Couldn't read the run's jobs."
+            var jobId = -1L
+            for (i in 0 until jobs.length()) {
+                val j = jobs.getJSONObject(i)
+                if (j.optString("conclusion") == "failure") { jobId = j.optLong("id"); break }
+            }
+            if (jobId < 0) return "The run failed but no failed job was found."
+            val log = raw("GET", "$API/actions/jobs/$jobId/logs")
+            extractErrors(log)
+        } catch (e: Exception) {
+            "Couldn't read the build log: ${e.message}"
+        }
+    }
+
+    /** Pull the salient failure lines out of a (large) Actions job log, de-duped and capped. */
+    private fun extractErrors(log: String): String {
+        val markers = listOf(
+            "e: ", "error:", "Unresolved reference", "Compilation error", "What went wrong",
+            "Caused by:", "> Task :", "FAILURE:", "none of the following", "Type mismatch",
+            "too many arguments", "no value passed for parameter",
+        )
+        val lines = log.lineSequence()
+            .map { it.replaceFirst(Regex("^\\S+Z\\s+"), "").trimEnd() }
+            .filter { l -> l.isNotBlank() && markers.any { l.contains(it, ignoreCase = false) } }
+            .distinct()
+            .toList()
+        return if (lines.isEmpty()) "The build failed but I couldn't isolate specific error lines in the log."
+        else lines.take(40).joinToString("\n")
+    }
+
     companion object {
         const val API = "https://api.github.com/repos/mascwa200-beep/Thing"
         private val JSON = "application/json; charset=utf-8".toMediaType()
