@@ -34,6 +34,8 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         NotificationChannels.ensure(this)
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
+        // Start the context monitor to detect context shifts for proactive suggestions.
+        appScope.launch { container.contextMonitor.start() }
     }
 
     override val workManagerConfiguration: Configuration
