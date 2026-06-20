@@ -275,7 +275,23 @@ class SelfCoder(
         val out = runCatching {
             engine.generate(user, emptyList(), sys).toList().joinToString("")
         }.getOrDefault("").trim()
-        return stripFences(out).ifBlank { null }?.takeIf { it.length in 8..200_000 && !it.startsWith("//") }
+        return stripFences(out).ifBlank { null }
+            ?.takeIf { it.length in 8..200_000 && !it.startsWith("//") }
+            ?.takeIf { !path.endsWith(".kt") || looksLikeKotlinSource(it) }
+    }
+
+    /** Conservative Kotlin pre-flight: a drafted `.kt` file must read like Kotlin source — a package line
+     *  or a recognizable top-level declaration, no leftover markdown fence, and not a natural-language
+     *  apology/prose — so a non-code draft is caught HERE instead of opening a PR that can't compile. It's
+     *  intentionally lenient (real Kotlin always passes); CI remains the real compiler. */
+    private fun looksLikeKotlinSource(src: String): Boolean {
+        val t = src.trim()
+        if (t.contains("```")) return false
+        val low = t.lowercase()
+        if (PROSE_STARTS.any { low.startsWith(it) }) return false
+        return Regex("(?m)^\\s*package\\s+[\\w.]+").containsMatchIn(t) ||
+            Regex("(?m)^\\s*(public |internal |private |abstract |open |sealed |data |enum |annotation )*" +
+                "(class|object|interface|fun|val|var|typealias)\\s").containsMatchIn(t)
     }
 
     private fun stripFences(s: String): String {
@@ -297,5 +313,10 @@ class SelfCoder(
         const val MAX_FILES = 4
         // Cap the stored preview diff so the approval payload stays bounded.
         const val MAX_DIFF_CHARS = 12_000
+        // Openers that mark a draft as natural-language prose rather than Kotlin source.
+        private val PROSE_STARTS = listOf(
+            "i cannot", "i can't", "i'm sorry", "sorry", "here is", "here's", "sure,", "sure!",
+            "unfortunately", "as an ai", "certainly", "of course",
+        )
     }
 }
