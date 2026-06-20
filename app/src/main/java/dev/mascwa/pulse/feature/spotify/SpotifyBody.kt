@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
@@ -49,17 +51,22 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
 
+/** Caution amber for App-Remote errors, readable against the green CRT. */
+private val Amber = Color(0xFFE0B341)
+
 /**
- * The PIP-BOY MUSIC (Spotify) feed — link an account, then see now-playing, drive transport, pick a
- * Connect device, and search-and-play, all in the Fallout green terminal idiom. The Web API controls
- * playback on an already-active Spotify device; in-app audio (the phone as its own device) is a Premium
- * follow-up via the Web Playback SDK.
+ * The PIP-BOY MUSIC (Spotify) feed. Two layers in the Fallout green idiom:
+ *  1) **PLAYER** — the App Remote "real player": connects to the installed Spotify app and plays/controls
+ *     it in-app (the audio comes from the Spotify app). Works standalone.
+ *  2) **ACCOUNT** — the Web API: link an account to search the catalogue and pick Connect devices. Search
+ *     results play through the App Remote player when it's connected, otherwise the active Connect device.
  */
 @Composable
 fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     val context = LocalContext.current
     val auth by vm.auth.collectAsStateWithLifecycle()
+    val remote by vm.remoteState.collectAsStateWithLifecycle()
     val playback by vm.playback.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
     val results by vm.searchResults.collectAsStateWithLifecycle()
@@ -69,37 +76,37 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(auth.linked) { if (auth.linked) vm.refresh() }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        // ---- PLAYER (App Remote — the real in-app player) ----
+        PipHeader("Player", trailing = if (remote.connected) "CONNECTED" else null)
+        if (remote.connected) {
+            ConnectedPlayer(remote, c, vm) { vm.disconnectApp() }
+        } else {
+            AppPlayerCard(remote, c) { vm.connectApp(context) }
+        }
+
+        // ---- ACCOUNT (Web API: search + devices) ----
         if (!auth.linked) {
-            // ---- CONNECT ----
-            PipHeader("Spotify")
+            PipHeader("Account")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text(
-                        "Link a Spotify account to control playback, see what's on air, and search the catalogue.",
+                        "Link a Spotify account to search the catalogue and choose Connect devices.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
                     )
                     Text(
-                        "In-app audio needs Spotify Premium; free accounts can still control any device that's already playing.",
+                        "The player above controls your installed Spotify app and works without linking.",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = 6.dp),
                     )
-                    PipButton("▸ LINK SPOTIFY", c, Modifier.padding(top = 14.dp)) { vm.connect(context) }
+                    PipButton("▸ LINK ACCOUNT", c, Modifier.padding(top = 12.dp)) { vm.connect(context) }
                 }
             }
         } else {
-            // ---- HEADER ----
-            PipHeader("Spotify", trailing = auth.displayName.ifBlank { "LINKED" })
-            if (!auth.premium && auth.displayName.isNotBlank()) {
-                Text(
-                    "Free account — control an active device; in-app playback needs Premium.",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+            // When the App Remote player isn't connected, show what's on a Web-API Connect device.
+            if (!remote.connected) {
+                PipHeader("Now Playing", trailing = auth.displayName.ifBlank { "LINKED" })
+                WebNowPlaying(playback, c, vm)
             }
-
-            // ---- NOW PLAYING ----
-            PipHeader("Now Playing")
-            NowPlaying(playback, c, vm)
 
             // ---- SEARCH ----
             PipHeader("Search")
@@ -115,10 +122,8 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 }
             }
             when (searchStatus) {
-                SpotifyViewModel.SearchStatus.LOADING ->
-                    StatusLine("Searching…", c)
-                SpotifyViewModel.SearchStatus.EMPTY ->
-                    StatusLine("No tracks found.", c)
+                SpotifyViewModel.SearchStatus.LOADING -> StatusLine("Searching…", c)
+                SpotifyViewModel.SearchStatus.EMPTY -> StatusLine("No tracks found.", c)
                 else -> results.forEach { track -> TrackRow(track, c) { vm.play(track) } }
             }
 
@@ -130,22 +135,79 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 devices.forEach { d -> DeviceRow(d, c) { vm.transferTo(d) } }
             }
 
-            // ---- DISCONNECT ----
-            Box(Modifier.padding(top = 18.dp, bottom = 24.dp)) {
-                PipButton("UNLINK SPOTIFY", c, Modifier) { vm.disconnect() }
+            Box(Modifier.padding(top = 18.dp, bottom = 8.dp)) {
+                PipButton("UNLINK ACCOUNT", c, Modifier) { vm.disconnect() }
             }
         }
         Box(Modifier.padding(bottom = 16.dp))
     }
 }
 
+/** The App Remote connect card (shown until connected). */
 @Composable
-private fun NowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: SpotifyViewModel) {
+private fun AppPlayerCard(remote: SpotifyAppRemoteController.RemoteState, c: NightwirePalette, onConnect: () -> Unit) {
+    if (remote.connected) return
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column {
+            Text(
+                "Connect to your installed Spotify app to play and control music in-app.",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+            )
+            if (remote.error != null) {
+                Text("⚠ ${remote.error}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Amber,
+                    modifier = Modifier.padding(top = 6.dp))
+            }
+            PipButton(
+                if (remote.connecting) "CONNECTING…" else "▸ CONNECT SPOTIFY APP",
+                c, Modifier.padding(top = 12.dp),
+            ) { if (!remote.connecting) onConnect() }
+        }
+    }
+}
+
+/** The connected App Remote player — live now-playing + transport (drives the Spotify app). */
+@Composable
+private fun ConnectedPlayer(
+    remote: SpotifyAppRemoteController.RemoteState,
+    c: NightwirePalette,
+    vm: SpotifyViewModel,
+    onDisconnect: () -> Unit,
+) {
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column {
+            Text(remote.trackName.ifBlank { "—" }, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 16.sp, color = c.ink)
+            if (remote.artist.isNotBlank()) {
+                Text(remote.artist, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
+                    modifier = Modifier.padding(top = 2.dp))
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TransportButton(Icons.Filled.SkipPrevious, "Previous", c) { vm.previous() }
+                TransportButton(
+                    if (remote.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    "Play/Pause", c, primary = true,
+                ) { vm.togglePlayPause() }
+                TransportButton(Icons.Filled.SkipNext, "Next", c) { vm.next() }
+                Box(Modifier.weight(1f))
+                Text("DISCONNECT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                    letterSpacing = 1.sp, color = c.muted, modifier = Modifier.clickable { onDisconnect() })
+            }
+        }
+    }
+}
+
+/** Web-API now-playing (a Connect device), shown when the App Remote player isn't connected. */
+@Composable
+private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: SpotifyViewModel) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column {
             if (playback == null) {
                 Text(
-                    "Nothing playing. Pick a device below or search a track to start.",
+                    "Nothing playing. Connect the player above, pick a device, or search a track.",
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 )
             } else {

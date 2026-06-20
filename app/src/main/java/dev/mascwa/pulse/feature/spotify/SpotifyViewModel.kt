@@ -6,6 +6,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.settings.SpotifyAuthState
+import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyRepository
@@ -47,6 +48,9 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
     private var searchJob: Job? = null
 
+    /** The App Remote "real player" — controls the installed Spotify app (audio plays through it). */
+    val remoteState = SpotifyAppRemoteController.state
+
     init {
         // Keep the now-playing readout live while linked.
         viewModelScope.launch {
@@ -56,6 +60,10 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
             }
         }
     }
+
+    /** Connect the App Remote player to the installed Spotify app (the real in-app player). */
+    fun connectApp(context: Context) = SpotifyAppRemoteController.connect(context)
+    fun disconnectApp() = SpotifyAppRemoteController.disconnect()
 
     /** Launch the Spotify authorize page in the browser (the redirect comes back to SpotifyAuthActivity). */
     fun connect(context: Context) {
@@ -82,19 +90,35 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
     private suspend fun refreshPlayback() { _playback.value = repo.currentlyPlaying() }
 
-    fun togglePlayPause() = viewModelScope.launch {
-        if (_playback.value?.isPlaying == true) repo.pause() else repo.resume()
-        delay(400); refreshPlayback()
+    // Transport routes to the App Remote player when it's connected (audio in the Spotify app), else to
+    // the Web API (controls whatever Connect device is active).
+
+    fun togglePlayPause() {
+        if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.togglePlayPause(); return }
+        viewModelScope.launch {
+            if (_playback.value?.isPlaying == true) repo.pause() else repo.resume()
+            delay(400); refreshPlayback()
+        }
     }
 
-    fun next() = viewModelScope.launch { repo.next(); delay(600); refreshPlayback() }
-    fun previous() = viewModelScope.launch { repo.previous(); delay(600); refreshPlayback() }
+    fun next() {
+        if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.next(); return }
+        viewModelScope.launch { repo.next(); delay(600); refreshPlayback() }
+    }
+
+    fun previous() {
+        if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.previous(); return }
+        viewModelScope.launch { repo.previous(); delay(600); refreshPlayback() }
+    }
 
     fun transferTo(device: SpotifyDevice) = viewModelScope.launch {
         repo.transferTo(device.id); delay(800); refreshPlayback(); _devices.value = repo.devices()
     }
 
-    fun play(track: SpotifyTrack) = viewModelScope.launch { repo.playUri(track.uri); delay(600); refreshPlayback() }
+    fun play(track: SpotifyTrack) {
+        if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.playUri(track.uri); return }
+        viewModelScope.launch { repo.playUri(track.uri); delay(600); refreshPlayback() }
+    }
 
     fun search(query: String) {
         searchJob?.cancel()

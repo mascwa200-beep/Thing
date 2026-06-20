@@ -186,4 +186,10 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.compose)
     implementation(libs.play.services.location)
+
+    // Spotify App Remote: the "real" player — connects to the installed Spotify app and drives its
+    // playback (audio plays through the Spotify app, controlled from PIP-BOY). Shipped only as a
+    // manually-vendored AAR (not on Maven); it needs Gson at runtime.
+    implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
+    implementation("com.google.code.gson:gson:2.11.0")
 }
