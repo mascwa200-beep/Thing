@@ -1,0 +1,323 @@
+package com.app.architecture.knowledge
+
+import java.time.Instant
+import kotlin.reflect.KClass
+
+data class ArchitectureKnowledgeBase(
+    val appName: String,
+    val createdAt: Instant = Instant.now(),
+    val modules: MutableMap<String, ModuleDefinition> = mutableMapOf(),
+    val apiSurfaces: MutableMap<String, ApiSurfaceDefinition> = mutableMapOf(),
+    val uiPatterns: MutableMap<String, UiPatternDefinition> = mutableMapOf(),
+    val dataFlows: MutableMap<String, DataFlowDefinition> = mutableMapOf(),
+    val historicalChanges: MutableList<ArchitecturalChange> = mutableListOf(),
+    val lastUpdated: Instant = Instant.now()
+)
+
+data class ModuleDefinition(
+    val name: String,
+    val description: String,
+    val dependencies: Set<String> = setOf(),
+    val exposedInterfaces: Set<String> = setOf(),
+    val internalComponents: Set<String> = setOf(),
+    val layer: ArchitectureLayer,
+    val responsibility: String,
+    val documentedAt: Instant = Instant.now(),
+    val notes: String = ""
+)
+
+enum class ArchitectureLayer {
+    PRESENTATION,
+    DOMAIN,
+    DATA,
+    INFRASTRUCTURE,
+    UTILITY
+}
+
+data class ApiSurfaceDefinition(
+    val name: String,
+    val moduleName: String,
+    val endpoints: List<ApiEndpoint> = emptyList(),
+    val publicMethods: Set<String> = setOf(),
+    val requestModels: Set<String> = setOf(),
+    val responseModels: Set<String> = setOf(),
+    val errorTypes: Set<String> = setOf(),
+    val deprecations: List<DeprecationNote> = emptyList(),
+    val documentedAt: Instant = Instant.now()
+)
+
+data class ApiEndpoint(
+    val name: String,
+    val signature: String,
+    val inputParameters: Map<String, String> = emptyMap(),
+    val outputType: String,
+    val sideEffects: String = "",
+    val callers: Set<String> = setOf()
+)
+
+data class DeprecationNote(
+    val target: String,
+    val reason: String,
+    val replacement: String?,
+    val removedAt: Instant?
+)
+
+data class UiPatternDefinition(
+    val name: String,
+    val description: String,
+    val components: Set<String> = setOf(),
+    val stateManagement: String,
+    val navigationFlow: String,
+    val examples: List<String> = emptyList(),
+    val documentedAt: Instant = Instant.now(),
+    val notes: String = ""
+)
+
+data class DataFlowDefinition(
+    val name: String,
+    val description: String,
+    val source: String,
+    val intermediateSteps: List<String> = emptyList(),
+    val destination: String,
+    val persistenceStrategy: String,
+    val cacheInvalidation: String,
+    val errorHandling: String,
+    val documentedAt: Instant = Instant.now(),
+    val notes: String = ""
+)
+
+data class ArchitecturalChange(
+    val id: String,
+    val timestamp: Instant = Instant.now(),
+    val category: ChangeCategory,
+    val affectedModules: Set<String> = setOf(),
+    val description: String,
+    val rationale: String,
+    val breaking: Boolean = false,
+    val mitigations: List<String> = emptyList(),
+    val references: List<String> = emptyList()
+)
+
+enum class ChangeCategory {
+    MODULE_CREATED,
+    MODULE_REMOVED,
+    DEPENDENCY_ADDED,
+    DEPENDENCY_REMOVED,
+    API_MODIFIED,
+    API_DEPRECATED,
+    PATTERN_INTRODUCED,
+    PATTERN_EVOLVED,
+    DATA_FLOW_CHANGED,
+    MIGRATION_COMPLETED,
+    REFACTORING,
+    OPTIMIZATION,
+    OTHER
+}
+
+class KnowledgeBaseManager(private val kb: ArchitectureKnowledgeBase) {
+
+    fun recordModule(module: ModuleDefinition): ArchitectureKnowledgeBase {
+        kb.modules[module.name] = module
+        kb.historicalChanges.add(
+            ArchitecturalChange(
+                id = "module_added_${module.name}_${System.nanoTime()}",
+                category = ChangeCategory.MODULE_CREATED,
+                description = "Module '${module.name}' added to architecture",
+                rationale = module.responsibility,
+                affectedModules = setOf(module.name)
+            )
+        )
+        return kb
+    }
+
+    fun recordApiSurface(api: ApiSurfaceDefinition): ArchitectureKnowledgeBase {
+        kb.apiSurfaces[api.name] = api
+        return kb
+    }
+
+    fun recordUiPattern(pattern: UiPatternDefinition): ArchitectureKnowledgeBase {
+        kb.uiPatterns[pattern.name] = pattern
+        kb.historicalChanges.add(
+            ArchitecturalChange(
+                id = "pattern_introduced_${pattern.name}_${System.nanoTime()}",
+                category = ChangeCategory.PATTERN_INTRODUCED,
+                description = "UI pattern '${pattern.name}' documented",
+                rationale = pattern.description,
+                affectedModules = setOf()
+            )
+        )
+        return kb
+    }
+
+    fun recordDataFlow(flow: DataFlowDefinition): ArchitectureKnowledgeBase {
+        kb.dataFlows[flow.name] = flow
+        return kb
+    }
+
+    fun recordChange(change: ArchitecturalChange): ArchitectureKnowledgeBase {
+        kb.historicalChanges.add(change)
+        return kb
+    }
+
+    fun addModuleDependency(
+        fromModule: String,
+        toModule: String,
+        reason: String = ""
+    ): ArchitectureKnowledgeBase {
+        kb.modules[fromModule]?.apply {
+            val updated = copy(dependencies = dependencies + toModule)
+            kb.modules[fromModule] = updated
+        }
+        kb.historicalChanges.add(
+            ArchitecturalChange(
+                id = "dep_added_${fromModule}_${toModule}_${System.nanoTime()}",
+                category = ChangeCategory.DEPENDENCY_ADDED,
+                description = "Dependency added: $fromModule → $toModule",
+                rationale = reason,
+                affectedModules = setOf(fromModule, toModule)
+            )
+        )
+        return kb
+    }
+
+    fun deprecateApi(
+        apiName: String,
+        reason: String,
+        replacement: String? = null,
+        removalDate: Instant? = null
+    ): ArchitectureKnowledgeBase {
+        kb.apiSurfaces[apiName]?.apply {
+            val note = DeprecationNote(
+                target = apiName,
+                reason = reason,
+                replacement = replacement,
+                removedAt = removalDate
+            )
+            val updated = copy(deprecations = deprecations + note)
+            kb.apiSurfaces[apiName] = updated
+        }
+        return kb
+    }
+
+    fun queryModulesByLayer(layer: ArchitectureLayer): List<ModuleDefinition> {
+        return kb.modules.values.filter { it.layer == layer }
+    }
+
+    fun queryDependencyChain(moduleName: String): List<String> {
+        val visited = mutableSetOf<String>()
+        val stack = mutableListOf(moduleName)
+        val chain = mutableListOf<String>()
+
+        while (stack.isNotEmpty()) {
+            val current = stack.removeLast()
+            if (current in visited) continue
+            visited.add(current)
+            chain.add(current)
+            kb.modules[current]?.dependencies?.forEach { dep ->
+                if (dep !in visited) stack.add(dep)
+            }
+        }
+        return chain
+    }
+
+    fun getChangesSince(timestamp: Instant): List<ArchitecturalChange> {
+        return kb.historicalChanges.filter { it.timestamp >= timestamp }
+    }
+
+    fun getModuleImpact(moduleName: String): ModuleImpactAnalysis {
+        val dependents = kb.modules.values.filter { moduleName in it.dependencies }
+        val dependencies = kb.modules[moduleName]?.dependencies ?: setOf()
+        val relatedChanges = kb.historicalChanges.filter { moduleName in it.affectedModules }
+
+        return ModuleImpactAnalysis(
+            moduleName = moduleName,
+            directDependents = dependents.map { it.name }.toSet(),
+            directDependencies = dependencies,
+            recentChanges = relatedChanges.sortedByDescending { it.timestamp }.take(10),
+            affectedApiSurfaces = kb.apiSurfaces.values
+                .filter { it.moduleName == moduleName }
+                .map { it.name }
+                .toSet()
+        )
+    }
+
+    fun auditKnowledgeBase(): AuditReport {
+        val issues = mutableListOf<AuditIssue>()
+        val timestamp = Instant.now()
+
+        kb.modules.forEach { (moduleName, module) ->
+            module.dependencies.forEach { dep ->
+                if (dep !in kb.modules) {
+                    issues.add(
+                        AuditIssue(
+                            severity = Severity.WARNING,
+                            message = "Module '$moduleName' depends on unknown module '$dep'"
+                        )
+                    )
+                }
+            }
+        }
+
+        kb.apiSurfaces.forEach { (apiName, api) ->
+            if (api.moduleName !in kb.modules) {
+                issues.add(
+                    AuditIssue(
+                        severity = Severity.ERROR,
+                        message = "API surface '$apiName' references non-existent module '${api.moduleName}'"
+                    )
+                )
+            }
+        }
+
+        return AuditReport(
+            timestamp = timestamp,
+            issues = issues,
+            moduleCount = kb.modules.size,
+            apiSurfaceCount = kb.apiSurfaces.size,
+            changeCount = kb.historicalChanges.size
+        )
+    }
+
+    fun exportAsJson(): String {
+        return kotlinx.serialization.json.Json.encodeToString(kb)
+    }
+}
+
+data class ModuleImpactAnalysis(
+    val moduleName: String,
+    val directDependents: Set<String>,
+    val directDependencies: Set<String>,
+    val recentChanges: List<ArchitecturalChange>,
+    val affectedApiSurfaces: Set<String>
+)
+
+data class AuditReport(
+    val timestamp: Instant,
+    val issues: List<AuditIssue>,
+    val moduleCount: Int,
+    val apiSurfaceCount: Int,
+    val changeCount: Int
+)
+
+data class AuditIssue(
+    val severity: Severity,
+    val message: String,
+    val suggestion: String? = null
+)
+
+enum class Severity {
+    INFO,
+    WARNING,
+    ERROR,
+    CRITICAL
+}
+
+object KnowledgeBaseFactory {
+    fun createKnowledgeBase(appName: String): ArchitectureKnowledgeBase {
+        return ArchitectureKnowledgeBase(appName = appName)
+    }
+
+    fun manageKnowledgeBase(kb: ArchitectureKnowledgeBase): KnowledgeBaseManager {
+        return KnowledgeBaseManager(kb)
+    }
+}
