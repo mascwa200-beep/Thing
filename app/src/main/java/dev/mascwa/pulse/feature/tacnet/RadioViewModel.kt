@@ -99,7 +99,7 @@ class RadioViewModel(
     val browseStatus: StateFlow<BrowseStatus> = _browseStatus.asStateFlow()
     private val _browseCountry = MutableStateFlow<String?>(null)
     val browseCountry: StateFlow<String?> = _browseCountry.asStateFlow()
-    private var browseJob: Job? = null
+    private var browseJob: kotlinx.coroutines.Job? = null
 
     /** Load the top stations for a country (the WORLD browse). */
     fun browse(country: RadioCountry) {
