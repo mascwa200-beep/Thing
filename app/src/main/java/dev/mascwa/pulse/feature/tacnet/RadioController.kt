@@ -27,8 +27,9 @@ object RadioController {
 
     enum class Status { IDLE, TUNING, ON_AIR, ERROR }
 
-    /** Tuned station tracked by identity (not list index) so it stays lit as the local list loads in. */
-    data class RadioState(val tuned: RadioStation? = null, val status: Status = Status.IDLE)
+    /** Tuned station tracked by identity (not list index) so it stays lit as the local list loads in.
+     *  [detail] carries the MediaPlayer error code on [Status.ERROR] so a failure is diagnosable. */
+    data class RadioState(val tuned: RadioStation? = null, val status: Status = Status.IDLE, val detail: String? = null)
 
     private val _state = MutableStateFlow(RadioState())
     val state: StateFlow<RadioState> = _state.asStateFlow()
@@ -40,6 +41,11 @@ object RadioController {
     /** Live "Artist - Song" for the tuned station (ICY stream metadata), or null when unavailable. */
     private val _nowPlaying = MutableStateFlow<String?>(null)
     val nowPlaying: StateFlow<String?> = _nowPlaying.asStateFlow()
+
+    // A real browser User-Agent for the audio request — picky commercial CDNs (StreamTheWorld/Triton,
+    // iHeart, etc.) refuse MediaPlayer's default UA, so the stream never opens.
+    private const val STREAM_UA =
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     private val scope = CoroutineScope(SupervisorJob())
     private var sleepJob: Job? = null
@@ -87,9 +93,15 @@ object RadioController {
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build(),
                 )
-                setDataSource(station.streamUrl)
+                // Send a real User-Agent: StreamTheWorld/Triton and many commercial radio CDNs reject
+                // MediaPlayer's default UA (403/empty body), which silently breaks tuning. A normal
+                // browser UA fixes the large majority of "won't tune" commercial streams.
+                setDataSource(app, android.net.Uri.parse(station.streamUrl), mapOf("User-Agent" to STREAM_UA))
                 setOnPreparedListener { it.start(); _state.value = RadioState(station, Status.ON_AIR) }
-                setOnErrorListener { _, _, _ -> _state.value = RadioState(station, Status.ERROR); true }
+                setOnErrorListener { _, what, extra ->
+                    _state.value = RadioState(station, Status.ERROR, "stream error ($what/$extra)")
+                    true
+                }
                 prepareAsync()
             }
         }.onFailure { _state.value = RadioState(station, Status.ERROR) }
