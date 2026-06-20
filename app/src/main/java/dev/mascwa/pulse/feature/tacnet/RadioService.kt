@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * A `mediaPlayback` foreground service whose only job is to keep the process (and thus [RadioController]'s
- * [android.media.MediaPlayer]) alive while audio is playing, and to show a media notification with a Stop
+ * ExoPlayer) alive while audio is playing, and to show a media notification with a Stop
  * action. Playback itself lives in [RadioController]; this service mirrors its state into the notification
  * and tears itself down when playback stops. Fully defensive — a notification/foreground hiccup can't crash.
  */

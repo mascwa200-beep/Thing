@@ -2,9 +2,19 @@ package dev.mascwa.pulse.feature.tacnet
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
 import kotlinx.coroutines.CoroutineScope
@@ -17,18 +27,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Process-wide radio playback: one [MediaPlayer] that keeps playing after the PIP-BOY — or the whole
+ * Process-wide radio playback: one [ExoPlayer] that keeps playing after the PIP-BOY — or the whole
  * Activity — goes away, kept alive by [RadioService] (a `mediaPlayback` foreground service). The
  * ViewModel and the service notification both drive and observe this single object, so "what's on air"
  * has one source of truth. Defensive throughout — a bad URL / network drop lands in [Status.ERROR],
  * never a crash.
+ *
+ * ExoPlayer (not bare MediaPlayer) so the picky commercial streams actually open: it handles ICY /
+ * SHOUTcast responses, HLS, and the cross-protocol (http↔https) redirects that StreamTheWorld / Triton
+ * mounts do — exactly the cases that left MediaPlayer at `error (1/-1004)`. A real browser User-Agent is
+ * set too, since those CDNs 403 the default one. The player is touched ONLY on the main thread.
  */
 object RadioController {
 
     enum class Status { IDLE, TUNING, ON_AIR, ERROR }
 
     /** Tuned station tracked by identity (not list index) so it stays lit as the local list loads in.
-     *  [detail] carries the MediaPlayer error code on [Status.ERROR] so a failure is diagnosable. */
+     *  [detail] carries the player error name on [Status.ERROR] so a failure is diagnosable. */
     data class RadioState(val tuned: RadioStation? = null, val status: Status = Status.IDLE, val detail: String? = null)
 
     private val _state = MutableStateFlow(RadioState())
@@ -43,14 +58,19 @@ object RadioController {
     val nowPlaying: StateFlow<String?> = _nowPlaying.asStateFlow()
 
     // A real browser User-Agent for the audio request — picky commercial CDNs (StreamTheWorld/Triton,
-    // iHeart, etc.) refuse MediaPlayer's default UA, so the stream never opens.
+    // iHeart, etc.) refuse the default player UA, so the stream never opens.
     private const val STREAM_UA =
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     private val scope = CoroutineScope(SupervisorJob())
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepJob: Job? = null
     private var metaJob: Job? = null
-    private var player: MediaPlayer? = null
+    private var player: ExoPlayer? = null
+
+    private fun runOnMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
+    }
 
     /** Arm (or clear, with null/0) a sleep timer that stops playback after [minutes]. */
     fun setSleep(context: Context, minutes: Int?) {
@@ -77,34 +97,50 @@ object RadioController {
         }
     }
 
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     fun play(context: Context, station: RadioStation) {
         val app = context.applicationContext
-        releasePlayer()
         _state.value = RadioState(station, Status.TUNING)
         startMetaPolling(station)
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
         // FGS start just means foreground-only playback, never a crash).
         runCatching { ContextCompat.startForegroundService(app, Intent(app, RadioService::class.java)) }
-        runCatching {
-            player = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build(),
-                )
-                // Send a real User-Agent: StreamTheWorld/Triton and many commercial radio CDNs reject
-                // MediaPlayer's default UA (403/empty body), which silently breaks tuning. A normal
-                // browser UA fixes the large majority of "won't tune" commercial streams.
-                setDataSource(app, android.net.Uri.parse(station.streamUrl), mapOf("User-Agent" to STREAM_UA))
-                setOnPreparedListener { it.start(); _state.value = RadioState(station, Status.ON_AIR) }
-                setOnErrorListener { _, what, extra ->
-                    _state.value = RadioState(station, Status.ERROR, "stream error ($what/$extra)")
-                    true
-                }
-                prepareAsync()
-            }
-        }.onFailure { _state.value = RadioState(station, Status.ERROR) }
+        runOnMain {
+            releasePlayerInternal()
+            runCatching {
+                val httpFactory = DefaultHttpDataSource.Factory()
+                    .setUserAgent(STREAM_UA)
+                    .setAllowCrossProtocolRedirects(true)
+                    .setConnectTimeoutMs(20_000)
+                    .setReadTimeoutMs(20_000)
+                val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
+                val exo = ExoPlayer.Builder(app)
+                    .setMediaSourceFactory(sourceFactory)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(C.USAGE_MEDIA)
+                            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                            .build(),
+                        /* handleAudioFocus = */ true,
+                    )
+                    .build()
+                exo.setMediaItem(MediaItem.fromUri(station.streamUrl))
+                exo.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY && _state.value.tuned?.streamUrl == station.streamUrl) {
+                            _state.value = RadioState(station, Status.ON_AIR)
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
+                    }
+                })
+                exo.playWhenReady = true
+                exo.prepare()
+                player = exo
+            }.onFailure { _state.value = RadioState(station, Status.ERROR, it.message) }
+        }
     }
 
     fun stop(context: Context) {
@@ -112,7 +148,7 @@ object RadioController {
         _sleepMinutes.value = null
         metaJob?.cancel()
         _nowPlaying.value = null
-        releasePlayer()
+        runOnMain { releasePlayerInternal() }
         _state.value = RadioState(null, Status.IDLE)
         runCatching {
             val app = context.applicationContext
@@ -133,8 +169,9 @@ object RadioController {
         }
     }
 
-    private fun releasePlayer() {
-        runCatching { player?.reset(); player?.release() }
+    /** Release the player — MUST be called on the main thread (ExoPlayer is single-thread-affine). */
+    private fun releasePlayerInternal() {
+        runCatching { player?.stop(); player?.release() }
         player = null
     }
 }
