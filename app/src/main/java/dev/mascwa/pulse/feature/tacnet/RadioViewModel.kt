@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.radio.DEFAULT_STATIONS
 import dev.mascwa.pulse.data.radio.RadioBrowserRepository
 import dev.mascwa.pulse.data.radio.RadioStation
+import dev.mascwa.pulse.data.radio.TuneInRepository
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ class RadioViewModel(
     private val locationProvider: LocationProvider? = null,
     private val radioBrowser: RadioBrowserRepository? = null,
     private val settings: SettingsRepository? = null,
+    private val tuneIn: TuneInRepository? = null,
 ) : ViewModel() {
 
     /** Lifecycle of the on-demand local-station lookup (drives the LOCAL section's header/hint). */
@@ -97,9 +99,14 @@ class RadioViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _searchStatus.value = SearchStatus.SEARCHING
-            val list = runCatching { browser.searchStations(q) }.getOrDefault(emptyList())
-            _searchResults.value = list
-            _searchStatus.value = if (list.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
+            // Radio Browser first; then append TuneIn hits (US commercial stations Radio Browser lacks,
+            // e.g. WTRV), de-duped by stream. Additive — TuneIn failing just means fewer results.
+            val browserList = runCatching { browser.searchStations(q) }.getOrDefault(emptyList())
+            val tuneList = runCatching { tuneIn?.search(q) }.getOrNull().orEmpty()
+            val seen = HashSet(browserList.map { it.streamUrl })
+            val merged = browserList + tuneList.filter { seen.add(it.streamUrl) }
+            _searchResults.value = merged
+            _searchStatus.value = if (merged.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
         }
     }
 
