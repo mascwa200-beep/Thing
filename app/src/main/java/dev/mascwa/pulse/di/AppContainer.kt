@@ -262,6 +262,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.RememberTool(jarvisMemory),
             dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory),
+            dev.mascwa.pulse.jarvis.agent.RecallLinkerTool(jarvisMemory, memoryStream, profileStore, cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.HistoryTool(memoryStream),
             dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore),
             dev.mascwa.pulse.jarvis.agent.ArchitectureTool(knowledgeStore, gitHubRepo),
@@ -382,7 +383,7 @@ class AppContainer(private val appContext: Context) {
 
     /** Bounded ReAct loop wiring the on-device model to the live tool set + durable memory + knowledge. */
     val agentOrchestrator: dev.mascwa.pulse.jarvis.agent.AgentOrchestrator by lazy {
-        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentToolsProvider, knowledgeStore)
+        dev.mascwa.pulse.jarvis.agent.AgentOrchestrator(inferenceEngine, jarvisMemory, agentToolsProvider, knowledgeStore, memoryStream, profileStore, cerebellumStore)
     }
 
     /** Builds J.A.R.V.I.S.'s spoken daily brief from live weather/objectives/news/markets. */
