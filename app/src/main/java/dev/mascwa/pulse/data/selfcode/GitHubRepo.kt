@@ -172,6 +172,14 @@ class GitHubRepo(private val settings: SettingsRepository) {
     suspend fun merge(number: Int): Boolean =
         runCatching { obj("PUT", "$API/pulls/$number/merge", JSONObject().put("merge_method", "squash")); true }.getOrDefault(false)
 
+    /** Close a pull request without merging. Reversible — it can be reopened on GitHub. */
+    suspend fun closePr(number: Int): Boolean =
+        runCatching { obj("PATCH", "$API/pulls/$number", JSONObject().put("state", "closed")); true }.getOrDefault(false)
+
+    /** Delete a branch ref — used to tidy up a closed `jarvis/…` throwaway branch. Best-effort. */
+    suspend fun deleteBranch(name: String): Boolean =
+        runCatching { raw("DELETE", "$API/git/refs/heads/$name"); true }.getOrDefault(false)
+
     companion object {
         const val API = "https://api.github.com/repos/mascwa200-beep/Thing"
         private val JSON = "application/json; charset=utf-8".toMediaType()

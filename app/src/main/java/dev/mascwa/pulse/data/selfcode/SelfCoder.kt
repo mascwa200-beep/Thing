@@ -96,6 +96,12 @@ class SelfCoder(
         val goal = action.payload["goal"].orEmpty()
         val files = parseStaged(action)
         if (files.isEmpty()) return "Nothing to commit, sir."
+        // Last-line sanity gate: never write a malformed path (a label, spaces, no filename) to GitHub —
+        // catches any legacy/queued proposal that predates path validation, so no more dead junk PRs.
+        files.firstOrNull { !isCommittablePath(it.path) }?.let {
+            return "`${it.path}` isn't a real file path, sir — I won't commit that. Re-issue the goal and " +
+                "I'll plan the right files."
+        }
         // Protected paths (CI/signing/manifest/gate/self-coder) are only refused for the fully-autonomous
         // loop; a user-approved change (a tap) may touch anything.
         if (repo.protectionEnforced()) {
@@ -136,6 +142,12 @@ class SelfCoder(
         return if (path.isNotBlank() && content.isNotBlank()) listOf(StagedFile(path, content, isNew = false)) else emptyList()
     }
 
+    /** A real repo path: non-blank, no spaces, no traversal, and an actual filename with an extension. */
+    private fun isCommittablePath(path: String): Boolean {
+        val p = path.trim().trimStart('/')
+        return p.isNotBlank() && !p.contains(' ') && !p.contains("..") && p.substringAfterLast('/').contains('.')
+    }
+
     private data class Target(val path: String, val isNew: Boolean)
 
     /** Decide which files to touch. With an explicit [pathHint] it's that single file; otherwise the model
@@ -147,9 +159,11 @@ class SelfCoder(
             .filter { it.endsWith(".kt") }
             .take(MAX_CANDIDATES)
         if (pathHint != null) {
-            if (enforce && repo.isProtected(pathHint)) return emptyList()
-            val isNew = runCatching { repo.getFile(pathHint, "main") }.getOrNull() == null
-            return listOf(Target(pathHint, isNew))
+            // Honour a hint ONLY if it's a real path (an existing file, or a valid new source path).
+            // A freeform label (e.g. "Local code sandbox for testing") is ignored so we fall through to
+            // model planning and implement the goal in real files — never commit a file named after a
+            // description, which compiles to nothing and just litters the repo with dead PRs.
+            resolveHint(pathHint, candidates, enforce)?.let { return it }
         }
         if (candidates.isEmpty()) return emptyList()
 
@@ -216,6 +230,20 @@ class SelfCoder(
         if (pick.isBlank()) return null
         return candidates.firstOrNull { it == pick }
             ?: candidates.singleOrNull { pick.endsWith(it) || it.endsWith(pick) }
+    }
+
+    /** Resolve a caller-supplied path hint to concrete targets, or null when it isn't actually a path (so
+     *  planning takes over). An existing file → edit it; a valid new source path → create it; an explicitly
+     *  named protected file → an empty list (refused outright). A freeform label falls through to planning
+     *  rather than being committed as a junk file named after the text. */
+    private suspend fun resolveHint(hint: String, candidates: List<String>, enforce: Boolean): List<Target>? {
+        if (runCatching { repo.getFile(hint, "main") }.getOrNull() != null) {
+            if (enforce && repo.isProtected(hint)) return emptyList()
+            return listOf(Target(hint, isNew = false))
+        }
+        if (isValidNewPath(hint, candidates, enforce)) return listOf(Target(hint, isNew = true))
+        if (enforce && repo.isProtected(hint)) return emptyList()
+        return null
     }
 
     /** A model-proposed NEW file path is allowed only when it's Kotlin, sits under a real source root, is

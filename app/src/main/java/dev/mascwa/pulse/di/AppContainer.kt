@@ -369,6 +369,9 @@ class AppContainer(private val appContext: Context) {
                 },
                 autoApply = { action -> approvalGate.apply(action) },
             ),
+            // Manage its OWN pull requests: list them with CI status + close dead/duplicate ones (scoped
+            // to jarvis/ branches; never merges, never touches a human's PR).
+            dev.mascwa.pulse.jarvis.agent.PullRequestTool(gitHubRepo),
         ) else emptyList()
         // Wrap every tool so each invocation lands in the activity log AND trains the cerebellum.
         val verboseLog = runCatching { settingsRepository.current().jarvis.verboseActivityLog }.getOrDefault(true)
