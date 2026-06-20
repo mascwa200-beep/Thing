@@ -74,6 +74,9 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
     val sleepMinutes by vm.sleepMinutes.collectAsStateWithLifecycle()
     val nowPlaying by vm.nowPlaying.collectAsStateWithLifecycle()
+    val browseStations by vm.browseStations.collectAsStateWithLifecycle()
+    val browseStatus by vm.browseStatus.collectAsStateWithLifecycle()
+    val browseCountry by vm.browseCountry.collectAsStateWithLifecycle()
     val c = Pulse.colors
     val tuned = state.tuned
     val context = LocalContext.current
@@ -205,6 +208,29 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
             StationStrip(localStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
+        // ---- WORLD (browse the planet's stations by country) ----
+        PipHeader("World")
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 2.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            vm.countries.forEach { country ->
+                CountryChip(country.label, selected = country.code == browseCountry, c = c) { vm.browse(country) }
+            }
+        }
+        when (browseStatus) {
+            RadioViewModel.BrowseStatus.IDLE ->
+                Text("Pick a country to scan its airwaves.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            RadioViewModel.BrowseStatus.LOADING ->
+                Text("Scanning…", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent)
+            RadioViewModel.BrowseStatus.EMPTY ->
+                Text("No stations found there.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            RadioViewModel.BrowseStatus.ERROR ->
+                Text("Browse unavailable — check your connection.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber)
+            RadioViewModel.BrowseStatus.READY ->
+                StationStrip(browseStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
+        }
+
         // ---- CURATED streams (always available) ----
         PipHeader("Stations")
         StationStrip(vm.curatedStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
@@ -215,6 +241,27 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                 "(a notification with Stop). Needs a connection; nearby stations need location.",
             fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
+        )
+    }
+}
+
+/** A Pip-Boy country selector pill for the WORLD browse — bright/filled when selected. */
+@Composable
+private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) c.accent.copy(alpha = 0.18f) else Color.Transparent)
+            .border(1.dp, if (selected) c.accent else c.line, RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text(
+            label.uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp,
+            color = if (selected) c.ink else c.muted,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }

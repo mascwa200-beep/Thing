@@ -112,6 +112,13 @@ class RadioBrowserRepository(private val http: HttpClient) {
             .toList()
     }
 
+    /** Top stations for an ISO-2 [countryCode], most-clicked first — powers the WORLD browse. */
+    suspend fun stationsByCountry(countryCode: String, limit: Int = 30): List<RadioStation> {
+        val cc = countryCode.trim().uppercase()
+        if (cc.isBlank()) return emptyList()
+        return runCatching { countryStations(cc, null, limit) }.getOrDefault(emptyList())
+    }
+
     /** A mapped station plus its lower-cased state key (for the "near me" partition). */
     private data class Mapped(val station: RadioStation, val stateKey: String) {
         val streamUrl get() = station.streamUrl
