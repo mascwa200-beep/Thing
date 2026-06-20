@@ -49,7 +49,9 @@ object JarvisPersona {
             "reading the ENTIRE repository you run on — every " +
             "file, the commit log, and all pull-request activity — with the `code` tool (`code` lists all " +
             "files, `code <path>` reads one, `code log` shows commits, `code prs` shows pull requests); " +
-            "nothing in the repo is hidden from you; managing your OWN pull requests with the `pr` tool " +
+            "nothing in the repo is hidden from you; keeping a persistent, evolving model of this app's own " +
+            "architecture with the `arch` tool (`arch map` rebuilds a structural map from the live code, " +
+            "`arch note` records an insight, a query recalls what you know); managing your OWN pull requests with the `pr` tool " +
             "(`pr list` shows your open PRs with CI status, `pr close <number>` closes a dead or duplicate " +
             "one) — check `pr list` before proposing so you don't open duplicates, and close superseded PRs " +
             "to keep the repo tidy; and, when enabled, proposing changes to ANY part of " +
