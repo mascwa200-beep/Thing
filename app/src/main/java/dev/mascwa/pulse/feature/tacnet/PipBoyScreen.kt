@@ -52,7 +52,8 @@ import kotlin.math.roundToInt
  * scaffold-free *Body is hosted inside the green CRT chrome.
  */
 private enum class PipTab(val label: String) {
-    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), QUESTS("QUESTS"), NOTES("NOTES"), RADIO("RADIO"),
+    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), QUESTS("QUESTS"), NOTES("NOTES"),
+    RADIO("RADIO"), MUSIC("MUSIC"),
 }
 
 @Composable
@@ -64,6 +65,7 @@ fun PipBoyScreen(
     radioVm: RadioViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
+    spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
     onBack: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
@@ -86,6 +88,7 @@ fun PipBoyScreen(
                     PipTab.QUESTS -> objectivesVm.refresh()
                     PipTab.NOTES -> Unit // the library is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
+                    PipTab.MUSIC -> spotifyVm.refresh()
                 }
             }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
         },
@@ -107,6 +110,7 @@ fun PipBoyScreen(
                         )
                         PipTab.NOTES -> dev.mascwa.pulse.feature.notes.NotesBody(notesVm)
                         PipTab.RADIO -> RadioBody(radioVm)
+                        PipTab.MUSIC -> dev.mascwa.pulse.feature.spotify.SpotifyBody(spotifyVm)
                     }
                     // A faint CRT scanline tube over every feed — decorative, so it passes touches
                     // through (no pointer input) and stays low-alpha to keep text readable.
