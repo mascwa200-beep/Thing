@@ -132,6 +132,9 @@ class AppContainer(private val appContext: Context) {
     }
 
     /** Local / regional internet radio (Radio Browser community API; free, keyless). */
+    val tuneInRepository: dev.mascwa.pulse.data.radio.TuneInRepository by lazy {
+        dev.mascwa.pulse.data.radio.TuneInRepository(http)
+    }
     val radioBrowserRepository: dev.mascwa.pulse.data.radio.RadioBrowserRepository by lazy {
         dev.mascwa.pulse.data.radio.RadioBrowserRepository(http)
     }

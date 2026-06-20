@@ -160,6 +160,7 @@ dependencies {
     // Internet-radio playback — ExoPlayer handles ICY/SHOUTcast, HLS, and cross-protocol
     // redirects that bare MediaPlayer fails on (StreamTheWorld/Triton commercial streams).
     implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.exoplayer.hls)
 
     // Local feature modules
     implementation(project(":core:database"))
