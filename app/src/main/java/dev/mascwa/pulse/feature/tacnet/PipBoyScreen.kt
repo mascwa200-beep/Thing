@@ -51,7 +51,7 @@ import kotlin.math.roundToInt
  * scaffold-free *Body is hosted inside the green CRT chrome.
  */
 private enum class PipTab(val label: String) {
-    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), RADIO("RADIO"),
+    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), NOTES("NOTES"), RADIO("RADIO"),
 }
 
 @Composable
@@ -61,6 +61,7 @@ fun PipBoyScreen(
     orbitalVm: OrbitalViewModel,
     spaceWxVm: SpaceWeatherViewModel,
     radioVm: RadioViewModel,
+    notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
     onBack: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
@@ -80,6 +81,7 @@ fun PipBoyScreen(
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
                     PipTab.DATA -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> radarVm.refresh()
+                    PipTab.NOTES -> Unit // the library is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
                 }
             }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
@@ -97,6 +99,7 @@ fun PipBoyScreen(
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
                         PipTab.DATA -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> RadarBody(radarVm)
+                        PipTab.NOTES -> dev.mascwa.pulse.feature.notes.NotesBody(notesVm)
                         PipTab.RADIO -> RadioBody(radioVm)
                     }
                     // A faint CRT scanline tube over every feed — decorative, so it passes touches

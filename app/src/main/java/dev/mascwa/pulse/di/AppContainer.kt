@@ -90,6 +90,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
     }
 
+    /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
+    val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
+        dev.mascwa.pulse.data.notes.NotesStore(appContext, json)
+    }
+
     /** Episodic memory stream: timestamped observations, recalled by recency·importance·relevance. */
     val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore by lazy {
         dev.mascwa.pulse.data.memory.MemoryStreamStore(appContext, json)
