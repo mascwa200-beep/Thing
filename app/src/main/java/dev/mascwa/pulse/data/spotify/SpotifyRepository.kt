@@ -33,6 +33,9 @@ data class SpotifyDevice(val id: String, val name: String, val type: String, val
 /** A track search result. */
 data class SpotifyTrack(val name: String, val artist: String, val uri: String, val albumArtUrl: String?)
 
+/** Outcome of a playback-control call, so the UI can explain why nothing happened. */
+enum class PlaybackResult { OK, NO_DEVICE, NEEDS_PREMIUM, FAILED }
+
 /**
  * High-level Spotify Web API client. Holds the OAuth lifecycle (begin/complete/refresh/disconnect) over
  * [SettingsRepository] (tokens persist in the settings JSON; the backup export scrubs them) and exposes
@@ -45,7 +48,9 @@ data class SpotifyTrack(val name: String, val artist: String, val uri: String, v
  */
 class SpotifyRepository(private val settings: SettingsRepository) {
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
+    // coerceInputValues so a null in a non-null field (some Spotify objects do this) coerces to the
+    // default instead of throwing — a parse throw would otherwise read as "no results" silently.
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false; coerceInputValues = true }
     private val base = "https://api.spotify.com/v1"
 
     val authState = settings.settings // Flow<AppSettings>; UI reads .spotify off it
@@ -140,7 +145,8 @@ class SpotifyRepository(private val settings: SettingsRepository) {
     suspend fun search(query: String, limit: Int = 20): List<SpotifyTrack> {
         val q = query.trim()
         if (q.isBlank()) return emptyList()
-        val enc = URLEncoder.encode(q, "UTF-8")
+        // %20 (not +) for the query — some endpoints treat a literal + as a plus sign, not a space.
+        val enc = URLEncoder.encode(q, "UTF-8").replace("+", "%20")
         val (code, body) = request("GET", "/search?type=track&limit=$limit&q=$enc") ?: return emptyList()
         if (code !in 200..299) return emptyList()
         val r = runCatching { json.decodeFromString(ApiSearch.serializer(), body) }.getOrNull() ?: return emptyList()
@@ -150,21 +156,29 @@ class SpotifyRepository(private val settings: SettingsRepository) {
     }
 
     // ---- Controls (target the active device unless a deviceId is given) ----
+    // These return a typed result so the UI can explain a 403 (Premium) / 404 (no device) instead of
+    // silently doing nothing.
 
-    suspend fun resume(deviceId: String? = null): Boolean = ok(request("PUT", "/me/player/play".dev(deviceId), "{}"))
-    suspend fun pause(deviceId: String? = null): Boolean = ok(request("PUT", "/me/player/pause".dev(deviceId)))
-    suspend fun next(deviceId: String? = null): Boolean = ok(request("POST", "/me/player/next".dev(deviceId)))
-    suspend fun previous(deviceId: String? = null): Boolean = ok(request("POST", "/me/player/previous".dev(deviceId)))
+    suspend fun resume(deviceId: String? = null): PlaybackResult = result(request("PUT", "/me/player/play".dev(deviceId), "{}"))
+    suspend fun pause(deviceId: String? = null): PlaybackResult = result(request("PUT", "/me/player/pause".dev(deviceId)))
+    suspend fun next(deviceId: String? = null): PlaybackResult = result(request("POST", "/me/player/next".dev(deviceId)))
+    suspend fun previous(deviceId: String? = null): PlaybackResult = result(request("POST", "/me/player/previous".dev(deviceId)))
 
     /** Start playing a specific track [uri] (optionally on [deviceId]). */
-    suspend fun playUri(uri: String, deviceId: String? = null): Boolean =
-        ok(request("PUT", "/me/player/play".dev(deviceId), """{"uris":["$uri"]}"""))
+    suspend fun playUri(uri: String, deviceId: String? = null): PlaybackResult =
+        result(request("PUT", "/me/player/play".dev(deviceId), """{"uris":["$uri"]}"""))
 
     /** Hand playback to [deviceId] (and start it). */
-    suspend fun transferTo(deviceId: String, play: Boolean = true): Boolean =
-        ok(request("PUT", "/me/player", """{"device_ids":["$deviceId"],"play":$play}"""))
+    suspend fun transferTo(deviceId: String, play: Boolean = true): PlaybackResult =
+        result(request("PUT", "/me/player", """{"device_ids":["$deviceId"],"play":$play}"""))
 
-    private fun ok(r: Pair<Int, String>?): Boolean = r != null && r.first in 200..299
+    private fun result(r: Pair<Int, String>?): PlaybackResult = when {
+        r == null -> PlaybackResult.FAILED
+        r.first in 200..299 -> PlaybackResult.OK
+        r.first == 404 -> PlaybackResult.NO_DEVICE       // no active device to control
+        r.first == 403 -> PlaybackResult.NEEDS_PREMIUM   // Web API playback control is Premium-only
+        else -> PlaybackResult.FAILED
+    }
 
     /** Append `?device_id=` when a target device is specified. */
     private fun String.dev(deviceId: String?): String =

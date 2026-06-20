@@ -71,6 +71,7 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val devices by vm.devices.collectAsStateWithLifecycle()
     val results by vm.searchResults.collectAsStateWithLifecycle()
     val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
+    val statusMsg by vm.status.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
 
     LaunchedEffect(auth.linked) { if (auth.linked) vm.refresh() }
@@ -82,6 +83,13 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
             ConnectedPlayer(remote, c, vm) { vm.disconnectApp() }
         } else {
             AppPlayerCard(remote, c) { vm.connectApp(context) }
+        }
+        // A control-result note (Premium needed / no device / failed), tappable to dismiss.
+        statusMsg?.let { msg ->
+            Text(
+                "⚠ $msg", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Amber,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).clickable { vm.clearStatus() },
+            )
         }
 
         // ---- ACCOUNT (Web API: search + devices) ----
