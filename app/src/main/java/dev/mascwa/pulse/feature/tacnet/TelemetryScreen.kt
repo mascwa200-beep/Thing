@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,9 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -84,6 +91,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+            PipHeader("Condition")
+            ConditionPanel(t, c)
+
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -162,6 +172,109 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 private fun batteryText(t: Telemetry): String {
     val pct = t.batteryPct?.let { "$it%" } ?: "—"
     return if (t.charging) "$pct ⚡" else pct
+}
+
+// ---- CONDITION: an original Pip-Boy-style figure whose body regions tint by live device health. ----
+
+private fun powerScore(t: Telemetry): Float = if (t.charging) 1f else (t.batteryPct ?: 100) / 100f
+private fun memoryScore(t: Telemetry): Float =
+    if (t.memTotalMb > 0) (1f - t.memUsedMb.toFloat() / t.memTotalMb).coerceIn(0f, 1f) else 1f
+private fun thermalScore(t: Telemetry): Float =
+    t.batteryTempC?.let { (1f - (it - 25f) / 25f).coerceIn(0f, 1f) } ?: 1f
+
+private fun condColor(c: NightwirePalette, score: Float): Color = when {
+    score >= 0.66f -> c.positive
+    score >= 0.33f -> c.amber
+    else -> c.negative
+}
+
+/** The STATUS condition readout: a tinted humanoid figure + a CND score and per-system breakdown. */
+@Composable
+private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
+    val power = powerScore(t)
+    val memory = memoryScore(t)
+    val thermal = thermalScore(t)
+    val overall = (power + memory + thermal) / 3f
+    val overallColor = condColor(c, overall)
+    val label = when {
+        overall >= 0.66f -> "OPTIMAL"
+        overall >= 0.33f -> "FAIR"
+        else -> "CRITICAL"
+    }
+    PipFrame(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ConditionFigure(
+                Modifier.size(width = 78.dp, height = 116.dp),
+                head = condColor(c, thermal),
+                torso = condColor(c, memory),
+                limbs = overallColor,
+                legs = condColor(c, power),
+            )
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text("CND ${(overall * 100).roundToInt()}%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp, color = overallColor)
+                Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.5.sp, color = c.muted,
+                    modifier = Modifier.padding(bottom = 6.dp))
+                CondRow("PWR", batteryText(t), condColor(c, power), c)
+                CondRow("MEM", "${(memory * 100).roundToInt()}% free", condColor(c, memory), c)
+                CondRow("THRM", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—", condColor(c, thermal), c)
+            }
+        }
+    }
+}
+
+/** A per-system condition row: a status dot + label + value. */
+@Composable
+private fun CondRow(label: String, value: String, dot: Color, c: NightwirePalette) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(dot))
+        Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
+            modifier = Modifier.padding(start = 7.dp))
+        Spacer(Modifier.weight(1f))
+        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+    }
+}
+
+/** An original, generic operator silhouette (NOT a trademarked character) — head/torso/arms/legs drawn
+ *  procedurally, each region tinted by its subsystem's health. Filled at low alpha + a bright outline. */
+@Composable
+private fun ConditionFigure(modifier: Modifier, head: Color, torso: Color, limbs: Color, legs: Color) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val sw = 3.dp.toPx()
+        val a = 0.22f
+
+        // Head.
+        val headR = h * 0.095f
+        val headC = Offset(cx, h * 0.12f)
+        drawCircle(head.copy(alpha = a), headR, headC)
+        drawCircle(head, headR, headC, style = Stroke(sw))
+
+        // Torso (a tapered trunk).
+        val tTop = h * 0.25f
+        val tBot = h * 0.58f
+        val half = w * 0.17f
+        val torsoPath = Path().apply {
+            moveTo(cx - half, tTop)
+            lineTo(cx + half, tTop)
+            lineTo(cx + half * 0.78f, tBot)
+            lineTo(cx - half * 0.78f, tBot)
+            close()
+        }
+        drawPath(torsoPath, torso.copy(alpha = a))
+        drawPath(torsoPath, torso, style = Stroke(sw))
+
+        // Arms from the shoulders.
+        val shoulderY = tTop + h * 0.015f
+        drawLine(limbs, Offset(cx - half, shoulderY), Offset(cx - half * 1.85f, h * 0.52f), sw, StrokeCap.Round)
+        drawLine(limbs, Offset(cx + half, shoulderY), Offset(cx + half * 1.85f, h * 0.52f), sw, StrokeCap.Round)
+
+        // Legs from the hips.
+        drawLine(legs, Offset(cx - half * 0.55f, tBot), Offset(cx - half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
+        drawLine(legs, Offset(cx + half * 0.55f, tBot), Offset(cx + half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
+    }
 }
 
 /** A VITALS gauge in the Fallout HP/AP idiom: a green-banded label/value header over a notched,
