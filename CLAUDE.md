@@ -380,6 +380,31 @@ slices, squash-merged to `main`, re-synced into the dev branch each time.
 - ⚠️ All #100–#106 on-device-unverified (CI compile-gates only). **Open / steerable:** live now-playing
   (ICY metadata) in the station cards; a STATUS Vault-Boy condition figure; turn-by-turn road routing.
 
+### Screenshot-driven Fallout batch #2 (this session cont., #108–#111 all merged)
+Owner pasted on-device screenshots + Fallout refs again; four asks, four CI-green slices:
+- **#108 — boot log is procedurally generated, unique per launch:** `BootScreen.generateBootLog()` builds the
+  decrypt roll from a wall-clock-seeded `Random` (hex addresses, module names, RNG seeds, sizes, OK/PASS
+  tokens; a random handful of middle lines shuffled in). POST opens, operator-handoff closes. No file-driven
+  text — different every cold start. ARGUS DYNAMICS reveal unchanged.
+- **#109 — green the SURVIVE/SOCIAL/SEARCH sub-screens:** the feed *routes* already get `pipBoyPalette` via the
+  NavHost-level provider, but the SURVIVE **sub-screens** (SOS/Places/Survival/Tools/Safety) aren't feed
+  routes → rendered dark. New `PipGreen { }` helper in `PulseApp` wraps SURVIVE/PLACES/SURVIVAL/TOOLS/SOS/
+  SAFETY/SOCIAL/SEARCH so the whole TOOLS area is uniformly green. (Follow-up: deeper per-screen PipFrame
+  framing vs the NeonPanel cards.)
+- **#110 — objective colours re-classified to gold/white/green:** `ObjectiveKind` MAIN=gold (keep),
+  SIDE=**white** (was blue — user-placed side), PLAIN→**WORK**=**green** (calendar/work). `Waypoint` default
+  PLAIN→SIDE; calendar events → WORK; NAV search/POI (user-placed) → SIDE; add-chips are Main/Side (WORK is
+  calendar-only); quest groups MAIN/SIDE/WORK·CALENDAR; map icons `obj-plain`→`obj-work`. Old persisted
+  "PLAIN" waypoints coerce to the SIDE default on load (`coerceInputValues`).
+- **#111 — road-snapped NAV path:** new `data/places/RoutingRepository.kt` (free, keyless **OSRM** demo
+  server, driving profile) returns road geometry; `NavViewModel.route` refreshes on waypoint-change or
+  >60 m player move (debounced 350 ms, combine+collectLatest, throttled); `NavScreen.routeLineGeoJson` feeds
+  the road polyline into `ROUTE_SOURCE` so the gold/white casing (#106) traces streets, straight-line
+  fallback until it resolves. ⚠️ OSRM demo server is community-hosted/best-effort (a keyed/self-hosted router
+  is the production hardening).
+- ⚠️ All #108–#111 on-device-unverified (CI compile-gates only). **Open / steerable:** deeper PipFrame
+  framing of the SURVIVE/SEARCH/SOCIAL screens; live now-playing (ICY) in station cards; STATUS condition figure.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
