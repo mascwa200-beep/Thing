@@ -115,6 +115,23 @@ data class ApiKeys(
     val nasaOrDemo get() = nasa.ifBlank { "DEMO_KEY" }
 }
 
+/** Spotify OAuth state (Authorization Code + PKCE). Tokens stay on-device in the settings JSON and are
+ *  scrubbed from the backup export. No client secret is stored — PKCE doesn't use one. */
+@Serializable
+data class SpotifyAuthState(
+    val accessToken: String = "",
+    val refreshToken: String = "",
+    /** Epoch ms when [accessToken] expires; the repo refreshes within 60s of it. */
+    val expiresAtMs: Long = 0,
+    /** The in-flight PKCE verifier between launching the browser and the redirect coming back. */
+    val pendingVerifier: String = "",
+    /** Cached for the UI header. */
+    val displayName: String = "",
+    val premium: Boolean = false,
+) {
+    val linked get() = accessToken.isNotBlank() || refreshToken.isNotBlank()
+}
+
 /** On-device assistant (J.A.R.V.I.S. Matrix) configuration. Stays on-device. */
 @Serializable
 data class JarvisSettings(
@@ -300,6 +317,9 @@ data class AppSettings(
 
     // PIP-BOY radio: favourited stations (local or curated), surfaced as a FAVOURITES section.
     val favoriteRadio: List<dev.mascwa.pulse.data.radio.RadioStation> = emptyList(),
+
+    // PIP-BOY music: Spotify OAuth (PKCE) link state. Scrubbed from the settings backup export.
+    val spotify: SpotifyAuthState = SpotifyAuthState(),
 
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),

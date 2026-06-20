@@ -95,6 +95,21 @@
             </intent-filter>
         </activity>
 
+        <!-- Catches the Spotify OAuth (PKCE) redirect; exchanges the code then returns to the app.
+             The owner must register this exact redirect URI in the Spotify developer dashboard. -->
+        <activity
+            android:name=".feature.spotify.SpotifyAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dev.mascwa.pulse" android:host="spotify-callback" />
+            </intent-filter>
+        </activity>
+
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <receiver
             android:name=".notifications.BootReceiver"

@@ -144,6 +144,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.radio.RadioBrowserRepository(http)
     }
 
+    /** PIP-BOY music: Spotify Web API (OAuth PKCE, tokens in settings). */
+    val spotifyRepository: dev.mascwa.pulse.data.spotify.SpotifyRepository by lazy {
+        dev.mascwa.pulse.data.spotify.SpotifyRepository(settingsRepository)
+    }
+
     // NAV objectives: device-calendar events (geocoded) + manual waypoints persisted in settings.
     val calendarObjectives: dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository by lazy {
         dev.mascwa.pulse.data.objectives.CalendarObjectivesRepository(appContext)

@@ -42,6 +42,7 @@ object SettingsBackup {
     fun redactSecrets(s: AppSettings): AppSettings = s.copy(
         apiKeys = ApiKeys(),
         jarvis = s.jarvis.copy(modelToken = "", githubToken = "", cloudApiKey = ""),
+        spotify = SpotifyAuthState(),
     )
 
     /** Lay a restored backup over the device's CURRENT settings, preserving the device's existing
@@ -53,6 +54,7 @@ object SettingsBackup {
             githubToken = current.jarvis.githubToken,
             cloudApiKey = current.jarvis.cloudApiKey,
         ),
+        spotify = current.spotify,
     )
 
     /** Serialize a redacted backup of [current] settings, stamped [nowMs]. */
