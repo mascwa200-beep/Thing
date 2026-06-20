@@ -405,6 +405,26 @@ Owner pasted on-device screenshots + Fallout refs again; four asks, four CI-gree
 - ⚠️ All #108–#111 on-device-unverified (CI compile-gates only). **Open / steerable:** deeper PipFrame
   framing of the SURVIVE/SEARCH/SOCIAL screens; live now-playing (ICY) in station cards; STATUS condition figure.
 
+### Owner follow-ups — PipFrame feeds · ICY now-playing · condition figure (this session cont., #113–#115 merged)
+The three steerable follow-ups, each its own CI-green slice (all squash-merged + re-synced):
+- **#113 — PipFrame framing for SURVIVE/SEARCH/SOCIAL:** converted from rounded `NeonPanel`/Material cards to
+  the flat corner-bracketed `PipFrame` terminal chrome. SEARCH's Material box+Button → a Pip-framed
+  `BasicTextField` + a `▸ SEARCH WITH <ENGINE>` Pip button under `PipHeader`s (was Material-coloured); SOCIAL
+  item cards → `PipFrame`, trending labels → `PipHeader`; SURVIVE hub tiles → a flat `PipHubTile` (vs the
+  rounded `HubTile`).
+- **#114 — live now-playing track (ICY metadata):** `MediaPlayer` doesn't surface ICY, so new
+  `data/radio/IcyMetadata.kt` opens a short-lived `Icy-MetaData:1` connection, reads `icy-metaint`, skips to
+  the metadata block, parses `StreamTitle` (reads a few KB then disconnects — not a 2nd playback stream;
+  defensive → null). `RadioController` polls the tuned station's title every ~25 s while on air (own
+  `metaJob`, cancelled on stop/change) → `nowPlaying` flow; `RadioBody` shows `♪ Artist - Song` in the tuner
+  + the on-air station card's tiny line. SomaFM carries ICY; many stations don't (→ falls back to genre).
+- **#115 — STATUS condition figure:** a CONDITION section atop the STATUS feed — an **original** generic
+  operator silhouette (head/torso/arms/legs drawn procedurally; **no trademarked Vault-Boy art**) whose
+  regions tint green/amber/red by subsystem health (head=thermal, torso=free-mem, legs=power, arms=overall),
+  a `CND %` (mean) + OPTIMAL/FAIR/CRITICAL label, and `PWR/MEM/THRM` rows. `condColor` thresholds at .66/.33.
+- ⚠️ All #113–#115 on-device-unverified (CI compile-gates only). The ICY read especially wants a real run
+  (SomaFM streams are the reliable ones). **Open / steerable next:** owner's call.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
