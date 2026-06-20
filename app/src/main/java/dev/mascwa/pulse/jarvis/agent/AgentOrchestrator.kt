@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.jarvis.agent
 
+import dev.mascwa.pulse.core.telemetry.MemoryStream
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.jarvis.inference.AssistantTurn
@@ -22,6 +23,7 @@ class AgentOrchestrator(
     private val memory: JarvisMemory,
     private val toolsProvider: suspend () -> List<JarvisTool>,
     private val knowledge: KnowledgeStore,
+    private val memoryStream: MemoryStream,
 ) {
     enum class Kind { THINKING, TOOL, FINAL }
     data class Step(val kind: Kind, val text: String)
@@ -35,8 +37,13 @@ class AgentOrchestrator(
         val tools = runCatching { toolsProvider() }.getOrDefault(emptyList())
         val recalled = runCatching { memory.recall(query) }.getOrDefault(emptyList())
         val docs = runCatching { knowledge.search(query, limit = 3) }.getOrDefault(emptyList())
+        
+        // Cross-reference linked entries in real time during retrieval
+        val linkedEntries = runCatching { memoryStream.getLinkedEntries(query) }.getOrDefault(emptyList())
+        
         val memoryNotes = recalled.map { it.noteText }
         val knowledgeChunks = docs.map { "[${it.title}] ${it.text}" }
+        val linkedNotes = linkedEntries.map { it.text }
 
         // Native function-calling path (cloud): the model emits structured tool calls — far more reliable
         // than the text protocol on-device models need. Falls through to text-ReAct when unavailable.
@@ -46,7 +53,7 @@ class AgentOrchestrator(
             // could collide with a built-in), whereas the text path just picks the first.
             val specs = tools.distinctBy { it.name.lowercase() }.map { ToolSpec(it.name, it.usage) }
             val messages = ArrayList<ToolMessage>()
-            messages.add(ToolMessage("system", buildNativeSystem(persona, memoryNotes, knowledgeChunks)))
+            messages.add(ToolMessage("system", buildNativeSystem(persona, memoryNotes, knowledgeChunks, linkedNotes)))
             history.forEach { messages.add(ToolMessage(if (it.role.equals("user", true)) "user" else "assistant", it.text)) }
             messages.add(ToolMessage("user", query.trim()))
             var nStep = 0
@@ -87,7 +94,7 @@ class AgentOrchestrator(
         }
 
         // --- Text-ReAct fallback (on-device models, which have no native function-calling) ---
-        val system = buildSystem(tools, persona, memoryNotes, knowledgeChunks)
+        val system = buildSystem(tools, persona, memoryNotes, knowledgeChunks, linkedNotes)
         val scratch = StringBuilder(query.trim())
         var step = 0
         while (step < MAX_STEPS) {
@@ -143,6 +150,7 @@ class AgentOrchestrator(
         persona: String,
         memoryNotes: List<String>,
         knowledgeChunks: List<String>,
+        linkedNotes: List<String>,
     ): String = buildString {
         append(persona.trim()).append("\n\n")
         append("You have tools (functions) available. When the user asks you to DO something a tool can ")
@@ -157,6 +165,10 @@ class AgentOrchestrator(
             append("\n\nRelevant memory:\n")
             memoryNotes.forEach { append("- <untrusted source=\"memory\">").append(it).append("</untrusted>\n") }
         }
+        if (linkedNotes.isNotEmpty()) {
+            append("\n\nLinked entries (projects/tasks/profiles):\n")
+            linkedNotes.forEach { append("- <untrusted source=\"linked\">").append(it).append("</untrusted>\n") }
+        }
         if (knowledgeChunks.isNotEmpty()) {
             append("\n\nRelevant knowledge from your library (use if helpful):\n")
             knowledgeChunks.forEach { append("- <untrusted source=\"knowledge\">").append(it.take(400)).append("</untrusted>\n") }
@@ -168,6 +180,7 @@ class AgentOrchestrator(
         persona: String,
         memoryNotes: List<String>,
         knowledgeChunks: List<String>,
+        linkedNotes: List<String>,
     ): String = buildString {
         append(persona.trim()).append("\n\n")
         append("You can use tools to get real, current information. To use one, reply with a single line:\n")
@@ -187,6 +200,10 @@ class AgentOrchestrator(
         if (memoryNotes.isNotEmpty()) {
             append("\n\nRelevant memory:\n")
             memoryNotes.forEach { append("- <untrusted source=\"memory\">").append(it).append("</untrusted>\n") }
+        }
+        if (linkedNotes.isNotEmpty()) {
+            append("\n\nLinked entries (projects/tasks/profiles):\n")
+            linkedNotes.forEach { append("- <untrusted source=\"linked\">").append(it).append("</untrusted>\n") }
         }
         if (knowledgeChunks.isNotEmpty()) {
             append("\n\nRelevant knowledge from your library (use if helpful):\n")
