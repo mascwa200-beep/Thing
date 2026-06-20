@@ -96,8 +96,12 @@ class SelfCoder(
         val goal = action.payload["goal"].orEmpty()
         val files = parseStaged(action)
         if (files.isEmpty()) return "Nothing to commit, sir."
-        files.firstOrNull { repo.isProtected(it.path.trim().trimStart('/')) }?.let {
-            return "`${it.path}` is protected, sir."
+        // Protected paths (CI/signing/manifest/gate/self-coder) are only refused for the fully-autonomous
+        // loop; a user-approved change (a tap) may touch anything.
+        if (repo.protectionEnforced()) {
+            files.firstOrNull { repo.isProtected(it.path.trim().trimStart('/')) }?.let {
+                return "`${it.path}` is protected while autonomous self-coding is on, sir."
+            }
         }
         val base = runCatching { repo.headSha("main") }.getOrElse {
             return "Couldn't read the repo (token scope?): ${it.message}"
@@ -138,11 +142,12 @@ class SelfCoder(
      *  plans the minimal set (create + wire-in), validated against the tree, the denylist and source roots.
      *  Falls back to a single best-guess file if planning yields nothing usable. */
     private suspend fun planFiles(goal: String, pathHint: String?): List<Target> {
+        val enforce = repo.protectionEnforced()
         val candidates = runCatching { repo.tree("main") }.getOrDefault(emptyList())
             .filter { it.endsWith(".kt") }
             .take(MAX_CANDIDATES)
         if (pathHint != null) {
-            if (repo.isProtected(pathHint)) return emptyList()
+            if (enforce && repo.isProtected(pathHint)) return emptyList()
             val isNew = runCatching { repo.getFile(pathHint, "main") }.getOrNull() == null
             return listOf(Target(pathHint, isNew))
         }
@@ -167,11 +172,11 @@ class SelfCoder(
             val isNew = m.groupValues[1].equals("NEW", ignoreCase = true)
             val p = m.groupValues[2].trim().trim('`', '"').trimStart('/')
             val resolved = if (isNew) {
-                if (isValidNewPath(p, candidates)) p else null
+                if (isValidNewPath(p, candidates, enforce)) p else null
             } else {
                 candidates.firstOrNull { it == p } ?: candidates.singleOrNull { p.endsWith(it) || it.endsWith(p) }
             }
-            if (resolved != null && !repo.isProtected(resolved)) targets[resolved] = Target(resolved, isNew)
+            if (resolved != null && (!enforce || !repo.isProtected(resolved))) targets[resolved] = Target(resolved, isNew)
             if (targets.size >= MAX_FILES) break
         }
         if (targets.isNotEmpty()) return targets.values.toList()
@@ -184,6 +189,7 @@ class SelfCoder(
     /** Single best-guess target (existing path, or `NEW: <path>` for a new file), validated. Used as the
      *  fallback when multi-file planning yields nothing. */
     private suspend fun locate(goal: String): String? {
+        val enforce = repo.protectionEnforced()
         val candidates = runCatching { repo.tree("main") }.getOrDefault(emptyList())
             .filter { it.endsWith(".kt") }
             .take(MAX_CANDIDATES)
@@ -204,7 +210,7 @@ class SelfCoder(
         if (rawLine.isBlank()) return null
         Regex("(?i)^NEW:\\s*(.+)$").find(rawLine)?.let { m ->
             val p = m.groupValues[1].trim().trim('`', '"').trimStart('/')
-            return if (isValidNewPath(p, candidates)) p else null
+            return if (isValidNewPath(p, candidates, enforce)) p else null
         }
         val pick = rawLine.trim('`', '"', '-', ' ')
         if (pick.isBlank()) return null
@@ -214,9 +220,9 @@ class SelfCoder(
 
     /** A model-proposed NEW file path is allowed only when it's Kotlin, sits under a real source root, is
      *  not protected, and doesn't already exist — so a bad path fails closed instead of committing junk. */
-    private fun isValidNewPath(path: String, existing: List<String>): Boolean {
+    private fun isValidNewPath(path: String, existing: List<String>, enforce: Boolean): Boolean {
         if (!path.endsWith(".kt") || path.contains("..")) return false
-        if (repo.isProtected(path) || existing.contains(path)) return false
+        if ((enforce && repo.isProtected(path)) || existing.contains(path)) return false
         return path.startsWith("app/src/main/java/") ||
             Regex("^core/[^/]+/src/main/java/").containsMatchIn(path)
     }

@@ -61,8 +61,8 @@ class GitHubRepo(private val settings: SettingsRepository) {
     suspend fun headSha(branch: String = "main"): String =
         obj("GET", "$API/git/ref/heads/$branch").getJSONObject("object").getString("sha")
 
-    /** Every source-file (blob) path in the repo tree at [ref], recursively, with protected paths
-     *  dropped. Lets the model pick WHICH file to change from a goal (the "knows where to do it" step).
+    /** EVERY file (blob) path in the repo tree at [ref], recursively — nothing hidden, so J.A.R.V.I.S.
+     *  can read the whole repository (the protected-path policy is applied at change time, not read time).
      *  Takes a commit/branch sha — the trees API resolves it to that commit's tree. */
     suspend fun tree(ref: String = "main"): List<String> {
         val sha = runCatching { headSha(ref) }.getOrElse { ref }
@@ -72,10 +72,44 @@ class GitHubRepo(private val settings: SettingsRepository) {
             val node = nodes.getJSONObject(i)
             if (node.optString("type") != "blob") continue
             val path = node.optString("path")
-            if (path.isNotBlank() && !isProtected(path)) out.add(path)
+            if (path.isNotBlank()) out.add(path)
         }
         return out
     }
+
+    /** Recent commits on [branch] (sha · message · author · date) — the repo's full history, not just
+     *  J.A.R.V.I.S.'s own PRs. */
+    suspend fun commits(branch: String = "main", limit: Int = 25): List<String> = runCatching {
+        val list = arr("GET", "$API/commits?sha=$branch&per_page=$limit")
+        (0 until list.length()).map { i ->
+            val c = list.getJSONObject(i)
+            val sha = c.optString("sha").take(7)
+            val commit = c.optJSONObject("commit")
+            val msg = commit?.optString("message")?.lineSequence()?.firstOrNull()?.trim().orEmpty()
+            val author = commit?.optJSONObject("author")?.optString("name").orEmpty()
+            val date = commit?.optJSONObject("author")?.optString("date")?.take(10).orEmpty()
+            "$sha · $msg — $author, $date"
+        }
+    }.getOrDefault(emptyList())
+
+    /** Recent pull requests (any author/state), so J.A.R.V.I.S. can see all activity — not only its own. */
+    suspend fun pulls(limit: Int = 25): List<String> = runCatching {
+        val list = arr("GET", "$API/pulls?state=all&per_page=$limit&sort=updated&direction=desc")
+        (0 until list.length()).map { i ->
+            val p = list.getJSONObject(i)
+            val num = p.optInt("number")
+            val state = if (!p.isNull("merged_at")) "merged" else p.optString("state")
+            val title = p.optString("title")
+            val author = p.optJSONObject("user")?.optString("login").orEmpty()
+            "#$num [$state] $title — $author"
+        }
+    }.getOrDefault(emptyList())
+
+    /** Whether the protected-path policy is enforced. Only the fully-autonomous (no-human-tap) loop is
+     *  held back from CI/signing/manifest/gate/self-coder; when changes go through the user's approval
+     *  tap (autonomous off), nothing is off-limits — J.A.R.V.I.S. may edit anything it's told to. */
+    suspend fun protectionEnforced(): Boolean =
+        runCatching { settings.current().jarvis.autonomousSelfCoding }.getOrDefault(true)
 
     suspend fun createBranch(name: String, fromSha: String) {
         obj("POST", "$API/git/refs", JSONObject().put("ref", "refs/heads/$name").put("sha", fromSha))
