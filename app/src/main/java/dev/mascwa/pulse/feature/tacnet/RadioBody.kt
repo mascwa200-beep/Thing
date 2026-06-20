@@ -128,6 +128,14 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
+                // On failure, surface the reason so the problem is visible, not silent.
+                if (state.status == RadioController.Status.ERROR && !state.detail.isNullOrBlank()) {
+                    Text(
+                        "Couldn't open the stream — ${state.detail}. Try another station.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
                 SleepTimerRow(
                     active = sleepMinutes,
                     c = c,
