@@ -117,6 +117,11 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     var query by remember { mutableStateOf("") }
 
     LaunchedEffect(auth.linked) { if (auth.linked) vm.refresh() }
+    // Once the App Remote player has been connected before, reconnect automatically when the tab opens so
+    // playback "just works" through the background Spotify app — no need to re-tap connect or open Spotify.
+    LaunchedEffect(auth.appRemoteAutoConnect, remote.connected) {
+        if (auth.appRemoteAutoConnect && !remote.connected && !remote.connecting) vm.autoConnectApp(context)
+    }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- PLAYER (App Remote — the real in-app player) ----
@@ -212,7 +217,8 @@ private fun AppPlayerCard(remote: SpotifyAppRemoteController.RemoteState, c: Nig
     PipFrame(Modifier.fillMaxWidth()) {
         Column {
             Text(
-                "Connect to your installed Spotify app to play and control music in-app.",
+                "Connect once to your installed Spotify app — it plays in the background and you control it " +
+                    "here. You won't need to open Spotify itself, and the tab reconnects automatically after this.",
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
             )
             if (remote.error != null) {

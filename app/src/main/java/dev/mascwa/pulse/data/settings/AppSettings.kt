@@ -125,6 +125,9 @@ data class SpotifyAuthState(
     val expiresAtMs: Long = 0,
     /** The in-flight PKCE verifier between launching the browser and the redirect coming back. */
     val pendingVerifier: String = "",
+    /** After the user connects the App Remote player once, reconnect to it automatically when the MUSIC
+     *  tab opens — so playback "just works" via the (background) Spotify app without re-tapping connect. */
+    val appRemoteAutoConnect: Boolean = false,
     /** Cached for the UI header. */
     val displayName: String = "",
     val premium: Boolean = false,

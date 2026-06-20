@@ -90,6 +90,10 @@ class SpotifyRepository(private val settings: SettingsRepository) {
 
     suspend fun disconnect() = settings.update { it.copy(spotify = SpotifyAuthState()) }
 
+    /** Remember whether the App Remote player should auto-reconnect on the MUSIC tab. */
+    suspend fun setAutoConnect(on: Boolean) =
+        settings.update { it.copy(spotify = it.spotify.copy(appRemoteAutoConnect = on)) }
+
     /** A valid access token, refreshing first if it's missing or within 60s of expiry; null if not linked. */
     private suspend fun token(): String? {
         val s = settings.current().spotify
