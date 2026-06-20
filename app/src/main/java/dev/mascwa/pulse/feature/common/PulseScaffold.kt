@@ -34,14 +34,21 @@ fun PulseScaffold(
             modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else modifier,
         topBar = {
             androidx.compose.foundation.layout.Column {
-                topBarOverride?.invoke() ?: TopAppBar(
-                    title = { Text(title) },
-                    navigationIcon = navigationIcon,
-                    actions = actions,
-                    scrollBehavior = scrollBehavior,
-                )
+                val feedTabs = LocalFeedTabs.current
+                when {
+                    topBarOverride != null -> topBarOverride()
+                    // Feed screens get the phosphor-green Pip-Boy header so the whole TOOLS top chrome
+                    // (header + tabs) reads as one CRT terminal panel, not a Material bar over a green strip.
+                    feedTabs != null -> PipBoyHeader(title, navigationIcon, actions)
+                    else -> TopAppBar(
+                        title = { Text(title) },
+                        navigationIcon = navigationIcon,
+                        actions = actions,
+                        scrollBehavior = scrollBehavior,
+                    )
+                }
                 // Fallout Pip-Boy feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
-                LocalFeedTabs.current?.let { FeedTabBar(it) }
+                feedTabs?.let { FeedTabBar(it) }
                 // Always-on cockpit telemetry strip (no-op when disabled in Settings).
                 HudStrip()
             }
