@@ -98,6 +98,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         is UpdateUi.Checking -> "Checking for a newer build…"
                         is UpdateUi.UpToDate ->
                             "You're on the latest build" + (st.latest?.let { " (v$it)" } ?: "") + "."
+                        is UpdateUi.Pending ->
+                            "Newer build${st.latest?.let { " v$it" } ?: ""} is still being verified — " +
+                                "you're on v${vm.installedVersion}. It'll be offered once CI is green."
                         is UpdateUi.Available -> "Update available — build #${st.info.versionCode}."
                         is UpdateUi.Downloading -> "Downloading ${st.pct}%…"
                         is UpdateUi.ReadyToInstall -> "Downloaded — tap Install now."
