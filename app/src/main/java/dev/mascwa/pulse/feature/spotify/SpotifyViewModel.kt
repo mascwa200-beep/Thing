@@ -10,6 +10,7 @@ import dev.mascwa.pulse.data.spotify.PlaybackResult
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
+import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyRepository
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
 import kotlinx.coroutines.Job
@@ -40,6 +41,12 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
     private val _devices = MutableStateFlow<List<SpotifyDevice>>(emptyList())
     val devices: StateFlow<List<SpotifyDevice>> = _devices.asStateFlow()
+
+    private val _playlists = MutableStateFlow<List<SpotifyPlaylist>>(emptyList())
+    val playlists: StateFlow<List<SpotifyPlaylist>> = _playlists.asStateFlow()
+
+    private val _recent = MutableStateFlow<List<SpotifyTrack>>(emptyList())
+    val recent: StateFlow<List<SpotifyTrack>> = _recent.asStateFlow()
 
     private val _searchResults = MutableStateFlow<List<SpotifyTrack>>(emptyList())
     val searchResults: StateFlow<List<SpotifyTrack>> = _searchResults.asStateFlow()
@@ -91,6 +98,8 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
     fun refresh() = viewModelScope.launch {
         refreshPlayback()
         _devices.value = repo.devices()
+        _playlists.value = repo.playlists()
+        _recent.value = repo.recentlyPlayed()
     }
 
     private suspend fun refreshPlayback() { _playback.value = repo.currentlyPlaying() }
@@ -141,6 +150,16 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
             // Start on the active device, or the first available — Web API play() no-ops without a target.
             val target = ensureDevice()
             reportStatus(repo.playUri(track.uri, target), targetWasNull = target == null)
+            delay(600); refreshPlayback()
+        }
+    }
+
+    /** Play a whole playlist (its context URI). App Remote plays any URI; Web API needs a target device. */
+    fun playPlaylist(playlist: SpotifyPlaylist) {
+        if (SpotifyAppRemoteController.isConnected) { SpotifyAppRemoteController.playUri(playlist.uri); return }
+        viewModelScope.launch {
+            val target = ensureDevice()
+            reportStatus(repo.playContext(playlist.uri, target), targetWasNull = target == null)
             delay(600); refreshPlayback()
         }
     }

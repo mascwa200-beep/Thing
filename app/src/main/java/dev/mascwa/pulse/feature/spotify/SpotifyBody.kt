@@ -50,6 +50,7 @@ import coil.compose.AsyncImage
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
+import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PipHeader
@@ -108,6 +109,8 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     val remote by vm.remoteState.collectAsStateWithLifecycle()
     val playback by vm.playback.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
+    val playlists by vm.playlists.collectAsStateWithLifecycle()
+    val recent by vm.recent.collectAsStateWithLifecycle()
     val results by vm.searchResults.collectAsStateWithLifecycle()
     val searchStatus by vm.searchStatus.collectAsStateWithLifecycle()
     val statusMsg by vm.status.collectAsStateWithLifecycle()
@@ -172,6 +175,18 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                 SpotifyViewModel.SearchStatus.LOADING -> StatusLine("Searching…", c)
                 SpotifyViewModel.SearchStatus.EMPTY -> StatusLine("No tracks found.", c)
                 else -> results.forEach { track -> TrackRow(track, c) { vm.play(track) } }
+            }
+
+            // ---- YOUR PLAYLISTS ----
+            if (playlists.isNotEmpty()) {
+                PipHeader("Your Playlists", trailing = playlists.size.toString())
+                playlists.forEach { pl -> PlaylistRow(pl, c) { vm.playPlaylist(pl) } }
+            }
+
+            // ---- RECENTLY PLAYED ----
+            if (recent.isNotEmpty()) {
+                PipHeader("Recently Played")
+                recent.forEach { track -> TrackRow(track, c) { vm.play(track) } }
             }
 
             // ---- DEVICES ----
@@ -324,6 +339,23 @@ private fun TrackRow(track: SpotifyTrack, c: NightwirePalette, onPlay: () -> Uni
             Text(track.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
             Text(track.artist, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 1.dp))
+        }
+        Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun PlaylistRow(pl: SpotifyPlaylist, c: NightwirePalette, onPlay: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp).background(c.accent.copy(alpha = 0.05f))
+            .clickable { onPlay() }.padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AlbumArt(pl.imageUrl, null, c, 40.dp)
+        Column(Modifier.weight(1f).padding(start = if (pl.imageUrl != null) 10.dp else 0.dp)) {
+            Text(pl.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+            val sub = (if (pl.ownerName.isNotBlank()) "${pl.ownerName} · " else "") + "${pl.trackCount} tracks"
+            Text(sub, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
         }
         Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
     }

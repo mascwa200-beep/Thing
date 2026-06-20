@@ -33,6 +33,9 @@ data class SpotifyDevice(val id: String, val name: String, val type: String, val
 /** A track search result. */
 data class SpotifyTrack(val name: String, val artist: String, val uri: String, val albumArtUrl: String?)
 
+/** A user playlist (its [uri] is a context to play). */
+data class SpotifyPlaylist(val name: String, val uri: String, val ownerName: String, val imageUrl: String?, val trackCount: Int)
+
 /** Outcome of a playback-control call, so the UI can explain why nothing happened. */
 enum class PlaybackResult { OK, NO_DEVICE, NEEDS_PREMIUM, FAILED }
 
@@ -155,6 +158,33 @@ class SpotifyRepository(private val settings: SettingsRepository) {
         }
     }
 
+    /** The user's own + followed playlists (newest-first as Spotify returns them). */
+    suspend fun playlists(limit: Int = 30): List<SpotifyPlaylist> {
+        val (code, body) = request("GET", "/me/playlists?limit=$limit") ?: return emptyList()
+        if (code !in 200..299) return emptyList()
+        val r = runCatching { json.decodeFromString(ApiPlaylistsPage.serializer(), body) }.getOrNull() ?: return emptyList()
+        return r.items.filter { it.uri.isNotBlank() }.map {
+            SpotifyPlaylist(
+                name = it.name.ifBlank { "Playlist" },
+                uri = it.uri,
+                ownerName = it.owner?.displayName.orEmpty(),
+                imageUrl = it.images.firstOrNull()?.url,
+                trackCount = it.tracks?.total ?: 0,
+            )
+        }
+    }
+
+    /** Recently-played tracks (de-duped by URI, most-recent first). */
+    suspend fun recentlyPlayed(limit: Int = 25): List<SpotifyTrack> {
+        val (code, body) = request("GET", "/me/player/recently-played?limit=$limit") ?: return emptyList()
+        if (code !in 200..299) return emptyList()
+        val r = runCatching { json.decodeFromString(ApiRecentlyPlayed.serializer(), body) }.getOrNull() ?: return emptyList()
+        val seen = HashSet<String>()
+        return r.items.mapNotNull { it.track }.filter { it.uri.isNotBlank() && seen.add(it.uri) }.map {
+            SpotifyTrack(it.name, it.artists.joinToString(", ") { a -> a.name }, it.uri, it.album?.images?.firstOrNull()?.url)
+        }
+    }
+
     // ---- Controls (target the active device unless a deviceId is given) ----
     // These return a typed result so the UI can explain a 403 (Premium) / 404 (no device) instead of
     // silently doing nothing.
@@ -167,6 +197,10 @@ class SpotifyRepository(private val settings: SettingsRepository) {
     /** Start playing a specific track [uri] (optionally on [deviceId]). */
     suspend fun playUri(uri: String, deviceId: String? = null): PlaybackResult =
         result(request("PUT", "/me/player/play".dev(deviceId), """{"uris":["$uri"]}"""))
+
+    /** Start playing a context [contextUri] (playlist / album / artist), optionally on [deviceId]. */
+    suspend fun playContext(contextUri: String, deviceId: String? = null): PlaybackResult =
+        result(request("PUT", "/me/player/play".dev(deviceId), """{"context_uri":"$contextUri"}"""))
 
     /** Hand playback to [deviceId] (and start it). */
     suspend fun transferTo(deviceId: String, play: Boolean = true): PlaybackResult =
@@ -245,4 +279,17 @@ class SpotifyRepository(private val settings: SettingsRepository) {
     @Serializable private data class ApiDevices(val devices: List<ApiDevice> = emptyList())
     @Serializable private data class ApiSearchTracks(val items: List<ApiTrack> = emptyList())
     @Serializable private data class ApiSearch(val tracks: ApiSearchTracks? = null)
+
+    @Serializable private data class ApiOwner(@SerialName("display_name") val displayName: String = "")
+    @Serializable private data class ApiTracksRef(val total: Int = 0)
+    @Serializable private data class ApiPlaylist(
+        val name: String = "",
+        val uri: String = "",
+        val owner: ApiOwner? = null,
+        val images: List<ApiImage> = emptyList(),
+        val tracks: ApiTracksRef? = null,
+    )
+    @Serializable private data class ApiPlaylistsPage(val items: List<ApiPlaylist> = emptyList())
+    @Serializable private data class ApiPlayHistory(val track: ApiTrack? = null)
+    @Serializable private data class ApiRecentlyPlayed(val items: List<ApiPlayHistory> = emptyList())
 }
