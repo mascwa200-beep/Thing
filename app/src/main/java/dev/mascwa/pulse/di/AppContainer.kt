@@ -126,6 +126,11 @@ class AppContainer(private val appContext: Context) {
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
 
+    /** Road-snapped routing (free, keyless OSRM) for the NAV navigation path. */
+    val routingRepository: dev.mascwa.pulse.data.places.RoutingRepository by lazy {
+        dev.mascwa.pulse.data.places.RoutingRepository(http)
+    }
+
     /** Local / regional internet radio (Radio Browser community API; free, keyless). */
     val radioBrowserRepository: dev.mascwa.pulse.data.radio.RadioBrowserRepository by lazy {
         dev.mascwa.pulse.data.radio.RadioBrowserRepository(http)
