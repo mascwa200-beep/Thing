@@ -72,6 +72,49 @@ class RadioViewModel(
     private val _localPlace = MutableStateFlow<String?>(null)
     val localPlace: StateFlow<String?> = _localPlace.asStateFlow()
 
+    /** A browsable country for the WORLD section (ISO-2 code + display label). */
+    data class RadioCountry(val code: String, val label: String)
+
+    /** Lifecycle of the WORLD (browse-by-country) lookup. */
+    enum class BrowseStatus { IDLE, LOADING, READY, EMPTY, ERROR }
+
+    /** A spread of the world's broadcast regions to browse — Radio Browser covers ~all of them. */
+    val countries: List<RadioCountry> = listOf(
+        RadioCountry("US", "United States"), RadioCountry("GB", "United Kingdom"),
+        RadioCountry("CA", "Canada"), RadioCountry("AU", "Australia"),
+        RadioCountry("IE", "Ireland"), RadioCountry("DE", "Germany"),
+        RadioCountry("FR", "France"), RadioCountry("ES", "Spain"),
+        RadioCountry("IT", "Italy"), RadioCountry("NL", "Netherlands"),
+        RadioCountry("SE", "Sweden"), RadioCountry("PL", "Poland"),
+        RadioCountry("BR", "Brazil"), RadioCountry("MX", "Mexico"),
+        RadioCountry("AR", "Argentina"), RadioCountry("JP", "Japan"),
+        RadioCountry("KR", "South Korea"), RadioCountry("IN", "India"),
+        RadioCountry("ZA", "South Africa"), RadioCountry("NG", "Nigeria"),
+        RadioCountry("NZ", "New Zealand"), RadioCountry("CH", "Switzerland"),
+    )
+
+    private val _browse = MutableStateFlow<List<RadioStation>>(emptyList())
+    val browseStations: StateFlow<List<RadioStation>> = _browse.asStateFlow()
+    private val _browseStatus = MutableStateFlow(BrowseStatus.IDLE)
+    val browseStatus: StateFlow<BrowseStatus> = _browseStatus.asStateFlow()
+    private val _browseCountry = MutableStateFlow<String?>(null)
+    val browseCountry: StateFlow<String?> = _browseCountry.asStateFlow()
+    private var browseJob: kotlinx.coroutines.Job? = null
+
+    /** Load the top stations for a country (the WORLD browse). */
+    fun browse(country: RadioCountry) {
+        val browser = radioBrowser
+        _browseCountry.value = country.code
+        if (browser == null) { _browseStatus.value = BrowseStatus.ERROR; return }
+        browseJob?.cancel()
+        browseJob = viewModelScope.launch {
+            _browseStatus.value = BrowseStatus.LOADING
+            val list = runCatching { browser.stationsByCountry(country.code) }.getOrDefault(emptyList())
+            _browse.value = list
+            _browseStatus.value = if (list.isEmpty()) BrowseStatus.EMPTY else BrowseStatus.READY
+        }
+    }
+
     private val _searchResults = MutableStateFlow<List<RadioStation>>(emptyList())
     val searchResults: StateFlow<List<RadioStation>> = _searchResults.asStateFlow()
     private val _searchStatus = MutableStateFlow(SearchStatus.IDLE)
