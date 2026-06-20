@@ -138,6 +138,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
     val activeWaypoint by vm.activeWaypoint.collectAsState()
     val allWaypoints by vm.allWaypoints.collectAsState()
     val activeWaypointId by vm.activeWaypointId.collectAsState()
+    val route by vm.route.collectAsState()
     val flyTo by vm.flyTo.collectAsState()
     val searchMessage by vm.searchMessage.collectAsState()
     val incidents by vm.incidents.collectAsState()
@@ -221,11 +222,12 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
         src.setGeoJson(poiGeoJson(enabled, pois))
     }
 
-    // Render the active objective waypoint (coloured by kind) + a route line from the player to it.
-    LaunchedEffect(activeWaypoint, location, map) {
+    // Render the active objective waypoint (coloured by kind) + a road-following route to it (straight
+    // line until the road route resolves).
+    LaunchedEffect(activeWaypoint, location, route, map) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
-        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeGeoJson(activeWaypoint, location))
+        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeLineGeoJson(route, activeWaypoint, location))
     }
 
     // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● PLAIN), active emphasised.
@@ -714,12 +716,21 @@ private fun waypointGeoJson(wp: Waypoint?): String {
         "\"properties\":{\"color\":\"${wp.kind.colorHex}\"}}]}"
 }
 
-/** GeoJSON for the player→waypoint route line, or an empty collection when either point is missing. */
-private fun routeGeoJson(wp: Waypoint?, loc: DeviceLocation?): String {
-    if (wp == null || loc == null) return EMPTY_FC
+/** GeoJSON LineString for the navigation path: the road-snapped [route] when available, else a
+ *  straight player→waypoint line (until routing resolves), else an empty collection. */
+private fun routeLineGeoJson(route: List<Pair<Double, Double>>, wp: Waypoint?, loc: DeviceLocation?): String {
+    val coords: List<Pair<Double, Double>> = when {
+        route.size >= 2 -> route
+        wp != null && loc != null -> listOf(loc.latitude to loc.longitude, wp.latitude to wp.longitude)
+        else -> return EMPTY_FC
+    }
+    val sb = StringBuilder()
+    coords.forEachIndexed { i, (lat, lon) ->
+        if (i > 0) sb.append(',')
+        sb.append('[').append(lon).append(',').append(lat).append(']')
+    }
     return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":" +
-        "{\"type\":\"LineString\",\"coordinates\":[[${loc.longitude},${loc.latitude}],[${wp.longitude},${wp.latitude}]]}," +
-        "\"properties\":{}}]}"
+        "{\"type\":\"LineString\",\"coordinates\":[$sb]},\"properties\":{}}]}"
 }
 
 /** Category POI markers, coloured per-feature via the data-driven "color" property. */

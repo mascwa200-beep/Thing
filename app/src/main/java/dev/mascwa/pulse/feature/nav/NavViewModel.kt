@@ -2,11 +2,13 @@ package dev.mascwa.pulse.feature.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
+import dev.mascwa.pulse.data.places.RoutingRepository
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -39,6 +42,7 @@ class NavViewModel(
     private val settings: SettingsRepository,
     private val waypointStore: WaypointStore,
     private val safety: SafetyRepository,
+    private val routing: RoutingRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -79,11 +83,41 @@ class NavViewModel(
     private val _searchMessage = MutableStateFlow<String?>(null)
     val searchMessage: StateFlow<String?> = _searchMessage.asStateFlow()
 
+    /** Road-snapped path (lat,lon points following streets) from the player to the active waypoint —
+     *  empty when nothing is tracked or routing failed (the screen falls back to a straight line). */
+    private val _route = MutableStateFlow<List<Pair<Double, Double>>>(emptyList())
+    val route: StateFlow<List<Pair<Double, Double>>> = _route.asStateFlow()
+    private var lastRouteWpId: String? = null
+    private var lastRouteStart: DeviceLocation? = null
+
     init {
         viewModelScope.launch {
             runCatching { settings.current() }.getOrNull()?.let {
                 _nav3d.value = it.nav3d
                 _headingUp.value = it.navHeadingUp
+            }
+        }
+        // Keep a road-following route to the active waypoint, refreshed when it changes or the player
+        // moves a meaningful distance — throttled so we don't hammer the routing server on each GPS tick.
+        viewModelScope.launch {
+            combine(activeWaypoint, _location) { wp, loc -> wp to loc }.collectLatest { (wp, loc) ->
+                if (wp == null || loc == null) {
+                    _route.value = emptyList()
+                    lastRouteWpId = null
+                    lastRouteStart = null
+                    return@collectLatest
+                }
+                val movedFar = lastRouteStart?.let {
+                    Geo.distanceMeters(it.latitude, it.longitude, loc.latitude, loc.longitude) > 60
+                } ?: true
+                if (wp.id == lastRouteWpId && !movedFar && _route.value.isNotEmpty()) return@collectLatest
+                delay(350) // debounce GPS chatter before hitting the routing server
+                val path = runCatching { routing.route(loc.latitude, loc.longitude, wp.latitude, wp.longitude) }.getOrNull()
+                if (path != null && path.size >= 2) {
+                    _route.value = path
+                    lastRouteWpId = wp.id
+                    lastRouteStart = loc
+                }
             }
         }
     }
