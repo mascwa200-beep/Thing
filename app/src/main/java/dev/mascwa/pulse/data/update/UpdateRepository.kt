@@ -23,11 +23,13 @@ data class UpdateInfo(
     val apkAssetUrl: String,
 )
 
-/** The result of an update check: the latest published version name (null = unknown/unparseable), and
- *  the installable update when it's newer than this build ([available] = null means already current). */
+/** The result of an update check: the latest published version name (null = unknown/unparseable), the
+ *  installable update when it's newer than this build, and [pending] = a newer build exists but isn't
+ *  offerable yet (still building / failed), so the UI must NOT claim you're already current. */
 data class UpdateCheck(
     val latestVersionName: String?,
     val available: UpdateInfo?,
+    val pending: Boolean = false,
 )
 
 /**
@@ -95,19 +97,19 @@ class UpdateRepository(
             ?: return UpdateCheck(null, null)
         val latestName = "1.0.$code"
         if (code <= BuildConfig.VERSION_CODE) return UpdateCheck(latestName, null)
-        // Only offer the update once the CI run that produced it is GREEN — never while it's still
-        // building (orange) or if it failed. The rolling `latest` release picks up the new APK + run
+        // A newer build exists. Only offer it once the CI run that produced it is GREEN — never while it's
+        // still building (orange) or if it failed. The rolling `latest` release picks up the new APK + run
         // number mid-workflow, so without this gate we'd offer a build that isn't finished/verified.
-        // Best-effort: false = confirmed not-green (suppress); true/null (green, or run too old / API
-        // unavailable) falls through so old or flaky cases never hide a real update.
-        if (isBuildGreen(code, headers) == false) return UpdateCheck(latestName, null)
+        // false = still building / failed → it's PENDING (not "you're current"); true/null (green, or
+        // cancelled-after-publish / run too old / API down) falls through so a real, built APK is offered.
+        if (isBuildGreen(code, headers) == false) return UpdateCheck(latestName, null, pending = true)
         // Pick the NEWEST .apk — the rolling release can briefly hold a stale asset (e.g. after the
         // published filename changed), and grabbing the first one would serve an old/downgrade build.
         // created_at is ISO-8601, so lexical max == most recent.
         val asset = rel.assets
             .filter { it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true) }
             .maxByOrNull { it.created_at }
-            ?: return UpdateCheck(latestName, null)
+            ?: return UpdateCheck(latestName, null, pending = true)
         return UpdateCheck(
             latestName,
             UpdateInfo(code, latestName, rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url),
@@ -115,18 +117,25 @@ class UpdateRepository(
     }
 
     /**
-     * Whether the workflow run that produced build [code] finished green. The shipped build's
+     * Whether the workflow run that produced build [code] is offerable. The shipped build's
      * `versionCode == github.run_number`, so the run with `run_number == code` is the one that built
-     * this release. Returns **true** = completed successfully, **false** = present but not success
-     * (queued / in-progress / failed / cancelled), **null** = couldn't determine (run too old to be in
-     * the recent page, or the API call failed) — the caller treats null as "don't suppress".
+     * this release. Returns **false** ONLY when it's genuinely not ready — still building/queued, or a
+     * hard failure; **true** when completed successfully; **null** for anything else (notably *cancelled*
+     * — concurrency can cancel a run AFTER it already published its APK, and a published APK is a good
+     * build — or a run too old to be in the recent page / the API call failing). The caller suppresses
+     * only on an explicit **false**, so a cancelled-but-published build is still offered.
      */
     private suspend fun isBuildGreen(code: Int, headers: Map<String, String>): Boolean? {
         val runs = runCatching {
             http.getJson("$API/actions/runs?per_page=30", RunList.serializer(), headers)
         }.getOrNull() ?: return null
         val run = runs.workflow_runs.firstOrNull { it.run_number == code } ?: return null
-        return run.status == "completed" && run.conclusion == "success"
+        return when {
+            run.status != "completed" -> false      // still building / queued
+            run.conclusion == "success" -> true      // green
+            run.conclusion == "failure" -> false     // hard failure
+            else -> null                             // cancelled / neutral / skipped — APK is published, don't suppress
+        }
     }
 
     /** Stream the APK to cache, reporting 0..100 progress. Private repos: fetch the asset API URL with the

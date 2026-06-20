@@ -62,6 +62,8 @@ class SettingsViewModel(
         data object Idle : UpdateUi
         data object Checking : UpdateUi
         data class UpToDate(val latest: String?) : UpdateUi
+        /** A newer build exists but isn't installable yet (still building / not verified). */
+        data class Pending(val latest: String?) : UpdateUi
         data class Available(val info: UpdateInfo) : UpdateUi
         data class Downloading(val pct: Int) : UpdateUi
         data class ReadyToInstall(val info: UpdateInfo, val file: File) : UpdateUi
@@ -82,7 +84,11 @@ class SettingsViewModel(
             _update.value = runCatching { updates.check() }.fold(
                 onSuccess = { result ->
                     val info = result.available
-                    if (info == null) UpdateUi.UpToDate(result.latestVersionName) else UpdateUi.Available(info)
+                    when {
+                        info != null -> UpdateUi.Available(info)
+                        result.pending -> UpdateUi.Pending(result.latestVersionName)
+                        else -> UpdateUi.UpToDate(result.latestVersionName)
+                    }
                 },
                 onFailure = { e ->
                     val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
