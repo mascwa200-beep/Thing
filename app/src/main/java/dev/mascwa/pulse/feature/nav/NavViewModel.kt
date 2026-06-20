@@ -107,6 +107,9 @@ class NavViewModel(
                     lastRouteStart = null
                     return@collectLatest
                 }
+                // A different objective: drop the previous path at once so the old road route never
+                // lingers on the map while the new one is computed (we redraw only when it resolves).
+                if (wp.id != lastRouteWpId) _route.value = emptyList()
                 val movedFar = lastRouteStart?.let {
                     Geo.distanceMeters(it.latitude, it.longitude, loc.latitude, loc.longitude) > 60
                 } ?: true
