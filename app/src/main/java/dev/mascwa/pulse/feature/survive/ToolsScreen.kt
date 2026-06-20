@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -100,10 +100,10 @@ private fun ToolButton(
     onClick: () -> Unit,
 ) {
     val c = Pulse.colors
-    NeonPanel(
+    PipFrame(
         modifier = Modifier.fillMaxWidth()
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
-        borderColor = if (active) accent else c.lineSoft,
+        accent = if (active) accent else c.line,
     ) {
         Column {
             Text(title, style = MaterialTheme.typography.titleMedium,

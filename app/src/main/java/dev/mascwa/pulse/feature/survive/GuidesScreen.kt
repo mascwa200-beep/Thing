@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.survival.Guide
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -57,7 +57,7 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null) {
                         color = c.muted, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
                 }
                 items(guides, key = { it.id }) { g ->
-                    NeonPanel(Modifier.fillMaxWidth().clickable { selected = g }) {
+                    PipFrame(Modifier.fillMaxWidth().clickable { selected = g }) {
                         Column {
                             Text(g.category.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
                             Text(g.title, style = MaterialTheme.typography.titleMedium, color = c.ink,

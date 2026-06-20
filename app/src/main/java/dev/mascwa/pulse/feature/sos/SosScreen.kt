@@ -35,9 +35,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
-import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -96,7 +96,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
             }
 
             // Call / text / share
-            item { SectionBar("Call & send for help") }
+            item { PipHeader("Call & send for help") }
             item {
                 ActionRow("Call ${state.emergencyNumber}", "Local emergency services", Icons.Filled.Call, c.magenta) {
                     vm.dialEmergency()
@@ -125,7 +125,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
             item {
                 val coords = if (state.latitude != null && state.longitude != null)
                     "%.5f, %.5f".format(state.latitude, state.longitude) else "Locating…"
-                NeonPanel(Modifier.fillMaxWidth()) {
+                PipFrame(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Your coordinates", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                         Text(coords, style = MaterialTheme.typography.bodyMedium, color = c.ink)
@@ -134,10 +134,10 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
             }
 
             // Emergency card
-            item { SectionBar("Emergency card") }
+            item { PipHeader("Emergency card") }
             item {
                 val card = state.card
-                NeonPanel(Modifier.fillMaxWidth()) {
+                PipFrame(Modifier.fillMaxWidth()) {
                     if (card.isEmpty) {
                         Text("Add your medical info & contacts in Settings ▸ Safety.",
                             style = MaterialTheme.typography.bodyMedium, color = c.muted)
@@ -152,10 +152,10 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
             if (state.contacts.isNotEmpty()) {
-                item { SectionBar("Emergency contacts") }
+                item { PipHeader("Emergency contacts") }
                 items(state.contacts.size) { i ->
                     val ct = state.contacts[i]
-                    NeonPanel(Modifier.fillMaxWidth()) {
+                    PipFrame(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(ct.name, style = MaterialTheme.typography.bodyLarge, color = c.ink)
                             Text(ct.phone, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
@@ -171,7 +171,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
 private fun ActionRow(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
                       accent: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, borderColor = accent.copy(alpha = 0.5f), corners = true) {
+    PipFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = accent) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center) {

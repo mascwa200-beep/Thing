@@ -37,7 +37,7 @@ import dev.mascwa.pulse.data.safety.Severity
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -67,7 +67,7 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
         ) {
             when {
                 needsPermission -> Column(Modifier.padding(16.dp)) {
-                    NeonPanel(Modifier.fillMaxWidth()) {
+                    PipFrame(Modifier.fillMaxWidth()) {
                         Column {
                             Text("Location needed", style = MaterialTheme.typography.titleMedium, color = c.ink)
                             Text("Grant location to see hazards and incidents near you.",
@@ -118,7 +118,7 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
         Severity.MODERATE -> c.amber
         Severity.LOW -> c.muted
     }
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }, borderColor = color.copy(alpha = 0.55f)) {
+    PipFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = color) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${type.label.uppercase()} · ${severity.name}", fontFamily = JetBrainsMono,

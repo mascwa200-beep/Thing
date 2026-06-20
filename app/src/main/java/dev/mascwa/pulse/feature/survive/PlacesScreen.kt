@@ -39,7 +39,7 @@ import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonChip
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -110,7 +110,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
 @Composable
 private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth()) {
+    PipFrame(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(place.name, style = MaterialTheme.typography.titleSmall, color = c.ink)
@@ -131,7 +131,7 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
 @Composable
 private fun PermissionPrompt(onGrant: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().padding(16.dp)) {
+    PipFrame(Modifier.fillMaxWidth().padding(16.dp)) {
         Column {
             Text("Location needed", style = MaterialTheme.typography.titleMedium, color = c.ink)
             Text("Grant location to find the nearest hospitals, shelters and more.",
