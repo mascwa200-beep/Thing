@@ -150,12 +150,10 @@ class KnowledgeTool(private val knowledge: KnowledgeStore) : JarvisTool {
 /** Live device state, straight from the hardware/OS. */
 class DeviceTool(private val device: DeviceContextProvider) : JarvisTool {
     override val name = "device"
-    override val usage = "device <anything> — read live battery / network / time state"
+    override val usage =
+        "device — report this phone: model, Android version, app build, memory, storage, power and network"
 
     override suspend fun run(arg: String): String = runCatching {
-        val c = device.snapshot()
-        val battery = if (c.batteryPct >= 0) "${c.batteryPct}%${if (c.isCharging) " (charging)" else ""}" else "unknown"
-        "Battery $battery · network ${c.network} · ${c.hour}:00 (${c.dayPart})" +
-            if (c.isPowerSave) " · power-save on" else ""
+        device.deviceReport()
     }.getOrElse { "Device read failed: ${it.message}" }
 }
