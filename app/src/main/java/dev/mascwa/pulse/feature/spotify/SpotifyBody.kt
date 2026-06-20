@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.spotify
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,13 +34,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
@@ -53,6 +60,38 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 /** Caution amber for App-Remote errors, readable against the green CRT. */
 private val Amber = Color(0xFFE0B341)
+
+/** A green-phosphor duotone (luminance → green) so album art reads as part of the Pip-Boy CRT instead
+ *  of a jarring full-colour thumbnail. R/B carry a faint share for body; G carries the luminance. */
+private val PhosphorDuotone = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0.030f, 0.059f, 0.011f, 0f, 0f, // R = 0.10·luma
+            0.299f, 0.587f, 0.114f, 0f, 0f, // G = luma
+            0.090f, 0.176f, 0.034f, 0f, 0f, // B = 0.30·luma
+            0f, 0f, 0f, 1f, 0f,             // A = A
+        ),
+    ),
+)
+
+/** A framed, green-duotone album thumbnail — from an App Remote [bitmap] or a Web API [url]. */
+@Composable
+private fun AlbumArt(url: String?, bitmap: android.graphics.Bitmap?, c: NightwirePalette, side: Dp) {
+    if (url == null && bitmap == null) return
+    Box(
+        Modifier.size(side).clip(RoundedCornerShape(4.dp))
+            .background(c.accent.copy(alpha = 0.06f))
+            .border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(4.dp)),
+    ) {
+        if (bitmap != null) {
+            Image(bitmap.asImageBitmap(), "Album art", Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop, colorFilter = PhosphorDuotone)
+        } else if (url != null) {
+            AsyncImage(model = url, contentDescription = "Album art", modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop, colorFilter = PhosphorDuotone)
+        }
+    }
+}
 
 /**
  * The PIP-BOY MUSIC (Spotify) feed. Two layers in the Fallout green idiom:
@@ -183,11 +222,16 @@ private fun ConnectedPlayer(
 ) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column {
-            Text(remote.trackName.ifBlank { "—" }, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                fontSize = 16.sp, color = c.ink)
-            if (remote.artist.isNotBlank()) {
-                Text(remote.artist, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
-                    modifier = Modifier.padding(top = 2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AlbumArt(null, remote.artBitmap, c, 60.dp)
+                Column(Modifier.padding(start = if (remote.artBitmap != null) 12.dp else 0.dp)) {
+                    Text(remote.trackName.ifBlank { "—" }, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp, color = c.ink)
+                    if (remote.artist.isNotBlank()) {
+                        Text(remote.artist, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
+                            modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
             }
             Row(
                 Modifier.fillMaxWidth().padding(top = 14.dp),
@@ -219,12 +263,17 @@ private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: S
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 )
             } else {
-                Text(playback.trackName, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink)
-                Text(playback.artist, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
-                    modifier = Modifier.padding(top = 2.dp))
-                if (playback.deviceName.isNotBlank()) {
-                    Text("◈ ${playback.deviceName}", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                        modifier = Modifier.padding(top = 4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AlbumArt(playback.albumArtUrl, null, c, 60.dp)
+                    Column(Modifier.padding(start = if (playback.albumArtUrl != null) 12.dp else 0.dp)) {
+                        Text(playback.trackName, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink)
+                        Text(playback.artist, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
+                            modifier = Modifier.padding(top = 2.dp))
+                        if (playback.deviceName.isNotBlank()) {
+                            Text("◈ ${playback.deviceName}", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                                modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
                 }
             }
             Row(
@@ -270,7 +319,8 @@ private fun TrackRow(track: SpotifyTrack, c: NightwirePalette, onPlay: () -> Uni
             .clickable { onPlay() }.padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
+        AlbumArt(track.albumArtUrl, null, c, 40.dp)
+        Column(Modifier.weight(1f).padding(start = if (track.albumArtUrl != null) 10.dp else 0.dp)) {
             Text(track.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
             Text(track.artist, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 1.dp))

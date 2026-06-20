@@ -7,6 +7,7 @@ import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.android.appremote.api.error.CouldNotFindSpotifyApp
 import com.spotify.android.appremote.api.error.NotLoggedInException
 import com.spotify.android.appremote.api.error.UserNotAuthorizedException
+import com.spotify.protocol.types.Image
 import com.spotify.protocol.types.PlayerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,7 @@ object SpotifyAppRemoteController {
         val trackName: String = "",
         val artist: String = "",
         val imageUri: String? = null,
+        val artBitmap: android.graphics.Bitmap? = null,
         val isPlaying: Boolean = false,
         val error: String? = null,
     )
@@ -37,6 +39,7 @@ object SpotifyAppRemoteController {
     val state: StateFlow<RemoteState> = _state.asStateFlow()
 
     private var remote: SpotifyAppRemote? = null
+    private var lastArtUri: String? = null
 
     val isConnected: Boolean get() = remote?.isConnected == true
 
@@ -76,11 +79,25 @@ object SpotifyAppRemoteController {
             isPlaying = !s.isPaused,
             error = null,
         )
+        // Album art comes as a Bitmap from App Remote's ImagesApi; fetch it only when the track changes.
+        val uri = t?.imageUri
+        when {
+            uri?.raw == null -> { lastArtUri = null; _state.value = _state.value.copy(artBitmap = null) }
+            uri.raw != lastArtUri -> {
+                lastArtUri = uri.raw
+                runCatching {
+                    remote?.imagesApi?.getImage(uri, Image.Dimension.MEDIUM)?.setResultCallback { bmp ->
+                        if (lastArtUri == uri.raw) _state.value = _state.value.copy(artBitmap = bmp)
+                    }
+                }
+            }
+        }
     }
 
     fun disconnect() {
         remote?.let { runCatching { SpotifyAppRemote.disconnect(it) } }
         remote = null
+        lastArtUri = null
         _state.value = RemoteState()
     }
 
