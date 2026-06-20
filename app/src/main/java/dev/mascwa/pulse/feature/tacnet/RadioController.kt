@@ -8,7 +8,6 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -16,7 +15,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.extractor.metadata.icy.IcyInfo
+import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -36,10 +35,14 @@ import kotlinx.coroutines.launch
  *
  * ExoPlayer (not bare MediaPlayer) so the picky commercial streams actually open: it handles ICY /
  * SHOUTcast responses, HLS, and the cross-protocol (http↔https) redirects that StreamTheWorld / Triton
- * mounts do. A real browser User-Agent is set since those CDNs 403 the default one. Crucially we use a
- * SINGLE connection: now-playing comes from ExoPlayer's IN-BAND ICY metadata (`Icy-MetaData: 1` +
- * onMetadata), not a second HTTP fetch — Triton drops the audio connection when a second one opens, which
- * was making streams cut out after a couple of seconds. The player is touched ONLY on the main thread.
+ * mounts do. A real browser User-Agent is set since those CDNs 403 the default one. The player is touched
+ * ONLY on the main thread.
+ *
+ * Now-playing: the audio connection is kept pristine (no `Icy-MetaData` header — on the Triton AAC mounts
+ * that header makes the server interleave metadata ExoPlayer doesn't strip, breaking the container parse).
+ * Instead a SEPARATE, brief, delayed ICY poll reads the title — and it is SKIPPED for the connection-limited
+ * commercial CDNs (StreamTheWorld / Amperwave), which drop the audio when a second connection opens. So
+ * SomaFM and most Icecast/SHOUTcast stations get live track text; the strict CDNs keep uninterrupted audio.
  */
 object RadioController {
 
@@ -68,7 +71,12 @@ object RadioController {
     private val scope = CoroutineScope(SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepJob: Job? = null
+    private var metaJob: Job? = null
     private var player: ExoPlayer? = null
+
+    // Connection-limited commercial CDNs: a second listener connection makes them drop the audio, so we
+    // never run the side metadata poll for these (they keep playing; just no track text).
+    private val SINGLE_CONNECTION_HOSTS = listOf("streamtheworld", "amperwave")
 
     private fun runOnMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
@@ -104,6 +112,7 @@ object RadioController {
         val app = context.applicationContext
         _state.value = RadioState(station, Status.TUNING)
         _nowPlaying.value = null
+        startMetaPolling(station)
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
         // FGS start just means foreground-only playback, never a crash).
         runCatching { ContextCompat.startForegroundService(app, Intent(app, RadioService::class.java)) }
@@ -149,16 +158,6 @@ object RadioController {
                             _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
                         }
                     }
-
-                    override fun onMetadata(metadata: Metadata) {
-                        val title = (0 until metadata.length()).asSequence()
-                            .map { metadata.get(it) }
-                            .filterIsInstance<IcyInfo>()
-                            .firstNotNullOfOrNull { it.title?.trim()?.ifBlank { null } }
-                        if (title != null && _state.value.tuned?.streamUrl == station.streamUrl) {
-                            _nowPlaying.value = title
-                        }
-                    }
                 })
                 exo.playWhenReady = true
                 exo.prepare()
@@ -170,12 +169,29 @@ object RadioController {
     fun stop(context: Context) {
         sleepJob?.cancel()
         _sleepMinutes.value = null
+        metaJob?.cancel()
         _nowPlaying.value = null
         runOnMain { releasePlayerInternal() }
         _state.value = RadioState(null, Status.IDLE)
         runCatching {
             val app = context.applicationContext
             app.stopService(Intent(app, RadioService::class.java))
+        }
+    }
+
+    /** Poll the tuned station's ICY now-playing title on a separate brief connection — but only for
+     *  stations that tolerate a second connection (skipped for the single-connection commercial CDNs so
+     *  their audio is never disturbed). A short initial delay lets the audio connection settle first. */
+    private fun startMetaPolling(station: RadioStation) {
+        metaJob?.cancel()
+        if (SINGLE_CONNECTION_HOSTS.any { station.streamUrl.contains(it, ignoreCase = true) }) return
+        metaJob = scope.launch {
+            delay(6_000)
+            while (_state.value.tuned?.streamUrl == station.streamUrl) {
+                val title = runCatching { IcyMetadata.nowPlaying(station.streamUrl) }.getOrNull()
+                if (_state.value.tuned?.streamUrl == station.streamUrl) _nowPlaying.value = title
+                delay(30_000)
+            }
         }
     }
 
