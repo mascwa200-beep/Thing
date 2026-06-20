@@ -33,7 +33,8 @@ import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonChip
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -97,7 +98,6 @@ private fun FeedList(
 @Composable
 private fun MastodonContent(vm: SocialViewModel, context: android.content.Context) {
     val async by vm.mastodon.collectAsStateWithLifecycle()
-    val c = Pulse.colors
     when {
         async.isInitialLoading -> LoadingState()
         async.isError -> ErrorState(async.error ?: "Error", onRetry = { vm.refresh() })
@@ -110,10 +110,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
             ) {
                 if (async.stale) item { StaleBanner(true) }
                 if (data.tags.isNotEmpty()) {
-                    item {
-                        Text("TRENDING TAGS", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
-                    }
+                    item { PipHeader("Trending tags") }
                     item {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             data.tags.forEach { tag ->
@@ -122,10 +119,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
                             }
                         }
                     }
-                    item {
-                        Text("TRENDING POSTS", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
-                    }
+                    item { PipHeader("Trending posts") }
                 }
                 items(data.statuses.distinctBy { it.url }, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
             }
@@ -136,7 +130,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
 @Composable
 private fun ItemRow(item: SocialItem, onClick: () -> Unit) {
     val c = Pulse.colors
-    NeonPanel(Modifier.fillMaxWidth().clickable { onClick() }) {
+    PipFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
         Column {
             Text(item.title, style = MaterialTheme.typography.bodyLarge, color = c.ink,
                 fontWeight = FontWeight.Medium)
