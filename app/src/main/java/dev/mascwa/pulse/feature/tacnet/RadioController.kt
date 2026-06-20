@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -15,7 +16,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import dev.mascwa.pulse.data.radio.IcyMetadata
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import dev.mascwa.pulse.data.radio.RadioStation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -35,8 +36,10 @@ import kotlinx.coroutines.launch
  *
  * ExoPlayer (not bare MediaPlayer) so the picky commercial streams actually open: it handles ICY /
  * SHOUTcast responses, HLS, and the cross-protocol (http↔https) redirects that StreamTheWorld / Triton
- * mounts do — exactly the cases that left MediaPlayer at `error (1/-1004)`. A real browser User-Agent is
- * set too, since those CDNs 403 the default one. The player is touched ONLY on the main thread.
+ * mounts do. A real browser User-Agent is set since those CDNs 403 the default one. Crucially we use a
+ * SINGLE connection: now-playing comes from ExoPlayer's IN-BAND ICY metadata (`Icy-MetaData: 1` +
+ * onMetadata), not a second HTTP fetch — Triton drops the audio connection when a second one opens, which
+ * was making streams cut out after a couple of seconds. The player is touched ONLY on the main thread.
  */
 object RadioController {
 
@@ -53,7 +56,7 @@ object RadioController {
     private val _sleepMinutes = MutableStateFlow<Int?>(null)
     val sleepMinutes: StateFlow<Int?> = _sleepMinutes.asStateFlow()
 
-    /** Live "Artist - Song" for the tuned station (ICY stream metadata), or null when unavailable. */
+    /** Live "Artist - Song" for the tuned station (in-band ICY stream metadata), or null when unavailable. */
     private val _nowPlaying = MutableStateFlow<String?>(null)
     val nowPlaying: StateFlow<String?> = _nowPlaying.asStateFlow()
 
@@ -65,7 +68,6 @@ object RadioController {
     private val scope = CoroutineScope(SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var sleepJob: Job? = null
-    private var metaJob: Job? = null
     private var player: ExoPlayer? = null
 
     private fun runOnMain(block: () -> Unit) {
@@ -101,7 +103,7 @@ object RadioController {
     fun play(context: Context, station: RadioStation) {
         val app = context.applicationContext
         _state.value = RadioState(station, Status.TUNING)
-        startMetaPolling(station)
+        _nowPlaying.value = null
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
         // FGS start just means foreground-only playback, never a crash).
         runCatching { ContextCompat.startForegroundService(app, Intent(app, RadioService::class.java)) }
@@ -113,6 +115,10 @@ object RadioController {
                     .setAllowCrossProtocolRedirects(true)
                     .setConnectTimeoutMs(20_000)
                     .setReadTimeoutMs(20_000)
+                    // Ask for in-band ICY metadata so we never open a second connection for now-playing —
+                    // Triton drops the audio stream when a second connection appears. ExoPlayer strips the
+                    // metadata bytes from the audio and surfaces them via onMetadata.
+                    .setDefaultRequestProperties(mapOf("Icy-MetaData" to "1"))
                 val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
                 val exo = ExoPlayer.Builder(app)
                     .setMediaSourceFactory(sourceFactory)
@@ -127,13 +133,30 @@ object RadioController {
                 exo.setMediaItem(MediaItem.fromUri(station.streamUrl))
                 exo.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_READY && _state.value.tuned?.streamUrl == station.streamUrl) {
-                            _state.value = RadioState(station, Status.ON_AIR)
+                        if (_state.value.tuned?.streamUrl != station.streamUrl) return
+                        when (playbackState) {
+                            Player.STATE_READY -> _state.value = RadioState(station, Status.ON_AIR)
+                            // A live stream shouldn't end; if it does the source dried up — show it instead
+                            // of going silent with no indication.
+                            Player.STATE_ENDED -> _state.value = RadioState(station, Status.ERROR, "stream dropped")
+                            else -> {}
                         }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
+                        if (_state.value.tuned?.streamUrl == station.streamUrl) {
+                            _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
+                        }
+                    }
+
+                    override fun onMetadata(metadata: Metadata) {
+                        val title = (0 until metadata.length()).asSequence()
+                            .map { metadata.get(it) }
+                            .filterIsInstance<IcyInfo>()
+                            .firstNotNullOfOrNull { it.title?.trim()?.ifBlank { null } }
+                        if (title != null && _state.value.tuned?.streamUrl == station.streamUrl) {
+                            _nowPlaying.value = title
+                        }
                     }
                 })
                 exo.playWhenReady = true
@@ -146,26 +169,12 @@ object RadioController {
     fun stop(context: Context) {
         sleepJob?.cancel()
         _sleepMinutes.value = null
-        metaJob?.cancel()
         _nowPlaying.value = null
         runOnMain { releasePlayerInternal() }
         _state.value = RadioState(null, Status.IDLE)
         runCatching {
             val app = context.applicationContext
             app.stopService(Intent(app, RadioService::class.java))
-        }
-    }
-
-    /** Poll the tuned station's ICY now-playing title every ~25 s while it's the current one. */
-    private fun startMetaPolling(station: RadioStation) {
-        metaJob?.cancel()
-        _nowPlaying.value = null
-        metaJob = scope.launch {
-            while (_state.value.tuned?.streamUrl == station.streamUrl) {
-                val title = runCatching { IcyMetadata.nowPlaying(station.streamUrl) }.getOrNull()
-                if (_state.value.tuned?.streamUrl == station.streamUrl) _nowPlaying.value = title
-                delay(25_000)
-            }
         }
     }
 
