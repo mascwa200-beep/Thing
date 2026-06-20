@@ -41,6 +41,7 @@ import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.LocalNightwire
+import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.ui.theme.pipBoyPalette
 import kotlin.math.roundToInt
 
@@ -51,7 +52,7 @@ import kotlin.math.roundToInt
  * scaffold-free *Body is hosted inside the green CRT chrome.
  */
 private enum class PipTab(val label: String) {
-    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), NOTES("NOTES"), RADIO("RADIO"),
+    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), QUESTS("QUESTS"), NOTES("NOTES"), RADIO("RADIO"),
 }
 
 @Composable
@@ -62,6 +63,7 @@ fun PipBoyScreen(
     spaceWxVm: SpaceWeatherViewModel,
     radioVm: RadioViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
+    objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
     onBack: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
@@ -81,6 +83,7 @@ fun PipBoyScreen(
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
                     PipTab.DATA -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> radarVm.refresh()
+                    PipTab.QUESTS -> objectivesVm.refresh()
                     PipTab.NOTES -> Unit // the library is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
                 }
@@ -99,6 +102,9 @@ fun PipBoyScreen(
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
                         PipTab.DATA -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> RadarBody(radarVm)
+                        PipTab.QUESTS -> dev.mascwa.pulse.feature.objectives.ObjectivesPanel(
+                            objectivesVm, Pulse.colors, Modifier.fillMaxSize(),
+                        )
                         PipTab.NOTES -> dev.mascwa.pulse.feature.notes.NotesBody(notesVm)
                         PipTab.RADIO -> RadioBody(radioVm)
                     }
