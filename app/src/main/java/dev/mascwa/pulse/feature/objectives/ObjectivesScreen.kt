@@ -81,7 +81,8 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
     }
 
     var label by remember { mutableStateOf("") }
-    var kind by remember { mutableStateOf(ObjectiveKind.PLAIN) }
+    // You place either a MAIN (gold) or a SIDE (white) objective; WORK (green) comes from the calendar.
+    var kind by remember { mutableStateOf(ObjectiveKind.SIDE) }
 
     LazyColumn(
         modifier,
@@ -126,7 +127,6 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
                     ) {
                         NeonChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
                         NeonChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
-                        NeonChip("Plain", kind == ObjectiveKind.PLAIN, onClick = { kind = ObjectiveKind.PLAIN })
                     }
                     Text(
                         "◢ ADD",
@@ -145,7 +145,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
             item {
                 Text(
                     "No quests yet. Add a waypoint above, or link your calendar. Tracked quests appear on " +
-                        "the NAV map as ★ main / ◆ side / ● misc markers.",
+                        "the NAV map as ★ gold main / ◆ white side / ● green work markers.",
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -156,7 +156,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
         listOf(
             "MAIN QUESTS" to ObjectiveKind.MAIN,
             "SIDE QUESTS" to ObjectiveKind.SIDE,
-            "MISCELLANEOUS" to ObjectiveKind.PLAIN,
+            "WORK · CALENDAR" to ObjectiveKind.WORK,
         ).forEach { (title, kindOf) ->
             val group = objectives.filter { it.kind == kindOf }
             if (group.isNotEmpty()) {

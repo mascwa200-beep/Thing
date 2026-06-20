@@ -611,7 +611,7 @@ private fun addObjectiveIcons(style: Style) {
     if (style.getImage("obj-main") != null) return
     style.addImage("obj-main", objectiveBitmap(ObjectiveKind.MAIN))
     style.addImage("obj-side", objectiveBitmap(ObjectiveKind.SIDE))
-    style.addImage("obj-plain", objectiveBitmap(ObjectiveKind.PLAIN))
+    style.addImage("obj-work", objectiveBitmap(ObjectiveKind.WORK))
 }
 
 /** Every tracked objective as its per-kind icon; the active one is scaled up for emphasis. */
@@ -662,7 +662,7 @@ private fun objectiveBitmap(kind: ObjectiveKind): android.graphics.Bitmap {
             }
             canvas.drawPath(path, outline); canvas.drawPath(path, fill)
         }
-        ObjectiveKind.PLAIN -> {
+        ObjectiveKind.WORK -> {
             val dot = r * 0.78f
             canvas.drawCircle(cx, cy, dot, outline); canvas.drawCircle(cx, cy, dot, fill)
         }
@@ -695,7 +695,7 @@ private fun objectiveGeoJson(waypoints: List<Waypoint>, activeId: String?): Stri
         val icon = when (wp.kind) {
             ObjectiveKind.MAIN -> "obj-main"
             ObjectiveKind.SIDE -> "obj-side"
-            ObjectiveKind.PLAIN -> "obj-plain"
+            ObjectiveKind.WORK -> "obj-work"
         }
         features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
             .append(wp.longitude).append(',').append(wp.latitude)

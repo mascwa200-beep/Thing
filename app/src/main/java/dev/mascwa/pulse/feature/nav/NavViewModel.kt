@@ -41,7 +41,7 @@ class NavViewModel(
     private val safety: SafetyRepository,
 ) : ViewModel() {
 
-    /** The objective/waypoint currently tracked on the map (gold/blue/white by kind), or null. */
+    /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
     val activeWaypoint: StateFlow<Waypoint?> =
         waypointStore.active.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -124,7 +124,7 @@ class NavViewModel(
             if (coords == null) {
                 _searchMessage.value = "Couldn't find \"$q\"."
             } else {
-                runCatching { waypointStore.add(q, coords.first, coords.second, ObjectiveKind.PLAIN) }
+                runCatching { waypointStore.add(q, coords.first, coords.second, ObjectiveKind.SIDE) }
                 _flyTo.value = coords
             }
         }
@@ -138,7 +138,7 @@ class NavViewModel(
     /** Set the tapped POI as the active map waypoint (plain/white) and close the detail card. */
     fun setWaypointFromPoi(place: Place) {
         viewModelScope.launch {
-            runCatching { waypointStore.add(place.name, place.latitude, place.longitude, ObjectiveKind.PLAIN) }
+            runCatching { waypointStore.add(place.name, place.latitude, place.longitude, ObjectiveKind.SIDE) }
         }
         _selectedPoi.value = null
     }

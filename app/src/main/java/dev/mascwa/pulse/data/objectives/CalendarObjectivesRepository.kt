@@ -59,7 +59,7 @@ class CalendarObjectivesRepository(private val context: Context) {
                 out += Objective(
                     id = "cal_${id}_$begin",
                     title = title,
-                    kind = ObjectiveKind.SIDE, // calendar events are "side missions" (blue) by default
+                    kind = ObjectiveKind.WORK, // calendar = "work" objectives, rendered green
                     latitude = coords.first,
                     longitude = coords.second,
                     source = ObjectiveSource.CALENDAR,
