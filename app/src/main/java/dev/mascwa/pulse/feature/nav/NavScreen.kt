@@ -222,12 +222,12 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
         src.setGeoJson(poiGeoJson(enabled, pois))
     }
 
-    // Render the active objective waypoint (coloured by kind) + a road-following route to it (straight
-    // line until the road route resolves).
-    LaunchedEffect(activeWaypoint, location, route, map) {
+    // Render the active objective waypoint (coloured by kind) + the road-following route to it. The
+    // route line only appears once the road geometry resolves (no straight-line placeholder).
+    LaunchedEffect(activeWaypoint, route, map) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
-        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeLineGeoJson(route, activeWaypoint, location))
+        style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeLineGeoJson(route))
     }
 
     // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● PLAIN), active emphasised.
@@ -716,16 +716,14 @@ private fun waypointGeoJson(wp: Waypoint?): String {
         "\"properties\":{\"color\":\"${wp.kind.colorHex}\"}}]}"
 }
 
-/** GeoJSON LineString for the navigation path: the road-snapped [route] when available, else a
- *  straight player→waypoint line (until routing resolves), else an empty collection. */
-private fun routeLineGeoJson(route: List<Pair<Double, Double>>, wp: Waypoint?, loc: DeviceLocation?): String {
-    val coords: List<Pair<Double, Double>> = when {
-        route.size >= 2 -> route
-        wp != null && loc != null -> listOf(loc.latitude to loc.longitude, wp.latitude to wp.longitude)
-        else -> return EMPTY_FC
-    }
+/** GeoJSON LineString for the navigation path: ONLY the road-snapped [route] once it resolves,
+ *  else an empty collection. We never draw the straight player→waypoint line — the path always reads
+ *  as a real road route, so opening the map shows nothing for the brief moment before routing returns
+ *  rather than flashing a straight diagonal that then snaps to roads. */
+private fun routeLineGeoJson(route: List<Pair<Double, Double>>): String {
+    if (route.size < 2) return EMPTY_FC
     val sb = StringBuilder()
-    coords.forEachIndexed { i, (lat, lon) ->
+    route.forEachIndexed { i, (lat, lon) ->
         if (i > 0) sb.append(',')
         sb.append('[').append(lon).append(',').append(lat).append(']')
     }
