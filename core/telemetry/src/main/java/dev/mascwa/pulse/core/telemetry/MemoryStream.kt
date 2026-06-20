@@ -30,7 +30,8 @@ enum class MemoryKind {
 /**
  * One memory. [importance] is a 1–10 "poignancy" rating (mundane → significant). [embedding] is the
  * semantic vector used for relevance; [lastAccessedMs] is bumped whenever the memory is retrieved, so
- * recency reflects *use*, not just creation (as in Generative Agents).
+ * recency reflects *use*, not just creation (as in Generative Agents). [linkedEntityIds] are
+ * cross-referenced IDs (profile, task, context) surfaced at retrieval time for real-time linking.
  */
 data class Memory(
     val id: Long,
@@ -40,6 +41,7 @@ data class Memory(
     val createdMs: Long,
     val lastAccessedMs: Long,
     val embedding: List<Float>,
+    val linkedEntityIds: Map<String, List<String>> = emptyMap(),
 )
 
 /** A memory plus its retrieval score and the normalized components that produced it (for transparency). */
@@ -57,6 +59,11 @@ data class RetrievalWeights(
     val importance: Double = 1.0,
     val relevance: Double = 1.0,
 )
+
+/** Callback to resolve linked entities from stores during retrieval. */
+interface LinkedEntityResolver {
+    suspend fun resolveProjectsAndTasks(queryText: String): Map<String, List<String>>
+}
 
 object MemoryStream {
     const val MAX_IMPORTANCE = 10
@@ -102,14 +109,19 @@ object MemoryStream {
      * components (recency, importance, relevance) is min-max normalized across the candidate set to
      * [0,1] and then combined with [weights] — the Generative-Agents retrieval function. Pass an empty
      * [queryEmbedding] to rank by recency + importance alone (relevance contributes nothing).
+     * 
+     * If [linkedEntityResolver] is provided, enrich each result with cross-referenced project/task
+     * entities from ProfileStore and CerebellumStore, resolved in real time during retrieval.
      */
-    fun retrieve(
+    suspend fun retrieve(
         memories: List<Memory>,
         queryEmbedding: List<Float>,
         nowMs: Long,
         topK: Int = DEFAULT_TOP_K,
         weights: RetrievalWeights = RetrievalWeights(),
         halfLifeMs: Long = DEFAULT_HALF_LIFE_MS,
+        linkedEntityResolver: LinkedEntityResolver? = null,
+        queryText: String = "",
     ): List<ScoredMemory> {
         if (memories.isEmpty() || topK <= 0) return emptyList()
         val rawRecency = memories.map { recencyDecay(nowMs - it.lastAccessedMs, halfLifeMs) }
@@ -120,11 +132,19 @@ object MemoryStream {
         val recN = minMaxNormalize(rawRecency)
         val impN = minMaxNormalize(rawImportance)
         val relN = minMaxNormalize(rawRelevance)
+        
+        val linkedEntities = if (linkedEntityResolver != null && queryText.isNotBlank()) {
+            linkedEntityResolver.resolveProjectsAndTasks(queryText)
+        } else {
+            emptyMap()
+        }
+        
         return memories.indices.map { i ->
             val score = weights.recency * recN[i] +
                 weights.importance * impN[i] +
                 weights.relevance * relN[i]
-            ScoredMemory(memories[i], score, recN[i], impN[i], relN[i])
+            val enrichedMemory = memories[i].copy(linkedEntityIds = linkedEntities)
+            ScoredMemory(enrichedMemory, score, recN[i], impN[i], relN[i])
         }.sortedWith(
             compareByDescending<ScoredMemory> { it.score }.thenByDescending { it.memory.lastAccessedMs },
         ).take(topK)
