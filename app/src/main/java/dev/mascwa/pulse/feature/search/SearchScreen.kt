@@ -1,33 +1,46 @@
 package dev.mascwa.pulse.feature.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
@@ -44,39 +57,61 @@ fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
         openUrl(context, vm.urlFor(query))
     }
 
-    dev.mascwa.pulse.feature.common.PulseScaffold(
+    PulseScaffold(
         title = "Search",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         Column(
-            Modifier.padding(innerPadding).padding(16.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.padding(innerPadding).padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
         ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("Search the web") },
-                singleLine = true,
-                trailingIcon = { IconButton(onClick = { go() }) { Icon(Icons.Filled.Search, "Search") } },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { go() }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("ENGINE", style = MaterialTheme.typography.labelMedium, color = c.muted)
+            PipHeader("Query")
+            PipFrame(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⌕", fontFamily = JetBrainsMono, fontSize = 18.sp, color = c.accent)
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 15.sp),
+                        cursorBrush = SolidColor(c.accent),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { go() }),
+                        modifier = Modifier.weight(1f).padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+                        decorationBox = { inner ->
+                            if (query.isEmpty()) {
+                                Text("Search the web…", fontFamily = JetBrainsMono, fontSize = 15.sp, color = c.muted)
+                            }
+                            inner()
+                        },
+                    )
+                }
+            }
+
+            PipHeader("Engine")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SearchEngine.entries.forEach { e ->
                     NeonChip(e.label, selected = e == engine, onClick = { vm.setEngine(e) },
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
             }
-            Button(onClick = { go() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Search with ${engine.label}")
+
+            PipFrame(
+                Modifier.fillMaxWidth().padding(top = 8.dp).clickable { go() },
+                accent = c.accent,
+            ) {
+                Text(
+                    "▸ SEARCH WITH ${engine.label.uppercase()}",
+                    fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp, color = c.accent, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             Text(
                 "Opens your query in ${engine.label} in the browser. No tracking key required.",
-                style = MaterialTheme.typography.labelSmall, color = c.muted,
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                modifier = Modifier.padding(top = 10.dp, bottom = 24.dp),
             )
         }
     }
