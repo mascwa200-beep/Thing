@@ -115,10 +115,11 @@ object RadioController {
                     .setAllowCrossProtocolRedirects(true)
                     .setConnectTimeoutMs(20_000)
                     .setReadTimeoutMs(20_000)
-                    // Ask for in-band ICY metadata so we never open a second connection for now-playing —
-                    // Triton drops the audio stream when a second connection appears. ExoPlayer strips the
-                    // metadata bytes from the audio and surfaces them via onMetadata.
-                    .setDefaultRequestProperties(mapOf("Icy-MetaData" to "1"))
+                // NOTE: we deliberately do NOT request ICY metadata (`Icy-MetaData: 1`). On these
+                // StreamTheWorld/Triton AAC mounts that header makes the server interleave metadata that
+                // ExoPlayer doesn't strip here, breaking the container parse
+                // (ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED). A single audio-only connection parses and
+                // plays continuously; live now-playing text is a follow-up (needs proper IcyDataSource wiring).
                 val sourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(app, httpFactory))
                 val exo = ExoPlayer.Builder(app)
                     .setMediaSourceFactory(sourceFactory)
