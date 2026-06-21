@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -103,12 +105,17 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** A banded library row (Fallout DATA>STATS look): title + body + date, with a delete control. */
+/** A banded library row in the canonical Fallout DATA>STATS look: an edge-to-edge faint-green band with
+ *  a bright hairline rule beneath (rows stack gap-free), holding title + body + date and a delete control. */
 @Composable
 private fun NoteRow(note: Note, c: NightwirePalette, onDelete: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 3.dp).background(c.accent.copy(alpha = 0.05f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth()
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = 0.08f))
+                drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
+            }
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
