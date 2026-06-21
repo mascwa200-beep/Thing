@@ -46,13 +46,13 @@ import dev.mascwa.pulse.ui.theme.pipBoyPalette
 import kotlin.math.roundToInt
 
 /**
- * The combined PIP-BOY tab — radar, phone telemetry, orbital and space weather under one Fallout
- * Pip-Boy STAT screen. The four feeds are the literal Pip-Boy sections: STATUS (telemetry / the
- * Vault-Boy condition readout), DATA (orbital), MAP (RADSCOPE) and RADIO (space weather). Each feed's
- * scaffold-free *Body is hosted inside the green CRT chrome.
+ * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy STAT screen, each as a literal
+ * section: STATUS (phone telemetry / condition), DATA (orbital + space weather), MAP (the NAV map +
+ * objectives), RADAR (the RADSCOPE), QUESTS (objectives log), NOTES (library), RADIO and MUSIC. Each
+ * feed's scaffold-free *Body is hosted inside the green CRT chrome.
  */
 private enum class PipTab(val label: String) {
-    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), QUESTS("QUESTS"), NOTES("NOTES"),
+    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), RADAR("RADAR"), QUESTS("QUESTS"), NOTES("NOTES"),
     RADIO("RADIO"), MUSIC("MUSIC"),
 }
 
@@ -65,6 +65,7 @@ fun PipBoyScreen(
     radioVm: RadioViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
+    navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
     spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
     onBack: (() -> Unit)? = null,
 ) {
@@ -84,7 +85,8 @@ fun PipBoyScreen(
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
                     PipTab.DATA -> { orbitalVm.refresh(); spaceWxVm.refresh() }
-                    PipTab.MAP -> radarVm.refresh()
+                    PipTab.MAP -> Unit // the NAV map is live (self-managed)
+                    PipTab.RADAR -> radarVm.refresh()
                     PipTab.QUESTS -> objectivesVm.refresh()
                     PipTab.NOTES -> Unit // the library is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
@@ -104,7 +106,8 @@ fun PipBoyScreen(
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
                         PipTab.DATA -> DataBody(orbitalVm, spaceWxVm)
-                        PipTab.MAP -> RadarBody(radarVm)
+                        PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
+                        PipTab.RADAR -> RadarBody(radarVm)
                         PipTab.QUESTS -> dev.mascwa.pulse.feature.objectives.ObjectivesPanel(
                             objectivesVm, Pulse.colors, Modifier.fillMaxSize(),
                         )

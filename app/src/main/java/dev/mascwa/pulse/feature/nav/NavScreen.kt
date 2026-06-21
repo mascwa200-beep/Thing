@@ -126,6 +126,23 @@ private enum class NavSubTab(val label: String) { MAP("MAP"), OBJECTIVES("OBJECT
 @Composable
 fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
+    PulseScaffold(
+        title = "NAV",
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.ink)
+            }
+        },
+    ) { innerPadding ->
+        NavBody(vm, objectivesVm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The scaffold-free NAV map body — the live MapLibre map with the MAP | OBJECTIVES sub-switch. Extracted
+ *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the PIP-BOY hub. */
+@Composable
+fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
     val location by vm.location.collectAsState()
     val heading by vm.headingDeg.collectAsState()
     val enabled by vm.enabled.collectAsState()
@@ -286,15 +303,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
         vm.consumeFlyTo()
     }
 
-    PulseScaffold(
-        title = "NAV",
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
-    ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+    Box(modifier.fillMaxSize()) {
             // The map stays composed in both sub-tabs (cheap to keep, costly to recreate); the
             // OBJECTIVES sub-tab simply draws an opaque manager panel over it.
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
@@ -397,7 +406,6 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
             )
         }
-    }
 }
 
 /** The MAP | OBJECTIVES segmented switch that lives on the NAV map (cyberpunk-styled, not Pip green). */
