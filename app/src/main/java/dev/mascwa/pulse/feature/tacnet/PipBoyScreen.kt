@@ -71,6 +71,7 @@ private enum class PipTab(val label: String, val section: PipSection) {
     ORBIT("ORBIT", PipSection.DATA),
     QUESTS("QUESTS", PipSection.DATA),
     NOTES("NOTES", PipSection.DATA),
+    DIARY("DIARY", PipSection.DATA),
     RADIO("STATIONS", PipSection.DATA),
     MUSIC("MUSIC", PipSection.DATA),
     ;
@@ -89,6 +90,7 @@ fun PipBoyScreen(
     spaceWxVm: SpaceWeatherViewModel,
     radioVm: RadioViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
+    diaryVm: dev.mascwa.pulse.feature.diary.DiaryViewModel,
     tasksVm: dev.mascwa.pulse.feature.tasks.TasksViewModel,
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
     navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
@@ -117,6 +119,7 @@ fun PipBoyScreen(
                     PipTab.RADAR -> radarVm.refresh()
                     PipTab.QUESTS -> objectivesVm.refresh()
                     PipTab.NOTES -> Unit // the library is local; nothing to refresh
+                    PipTab.DIARY -> Unit // the diary is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
                     PipTab.MUSIC -> spotifyVm.refresh()
                 }
@@ -141,6 +144,7 @@ fun PipBoyScreen(
                             objectivesVm, Pulse.colors, Modifier.fillMaxSize(),
                         )
                         PipTab.NOTES -> dev.mascwa.pulse.feature.notes.NotesBody(notesVm)
+                        PipTab.DIARY -> dev.mascwa.pulse.feature.diary.DiaryBody(diaryVm)
                         PipTab.RADIO -> RadioBody(radioVm)
                         PipTab.MUSIC -> dev.mascwa.pulse.feature.spotify.SpotifyBody(spotifyVm)
                     }
