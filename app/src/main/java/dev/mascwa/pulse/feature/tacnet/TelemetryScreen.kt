@@ -95,6 +95,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipHeader("Condition")
             ConditionPanel(t, c)
 
+            PipHeader("Radiation")
+            RadiationPanel(t, c)
+
             PipHeader("Effects")
             EffectsPanel(t, gps != null, c)
 
@@ -323,6 +326,48 @@ private fun FalloutGauge(label: String, value: String, fraction: Float, color: C
 @Composable
 private fun FalloutStatRow(label: String, value: String) {
     dev.mascwa.pulse.feature.common.PipDataRow(label, value)
+}
+
+/** The RADIATION readout (Fallout STATUS>RAD): "rads" = live system stress — memory pressure plus
+ *  thermal load above nominal — on the 0–1000 RADS ruler; RAD RESIST = free headroom. */
+@Composable
+private fun RadiationPanel(t: Telemetry, c: NightwirePalette) {
+    val memPct = if (t.memTotalMb > 0) ((t.memUsedMb * 100) / t.memTotalMb).toInt() else 0
+    val temp = t.batteryTempC ?: 25f
+    val rads = (memPct * 5 + (maxOf(0f, temp - 25f) * 20f).toInt()).coerceIn(0, 1000)
+    val resist = (100 - memPct).coerceIn(0, 100)
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("RAD RESIST $resist%", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
+                Text("$rads / 1000 RADS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+            }
+            RadRuler(rads, c, Modifier.fillMaxWidth().padding(top = 12.dp))
+        }
+    }
+}
+
+/** The Fallout RADS ruler: a tick scale 0…1000 with an arrow pointer at the current reading. */
+@Composable
+private fun RadRuler(rads: Int, c: NightwirePalette, modifier: Modifier) {
+    Canvas(modifier.height(34.dp)) {
+        val w = size.width
+        val y = size.height * 0.62f
+        drawLine(c.accent.copy(alpha = 0.5f), Offset(0f, y), Offset(w, y), 1.5.dp.toPx())
+        for (i in 0..10) {
+            val x = (w * i / 10f).coerceIn(0.5f, w - 0.5f)
+            val tall = i % 5 == 0
+            drawLine(c.accent.copy(alpha = if (tall) 0.7f else 0.4f), Offset(x, y), Offset(x, y - if (tall) 11f else 6f), 1.dp.toPx())
+        }
+        val px = (w * (rads / 1000f)).coerceIn(0f, w)
+        val arrow = Path().apply {
+            moveTo(px, y - 3f)
+            lineTo(px - 7f, y + 11f)
+            lineTo(px + 7f, y + 11f)
+            close()
+        }
+        drawPath(arrow, c.accent)
+    }
 }
 
 /** A Fallout-style status effect derived from live device state. */
