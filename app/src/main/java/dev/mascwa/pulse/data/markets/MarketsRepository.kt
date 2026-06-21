@@ -155,12 +155,19 @@ class MarketsRepository(
         val meta = result["meta"]?.jsonObject ?: error("No meta for ${item.id}")
         fun metaD(k: String) = meta[k]?.jsonPrimitive?.doubleOrNull
         val price = metaD("regularMarketPrice") ?: error("No price for ${item.id}")
-        val prev = metaD("chartPreviousClose") ?: metaD("previousClose")
-        val change = if (prev != null) price - prev else null
-        val pct = if (prev != null && prev != 0.0) (change!! / prev) * 100.0 else null
         val closes = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
             ?.firstOrNull()?.jsonObject?.get("close")?.jsonArray
             ?.mapNotNull { it.jsonPrimitive.doubleOrNull } ?: emptyList()
+        // Previous *trading-day* close, for TODAY's move. NOT chartPreviousClose: on a range=1mo chart
+        // that field is the close BEFORE the whole month-long range, so price-vs-it is a ~1-MONTH change
+        // — which is why the percentages looked oversized/"weird" (e.g. a monthly +7% shown as the day's
+        // move). Prefer the official meta.previousClose; else yesterday's candle (the second-to-last daily
+        // close, which tracks the live price's prior session); chartPreviousClose only as a last resort.
+        val prev = metaD("previousClose")
+            ?: closes.getOrNull(closes.size - 2)
+            ?: metaD("chartPreviousClose")
+        val change = if (prev != null) price - prev else null
+        val pct = if (prev != null && prev != 0.0) (change!! / prev) * 100.0 else null
         val currency = if (item.type == WatchType.FOREX) ""
         else meta["currency"]?.jsonPrimitive?.contentOrNull ?: currencyFor(item)
 
