@@ -126,7 +126,7 @@ fun PipBoyScreen(
         // (also provided app-wide for the TOOLS section; kept here so PIP-BOY is self-contained).
         CompositionLocalProvider(LocalNightwire provides pipBoyPalette) {
             Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
-                PipStatHeader(telem)
+                PipStatHeader(telem, tab.section)
                 PipTabRail(tab) { tab = it }
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -218,10 +218,11 @@ private fun DrawScope.drawCornerBrackets(color: Color) {
 private fun freeMemPercent(t: Telemetry): Float =
     if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100f) / t.memTotalMb).coerceIn(0f, 100f) else 0f
 
-/** The top STAT readout strip — `LVL n · HP x/100 · AP x/100 · NET`, pixel-faithful to the reference's
- *  top bar. HP = battery, AP = free memory, LVL = build. Live device data in the Pip-Boy idiom. */
+/** The top STAT readout strip — `[SECTION] LVL n · HP x/100 · AP x/100 · NET`, pixel-faithful to the
+ *  reference's top bar. HP = battery, AP = free memory, LVL = build. Live device data in the Pip-Boy
+ *  idiom; the leading bracket names the active section (STATS / ITEMS / DATA). */
 @Composable
-private fun PipStatHeader(t: Telemetry) {
+private fun PipStatHeader(t: Telemetry, section: PipSection) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val mem = freeMemPercent(t).roundToInt()
     val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
@@ -231,6 +232,11 @@ private fun PipStatHeader(t: Telemetry) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
+        Text(
+            "[${section.label}]",
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp,
+            color = Pip.bright,
+        )
         StatReadout("LVL", "$level")
         StatReadout("HP", "$bat / 100" + if (t.charging) " ⚡" else "")
         StatReadout("AP", "$mem / 100")
