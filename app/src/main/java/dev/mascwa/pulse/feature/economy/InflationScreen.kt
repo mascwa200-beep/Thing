@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,20 +22,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.feature.common.CyberHeader
+import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LineChart
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.ui.theme.trendColor
 
 @Composable
 private fun InflationExplainer() {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Understanding this number", style = MaterialTheme.typography.titleMedium)
+    val c = Pulse.colors
+    NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("UNDERSTANDING THIS NUMBER", fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.2.sp, color = c.accent)
             ExplainBlock(
                 "What it measures",
                 "Consumer Price Inflation tracks the average change in prices a household pays for a fixed " +
@@ -59,8 +66,7 @@ private fun InflationExplainer() {
                 "Note: this is general context. Pinning a specific year's inflation on particular policies or " +
                     "events requires official national statistics and analysis — not something this annual figure " +
                     "alone can attribute.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
             )
         }
     }
@@ -68,9 +74,10 @@ private fun InflationExplainer() {
 
 @Composable
 private fun ExplainBlock(title: String, body: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val c = Pulse.colors
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = c.ink)
+        Text(body, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2)
     }
 }
 
@@ -113,24 +120,24 @@ fun InflationBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                             CountryPicker(current = state.country, onSelect = { vm.setCountry(it) })
                         }
                         item {
-                            Card(Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(16.dp)) {
+                            val c = Pulse.colors
+                            NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+                                Column {
                                     Text(
-                                        "Consumer Price Inflation",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        "CONSUMER PRICE INFLATION",
+                                        fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.2.sp, color = c.accent,
                                     )
                                     val latest = series?.latest
                                     Text(
                                         Formatters.percent(latest?.value),
-                                        style = MaterialTheme.typography.displaySmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 36.sp,
                                         color = trendColor((latest?.value ?: 0.0) <= 3.0),
+                                        modifier = Modifier.padding(top = 2.dp),
                                     )
                                     Text(
-                                        "${series?.countryName ?: state.country}" +
-                                            (latest?.year?.let { " · $it" } ?: ""),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ("${series?.countryName ?: state.country}" +
+                                            (latest?.year?.let { " · $it" } ?: "")).uppercase(),
+                                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp, color = c.muted,
                                     )
                                     if ((series?.points?.size ?: 0) >= 2) {
                                         LineChart(
@@ -158,29 +165,28 @@ fun InflationBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                             }
                         }
                         item { InflationExplainer() }
-                        item {
-                            Text("History", style = MaterialTheme.typography.titleMedium)
-                        }
+                        item { CyberHeader("History") }
                         items(series?.points.orEmpty().reversed(), key = { it.year }) { p ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text("${p.year}", style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    Formatters.percent(p.value),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium,
-                                    color = trendColor(p.value <= 3.0),
-                                )
+                            val c = Pulse.colors
+                            CyberRowFrame {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                ) {
+                                    Text("${p.year}", fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink2)
+                                    Text(
+                                        Formatters.percent(p.value),
+                                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                                        color = trendColor(p.value <= 3.0),
+                                    )
+                                }
                             }
-                            HorizontalDivider()
                         }
                         item {
                             Text(
                                 "Source: World Bank Open Data — inflation, consumer prices (annual %).",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pulse.colors.muted,
                             )
                         }
                     }

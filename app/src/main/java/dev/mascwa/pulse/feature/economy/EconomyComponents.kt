@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.economy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -10,12 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,10 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.economy.IndicatorSeries
 import dev.mascwa.pulse.data.economy.ValueFormat
 import dev.mascwa.pulse.feature.common.LineChart
+import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.ui.theme.trendColor
 
 /** A curated, World-Bank-compatible country list for the picker. */
@@ -91,30 +94,26 @@ fun formatLatest(series: IndicatorSeries): String {
 
 @Composable
 fun IndicatorCard(series: IndicatorSeries, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        ),
-    ) {
+    val c = Pulse.colors
+    NeonPanel(modifier.fillMaxWidth(), corners = true, padding = PaddingValues(16.dp)) {
         Row(
-            Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(Modifier.weight(1f)) {
-                Text(series.indicatorTitle, style = MaterialTheme.typography.titleSmall)
-                Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    series.indicatorTitle.uppercase(),
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 0.8.sp, color = c.ink2,
+                )
+                Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
                     Text(
                         formatLatest(series),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = c.ink,
                     )
                     Text(
                         "  ${series.unit}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp),
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                        modifier = Modifier.padding(bottom = 5.dp),
                     )
                 }
                 val yoy = series.yoyChange
@@ -123,14 +122,14 @@ fun IndicatorCard(series: IndicatorSeries, modifier: Modifier = Modifier) {
                     val improving = if (series.higherIsBetter) yoy >= 0 else yoy <= 0
                     Text(
                         "${if (yoy >= 0) "+" else ""}${Formatters.number(yoy, 2)} vs ${year - 1}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = trendColor(improving),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = trendColor(improving),
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 } else if (year != null) {
                     Text(
-                        "as of $year",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "AS OF $year",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
