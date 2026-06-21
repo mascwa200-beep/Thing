@@ -73,11 +73,12 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
         }
     }
 
-    /** Connect the App Remote player to the installed Spotify app (the real in-app player). Remembers the
-     *  intent so the MUSIC tab can auto-reconnect next time (Spotify wakes in the background). */
+    /** Connect the App Remote player to the installed Spotify app (the real in-app player). This is the
+     *  explicit user tap, so it shows Spotify's auth view to grant access once. Remembers the intent so
+     *  the MUSIC tab can silently auto-reconnect next time (Spotify wakes in the background). */
     fun connectApp(context: Context) {
         viewModelScope.launch { repo.setAutoConnect(true) }
-        SpotifyAppRemoteController.connect(context)
+        SpotifyAppRemoteController.connect(context, interactive = true)
     }
 
     fun disconnectApp() {
@@ -85,8 +86,9 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
         SpotifyAppRemoteController.disconnect()
     }
 
-    /** Auto-reconnect path used on tab open — connects without flipping the remembered preference. */
-    fun autoConnectApp(context: Context) = SpotifyAppRemoteController.connect(context)
+    /** Auto-reconnect path used on tab open — a SILENT connect (no auth view, no error nag) so the user is
+     *  never re-prompted to "Authorize Pulse" on every open; once authorized it reconnects with no prompt. */
+    fun autoConnectApp(context: Context) = SpotifyAppRemoteController.connect(context, interactive = false)
 
     /** Launch the Spotify authorize page in the browser (the redirect comes back to SpotifyAuthActivity). */
     fun connect(context: Context) {

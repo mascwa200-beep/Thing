@@ -43,12 +43,26 @@ object SpotifyAppRemoteController {
 
     val isConnected: Boolean get() = remote?.isConnected == true
 
-    fun connect(context: Context) {
+    /**
+     * Connect to the installed Spotify app.
+     *
+     * App Remote has its **own** authorization with the Spotify app (separate from the Web-API OAuth
+     * token): the first connect needs the user to approve Pulse once, and Spotify only *remembers* that
+     * grant when this app's package + signing SHA-1 + redirect URI are registered in the Spotify
+     * dashboard. [interactive] picks how an un-authorized state is handled:
+     *  - `true`  (the user tapped CONNECT): show Spotify's auth view so they can grant access, and surface
+     *            a readable error if it still fails.
+     *  - `false` (silent auto-reconnect on tab open): never show the auth view and never surface an error
+     *            — if not yet authorized it just fails quietly back to the CONNECT card, so the user isn't
+     *            nagged with "Authorize Pulse…" on every single open. Once authorized, silent reconnect
+     *            succeeds with no prompt — the "connect once, then auto-reconnect" behaviour.
+     */
+    fun connect(context: Context, interactive: Boolean = true) {
         if (remote?.isConnected == true) return
         _state.value = _state.value.copy(connecting = true, error = null)
         val params = ConnectionParams.Builder(SpotifyAuth.CLIENT_ID)
             .setRedirectUri(SpotifyAuth.REDIRECT_URI)
-            .showAuthView(true)
+            .showAuthView(interactive)
             .build()
         runCatching {
             SpotifyAppRemote.connect(context, params, object : Connector.ConnectionListener {
@@ -62,10 +76,12 @@ object SpotifyAppRemoteController {
 
                 override fun onFailure(error: Throwable) {
                     remote = null
-                    _state.value = RemoteState(error = error.toFriendly())
+                    // A silent auto-attempt that isn't authorized yet drops back to the plain CONNECT card
+                    // (no alarming amber line); only an explicit tap explains why it failed.
+                    _state.value = if (interactive) RemoteState(error = error.toFriendly()) else RemoteState()
                 }
             })
-        }.onFailure { _state.value = RemoteState(error = it.toFriendly()) }
+        }.onFailure { _state.value = if (interactive) RemoteState(error = it.toFriendly()) else RemoteState() }
     }
 
     private fun onPlayerState(s: PlayerState) {
