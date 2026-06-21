@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.common
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -87,6 +89,57 @@ fun PipHeader(title: String, modifier: Modifier = Modifier, trailing: String? = 
             Text(trailing, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted)
         }
     }
+}
+
+/**
+ * THE canonical Fallout Pip-Boy list row (DATA>STATS look): an edge-to-edge faint-green band with a
+ * bright phosphor hairline rule along its bottom edge, the [label] on the left and the [value] on the
+ * right in bright phosphor. Stack these with NO gaps (a plain Column) so the hairlines form the
+ * continuous Pip-Boy list. Use this for every readout/stat list from here on.
+ */
+@Composable
+fun PipDataRow(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Pulse.colors.ink) {
+    val c = Pulse.colors
+    Box(
+        modifier
+            .fillMaxWidth()
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = 0.08f))
+                drawLine(
+                    c.accent.copy(alpha = 0.35f),
+                    Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx(),
+                )
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label, fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = valueColor)
+        }
+    }
+}
+
+/**
+ * THE canonical Fallout selectable list item (the category/menu column): the [selected] one is a solid
+ * bright-green bar with inverted (void/black) text; the rest are bright phosphor on transparent. Use for
+ * every pick-one list from here on.
+ */
+@Composable
+fun PipSelectRow(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Text(
+        label,
+        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp,
+        color = if (selected) c.void else c.ink,
+        modifier = modifier
+            .fillMaxWidth()
+            .background(if (selected) c.accent else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    )
 }
 
 /** A framed label/value tile (terminal version of StatTile) for the feeds. */

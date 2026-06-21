@@ -111,7 +111,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 
             PipHeader("Sensors")
             PipFrame(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Column {
                     FalloutStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
                     FalloutStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
                     FalloutStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
@@ -122,7 +122,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 
             PipHeader("System")
             PipFrame(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Column {
                     FalloutStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
                     FalloutStatRow("Power", if (t.charging) "Charging" else "On battery")
                     FalloutStatRow("Network", t.netType)
@@ -135,7 +135,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipFrame(Modifier.fillMaxWidth()) {
                 val loc = gps
                 if (loc != null) {
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column {
                         FalloutStatRow("Latitude", "%.5f".format(loc.latitude))
                         FalloutStatRow("Longitude", "%.5f".format(loc.longitude))
                         FalloutStatRow("Place", loc.name)
@@ -312,20 +312,8 @@ private fun FalloutGauge(label: String, value: String, fraction: Float, color: C
     }
 }
 
-/** A SENSORS/SYSTEM/POSITION readout as a Fallout DATA>STATS banded row: a faint green band, label
- *  left, value right in bright phosphor. */
+/** A SENSORS/SYSTEM/POSITION readout — the canonical Fallout DATA>STATS banded row (shared [PipDataRow]). */
 @Composable
 private fun FalloutStatRow(label: String, value: String) {
-    val c = Pulse.colors
-    Box(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(3.dp))
-            .background(c.accent.copy(alpha = 0.07f))
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.ink2)
-            Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.accent)
-        }
-    }
+    dev.mascwa.pulse.feature.common.PipDataRow(label, value)
 }
