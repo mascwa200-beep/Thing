@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import dev.mascwa.pulse.ui.effects.BootScreen
-import dev.mascwa.pulse.ui.effects.ScanlineOverlay
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -170,10 +169,9 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
-                    // CRT scanline + sweep overlay above everything (never blocks touch).
-                    ScanlineOverlay(scanlines = settings.scanlines)
-                    // Chromatic-aberration fringe (Settings → Glitch effects); above content, no touch.
-                    dev.mascwa.pulse.ui.effects.ChromaticAberrationOverlay(enabled = settings.glitch)
+                    // THE single appearance effect: the non-invasive J.A.R.V.I.S.-is-watching presence
+                    // (corner brackets + slow sweep + drifting reticle), above content, never blocks touch.
+                    dev.mascwa.pulse.ui.effects.JarvisPresenceOverlay(enabled = settings.jarvisPresence)
                     // Cold-open: permanent + always topmost, so it draws first and masks everything
                     // (app, gate, overlays) until it fades. No off-switch by design.
                     if (!booted) {

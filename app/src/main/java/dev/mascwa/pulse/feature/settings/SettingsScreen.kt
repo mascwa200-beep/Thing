@@ -147,12 +147,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }
-                    PrefSwitch("Scanlines & CRT", "Retro display overlay", s.scanlines) { v ->
-                        vm.update { it.copy(scanlines = v) }
-                    }
-                    PrefSwitch("Chromatic aberration", "Animated RGB colour-split fringe", s.glitch) { v ->
-                        vm.update { it.copy(glitch = v) }
-                    }
+                    PrefSwitch(
+                        "J.A.R.V.I.S. presence",
+                        "The one ambient effect — a non-invasive watching HUD (corner brackets, a slow " +
+                            "sweep and a drifting reticle) that follows you everywhere. Replaces the old " +
+                            "scanline/aberration overlays. ~1 MB, no retained buffers.",
+                        s.jarvisPresence,
+                    ) { v -> vm.update { it.copy(jarvisPresence = v) } }
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
                     }
