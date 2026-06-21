@@ -100,7 +100,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                 val u by vm.updateState.collectAsStateWithLifecycle()
                 // Auto-check on open so arriving from the update notification lands on the action.
                 LaunchedEffect(Unit) { vm.checkForUpdate() }
-                PrefSection("Software update") {
+                PrefSection("Software update", initiallyExpanded = true) {
                     val status = when (val st = u) {
                         is UpdateUi.Checking -> "Checking for a newer build…"
                         is UpdateUi.UpToDate ->
@@ -163,25 +163,6 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         subtitle = "Auto-scroll rate of the home markets ticker",
                         valueLabel = { "%.2f×".format(it) },
                     ) { v -> vm.update { it.copy(tickerSpeed = v) } }
-                }
-            }
-            item { HorizontalDivider() }
-
-            // ----- J.A.R.V.I.S. feed (home status briefing) -----
-            item {
-                PrefSection("J.A.R.V.I.S. feed") {
-                    EditableValueRow(
-                        "Briefing focus",
-                        value = s.jarvisFeedTopic.ifBlank { "Not set" },
-                        onSet = { vm.update { st -> st.copy(jarvisFeedTopic = it.trim()) } },
-                    )
-                    Text(
-                        "What J.A.R.V.I.S. keeps an eye on in the home status feed — a project, a topic, " +
-                            "\"device health\", etc. Shown as a summary, never your chat.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
                 }
             }
             item { HorizontalDivider() }
