@@ -48,8 +48,13 @@ import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.weather.WeatherCode
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import dev.mascwa.pulse.feature.common.LocalTickerSpeed
 import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.cyberTag
+import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.Ticker
 import dev.mascwa.pulse.feature.common.TickerItem
@@ -404,41 +409,70 @@ private fun ForYouCard(
         Modifier.fillMaxWidth().padding(top = 12.dp),
         corners = true,
         borderColor = c.accent.copy(alpha = 0.5f),
+        padding = PaddingValues(0.dp),
     ) {
-        Column {
-            DecryptText(
-                text = "FOR YOU  ▸",
-                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 2.sp, color = c.accent,
-            )
-            if (taskFocus != null) {
+        Column(Modifier.fillMaxWidth()) {
+            // CP2077 quest-HUD header — a "transmission incoming" framing for J.A.R.V.I.S.'s feed.
+            Row(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("◆", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
+                DecryptText(
+                    text = "J.A.R.V.I.S. FEED",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    letterSpacing = 2.sp, color = c.accent,
+                )
+                Box(Modifier.weight(1f).height(1.dp).background(c.line))
                 Text(
-                    taskFocus,
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { openRoute("jarvis") }
-                        .padding(top = 6.dp),
+                    "INCOMING · ${cyberTag("jarvis.feed")}",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted,
                 )
             }
-            if (profileHighlight != null) {
-                Text(
-                    profileHighlight,
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
+            // The active objective (task focus) leads, like a tracked quest.
+            taskFocus?.let { QuestFeedRow("◆", it, "ACTIVE OBJECTIVE · TRACKING", c.accent, c) { openRoute("jarvis") } }
+            // Recommendations are side feeds.
             recommendations.forEach { rec ->
                 val rk = rec.routeKey
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .then(if (rk != null) Modifier.clickable { openRoute(rk) } else Modifier)
-                        .padding(top = 6.dp),
-                ) {
-                    Text(rec.headline, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
-                    Text(rec.detail, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-                }
+                QuestFeedRow("◇", rec.headline, rec.detail, c.ink, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
             }
+            // Profile highlight = intel readout.
+            profileHighlight?.let { QuestFeedRow("▸", it, "INTEL", c.ink2, c, onClick = null) }
+        }
+    }
+}
+
+/** One CP2077 quest-feed entry: a diamond/chevron [marker] + bright [title] over a dim mono [sub] line,
+ *  with a leading accent blade and a bottom hairline — the quest-log row from the reference HUD. */
+@Composable
+private fun QuestFeedRow(
+    marker: String,
+    title: String,
+    sub: String,
+    titleColor: androidx.compose.ui.graphics.Color,
+    c: NightwirePalette,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = 0.5f), size = Size(2.5.dp.toPx(), size.height))
+                drawLine(c.lineSoft, Offset(0f, size.height), Offset(size.width, size.height), 1f)
+            }
+            .padding(start = 14.dp, end = 14.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Text(marker, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.accent, modifier = Modifier.padding(top = 1.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = titleColor)
+            Text(
+                sub.uppercase(),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
         }
     }
 }
