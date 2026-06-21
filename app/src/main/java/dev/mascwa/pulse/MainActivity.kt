@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching {
                 val settings = app.container.settingsRepository.current()
-                if (!settings.autoUpdate) return@runCatching
+                // Auto-update is permanently on (no opt-out) — always check for a newer green build.
                 val info = app.container.updateRepository.check().available
                 if (info != null && info.versionCode > settings.lastAutoUpdateCode) {
                     val file = app.container.updateRepository.download(info) { }

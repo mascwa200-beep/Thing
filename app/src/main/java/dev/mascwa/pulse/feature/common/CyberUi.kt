@@ -45,7 +45,8 @@ fun cyberTag(seed: String): String {
 /**
  * The signature CP2077 section header: a sharp skewed accent blade, the uppercase display title, a thin
  * rule line out to the edge, and a mono technical [tag] code stamp on the right. Drop-in replacement for
- * plain section labels — gives every list the angular HUD feel.
+ * plain section labels — gives every list the angular HUD feel. When [onToggle] is set it becomes a
+ * collapsible header: the whole row is tappable and a ▾/▸ chevron reflects [collapsed].
  */
 @Composable
 fun CyberHeader(
@@ -53,10 +54,15 @@ fun CyberHeader(
     modifier: Modifier = Modifier,
     tag: String? = null,
     accent: Color = Pulse.colors.accent,
+    collapsed: Boolean? = null,
+    onToggle: (() -> Unit)? = null,
 ) {
     val c = Pulse.colors
     Row(
-        modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+        modifier
+            .fillMaxWidth()
+            .then(if (onToggle != null) Modifier.clickable { onToggle() } else Modifier)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
@@ -78,6 +84,12 @@ fun CyberHeader(
             tag ?: cyberTag(title),
             fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = accent.copy(alpha = 0.7f),
         )
+        if (collapsed != null && onToggle != null) {
+            Text(
+                if (collapsed) "▸" else "▾",
+                fontFamily = JetBrainsMono, fontSize = 12.sp, color = accent,
+            )
+        }
     }
 }
 

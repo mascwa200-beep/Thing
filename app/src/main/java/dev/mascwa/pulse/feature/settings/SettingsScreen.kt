@@ -5,12 +5,15 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +25,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -57,6 +63,7 @@ import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.settings.WindUnit
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
@@ -100,44 +107,34 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                             "You're on the latest build" + (st.latest?.let { " (v$it)" } ?: "") + "."
                         is UpdateUi.Pending ->
                             "Newer build${st.latest?.let { " v$it" } ?: ""} is still being verified — " +
-                                "you're on v${vm.installedVersion}. It'll be offered once CI is green."
+                                "you're on v${vm.installedVersion}. Offered once CI is green."
                         is UpdateUi.Available -> "Update available — build #${st.info.versionCode}."
                         is UpdateUi.Downloading -> "Downloading ${st.pct}%…"
-                        is UpdateUi.ReadyToInstall -> "Downloaded — tap Install now."
+                        is UpdateUi.ReadyToInstall -> "Downloaded — tap install."
                         is UpdateUi.Error -> st.message
-                        else -> "Tap to check for a new version."
+                        else -> "Auto-update is on — newest green build installs itself."
                     }
-                    PrefClickable(
-                        "Check for updates",
-                        value = "v${vm.installedVersion}",
-                        subtitle = status,
-                        onClick = {
+                    // Compact round HUD buttons (no full-width rows): check, then download / install
+                    // as the state advances. Auto-update is always on, so this is just manual override.
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        RoundCyberButton(Icons.Filled.Refresh, "Check for updates") {
                             android.widget.Toast.makeText(context, "Checking for updates…", android.widget.Toast.LENGTH_SHORT).show()
                             vm.checkForUpdate()
-                        },
-                    )
-                    PrefSwitch(
-                        "Auto-update",
-                        "When a build passes CI (turns green), download it and open the installer automatically " +
-                            "— on launch and whenever you return to the app. You tap \"Update\" once to confirm; " +
-                            "Android can't install a sideloaded app fully silently.",
-                        s.autoUpdate,
-                    ) { v -> vm.update { it.copy(autoUpdate = v) } }
-                    when (val st = u) {
-                        is UpdateUi.Available -> PrefClickable(
-                            "Download & install",
-                            subtitle = st.info.notes.take(140).ifBlank { "Get build #${st.info.versionCode}" },
-                            onClick = { vm.downloadUpdate() },
-                        )
-                        is UpdateUi.ReadyToInstall -> PrefClickable(
-                            "Install now",
-                            subtitle = "Opens the system installer — you confirm the update. If it says " +
-                                "\"App not installed\", uninstall the old Pulse once (a one-time signing " +
-                                "change), then install — every update after that is seamless.",
-                            onClick = { installApk(context, st.file) },
-                        )
-                        is UpdateUi.Error -> PrefClickable("Retry", onClick = { vm.downloadUpdate() })
-                        else -> {}
+                        }
+                        when (val st = u) {
+                            is UpdateUi.Available -> RoundCyberButton(Icons.Filled.Download, "Download & install") { vm.downloadUpdate() }
+                            is UpdateUi.ReadyToInstall -> RoundCyberButton(Icons.Filled.InstallMobile, "Install now") { installApk(context, st.file) }
+                            is UpdateUi.Error -> RoundCyberButton(Icons.Filled.Download, "Retry") { vm.downloadUpdate() }
+                            else -> {}
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("v${vm.installedVersion}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -583,6 +580,23 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                 }
             }
         }
+    }
+}
+
+/** A compact circular CP2077 HUD action button — accent-ringed icon, no full-width row. */
+@Composable
+private fun RoundCyberButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(c.accent.copy(alpha = 0.10f))
+            .border(BorderStroke(1.5.dp, c.accent), CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription, tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
