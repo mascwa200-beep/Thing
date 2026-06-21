@@ -1,7 +1,12 @@
 package dev.mascwa.pulse.feature.tacnet
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,12 +35,17 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -69,7 +79,18 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val t by vm.telemetry.collectAsStateWithLifecycle()
     val gps by vm.gps.collectAsStateWithLifecycle()
     val log by vm.log.collectAsStateWithLifecycle()
+    val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
     val c = Pulse.colors
+
+    val context = LocalContext.current
+    val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            vm.setPortrait(uri.toString())
+        }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -92,6 +113,11 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+            PipHeader("Operator")
+            OperatorPortrait(portraitUri, dev.mascwa.pulse.BuildConfig.VERSION_CODE, c) {
+                runCatching { pickPortrait.launch(arrayOf("image/*")) }
+            }
+
             PipHeader("Condition")
             ConditionPanel(t, c)
 
@@ -326,6 +352,51 @@ private fun FalloutGauge(label: String, value: String, fraction: Float, color: C
 @Composable
 private fun FalloutStatRow(label: String, value: String) {
     dev.mascwa.pulse.feature.common.PipDataRow(label, value)
+}
+
+/** Green-phosphor duotone (luminance → green) so a portrait reads as part of the Pip-Boy CRT. */
+private val PortraitDuotone = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0.030f, 0.059f, 0.011f, 0f, 0f,
+            0.299f, 0.587f, 0.114f, 0f, 0f,
+            0.090f, 0.176f, 0.034f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    ),
+)
+
+/** The operator portrait (Fallout STATUS character image): tap to pick an image — it persists and renders
+ *  in the green CRT duotone with an OPERATIVE · LEVEL line; empty shows the upload prompt. */
+@Composable
+private fun OperatorPortrait(uri: String, level: Int, c: NightwirePalette, onPick: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (uri.isBlank()) {
+                Box(
+                    Modifier.fillMaxWidth().height(150.dp)
+                        .border(1.dp, c.line, RoundedCornerShape(4.dp))
+                        .clickable { onPick() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("CLICK TO UPLOAD AN IMAGE", fontFamily = JetBrainsMono, fontSize = 11.sp,
+                        letterSpacing = 1.sp, color = c.muted)
+                }
+            } else {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "Operator portrait",
+                    modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(4.dp)).clickable { onPick() },
+                    contentScale = ContentScale.Crop,
+                    colorFilter = PortraitDuotone,
+                )
+            }
+            Text(
+                "OPERATIVE · LEVEL $level", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 14.sp, letterSpacing = 1.5.sp, color = c.ink, modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+    }
 }
 
 /** The RADIATION readout (Fallout STATUS>RAD): "rads" = live system stress — memory pressure plus
