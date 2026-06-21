@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -32,6 +34,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,14 +52,33 @@ import dev.mascwa.pulse.ui.theme.pipBoyPalette
 import kotlin.math.roundToInt
 
 /**
- * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy STAT screen, each as a literal
- * section: STATUS (phone telemetry / condition), DATA (orbital + space weather), MAP (the NAV map +
- * objectives), RADAR (the RADSCOPE), QUESTS (objectives log), NOTES (library), RADIO and MUSIC. Each
- * feed's scaffold-free *Body is hosted inside the green CRT chrome.
+ * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy device, organised under the
+ * three canonical Pip-Boy sections selected from the global bottom nav (STATS / ITEMS / DATA):
+ *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.).
+ *  - ITEMS  → the collected-inventory view (favourite stations, notes, tracked objectives).
+ *  - DATA   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), QUESTS
+ *             (objectives log), NOTES (library), RADIO and MUSIC.
+ * The sub-tab rail shows only the active section's tabs; each feed's scaffold-free *Body is hosted
+ * inside the green CRT chrome.
  */
-private enum class PipTab(val label: String) {
-    STATUS("STATUS"), DATA("DATA"), MAP("MAP"), RADAR("RADAR"), QUESTS("QUESTS"), NOTES("NOTES"),
-    RADIO("RADIO"), MUSIC("MUSIC"),
+private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"), DATA("DATA") }
+
+private enum class PipTab(val label: String, val section: PipSection) {
+    STATUS("STATUS", PipSection.STATS),
+    ITEMS("ITEMS", PipSection.ITEMS),
+    MAP("MAP", PipSection.DATA),
+    RADAR("RADAR", PipSection.DATA),
+    ORBIT("ORBIT", PipSection.DATA),
+    QUESTS("QUESTS", PipSection.DATA),
+    NOTES("NOTES", PipSection.DATA),
+    RADIO("RADIO", PipSection.DATA),
+    MUSIC("MUSIC", PipSection.DATA),
+    ;
+
+    companion object {
+        /** The default (first) tab for a section — what the bottom-nav section button selects. */
+        fun firstOf(section: PipSection): PipTab = entries.first { it.section == section }
+    }
 }
 
 @Composable
@@ -71,6 +93,7 @@ fun PipBoyScreen(
     navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
     spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
     onBack: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
     // Live device readouts for the persistent STAT strip (STATUS is the default tab, so telemetry
@@ -87,7 +110,8 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
-                    PipTab.DATA -> { orbitalVm.refresh(); spaceWxVm.refresh() }
+                    PipTab.ITEMS -> objectivesVm.refresh() // refresh tracked objectives in the inventory
+                    PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
                     PipTab.RADAR -> radarVm.refresh()
                     PipTab.QUESTS -> objectivesVm.refresh()
@@ -108,7 +132,8 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
-                        PipTab.DATA -> DataBody(orbitalVm, spaceWxVm)
+                        PipTab.ITEMS -> ItemsBody(radioVm, notesVm, objectivesVm)
+                        PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
                         PipTab.QUESTS -> dev.mascwa.pulse.feature.objectives.ObjectivesPanel(
@@ -123,7 +148,13 @@ fun PipBoyScreen(
                     Canvas(Modifier.matchParentSize()) { crtScanlines(Color.Black.copy(alpha = 0.12f), gap = 3f) }
                 }
 
-                PipStatBar(telem, tab)
+                PipBottomNav(
+                    telem,
+                    section = tab.section,
+                    onSection = { tab = PipTab.firstOf(it) },
+                    onOpenSettings = onOpenSettings,
+                    onExit = onBack,
+                )
             }
         }
     }
@@ -135,12 +166,13 @@ fun PipBoyScreen(
 private fun PipTabRail(current: PipTab, onSelect: (PipTab) -> Unit) {
     Box(Modifier.fillMaxWidth().background(Pip.bg)) {
         Canvas(Modifier.matchParentSize()) { crtScanlines(Pip.gridSoft, gap = 3f) }
+        val tabs = PipTab.entries.filter { it.section == current.section }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PipTab.entries.forEachIndexed { i, t ->
+            tabs.forEachIndexed { i, t ->
                 if (i > 0) {
                     // em-dash connector line between tabs
                     Box(Modifier.padding(horizontal = 5.dp).width(14.dp).height(1.5.dp).background(Pip.mid))
@@ -215,23 +247,206 @@ private fun StatReadout(label: String, value: String) {
     }
 }
 
-/** The bottom Pip-Boy status bar — HP (battery) and AP (free memory) gauges flanking the level. */
+/**
+ * The bottom Pip-Boy frame: HP/AP gauges over the global section nav (STATS / ITEMS / DATA circular
+ * buttons), flanked by the Fallout utility pills (SAVE/LOAD/RESET · ♥ SET/BUG/EXIT), with a
+ * `CLOSE ⌄ MENU` label and the build version — pixel-faithful to the reference Pip-Boy bottom bar.
+ * The three section circles are the live selector; SET opens Settings, EXIT backs out when wired; the
+ * remaining pills are device chrome (rendered dim, non-interactive) to complete the look.
+ */
 @Composable
-private fun PipStatBar(t: Telemetry, tab: PipTab) {
+private fun PipBottomNav(
+    t: Telemetry,
+    section: PipSection,
+    onSection: (PipSection) -> Unit,
+    onOpenSettings: (() -> Unit)?,
+    onExit: (() -> Unit)?,
+) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
-    val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
-    Column(Modifier.fillMaxWidth().background(Pip.bg).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
-            Text("LVL $level", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Pip.glow)
-            StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
+    val version = "v" + dev.mascwa.pulse.BuildConfig.VERSION_CODE
+    Column(Modifier.fillMaxWidth().background(Pip.bg)) {
+        // Bright phosphor rule separating the frame from the feed above.
+        Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
+            drawLine(Pip.grid, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), size.height)
         }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("ARGUS DYNAMICS", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
-            Text("▸ ${tab.label}", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.mid)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            // HP / AP gauges (battery / free memory).
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
+                StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
+            }
+            // The global section selector — three Pip-Boy circular buttons.
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PipSection.entries.forEach { s ->
+                    SectionButton(s.label, s == section) { onSection(s) }
+                }
+            }
+            // The Fallout utility pills + close label, flanking the section nav.
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
+                    UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("CLOSE ⌄ MENU", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
+                Text("ARGUS DYNAMICS · $version", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
+            }
         }
     }
+}
+
+/** One global-section button: a Pip-Boy circle (selected = filled & larger) with a label beneath. */
+@Composable
+private fun SectionButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    val diameter = if (selected) 30.dp else 22.dp
+    Column(
+        Modifier.padding(horizontal = 14.dp).clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(30.dp), // fixed footprint so the row doesn't reflow as selection changes
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(diameter)) {
+                val r = size.minDimension / 2f
+                val c = Offset(size.width / 2f, size.height / 2f)
+                if (selected) {
+                    drawCircle(Pip.bright, radius = r, center = c)
+                    drawCircle(Pip.bg, radius = r * 0.38f, center = c)
+                } else {
+                    drawCircle(Pip.dim, radius = r, center = c, style = Stroke(width = 1.5.dp.toPx()))
+                }
+            }
+        }
+        Text(
+            label,
+            fontFamily = ChakraPetch,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            color = if (selected) Pip.glow else Pip.dim,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+    }
+}
+
+/** A small Fallout utility pill. Interactive (bright, bordered) when [onClick] is set; else dim chrome. */
+@Composable
+private fun UtilPill(label: String, onClick: (() -> Unit)?) {
+    val color = if (onClick != null) Pip.mid else Pip.dim
+    Box(
+        Modifier
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .drawBehind {
+                drawRoundRect(
+                    color.copy(alpha = 0.45f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx(), 8.dp.toPx()),
+                    style = Stroke(width = 1f),
+                )
+            }
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    ) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.5.sp, color = color)
+    }
+}
+
+/** The collected-inventory categories for the ITEMS section, mapped to what the app actually saves. */
+private enum class ItemCat(val label: String) { STATIONS("STATIONS"), NOTES("NOTES"), OBJECTIVES("OBJECTIVES") }
+
+/**
+ * The ITEMS section body — a Fallout inventory of the things the user has collected in Pulse:
+ * favourite radio stations, saved notes and tracked objectives, picked through a category rail and
+ * listed as the canonical Pip-Boy data rows. Read-only here; each item is curated from its own screen.
+ */
+@Composable
+private fun ItemsBody(
+    radioVm: RadioViewModel,
+    notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
+    objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
+) {
+    val favs by radioVm.favorites.collectAsStateWithLifecycle()
+    val notes by notesVm.notes.collectAsStateWithLifecycle()
+    val objectives by objectivesVm.objectives.collectAsStateWithLifecycle()
+    var cat by remember { mutableStateOf(ItemCat.STATIONS) }
+    val count = when (cat) {
+        ItemCat.STATIONS -> favs.size
+        ItemCat.NOTES -> notes.size
+        ItemCat.OBJECTIVES -> objectives.size
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ItemCat.entries.forEach { ic ->
+                val n = when (ic) {
+                    ItemCat.STATIONS -> favs.size
+                    ItemCat.NOTES -> notes.size
+                    ItemCat.OBJECTIVES -> objectives.size
+                }
+                val on = ic == cat
+                Box(
+                    Modifier
+                        .clickable { cat = ic }
+                        .then(if (on) Modifier.drawBehind { drawCornerBrackets(Pip.glow) } else Modifier)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        "${ic.label} [$n]",
+                        fontFamily = ChakraPetch,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 13.sp,
+                        letterSpacing = 1.sp,
+                        color = if (on) Pip.glow else Pip.dim,
+                    )
+                }
+            }
+        }
+        dev.mascwa.pulse.feature.common.PipHeader(cat.label, Modifier.padding(horizontal = 14.dp), trailing = "$count")
+        when (cat) {
+            ItemCat.STATIONS ->
+                if (favs.isEmpty()) EmptyItems("No favourite stations. Star one in RADIO.")
+                else favs.forEach { s -> dev.mascwa.pulse.feature.common.PipDataRow(s.name, s.band) }
+            ItemCat.NOTES ->
+                if (notes.isEmpty()) EmptyItems("No notes saved. Add one in NOTES.")
+                else notes.forEach { n -> dev.mascwa.pulse.feature.common.PipDataRow(n.title.ifBlank { "Untitled" }, n.category.ifBlank { "—" }) }
+            ItemCat.OBJECTIVES ->
+                if (objectives.isEmpty()) EmptyItems("No tracked objectives. Add one in QUESTS / MAP.")
+                else objectives.forEach { o ->
+                    val detail = o.whenLabel
+                        ?: o.distanceMeters?.let { if (it >= 1000) "%.1f km".format(it / 1000) else "${it.roundToInt()} m" }
+                        ?: o.kind.name
+                    dev.mascwa.pulse.feature.common.PipDataRow(o.title, detail)
+                }
+        }
+    }
+}
+
+/** Empty-state line for an inventory category. */
+@Composable
+private fun EmptyItems(message: String) {
+    Text(
+        message,
+        fontFamily = JetBrainsMono,
+        fontSize = 12.sp,
+        color = Pip.dim,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+    )
 }
 
 /** One labelled HP/AP-style gauge: label + value over a thin filled bar. */
