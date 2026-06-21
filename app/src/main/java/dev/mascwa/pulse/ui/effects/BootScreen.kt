@@ -179,15 +179,17 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
         CompositionLocalProvider(LocalGlitchEnabled provides true) {
             val shown = (((p - 0.05f) / 0.70f) * bootLines.size).toInt().coerceIn(0, bootLines.size)
             val logAlpha = (1f - (p - 0.80f) / 0.10f).coerceIn(0f, 1f)
-            // The decrypt log lives in its OWN bottom-anchored, clipped frame so it can never grow up into
-            // the centre eye / brand reveal. However many lines the procedural roll produces, the text stays
-            // inside this maintained box — overflow clips at the top, terminal-style — keeping the visuals clear.
-            Box(
-                Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 56.dp),
-                contentAlignment = Alignment.BottomStart,
-            ) {
+            // The decrypt log lives in its OWN maintained box — a clipped band in the LOWER portion only,
+            // strictly below the eye/seal (now in the upper half) and lifted off the bottom. Text appears
+            // ONLY inside this band: anything past its top edge is clipped away, so it can never overlap the
+            // eye above it, and it never reaches the brand/footer below. No visual overlap, ever.
+            Box(Modifier.fillMaxSize().padding(start = 26.dp, end = 26.dp, bottom = 60.dp)) {
                 Column(
-                    Modifier.fillMaxWidth().fillMaxHeight(0.40f).clipToBounds(),
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.42f)
+                        .clipToBounds(),
                     verticalArrangement = Arrangement.Bottom,
                 ) {
                     bootLines.take(shown).forEachIndexed { i, line ->
@@ -235,7 +237,8 @@ private fun bootLineColor(c: NightwirePalette, i: Int, total: Int): Color = when
 private fun DrawScope.drawOmenField(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>) {
     val w = size.width
     val h = size.height
-    val center = Offset(w / 2f, h / 2f)
+    // The eye/seal sits in the UPPER portion so the boot-log band below it never overlaps it.
+    val center = Offset(w / 2f, h * 0.35f)
     val baseR = minOf(w, h) / 2f
 
     // Cold radial vignette.
