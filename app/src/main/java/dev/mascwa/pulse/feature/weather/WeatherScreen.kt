@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.weather
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,11 +49,19 @@ import dev.mascwa.pulse.core.telemetry.Explainer
 import dev.mascwa.pulse.core.telemetry.WeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.weather.WeatherCode
+import dev.mascwa.pulse.feature.common.CyberChipCut
+import dev.mascwa.pulse.feature.common.CyberHeader
+import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun WeatherScreen(vm: WeatherViewModel) {
@@ -219,31 +228,33 @@ private fun CurrentWeatherCard(
     onExplain: (String, List<Explainer>) -> Unit = { _, _ -> },
 ) {
     val c = wd.current ?: return
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp)) {
+    val p = Pulse.colors
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, padding = PaddingValues(20.dp)) {
+        Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(WeatherCode.emoji(c.weatherCode, c.isDay), style = MaterialTheme.typography.displayMedium)
+                Text(WeatherCode.emoji(c.weatherCode, c.isDay), fontSize = 44.sp)
                 Column(Modifier.padding(start = 12.dp)) {
                     Text(
                         "${Formatters.number(c.temperature, 0)}${wd.tempUnitSymbol}",
-                        style = MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 40.sp, color = p.ink,
                     )
-                    Text(WeatherCode.describe(c.weatherCode), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        WeatherCode.describe(c.weatherCode).uppercase(),
+                        fontFamily = JetBrainsMono, fontSize = 12.sp, letterSpacing = 1.sp, color = p.accent,
+                    )
                 }
             }
             Text(
-                "Feels like ${Formatters.number(c.apparentTemperature, 0)}${wd.tempUnitSymbol}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                "FEELS LIKE ${Formatters.number(c.apparentTemperature, 0)}${wd.tempUnitSymbol}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 0.8.sp, color = p.ink2,
                 modifier = Modifier
-                    .padding(top = 4.dp)
+                    .padding(top = 6.dp)
                     .clickable {
                         WeatherExplainers.feelsLike(c.temperature, c.apparentTemperature, wd.tempUnitSymbol)
                             ?.let { onExplain("Feels like", listOf(it)) }
                     },
             )
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = p.line)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Stat("Humidity", "${Formatters.number(c.humidity, 0)}%") {
                     WeatherExplainers.humidity(c.humidity)?.let { onExplain("Humidity", listOf(it)) }
@@ -260,60 +271,63 @@ private fun CurrentWeatherCard(
 
 @Composable
 private fun Stat(label: String, value: String, onClick: (() -> Unit)? = null) {
+    val p = Pulse.colors
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
     ) {
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = p.ink)
+        Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = p.muted)
     }
 }
 
 @Composable
 private fun HourCell(h: dev.mascwa.pulse.data.weather.HourlyPoint, unit: String) {
+    val p = Pulse.colors
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .clip(CyberChipCut)
+            .background(p.panel)
+            .border(androidx.compose.foundation.BorderStroke(1.dp, p.lineSoft), CyberChipCut)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(WeatherFormat.timeLabel(h.timeIso, true), style = MaterialTheme.typography.labelSmall)
-        Text(WeatherCode.emoji(h.weatherCode), style = MaterialTheme.typography.titleLarge)
-        Text("${Formatters.number(h.temperature, 0)}$unit", style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium)
-        Text("${h.precipProbability ?: 0}%", style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary)
+        Text(WeatherFormat.timeLabel(h.timeIso, true), fontFamily = JetBrainsMono, fontSize = 10.sp, color = p.muted)
+        Text(WeatherCode.emoji(h.weatherCode), fontSize = 22.sp)
+        Text("${Formatters.number(h.temperature, 0)}$unit", fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = p.ink)
+        Text("${h.precipProbability ?: 0}%", fontFamily = JetBrainsMono, fontSize = 10.sp, color = p.accent)
     }
 }
 
 @Composable
 private fun DailyRow(index: Int, d: dev.mascwa.pulse.data.weather.DailyPoint, unit: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            WeatherFormat.dayLabel(d.dateIso, index),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.width(64.dp),
-        )
-        Text(WeatherCode.emoji(d.weatherCode), style = MaterialTheme.typography.titleLarge)
-        Text(
-            "${d.precipProbabilityMax ?: 0}%",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.width(56.dp).padding(start = 12.dp),
-        )
-        Text(WeatherCode.describe(d.weatherCode), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        Text(
-            "${Formatters.number(d.tempMax, 0)}° / ${Formatters.number(d.tempMin, 0)}°",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-        )
+    val p = Pulse.colors
+    CyberRowFrame {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                WeatherFormat.dayLabel(d.dateIso, index).uppercase(),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = p.ink,
+                modifier = Modifier.width(60.dp),
+            )
+            Text(WeatherCode.emoji(d.weatherCode), fontSize = 20.sp)
+            Text(
+                "${d.precipProbabilityMax ?: 0}%",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = p.accent,
+                modifier = Modifier.width(52.dp).padding(start = 12.dp),
+            )
+            Text(
+                WeatherCode.describe(d.weatherCode),
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = p.muted, modifier = Modifier.weight(1f),
+            )
+            Text(
+                "${Formatters.number(d.tempMax, 0)}° / ${Formatters.number(d.tempMin, 0)}°",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = p.ink,
+            )
+        }
     }
-    HorizontalDivider()
 }
 
 @Composable
@@ -321,24 +335,26 @@ private fun AirQualityCard(
     aq: dev.mascwa.pulse.data.weather.AirQuality,
     onExplain: (String, List<Explainer>) -> Unit = { _, _ -> },
 ) {
-    Card(
+    val p = Pulse.colors
+    NeonPanel(
         Modifier.fillMaxWidth().clickable {
             WeatherExplainers.airQuality(aq.usAqi, aq.europeanAqi)?.let { onExplain("Air quality", listOf(it)) }
         },
+        corners = true,
+        padding = PaddingValues(16.dp),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Air quality", style = MaterialTheme.typography.titleMedium)
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Column {
+            Text("AIR QUALITY", fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.5.sp, color = p.accent)
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Stat("EU AQI", "${Formatters.number(aq.europeanAqi, 0)}")
                 Stat("US AQI", "${Formatters.number(aq.usAqi, 0)}")
                 Stat("PM2.5", "${Formatters.number(aq.pm25, 0)}")
                 Stat("PM10", "${Formatters.number(aq.pm10, 0)}")
             }
             Text(
-                WeatherFormat.aqiLabel(aq.europeanAqi),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 8.dp),
+                WeatherFormat.aqiLabel(aq.europeanAqi).uppercase(),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp, color = p.accent,
+                modifier = Modifier.padding(top = 10.dp),
             )
         }
     }
@@ -346,10 +362,5 @@ private fun AirQualityCard(
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+    CyberHeader(text)
 }
