@@ -276,10 +276,10 @@ private fun PipBottomNav(
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
     val version = "v" + dev.mascwa.pulse.BuildConfig.VERSION_CODE
-    // The WHOLE bottom cluster — HP/AP gauges, the STATS/ITEMS/DATA circles and the utility pills —
-    // collapses under the CLOSE/OPEN MENU handle, leaving just a thin bar. Default expanded so the
-    // section nav is there on open; tap to tuck it all away. Persists within the session.
-    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+    // The WHOLE bottom cluster — HP/AP gauges, the STATS/ITEMS/DATA circles AND the utility pills —
+    // collapses under the CLOSE/OPEN MENU handle, leaving just a thin bar. Default COLLAPSED for the
+    // cleanest resting state; tap OPEN MENU to bring the section nav up. Persists within the session.
+    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().background(Pip.bg)) {
         // Bright phosphor rule separating the frame from the feed above.
         Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
