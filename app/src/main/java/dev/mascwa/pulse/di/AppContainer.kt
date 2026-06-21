@@ -95,6 +95,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)
     }
 
+    /** DIARY: the user's dated personal journal (J.A.R.V.I.S. can journal here via the `diary` tool). */
+    val diaryStore: dev.mascwa.pulse.data.diary.DiaryStore by lazy {
+        dev.mascwa.pulse.data.diary.DiaryStore(appContext, json)
+    }
+
     /** Episodic memory stream: timestamped observations, recalled by recency·importance·relevance. */
     val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore by lazy {
         dev.mascwa.pulse.data.memory.MemoryStreamStore(appContext, json)
@@ -285,6 +290,8 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
+            dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
+            dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
