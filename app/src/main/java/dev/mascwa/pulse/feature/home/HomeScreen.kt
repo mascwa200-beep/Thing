@@ -55,6 +55,11 @@ import dev.mascwa.pulse.feature.common.LocalTickerSpeed
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.ui.theme.NightwirePalette
+import androidx.compose.runtime.staticCompositionLocalOf
+
+/** What the user asked J.A.R.V.I.S. to brief on in the home status feed (Settings → briefing focus).
+ *  Provided app-wide from settings; never carries chat content. */
+val LocalJarvisFeedTopic = staticCompositionLocalOf { "" }
 import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.Ticker
 import dev.mascwa.pulse.feature.common.TickerItem
@@ -173,10 +178,9 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // (J.A.R.V.I.S. now lives in the bottom nav — the Home quick card was removed so there's
                 // a single shortcut to the console.)
 
-                // Tailored "for you" recommendations + profile highlight (hidden until something's known).
-                if (state.recommendations.isNotEmpty() || state.profileHighlight != null || state.taskFocus != null) {
-                    item { ForYouCard(state.recommendations, state.profileHighlight, state.taskFocus, nav.openRoute) }
-                }
+                // J.A.R.V.I.S. status feed — always present (J.A.R.V.I.S. is "always watching"): diagnostics
+                // + the user's monitoring focus + usage-based educated guesses. Never chat content.
+                item { ForYouCard(state.recommendations, state.profileHighlight, state.taskFocus, nav.openRoute) }
 
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
@@ -405,52 +409,64 @@ private fun ForYouCard(
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
+    // The J.A.R.V.I.S. feed is the one cyan "Stark HUD" island on the crimson home — a professional,
+    // non-chat status briefing. It NEVER surfaces chat content: only operational awareness — usage-based
+    // educated guesses, the user's chosen monitoring focus, and APK/internal diagnostics.
+    val hud = c.sky
+    val topic = LocalJarvisFeedTopic.current
     NeonPanel(
         Modifier.fillMaxWidth().padding(top = 12.dp),
         corners = true,
-        borderColor = c.accent.copy(alpha = 0.5f),
+        borderColor = hud.copy(alpha = 0.5f),
         padding = PaddingValues(0.dp),
     ) {
         Column(Modifier.fillMaxWidth()) {
-            // CP2077 quest-HUD header — a "transmission incoming" framing for J.A.R.V.I.S.'s feed.
+            // J.A.R.V.I.S. HUD header (cyan, Stark-style).
             Row(
                 Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("◆", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
+                Text("◆", fontFamily = JetBrainsMono, fontSize = 11.sp, color = hud)
                 DecryptText(
-                    text = "J.A.R.V.I.S. FEED",
+                    text = "J.A.R.V.I.S.",
                     fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                    letterSpacing = 2.sp, color = c.accent,
+                    letterSpacing = 3.sp, color = hud,
                 )
-                Box(Modifier.weight(1f).height(1.dp).background(c.line))
+                Box(Modifier.weight(1f).height(1.dp).background(hud.copy(alpha = 0.35f)))
                 Text(
-                    "INCOMING · ${cyberTag("jarvis.feed")}",
+                    "ONLINE · ${cyberTag("jarvis")}",
                     fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted,
                 )
             }
-            // The active objective (task focus) leads, like a tracked quest.
-            taskFocus?.let { QuestFeedRow("◆", it, "ACTIVE OBJECTIVE · TRACKING", c.accent, c) { openRoute("jarvis") } }
-            // Recommendations are side feeds.
+            // APK / internal diagnostics — a professional status line (no chat).
+            QuestFeedRow(
+                "▸", "All systems nominal",
+                "DIAGNOSTICS · BUILD ${dev.mascwa.pulse.BuildConfig.VERSION_CODE} · ONLINE",
+                c.ink, hud, c,
+            )
+            // The user's chosen briefing focus (Settings) — what J.A.R.V.I.S. should keep an eye on.
+            if (topic.isNotBlank()) {
+                QuestFeedRow("◆", topic, "MONITORING · BRIEFING FOCUS", hud, hud, c) { openRoute("jarvis") }
+            }
+            // Usage-based educated guesses — the "always watching" awareness (what you use, when).
             recommendations.forEach { rec ->
                 val rk = rec.routeKey
-                QuestFeedRow("◇", rec.headline, rec.detail, c.ink, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
+                QuestFeedRow("◇", rec.headline, rec.detail, c.ink, hud, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
             }
-            // Profile highlight = intel readout.
-            profileHighlight?.let { QuestFeedRow("▸", it, "INTEL", c.ink2, c, onClick = null) }
         }
     }
 }
 
-/** One CP2077 quest-feed entry: a diamond/chevron [marker] + bright [title] over a dim mono [sub] line,
- *  with a leading accent blade and a bottom hairline — the quest-log row from the reference HUD. */
+/** One J.A.R.V.I.S. feed entry: a [marker] + bright [title] over a dim mono [sub] line, with a leading
+ *  [blade]-coloured accent edge and a bottom hairline — the status-log row. */
 @Composable
 private fun QuestFeedRow(
     marker: String,
     title: String,
     sub: String,
     titleColor: androidx.compose.ui.graphics.Color,
+    blade: androidx.compose.ui.graphics.Color,
     c: NightwirePalette,
     onClick: (() -> Unit)? = null,
 ) {
@@ -458,14 +474,14 @@ private fun QuestFeedRow(
         Modifier.fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .drawBehind {
-                drawRect(c.accent.copy(alpha = 0.5f), size = Size(2.5.dp.toPx(), size.height))
+                drawRect(blade.copy(alpha = 0.5f), size = Size(2.5.dp.toPx(), size.height))
                 drawLine(c.lineSoft, Offset(0f, size.height), Offset(size.width, size.height), 1f)
             }
             .padding(start = 14.dp, end = 14.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Text(marker, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.accent, modifier = Modifier.padding(top = 1.dp))
+        Text(marker, fontFamily = JetBrainsMono, fontSize = 12.sp, color = blade, modifier = Modifier.padding(top = 1.dp))
         Column(Modifier.weight(1f)) {
             Text(title, fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = titleColor)
             Text(

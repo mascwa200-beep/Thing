@@ -134,6 +134,7 @@ class MainActivity : ComponentActivity() {
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
                     dev.mascwa.pulse.ui.effects.LocalHaptics provides settings.haptics,
                     dev.mascwa.pulse.feature.common.LocalTickerSpeed provides settings.tickerSpeed,
+                    dev.mascwa.pulse.feature.home.LocalJarvisFeedTopic provides settings.jarvisFeedTopic,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
                     dev.mascwa.pulse.feature.common.LocalHud provides dev.mascwa.pulse.feature.common.HudState(
                         kp = kp,
@@ -169,9 +170,8 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
-                    // THE single appearance effect: the non-invasive J.A.R.V.I.S.-is-watching presence
-                    // (corner brackets + slow sweep + drifting reticle), above content, never blocks touch.
-                    dev.mascwa.pulse.ui.effects.JarvisPresenceOverlay(enabled = settings.jarvisPresence)
+                    // (The visual "always watching" overlay was removed — J.A.R.V.I.S.'s awareness is
+                    // non-visual now; the presence surfaces as a professional status feed instead.)
                     // Cold-open: permanent + always topmost, so it draws first and masks everything
                     // (app, gate, overlays) until it fades. No off-switch by design.
                     if (!booted) {
