@@ -1,6 +1,5 @@
 package dev.mascwa.pulse.feature.markets
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,19 +29,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.MarketExplainers
 import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.feature.common.ChangePill
+import dev.mascwa.pulse.feature.common.CyberHeader
+import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.feature.common.cyberTag
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.feature.economy.EconomyBody
 import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.economy.InflationBody
@@ -135,11 +142,11 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
 
                         if (gainers.isNotEmpty()) {
                             item(key = "h_gain") { SectionLabel("Top gainers") }
-                            items(gainers, key = { "g_${it.id}" }) { q -> MoverRow(q) { selected = q } }
+                            items(gainers, key = { "g_${it.id}" }) { q -> CyberRowFrame(onClick = { selected = q }) { MoverRow(q) } }
                         }
                         if (losers.isNotEmpty()) {
                             item(key = "h_lose") { SectionLabel("Top losers") }
-                            items(losers, key = { "l_${it.id}" }) { q -> MoverRow(q) { selected = q } }
+                            items(losers, key = { "l_${it.id}" }) { q -> CyberRowFrame(onClick = { selected = q }) { MoverRow(q) } }
                         }
                         if (gainers.isNotEmpty() || losers.isNotEmpty()) {
                             item(key = "d_movers") { HorizontalDivider() }
@@ -149,14 +156,14 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
                             val rows = grouped[type].orEmpty()
                             if (rows.isNotEmpty()) {
                                 item(key = "h_$label") { SectionLabel(label) }
-                                items(rows, key = { it.id }) { QuoteRow(it, Modifier.clickable { selected = it }) }
+                                items(rows, key = { it.id }) { q -> CyberRowFrame(onClick = { selected = q }) { QuoteRow(q) } }
                                 item(key = "d_$label") { HorizontalDivider() }
                             }
                         }
                         val cryptoRows = crypto.data.orEmpty()
                         if (cryptoRows.isNotEmpty()) {
                             item(key = "h_crypto") { SectionLabel("Crypto") }
-                            items(cryptoRows, key = { "c_${it.id}" }) { QuoteRow(it, Modifier.clickable { selected = it }) }
+                            items(cryptoRows, key = { "c_${it.id}" }) { q -> CyberRowFrame(onClick = { selected = q }) { QuoteRow(q) } }
                         }
                         if (grouped.isEmpty() && cryptoRows.isEmpty()) {
                             item { EmptyState("Your watchlist is empty. Add symbols in Settings.") }
@@ -180,9 +187,9 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MoverRow(q: Quote, onClick: () -> Unit) {
+private fun MoverRow(q: Quote) {
     Row(
-        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -197,28 +204,37 @@ private fun MoverRow(q: Quote, onClick: () -> Unit) {
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
+    CyberHeader(text)
 }
 
 @Composable
 private fun MoodBanner(mood: MarketMood.Mood) {
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
-        Text(
-            "MARKET MOOD",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(mood.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            mood.detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val c = Pulse.colors
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        corners = true,
+    ) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "MARKET MOOD",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.5.sp, color = c.accent,
+                )
+                Text(
+                    cyberTag("market.mood"),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.muted,
+                )
+            }
+            Text(
+                mood.headline,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = c.ink,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                mood.detail,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
