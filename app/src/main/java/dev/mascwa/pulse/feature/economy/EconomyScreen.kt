@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.EconomyExplainers
 import dev.mascwa.pulse.data.economy.IndicatorSeries
+import dev.mascwa.pulse.feature.common.CyberHeader
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
@@ -73,13 +74,7 @@ fun EconomyBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                             modifier = Modifier.padding(top = 8.dp, start = 4.dp),
                         )
                     }
-                    item {
-                        Text(
-                            data?.countryName ?: state.country,
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp),
-                        )
-                    }
+                    item { CyberHeader(data?.countryName ?: state.country) }
                     items(data?.series.orEmpty().filter { it.points.isNotEmpty() }, key = { it.indicatorId }) {
                         IndicatorCard(it, Modifier.clickable { explain = it })
                     }

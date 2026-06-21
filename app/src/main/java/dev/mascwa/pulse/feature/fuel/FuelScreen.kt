@@ -1,6 +1,5 @@
 package dev.mascwa.pulse.feature.fuel
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,8 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,16 +25,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.MarketExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.markets.Quote
+import dev.mascwa.pulse.feature.common.CyberHeader
+import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.feature.markets.QuoteRow
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
@@ -73,8 +77,8 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
                         if (state.stale) item { StaleBanner(true) }
 
                         item { SectionLabel("Energy benchmarks (live)") }
-                        items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) {
-                            QuoteRow(it, Modifier.clickable { selected = it })
+                        items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) { q ->
+                            CyberRowFrame(onClick = { selected = q }) { QuoteRow(q) }
                         }
                         if (data?.benchmarks.isNullOrEmpty()) {
                             item {
@@ -97,22 +101,24 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
                             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
                             item { SectionLabel("US weekly retail (EIA)") }
                             items(data!!.usRetail, key = { "r_${it.product}" }) { rp ->
-                                Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(rp.product, style = MaterialTheme.typography.bodyLarge)
-                                        rp.period?.let {
-                                            Text(it, style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val cc = Pulse.colors
+                                CyberRowFrame {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(rp.product, fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 15.sp, color = cc.ink)
+                                            rp.period?.let {
+                                                Text(it.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = cc.muted)
+                                            }
                                         }
+                                        Text(
+                                            "${Formatters.currency(rp.usdPerGallon, "USD", 3)} /gal",
+                                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = cc.ink,
+                                        )
                                     }
-                                    Text(
-                                        "${Formatters.currency(rp.usdPerGallon, "USD", 3)} /gal",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
                                 }
                             }
                         }
@@ -145,36 +151,33 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PumpPriceCard(price: dev.mascwa.pulse.data.fuel.PumpPrice) {
+    val c = Pulse.colors
     val perLitre = price.usdPerLitre
     val perGallon = perLitre?.let { it * 3.78541 }
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        ),
+    NeonPanel(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        corners = true,
+        padding = androidx.compose.foundation.layout.PaddingValues(16.dp),
     ) {
         Row(
-            Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column {
-                Text(price.fuel, style = MaterialTheme.typography.titleMedium)
+                Text(price.fuel.uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = c.ink)
                 price.year?.let {
-                    Text("as of $it", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("AS OF $it", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     "${Formatters.currency(perLitre, "USD", 2)} /L",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink,
                 )
                 Text(
                     "${Formatters.currency(perGallon, "USD", 2)} /gal",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 )
             }
         }
@@ -183,11 +186,5 @@ private fun PumpPriceCard(price: dev.mascwa.pulse.data.fuel.PumpPrice) {
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
+    CyberHeader(text)
 }
