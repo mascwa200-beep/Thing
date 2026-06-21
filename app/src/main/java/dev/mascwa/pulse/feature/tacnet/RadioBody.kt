@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -267,7 +268,7 @@ private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, o
     }
 }
 
-/** A horizontally-scrollable rail of station cards — slide left/right to browse, tap to tune. */
+/** A vertical Fallout list of stations — canonical banded rows, tap to tune. */
 @Composable
 private fun StationStrip(
     stations: List<RadioStation>,
@@ -278,13 +279,9 @@ private fun StationStrip(
     onFavorite: (RadioStation) -> Unit,
     onTune: (RadioStation) -> Unit,
 ) {
-    LazyRow(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp),
-    ) {
-        items(stations, key = { it.streamUrl }) { st ->
-            StationCard(st, state, c, st.streamUrl in favUrls, nowPlaying, { onFavorite(st) }) { onTune(st) }
+    Column(Modifier.fillMaxWidth()) {
+        stations.forEach { st ->
+            StationRow(st, state, c, st.streamUrl in favUrls, nowPlaying, { onFavorite(st) }) { onTune(st) }
         }
     }
 }
@@ -312,10 +309,11 @@ private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) ->
     }
 }
 
-/** A rounded station "cube" for the horizontal rails: a play/EQ glyph + ★ up top, then the station
- *  name and a tiny metadata line (genre/region — the slot a now-playing track would sit in). */
+/** A station as a canonical Fallout banded list row: a status glyph / signal bars, the station name + a
+ *  tiny genre/region (or live now-playing) line, and a ★ favourite toggle. Tap the row to tune. Rows
+ *  stack gap-free, separated by the bright hairline rule. */
 @Composable
-private fun StationCard(
+private fun StationRow(
     st: RadioStation,
     state: RadioController.RadioState,
     c: NightwirePalette,
@@ -328,46 +326,45 @@ private fun StationCard(
     val onAir = active && state.status == RadioController.Status.ON_AIR
     val tuningThis = active && state.status == RadioController.Status.TUNING
     val track = if (onAir && !nowPlaying.isNullOrBlank()) nowPlaying else null
-    Box(
+    Row(
         Modifier
-            .width(168.dp)
-            .height(104.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (active) c.accent.copy(alpha = 0.14f) else c.panel.copy(alpha = 0.45f))
-            .border(1.dp, if (active) c.accent else c.line, RoundedCornerShape(14.dp))
+            .fillMaxWidth()
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = if (active) 0.16f else 0.08f))
+                drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
+            }
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (onAir) {
-                    SignalBars(c.accent, Modifier.size(width = 22.dp, height = 12.dp))
-                } else {
-                    Text(
-                        if (tuningThis) "···" else "▶",
-                        fontFamily = JetBrainsMono, fontSize = 13.sp, color = if (active) c.accent else c.muted,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
+        Box(Modifier.width(26.dp), contentAlignment = Alignment.Center) {
+            if (onAir) {
+                SignalBars(c.accent, Modifier.size(width = 22.dp, height = 12.dp))
+            } else {
                 Text(
-                    if (isFavorite) "★" else "☆",
-                    fontFamily = JetBrainsMono, fontSize = 16.sp, color = if (isFavorite) c.amber else c.muted,
-                    modifier = Modifier.clickable(onClick = onFavorite),
+                    if (tuningThis) "···" else "▶",
+                    fontFamily = JetBrainsMono, fontSize = 13.sp, color = if (active) c.accent else c.muted,
                 )
             }
-            Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
             Text(
-                st.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
-                color = if (active) c.ink else c.ink2, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp,
+                st.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
                 track?.let { "♪ $it" } ?: st.band,
-                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp,
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp,
                 color = if (track != null) c.accent else c.muted,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp),
             )
         }
+        Text(
+            if (isFavorite) "★" else "☆",
+            fontFamily = JetBrainsMono, fontSize = 17.sp, color = if (isFavorite) c.amber else c.muted,
+            modifier = Modifier.clickable(onClick = onFavorite).padding(start = 12.dp),
+        )
     }
 }
 
