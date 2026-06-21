@@ -48,8 +48,11 @@ import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.settings.HomeSection
 import dev.mascwa.pulse.data.weather.WeatherCode
+import dev.mascwa.pulse.feature.common.LocalTickerSpeed
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.SectionBar
+import dev.mascwa.pulse.feature.common.Ticker
+import dev.mascwa.pulse.feature.common.TickerItem
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -245,9 +248,9 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
 }
 
 /**
- * The home markets strip. Replaces the old auto-scrolling ticker (which could stall / show a half-empty
- * bar) with a STATIC, user-swipeable row: a plain-English mood read + every loaded instrument's move.
- * Reliable and clear — no animation, no fill bug — and taps through to the full Markets screen.
+ * The home markets ticker — an auto-scrolling NIGHTWIRE marquee: a plain-English mood read + every
+ * loaded instrument's move, looping seamlessly. Scroll rate is the user's adjustable [LocalTickerSpeed]
+ * (Settings slider). Taps through to the full Markets screen. Built on the robust [Ticker] (no fill bug).
  */
 @Composable
 private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
@@ -255,38 +258,14 @@ private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
     val items = quotes.orEmpty().filter { it.changePercent != null }
     if (items.isEmpty()) return
     val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(30.dp)
-            .background(c.carbon)
-            .clickable { onClick() }
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        mood?.let {
-            Text(
-                it.headline, fontFamily = JetBrainsMono, fontSize = 11.sp,
-                fontWeight = FontWeight.Medium, color = c.accent,
-            )
-        }
+    val tickerItems = buildList {
+        mood?.let { add(TickerItem("", it.headline, c.accent)) }
         items.forEach { q ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(q.label.uppercase().take(12), fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-                q.changePercent?.let { pct ->
-                    Text(
-                        Formatters.signedPercent(pct), fontFamily = JetBrainsMono, fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium, color = trendColor(pct >= 0),
-                    )
-                }
-            }
+            val pct = q.changePercent ?: return@forEach
+            add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), trendColor(pct >= 0)))
         }
     }
+    Ticker(tickerItems, speedFactor = LocalTickerSpeed.current, onClick = onClick)
 }
 
 @Composable

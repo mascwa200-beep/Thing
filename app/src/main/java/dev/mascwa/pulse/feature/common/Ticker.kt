@@ -41,17 +41,31 @@ import kotlin.math.max
 
 data class TickerItem(val symbol: String, val value: String, val color: Color)
 
-/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. Optional [onClick] (e.g. open Markets). */
+/** Auto-scroll speed multiplier for the [Ticker] (1f = default; higher = faster). Provided app-wide from
+ *  the user's setting; defaults to 1f so the ticker works even without a provider. */
+val LocalTickerSpeed = androidx.compose.runtime.staticCompositionLocalOf { 1f }
+
+/** Infinite left-scrolling market/news ticker, NIGHTWIRE style. [speedFactor] scales the scroll rate
+ *  (1f default; higher = faster). Optional [onClick] (e.g. open Markets). */
 @Composable
-fun Ticker(items: List<TickerItem>, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun Ticker(
+    items: List<TickerItem>,
+    modifier: Modifier = Modifier,
+    speedFactor: Float = 1f,
+    onClick: (() -> Unit)? = null,
+) {
     if (items.isEmpty()) return
     val c = Pulse.colors
 
+    // Base sweep duration scales with item count; faster speedFactor = shorter duration. Clamped so the
+    // ticker can't freeze (huge duration) or strobe (tiny duration).
+    val baseDuration = max(14000, items.size * 1500)
+    val durationMs = (baseDuration / speedFactor.coerceIn(0.2f, 4f)).toInt().coerceIn(3000, 120000)
     val transition = rememberInfiniteTransition(label = "ticker")
     val progress by transition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            tween(max(14000, items.size * 1500), easing = LinearEasing), RepeatMode.Restart,
+            tween(durationMs, easing = LinearEasing), RepeatMode.Restart,
         ),
         label = "tickerProgress",
     )
