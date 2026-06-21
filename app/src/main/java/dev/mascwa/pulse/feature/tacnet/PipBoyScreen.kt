@@ -71,7 +71,7 @@ private enum class PipTab(val label: String, val section: PipSection) {
     ORBIT("ORBIT", PipSection.DATA),
     QUESTS("QUESTS", PipSection.DATA),
     NOTES("NOTES", PipSection.DATA),
-    RADIO("RADIO", PipSection.DATA),
+    RADIO("STATIONS", PipSection.DATA),
     MUSIC("MUSIC", PipSection.DATA),
     ;
 
@@ -89,6 +89,7 @@ fun PipBoyScreen(
     spaceWxVm: SpaceWeatherViewModel,
     radioVm: RadioViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
+    tasksVm: dev.mascwa.pulse.feature.tasks.TasksViewModel,
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
     navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
     spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
@@ -132,7 +133,7 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
-                        PipTab.ITEMS -> ItemsBody(radioVm, notesVm, objectivesVm)
+                        PipTab.ITEMS -> ItemsBody(tasksVm, notesVm, objectivesVm)
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
@@ -271,6 +272,9 @@ private fun PipBottomNav(
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
     val version = "v" + dev.mascwa.pulse.BuildConfig.VERSION_CODE
+    // The utility pills (SAVE/LOAD/RESET · ♥ SET/BUG/EXIT) collapse by default to keep the frame clean;
+    // tapping the CLOSE/OPEN MENU label reveals them. Persists across recomposition within the session.
+    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().background(Pip.bg)) {
         // Bright phosphor rule separating the frame from the feed above.
         Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
@@ -292,22 +296,29 @@ private fun PipBottomNav(
                     SectionButton(s.label, s == section) { onSection(s) }
                 }
             }
-            // The Fallout utility pills + close label, flanking the section nav.
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
-                    UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
+            // The Fallout utility pills — collapsible (toggled by the CLOSE/OPEN MENU label below) so they
+            // can be tucked away to declutter the frame.
+            androidx.compose.animation.AnimatedVisibility(menuOpen) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
+                        UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
+                    }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("CLOSE ⌄ MENU", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
+                Text(
+                    if (menuOpen) "CLOSE ⌄ MENU" else "OPEN ⌃ MENU",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.mid,
+                    modifier = Modifier.clickable { menuOpen = !menuOpen },
+                )
                 Text("ARGUS DYNAMICS · $version", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
             }
         }
@@ -370,25 +381,30 @@ private fun UtilPill(label: String, onClick: (() -> Unit)?) {
 }
 
 /** The collected-inventory categories for the ITEMS section, mapped to what the app actually saves. */
-private enum class ItemCat(val label: String) { STATIONS("STATIONS"), NOTES("NOTES"), OBJECTIVES("OBJECTIVES") }
+private enum class ItemCat(val label: String) { TASKS("TASKS"), NOTES("NOTES"), OBJECTIVES("OBJECTIVES") }
 
 /**
- * The ITEMS section body — a Fallout inventory of the things the user has collected in Pulse:
- * favourite radio stations, saved notes and tracked objectives, picked through a category rail and
- * listed as the canonical Pip-Boy data rows. Read-only here; each item is curated from its own screen.
+ * The ITEMS section body — a Fallout inventory of the things the user is tracking in Pulse: open tasks
+ * (the deliberate-goal layer J.A.R.V.I.S. captures), saved notes and tracked objectives, picked through
+ * a category rail and listed as the canonical Pip-Boy data rows. Read-only here; each item is curated
+ * from its own screen (J.A.R.V.I.S. / NOTES / QUESTS). Favourite stations now live under the STATIONS tab.
  */
 @Composable
 private fun ItemsBody(
-    radioVm: RadioViewModel,
+    tasksVm: dev.mascwa.pulse.feature.tasks.TasksViewModel,
     notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel,
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
 ) {
-    val favs by radioVm.favorites.collectAsStateWithLifecycle()
+    val tasks by tasksVm.tasks.collectAsStateWithLifecycle()
     val notes by notesVm.notes.collectAsStateWithLifecycle()
     val objectives by objectivesVm.objectives.collectAsStateWithLifecycle()
-    var cat by remember { mutableStateOf(ItemCat.STATIONS) }
+    // Pending (not-done) tasks first, then completed — the useful order for an inventory glance.
+    val pendingTasks = tasks.filter { it.status != dev.mascwa.pulse.core.telemetry.TaskStatus.DONE }
+    val doneTasks = tasks.filter { it.status == dev.mascwa.pulse.core.telemetry.TaskStatus.DONE }
+    val orderedTasks = pendingTasks + doneTasks
+    var cat by remember { mutableStateOf(ItemCat.TASKS) }
     val count = when (cat) {
-        ItemCat.STATIONS -> favs.size
+        ItemCat.TASKS -> tasks.size
         ItemCat.NOTES -> notes.size
         ItemCat.OBJECTIVES -> objectives.size
     }
@@ -401,7 +417,7 @@ private fun ItemsBody(
         ) {
             ItemCat.entries.forEach { ic ->
                 val n = when (ic) {
-                    ItemCat.STATIONS -> favs.size
+                    ItemCat.TASKS -> tasks.size
                     ItemCat.NOTES -> notes.size
                     ItemCat.OBJECTIVES -> objectives.size
                 }
@@ -425,9 +441,15 @@ private fun ItemsBody(
         }
         dev.mascwa.pulse.feature.common.PipHeader(cat.label, Modifier.padding(horizontal = 14.dp), trailing = "$count")
         when (cat) {
-            ItemCat.STATIONS ->
-                if (favs.isEmpty()) EmptyItems("No favourite stations. Star one in RADIO.")
-                else favs.forEach { s -> dev.mascwa.pulse.feature.common.PipDataRow(s.name, s.band) }
+            ItemCat.TASKS ->
+                if (orderedTasks.isEmpty()) EmptyItems("No tasks. J.A.R.V.I.S. captures \"I need to…\" / \"todo:\".")
+                else orderedTasks.forEach { t ->
+                    val detail = t.note.ifBlank { t.status.name }
+                    dev.mascwa.pulse.feature.common.PipDataRow(
+                        t.title, detail,
+                        valueColor = if (t.status == dev.mascwa.pulse.core.telemetry.TaskStatus.DONE) Pip.dim else Pulse.colors.ink,
+                    )
+                }
             ItemCat.NOTES ->
                 if (notes.isEmpty()) EmptyItems("No notes saved. Add one in NOTES.")
                 else notes.forEach { n -> dev.mascwa.pulse.feature.common.PipDataRow(n.title.ifBlank { "Untitled" }, n.category.ifBlank { "—" }) }
