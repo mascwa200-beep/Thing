@@ -98,6 +98,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipHeader("Effects")
             EffectsPanel(t, gps != null, c)
 
+            PipHeader("S.P.E.C.I.A.L.")
+            SpecialPanel(t, c)
+
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -350,6 +353,65 @@ private fun EffectsPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
         } else {
             Column { effects.forEach { EffectRow(it, c) } }
         }
+    }
+}
+
+/** A Fallout S.P.E.C.I.A.L. attribute, mapped to a real device capability (1–10). */
+private data class SpecialStat(val letter: Char, val name: String, val value: Int, val desc: String)
+
+/** The 7 SPECIAL attributes derived from live device state — iconic Fallout, grounded in real data:
+ *  Strength = power, Perception = sensors, Endurance = thermal, Charisma = link, Intelligence = memory,
+ *  Agility = free headroom, Luck = the build. */
+private fun specialStats(t: Telemetry): List<SpecialStat> {
+    fun pct10(p: Int) = (1 + p * 9 / 100).coerceIn(1, 10)
+    val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
+    val freeMem = if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100) / t.memTotalMb).toInt() else 0
+    val sensors = listOf(t.pressureHpa, t.magneticUt, t.lightLux, t.accelG, t.gyroDps).count { it != null }
+    val temp = t.batteryTempC ?: 25f
+    val endurance = (((45f - temp) / 25f) * 10f).toInt().coerceIn(1, 10)
+    val charisma = (if (t.netType.isNotBlank()) 8 else 2).coerceIn(1, 10)
+    val intelligence = (t.memTotalMb / 1500).toInt().coerceIn(1, 10)
+    val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
+    return listOf(
+        SpecialStat('S', "STRENGTH", pct10(bat), "Power reserves — what you carry through the day."),
+        SpecialStat('P', "PERCEPTION", (1 + sensors * 9 / 5).coerceIn(1, 10), "Sensor acuity — awareness of your surroundings."),
+        SpecialStat('E', "ENDURANCE", endurance, "Resilience — staying cool under load."),
+        SpecialStat('C', "CHARISMA", charisma, "Connection — your link to the world."),
+        SpecialStat('I', "INTELLIGENCE", intelligence, "Cognition — the memory to think with."),
+        SpecialStat('A', "AGILITY", pct10(freeMem), "Responsiveness — free headroom to act fast."),
+        SpecialStat('L', "LUCK", (level % 10) + 1, "Fortune — favours the prepared. (Build $level)"),
+    )
+}
+
+/** The S.P.E.C.I.A.L. readout (Fallout STATS>SPECIAL): the seven attributes as device capabilities. */
+@Composable
+private fun SpecialPanel(t: Telemetry, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column { specialStats(t).forEach { SpecialRow(it, c) } }
+    }
+}
+
+/** One SPECIAL row: the letter, the attribute name + description, and the 1–10 value on the right. */
+@Composable
+private fun SpecialRow(s: SpecialStat, c: NightwirePalette) {
+    Row(
+        Modifier.fillMaxWidth()
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = 0.08f))
+                drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${s.letter}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp,
+            color = c.accent, modifier = Modifier.width(26.dp))
+        Column(Modifier.weight(1f)) {
+            Text(s.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                color = c.ink, letterSpacing = 0.8.sp)
+            Text(s.desc, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+        Text("${s.value}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp,
+            color = c.accent, modifier = Modifier.padding(start = 10.dp))
     }
 }
 
