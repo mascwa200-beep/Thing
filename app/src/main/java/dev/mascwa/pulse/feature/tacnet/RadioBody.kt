@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -330,7 +331,9 @@ private fun StationRow(
         Modifier
             .fillMaxWidth()
             .drawBehind {
-                drawRect(c.accent.copy(alpha = if (active) 0.16f else 0.08f))
+                drawRect(c.accent.copy(alpha = if (active) 0.20f else 0.08f))
+                // The tuned station is the "selected" row — a bright left cursor bar (Fallout selection).
+                if (active) drawRect(c.accent, size = Size(3.dp.toPx(), size.height))
                 drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
             }
             .clickable(onClick = onClick)
@@ -351,7 +354,7 @@ private fun StationRow(
         Column(Modifier.weight(1f)) {
             Text(
                 st.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (active) c.accent else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
                 track?.let { "♪ $it" } ?: st.band,
