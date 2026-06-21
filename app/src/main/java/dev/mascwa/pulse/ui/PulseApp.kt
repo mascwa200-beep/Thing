@@ -273,7 +273,10 @@ fun PulseApp(
                 val objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
                 val navVm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
                 val spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, objectivesVm, navVm, spotifyVm)
+                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(
+                    radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, objectivesVm, navVm, spotifyVm,
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                )
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
