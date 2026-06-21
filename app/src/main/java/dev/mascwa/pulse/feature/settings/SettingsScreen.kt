@@ -162,6 +162,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
                     }
+                    PrefSlider(
+                        "Ticker speed",
+                        value = s.tickerSpeed,
+                        valueRange = 0.25f..3f,
+                        subtitle = "Auto-scroll rate of the home markets ticker",
+                        valueLabel = { "%.2f×".format(it) },
+                    ) { v -> vm.update { it.copy(tickerSpeed = v) } }
                 }
             }
             item { HorizontalDivider() }

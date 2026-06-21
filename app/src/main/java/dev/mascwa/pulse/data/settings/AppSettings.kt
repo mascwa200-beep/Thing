@@ -347,6 +347,9 @@ data class AppSettings(
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
+    /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
+     *  Adjustable via the Settings slider; clamped to a sane range where used. */
+    val tickerSpeed: Float = 1.0f,
 )
 
 /** Sensible International defaults for first launch. */
