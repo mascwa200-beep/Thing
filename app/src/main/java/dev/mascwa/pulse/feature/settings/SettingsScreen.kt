@@ -147,13 +147,6 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }
-                    PrefSwitch(
-                        "J.A.R.V.I.S. presence",
-                        "The one ambient effect — a non-invasive watching HUD (corner brackets, a slow " +
-                            "sweep and a drifting reticle) that follows you everywhere. Replaces the old " +
-                            "scanline/aberration overlays. ~1 MB, no retained buffers.",
-                        s.jarvisPresence,
-                    ) { v -> vm.update { it.copy(jarvisPresence = v) } }
                     PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
                         vm.update { it.copy(hudStrip = v) }
                     }
@@ -170,6 +163,25 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                         subtitle = "Auto-scroll rate of the home markets ticker",
                         valueLabel = { "%.2f×".format(it) },
                     ) { v -> vm.update { it.copy(tickerSpeed = v) } }
+                }
+            }
+            item { HorizontalDivider() }
+
+            // ----- J.A.R.V.I.S. feed (home status briefing) -----
+            item {
+                PrefSection("J.A.R.V.I.S. feed") {
+                    EditableValueRow(
+                        "Briefing focus",
+                        value = s.jarvisFeedTopic.ifBlank { "Not set" },
+                        onSet = { vm.update { st -> st.copy(jarvisFeedTopic = it.trim()) } },
+                    )
+                    Text(
+                        "What J.A.R.V.I.S. keeps an eye on in the home status feed — a project, a topic, " +
+                            "\"device health\", etc. Shown as a summary, never your chat.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
             }
             item { HorizontalDivider() }

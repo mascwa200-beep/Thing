@@ -350,10 +350,11 @@ data class AppSettings(
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
      *  Adjustable via the Settings slider; clamped to a sane range where used. */
     val tickerSpeed: Float = 1.0f,
-    /** THE single appearance effect: the non-invasive J.A.R.V.I.S.-is-watching ambient overlay (corner
-     *  brackets + slow sweep + a drifting reticle gaze). Replaces the old separate scanline/aberration
-     *  toggles. Default ON — the "always watching" presence. */
+    /** (Deprecated — the visual "watching" overlay was removed; kept to avoid a settings migration.) */
     val jarvisPresence: Boolean = true,
+    /** What the user wants J.A.R.V.I.S. to brief them on in the home status feed (free text, e.g. a
+     *  project, a topic, "device health"). Drives the feed's MONITORING line. Never chat content. */
+    val jarvisFeedTopic: String = "",
 )
 
 /** Sensible International defaults for first launch. */
