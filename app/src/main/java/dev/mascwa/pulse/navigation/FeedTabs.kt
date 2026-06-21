@@ -8,12 +8,12 @@ import androidx.compose.runtime.compositionLocalOf
  * feed and each tab jumps directly to its feed — no in-between launcher.
  *
  * (J.A.R.V.I.S. is deliberately not a tab — it has its own Stark-HUD area and is reached from Home.
- *  OBJECTIVES is no longer a tab either — it's folded into the NAV map as a MAP|OBJECTIVES sub-tab.)
+ *  NAV + QUESTS are no longer top-level tabs either — both are folded into the PIP-BOY hub as its MAP
+ *  and QUESTS sections; objectives are reached from the MAP. Their standalone routes are kept for
+ *  Home/hub deep-links.)
  */
 val FEED_TABS: List<Pair<String, String>> = listOf(
     Routes.TACNET to "PIP-BOY",
-    Routes.NAV to "NAV",
-    Routes.QUESTS to "QUESTS",
     Routes.SURVIVE to "SURVIVE",
     Routes.SOCIAL to "SOCIAL",
     Routes.SEARCH to "SEARCH",

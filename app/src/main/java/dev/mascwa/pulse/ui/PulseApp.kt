@@ -271,8 +271,9 @@ fun PulseApp(
                 val radioVm: dev.mascwa.pulse.feature.tacnet.RadioViewModel = viewModel(factory = factory)
                 val notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel = viewModel(factory = factory)
                 val objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
+                val navVm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
                 val spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, objectivesVm, spotifyVm)
+                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, objectivesVm, navVm, spotifyVm)
             }
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
