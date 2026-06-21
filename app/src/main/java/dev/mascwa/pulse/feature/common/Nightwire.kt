@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,16 @@ import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+
+/**
+ * The NIGHTWIRE Cyberpunk-2077 panel silhouette — a chamfered (cut-corner) box: the top-end and
+ * bottom-start corners are sliced off on a diagonal, the signature CP2077 HUD parallelogram-notch.
+ * Shared by every core surface so the whole app reads as one angular terminal.
+ */
+val CyberCut = CutCornerShape(topStart = 0.dp, topEnd = 11.dp, bottomEnd = 0.dp, bottomStart = 11.dp)
+
+/** A tighter chamfer for chips / small controls. */
+val CyberChipCut = CutCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomEnd = 0.dp, bottomStart = 8.dp)
 
 /** Draws Cyberpunk-style L-shaped HUD corner brackets inside a draw scope. */
 fun DrawScope.hudCorners(color: Color, lenPx: Float, strokePx: Float, marginPx: Float) {
@@ -62,9 +73,9 @@ fun NeonPanel(
     val accent = Pulse.colors.accent
     Box(
         modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(CyberCut)
             .background(background)
-            .border(BorderStroke(1.dp, borderColor), RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, borderColor), CyberCut)
             .then(
                 if (corners) Modifier.drawWithContent {
                     drawContent()
@@ -92,7 +103,8 @@ fun SectionBar(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(3.dp).height(14.dp).clip(RoundedCornerShape(2.dp)).background(c.accent))
+            // Sharp angular accent marker (a thin skewed blade) — CP2077, not a rounded bar.
+            Box(Modifier.width(4.dp).height(15.dp).clip(CutCornerShape(topStart = 0.dp, topEnd = 4.dp, bottomEnd = 0.dp, bottomStart = 4.dp)).background(c.accent))
             dev.mascwa.pulse.ui.effects.DecryptText(
                 title.uppercase(),
                 fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold,
@@ -116,11 +128,11 @@ fun NeonChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
     val c = Pulse.colors
     Box(
         modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(CyberChipCut)
             .background(if (selected) c.accent.copy(alpha = 0.13f) else c.panel)
             .border(
                 BorderStroke(1.dp, if (selected) c.accent else c.line),
-                RoundedCornerShape(20.dp),
+                CyberChipCut,
             )
             .clickable { onClick() }
             .padding(horizontal = 13.dp, vertical = 7.dp),
@@ -186,9 +198,9 @@ fun HubTile(
     val c = Pulse.colors
     Box(
         modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(CyberCut)
             .background(c.panel)
-            .border(BorderStroke(1.dp, c.lineSoft), RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, c.lineSoft), CyberCut)
             .drawWithContent {
                 drawContent()
                 hudCorners(accent.copy(alpha = 0.7f), 11.dp.toPx(), 1.5.dp.toPx(), 3.dp.toPx())
