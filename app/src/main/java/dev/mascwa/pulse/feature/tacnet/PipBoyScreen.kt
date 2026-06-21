@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,9 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,50 +129,89 @@ fun PipBoyScreen(
     }
 }
 
-/** Fallout-style section rail: STATUS · DATA · MAP · RADIO, the selected one lit + underlined. */
+/** Fallout Pip-Boy section rail: tabs joined by em-dash connectors, the selected one framed in corner
+ *  brackets (pixel-faithful to the reference's `Status — S.P.E.C.I.A.L. — …` sub-tab bar). */
 @Composable
 private fun PipTabRail(current: PipTab, onSelect: (PipTab) -> Unit) {
     Box(Modifier.fillMaxWidth().background(Pip.bg)) {
         Canvas(Modifier.matchParentSize()) { crtScanlines(Pip.gridSoft, gap = 3f) }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(22.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            PipTab.entries.forEach { t ->
+            PipTab.entries.forEachIndexed { i, t ->
+                if (i > 0) {
+                    // em-dash connector line between tabs
+                    Box(Modifier.padding(horizontal = 5.dp).width(14.dp).height(1.5.dp).background(Pip.mid))
+                }
                 val on = t == current
-                Text(
-                    t.label,
-                    fontFamily = ChakraPetch,
-                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 15.sp,
-                    letterSpacing = 1.5.sp,
-                    color = if (on) Pip.glow else Pip.dim,
-                    textDecoration = if (on) TextDecoration.Underline else TextDecoration.None,
-                    modifier = Modifier.clickable { onSelect(t) },
-                )
+                Box(
+                    Modifier
+                        .clickable { onSelect(t) }
+                        .then(if (on) Modifier.drawBehind { drawCornerBrackets(Pip.glow) } else Modifier)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        t.label,
+                        fontFamily = ChakraPetch,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 14.sp,
+                        letterSpacing = 1.2.sp,
+                        color = if (on) Pip.glow else Pip.dim,
+                    )
+                }
             }
         }
     }
+}
+
+/** L-shaped corner brackets framing the selected tab — the Fallout Pip-Boy selection box. */
+private fun DrawScope.drawCornerBrackets(color: Color) {
+    val w = size.width
+    val h = size.height
+    val len = 7.dp.toPx()
+    val sw = 1.4.dp.toPx()
+    drawLine(color, Offset(0f, 0f), Offset(len, 0f), sw)
+    drawLine(color, Offset(0f, 0f), Offset(0f, len), sw)
+    drawLine(color, Offset(w, 0f), Offset(w - len, 0f), sw)
+    drawLine(color, Offset(w, 0f), Offset(w, len), sw)
+    drawLine(color, Offset(0f, h), Offset(len, h), sw)
+    drawLine(color, Offset(0f, h), Offset(0f, h - len), sw)
+    drawLine(color, Offset(w, h), Offset(w - len, h), sw)
+    drawLine(color, Offset(w, h), Offset(w, h - len), sw)
 }
 
 /** Free memory as a 0–100 %, used for the AP gauge. */
 private fun freeMemPercent(t: Telemetry): Float =
     if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100f) / t.memTotalMb).coerceIn(0f, 100f) else 0f
 
-/** The top STAT readout strip (persistent across sub-tabs) — live device data in Fallout STAT style. */
+/** The top STAT readout strip — `LVL n · HP x/100 · AP x/100 · NET`, pixel-faithful to the reference's
+ *  top bar. HP = battery, AP = free memory, LVL = build. Live device data in the Pip-Boy idiom. */
 @Composable
 private fun PipStatHeader(t: Telemetry) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
+    val mem = freeMemPercent(t).roundToInt()
+    val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
     Row(
-        Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
+        Modifier.fillMaxWidth().background(Pip.bg).horizontalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Text("STAT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 2.sp, color = Pip.glow)
-        Text("HP $bat%${if (t.charging) " ⚡" else ""}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.mid)
-        Text("AP ${freeMemPercent(t).roundToInt()}%", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.mid)
-        if (t.netType.isNotBlank()) Text(t.netType, fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim)
+        StatReadout("LVL", "$level")
+        StatReadout("HP", "$bat / 100" + if (t.charging) " ⚡" else "")
+        StatReadout("AP", "$mem / 100")
+        if (t.netType.isNotBlank()) StatReadout("NET", t.netType)
+    }
+}
+
+/** One `LABEL value` readout in the top stat strip. */
+@Composable
+private fun StatReadout(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$label ", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp, color = Pip.glow)
+        Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.bright)
     }
 }
 

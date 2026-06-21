@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -93,6 +94,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     ) {
             PipHeader("Condition")
             ConditionPanel(t, c)
+
+            PipHeader("Effects")
+            EffectsPanel(t, gps != null, c)
 
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
@@ -316,4 +320,57 @@ private fun FalloutGauge(label: String, value: String, fraction: Float, color: C
 @Composable
 private fun FalloutStatRow(label: String, value: String) {
     dev.mascwa.pulse.feature.common.PipDataRow(label, value)
+}
+
+/** A Fallout-style status effect derived from live device state. */
+private data class StatusEffect(val tag: String, val name: String, val desc: String, val good: Boolean)
+
+/** Active "effects" — real device/app state surfaced as Fallout status effects (the STATUS>EFF panel):
+ *  charging, low power, thermal, data link, GPS. */
+private fun activeEffects(t: Telemetry, hasGps: Boolean): List<StatusEffect> {
+    val out = ArrayList<StatusEffect>()
+    val bat = t.batteryPct ?: 0
+    if (t.charging) out += StatusEffect("⚡", "CHARGING", "Power cell recharging", true)
+    if (!t.charging && bat in 1..20) out += StatusEffect("▼", "LOW POWER", "Reserves critical — conserve energy", false)
+    val temp = t.batteryTempC
+    if (temp != null && temp >= 40f) out += StatusEffect("△", "OVERHEATING", "Core temperature elevated", false)
+    if (t.netType.isNotBlank()) out += StatusEffect("≋", "${t.netType.uppercase()} LINK", "Data uplink established", true)
+    else out += StatusEffect("⊘", "OFFLINE", "No uplink — running on local cache", false)
+    if (hasGps) out += StatusEffect("◎", "GPS LOCK", "Position fix acquired", true)
+    return out
+}
+
+/** The EFFECTS readout (Fallout STATUS>EFF): active device state as status effects. */
+@Composable
+private fun EffectsPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
+    val effects = activeEffects(t, hasGps)
+    PipFrame(Modifier.fillMaxWidth()) {
+        if (effects.isEmpty()) {
+            Text("No active effects.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+        } else {
+            Column { effects.forEach { EffectRow(it, c) } }
+        }
+    }
+}
+
+/** One status-effect row: a tag glyph, the effect name (bold) and a short description, banded. */
+@Composable
+private fun EffectRow(e: StatusEffect, c: NightwirePalette) {
+    Row(
+        Modifier.fillMaxWidth()
+            .drawBehind {
+                drawRect(c.accent.copy(alpha = 0.08f))
+                drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(e.tag, fontFamily = JetBrainsMono, fontSize = 14.sp, color = if (e.good) c.accent else c.amber,
+            modifier = Modifier.width(26.dp))
+        Column(Modifier.weight(1f)) {
+            Text(e.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                color = if (e.good) c.ink else c.amber, letterSpacing = 0.8.sp)
+            Text(e.desc, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+    }
 }
