@@ -18,13 +18,8 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun PrefSection(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+    Column(Modifier.fillMaxWidth()) {
+        dev.mascwa.pulse.feature.common.CyberHeader(title)
         content()
     }
 }
