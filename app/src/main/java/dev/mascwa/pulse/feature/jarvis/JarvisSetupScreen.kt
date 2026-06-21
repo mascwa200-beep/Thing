@@ -96,6 +96,7 @@ fun JarvisSetupScreen(
     val maxTokens by vm.maxTokens.collectAsState()
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
+    val feedTopic by vm.feedTopic.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
     val knowledgeDocs by vm.knowledgeDocs.collectAsState()
@@ -283,6 +284,14 @@ fun JarvisSetupScreen(
             Text(
                 "Saved on-device. A built-in safety rule is always appended in code and can't be " +
                     "overridden by the charter.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("STATUS-FEED FOCUS  ·  what J.A.R.V.I.S. briefs on the home HUD")
+            MonoField(feedTopic, vm::onFeedTopicChange, "a project, a topic, \"device health\"…")
+            Text(
+                "Shown as a quick summary on the home status feed — never your chat. Leave blank for just " +
+                    "diagnostics + usage-based suggestions.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 

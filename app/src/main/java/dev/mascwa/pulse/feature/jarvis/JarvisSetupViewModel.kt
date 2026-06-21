@@ -127,6 +127,10 @@ class JarvisSetupViewModel(
     private val _githubToken = MutableStateFlow("")
     val githubToken: StateFlow<String> = _githubToken.asStateFlow()
 
+    private val _feedTopic = MutableStateFlow("")
+    /** What J.A.R.V.I.S. briefs on in the home status feed (a project/topic/"device health"). Never chat. */
+    val feedTopic: StateFlow<String> = _feedTopic.asStateFlow()
+
     private val _chatFormat = MutableStateFlow(ChatFormat.AUTO)
     /** Chat template used to format prompts for the model (Auto/ChatML/Gemma/Plain). */
     val chatFormat: StateFlow<ChatFormat> = _chatFormat.asStateFlow()
@@ -196,6 +200,7 @@ class JarvisSetupViewModel(
             _cloudModel.value = saved.cloudModel
             _maxTokens.value = saved.maxTokens
             _curiosityLevel.value = saved.curiosityLevel
+            _feedTopic.value = settings.current().jarvisFeedTopic
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
@@ -364,6 +369,14 @@ class JarvisSetupViewModel(
         _githubToken.value = value
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(githubToken = value.trim())) }
+        }
+    }
+
+    /** Persist what J.A.R.V.I.S. should brief on in the home status feed (top-level setting, not chat). */
+    fun onFeedTopicChange(value: String) {
+        _feedTopic.value = value
+        viewModelScope.launch {
+            settings.update { it.copy(jarvisFeedTopic = value.trim()) }
         }
     }
 
