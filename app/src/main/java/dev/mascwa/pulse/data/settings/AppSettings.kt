@@ -324,6 +324,9 @@ data class AppSettings(
     // PIP-BOY music: Spotify OAuth (PKCE) link state. Scrubbed from the settings backup export.
     val spotify: SpotifyAuthState = SpotifyAuthState(),
 
+    // PIP-BOY STATUS: a user-chosen operator portrait (content URI) shown in the CND section. Blank = none.
+    val operatorPortraitUri: String = "",
+
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),
 
