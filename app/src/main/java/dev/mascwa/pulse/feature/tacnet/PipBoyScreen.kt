@@ -276,44 +276,46 @@ private fun PipBottomNav(
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
     val version = "v" + dev.mascwa.pulse.BuildConfig.VERSION_CODE
-    // The utility pills (SAVE/LOAD/RESET · ♥ SET/BUG/EXIT) collapse by default to keep the frame clean;
-    // tapping the CLOSE/OPEN MENU label reveals them. Persists across recomposition within the session.
-    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    // The WHOLE bottom cluster — HP/AP gauges, the STATS/ITEMS/DATA circles and the utility pills —
+    // collapses under the CLOSE/OPEN MENU handle, leaving just a thin bar. Default expanded so the
+    // section nav is there on open; tap to tuck it all away. Persists within the session.
+    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
     Column(Modifier.fillMaxWidth().background(Pip.bg)) {
         // Bright phosphor rule separating the frame from the feed above.
         Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
             drawLine(Pip.grid, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), size.height)
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // HP / AP gauges (battery / free memory).
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
-                StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
-            }
-            // The global section selector — three Pip-Boy circular buttons.
-            Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PipSection.entries.forEach { s ->
-                    SectionButton(s.label, s == section) { onSection(s) }
-                }
-            }
-            // The Fallout utility pills — collapsible (toggled by the CLOSE/OPEN MENU label below) so they
-            // can be tucked away to declutter the frame.
             androidx.compose.animation.AnimatedVisibility(menuOpen) {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
+                Column(Modifier.fillMaxWidth()) {
+                    // HP / AP gauges (battery / free memory).
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
+                        StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
-                        UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
+                    // The global section selector — three Pip-Boy circular buttons.
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PipSection.entries.forEach { s ->
+                            SectionButton(s.label, s == section) { onSection(s) }
+                        }
+                    }
+                    // The Fallout utility pills.
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
+                            UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
+                        }
                     }
                 }
             }
