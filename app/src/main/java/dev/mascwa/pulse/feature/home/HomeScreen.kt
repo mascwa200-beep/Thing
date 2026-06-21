@@ -56,10 +56,6 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
-
-/** What the user asked J.A.R.V.I.S. to brief on in the home status feed (Settings → briefing focus).
- *  Provided app-wide from settings; never carries chat content. */
-val LocalJarvisFeedTopic = staticCompositionLocalOf { "" }
 import dev.mascwa.pulse.feature.common.SectionBar
 import dev.mascwa.pulse.feature.common.Ticker
 import dev.mascwa.pulse.feature.common.TickerItem
@@ -75,6 +71,10 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.ui.theme.trendColor
 import java.util.Calendar
+
+/** What the user asked J.A.R.V.I.S. to brief on in the home status feed (Settings → briefing focus).
+ *  Provided app-wide from settings; never carries chat content. */
+val LocalJarvisFeedTopic = staticCompositionLocalOf { "" }
 
 class HomeNav(
     val openNews: () -> Unit,
