@@ -67,7 +67,6 @@ import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
-import dev.mascwa.pulse.feature.objectives.ObjectivesPanel
 import dev.mascwa.pulse.feature.objectives.ObjectivesViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -121,8 +120,6 @@ private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
 private val ROAD = Color(0xFF2DE2E6)           // glowing cyan road network
 
 /** The NAV map's internal views: the live map, or the objectives manager folded in as a sub-tab. */
-private enum class NavSubTab(val label: String) { MAP("MAP"), OBJECTIVES("OBJECTIVES") }
-
 @Composable
 fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
@@ -161,7 +158,6 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
     val incidents by vm.incidents.collectAsState()
     val showIncidents by vm.showIncidents.collectAsState()
     var query by remember { mutableStateOf("") }
-    var subTab by remember { mutableStateOf(NavSubTab.MAP) }
 
     DisposableEffect(Unit) {
         vm.start()
@@ -308,8 +304,7 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
             // OBJECTIVES sub-tab simply draws an opaque manager panel over it.
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-            if (subTab == NavSubTab.MAP) {
-                NavChrome(hasFix = location != null, c = c)
+            NavChrome(hasFix = location != null, c = c)
 
                 // Compass readout (folded in from the old Compass screen): live true-north heading.
                 NavCompass(
@@ -388,52 +383,7 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                         c = c,
                     )
                 }
-            } else {
-                // OBJECTIVES sub-tab: opaque manager panel over the (still-alive) map. Refresh on entry.
-                LaunchedEffect(Unit) { objectivesVm.refresh() }
-                ObjectivesPanel(
-                    vm = objectivesVm,
-                    c = c,
-                    modifier = Modifier.fillMaxSize().background(c.void).padding(top = 48.dp),
-                )
-            }
-
-            // The MAP | OBJECTIVES sub-tab switch, always above either view.
-            NavSubTabBar(
-                current = subTab,
-                onSelect = { subTab = it },
-                c = c,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
-            )
         }
-}
-
-/** The MAP | OBJECTIVES segmented switch that lives on the NAV map (cyberpunk-styled, not Pip green). */
-@Composable
-private fun NavSubTabBar(current: NavSubTab, onSelect: (NavSubTab) -> Unit, c: NightwirePalette, modifier: Modifier) {
-    Row(
-        modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(c.panel.copy(alpha = 0.92f))
-            .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        NavSubTab.entries.forEach { tab ->
-            val active = tab == current
-            Text(
-                tab.label,
-                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.2.sp,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                color = if (active) c.void else c.ink,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (active) c.accent else Color.Transparent)
-                    .clickable(enabled = !active) { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 7.dp),
-            )
-        }
-    }
 }
 
 /** Camera for follow mode: tilt/bearing derive from the view mode (north-up = bearing 0). */
