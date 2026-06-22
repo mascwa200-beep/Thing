@@ -50,6 +50,10 @@ class Notifier(private val context: Context) {
     fun notifyReminder(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "REMINDER", title, body, "home", NotificationCompat.PRIORITY_HIGH)
 
+    /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
+    fun notifyFinding(id: Int, title: String, body: String) =
+        post(NotificationChannels.DIGEST, id, "J.A.R.V.I.S.", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)
+
     fun notifyDigest(id: Int, title: String, body: String, lines: List<String>) {
         val joined = lines.joinToString("\n").ifBlank { body }
         post(NotificationChannels.DIGEST, id, "DAILY DIGEST", title, joined, "home", NotificationCompat.PRIORITY_LOW)
