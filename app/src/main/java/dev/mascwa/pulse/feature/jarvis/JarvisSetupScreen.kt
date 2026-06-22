@@ -97,6 +97,7 @@ fun JarvisSetupScreen(
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
     val feedTopic by vm.feedTopic.collectAsState()
+    val autonomousCuriosity by vm.autonomousCuriosity.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
     val knowledgeChunks by vm.knowledgeChunks.collectAsState()
     val knowledgeDocs by vm.knowledgeDocs.collectAsState()
@@ -293,6 +294,16 @@ fun JarvisSetupScreen(
                 "Shown as a quick summary on the home status feed — never your chat. Leave blank for just " +
                     "diagnostics + usage-based suggestions.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            SettingToggle(
+                title = "AUTONOMOUS CURIOSITY",
+                subtitle = "Let J.A.R.V.I.S. research your standing interests + his own curiosities in the " +
+                    "background (~every 4h) and bring you findings with a notification. Needs cloud chat on — " +
+                    "it spends your provider credits — so it's off by default. Set standing orders with " +
+                    "\"keep an eye on …\"; he also investigates the device itself.",
+                enabled = autonomousCuriosity,
+                onToggle = vm::setAutonomousCuriosity,
             )
 
             FieldLabel("CURIOSITY  ·  J.A.R.V.I.S. attentiveness")

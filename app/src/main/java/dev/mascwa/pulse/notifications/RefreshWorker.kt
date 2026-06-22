@@ -3,6 +3,7 @@ package dev.mascwa.pulse.notifications
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
@@ -71,6 +72,42 @@ class RefreshWorker(
                                 body = "Merged PR #${pr.number} — a new build will follow; you'll be prompted to install it.",
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // --- J.A.R.V.I.S. autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
+        // interest or the device itself, record ONE finding via the agent's `finding` tool, then notify. ---
+        if (jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val curiosityIntervalMs = 4L * 60 * 60 * 1000 // at most every ~4 hours
+                if (now - settings.lastCuriosityMs >= curiosityIntervalMs) {
+                    // Rotate over the standing interests + a "your own device" subject so it covers both the
+                    // owner's orders and J.A.R.V.I.S.'s own substrate over time.
+                    val subjects = container.interestStore.all().map { it.topic } +
+                        "your own device — its sensors, capabilities and settings (your substrate)"
+                    val subject = subjects[settings.curiosityIndex.mod(subjects.size)]
+                    val before = container.findingStore.unseenCount()
+                    val query =
+                        "Quietly investigate \"$subject\" on the owner's behalf. Use your web tools to find ONE " +
+                            "genuinely remarkable, recent idea or development (or, for the device, one notable " +
+                            "capability or setting). Be selective — only something worth the owner's attention. " +
+                            "Record it with the `finding` tool (`finding <headline> | <body>`, include a source " +
+                            "URL; lead with [device] if it's about the device). Then reply with just the headline."
+                    container.agentOrchestrator.run(query, dev.mascwa.pulse.jarvis.JarvisPersona.SYSTEM_PROMPT)
+                        .collect { /* drive the agent loop to completion; the `finding` tool stores the result */ }
+                    if (container.findingStore.unseenCount() > before) {
+                        val latest = container.findingStore.findingsFlow.value.firstOrNull { !it.seen }
+                        notifier.notifyFinding(
+                            id = 7501,
+                            title = "J.A.R.V.I.S. has a finding",
+                            body = latest?.headline ?: "I came across something — ready when you are.",
+                        )
+                    }
+                    container.settingsRepository.update {
+                        it.copy(lastCuriosityMs = now, curiosityIndex = it.curiosityIndex + 1)
                     }
                 }
             }

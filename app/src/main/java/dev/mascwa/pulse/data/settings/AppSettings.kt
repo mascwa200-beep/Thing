@@ -212,6 +212,10 @@ data class JarvisSettings(
      *  chat is on), not just operational events. Raw API keys / tokens are ALWAYS scrubbed regardless.
      *  On by default per the owner's explicit choice; turn off for operational-only (no content). */
     val verboseActivityLog: Boolean = true,
+    /** Let J.A.R.V.I.S. autonomously research your standing interests + his own curiosities in the
+     *  background (cloud-gated; spends provider credits) and bring you findings with a notification.
+     *  Off by default — opt in, since it acts on its own and uses your cloud key. */
+    val autonomousCuriosity: Boolean = false,
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */
@@ -347,6 +351,10 @@ data class AppSettings(
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
+    /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
+     *  cursor over the standing interests + the device subject so it rotates what it investigates. */
+    val lastCuriosityMs: Long = 0,
+    val curiosityIndex: Int = 0,
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
      *  Adjustable via the Settings slider; clamped to a sane range where used. */
     val tickerSpeed: Float = 1.0f,
