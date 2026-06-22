@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
@@ -118,18 +122,48 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
     LaunchedEffect(auth.linked) { if (auth.linked) vm.refresh() }
     // Once the App Remote player has been connected before, reconnect automatically when the tab opens so
-    // playback "just works" through the background Spotify app — no need to re-tap connect or open Spotify.
+    // playback "just works" through the background Spotify app. Gated on error == null so a terminal
+    // failure (not installed / not authorized / unreachable) doesn't auto-retry forever — the user then
+    // uses the manual Reconnect control. Backoff reconnects keep `connecting` true, so this won't re-fire
+    // mid-backoff either.
     LaunchedEffect(auth.appRemoteAutoConnect, remote.connected) {
-        if (auth.appRemoteAutoConnect && !remote.connected && !remote.connecting) vm.autoConnectApp(context)
+        if (auth.appRemoteAutoConnect && !remote.connected && !remote.connecting && remote.error == null) {
+            vm.autoConnectApp(context)
+        }
+    }
+    // Foreground-return (the native analogue of visibilitychange → visible): silently re-establish the
+    // App Remote link if it dropped while backgrounded. Silent, so the connect card never flashes.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, auth.appRemoteAutoConnect) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && auth.appRemoteAutoConnect &&
+                !SpotifyAppRemoteController.isConnected
+            ) {
+                vm.autoConnectApp(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- PLAYER (App Remote — the real in-app player) ----
-        PipHeader("Player", trailing = if (remote.connected) "CONNECTED" else null)
-        if (remote.connected) {
-            ConnectedPlayer(remote, c, vm) { vm.disconnectApp() }
-        } else {
-            AppPlayerCard(remote, c) { vm.connectApp(context) }
+        PipHeader(
+            "Player",
+            trailing = when {
+                remote.connected -> "CONNECTED"
+                remote.connecting -> "CONNECTING"
+                else -> null
+            },
+        )
+        when {
+            // Connected → the live player.
+            remote.connected -> ConnectedPlayer(remote, c, vm) { vm.disconnectApp() }
+            // A (re)connect is in flight (initial connect or a transient-drop backoff) → a quiet note, NOT
+            // the connect card. This is what keeps the card from flashing on a background→foreground drop.
+            remote.connecting -> ReconnectingNote(c)
+            // Genuinely not connected and not retrying (first run, or after attempts/auth failed) → the card.
+            else -> AppPlayerCard(remote, c, onConnect = { vm.connectApp(context) }, onReconnect = { vm.reconnectApp(context) })
         }
         // A control-result note (Premium needed / no device / failed), tappable to dismiss.
         statusMsg?.let { msg ->
@@ -210,25 +244,44 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** The App Remote connect card (shown until connected). */
+/** A quiet "(re)connecting" note shown while an attempt or a transient-drop backoff is in flight — keeps
+ *  the connect card from flashing when App Remote briefly drops (e.g. on returning from the background). */
 @Composable
-private fun AppPlayerCard(remote: SpotifyAppRemoteController.RemoteState, c: NightwirePalette, onConnect: () -> Unit) {
+private fun ReconnectingNote(c: NightwirePalette) {
+    Text(
+        "↻ Connecting to Spotify…",
+        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+    )
+}
+
+/** The App Remote connect card — shown only when genuinely not connected and not (re)connecting. When a
+ *  reason is known ([remote.error]) it leads with that clear message instead of the generic invite, and
+ *  offers a manual Reconnect for the rare stuck case. */
+@Composable
+private fun AppPlayerCard(
+    remote: SpotifyAppRemoteController.RemoteState,
+    c: NightwirePalette,
+    onConnect: () -> Unit,
+    onReconnect: () -> Unit,
+) {
     if (remote.connected) return
+    val failed = remote.error != null
     PipFrame(Modifier.fillMaxWidth()) {
         Column {
-            Text(
-                "Connect once to your installed Spotify app — it plays in the background and you control it " +
-                    "here. You won't need to open Spotify itself, and the tab reconnects automatically after this.",
-                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
-            )
-            if (remote.error != null) {
-                Text("⚠ ${remote.error}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = Amber,
-                    modifier = Modifier.padding(top = 6.dp))
+            if (failed) {
+                Text("⚠ ${remote.error}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Amber)
+            } else {
+                Text(
+                    "Connect once to your installed Spotify app — it plays in the background and you control " +
+                        "it here. You won't need to open Spotify itself, and it reconnects automatically after.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
+                )
             }
-            PipButton(
-                if (remote.connecting) "CONNECTING…" else "▸ CONNECT SPOTIFY APP",
-                c, Modifier.padding(top = 12.dp),
-            ) { if (!remote.connecting) onConnect() }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PipButton(if (failed) "▸ RECONNECT" else "▸ CONNECT SPOTIFY APP", c, Modifier.weight(1f)) { onConnect() }
+                if (failed) PipButton("↻", c, Modifier) { onReconnect() }
+            }
         }
     }
 }
