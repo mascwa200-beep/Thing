@@ -52,6 +52,8 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val profile by vm.profile.collectAsState()
     val tasks by vm.tasks.collectAsState()
     val episodic by vm.episodic.collectAsState()
+    val interests by vm.interests.collectAsState()
+    val findings by vm.findings.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -138,6 +140,111 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                 item {
                     MemButton("CLEAR EPISODIC", c.magenta) { vm.clearEpisodic() }
                 }
+            }
+
+            item { SectionBar("INTERESTS · ${interests.size}") }
+            if (interests.isEmpty()) {
+                item {
+                    Text(
+                        "No standing interests yet. Give J.A.R.V.I.S. a standing order (\"keep an eye on " +
+                            "temporal-AI-consciousness research\") and he'll track it — and develop his own " +
+                            "curiosities over time. They appear here.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(interests, key = { it.id }) { interest ->
+                InterestCard(interest, c, onForget = { vm.forgetInterest(interest.topic) })
+            }
+            if (interests.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR INTERESTS", c.magenta) { vm.clearInterests() }
+                }
+            }
+
+            item { SectionBar("FINDINGS · ${findings.size}") }
+            if (findings.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing curated yet. As J.A.R.V.I.S. follows his interests and audits this device, " +
+                            "he records things worth showing you here — newest first, with a NEW badge until " +
+                            "you've seen them.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(findings, key = { it.id }) { finding ->
+                FindingCard(
+                    finding, c,
+                    onSeen = { vm.markFindingSeen(finding.id) },
+                    onForget = { vm.forgetFinding(finding.id) },
+                )
+            }
+            if (findings.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR FINDINGS", c.magenta) { vm.clearFindings() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InterestCard(interest: dev.mascwa.pulse.data.interests.Interest, c: NightwirePalette, onForget: () -> Unit) {
+    val isOwner = interest.origin == dev.mascwa.pulse.data.interests.InterestOrigin.OWNER
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                if (isOwner) "STANDING ORDER" else "OWN CURIOSITY",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp,
+                color = if (isOwner) c.accent else c.violet,
+            )
+            Text(interest.topic, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            if (interest.note.isNotBlank()) {
+                Text(interest.note, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            MemButton("FORGET", c.magenta, onForget)
+        }
+    }
+}
+
+@Composable
+private fun FindingCard(
+    finding: dev.mascwa.pulse.data.findings.Finding,
+    c: NightwirePalette,
+    onSeen: () -> Unit,
+    onForget: () -> Unit,
+) {
+    val kindColor = when (finding.kind) {
+        dev.mascwa.pulse.data.findings.FindingKind.STANDING -> c.accent
+        dev.mascwa.pulse.data.findings.FindingKind.EMERGENT -> c.violet
+        dev.mascwa.pulse.data.findings.FindingKind.DEVICE -> c.positive
+    }
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    finding.kind.name,
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = kindColor,
+                )
+                Text(
+                    DateUtils.getRelativeTimeSpanString(finding.createdMs).toString(),
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+                if (!finding.seen) {
+                    Text("• NEW", fontFamily = JetBrainsMono, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = c.magenta)
+                }
+            }
+            Text(finding.headline, fontFamily = JetBrainsMono, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            if (finding.body.isNotBlank()) {
+                Text(finding.body, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+            }
+            if (finding.sourceUrl.isNotBlank()) {
+                Text(finding.sourceUrl, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!finding.seen) MemButton("MARK SEEN", c.accent, onSeen)
+                MemButton("FORGET", c.magenta, onForget)
             }
         }
     }

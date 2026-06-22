@@ -6,6 +6,10 @@ import dev.mascwa.pulse.core.telemetry.Memory
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task
 import dev.mascwa.pulse.core.telemetry.TaskBoard
+import dev.mascwa.pulse.data.findings.Finding
+import dev.mascwa.pulse.data.findings.FindingStore
+import dev.mascwa.pulse.data.interests.Interest
+import dev.mascwa.pulse.data.interests.InterestStore
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
@@ -27,6 +31,8 @@ class JarvisMemoryViewModel(
     private val profileStore: ProfileStore,
     private val taskStore: TaskStore,
     private val memoryStream: MemoryStreamStore,
+    private val interestStore: InterestStore,
+    private val findingStore: FindingStore,
 ) : ViewModel() {
 
     val notes: StateFlow<List<AgentNoteEntity>> =
@@ -45,11 +51,19 @@ class JarvisMemoryViewModel(
         .map { list -> list.sortedByDescending { it.createdMs } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Standing interests — the owner's standing orders + J.A.R.V.I.S.'s own curiosities (owner first). */
+    val interests: StateFlow<List<Interest>> = interestStore.interestsFlow
+
+    /** J.A.R.V.I.S.'s curated findings (newest first), unseen surfaced with a badge. */
+    val findings: StateFlow<List<Finding>> = findingStore.findingsFlow
+
     init {
-        // Trigger a load so the profile + task + episodic flows populate when the screen opens.
+        // Trigger a load so the profile + task + episodic + interest + finding flows populate on open.
         viewModelScope.launch { runCatching { profileStore.all() } }
         viewModelScope.launch { runCatching { taskStore.all() } }
         viewModelScope.launch { runCatching { memoryStream.all() } }
+        viewModelScope.launch { runCatching { interestStore.all() } }
+        viewModelScope.launch { runCatching { findingStore.load() } }
     }
 
     fun edit(id: Long, text: String) {
@@ -93,5 +107,30 @@ class JarvisMemoryViewModel(
     /** Forget the whole episodic stream. */
     fun clearEpisodic() {
         viewModelScope.launch { runCatching { memoryStream.clear() } }
+    }
+
+    /** Drop a single standing interest (by topic). */
+    fun forgetInterest(topic: String) {
+        viewModelScope.launch { runCatching { interestStore.remove(topic) } }
+    }
+
+    /** Forget all standing interests. */
+    fun clearInterests() {
+        viewModelScope.launch { runCatching { interestStore.clear() } }
+    }
+
+    /** Drop a single finding. */
+    fun forgetFinding(id: String) {
+        viewModelScope.launch { runCatching { findingStore.remove(id) } }
+    }
+
+    /** Mark a finding as seen (clears its unseen badge). */
+    fun markFindingSeen(id: String) {
+        viewModelScope.launch { runCatching { findingStore.markSeen(id) } }
+    }
+
+    /** Forget all findings. */
+    fun clearFindings() {
+        viewModelScope.launch { runCatching { findingStore.clear() } }
     }
 }
