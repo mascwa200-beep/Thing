@@ -90,6 +90,12 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
      *  never re-prompted to "Authorize Pulse" on every open; once authorized it reconnects with no prompt. */
     fun autoConnectApp(context: Context) = SpotifyAppRemoteController.connect(context, interactive = false)
 
+    /** The manual "Reconnect" control — resets backoff and tries interactively (for the rare stuck case). */
+    fun reconnectApp(context: Context) {
+        viewModelScope.launch { repo.setAutoConnect(true) }
+        SpotifyAppRemoteController.reconnect(context)
+    }
+
     /** Launch the Spotify authorize page in the browser (the redirect comes back to SpotifyAuthActivity). */
     fun connect(context: Context) {
         viewModelScope.launch {
