@@ -100,6 +100,16 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.diary.DiaryStore(appContext, json)
     }
 
+    /** Standing INTERESTS: the owner's standing orders + J.A.R.V.I.S.'s own emergent curiosities to monitor. */
+    val interestStore: dev.mascwa.pulse.data.interests.InterestStore by lazy {
+        dev.mascwa.pulse.data.interests.InterestStore(appContext, json)
+    }
+
+    /** FINDINGS: what J.A.R.V.I.S. curates from his gathering + brings to the owner conversationally. */
+    val findingStore: dev.mascwa.pulse.data.findings.FindingStore by lazy {
+        dev.mascwa.pulse.data.findings.FindingStore(appContext, json)
+    }
+
     /** Episodic memory stream: timestamped observations, recalled by recency·importance·relevance. */
     val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore by lazy {
         dev.mascwa.pulse.data.memory.MemoryStreamStore(appContext, json)
@@ -292,6 +302,8 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
             dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
             dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
+            dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),
+            dev.mascwa.pulse.jarvis.agent.FindingTool(findingStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
