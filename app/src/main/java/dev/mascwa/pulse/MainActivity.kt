@@ -202,6 +202,8 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.taskStore.flushNow() }
             runCatching { app.container.memoryStream.flushNow() }
             runCatching { app.container.diaryStore.flushNow() }
+            runCatching { app.container.interestStore.flushNow() }
+            runCatching { app.container.findingStore.flushNow() }
         }
         super.onStop()
     }
