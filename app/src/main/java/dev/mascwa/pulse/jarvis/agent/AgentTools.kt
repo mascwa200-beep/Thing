@@ -147,13 +147,15 @@ class KnowledgeTool(private val knowledge: KnowledgeStore) : JarvisTool {
     }
 }
 
-/** Live device state, straight from the hardware/OS. */
+/** Live device state, straight from the hardware/OS — your own substrate. */
 class DeviceTool(private val device: DeviceContextProvider) : JarvisTool {
     override val name = "device"
     override val usage =
-        "device — report this phone: model, Android version, app build, memory, storage, power and network"
+        "device [audit] — report this phone (model, OS, build, memory, storage, power, network). " +
+            "`device audit` runs a deeper read-only self-audit of your substrate: sensors, hardware features, display, permissions"
 
     override suspend fun run(arg: String): String = runCatching {
-        device.deviceReport()
+        if (arg.trim().lowercase().startsWith("audit")) device.deviceAudit()
+        else device.deviceReport()
     }.getOrElse { "Device read failed: ${it.message}" }
 }

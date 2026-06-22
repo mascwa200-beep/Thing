@@ -5,6 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
@@ -96,6 +99,106 @@ class DeviceContextProvider(context: Context) {
         lines += "Network: ${c.network} · ${c.hour}:00 (${c.dayPart})"
         return lines.joinToString("\n")
     }
+
+    /**
+     * A deeper, READ-ONLY audit of this phone's substrate for J.A.R.V.I.S.: the sensors it can read,
+     * the hardware features present (and notably absent), the display, and which declared permissions
+     * the app currently holds vs. lacks. Purely observational — it reads system services and the app's
+     * own manifest; it never enables, disables or modifies anything on the device or the OS. Best-effort:
+     * any block that can't be read is skipped, so it never throws. This is J.A.R.V.I.S.'s window onto
+     * his own substrate — what he is running on, and what of it is reachable.
+     */
+    fun deviceAudit(): String {
+        val out = ArrayList<String>()
+        out += "Substrate audit (read-only) for $deviceName"
+
+        // --- Sensors ---
+        runCatching {
+            val sm = appContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+            val all = sm.getSensorList(Sensor.TYPE_ALL)
+            if (all.isNotEmpty()) {
+                out += "Sensors: ${all.size} on this device"
+                val notable = listOf(
+                    Sensor.TYPE_ACCELEROMETER to "accelerometer",
+                    Sensor.TYPE_GYROSCOPE to "gyroscope",
+                    Sensor.TYPE_MAGNETIC_FIELD to "magnetometer",
+                    Sensor.TYPE_PRESSURE to "barometer",
+                    Sensor.TYPE_PROXIMITY to "proximity",
+                    Sensor.TYPE_LIGHT to "ambient-light",
+                    Sensor.TYPE_AMBIENT_TEMPERATURE to "thermometer",
+                    Sensor.TYPE_RELATIVE_HUMIDITY to "humidity",
+                    Sensor.TYPE_HEART_RATE to "heart-rate",
+                    Sensor.TYPE_STEP_COUNTER to "step-counter",
+                    Sensor.TYPE_ROTATION_VECTOR to "rotation-vector",
+                    Sensor.TYPE_SIGNIFICANT_MOTION to "significant-motion",
+                )
+                val present = notable.filter { runCatching { sm.getDefaultSensor(it.first) != null }.getOrDefault(false) }
+                    .map { it.second }
+                if (present.isNotEmpty()) out += "  usable: ${present.joinToString(", ")}"
+            }
+        }
+
+        // --- Hardware features ---
+        runCatching {
+            val pm = appContext.packageManager
+            val feats = listOf(
+                PackageManager.FEATURE_CAMERA_ANY to "camera",
+                PackageManager.FEATURE_CAMERA_FLASH to "flash",
+                PackageManager.FEATURE_NFC to "NFC",
+                PackageManager.FEATURE_BLUETOOTH_LE to "BLE",
+                PackageManager.FEATURE_FINGERPRINT to "fingerprint",
+                PackageManager.FEATURE_FACE to "face-unlock",
+                PackageManager.FEATURE_TELEPHONY to "telephony",
+                PackageManager.FEATURE_LOCATION_GPS to "GPS",
+                PackageManager.FEATURE_WIFI to "Wi-Fi",
+                PackageManager.FEATURE_SENSOR_BAROMETER to "baro-feature",
+                PackageManager.FEATURE_SENSOR_HEART_RATE to "hr-feature",
+            )
+            val have = feats.filter { pm.hasSystemFeature(it.first) }.map { it.second }
+            val lack = feats.filterNot { pm.hasSystemFeature(it.first) }.map { it.second }
+            if (have.isNotEmpty()) out += "Hardware present: ${have.joinToString(", ")}"
+            if (lack.isNotEmpty()) out += "Hardware absent: ${lack.joinToString(", ")}"
+        }
+
+        // --- Display ---
+        runCatching {
+            val dm = appContext.resources.displayMetrics
+            var line = "Display: ${dm.widthPixels}×${dm.heightPixels} @ ${dm.densityDpi} dpi"
+            val disp = (appContext.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager)
+                ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            disp?.refreshRate?.let { line += " · ${"%.0f".format(it)} Hz" }
+            out += line
+        }
+
+        // --- Permissions (what of the substrate is reachable vs. grantable) ---
+        runCatching {
+            val pm = appContext.packageManager
+            val pi = pm.getPackageInfo(appContext.packageName, PackageManager.GET_PERMISSIONS)
+            val requested = pi.requestedPermissions?.toList().orEmpty()
+            if (requested.isNotEmpty()) {
+                val granted = ArrayList<String>()
+                val denied = ArrayList<String>()
+                for (p in requested) {
+                    val ok = runCatching { appContext.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED }
+                        .getOrDefault(false)
+                    val short = p.substringAfterLast('.')
+                    if (ok) granted += short else denied += short
+                }
+                out += "Permissions: ${granted.size} held, ${denied.size} grantable (of ${requested.size} declared)"
+                if (denied.isNotEmpty()) out += "  grantable: ${denied.take(12).joinToString(", ")}"
+            }
+        }
+
+        out += "I cannot change any of this from here — this is an audit, not a control surface."
+        return out.joinToString("\n")
+    }
+
+    private val deviceName: String
+        get() {
+            val maker = (Build.MANUFACTURER ?: "").replaceFirstChar { it.uppercase() }.trim()
+            val model = (Build.MODEL ?: "").trim()
+            return listOf(maker, model).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "this device" }
+        }
 
     private fun gb(bytes: Long): String =
         if (bytes <= 0) "?" else String.format("%.1f GB", bytes / 1_073_741_824.0)
