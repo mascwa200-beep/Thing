@@ -220,6 +220,11 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                 vm.selectPoi(hit)
                 hit != null
             }
+            // Long-press anywhere drops a waypoint there + opens its card (track / remove).
+            ml.addOnMapLongClickListener { latLng ->
+                vm.dropWaypointAt(latLng.latitude, latLng.longitude)
+                true
+            }
         }
     }
 
