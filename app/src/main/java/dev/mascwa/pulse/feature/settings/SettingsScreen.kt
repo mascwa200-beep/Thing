@@ -347,8 +347,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
                     )
                     PrefSwitch(
                         "HTTPS-only egress",
-                        "Block cleartext (non-HTTPS) outbound requests except whitelisted hosts. Note: turning " +
-                            "this on disables http-only internet-radio stations.",
+                        "Block cleartext (non-HTTPS) outbound app/API requests except whitelisted hosts, and " +
+                            "log any that are blocked. (Doesn't affect the radio player, which streams audio " +
+                            "on a separate path.)",
                         checked = s.security.httpsOnly,
                         onChange = { v -> vm.update { it.copy(security = it.security.copy(httpsOnly = v)) } },
                     )
