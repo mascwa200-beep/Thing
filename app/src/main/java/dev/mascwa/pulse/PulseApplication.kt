@@ -34,6 +34,8 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         NotificationChannels.ensure(this)
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
+        // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).
+        runCatching { container.trustedNetworkMonitor.begin() }
     }
 
     override val workManagerConfiguration: Configuration

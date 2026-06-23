@@ -54,6 +54,10 @@ class Notifier(private val context: Context) {
     fun notifyFinding(id: Int, title: String, body: String) =
         post(NotificationChannels.DIGEST, id, "J.A.R.V.I.S.", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)
 
+    /** Trusted Network Mode status (e.g. needs Device-Owner provisioning) — opens Settings. */
+    fun notifySecurity(id: Int, title: String, body: String) =
+        post(NotificationChannels.DIGEST, id, "SECURITY", title, body, "settings", NotificationCompat.PRIORITY_DEFAULT)
+
     fun notifyDigest(id: Int, title: String, body: String, lines: List<String>) {
         val joined = lines.joinToString("\n").ifBlank { body }
         post(NotificationChannels.DIGEST, id, "DAILY DIGEST", title, joined, "home", NotificationCompat.PRIORITY_LOW)
