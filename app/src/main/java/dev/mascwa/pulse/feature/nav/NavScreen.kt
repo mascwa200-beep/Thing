@@ -10,6 +10,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.floor
+import kotlin.math.log10
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -175,6 +180,8 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     // True = camera tracks GPS; flips to false the moment the user pans/zooms/rotates by hand.
     var follow by remember { mutableStateOf(true) }
+    // Metres per screen pixel at the map centre (MapLibre's own scale-bar input), refreshed on camera idle.
+    var scaleMpp by remember { mutableStateOf(0.0) }
 
     // One-time map wiring: free-roam gestures, cyberpunk style + red 3D buildings, the player marker,
     // tap-to-select POIs, and dropping follow-mode as soon as the user drives the camera by hand.
@@ -219,6 +226,15 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                 vm.selectWaypoint(null)
                 vm.selectPoi(hit)
                 hit != null
+            }
+            // Keep the scale bar in sync with the zoom/centre once the camera settles. Metres per dp via
+            // MapLibre's own web-mercator maths (512-px tiles; pixelRatio = density → logical px == dp).
+            ml.addOnCameraIdleListener {
+                scaleMpp = runCatching {
+                    val cam = ml.cameraPosition
+                    val lat = cam.target?.latitude ?: 0.0
+                    40_075_016.686 * Math.cos(Math.toRadians(lat)) / (512.0 * 2.0.pow(cam.zoom))
+                }.getOrDefault(0.0)
             }
             // Long-press anywhere drops a waypoint there + opens its card (track / remove).
             ml.addOnMapLongClickListener { latLng ->
@@ -319,6 +335,13 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                     headingUp = headingUp,
                     c = c,
                     modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 104.dp),
+                )
+
+                // Map scale bar (matches MapLibre's own scale-bar maths).
+                ScaleBar(
+                    metersPerPixel = scaleMpp,
+                    c = c,
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 168.dp),
                 )
 
                 // Search bar — geocode a place, drop a waypoint, fly there.
@@ -768,6 +791,47 @@ private fun MapControlButton(
         }
     }
 }
+
+/**
+ * A map scale bar. [metersPerPixel] is metres per MapLibre *logical* pixel (512-tile web-mercator). Since
+ * MapLibre's pixelRatio defaults to the display density, one logical pixel == one Android dp — so the
+ * value is metres-per-dp and the bar is drawn in dp with no density factor. Picks a "nice" 1/2/5×10ⁿ
+ * distance that fits the target width.
+ */
+@Composable
+private fun ScaleBar(metersPerPixel: Double, c: NightwirePalette, modifier: Modifier = Modifier) {
+    if (metersPerPixel <= 0.0) return
+    val maxMeters = 96.0 * metersPerPixel                 // a ~96dp-wide bar (mpp is metres per dp)
+    val nice = niceDistance(maxMeters)
+    val barDp = (nice / metersPerPixel).toFloat().dp
+    Column(modifier) {
+        Text(formatScale(nice), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        Box(
+            Modifier.padding(top = 2.dp).width(barDp).height(4.dp)
+                .background(c.ink.copy(alpha = 0.85f)),
+        )
+    }
+}
+
+private fun niceDistance(max: Double): Double {
+    if (max <= 0.0) return 1.0
+    val pow = 10.0.pow(floor(log10(max)))
+    val n = max / pow
+    val nice = when {
+        n >= 5.0 -> 5.0
+        n >= 2.0 -> 2.0
+        else -> 1.0
+    }
+    return nice * pow
+}
+
+private fun formatScale(meters: Double): String =
+    if (meters >= 1000.0) {
+        val km = meters / 1000.0
+        if (km == km.toLong().toDouble()) "${km.toLong()} km" else "%.1f km".format(km)
+    } else {
+        "${meters.toLong()} m"
+    }
 
 /** Live navigation banner: relative turn arrow + objective + distance · driving ETA (or "direct"). */
 @Composable
