@@ -32,6 +32,12 @@ android {
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("en")
 
+        // The app ships exclusively to one arm64 device (Pixel 10 Pro XL), so package only its native
+        // libraries (Vosk / JNA / MediaPipe / MapLibre / ExoPlayer) for arm64-v8a. Dropping the unused
+        // armeabi-v7a / x86 / x86_64 variants removes the bulk of the APK's native footprint with zero
+        // behaviour change on the target device.
+        ndk { abiFilters += "arm64-v8a" }
+
         // Device the app is built exclusively for. The runtime gate matches
         // Build.MODEL against this (case-insensitive, substring). Documented
         // override in DeviceGate keeps the sole user from ever being locked out.
@@ -115,10 +121,16 @@ android {
 
     packaging {
         resources {
+            // Inert build/metadata artifacts with no runtime behaviour — dropped to trim the APK.
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/DEPENDENCIES",
-                "/META-INF/INDEX.LIST"
+                "/META-INF/INDEX.LIST",
+                "/META-INF/*.version",
+                "/META-INF/androidx.*.version",
+                "/META-INF/com/android/build/gradle/app-metadata.properties",
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json"
             )
         }
     }
@@ -155,7 +167,6 @@ dependencies {
     // Networking (thin OkHttp wrapper + kotlinx.serialization handles
     // JSON, RSS/XML and CSV uniformly across many keyless hosts)
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
 
     // Internet-radio playback — ExoPlayer handles ICY/SHOUTcast, HLS, and cross-protocol
     // redirects that bare MediaPlayer fails on (StreamTheWorld/Triton commercial streams).
