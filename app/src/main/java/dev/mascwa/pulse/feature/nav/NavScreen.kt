@@ -1,6 +1,9 @@
 package dev.mascwa.pulse.feature.nav
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -915,6 +918,7 @@ private fun WaypointDetailCard(
     onRemove: () -> Unit,
 ) {
     val kindColor = Color(waypoint.kind.colorArgb)
+    val context = LocalContext.current
     val dist = location?.let {
         Geo.formatDistance(Geo.distanceMeters(it.latitude, it.longitude, waypoint.latitude, waypoint.longitude))
     }
@@ -957,6 +961,15 @@ private fun WaypointDetailCard(
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, c.sky, RoundedCornerShape(8.dp))
+                        .clickable { openLocationExternally(context, waypoint.label, waypoint.latitude, waypoint.longitude) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text("↗ MAPS", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.sky)
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
                         .border(1.dp, c.muted, RoundedCornerShape(8.dp))
                         .clickable(onClick = onRemove)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -965,6 +978,25 @@ private fun WaypointDetailCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Open a waypoint in an external maps app via a `geo:` intent (OsmAnd, Organic Maps, Google Maps — for
+ * full turn-by-turn). If no maps app handles it, fall back to a share sheet with the coordinates + an
+ * OpenStreetMap link. Fully defensive — does nothing on failure.
+ */
+private fun openLocationExternally(context: Context, label: String, lat: Double, lon: Double) {
+    val geo = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon(${Uri.encode(label)})"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (runCatching { context.startActivity(geo); true }.getOrDefault(false)) return
+    val text = "$label\n$lat, $lon\nhttps://www.openstreetmap.org/?mlat=$lat&mlon=$lon#map=16/$lat/$lon"
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(send, "Share location").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 
