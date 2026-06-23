@@ -286,6 +286,77 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
             }
             item { HorizontalDivider() }
 
+            // ----- Security & network (Trusted Network Mode + encryption) -----
+            item {
+                PrefSection("Security & network") {
+                    PrefSwitch(
+                        "Trusted Network Mode",
+                        "Disable Wi-Fi when you leave the home network and cellular takes over (dual-verified: " +
+                            "home lost AND cellular up). Re-enables on return. Needs Device-Owner provisioning to " +
+                            "toggle the radio — otherwise it just notifies.",
+                        checked = s.security.trustedNetworkMode,
+                        onChange = { v -> vm.update { it.copy(security = it.security.copy(trustedNetworkMode = v)) } },
+                    )
+                    PrefClickable(
+                        "Wi-Fi control",
+                        value = if (vm.isDeviceOwner) "Device Owner ✓" else "Not provisioned",
+                        subtitle = if (vm.isDeviceOwner)
+                            "Pulse can toggle Wi-Fi. Stays minimal: no wipe/lock/password powers."
+                        else
+                            "To let Pulse actually toggle Wi-Fi, provision it once over adb on a device with no " +
+                                "other accounts:\nadb shell dpm set-device-owner " +
+                                "dev.mascwa.pulse.debug/dev.mascwa.pulse.security.PulseDeviceAdminReceiver\n" +
+                                "Until then, the mode just notifies you to toggle Wi-Fi yourself.",
+                        onClick = { },
+                    )
+                    // Home networks
+                    val currentNet = vm.currentNetworkName()
+                    PrefClickable(
+                        "Add current Wi-Fi as home",
+                        value = currentNet ?: "not on Wi-Fi",
+                        subtitle = "Designate the network you're on now as a home network.",
+                        onClick = { currentNet?.let { vm.addHomeSsid(it) } },
+                    )
+                    if (s.security.homeSsids.isEmpty()) {
+                        Text(
+                            "No home networks set. Add the one you're on at home so Pulse knows when you've left it.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                    s.security.homeSsids.forEach { ssid ->
+                        PrefClickable(ssid, value = "remove", subtitle = "Home network", onClick = { vm.removeHomeSsid(ssid) })
+                    }
+                    SingleChoiceRow(
+                        "Re-probe after",
+                        s.security.reprobeMinutes,
+                        listOf(5, 10, 15, 30, 60).map { it to "$it min" },
+                    ) { m -> vm.update { it.copy(security = it.security.copy(reprobeMinutes = m)) } }
+                    PrefSwitch(
+                        "Notify if not provisioned",
+                        "Show a notification when Pulse wants to toggle Wi-Fi but isn't a Device Owner yet.",
+                        checked = s.security.notifyWhenUnprovisioned,
+                        onChange = { v -> vm.update { it.copy(security = it.security.copy(notifyWhenUnprovisioned = v)) } },
+                    )
+                    PrefSwitch(
+                        "Encrypt secrets at rest",
+                        "Encrypt your cloud & GitHub tokens on disk with the Android Keystore.",
+                        checked = s.security.encryptSecretsAtRest,
+                        onChange = { v -> vm.update { it.copy(security = it.security.copy(encryptSecretsAtRest = v)) } },
+                    )
+                    PrefSwitch(
+                        "HTTPS-only egress",
+                        "Block cleartext (non-HTTPS) outbound app/API requests except whitelisted hosts, and " +
+                            "log any that are blocked. (Doesn't affect the radio player, which streams audio " +
+                            "on a separate path.)",
+                        checked = s.security.httpsOnly,
+                        onChange = { v -> vm.update { it.copy(security = it.security.copy(httpsOnly = v)) } },
+                    )
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Home dashboard -----
             item {
                 PrefSection("Home dashboard") {

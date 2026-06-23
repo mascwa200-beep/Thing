@@ -36,6 +36,7 @@ class SettingsViewModel(
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
     private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
+    private val wifi: dev.mascwa.pulse.security.WifiPolicyController,
 ) : ViewModel() {
 
     private val _selfCode = MutableStateFlow("")
@@ -213,6 +214,32 @@ class SettingsViewModel(
     /** Forget the episodic memory stream (timestamped observations & reflections). */
     fun clearMemoryStream() {
         viewModelScope.launch { memoryStream.clear() }
+    }
+
+    // ----- Trusted Network Mode / security -----
+
+    /** True once Pulse is provisioned as Device Owner → the Wi-Fi toggle will actually take effect. */
+    val isDeviceOwner: Boolean get() = wifi.isDeviceOwner()
+
+    /** The currently-associated Wi-Fi SSID (quotes stripped), or null if not on Wi-Fi / unreadable. */
+    fun currentNetworkName(): String? {
+        val raw = wifi.currentSsid() ?: return null
+        val clean = raw.trim().removePrefix("\"").removeSuffix("\"").trim()
+        return if (clean.isBlank() || clean.equals("<unknown ssid>", ignoreCase = true)) null else clean
+    }
+
+    /** Add an SSID to the home list (de-duped, case-insensitive). */
+    fun addHomeSsid(ssid: String) {
+        val clean = ssid.trim().removePrefix("\"").removeSuffix("\"").trim()
+        if (clean.isBlank()) return
+        update { s ->
+            if (s.security.homeSsids.any { it.equals(clean, ignoreCase = true) }) s
+            else s.copy(security = s.security.copy(homeSsids = s.security.homeSsids + clean))
+        }
+    }
+
+    fun removeHomeSsid(ssid: String) = update { s ->
+        s.copy(security = s.security.copy(homeSsids = s.security.homeSsids.filterNot { it.equals(ssid, ignoreCase = true) }))
     }
 
     fun sendTestNotification() {

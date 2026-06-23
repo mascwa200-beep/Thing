@@ -440,4 +440,14 @@ class AppContainer(private val appContext: Context) {
 
     val notifier: Notifier by lazy { Notifier(appContext) }
     val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
+
+    // --- Network security: Trusted Network Mode (Device-Owner-gated Wi-Fi control) ---
+    val wifiPolicyController: dev.mascwa.pulse.security.WifiPolicyController by lazy {
+        dev.mascwa.pulse.security.WifiPolicyController(appContext)
+    }
+    val trustedNetworkMonitor: dev.mascwa.pulse.security.TrustedNetworkMonitor by lazy {
+        dev.mascwa.pulse.security.TrustedNetworkMonitor(
+            appContext, settingsRepository, usageRepository, notifier, wifiPolicyController,
+        )
+    }
 }

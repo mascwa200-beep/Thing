@@ -247,6 +247,29 @@ data class NotificationPrefs(
     val marketMovePercent: Double = 3.0,
 )
 
+/**
+ * Network-security / privacy controls. **Trusted Network Mode** disables Wi-Fi when the device leaves the
+ * designated home network and cellular is carrying it (dual-verified), re-enabling it on return; the radio
+ * toggle needs Pulse provisioned as a Device Owner (one-time adb), otherwise it degrades to a notification.
+ * The encryption controls protect credentials at rest and keep egress on HTTPS.
+ */
+@Serializable
+data class SecuritySettings(
+    /** Master switch for Trusted Network Mode. Default OFF — it's a deliberate, provisioned feature. */
+    val trustedNetworkMode: Boolean = false,
+    /** SSIDs the user designates as "home" (quotes stripped, compared case-insensitively). */
+    val homeSsids: List<String> = emptyList(),
+    /** Minutes to hold Wi-Fi off while away before re-enabling to re-probe for the home network. */
+    val reprobeMinutes: Int = 10,
+    /** Notify (vs. silently failing) when Wi-Fi can't be toggled because Pulse isn't a Device Owner. */
+    val notifyWhenUnprovisioned: Boolean = true,
+    /** Encrypt credentials (cloud + GitHub tokens) at rest via the Android Keystore. Default ON. */
+    val encryptSecretsAtRest: Boolean = true,
+    /** Block cleartext (non-HTTPS) outbound requests except explicitly whitelisted hosts. Default OFF
+     *  (your http radio streams rely on cleartext; turning this on disables http-only stations). */
+    val httpsOnly: Boolean = false,
+)
+
 /** The full, single source of truth for user configuration. */
 @Serializable
 data class AppSettings(
@@ -330,6 +353,9 @@ data class AppSettings(
 
     // PIP-BOY STATUS: a user-chosen operator portrait (content URI) shown in the CND section. Blank = none.
     val operatorPortraitUri: String = "",
+
+    // Network security / privacy (Trusted Network Mode + at-rest/HTTPS encryption controls)
+    val security: SecuritySettings = SecuritySettings(),
 
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),

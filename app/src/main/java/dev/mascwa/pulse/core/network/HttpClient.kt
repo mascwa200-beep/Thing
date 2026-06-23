@@ -113,6 +113,8 @@ class HttpClient(
                 .retryOnConnectionFailure(true)
                 .followRedirects(true)
                 .followSslRedirects(true)
+                // Enforce HTTPS-only egress when the user's security setting is on (no-op otherwise).
+                .addInterceptor(CleartextGuardInterceptor())
                 .dispatcher(dispatcher)
             if (cacheDir != null) {
                 runCatching {

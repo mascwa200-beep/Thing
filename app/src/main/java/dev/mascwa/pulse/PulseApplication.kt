@@ -6,11 +6,14 @@ import android.util.Log
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import dev.mascwa.pulse.core.network.CleartextPolicy
 import dev.mascwa.pulse.di.AppContainer
 import dev.mascwa.pulse.notifications.NotificationChannels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -34,6 +37,18 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         NotificationChannels.ensure(this)
         // Seed the APK-bundled reference docs into the knowledge library on first launch.
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
+        // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).
+        runCatching { container.trustedNetworkMonitor.begin() }
+        // Keep the HTTPS-only egress guard in sync with the security setting + log blocked cleartext.
+        CleartextPolicy.onBlocked = { host ->
+            runCatching { container.usageRepository.log("network", "blocked cleartext egress to $host (HTTPS-only)") }
+        }
+        appScope.launch {
+            container.settingsRepository.settings
+                .map { it.security.httpsOnly }
+                .distinctUntilChanged()
+                .collect { CleartextPolicy.enabled = it }
+        }
     }
 
     override val workManagerConfiguration: Configuration
