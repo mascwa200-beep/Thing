@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.RouteProgress
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
@@ -110,13 +111,24 @@ class NavViewModel(
      * before the road route is known, so the map always tells you how far you have to go.
      */
     val readout: StateFlow<NavReadout?> =
-        combine(activeWaypoint, _location, _routeInfo) { wp, loc, info ->
+        combine(activeWaypoint, _location, _routeInfo, _route) { wp, loc, info, routePts ->
             if (wp == null || loc == null) return@combine null
             val straight = Geo.distanceMeters(loc.latitude, loc.longitude, wp.latitude, wp.longitude)
+            // Live distance remaining along the road route — counts down on every GPS tick without
+            // re-routing. Falls back to OSRM's total, then straight-line.
+            val remaining = if (info != null && routePts.size >= 2)
+                RouteProgress.remainingMeters(routePts, loc.latitude, loc.longitude) else null
+            val meters = remaining ?: info?.distanceMeters ?: straight
+            val etaText = when {
+                info != null && remaining != null && info.distanceMeters > 0 ->
+                    formatEta(info.durationSeconds * (remaining / info.distanceMeters))
+                info != null -> formatEta(info.durationSeconds)
+                else -> null
+            }
             NavReadout(
                 label = wp.label,
-                distanceText = Geo.formatDistance(info?.distanceMeters ?: straight),
-                etaText = info?.durationSeconds?.let { formatEta(it) },
+                distanceText = Geo.formatDistance(meters),
+                etaText = etaText,
                 viaRoad = info != null,
                 bearingDeg = Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude),
             )
