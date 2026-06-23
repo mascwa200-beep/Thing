@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Feeds the cyberpunk NAV map: a polled GPS fix (offline-capable, GMS-optional), the live true-north
@@ -34,6 +35,17 @@ import kotlinx.coroutines.launch
  */
 /** A nearby safety incident pinned on the NAV map (folded in from the old Map screen). */
 data class IncidentMarker(val latitude: Double, val longitude: Double, val title: String)
+
+/** Live navigation readout for the active objective shown as a banner on the NAV map. */
+data class NavReadout(
+    val label: String,
+    val distanceText: String,
+    /** Driving ETA once a road route resolves; null = straight-line ("direct") only. */
+    val etaText: String?,
+    val viaRoad: Boolean,
+    /** True-north bearing to the objective, for the relative turn arrow. */
+    val bearingDeg: Double,
+)
 
 class NavViewModel(
     private val locationProvider: LocationProvider,
@@ -87,8 +99,28 @@ class NavViewModel(
      *  empty when nothing is tracked or routing failed (the screen falls back to a straight line). */
     private val _route = MutableStateFlow<List<Pair<Double, Double>>>(emptyList())
     val route: StateFlow<List<Pair<Double, Double>>> = _route.asStateFlow()
+    /** Road distance + driving duration for the active route (null until/unless routing resolves). */
+    private val _routeInfo = MutableStateFlow<RoutingRepository.RoadRoute?>(null)
     private var lastRouteWpId: String? = null
     private var lastRouteStart: DeviceLocation? = null
+
+    /**
+     * Live navigation readout for the active objective: how far + (if a road route resolved) the driving
+     * ETA, plus the bearing to it for the turn arrow. Falls back to straight-line distance ("direct")
+     * before the road route is known, so the map always tells you how far you have to go.
+     */
+    val readout: StateFlow<NavReadout?> =
+        combine(activeWaypoint, _location, _routeInfo) { wp, loc, info ->
+            if (wp == null || loc == null) return@combine null
+            val straight = Geo.distanceMeters(loc.latitude, loc.longitude, wp.latitude, wp.longitude)
+            NavReadout(
+                label = wp.label,
+                distanceText = Geo.formatDistance(info?.distanceMeters ?: straight),
+                etaText = info?.durationSeconds?.let { formatEta(it) },
+                viaRoad = info != null,
+                bearingDeg = Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude),
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch {
@@ -103,21 +135,23 @@ class NavViewModel(
             combine(activeWaypoint, _location) { wp, loc -> wp to loc }.collectLatest { (wp, loc) ->
                 if (wp == null || loc == null) {
                     _route.value = emptyList()
+                    _routeInfo.value = null
                     lastRouteWpId = null
                     lastRouteStart = null
                     return@collectLatest
                 }
                 // A different objective: drop the previous path at once so the old road route never
                 // lingers on the map while the new one is computed (we redraw only when it resolves).
-                if (wp.id != lastRouteWpId) _route.value = emptyList()
+                if (wp.id != lastRouteWpId) { _route.value = emptyList(); _routeInfo.value = null }
                 val movedFar = lastRouteStart?.let {
                     Geo.distanceMeters(it.latitude, it.longitude, loc.latitude, loc.longitude) > 60
                 } ?: true
                 if (wp.id == lastRouteWpId && !movedFar && _route.value.isNotEmpty()) return@collectLatest
                 delay(350) // debounce GPS chatter before hitting the routing server
-                val path = runCatching { routing.route(loc.latitude, loc.longitude, wp.latitude, wp.longitude) }.getOrNull()
-                if (path != null && path.size >= 2) {
-                    _route.value = path
+                val r = runCatching { routing.route(loc.latitude, loc.longitude, wp.latitude, wp.longitude) }.getOrNull()
+                if (r != null && r.points.size >= 2) {
+                    _route.value = r.points
+                    _routeInfo.value = r
                     lastRouteWpId = wp.id
                     lastRouteStart = loc
                 }
@@ -133,6 +167,21 @@ class NavViewModel(
     fun setHeadingUp(on: Boolean) {
         _headingUp.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navHeadingUp = on) } } }
+    }
+
+    /** Re-centre the map on the active objective (tapping the nav readout banner). */
+    fun focusActive() {
+        val wp = activeWaypoint.value ?: return
+        _flyTo.value = wp.latitude to wp.longitude
+    }
+
+    private fun formatEta(seconds: Double): String {
+        val mins = (seconds / 60.0).roundToInt()
+        return when {
+            mins < 1 -> "<1 min"
+            mins < 60 -> "$mins min"
+            else -> "${mins / 60} h ${mins % 60} min"
+        }
     }
 
     fun selectPoi(place: Place?) { _selectedPoi.value = place }

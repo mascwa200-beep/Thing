@@ -64,6 +64,7 @@ import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
+import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
@@ -154,6 +155,7 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
     val activeWaypointId by vm.activeWaypointId.collectAsState()
     val route by vm.route.collectAsState()
     val flyTo by vm.flyTo.collectAsState()
+    val readout by vm.readout.collectAsState()
     val searchMessage by vm.searchMessage.collectAsState()
     val incidents by vm.incidents.collectAsState()
     val showIncidents by vm.showIncidents.collectAsState()
@@ -354,6 +356,10 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // Live navigation readout — distance + driving ETA + turn arrow to the active objective.
+                    readout?.let { r ->
+                        NavReadoutBanner(readout = r, heading = heading, c = c, onTap = { vm.focusActive() })
+                    }
                     selectedWaypoint?.let { wp ->
                         WaypointDetailCard(
                             waypoint = wp,
@@ -754,6 +760,33 @@ private fun MapControlButton(
             Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
         } else {
             Text(label.orEmpty(), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
+        }
+    }
+}
+
+/** Live navigation banner: relative turn arrow + objective + distance · driving ETA (or "direct"). */
+@Composable
+private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePalette, onTap: () -> Unit) {
+    val arrow = NavGuidance.relativeArrow(readout.bearingDeg, heading.toDouble())
+    NeonPanel(Modifier.fillMaxWidth().clickable(onClick = onTap), corners = true) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(arrow, fontFamily = JetBrainsMono, fontSize = 24.sp, color = c.amber,
+                modifier = Modifier.padding(end = 12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "◎ ${readout.label}".uppercase(),
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                    color = c.ink, maxLines = 1,
+                )
+                Text(
+                    readout.distanceText + " · " + (readout.etaText ?: "direct"),
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.sky,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            if (!readout.viaRoad) {
+                Text("◢ ROUTING…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            }
         }
     }
 }
