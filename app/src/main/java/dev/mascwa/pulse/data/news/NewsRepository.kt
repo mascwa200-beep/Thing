@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.network.RssItem
 import dev.mascwa.pulse.core.network.RssParser
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.AppSettings
+import dev.mascwa.pulse.data.settings.CustomFeed
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -53,16 +54,27 @@ class NewsRepository(
             }
         }
         return try {
+            val failures = java.util.Collections.synchronizedList(mutableListOf<String>())
             val all = coroutineScope {
                 s.customFeeds.map { feed ->
                     async {
-                        runCatching {
-                            val xml = http.getString(feed.url)
-                            RssParser.parse(xml).items.map { it.toArticle(feed.name, "My Feeds") }
-                        }.getOrDefault(emptyList())
+                        runCatching { loadCustomFeed(feed) }
+                            .getOrElse {
+                                failures.add("${feed.name}: ${feedFailureReason(it)}")
+                                emptyList()
+                            }
                     }
                 }.flatMap { it.await() }
-            }.sortedByDescending { it.publishedEpochMs }
+            }.distinctBy { it.url }.sortedByDescending { it.publishedEpochMs }
+
+            if (all.isEmpty() && failures.isNotEmpty()) {
+                // Don't dead-end on a blank "No articles found" — say which feeds failed and why.
+                throw java.io.IOException(
+                    "Couldn't load your feeds:\n" + failures.joinToString("\n") { "• $it" } +
+                        "\n\nThe URL must be the RSS feed itself (often ends in .xml, /feed, or RSSFeed.aspx?…), " +
+                        "not the website page.",
+                )
+            }
             cache.write(key, all, ListSerializer(Article.serializer()))
             Fetched(all, false)
         } catch (e: Exception) {
@@ -71,6 +83,45 @@ class NewsRepository(
             }
             throw e
         }
+    }
+
+    /**
+     * Load one custom feed, tolerant of a user who pasted the website page URL instead of the feed URL:
+     * if the response doesn't parse as RSS/Atom, try RSS auto-discovery (the page's
+     * `<link rel="alternate" type="application/rss+xml">`) and fetch that instead. Throws with a readable
+     * reason when there's genuinely no feed.
+     */
+    private suspend fun loadCustomFeed(feed: CustomFeed): List<Article> {
+        val xml = http.getString(feed.url)
+        runCatching { RssParser.parse(xml) }.getOrNull()?.takeIf { it.items.isNotEmpty() }?.let { parsed ->
+            return parsed.items.map { it.toArticle(feed.name, "My Feeds") }
+        }
+        // Not a parseable feed (likely an HTML page) — try to discover the real feed link in the markup.
+        val discovered = discoverFeedUrl(xml, feed.url)
+        if (discovered != null && discovered != feed.url) {
+            val parsed2 = RssParser.parse(http.getString(discovered))
+            if (parsed2.items.isNotEmpty()) return parsed2.items.map { it.toArticle(feed.name, "My Feeds") }
+        }
+        // A valid-but-empty feed returns nothing; an unparseable page is a configuration error.
+        if (xml.trimStart().startsWith("<?xml") || xml.contains("<rss") || xml.contains("<feed")) return emptyList()
+        throw IllegalStateException("not an RSS feed — that looks like a web page")
+    }
+
+    private fun feedFailureReason(e: Throwable): String = when (e) {
+        is dev.mascwa.pulse.core.network.HttpException -> "couldn't fetch (HTTP ${e.code})"
+        else -> e.message ?: "couldn't load"
+    }
+
+    /** Find a feed URL advertised in an HTML page's `<link rel="alternate" type="application/rss+xml">`. */
+    private fun discoverFeedUrl(html: String, baseUrl: String): String? {
+        for (tag in Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE).findAll(html).map { it.value }) {
+            val lower = tag.lowercase()
+            if (!lower.contains("alternate")) continue
+            if (!lower.contains("rss+xml") && !lower.contains("atom+xml")) continue
+            val href = Regex("href=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(tag)?.groupValues?.get(1) ?: continue
+            return runCatching { java.net.URI(baseUrl).resolve(href).toString() }.getOrDefault(href)
+        }
+        return null
     }
 
     suspend fun search(query: String): List<Article> {
