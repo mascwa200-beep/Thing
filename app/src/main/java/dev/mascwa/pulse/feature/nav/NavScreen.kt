@@ -873,6 +873,7 @@ private fun PoiDetailCard(
     onSetWaypoint: () -> Unit,
 ) {
     val dist = location?.let { Geo.formatDistance(Geo.distanceMeters(it.latitude, it.longitude, poi.latitude, poi.longitude)) }
+    val context = LocalContext.current
     NeonPanel(Modifier.fillMaxWidth(), corners = true) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -891,9 +892,9 @@ private fun PoiDetailCard(
             poi.address?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
             }
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 Modifier
-                    .padding(top = 10.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(c.amber.copy(alpha = 0.16f))
                     .border(1.dp, c.amber, RoundedCornerShape(8.dp))
@@ -901,6 +902,16 @@ private fun PoiDetailCard(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text("◢ SET WAYPOINT", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.amber)
+            }
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, c.sky, RoundedCornerShape(8.dp))
+                    .clickable { openLocationExternally(context, poi.name, poi.latitude, poi.longitude) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text("↗ MAPS", fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.sky)
+            }
             }
         }
     }
