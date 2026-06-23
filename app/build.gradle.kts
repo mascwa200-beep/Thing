@@ -77,10 +77,13 @@ android {
             // being non-debuggable so ART honours the baseline profile (the PGO-equivalent AOT win).
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // R8 is intentionally OFF: baseline profiles don't need it, and minification risks runtime
-            // breakage (serialization/MediaPipe/Vosk/MapLibre/reflection) that CI can't catch. It can be
-            // enabled later once keep-rules are verified on-device.
-            isMinifyEnabled = false
+            // R8 code shrinking ON (owner-approved). It tree-shakes unused code — most notably the large
+            // material-icons-extended library — for a real APK/DEX win. The keep + dontwarn rules in
+            // proguard-rules.pro cover everything reflection/JNI/serialization-driven (MediaPipe, Vosk/JNA,
+            // MapLibre, Spotify/Gson, luaj, Room, kotlinx.serialization) that R8 can't see. R8 fullMode is
+            // disabled (gradle.properties) for a conservative first enablement. NEEDS on-device
+            // verification. Resource shrinking is the next step once this is confirmed working on the Pixel.
+            isMinifyEnabled = true
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
