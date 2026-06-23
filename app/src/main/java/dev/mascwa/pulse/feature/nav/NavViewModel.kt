@@ -229,6 +229,18 @@ class NavViewModel(
         _selectedPoi.value = null
     }
 
+    /** Long-press on the map → drop a waypoint at that point and open its card (to track or remove it). */
+    fun dropWaypointAt(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            val label = String.format(java.util.Locale.US, "Pin %.4f, %.4f", lat, lon)
+            val wp = runCatching { waypointStore.add(label, lat, lon, ObjectiveKind.SIDE) }.getOrNull()
+            if (wp != null) {
+                _selectedPoi.value = null
+                _selectedWaypointId.value = wp.id
+            }
+        }
+    }
+
     /** Stop tracking the active waypoint (clears the marker + route from the map). */
     fun clearWaypoint() {
         viewModelScope.launch { runCatching { waypointStore.setActive(null) } }
