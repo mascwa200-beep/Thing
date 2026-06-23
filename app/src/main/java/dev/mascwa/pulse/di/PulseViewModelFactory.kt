@@ -96,6 +96,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.security.SecurityAuditViewModel::class.java) ->
+                dev.mascwa.pulse.feature.security.SecurityAuditViewModel(c.securityAuditor, c.securityAuditStore, c.applicationContext)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.nav.NavViewModel::class.java) ->
                 dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->

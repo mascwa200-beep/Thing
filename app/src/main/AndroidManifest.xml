@@ -23,6 +23,14 @@
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- On-device security auditor (read-only, local-only): enumerate installed apps + their permissions
+         (QUERY_ALL_PACKAGES) and read per-app data usage (PACKAGE_USAGE_STATS, granted by the user via
+         Settings → Usage access). Both are sideload-appropriate; the auditor never transmits findings. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Background refresh that survives reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 

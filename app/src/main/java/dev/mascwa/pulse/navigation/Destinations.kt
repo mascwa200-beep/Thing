@@ -67,6 +67,9 @@ object Routes {
 
     // Diagnostics
     const val CRASH_LOG = "crash_log"
+
+    // On-device security auditor (read-only, local-only)
+    const val SECURITY_AUDIT = "security_audit"
 }
 
 data class TopDestination(

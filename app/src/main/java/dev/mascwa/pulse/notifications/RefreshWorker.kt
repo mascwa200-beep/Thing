@@ -113,6 +113,30 @@ class RefreshWorker(
             }
         }
 
+        // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
+        runCatching {
+            val now = System.currentTimeMillis()
+            val auditIntervalMs = 55L * 60 * 1000 // ~hourly
+            container.securityAuditStore.load()
+            val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
+            if (lastScan > 0 && now - lastScan >= auditIntervalMs) {
+                val crit = dev.mascwa.pulse.core.telemetry.SecurityAudit.Severity.CRITICAL
+                val prevCritical = container.securityAuditStore.auditFlow.value.findings
+                    .filter { it.severity == crit }.map { it.id }.toSet()
+                val result = container.securityAuditor.runAudit(container.securityAuditStore.snapshot())
+                container.securityAuditStore.saveResult(result)
+                val newCriticals = container.securityAuditStore.auditFlow.value.findings
+                    .filter { it.severity == crit && it.id !in prevCritical }
+                if (newCriticals.isNotEmpty()) {
+                    notifier.notifySecurity(
+                        id = 7620,
+                        title = "Security audit: ${newCriticals.size} new critical finding(s)",
+                        body = newCriticals.first().title,
+                    )
+                }
+            }
+        }
+
         // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
         if (prefs.breakingNews) {
             runCatching { BreakingNewsPulse.check(container) }

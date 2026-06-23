@@ -29,6 +29,9 @@ import kotlinx.serialization.json.Json
  */
 class AppContainer(private val appContext: Context) {
 
+    /** The application context, for the few ViewModels that need it (e.g. AppOps / settings intents). */
+    val applicationContext: Context get() = appContext
+
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
@@ -440,6 +443,14 @@ class AppContainer(private val appContext: Context) {
 
     val notifier: Notifier by lazy { Notifier(appContext) }
     val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
+
+    // --- On-device security auditor (read-only, local-only defender's tool) ---
+    val securityAuditor: dev.mascwa.pulse.data.security.SecurityAuditor by lazy {
+        dev.mascwa.pulse.data.security.SecurityAuditor(appContext)
+    }
+    val securityAuditStore: dev.mascwa.pulse.data.security.SecurityAuditStore by lazy {
+        dev.mascwa.pulse.data.security.SecurityAuditStore(appContext, json)
+    }
 
     // --- Network security: Trusted Network Mode (Device-Owner-gated Wi-Fi control) ---
     val wifiPolicyController: dev.mascwa.pulse.security.WifiPolicyController by lazy {
