@@ -441,6 +441,14 @@ class AppContainer(private val appContext: Context) {
     val notifier: Notifier by lazy { Notifier(appContext) }
     val notificationScheduler: NotificationScheduler by lazy { NotificationScheduler(appContext) }
 
+    // --- On-device security auditor (read-only, local-only defender's tool) ---
+    val securityAuditor: dev.mascwa.pulse.data.security.SecurityAuditor by lazy {
+        dev.mascwa.pulse.data.security.SecurityAuditor(appContext)
+    }
+    val securityAuditStore: dev.mascwa.pulse.data.security.SecurityAuditStore by lazy {
+        dev.mascwa.pulse.data.security.SecurityAuditStore(appContext, json)
+    }
+
     // --- Network security: Trusted Network Mode (Device-Owner-gated Wi-Fi control) ---
     val wifiPolicyController: dev.mascwa.pulse.security.WifiPolicyController by lazy {
         dev.mascwa.pulse.security.WifiPolicyController(appContext)

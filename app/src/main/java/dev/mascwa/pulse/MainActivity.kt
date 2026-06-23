@@ -204,6 +204,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.diaryStore.flushNow() }
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
+            runCatching { app.container.securityAuditStore.flushNow() }
         }
         super.onStop()
     }
