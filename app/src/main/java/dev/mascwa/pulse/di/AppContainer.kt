@@ -29,6 +29,9 @@ import kotlinx.serialization.json.Json
  */
 class AppContainer(private val appContext: Context) {
 
+    /** The application context, for the few ViewModels that need it (e.g. AppOps / settings intents). */
+    val applicationContext: Context get() = appContext
+
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }

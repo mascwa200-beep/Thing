@@ -192,7 +192,11 @@ fun PulseApp(
             }
             composable(Routes.SETTINGS) {
                 val vm: SettingsViewModel = viewModel(factory = factory)
-                SettingsScreen(vm, onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } })
+                SettingsScreen(
+                    vm,
+                    onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } },
+                    onOpenSecurityAudit = { navController.navigate(Routes.SECURITY_AUDIT) { launchSingleTop = true } },
+                )
             }
             composable(Routes.ECONOMY) {
                 val vm: EconomyViewModel = viewModel(factory = factory)
@@ -339,6 +343,10 @@ fun PulseApp(
             composable(Routes.CRASH_LOG) {
                 val vm: dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.diagnostics.CrashLogScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SECURITY_AUDIT) {
+                val vm: dev.mascwa.pulse.feature.security.SecurityAuditViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
         }
         }

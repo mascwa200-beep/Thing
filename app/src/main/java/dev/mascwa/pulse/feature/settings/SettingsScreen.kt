@@ -67,7 +67,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
+fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpenSecurityAudit: () -> Unit = {}) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -289,6 +289,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}) {
             // ----- Security & network (Trusted Network Mode + encryption) -----
             item {
                 PrefSection("Security & network") {
+                    PrefClickable(
+                        "Security auditor",
+                        subtitle = "Read-only, local-only audit: app permissions, trust store, encryption & " +
+                            "data drain. Findings stay on-device.",
+                        onClick = onOpenSecurityAudit,
+                    )
                     PrefSwitch(
                         "Trusted Network Mode",
                         "Disable Wi-Fi when you leave the home network and cellular takes over (dual-verified: " +
