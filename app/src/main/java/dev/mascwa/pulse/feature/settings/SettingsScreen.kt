@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -45,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +73,15 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Collapse state for the sections whose content is rendered as separate LazyColumn items (so the
+    // PrefSection header alone can't gate them). Hoisted here so the header + its items toggle together.
+    // All start collapsed, matching the rest of Settings.
+    var homeCollapsed by rememberSaveable { mutableStateOf(true) }
+    var watchlistCollapsed by rememberSaveable { mutableStateOf(true) }
+    var feedsCollapsed by rememberSaveable { mutableStateOf(true) }
+    var mutedCollapsed by rememberSaveable { mutableStateOf(true) }
+    var imageSitesCollapsed by rememberSaveable { mutableStateOf(true) }
 
     fun notificationsAllowed(): Boolean =
         android.os.Build.VERSION.SDK_INT < 33 ||
@@ -364,8 +375,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             item { HorizontalDivider() }
 
             // ----- Home dashboard -----
-            item {
-                PrefSection("Home dashboard") {
+            collapsibleHeader("Home dashboard", homeCollapsed) { homeCollapsed = !homeCollapsed }
+            if (!homeCollapsed) {
+                item {
                     Text(
                         "Toggle and reorder the sections shown on Home.",
                         style = MaterialTheme.typography.bodySmall,
@@ -373,107 +385,115 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
-            }
-            item {
-                HomeSectionEditor(
-                    enabledOrdered = s.homeSections,
-                    onChange = { list -> vm.update { it.copy(homeSections = list) } },
-                )
+                item {
+                    HomeSectionEditor(
+                        enabledOrdered = s.homeSections,
+                        onChange = { list -> vm.update { it.copy(homeSections = list) } },
+                    )
+                }
             }
             item { HorizontalDivider() }
 
             // ----- Watchlist -----
-            item { PrefSection("Markets watchlist") {} }
-            watchlistEditor(
-                title = "Symbols (Stooq) & crypto (CoinGecko)",
-                items = s.watchlist + s.cryptoList,
-                onRemove = { item ->
-                    vm.update {
-                        it.copy(
-                            watchlist = it.watchlist.filterNot { w -> w.id == item.id },
-                            cryptoList = it.cryptoList.filterNot { w -> w.id == item.id },
-                        )
-                    }
-                },
-            )
-            item {
-                AddWatchRow { item ->
-                    vm.update {
-                        if (item.type == WatchType.CRYPTO) it.copy(cryptoList = (it.cryptoList + item).distinctBy { w -> w.id })
-                        else it.copy(watchlist = (it.watchlist + item).distinctBy { w -> w.id })
+            collapsibleHeader("Markets watchlist", watchlistCollapsed) { watchlistCollapsed = !watchlistCollapsed }
+            if (!watchlistCollapsed) {
+                watchlistEditor(
+                    title = "Symbols (Stooq) & crypto (CoinGecko)",
+                    items = s.watchlist + s.cryptoList,
+                    onRemove = { item ->
+                        vm.update {
+                            it.copy(
+                                watchlist = it.watchlist.filterNot { w -> w.id == item.id },
+                                cryptoList = it.cryptoList.filterNot { w -> w.id == item.id },
+                            )
+                        }
+                    },
+                )
+                item {
+                    AddWatchRow { item ->
+                        vm.update {
+                            if (item.type == WatchType.CRYPTO) it.copy(cryptoList = (it.cryptoList + item).distinctBy { w -> w.id })
+                            else it.copy(watchlist = (it.watchlist + item).distinctBy { w -> w.id })
+                        }
                     }
                 }
             }
             item { HorizontalDivider() }
 
             // ----- Custom feeds -----
-            item { PrefSection("Custom RSS feeds") {} }
-            itemsIndexed(s.customFeeds) { i, feed ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(feed.name, style = MaterialTheme.typography.bodyLarge)
-                        Text(feed.url, style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            collapsibleHeader("Custom RSS feeds", feedsCollapsed) { feedsCollapsed = !feedsCollapsed }
+            if (!feedsCollapsed) {
+                itemsIndexed(s.customFeeds) { i, feed ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(feed.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(feed.url, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                        IconButton(onClick = {
+                            vm.update { it.copy(customFeeds = it.customFeeds.filterIndexed { idx, _ -> idx != i }) }
+                        }) { Icon(Icons.Filled.Delete, "Remove") }
                     }
-                    IconButton(onClick = {
-                        vm.update { it.copy(customFeeds = it.customFeeds.filterIndexed { idx, _ -> idx != i }) }
-                    }) { Icon(Icons.Filled.Delete, "Remove") }
                 }
-            }
-            item {
-                AddFeedRow { feed ->
-                    vm.update { it.copy(customFeeds = (it.customFeeds + feed)) }
+                item {
+                    AddFeedRow { feed ->
+                        vm.update { it.copy(customFeeds = (it.customFeeds + feed)) }
+                    }
                 }
             }
             item { HorizontalDivider() }
 
             // ----- Muted keywords -----
-            item { PrefSection("Muted keywords") {} }
-            itemsIndexed(s.mutedKeywords) { i, kw ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(kw, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                    IconButton(onClick = {
-                        vm.update { it.copy(mutedKeywords = it.mutedKeywords.filterIndexed { idx, _ -> idx != i }) }
-                    }) { Icon(Icons.Filled.Delete, "Remove") }
+            collapsibleHeader("Muted keywords", mutedCollapsed) { mutedCollapsed = !mutedCollapsed }
+            if (!mutedCollapsed) {
+                itemsIndexed(s.mutedKeywords) { i, kw ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(kw, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                        IconButton(onClick = {
+                            vm.update { it.copy(mutedKeywords = it.mutedKeywords.filterIndexed { idx, _ -> idx != i }) }
+                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                    }
                 }
-            }
-            item {
-                AddTextRow("Add keyword to mute") { kw ->
-                    vm.update { it.copy(mutedKeywords = (it.mutedKeywords + kw).distinct()) }
+                item {
+                    AddTextRow("Add keyword to mute") { kw ->
+                        vm.update { it.copy(mutedKeywords = (it.mutedKeywords + kw).distinct()) }
+                    }
                 }
             }
             item { HorizontalDivider() }
 
             // ----- Image search sites -----
-            item { PrefSection("Image search sites") {} }
-            item {
-                Text(
-                    "Sites you've added on the Images screen (a %s is replaced with your keyword).",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-            itemsIndexed(s.customImageSites) { i, site ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                    IconButton(onClick = {
-                        vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
-                    }) { Icon(Icons.Filled.Delete, "Remove") }
+            collapsibleHeader("Image search sites", imageSitesCollapsed) { imageSitesCollapsed = !imageSitesCollapsed }
+            if (!imageSitesCollapsed) {
+                item {
+                    Text(
+                        "Sites you've added on the Images screen (a %s is replaced with your keyword).",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
-            }
-            item {
-                AddTextRow("Add image site URL") { url ->
-                    if (url.startsWith("http")) {
-                        vm.update { it.copy(customImageSites = (it.customImageSites + url.trim()).distinct()) }
+                itemsIndexed(s.customImageSites) { i, site ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        IconButton(onClick = {
+                            vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
+                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                    }
+                }
+                item {
+                    AddTextRow("Add image site URL") { url ->
+                        if (url.startsWith("http")) {
+                            vm.update { it.copy(customImageSites = (it.customImageSites + url.trim()).distinct()) }
+                        }
                     }
                 }
             }
@@ -658,6 +678,17 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 }
             }
         }
+    }
+}
+
+/**
+ * A standalone collapsible section header for sections whose body is rendered as separate LazyColumn
+ * items (Home dashboard, watchlist, feeds, muted keywords, image sites). The caller gates the body items
+ * with `if (!collapsed)`, so the chevron actually hides the content — same look as [PrefSection]'s header.
+ */
+private fun LazyListScope.collapsibleHeader(title: String, collapsed: Boolean, onToggle: () -> Unit) {
+    item {
+        dev.mascwa.pulse.feature.common.CyberHeader(title, collapsed = collapsed, onToggle = onToggle)
     }
 }
 
