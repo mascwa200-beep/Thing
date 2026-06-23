@@ -41,6 +41,10 @@
     <string name="channel_reminders_name">Reminders</string>
     <string name="channel_reminders_desc">Reminders you ask J.A.R.V.I.S. to set</string>
 
+    <!-- Trusted Network Mode device-admin component -->
+    <string name="device_admin_label">Pulse Trusted Network Mode</string>
+    <string name="device_admin_description">Lets Pulse control the Wi-Fi radio for Trusted Network Mode. Requests no other powers — no wipe, lock or password control.</string>
+
     <!-- Device gate -->
     <string name="gate_title">Built for Pixel 10 Pro XL</string>
     <string name="gate_body">Pulse is an exclusive build for the Google Pixel 10 Pro XL. This device reports a different model, so some layout and features are not guaranteed.</string>

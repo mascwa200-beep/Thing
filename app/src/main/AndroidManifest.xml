@@ -14,6 +14,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Trusted Network Mode: read Wi-Fi state + (Device-Owner only) toggle the radio when the device
+         leaves the home network and cellular is carrying it. CHANGE_WIFI_STATE is a no-op for ordinary
+         apps on Android 10+; it only takes effect once Pulse is provisioned as a Device Owner. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -118,6 +124,22 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Trusted Network Mode: device-admin component so Pulse can be provisioned as a Device Owner
+             (one-time adb), which unlocks the Wi-Fi-toggle privilege. Requests no intrusive policies. -->
+        <receiver
+            android:name=".security.PulseDeviceAdminReceiver"
+            android:description="@string/device_admin_description"
+            android:label="@string/device_admin_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
 

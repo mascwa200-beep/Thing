@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Device-admin policy declaration for Pulse. Deliberately requests NO intrusive policies (no wipe, lock,
+  password or storage-encryption enforcement). Being a Device Owner is needed purely to unlock the
+  documented Wi-Fi-toggle privilege used by Trusted Network Mode; an empty policy set keeps the privilege
+  minimal.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies />
+</device-admin>
