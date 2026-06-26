@@ -121,12 +121,14 @@ private object Lud {
     // Geometry / motion
     const val RING_RATIO = 1.20f           // geometric ring spacing (slow far → fast near)
     const val SEED_PX = 3f
-    const val ENGAGE_MS = 12000             // slow speed-up: GO → ~4s white light-speed → ~5s plaid forming
-    const val STOP_MS = 2400                // Act III decel time — the visible "slowing down" before the impact
+    const val SETUP_MS = 8000               // Beat 1: bridge set-up dialogue ("light speed is too slow…")
+    const val ENGAGE_MS = 9000              // Beat 2-3: buckle/GO → white light-speed climb → plaid forming
+    const val FLYBY_MS = 7000               // Beat 4: exterior plaid flyby past the Winnebago
+    const val STOP_MS = 1300                // Beat 5: abrupt stop (the gag is the near-instant halt)
     const val SLAM_MS = 700                 // Helmet's "STOOOOP!" red override before the stop
-    const val STOP_HOLD_MS = 1200           // FULL STOP plate hold before returning to the console
+    const val STOP_HOLD_MS = 900            // FULL STOP plate hold before the aftermath
+    const val AFTER_MS = 9000               // Beat 6: the aftermath dialogue ("…smoke if you got 'em")
     const val CRUISE_MS = 1500              // ring-scroll period (lower = faster forward rush)
-    const val PASSED_MS = 3500              // delay after plaid before "we passed 'em!" (the Winnebago)
     const val twoStageBrake = true          // first press warns (Sandurz), second press stops (Helmet)
 }
 
@@ -686,25 +688,33 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
             ) == 0f
         }.getOrDefault(false)
     }
-    val eng = remember { Animatable(0f) }     // ENGAGE timeline (brace → jump → flash)
-    val stop = remember { Animatable(0f) }    // Act III hard-snap collapse
-    var phase by remember { mutableStateOf(0) }      // 0 engage · 1 plaid (held) · 2 slam · 3 full-stop
+    val setupA = remember { Animatable(0f) }  // Beat 1: bridge set-up dialogue
+    val eng = remember { Animatable(0f) }     // Beat 2-3: buckle/GO → jump → signs → plaid
+    val fly = remember { Animatable(0f) }     // Beat 4: exterior plaid flyby past the Winnebago
+    val stop = remember { Animatable(0f) }    // Beat 5: the emergency stop
+    val after = remember { Animatable(0f) }   // Beat 6: aftermath dialogue
+    var phase by remember { mutableStateOf(0) }      // 0 setup·1 engage·2 flyby·3 cruise(held)·4 slam·5 stop·6 aftermath
     var brakeStage by remember { mutableStateOf(0) } // 0 armed · 1 warned (override)
-    var passed by remember { mutableStateOf(false) } // "we passed 'em!" reveal, after the plaid forms
     LaunchedEffect(Unit) {
-        if (reduceMotion) phase = 1
-        else { eng.animateTo(1f, tween(Lud.ENGAGE_MS, easing = LinearEasing)); phase = 1 }
+        if (reduceMotion) {
+            phase = 3
+        } else {
+            setupA.animateTo(1f, tween(Lud.SETUP_MS, easing = LinearEasing))
+            phase = 1; eng.animateTo(1f, tween(Lud.ENGAGE_MS, easing = LinearEasing))
+            phase = 2; fly.animateTo(1f, tween(Lud.FLYBY_MS, easing = LinearEasing))
+            phase = 3 // back on the bridge — plaid cruise, held until the brake is pulled
+        }
     }
     LaunchedEffect(phase) {
         when (phase) {
-            1 -> { delay(Lud.PASSED_MS.toLong()); passed = true }  // they overshoot Lone Starr's Winnebago
-            2 -> { delay(Lud.SLAM_MS.toLong()); phase = 3 }        // Helmet's "STOOOOP!" then snap
-            3 -> {
+            4 -> { delay(Lud.SLAM_MS.toLong()); phase = 5 }       // Helmet's "STOOOOP!" → the stop
+            5 -> {
                 stop.snapTo(0f)
                 stop.animateTo(1f, tween(Lud.STOP_MS, easing = LinearEasing))
                 delay(Lud.STOP_HOLD_MS.toLong())
-                onDone()
+                phase = 6                                          // aftermath
             }
+            6 -> { after.animateTo(1f, tween(Lud.AFTER_MS, easing = LinearEasing)); onDone() }
         }
     }
     val inf = rememberInfiniteTransition(label = "plaid")
@@ -713,7 +723,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
     val scrollState = inf.animateFloat(0f, 1f, infiniteRepeatable(tween(Lud.CRUISE_MS, easing = LinearEasing)), label = "scroll")
     val pumpState = inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1430, easing = LinearEasing)), label = "pump")
     val blinkState = inf.animateFloat(0.25f, 1f, infiniteRepeatable(tween(150), RepeatMode.Reverse), label = "blink")
-    // Discrete engage stage (derived) so the text layer recomposes only when the sign changes, not per frame.
+    // Discrete line/stage indices (derived) so the text layer recomposes only when a line changes, not per frame.
     val engStage by remember {
         derivedStateOf {
             val e = eng.value
@@ -728,6 +738,9 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
             }
         }
     }
+    val setupLine by remember { derivedStateOf { (setupA.value * 6f).toInt().coerceIn(0, 5) } }
+    val flyLine by remember { derivedStateOf { (fly.value * 3f).toInt().coerceIn(0, 2) } }
+    val afterLine by remember { derivedStateOf { (after.value * 6f).toInt().coerceIn(0, 5) } }
 
     val braceEnd = 0.20f // engage sub-beats: buckle up + "GO!" before launch
     val lightEnd = 0.62f // white light-speed climb (signs LIGHT→RIDICULOUS→LUDICROUS) → plaid forming
@@ -742,6 +755,15 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
             val blink = blinkState.value
             when (phase) {
                 0 -> {
+                    // SET-UP — a calm drifting starfield while the bridge argues over ludicrous speed.
+                    stars.forEach { s ->
+                        val drift = if (reduceMotion) 0f else setupA.value * 120f * (0.3f + s[3])
+                        val x = ((s[0] * 0.5f + 0.5f) * size.width + drift) % size.width
+                        val y = (s[1] * 0.5f + 0.5f) * size.height
+                        drawCircle(Color.White.copy(alpha = 0.18f + 0.4f * s[3]), 1f + s[3], Offset(x, y))
+                    }
+                }
+                1 -> {
                     val e = eng.value
                     when {
                         e < braceEnd -> {
@@ -803,18 +825,19 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                         }
                     }
                 }
-                1, 2 -> {
-                    // PLAID cruise (held). Act 2 keeps cruising under Helmet's red override wash.
+                2 -> drawFlyby(if (reduceMotion) 0.5f else fly.value, stars)
+                3, 4 -> {
+                    // PLAID cruise (held) — back on the bridge. Phase 4 = Helmet's red override wash.
                     val micro = if (reduceMotion) 0f else 2.dp.toPx()
                     val c = base + Offset(sin(scroll * 12f) * micro, cos(scroll * 9f) * micro)
                     drawShaft(scroll, 1f, c)
                     cruiseStreaks(stars, scroll, c, maxR)
                     drawBurst(c, breath, 1f)
-                    if (phase == 2) drawRect(Lud.WALL_RED.copy(alpha = 0.35f + 0.25f * blink))
+                    if (phase == 4) drawRect(Lud.WALL_RED.copy(alpha = 0.35f + 0.25f * blink))
                 }
-                else -> {
-                    // FULL STOP — a visible deceleration that ends in a VIOLENT impact (Helmet headfirst
-                    // into the console): the tunnel slows and recedes, then a hard recoil-lurch + white slam.
+                5 -> {
+                    // FULL STOP — the abrupt halt (the gag): the tunnel slams shut and recedes to a point,
+                    // ending in a violent recoil-lurch + white slam (Helmet headfirst into the console).
                     val s = stop.value
                     val pull = 1f - s
                     val impact = ((s - 0.84f) / 0.16f).coerceIn(0f, 1f)        // ramps 0→1 over the final 16%
@@ -834,12 +857,15 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     drawBurst(c, pull, pull * pull)
                     if (hit > 0f) drawRect(Color.White.copy(alpha = (hit * 0.9f).coerceIn(0f, 1f)))   // the slam
                 }
+                else -> drawRect(Color.Black) // 6 aftermath: the dialogue plays over black
             }
         }
 
         when (phase) {
-            0 -> EngageText(engStage, blinkState)
-            1 -> Column(
+            0 -> SetupDialogue(setupLine)
+            1 -> EngageText(engStage, blinkState)
+            2 -> FlybyDialogue(flyLine)
+            3 -> Column(
                 Modifier.fillMaxSize().padding(top = 76.dp, bottom = 54.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween,
@@ -850,34 +876,34 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                         .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                 ) {
-                    mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
-                    Spacer(Modifier.height(10.dp))
-                    mono("THEY'VE GONE TO PLAID!", Lud.RAIL_GOLD, 18f, FontWeight.Bold, TextAlign.Center, 2f)
-                    if (passed) {
-                        Spacer(Modifier.height(10.dp))
-                        mono("WE PASSED 'EM — STOP THIS SHIP!", Sb.redHot, 10f, FontWeight.Bold, TextAlign.Center, 1.5f)
-                    }
+                    mono("DARK HELMET", Sb.redHot, 9f, FontWeight.Bold, TextAlign.Center, 3f)
+                    Spacer(Modifier.height(8.dp))
+                    mono("WE PASSED 'EM!", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 2f)
+                    Spacer(Modifier.height(8.dp))
+                    mono("STOP THIS THING!", Sb.redHot, 14f, FontWeight.Bold, TextAlign.Center, 2f)
                     if (brakeStage == 1) {
-                        Spacer(Modifier.height(8.dp))
-                        mono("WE CAN'T STOP — IT'S TOO DANGEROUS — SLOW DOWN FIRST", Sb.amber, 9f, FontWeight.Bold, TextAlign.Center, 1f)
+                        Spacer(Modifier.height(10.dp))
+                        mono("SANDURZ: WE CAN'T STOP — IT'S TOO DANGEROUS — SLOW DOWN FIRST!", Sb.amber, 9f, FontWeight.Bold, TextAlign.Center, 1f)
                     }
                 }
                 EmergencyStopButton(blinkState, brakeStage) {
                     when {
                         reduceMotion -> onDone()
                         Lud.twoStageBrake && brakeStage == 0 -> brakeStage = 1
-                        Lud.twoStageBrake -> phase = 2
-                        else -> phase = 3
+                        Lud.twoStageBrake -> phase = 4
+                        else -> phase = 5
                     }
                 }
             }
-            2 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            4 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 26.dp, vertical = 18.dp),
                 ) {
+                    mono("DARK HELMET", Sb.redHot, 9f, FontWeight.Bold, TextAlign.Center, 3f)
+                    Spacer(Modifier.height(10.dp))
                     mono("BULLSHIT! STOP THIS THING!", Color.White, 18f, FontWeight.Bold, TextAlign.Center, 1.5f)
                     Spacer(Modifier.height(8.dp))
                     mono("I ORDER YOU!", Color.White, 14f, FontWeight.Bold, TextAlign.Center, 2f)
@@ -885,7 +911,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     mono("S T O O O O O P !", Sb.redHot, 22f, FontWeight.Bold, TextAlign.Center, 4f)
                 }
             }
-            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            5 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -895,10 +921,9 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     mono("⏹  FULL STOP", Sb.redHot, 18f, FontWeight.Bold, TextAlign.Center, 2f)
                     Spacer(Modifier.height(8.dp))
                     mono("ALL STOP · DROPPING TO SUBLIGHT", Sb.silver, 11f, FontWeight.Normal, TextAlign.Center, 1.5f)
-                    Spacer(Modifier.height(6.dp))
-                    mono("smoke if you got 'em", Sb.dim, 9f, align = TextAlign.Center, spacing = 1f)
                 }
             }
+            else -> AftermathDialogue(afterLine)
         }
     }
 }
@@ -933,6 +958,132 @@ private fun EngageText(stage: Int, blink: State<Float>) {
             )
             else -> {}
         }
+    }
+}
+
+/** A speaker-attributed dialogue card, centred — used for the set-up and aftermath exchanges. */
+@Composable
+private fun DialogueCard(speaker: String, speakerColor: Color, line: String) {
+    Box(Modifier.fillMaxSize().padding(30.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 24.dp, vertical = 18.dp),
+        ) {
+            mono(speaker, speakerColor, 10f, FontWeight.Bold, TextAlign.Center, 3f)
+            Spacer(Modifier.height(10.dp))
+            mono(line, Color.White, 16f, FontWeight.Bold, TextAlign.Center, 1.5f)
+        }
+    }
+}
+
+/** Beat 1 — the bridge set-up exchange before "GO!". */
+@Composable
+private fun SetupDialogue(line: Int) {
+    when (line) {
+        0 -> DialogueCard("COL. SANDURZ", Sb.amber, "PREPARE SHIP FOR LIGHT SPEED!")
+        1 -> DialogueCard("DARK HELMET", Sb.redHot, "NO — LIGHT SPEED IS TOO SLOW.")
+        2 -> DialogueCard("DARK HELMET", Sb.redHot, "WE'LL HAVE TO GO RIGHT TO…\nLUDICROUS SPEED!")
+        3 -> DialogueCard("COL. SANDURZ", Sb.amber, "LUDICROUS SPEED?! THIS SHIP\nCAN'T TAKE IT!")
+        4 -> DialogueCard("DARK HELMET", Sb.redHot, "WHAT'S THE MATTER, SANDURZ?\nCHICKEN?")
+        else -> DialogueCard("COL. SANDURZ", Sb.amber, "SIR, HADN'T YOU BETTER\nBUCKLE UP?")
+    }
+}
+
+/** Beat 6 — the aftermath, ending on "smoke if you got 'em". */
+@Composable
+private fun AftermathDialogue(line: Int) {
+    when (line) {
+        0 -> DialogueCard("COL. SANDURZ", Sb.amber, "ARE YOU ALL RIGHT, SIR?")
+        1 -> DialogueCard("DARK HELMET", Sb.redHot, "FINE. HOW'VE YOU BEEN?")
+        2 -> DialogueCard("COL. SANDURZ", Sb.amber, "IT'S A GOOD THING YOU WERE\nWEARING THAT HELMET.")
+        3 -> DialogueCard("COL. SANDURZ", Sb.amber, "WE'RE STOPPED, SIR.")
+        4 -> DialogueCard("DARK HELMET", Sb.redHot, "GOOD. LET'S TAKE A\nFIVE-MINUTE BREAK.")
+        else -> DialogueCard("DARK HELMET", Sb.redHot, "SMOKE IF YOU GOT 'EM.")
+    }
+}
+
+/** Beat 4 — the Eagle 5 crew reacting as Spaceball One blasts past in plaid (caption sits low). */
+@Composable
+private fun FlybyDialogue(line: Int) {
+    Box(Modifier.fillMaxSize().padding(bottom = 72.dp), contentAlignment = Alignment.BottomCenter) {
+        val speaker: String
+        val speakerColor: Color
+        val text: String
+        when (line) {
+            0 -> { speaker = "BARF · EAGLE 5"; speakerColor = Sb.green; text = "WHAT THE HELL WAS THAT?!" }
+            1 -> { speaker = "LONE STARR"; speakerColor = Sb.neonHot; text = "SPACEBALL ONE." }
+            else -> { speaker = "BARF · EAGLE 5"; speakerColor = Sb.green; text = "THEY'VE GONE TO PLAID!" }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        ) {
+            mono(speaker, speakerColor, 10f, FontWeight.Bold, TextAlign.Center, 3f)
+            Spacer(Modifier.height(8.dp))
+            mono(text, Color.White, if (line == 2) 20f else 16f, FontWeight.Bold, TextAlign.Center, 1.5f)
+        }
+    }
+}
+
+/** Vivid tartan colours for the exterior plaid trail. */
+private val PlaidTrail = listOf(
+    Color(0xFFFF2D2D), Color(0xFFFF8A00), Color(0xFFFFE000), Color(0xFF25FF3C),
+    Color(0xFF00E6FF), Color(0xFF2A6BFF), Color(0xFFFF2ED1),
+)
+
+/**
+ * Beat 4 exterior: from near the Eagle 5, Spaceball One streaks left→right across a starfield, leaving a
+ * ribbon of woven plaid light fading out behind it. `p` (0..1) drives the flyby; no retained buffers.
+ */
+private fun DrawScope.drawFlyby(p: Float, stars: List<FloatArray>) {
+    drawRect(Color.Black)
+    stars.forEach { s ->
+        val x = ((s[0] * 0.5f + 0.5f) * size.width + p * 120f * (0.3f + s[3])) % size.width
+        val y = (s[1] * 0.5f + 0.5f) * size.height
+        drawCircle(Color.White.copy(alpha = 0.18f + 0.4f * s[3]), 1f + s[3], Offset(x, y))
+    }
+    val shipY = size.height * 0.46f
+    val shipLen = size.minDimension * 0.42f
+    val shipH = size.minDimension * 0.055f
+    val noseX = -shipLen + (size.width + shipLen * 2f) * p
+    val tailX = noseX - shipLen
+    // Plaid ribbon trail — woven multicolour rows fading in from the left up to the ship's tail.
+    val bandH = shipH * 3.2f
+    val top = shipY - bandH / 2f
+    val trailEnd = tailX.coerceAtLeast(2f)
+    val rowH = bandH / PlaidTrail.size
+    for (r in PlaidTrail.indices) {
+        drawRect(
+            Brush.horizontalGradient(listOf(Color.Transparent, PlaidTrail[r].copy(alpha = 0.7f)), 0f, trailEnd),
+            topLeft = Offset(0f, top + r * rowH), size = Size(trailEnd, rowH + 0.5f),
+        )
+    }
+    var wx = (p * 220f) % 22f
+    while (wx < trailEnd) {
+        drawRect(Color.White.copy(alpha = 0.05f), Offset(wx, top), Size(2f, bandH))
+        wx += 22f
+    }
+    // Spaceball One — a grey ribbed capsule with an engine flare at the tail.
+    if (noseX > 0f && tailX < size.width) {
+        drawRoundRect(
+            Brush.verticalGradient(listOf(Color(0xFFB8BDC4), Color(0xFF6A6F77), Color(0xFF2C3036))),
+            topLeft = Offset(tailX, shipY - shipH / 2f), size = Size(shipLen, shipH),
+            cornerRadius = CornerRadius(shipH / 2f, shipH / 2f),
+        )
+        var bx = tailX + shipLen * 0.22f
+        while (bx < noseX - shipLen * 0.12f) {
+            drawCircle(Color(0xFF9A9FA7), shipH * 0.2f, Offset(bx, shipY - shipH * 0.16f))
+            bx += shipLen * 0.16f
+        }
+        val flareR = shipH * 1.5f
+        drawCircle(
+            Brush.radialGradient(listOf(Color.White, Color(0xFFFFC04D), Color.Transparent), Offset(tailX, shipY), flareR),
+            flareR, Offset(tailX, shipY), blendMode = BlendMode.Plus,
+        )
     }
 }
 
