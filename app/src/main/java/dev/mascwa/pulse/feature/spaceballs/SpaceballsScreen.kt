@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ import dev.mascwa.pulse.data.settings.ThemeMode
 import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -614,12 +616,13 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
 }
 
 /**
- * LUDICROUS SPEED — the Spaceballs (1987) jump, beat for beat:
- *   BRACE ("Ludicrous speed, GO!", seatbelts fastened, engines charging) → violent g-force
- *   star-streak JUMP with the gridded tunnel + screen shake → white BLAST flash → the full PLAID
- *   tunnel ("They've gone to plaid!") → OVERSHOOT ("We've passed them!") as the ship streaks off to a
- *   vanishing point. Params-only (one star list); every position is computed in the draw pass, so
- *   there is zero per-frame allocation.
+ * LUDICROUS SPEED — the Spaceballs (1987) jump. It does NOT auto-stop: once engaged it holds at
+ * ludicrous speed (you've overshot — "they've gone to plaid!") until you PULL THE EMERGENCY BRAKE.
+ *   phase 0 ENGAGE — brace ("Ludicrous speed, GO!") → g-force star-streak jump into the gridded
+ *                    tunnel → white blast flash.
+ *   phase 1 CRUISE — the full plaid tunnel runs forever, flying forward, with the EMERGENCY BRAKE.
+ *   phase 2 BRAKE  — the brake is pulled: the tunnel decelerates and recedes to a point → all stop.
+ * Params-only (one star list); every position is computed in the draw pass — zero per-frame alloc.
  */
 @Composable
 private fun LudicrousOverlay(onDone: () -> Unit) {
@@ -634,72 +637,82 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
             )
         }
     }
-    val t = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { t.animateTo(1f, tween(6400, easing = LinearEasing)); onDone() }
+    val eng = remember { Animatable(0f) }    // brace → jump → flash (timed)
+    val brake = remember { Animatable(0f) }  // deceleration once the brake is pulled
+    var phase by remember { mutableStateOf(0) } // 0 engage · 1 cruise (held) · 2 braking
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        eng.animateTo(1f, tween(3600, easing = LinearEasing))
+        phase = 1 // hold at ludicrous speed until the emergency brake is pulled — no auto-stop
+    }
     val inf = rememberInfiniteTransition(label = "plaid")
     val scroll by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(680, easing = LinearEasing)), label = "scroll")
+    val pump by inf.animateFloat(0.3f, 1f, infiniteRepeatable(tween(520), RepeatMode.Reverse), label = "pump")
 
-    val braceEnd = 0.14f
-    val accelEnd = 0.55f
-    val flashEnd = 0.60f
-    val plaidEnd = 0.86f
+    val braceEnd = 0.30f // engage sub-beats, within eng's 0..1
+    val accelEnd = 0.84f
 
-    Box(Modifier.fillMaxSize().background(Color.Black).clickable { onDone() }, contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) {
-            val p = t.value
             val base = Offset(size.width / 2, size.height / 2)
             val maxR = size.minDimension * 0.95f
-            when {
-                p < braceEnd -> {
-                    // Calm starfield, a building rumble before the lever goes forward.
-                    val warm = p / braceEnd
-                    val jit = warm * warm * 3.dp.toPx()
-                    val c = base + Offset(sin(p * 211f) * jit, cos(p * 173f) * jit)
-                    stars.forEach { s ->
-                        val pos = c + Offset(s[0], s[1]) * (s[2] * maxR)
-                        drawCircle(Color.White.copy(alpha = 0.25f + 0.5f * s[3]), 1f + s[3], pos)
+            when (phase) {
+                0 -> {
+                    val e = eng.value
+                    when {
+                        e < braceEnd -> {
+                            // Calm starfield, a building rumble before the lever goes forward.
+                            val warm = e / braceEnd
+                            val jit = warm * warm * 3.dp.toPx()
+                            val c = base + Offset(sin(e * 211f) * jit, cos(e * 173f) * jit)
+                            stars.forEach { s ->
+                                val pos = c + Offset(s[0], s[1]) * (s[2] * maxR)
+                                drawCircle(Color.White.copy(alpha = 0.25f + 0.5f * s[3]), 1f + s[3], pos)
+                            }
+                        }
+                        e < accelEnd -> {
+                            // Violent shake as the gridded tunnel builds out of the vanishing point.
+                            val a = (e - braceEnd) / (accelEnd - braceEnd)
+                            val speed = a * a
+                            val jit = speed * 7.dp.toPx()
+                            val c = base + Offset(sin(e * 257f) * jit, cos(e * 193f) * jit)
+                            drawTunnel(flow = scroll, burst = speed, intensity = speed, pivot = c)
+                            stars.forEach { s ->
+                                val dir = Offset(s[0], s[1])
+                                val r0 = (0.10f + speed) * maxR * (0.2f + s[2])
+                                val len = (4f + speed * 360f) * (0.4f + s[2])
+                                drawLine(
+                                    streakColor(s).copy(alpha = (0.40f + 0.55f * speed).coerceAtMost(1f)),
+                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3f, cap = StrokeCap.Round,
+                                )
+                            }
+                        }
+                        else -> {
+                            // Blast flash fading to reveal the full tunnel (→ cruise).
+                            val pulse = 0.8f + 0.2f * sin(scroll * 6.2832f)
+                            drawTunnel(flow = scroll, burst = pulse, intensity = 1f, pivot = base)
+                            drawRect(Color.White.copy(alpha = (1f - (e - accelEnd) / (1f - accelEnd)).coerceIn(0f, 1f)))
+                        }
                     }
                 }
-                p < accelEnd -> {
-                    val a = (p - braceEnd) / (accelEnd - braceEnd)
-                    val speed = a * a
-                    // Violent shake as the gridded tunnel builds out of the vanishing point.
-                    val jit = speed * 7.dp.toPx()
-                    val c = base + Offset(sin(p * 257f) * jit, cos(p * 193f) * jit)
-                    drawTunnel(flow = scroll, burst = speed, intensity = speed, pivot = c)
-                    stars.forEach { s ->
-                        val dir = Offset(s[0], s[1])
-                        val r0 = (0.10f + speed) * maxR * (0.2f + s[2])
-                        val len = (4f + speed * 360f) * (0.4f + s[2])
-                        drawLine(
-                            streakColor(s).copy(alpha = (0.40f + 0.55f * speed).coerceAtMost(1f)),
-                            c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3f, cap = StrokeCap.Round,
-                        )
-                    }
-                }
-                p < flashEnd -> drawRect(
-                    Color.White.copy(alpha = (1f - (p - accelEnd) / (flashEnd - accelEnd)).coerceIn(0f, 1f)),
-                )
-                p < plaidEnd -> {
-                    // PLAID: the full Spaceballs tunnel — orange wall-grid converging on a burst,
-                    // multicoloured stars streaking past it, flying forward.
+                1 -> {
+                    // CRUISE — the full plaid tunnel, held, flying forward (no auto-stop).
                     val pulse = 0.8f + 0.2f * sin(scroll * 6.2832f)
                     drawTunnel(flow = scroll, burst = pulse, intensity = 1f, pivot = base)
                     stars.forEach { s ->
                         val dir = Offset(s[0], s[1])
-                        val phase = (scroll + s[2]) % 1f
-                        val r0 = phase * maxR * (0.6f + s[2])
-                        val len = (40f + 240f * phase) * (0.4f + s[2])
+                        val phaseR = (scroll + s[2]) % 1f
+                        val r0 = phaseR * maxR * (0.6f + s[2])
+                        val len = (40f + 240f * phaseR) * (0.4f + s[2])
                         drawLine(
-                            streakColor(s).copy(alpha = 0.85f * (1f - phase * 0.4f)),
+                            streakColor(s).copy(alpha = 0.85f * (1f - phaseR * 0.4f)),
                             base + dir * r0, base + dir * (r0 + len), 2f + s[3] * 1.5f, cap = StrokeCap.Round,
                         )
                     }
                 }
                 else -> {
-                    // Overshoot: the tunnel recedes as the ship streaks off to a vanishing point.
-                    val q = (p - plaidEnd) / (1f - plaidEnd)
-                    val pull = 1f - q
+                    // BRAKING — the tunnel decelerates and recedes to a vanishing point.
+                    val pull = 1f - brake.value
                     drawTunnel(flow = scroll, burst = pull * pull, intensity = pull, pivot = base)
                     stars.forEach { s ->
                         val dir = Offset(s[0], s[1])
@@ -711,42 +724,105 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                 }
             }
         }
-        val p = t.value
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            when {
-                p < braceEnd -> {
-                    mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
-                    Spacer(Modifier.height(8.dp))
-                    mono("ENGINES: LUDICROUS   ·   SEATBELTS: FASTENED", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
-                    if (p > braceEnd * 0.62f) {
-                        Spacer(Modifier.height(18.dp))
-                        mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
+
+        when (phase) {
+            0 -> {
+                val e = eng.value
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (e < braceEnd) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
+                            Spacer(Modifier.height(8.dp))
+                            mono("ENGINES: LUDICROUS   ·   SEATBELTS: FASTENED", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
+                            if (e > braceEnd * 0.62f) {
+                                Spacer(Modifier.height(18.dp))
+                                mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
+                            }
+                        }
                     }
                 }
-                p < flashEnd -> {}
-                p < plaidEnd -> Column(
+            }
+            1 -> {
+                // Caption up top, the EMERGENCY BRAKE down where a thumb can reach it.
+                Column(
+                    Modifier.fillMaxSize().padding(top = 76.dp, bottom = 54.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
-                    Spacer(Modifier.height(12.dp))
-                    mono("THEY'VE GONE TO PLAID!", Sb.gold, 18f, FontWeight.Bold, TextAlign.Center, 2f)
-                    Spacer(Modifier.height(18.dp))
-                    mono("tap to disengage", Sb.silver, 9f, align = TextAlign.Center)
-                }
-                else -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                ) {
-                    mono("WE'VE PASSED THEM!", Sb.neonHot, 18f, FontWeight.Bold, TextAlign.Center, 2f)
-                    Spacer(Modifier.height(10.dp))
-                    mono("...  ALL  STOP", Sb.silver, 12f, FontWeight.Normal, TextAlign.Center, 2f)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                    ) {
+                        mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
+                        Spacer(Modifier.height(10.dp))
+                        mono("THEY'VE GONE TO PLAID!", Sb.gold, 18f, FontWeight.Bold, TextAlign.Center, 2f)
+                        Spacer(Modifier.height(10.dp))
+                        mono("WE'VE PASSED THEM — STOP THIS SHIP!", Sb.redHot, 10f, FontWeight.Bold, TextAlign.Center, 1.5f)
+                    }
+                    EmergencyBrakeButton(pump) {
+                        if (phase == 1) {
+                            phase = 2
+                            scope.launch {
+                                brake.animateTo(1f, tween(1900, easing = LinearEasing))
+                                onDone()
+                            }
+                        }
+                    }
                 }
             }
+            else -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                    ) {
+                        mono("⏹  EMERGENCY BRAKE", Sb.redHot, 16f, FontWeight.Bold, TextAlign.Center, 2f)
+                        Spacer(Modifier.height(10.dp))
+                        mono("ALL STOP · DROPPING TO SUBLIGHT", Sb.silver, 11f, FontWeight.Normal, TextAlign.Center, 1.5f)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The hazard-striped EMERGENCY BRAKE that halts ludicrous speed — pulses to demand attention. */
+@Composable
+private fun EmergencyBrakeButton(pulse: Float, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .width(272.dp)
+            .height(82.dp)
+            .clickable { onClick() }
+            .drawBehind {
+                val r = 16.dp.toPx()
+                drawRoundRect(
+                    Brush.verticalGradient(listOf(Sb.redHot, Sb.red, Color(0xFF6E0A16))),
+                    cornerRadius = CornerRadius(r, r),
+                )
+                val bw = 5.dp.toPx()
+                drawRoundRect(Sb.gold.copy(alpha = 0.9f), cornerRadius = CornerRadius(r, r), style = Stroke(bw))
+                // Black hazard notches along the top & bottom edges (caution-tape look).
+                val step = 15.dp.toPx(); val skew = 7.dp.toPx()
+                var x = step
+                while (x < size.width - step * 0.5f) {
+                    drawLine(Color.Black.copy(alpha = 0.85f), Offset(x, 1f), Offset(x - skew, bw * 1.7f), 3.dp.toPx())
+                    drawLine(Color.Black.copy(alpha = 0.85f), Offset(x, size.height - 1f), Offset(x - skew, size.height - bw * 1.7f), 3.dp.toPx())
+                    x += step
+                }
+                // Pulsing alert glow.
+                drawRoundRect(Sb.redHot.copy(alpha = 0.25f + 0.55f * pulse), cornerRadius = CornerRadius(r, r), style = Stroke(2.5.dp.toPx()))
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            mono("⚠  EMERGENCY BRAKE  ⚠", Color.White, 15f, FontWeight.Bold, TextAlign.Center, 2f)
+            Spacer(Modifier.height(2.dp))
+            mono("PULL TO STOP", Color.White.copy(alpha = 0.85f), 8f, FontWeight.Bold, TextAlign.Center, 3f)
         }
     }
 }
