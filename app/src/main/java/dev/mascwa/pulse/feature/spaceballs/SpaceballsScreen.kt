@@ -1029,10 +1029,12 @@ private fun FlybyDialogue(line: Int) {
     }
 }
 
-/** Vivid tartan colours for the exterior plaid trail. */
-private val PlaidTrail = listOf(
-    Color(0xFFFF2D2D), Color(0xFFFF8A00), Color(0xFFFFE000), Color(0xFF25FF3C),
-    Color(0xFF00E6FF), Color(0xFF2A6BFF), Color(0xFFFF2ED1),
+/** A bright Royal-Stewart-flavoured tartan "sett" (colour, width dp) — the plaid weave for the flyby wake. */
+private val TartanSett = listOf(
+    Color(0xFFC8102E) to 26f, Color(0xFF111111) to 3f, Color(0xFFF2C200) to 3f, Color(0xFF111111) to 3f,
+    Color(0xFFC8102E) to 8f, Color(0xFF14377D) to 14f, Color(0xFFF5F5F5) to 3f, Color(0xFF14377D) to 14f,
+    Color(0xFFC8102E) to 8f, Color(0xFF1B5E20) to 16f, Color(0xFFF2C200) to 3f, Color(0xFF1B5E20) to 16f,
+    Color(0xFFC8102E) to 8f,
 )
 
 /**
@@ -1051,21 +1053,33 @@ private fun DrawScope.drawFlyby(p: Float, stars: List<FloatArray>) {
     val shipH = size.minDimension * 0.055f
     val noseX = -shipLen + (size.width + shipLen * 2f) * p
     val tailX = noseX - shipLen
-    // Plaid ribbon trail — woven multicolour rows fading in from the left up to the ship's tail.
-    val bandH = shipH * 3.2f
+    // A big woven TARTAN wake — the plaid we see the most of: a real warp×weft weave (crossing colour
+    // bands, the vertical pass half-alpha so crossings blend) fading in from the left up to the ship.
+    val bandH = size.minDimension * 0.52f
     val top = shipY - bandH / 2f
     val trailEnd = tailX.coerceAtLeast(2f)
-    val rowH = bandH / PlaidTrail.size
-    for (r in PlaidTrail.indices) {
-        drawRect(
-            Brush.horizontalGradient(listOf(Color.Transparent, PlaidTrail[r].copy(alpha = 0.7f)), 0f, trailEnd),
-            topLeft = Offset(0f, top + r * rowH), size = Size(trailEnd, rowH + 0.5f),
-        )
+    run { // warp — horizontal colour bands, faded in from the left
+        var y = top
+        var i = 0
+        while (y < top + bandH) {
+            val (col, w) = TartanSett[i % TartanSett.size]
+            val wp = w.dp.toPx()
+            drawRect(
+                Brush.horizontalGradient(listOf(Color.Transparent, col.copy(alpha = 0.9f)), 0f, trailEnd),
+                topLeft = Offset(0f, y), size = Size(trailEnd, wp + 0.5f),
+            )
+            y += wp; i++
+        }
     }
-    var wx = (p * 220f) % 22f
-    while (wx < trailEnd) {
-        drawRect(Color.White.copy(alpha = 0.05f), Offset(wx, top), Size(2f, bandH))
-        wx += 22f
+    run { // weft — vertical colour bands at half alpha so crossings blend into the tartan; x-faded
+        var x = 0f
+        var i = 0
+        while (x < trailEnd) {
+            val (col, w) = TartanSett[i % TartanSett.size]
+            val wp = w.dp.toPx()
+            drawRect(col.copy(alpha = 0.5f * (x / trailEnd)), Offset(x, top), Size(wp + 0.5f, bandH))
+            x += wp; i++
+        }
     }
     // Spaceball One — a grey ribbed capsule with an engine flare at the tail.
     if (noseX > 0f && tailX < size.width) {
