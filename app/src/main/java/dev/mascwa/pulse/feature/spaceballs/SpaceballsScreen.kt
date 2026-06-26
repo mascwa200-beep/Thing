@@ -654,9 +654,9 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
 
 /**
  * LUDICROUS SPEED → PLAID → FULL STOP — the Spaceballs (1987) gag, built to the owner's spec and played
- * dead straight. Three acts: ENGAGE (escalating LIGHT→RIDICULOUS→LUDICROUS signs → "GO!" → a slow white
- * light-speed streak run that turns into the plaid tunnel), PLAID (woven red/gold shaft + starburst +
- * streak rain, then "we passed 'em!"; held forever —
+ * dead straight. Three acts: ENGAGE (buckle up → "GO!" → a slow white light-speed climb whose bridge
+ * signs light LIGHT→RIDICULOUS→LUDICROUS in order, then it turns to plaid), PLAID (woven red/gold shaft +
+ * starburst + streak rain, then Barf's "they've gone to plaid!" + "we passed 'em!"; held forever —
  * the ship overshoots because nobody stops it), and FULL STOP (pull the "EMERGENCY STOP — NEVER USE"
  * lever → a visible deceleration ending in a violent impact, Helmet into the console). Honesty: the animation announces nothing
  * to a screen reader — it's purely visual and silent by design; only the trigger and brake are real
@@ -711,8 +711,8 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
     val scroll = if (reduceMotion) 0.4f else scrollA
     val breath = 1f + 0.15f * sin((if (reduceMotion) 0f else pumpA) * 6.2832f)
 
-    val braceEnd = 0.28f // engage sub-beats, within eng's 0..1
-    val lightEnd = 0.60f // GO/signs → white light-speed → plaid forming
+    val braceEnd = 0.20f // engage sub-beats: buckle up + "GO!" before launch
+    val lightEnd = 0.62f // white light-speed climb (signs LIGHT→RIDICULOUS→LUDICROUS) → plaid forming
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) {
@@ -878,27 +878,48 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
 private fun EngageText(e: Float, blink: Float) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
-            e < 0.04f -> {}
-            e < 0.09f -> mono("LIGHT  SPEED", Sb.dim, 16f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.14f -> mono("RIDICULOUS  SPEED", Sb.amber.copy(alpha = 0.9f), 18f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.20f -> mono("LUDICROUS  SPEED", Sb.redHot.copy(alpha = blink), 22f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.28f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                mono("AW, BUCKLE THIS!", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
-                Spacer(Modifier.height(6.dp))
+            // BRACE — strap in, give up on the belt, then the order.
+            e < 0.05f -> {}
+            e < 0.16f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                mono("AW, BUCKLE THIS!", Sb.dim, 10f, align = TextAlign.Center, spacing = 1.5f)
+                Spacer(Modifier.height(8.dp))
                 mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
                 Spacer(Modifier.height(8.dp))
                 mono("ENGINES: LUDICROUS   ·   SEATBELTS: FASTENED", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
-                Spacer(Modifier.height(16.dp))
-                mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
             }
-            e < 0.60f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                mono("◤  LIGHT SPEED  ◥", Color.White.copy(alpha = 0.85f), 14f, FontWeight.Bold, TextAlign.Center, 4f)
-                Spacer(Modifier.height(12.dp))
-                mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 12f, FontWeight.Bold, TextAlign.Center, 1f)
+            e < 0.20f -> mono("G O !", Sb.redHot, 40f, FontWeight.Bold, TextAlign.Center, 8f)
+            // LIGHT SPEED — the ship climbs through the tiers; the three bridge signs light up in order.
+            e < 0.62f -> {
+                val tier = ((e - 0.20f) / 0.42f).coerceIn(0f, 1f)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SpeedSign("LIGHT  SPEED", tier > 0f, false, blink)
+                    SpeedSign("RIDICULOUS  SPEED", tier > 0.34f, false, blink)
+                    SpeedSign("LUDICROUS  SPEED", tier > 0.67f, tier > 0.67f, blink)
+                    if (tier < 0.4f) {
+                        Spacer(Modifier.height(6.dp))
+                        mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 11f, FontWeight.Bold, TextAlign.Center, 1f)
+                    }
+                }
             }
             else -> {}
         }
     }
+}
+
+/** A bridge speed-tier sign that lights up as the ship climbs through it (LUDICROUS flashes). */
+@Composable
+private fun SpeedSign(label: String, lit: Boolean, flashing: Boolean, blink: Float) {
+    val color = when {
+        flashing -> Sb.redHot
+        lit -> Sb.amber
+        else -> Sb.dim
+    }
+    val alpha = when {
+        flashing -> blink
+        lit -> 1f
+        else -> 0.2f
+    }
+    mono(label, color.copy(alpha = alpha), 18f, FontWeight.Bold, TextAlign.Center, 4f)
 }
 
 /**
