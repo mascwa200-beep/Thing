@@ -172,9 +172,10 @@ class MainActivity : ComponentActivity() {
                     }
                     // (The visual "always watching" overlay was removed — J.A.R.V.I.S.'s awareness is
                     // non-visual now; the presence surfaces as a professional status feed instead.)
-                    // Cold-open: permanent + always topmost, so it draws first and masks everything
-                    // (app, gate, overlays) until it fades. No off-switch by design.
-                    if (!booted) {
+                    // Cold-open: opt-in (off by default to save startup RAM — the ~800-mote animation).
+                    // When on, it draws topmost and masks everything (app, gate, overlays) until it fades.
+                    // Toggle in Settings → Appearance ("Boot sequence").
+                    if (settings.bootAnimation && !booted) {
                         BootScreen(onFinished = { booted = true })
                     }
                 }

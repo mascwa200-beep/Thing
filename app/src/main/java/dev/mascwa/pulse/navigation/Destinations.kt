@@ -3,6 +3,8 @@ package dev.mascwa.pulse.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
@@ -70,6 +72,9 @@ object Routes {
 
     // On-device security auditor (read-only, local-only)
     const val SECURITY_AUDIT = "security_audit"
+
+    // The BRIDGE: a Spaceballs-themed mock control deck (pure UI theater), between TOOLS and SYS.
+    const val SPACEBALLS = "spaceballs"
 }
 
 data class TopDestination(
@@ -88,5 +93,6 @@ val TOP_DESTINATIONS = listOf(
     // TOOLS is a pseudo-destination: it opens the Pip-Boy feed tabs (FEED_HOME) and highlights on
     // any feed route — handled specially in PulseApp. TACNET (the PIP-BOY screen) is the feed home.
     TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
+    TopDestination(Routes.SPACEBALLS, "DECK", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
 )

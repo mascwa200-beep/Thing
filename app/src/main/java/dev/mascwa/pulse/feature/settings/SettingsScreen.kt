@@ -167,6 +167,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
                     }
+                    PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
+                        vm.update { it.copy(bootAnimation = v) }
+                    }
                     PrefSlider(
                         "Ticker speed",
                         value = s.tickerSpeed,
