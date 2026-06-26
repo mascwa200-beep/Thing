@@ -509,7 +509,7 @@ private fun ControlArray(onCommand: (String) -> Unit, onLudicrous: () -> Unit) {
 }
 
 @Composable
-private fun DomeButton(color: Color, label: String, onClick: () -> Unit, diameter: Dp = 46.dp) {
+private fun DomeButton(color: Color, label: String, diameter: Dp = 46.dp, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
