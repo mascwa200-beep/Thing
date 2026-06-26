@@ -29,6 +29,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -705,11 +708,26 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
         }
     }
     val inf = rememberInfiniteTransition(label = "plaid")
-    val scrollA by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(Lud.CRUISE_MS, easing = LinearEasing)), label = "scroll")
-    val pumpA by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1430, easing = LinearEasing)), label = "pump")
-    val blink by inf.animateFloat(0.25f, 1f, infiniteRepeatable(tween(150), RepeatMode.Reverse), label = "blink")
-    val scroll = if (reduceMotion) 0.4f else scrollA
-    val breath = 1f + 0.15f * sin((if (reduceMotion) 0f else pumpA) * 6.2832f)
+    // Animation State objects — READ ONLY inside the draw/layer blocks (deferred) so the overlay
+    // redraws at 60fps WITHOUT recomposing the whole tree every frame (the smoothness fix).
+    val scrollState = inf.animateFloat(0f, 1f, infiniteRepeatable(tween(Lud.CRUISE_MS, easing = LinearEasing)), label = "scroll")
+    val pumpState = inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1430, easing = LinearEasing)), label = "pump")
+    val blinkState = inf.animateFloat(0.25f, 1f, infiniteRepeatable(tween(150), RepeatMode.Reverse), label = "blink")
+    // Discrete engage stage (derived) so the text layer recomposes only when the sign changes, not per frame.
+    val engStage by remember {
+        derivedStateOf {
+            val e = eng.value
+            when {
+                e < 0.05f -> 0
+                e < 0.12f -> 1   // buckle up
+                e < 0.20f -> 2   // "Ludicrous speed, GO!"
+                e < 0.343f -> 3  // LIGHT SPEED
+                e < 0.481f -> 4  // RIDICULOUS SPEED
+                e < 0.62f -> 5   // LUDICROUS SPEED (flashing)
+                else -> 6
+            }
+        }
+    }
 
     val braceEnd = 0.20f // engage sub-beats: buckle up + "GO!" before launch
     val lightEnd = 0.62f // white light-speed climb (signs LIGHT→RIDICULOUS→LUDICROUS) → plaid forming
@@ -718,6 +736,10 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
         Canvas(Modifier.fillMaxSize()) {
             val base = Offset(size.width / 2, size.height / 2)
             val maxR = size.minDimension * 0.95f
+            // Deferred animation reads — happen in the draw phase, so they redraw without recomposing.
+            val scroll = if (reduceMotion) 0.4f else scrollState.value
+            val breath = 1f + 0.15f * sin((if (reduceMotion) 0f else pumpState.value) * 6.2832f)
+            val blink = blinkState.value
             when (phase) {
                 0 -> {
                     val e = eng.value
@@ -808,7 +830,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
         }
 
         when (phase) {
-            0 -> EngageText(eng.value, blink)
+            0 -> EngageText(engStage, blinkState)
             1 -> Column(
                 Modifier.fillMaxSize().padding(top = 76.dp, bottom = 54.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -832,7 +854,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                         mono("WE CAN'T STOP — IT'S TOO DANGEROUS — SLOW DOWN FIRST", Sb.amber, 9f, FontWeight.Bold, TextAlign.Center, 1f)
                     }
                 }
-                EmergencyStopButton(blink, brakeStage) {
+                EmergencyStopButton(blinkState, brakeStage) {
                     when {
                         reduceMotion -> onDone()
                         Lud.twoStageBrake && brakeStage == 0 -> brakeStage = 1
@@ -875,37 +897,32 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
 
 /** Act-I escalating signage: LIGHT → RIDICULOUS → LUDICROUS (flashing) → "GO!" + the seatbelts gag. */
 @Composable
-private fun EngageText(e: Float, blink: Float) {
+private fun EngageText(stage: Int, blink: State<Float>) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        when {
-            e < 0.05f -> {}
+        when (stage) {
             // 1) Strap in (the giant-seatbelt gag) — NO speed signs yet.
-            e < 0.12f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            1 -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 mono("AW, BUCKLE THIS!", Sb.dim, 11f, FontWeight.Bold, TextAlign.Center, 1.5f)
                 Spacer(Modifier.height(8.dp))
                 mono("SEATBELTS: FASTENED   ·   ENGINES: LUDICROUS", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
             }
             // 2) The command: "Ludicrous speed, GO!".
-            e < 0.20f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            2 -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 18f, FontWeight.Bold, TextAlign.Center, 3f)
                 Spacer(Modifier.height(14.dp))
                 mono("G O !", Sb.redHot, 40f, FontWeight.Bold, TextAlign.Center, 8f)
             }
-            // 3) After GO, the ship climbs — the speed sign pops up ONE tier at a time, in order.
-            e < 0.62f -> {
-                val tier = ((e - 0.20f) / 0.42f).coerceIn(0f, 1f)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    when {
-                        tier < 0.34f -> mono("LIGHT  SPEED", Color.White, 24f, FontWeight.Bold, TextAlign.Center, 4f)
-                        tier < 0.67f -> mono("RIDICULOUS  SPEED", Sb.amber, 24f, FontWeight.Bold, TextAlign.Center, 4f)
-                        else -> mono("LUDICROUS  SPEED", Sb.redHot.copy(alpha = blink), 26f, FontWeight.Bold, TextAlign.Center, 4f)
-                    }
-                    if (tier < 0.34f) {
-                        Spacer(Modifier.height(14.dp))
-                        mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 11f, FontWeight.Bold, TextAlign.Center, 1f)
-                    }
-                }
+            // 3) After GO the ship climbs — the speed sign pops up ONE tier at a time, in order.
+            3 -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                mono("LIGHT  SPEED", Color.White, 24f, FontWeight.Bold, TextAlign.Center, 4f)
+                Spacer(Modifier.height(14.dp))
+                mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 11f, FontWeight.Bold, TextAlign.Center, 1f)
             }
+            4 -> mono("RIDICULOUS  SPEED", Sb.amber, 24f, FontWeight.Bold, TextAlign.Center, 4f)
+            5 -> mono(
+                "LUDICROUS  SPEED", Sb.redHot, 26f, FontWeight.Bold, TextAlign.Center, 4f,
+                Modifier.graphicsLayer { alpha = blink.value }, // flash via the draw phase — no recomposition
+            )
             else -> {}
         }
     }
@@ -916,7 +933,7 @@ private fun EngageText(e: Float, blink: Float) {
  * `stage` 0 shows the dire label; pressing once warns (Sandurz) and flips to OVERRIDE / PRESS AGAIN.
  */
 @Composable
-private fun EmergencyStopButton(pulse: Float, stage: Int, onClick: () -> Unit) {
+private fun EmergencyStopButton(pulse: State<Float>, stage: Int, onClick: () -> Unit) {
     Box(
         Modifier
             .width(280.dp)
@@ -938,8 +955,8 @@ private fun EmergencyStopButton(pulse: Float, stage: Int, onClick: () -> Unit) {
                     drawLine(Color.Black.copy(alpha = 0.85f), Offset(x, size.height - 1f), Offset(x - skew, size.height - bw * 1.7f), 3.dp.toPx())
                     x += step
                 }
-                // Pulsing alert glow.
-                drawRoundRect(Sb.redHot.copy(alpha = 0.25f + 0.55f * pulse), cornerRadius = CornerRadius(r, r), style = Stroke(2.5.dp.toPx()))
+                // Pulsing alert glow (read in the draw phase — no recomposition).
+                drawRoundRect(Sb.redHot.copy(alpha = 0.25f + 0.55f * pulse.value), cornerRadius = CornerRadius(r, r), style = Stroke(2.5.dp.toPx()))
             },
         contentAlignment = Alignment.Center,
     ) {
