@@ -602,78 +602,161 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
     }
 }
 
-/** LUDICROUS SPEED: warp-streak acceleration → white flash → scrolling plaid ("we've gone to plaid"). */
+/**
+ * LUDICROUS SPEED — the Spaceballs (1987) jump, beat for beat:
+ *   BRACE ("Ludicrous speed, GO!", seatbelts fastened, engines charging) → violent g-force
+ *   star-streak JUMP with a hyperspace tunnel + screen shake → white BLAST flash → scrolling tartan
+ *   PLAID ("They've gone to plaid!") → OVERSHOOT ("We've passed them!") as the ship streaks off to a
+ *   vanishing point. Params-only (one star list); every position is computed in the draw pass, so
+ *   there is zero per-frame allocation.
+ */
 @Composable
 private fun LudicrousOverlay(onDone: () -> Unit) {
+    // Each star: unit ray (x, y), radial seed, brightness — one allocation, reused every frame.
     val stars = remember {
-        List(170) {
+        List(220) {
             val a = kotlin.random.Random.nextDouble(0.0, 2 * PI)
-            Triple(cos(a).toFloat(), sin(a).toFloat(), kotlin.random.Random.nextFloat())
+            floatArrayOf(
+                cos(a).toFloat(), sin(a).toFloat(),
+                kotlin.random.Random.nextFloat(), 0.5f + kotlin.random.Random.nextFloat() * 0.5f,
+            )
         }
     }
     val t = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { t.animateTo(1f, tween(5600, easing = LinearEasing)); onDone() }
+    LaunchedEffect(Unit) { t.animateTo(1f, tween(6400, easing = LinearEasing)); onDone() }
     val inf = rememberInfiniteTransition(label = "plaid")
-    val scroll by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "scroll")
+    val scroll by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(680, easing = LinearEasing)), label = "scroll")
+
+    val braceEnd = 0.14f
+    val accelEnd = 0.55f
+    val flashEnd = 0.60f
+    val plaidEnd = 0.86f
 
     Box(Modifier.fillMaxSize().background(Color.Black).clickable { onDone() }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val p = t.value
-            val center = Offset(size.width / 2, size.height / 2)
+            val base = Offset(size.width / 2, size.height / 2)
+            val maxR = size.minDimension * 0.95f
             when {
-                p < 0.52f -> {
-                    val a = p / 0.52f
-                    val speed = a * a
-                    val maxR = size.minDimension * 0.8f
-                    stars.forEach { (dx, dy, seed) ->
-                        val dir = Offset(dx, dy)
-                        val r0 = seed * maxR * (0.15f + speed)
-                        val len = (3f + speed * 280f) * (0.4f + seed)
-                        val s0 = center + dir * r0
-                        val e0 = center + dir * (r0 + len)
-                        drawLine(Color.White.copy(alpha = (0.3f + 0.65f * speed).coerceAtMost(1f)), s0, e0, 1f + speed * 3f)
+                p < braceEnd -> {
+                    // Calm starfield, a building rumble before the lever goes forward.
+                    val warm = p / braceEnd
+                    val jit = warm * warm * 3.dp.toPx()
+                    val c = base + Offset(sin(p * 211f) * jit, cos(p * 173f) * jit)
+                    stars.forEach { s ->
+                        val pos = c + Offset(s[0], s[1]) * (s[2] * maxR)
+                        drawCircle(Color.White.copy(alpha = 0.25f + 0.5f * s[3]), 1f + s[3], pos)
                     }
                 }
-                p < 0.6f -> drawRect(Color.White.copy(alpha = (1f - (p - 0.52f) / 0.08f).coerceIn(0f, 1f)))
-                else -> drawPlaid(scroll)
+                p < accelEnd -> {
+                    val a = (p - braceEnd) / (accelEnd - braceEnd)
+                    val speed = a * a
+                    // Violent shake at the punch, and a blue hyperspace tunnel bloom out of the centre.
+                    val jit = speed * 7.dp.toPx()
+                    val c = base + Offset(sin(p * 257f) * jit, cos(p * 193f) * jit)
+                    val tunnelR = maxR * (0.25f + speed * 0.7f)
+                    drawCircle(
+                        Brush.radialGradient(
+                            listOf(Sb.neonHot.copy(alpha = 0.30f * speed), Color.Transparent), c, tunnelR,
+                        ),
+                        tunnelR, c,
+                    )
+                    stars.forEach { s ->
+                        val dir = Offset(s[0], s[1])
+                        val r0 = (0.12f + speed) * maxR * (0.2f + s[2])
+                        val len = (4f + speed * 360f) * (0.4f + s[2])
+                        drawLine(
+                            Color.White.copy(alpha = (0.35f + 0.6f * speed).coerceAtMost(1f)),
+                            c + dir * r0, c + dir * (r0 + len), 1f + speed * 3.5f, cap = StrokeCap.Round,
+                        )
+                    }
+                }
+                p < flashEnd -> drawRect(
+                    Color.White.copy(alpha = (1f - (p - accelEnd) / (flashEnd - accelEnd)).coerceIn(0f, 1f)),
+                )
+                p < plaidEnd -> drawPlaid(scroll)
+                else -> {
+                    // Overshoot: the plaid recedes as the ship streaks off to a vanishing point.
+                    val q = (p - plaidEnd) / (1f - plaidEnd)
+                    val pull = 1f - q
+                    drawPlaid(scroll, alpha = pull)
+                    stars.forEach { s ->
+                        val dir = Offset(s[0], s[1])
+                        val r1 = (0.15f + s[2]) * maxR * (0.3f + pull)
+                        val r0 = r1 + 220f * pull * (0.4f + s[2])
+                        drawLine(Color.White.copy(alpha = 0.5f * pull), base + dir * r0, base + dir * r1, 2f, cap = StrokeCap.Round)
+                    }
+                    drawCircle(Color.White.copy(alpha = pull), 2f + 6f * pull, base)
+                }
             }
         }
         val p = t.value
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             when {
-                p < 0.52f -> mono("PREPARE FOR LUDICROUS SPEED", Sb.amber, 15f, FontWeight.Bold, TextAlign.Center, 2f)
-                p < 0.6f -> {}
-                else -> {
-                    mono("★  LUDICROUS SPEED  ★", Color.White, 22f, FontWeight.Bold, TextAlign.Center, 3f)
-                    Spacer(Modifier.height(10.dp))
-                    mono("WE'VE GONE TO PLAID", Sb.gold, 15f, FontWeight.Bold, TextAlign.Center, 2f)
-                    Spacer(Modifier.height(16.dp))
+                p < braceEnd -> {
+                    mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
+                    Spacer(Modifier.height(8.dp))
+                    mono("ENGINES: LUDICROUS   ·   SEATBELTS: FASTENED", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
+                    if (p > braceEnd * 0.62f) {
+                        Spacer(Modifier.height(18.dp))
+                        mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
+                    }
+                }
+                p < flashEnd -> {}
+                p < plaidEnd -> {
+                    mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
+                    Spacer(Modifier.height(12.dp))
+                    mono("THEY'VE GONE TO PLAID!", Sb.gold, 18f, FontWeight.Bold, TextAlign.Center, 2f)
+                    Spacer(Modifier.height(18.dp))
                     mono("tap to disengage", Sb.silver, 9f, align = TextAlign.Center)
+                }
+                else -> {
+                    mono("WE'VE PASSED THEM!", Sb.neonHot, 18f, FontWeight.Bold, TextAlign.Center, 2f)
+                    Spacer(Modifier.height(10.dp))
+                    mono("...  ALL  STOP", Sb.silver, 12f, FontWeight.Normal, TextAlign.Center, 2f)
                 }
             }
         }
     }
 }
 
-private fun DrawScope.drawPlaid(scroll: Float) {
-    drawRect(Color(0xFF06140A))
-    val palette = listOf(
-        Color(0xFF1E7D34), Color(0xFF0C3F19), Color(0xFFB23A2E), Color(0xFF20407A), Color(0xFFE0C040),
+/**
+ * Authentic scrolling tartan — a repeating "sett" of coloured bands woven warp × weft. The vertical
+ * pass is drawn at half alpha so crossings blend like a real weave (two thread colours meeting), which
+ * is what reads as plaid rather than a flat grid. Royal-Stewart-flavoured bright sett; scrolls diagonally.
+ */
+private fun DrawScope.drawPlaid(scroll: Float, alpha: Float = 1f) {
+    val red = Color(0xFFC8102E)
+    val navy = Color(0xFF1B2A6B)
+    val green = Color(0xFF0F7A34)
+    val yellow = Color(0xFFF2C200)
+    val white = Color(0xFFF5F5F5)
+    val black = Color(0xFF0A0A0A)
+    // (colour, width in dp) — one repeat of the sett, symmetric like a real tartan.
+    val sett = listOf(
+        red to 24f, black to 2f, yellow to 2f, black to 2f, red to 8f,
+        navy to 14f, white to 2f, navy to 14f, red to 8f,
+        green to 16f, yellow to 2f, green to 16f, red to 8f,
     )
-    val band = 30.dp.toPx()
-    val period = band * palette.size
-    val oy = (scroll * period) % period
-    val ox = (scroll * period * 0.7f) % period
-    var idx = 0; var y = -period + oy
+    val period = (sett.sumOf { it.second.toDouble() }).toFloat() * 1.dp.toPx()
+    drawRect(Color(0xFF120406).copy(alpha = alpha))
+    val off = (scroll * period) % period
+    // Weft (horizontal bands) — opaque ground.
+    var y = off - period
+    var i = 0
     while (y < size.height) {
-        drawRect(palette[idx % palette.size].copy(alpha = 0.42f), Offset(0f, y), Size(size.width, band))
-        drawRect(Color.White.copy(alpha = 0.06f), Offset(0f, y), Size(size.width, 1.5.dp.toPx()))
-        y += band; idx++
+        val (col, w) = sett[i % sett.size]
+        val wp = w.dp.toPx()
+        drawRect(col.copy(alpha = alpha), Offset(0f, y), Size(size.width, wp + 0.5f))
+        y += wp; i++
     }
-    idx = 0; var x = -period + ox
+    // Warp (vertical bands) — half alpha so crossings blend into the weave.
+    var x = off - period
+    i = 0
     while (x < size.width) {
-        drawRect(palette[idx % palette.size].copy(alpha = 0.42f), Offset(x, 0f), Size(band, size.height))
-        drawRect(Color.White.copy(alpha = 0.06f), Offset(x, 0f), Size(1.5.dp.toPx(), size.height))
-        x += band; idx++
+        val (col, w) = sett[i % sett.size]
+        val wp = w.dp.toPx()
+        drawRect(col.copy(alpha = 0.5f * alpha), Offset(x, 0f), Size(wp + 0.5f, size.height))
+        x += wp; i++
     }
 }
