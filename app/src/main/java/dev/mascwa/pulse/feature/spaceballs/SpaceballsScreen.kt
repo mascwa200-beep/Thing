@@ -878,25 +878,30 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
 private fun EngageText(e: Float, blink: Float) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
-            // BRACE — strap in, give up on the belt, then the order.
             e < 0.05f -> {}
-            e < 0.16f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                mono("AW, BUCKLE THIS!", Sb.dim, 10f, align = TextAlign.Center, spacing = 1.5f)
+            // 1) Strap in (the giant-seatbelt gag) — NO speed signs yet.
+            e < 0.12f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                mono("AW, BUCKLE THIS!", Sb.dim, 11f, FontWeight.Bold, TextAlign.Center, 1.5f)
                 Spacer(Modifier.height(8.dp))
-                mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
-                Spacer(Modifier.height(8.dp))
-                mono("ENGINES: LUDICROUS   ·   SEATBELTS: FASTENED", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
+                mono("SEATBELTS: FASTENED   ·   ENGINES: LUDICROUS", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
             }
-            e < 0.20f -> mono("G O !", Sb.redHot, 40f, FontWeight.Bold, TextAlign.Center, 8f)
-            // LIGHT SPEED — the ship climbs through the tiers; the three bridge signs light up in order.
+            // 2) The command: "Ludicrous speed, GO!".
+            e < 0.20f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 18f, FontWeight.Bold, TextAlign.Center, 3f)
+                Spacer(Modifier.height(14.dp))
+                mono("G O !", Sb.redHot, 40f, FontWeight.Bold, TextAlign.Center, 8f)
+            }
+            // 3) After GO, the ship climbs — the speed sign pops up ONE tier at a time, in order.
             e < 0.62f -> {
                 val tier = ((e - 0.20f) / 0.42f).coerceIn(0f, 1f)
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SpeedSign("LIGHT  SPEED", tier > 0f, false, blink)
-                    SpeedSign("RIDICULOUS  SPEED", tier > 0.34f, false, blink)
-                    SpeedSign("LUDICROUS  SPEED", tier > 0.67f, tier > 0.67f, blink)
-                    if (tier < 0.4f) {
-                        Spacer(Modifier.height(6.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    when {
+                        tier < 0.34f -> mono("LIGHT  SPEED", Color.White, 24f, FontWeight.Bold, TextAlign.Center, 4f)
+                        tier < 0.67f -> mono("RIDICULOUS  SPEED", Sb.amber, 24f, FontWeight.Bold, TextAlign.Center, 4f)
+                        else -> mono("LUDICROUS  SPEED", Sb.redHot.copy(alpha = blink), 26f, FontWeight.Bold, TextAlign.Center, 4f)
+                    }
+                    if (tier < 0.34f) {
+                        Spacer(Modifier.height(14.dp))
                         mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 11f, FontWeight.Bold, TextAlign.Center, 1f)
                     }
                 }
@@ -904,22 +909,6 @@ private fun EngageText(e: Float, blink: Float) {
             else -> {}
         }
     }
-}
-
-/** A bridge speed-tier sign that lights up as the ship climbs through it (LUDICROUS flashes). */
-@Composable
-private fun SpeedSign(label: String, lit: Boolean, flashing: Boolean, blink: Float) {
-    val color = when {
-        flashing -> Sb.redHot
-        lit -> Sb.amber
-        else -> Sb.dim
-    }
-    val alpha = when {
-        flashing -> blink
-        lit -> 1f
-        else -> 0.2f
-    }
-    mono(label, color.copy(alpha = alpha), 18f, FontWeight.Bold, TextAlign.Center, 4f)
 }
 
 /**
