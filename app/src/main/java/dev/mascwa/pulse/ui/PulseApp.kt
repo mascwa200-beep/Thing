@@ -198,6 +198,10 @@ fun PulseApp(
                     onOpenSecurityAudit = { navController.navigate(Routes.SECURITY_AUDIT) { launchSingleTop = true } },
                 )
             }
+            composable(Routes.SPACEBALLS) {
+                val vm: SettingsViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.spaceballs.SpaceballsScreen(vm)
+            }
             composable(Routes.ECONOMY) {
                 val vm: EconomyViewModel = viewModel(factory = factory)
                 EconomyScreen(vm, onBack = { navController.popBackStack() })
