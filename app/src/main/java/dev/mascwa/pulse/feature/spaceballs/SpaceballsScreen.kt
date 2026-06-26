@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -117,11 +118,12 @@ private object Lud {
     // Geometry / motion
     const val RING_RATIO = 1.20f           // geometric ring spacing (slow far → fast near)
     const val SEED_PX = 3f
-    const val ENGAGE_MS = 5000              // slower, appreciable speed-up
-    const val STOP_MS = 1600                // Act III decel time — the visible "slowing down" before the impact
-    const val SLAM_MS = 600                 // Helmet's "STOOOOP!" red override before the stop
-    const val STOP_HOLD_MS = 1100           // FULL STOP plate hold before returning to the console
-    const val CRUISE_MS = 1200              // ring-scroll period (lower = faster forward rush)
+    const val ENGAGE_MS = 12000             // slow speed-up: GO → ~4s white light-speed → ~5s plaid forming
+    const val STOP_MS = 2400                // Act III decel time — the visible "slowing down" before the impact
+    const val SLAM_MS = 700                 // Helmet's "STOOOOP!" red override before the stop
+    const val STOP_HOLD_MS = 1200           // FULL STOP plate hold before returning to the console
+    const val CRUISE_MS = 1500              // ring-scroll period (lower = faster forward rush)
+    const val PASSED_MS = 3500              // delay after plaid before "we passed 'em!" (the Winnebago)
     const val twoStageBrake = true          // first press warns (Sandurz), second press stops (Helmet)
 }
 
@@ -652,8 +654,9 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
 
 /**
  * LUDICROUS SPEED → PLAID → FULL STOP — the Spaceballs (1987) gag, built to the owner's spec and played
- * dead straight. Three acts: ENGAGE (escalating LIGHT→RIDICULOUS→LUDICROUS signs → "GO!" → exponential
- * jump into the plaid tunnel), PLAID (the woven red/gold shaft + starburst + streak rain, held forever —
+ * dead straight. Three acts: ENGAGE (escalating LIGHT→RIDICULOUS→LUDICROUS signs → "GO!" → a slow white
+ * light-speed streak run that turns into the plaid tunnel), PLAID (woven red/gold shaft + starburst +
+ * streak rain, then "we passed 'em!"; held forever —
  * the ship overshoots because nobody stops it), and FULL STOP (pull the "EMERGENCY STOP — NEVER USE"
  * lever → a visible deceleration ending in a violent impact, Helmet into the console). Honesty: the animation announces nothing
  * to a screen reader — it's purely visual and silent by design; only the trigger and brake are real
@@ -684,12 +687,14 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
     val stop = remember { Animatable(0f) }    // Act III hard-snap collapse
     var phase by remember { mutableStateOf(0) }      // 0 engage · 1 plaid (held) · 2 slam · 3 full-stop
     var brakeStage by remember { mutableStateOf(0) } // 0 armed · 1 warned (override)
+    var passed by remember { mutableStateOf(false) } // "we passed 'em!" reveal, after the plaid forms
     LaunchedEffect(Unit) {
         if (reduceMotion) phase = 1
         else { eng.animateTo(1f, tween(Lud.ENGAGE_MS, easing = LinearEasing)); phase = 1 }
     }
     LaunchedEffect(phase) {
         when (phase) {
+            1 -> { delay(Lud.PASSED_MS.toLong()); passed = true }  // they overshoot Lone Starr's Winnebago
             2 -> { delay(Lud.SLAM_MS.toLong()); phase = 3 }        // Helmet's "STOOOOP!" then snap
             3 -> {
                 stop.snapTo(0f)
@@ -706,8 +711,8 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
     val scroll = if (reduceMotion) 0.4f else scrollA
     val breath = 1f + 0.15f * sin((if (reduceMotion) 0f else pumpA) * 6.2832f)
 
-    val braceEnd = 0.30f // engage sub-beats, within eng's 0..1
-    val accelEnd = 0.84f
+    val braceEnd = 0.28f // engage sub-beats, within eng's 0..1
+    val lightEnd = 0.60f // GO/signs → white light-speed → plaid forming
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) {
@@ -718,7 +723,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     val e = eng.value
                     when {
                         e < braceEnd -> {
-                            // Trembling starfield before the punch.
+                            // Trembling starfield while Lord Helmet shouts "Ludicrous speed, GO!".
                             val warm = e / braceEnd
                             val jit = if (reduceMotion) 0f else warm * warm * 3.dp.toPx()
                             val c = base + Offset(sin(e * 211f) * jit, cos(e * 173f) * jit)
@@ -727,40 +732,44 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                                 drawCircle(Color.White.copy(alpha = 0.22f + 0.5f * s[3]), 1f + s[3], pos)
                             }
                         }
-                        e < accelEnd -> {
-                            // Punch into the shaft: ease-in acceleration + shake + blue bloom.
-                            val a = (e - braceEnd) / (accelEnd - braceEnd)
+                        e < lightEnd -> {
+                            // LIGHT SPEED — the ship takes off; stars stretch into long WHITE streaks,
+                            // accelerating, with a hard g-force shake (Helmet hanging on / lifting off).
+                            val a = (e - braceEnd) / (lightEnd - braceEnd)
                             val speed = a * a
-                            val jit = if (reduceMotion) 0f else speed * 12.dp.toPx()
-                            val c = base + Offset(sin(e * 257f) * jit, cos(e * 193f) * jit)
-                            drawShaft(scroll, speed, c)
-                            // Blue hyperspace bloom (additive, on top of the shaft's black clear).
-                            val bloomR = maxR * (0.2f + speed * 0.7f)
-                            drawCircle(
-                                Brush.radialGradient(
-                                    listOf(Lud.WARP_CYAN.copy(alpha = 0.5f * speed), Lud.WARP_BLUE.copy(alpha = 0.25f * speed), Color.Transparent),
-                                    c, bloomR,
-                                ),
-                                bloomR, c, blendMode = BlendMode.Plus,
-                            )
+                            val jit = if (reduceMotion) 0f else (0.25f + speed) * 11.dp.toPx()
+                            val c = base + Offset(sin(e * 47f) * jit, cos(e * 39f) * jit)
                             stars.forEach { s ->
                                 val dir = Offset(s[0], s[1])
-                                val r0 = (0.10f + speed) * maxR * (0.2f + s[2])
-                                val len = (4f + speed * 360f) * (0.4f + s[2])
+                                val phaseR = (scroll + s[2]) % 1f
+                                val r0 = phaseR * maxR * (0.6f + s[2])
+                                val len = (30f + 380f * phaseR) * (0.4f + s[2]) * (0.3f + 0.7f * speed)
                                 drawLine(
-                                    streakColor(s).copy(alpha = (0.40f + 0.55f * speed).coerceAtMost(1f)),
-                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3f,
+                                    Color.White.copy(alpha = (0.85f * (1f - phaseR * 0.4f)) * (0.4f + 0.6f * speed)),
+                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 2.5f,
                                     cap = StrokeCap.Round, blendMode = BlendMode.Plus,
                                 )
                             }
-                            drawBurst(c, speed, speed)
                         }
                         else -> {
-                            // White blast flash fading to reveal the plaid → hand to Act II.
-                            drawShaft(scroll, 1f, base)
-                            cruiseStreaks(stars, scroll, base, maxR)
-                            drawBurst(base, breath, 1f)
-                            drawRect(Color.White.copy(alpha = (1f - (e - accelEnd) / (1f - accelEnd)).coerceIn(0f, 1f)))
+                            // PLAID FORM — over a few seconds the white streaks gain colour and the woven
+                            // red tunnel + burst fade in: "...they've gone to plaid."
+                            val a = ((e - lightEnd) / (1f - lightEnd)).coerceIn(0f, 1f)
+                            val jit = if (reduceMotion) 0f else (1f - a) * 8.dp.toPx()
+                            val c = base + Offset(sin(e * 41f) * jit, cos(e * 35f) * jit)
+                            drawShaft(scroll, a, c)
+                            stars.forEach { s ->
+                                val dir = Offset(s[0], s[1])
+                                val phaseR = (scroll + s[2]) % 1f
+                                val r0 = phaseR * maxR * (0.6f + s[2])
+                                val len = (40f + 320f * phaseR) * (0.4f + s[2])
+                                drawLine(
+                                    lerp(Color.White, streakColor(s), a).copy(alpha = 0.85f * (1f - phaseR * 0.4f)),
+                                    c + dir * r0, c + dir * (r0 + len), 2f + s[3] * 1.5f,
+                                    cap = StrokeCap.Round, blendMode = BlendMode.Plus,
+                                )
+                            }
+                            drawBurst(c, a, a)
                         }
                     }
                 }
@@ -814,8 +823,10 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
                     Spacer(Modifier.height(10.dp))
                     mono("THEY'VE GONE TO PLAID!", Lud.RAIL_GOLD, 18f, FontWeight.Bold, TextAlign.Center, 2f)
-                    Spacer(Modifier.height(10.dp))
-                    mono("WE PASSED 'EM — STOP THIS SHIP!", Sb.redHot, 10f, FontWeight.Bold, TextAlign.Center, 1.5f)
+                    if (passed) {
+                        Spacer(Modifier.height(10.dp))
+                        mono("WE PASSED 'EM — STOP THIS SHIP!", Sb.redHot, 10f, FontWeight.Bold, TextAlign.Center, 1.5f)
+                    }
                     if (brakeStage == 1) {
                         Spacer(Modifier.height(8.dp))
                         mono("WE CAN'T STOP — IT'S TOO DANGEROUS — SLOW DOWN FIRST", Sb.amber, 9f, FontWeight.Bold, TextAlign.Center, 1f)
@@ -867,11 +878,11 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
 private fun EngageText(e: Float, blink: Float) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
-            e < 0.06f -> {}
-            e < 0.135f -> mono("LIGHT  SPEED", Sb.dim, 16f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.21f -> mono("RIDICULOUS  SPEED", Sb.amber.copy(alpha = 0.9f), 18f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.27f -> mono("LUDICROUS  SPEED", Sb.redHot.copy(alpha = blink), 22f, FontWeight.Bold, TextAlign.Center, 4f)
-            e < 0.34f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            e < 0.04f -> {}
+            e < 0.09f -> mono("LIGHT  SPEED", Sb.dim, 16f, FontWeight.Bold, TextAlign.Center, 4f)
+            e < 0.14f -> mono("RIDICULOUS  SPEED", Sb.amber.copy(alpha = 0.9f), 18f, FontWeight.Bold, TextAlign.Center, 4f)
+            e < 0.20f -> mono("LUDICROUS  SPEED", Sb.redHot.copy(alpha = blink), 22f, FontWeight.Bold, TextAlign.Center, 4f)
+            e < 0.28f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 mono("AW, BUCKLE THIS!", Sb.dim, 9f, align = TextAlign.Center, spacing = 1.5f)
                 Spacer(Modifier.height(6.dp))
                 mono("▲  LUDICROUS  SPEED  ▲", Sb.amber, 16f, FontWeight.Bold, TextAlign.Center, 3f)
@@ -880,7 +891,11 @@ private fun EngageText(e: Float, blink: Float) {
                 Spacer(Modifier.height(16.dp))
                 mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
             }
-            e < 0.52f -> mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 12f, FontWeight.Bold, TextAlign.Center, 1f)
+            e < 0.60f -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                mono("◤  LIGHT SPEED  ◥", Color.White.copy(alpha = 0.85f), 14f, FontWeight.Bold, TextAlign.Center, 4f)
+                Spacer(Modifier.height(12.dp))
+                mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 12f, FontWeight.Bold, TextAlign.Center, 1f)
+            }
             else -> {}
         }
     }
