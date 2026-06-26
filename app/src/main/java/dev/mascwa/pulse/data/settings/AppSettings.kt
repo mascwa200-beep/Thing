@@ -281,7 +281,7 @@ data class AppSettings(
     val amoledBlack: Boolean = false,                 // true-black surfaces
     val scanlines: Boolean = false,                   // CRT scanline overlay (off: clean 2077-HUD look, lighter)
     val glitch: Boolean = false,                      // chromatic glitch FX (off by default: no jank, less GPU/RAM)
-    val bootAnimation: Boolean = true,                // terminal boot sequence on launch
+    val bootAnimation: Boolean = false,               // cold-open boot sequence on launch (off by default to save startup RAM; re-enable in Settings → Appearance)
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
     val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
