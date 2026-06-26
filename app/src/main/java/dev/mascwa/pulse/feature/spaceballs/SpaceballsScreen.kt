@@ -2,7 +2,6 @@ package dev.mascwa.pulse.feature.spaceballs
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -119,7 +118,7 @@ private object Lud {
     const val RING_RATIO = 1.20f           // geometric ring spacing (slow far → fast near)
     const val SEED_PX = 3f
     const val ENGAGE_MS = 5000              // slower, appreciable speed-up
-    const val STOP_MS = 1700                // Act III decel — a visible "slowing down" (drop to ~260 for a hard snap)
+    const val STOP_MS = 1600                // Act III decel time — the visible "slowing down" before the impact
     const val SLAM_MS = 600                 // Helmet's "STOOOOP!" red override before the stop
     const val STOP_HOLD_MS = 1100           // FULL STOP plate hold before returning to the console
     const val CRUISE_MS = 1200              // ring-scroll period (lower = faster forward rush)
@@ -656,7 +655,7 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
  * dead straight. Three acts: ENGAGE (escalating LIGHT→RIDICULOUS→LUDICROUS signs → "GO!" → exponential
  * jump into the plaid tunnel), PLAID (the woven red/gold shaft + starburst + streak rain, held forever —
  * the ship overshoots because nobody stops it), and FULL STOP (pull the "EMERGENCY STOP — NEVER USE"
- * lever → a visible hard deceleration to rest; Lud.STOP_MS tunes it). Honesty: the animation announces nothing
+ * lever → a visible deceleration ending in a violent impact, Helmet into the console). Honesty: the animation announces nothing
  * to a screen reader — it's purely visual and silent by design; only the trigger and brake are real
  * controls. Honours OS reduce-motion (skips Act I + the snap). Tunables live in the Lud CONFIG above.
  */
@@ -694,7 +693,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
             2 -> { delay(Lud.SLAM_MS.toLong()); phase = 3 }        // Helmet's "STOOOOP!" then snap
             3 -> {
                 stop.snapTo(0f)
-                stop.animateTo(1f, tween(Lud.STOP_MS, easing = LinearOutSlowInEasing))
+                stop.animateTo(1f, tween(Lud.STOP_MS, easing = LinearEasing))
                 delay(Lud.STOP_HOLD_MS.toLong())
                 onDone()
             }
@@ -775,12 +774,16 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     if (phase == 2) drawRect(Lud.WALL_RED.copy(alpha = 0.35f + 0.25f * blink))
                 }
                 else -> {
-                    // FULL STOP — a visible deceleration: the tunnel slows hard and recedes to centre,
-                    // streaks converge, the burst dims, with a diminishing brake-jolt. (LinearOutSlowIn.)
+                    // FULL STOP — a visible deceleration that ends in a VIOLENT impact (Helmet headfirst
+                    // into the console): the tunnel slows and recedes, then a hard recoil-lurch + white slam.
                     val s = stop.value
                     val pull = 1f - s
-                    val jx = if (reduceMotion) 0f else sin(s * 34f) * pull * pull * 9.dp.toPx()
-                    val jy = if (reduceMotion) 0f else cos(s * 29f) * pull * pull * 6.dp.toPx()
+                    val impact = ((s - 0.84f) / 0.16f).coerceIn(0f, 1f)        // ramps 0→1 over the final 16%
+                    val hit = (impact * (1f - impact) * 4f).coerceIn(0f, 1f)   // one spike, peaking at the slam
+                    val shimmy = if (reduceMotion) 0f else pull * 6.dp.toPx()
+                    val lurch = if (reduceMotion) 0f else hit * 30.dp.toPx()
+                    val jx = sin(s * 33f) * shimmy + sin(s * 140f) * lurch
+                    val jy = cos(s * 27f) * shimmy - lurch * 0.8f
                     val c = base + Offset(jx, jy)
                     drawShaft(scroll, pull, c)
                     stars.forEach { st2 ->
@@ -790,6 +793,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                         drawLine(streakColor(st2).copy(alpha = 0.6f * pull), c + dir * rOut, c + dir * rIn, 2f, cap = StrokeCap.Round, blendMode = BlendMode.Plus)
                     }
                     drawBurst(c, pull, pull * pull)
+                    if (hit > 0f) drawRect(Color.White.copy(alpha = (hit * 0.9f).coerceIn(0f, 1f)))   // the slam
                 }
             }
         }
@@ -876,6 +880,7 @@ private fun EngageText(e: Float, blink: Float) {
                 Spacer(Modifier.height(16.dp))
                 mono("G O !", Sb.redHot, 34f, FontWeight.Bold, TextAlign.Center, 8f)
             }
+            e < 0.52f -> mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 12f, FontWeight.Bold, TextAlign.Center, 1f)
             else -> {}
         }
     }
