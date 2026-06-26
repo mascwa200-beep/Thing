@@ -1,18 +1,28 @@
 package dev.mascwa.pulse.feature.spaceballs
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -26,12 +36,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,293 +56,240 @@ import dev.mascwa.pulse.data.settings.ThemeMode
 import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.random.Random
 
 /* -------------------------------------------------------------------------------------------------
- * The BRIDGE CONSOLE: a Spaceballs (1987) tribute. Pure UI theater — gloriously over-engineered,
- * bureaucratically absurd, and almost entirely non-functional. The only buttons that do anything are
- * hidden in the Manual Override panel, where mundane settings wear catastrophic warning labels.
- * Self-contained grey/silver/black look, deliberately separate from the rest of the app. (Warrning:
- * this comment is the most useful thing in the file.)
+ * THE BRIDGE — a Spaceballs (1987) starship control console, rendered as believable hardware: beveled
+ * riveted metal plating, a blue angular neon monitor over a green oscilloscope crosshair, colored dome
+ * buttons, illuminated flip-switches, needle gauges and a dot-matrix readout. Played entirely straight —
+ * the joke is that mundane settings are presented as critical starship instrumentation. The big red
+ * button engages LUDICROUS SPEED (we've gone to plaid). All real functionality lives in the flip-switch
+ * bank; everything else is committed, earnest theater.
  * ------------------------------------------------------------------------------------------------- */
 
 private object Sb {
-    val base = Color(0xFF343434)
-    val panel = Color(0xFF2A2A2A)
-    val well = Color(0xFF0A0A0A)
-    val silver = Color(0xFFE8E8E8)
-    val edgeLight = Color(0xFF6E6E6E)
-    val edgeDark = Color(0xFF101010)
+    val metalDark = Color(0xFF15171B)
+    val metalMid = Color(0xFF34383F)
+    val metalLight = Color(0xFF5C626B)
+    val screen = Color(0xFF04070A)
+    val neon = Color(0xFF1E90FF)
+    val neonHot = Color(0xFF7FC0FF)
     val green = Color(0xFF39FF14)
+    val greenDim = Color(0xFF1C7A0E)
     val amber = Color(0xFFFFB81C)
+    val gold = Color(0xFFFFD24A)
     val red = Color(0xFFDC143C)
-    val dim = Color(0xFF8C8C8C)
+    val redHot = Color(0xFFFF3B5C)
+    val purple = Color(0xFF9B59B6)
+    val silver = Color(0xFFD8DCE2)
+    val dim = Color(0xFF8A8F97)
 }
 
-/** Hard, two-tone bevel — light top/left, dark bottom/right (or inverted for a recessed look). */
-private fun Modifier.beveled(raised: Boolean = true): Modifier = drawBehind {
+// --- hardware modifiers --------------------------------------------------------------------------
+
+/** Brushed-metal plate: vertical gradient + faint streaks + hard bevel + corner rivets. Static. */
+private fun Modifier.metal(raised: Boolean = true, rivets: Boolean = true): Modifier = drawBehind {
+    drawRect(Brush.verticalGradient(listOf(Sb.metalLight, Sb.metalMid, Sb.metalDark)))
+    var x = 0f
+    val streak = Color.White.copy(alpha = 0.025f)
+    while (x < size.width) { drawLine(streak, Offset(x, 0f), Offset(x, size.height)); x += 3.dp.toPx() }
     val w = 2.dp.toPx()
-    val tl = if (raised) Sb.edgeLight else Sb.edgeDark
-    val br = if (raised) Sb.edgeDark else Sb.edgeLight
+    val tl = if (raised) Sb.metalLight else Sb.metalDark
+    val br = if (raised) Sb.metalDark else Sb.metalLight
     drawRect(tl, Offset.Zero, Size(size.width, w))
     drawRect(tl, Offset.Zero, Size(w, size.height))
     drawRect(br, Offset(0f, size.height - w), Size(size.width, w))
     drawRect(br, Offset(size.width - w, 0f), Size(w, size.height))
-}
-
-/** A faint CRT scanline texture drawn over the content. */
-private fun Modifier.scanlines(): Modifier = drawWithContent {
-    drawContent()
-    val gap = 3.dp.toPx()
-    var y = 0f
-    while (y < size.height) {
-        drawRect(Color.Black.copy(alpha = 0.13f), Offset(0f, y), Size(size.width, 1f))
-        y += gap
+    if (rivets) {
+        val r = 2.4.dp.toPx(); val p = 7.dp.toPx()
+        listOf(
+            Offset(p, p), Offset(size.width - p, p),
+            Offset(p, size.height - p), Offset(size.width - p, size.height - p),
+        ).forEach {
+            drawCircle(Sb.metalDark, r, it)
+            drawCircle(Sb.metalLight.copy(alpha = 0.8f), r * 0.45f, it - Offset(r * 0.3f, r * 0.3f))
+        }
     }
 }
 
+/** Recessed (sunken) panel: dark fill + inset bevel (dark top/left, light bottom/right). */
+private fun Modifier.recessed(): Modifier = drawBehind {
+    drawRect(Sb.metalDark)
+    val w = 1.5.dp.toPx()
+    drawRect(Color.Black, Offset.Zero, Size(size.width, w))
+    drawRect(Color.Black, Offset.Zero, Size(w, size.height))
+    drawRect(Sb.metalLight.copy(alpha = 0.5f), Offset(0f, size.height - w), Size(size.width, w))
+    drawRect(Sb.metalLight.copy(alpha = 0.5f), Offset(size.width - w, 0f), Size(w, size.height))
+}
+
+private fun chamfer(size: Size, cut: Float): Path = Path().apply {
+    val w = size.width; val h = size.height
+    moveTo(cut, 0f); lineTo(w - cut, 0f); lineTo(w, cut); lineTo(w, h - cut)
+    lineTo(w - cut, h); lineTo(cut, h); lineTo(0f, h - cut); lineTo(0f, cut); close()
+}
+
+private fun DrawScope.crosshair() {
+    val g = Sb.green.copy(alpha = 0.42f)
+    val faint = Sb.green.copy(alpha = 0.10f)
+    val cx = size.width / 2; val cy = size.height / 2
+    val step = 18.dp.toPx()
+    var gx = cx % step; while (gx < size.width) { drawLine(faint, Offset(gx, 0f), Offset(gx, size.height)); gx += step }
+    var gy = cy % step; while (gy < size.height) { drawLine(faint, Offset(0f, gy), Offset(size.width, gy)); gy += step }
+    drawLine(g, Offset(0f, cy), Offset(size.width, cy), 1.2f)
+    drawLine(g, Offset(cx, 0f), Offset(cx, size.height), 1.2f)
+    val t = 5.dp.toPx()
+    var x = cx % step; while (x < size.width) { drawLine(g, Offset(x, cy - t), Offset(x, cy + t)); x += step }
+    var y = cy % step; while (y < size.height) { drawLine(g, Offset(cx - t, y), Offset(cx + t, y)); y += step }
+    drawCircle(g, 24.dp.toPx(), Offset(cx, cy), style = Stroke(1.2.dp.toPx()))
+}
+
+// --- screen ---------------------------------------------------------------------------------------
+
+@Composable
+private fun NeonScreen(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    val inf = rememberInfiniteTransition(label = "neon")
+    val pulse by inf.animateFloat(0.55f, 1f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "pulse")
+    val scan by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "scan")
+    Box(
+        modifier.drawBehind {
+            val cut = 14.dp.toPx()
+            val path = chamfer(size, cut)
+            drawPath(path, Sb.screen)
+            clipPath(path) {
+                crosshair()
+                drawRect(Sb.green.copy(alpha = 0.06f), Offset(0f, scan * size.height), Size(size.width, 2.dp.toPx()))
+            }
+            for (i in 4 downTo 1) {
+                drawPath(path, Sb.neon.copy(alpha = pulse * 0.09f * i), style = Stroke((i * 2.4f).dp.toPx()))
+            }
+            drawPath(path, Sb.neonHot.copy(alpha = pulse), style = Stroke(1.6.dp.toPx()))
+        }.padding(16.dp),
+        content = content,
+    )
+}
+
+// --- text helper ----------------------------------------------------------------------------------
+
 @Composable
 private fun mono(
-    text: String,
-    color: Color = Sb.silver,
-    size: Float = 11f,
-    weight: FontWeight = FontWeight.Normal,
-    align: TextAlign? = null,
-    spacing: Float = 0.5f,
-    modifier: Modifier = Modifier,
-) = Text(
-    text, modifier = modifier, color = color, fontFamily = JetBrainsMono, fontSize = size.sp,
-    fontWeight = weight, textAlign = align, letterSpacing = spacing.sp,
-)
+    text: String, color: Color = Sb.silver, size: Float = 11f, weight: FontWeight = FontWeight.Normal,
+    align: TextAlign? = null, spacing: Float = 0.5f, modifier: Modifier = Modifier,
+) = Text(text, modifier = modifier, color = color, fontFamily = JetBrainsMono, fontSize = size.sp,
+    fontWeight = weight, textAlign = align, letterSpacing = spacing.sp)
+
+// --- screen entry ---------------------------------------------------------------------------------
 
 @Composable
 fun SpaceballsScreen(vm: SettingsViewModel) {
     val s by vm.settings.collectAsStateWithLifecycle()
 
-    // Meaningless live state — increments forever, reflects nothing.
     var tick by remember { mutableStateOf(0) }
     var uptime by remember { mutableStateOf(8_675_309L) }
-    LaunchedEffect(Unit) {
-        while (true) { delay(420); tick += 1; uptime += 7 }
-    }
+    LaunchedEffect(Unit) { while (true) { delay(450); tick += 1; uptime += 7 } }
 
     var activeCmd by remember { mutableStateOf<String?>(null) }
-    var cmdPhase by remember { mutableStateOf(0) } // 0 = processing, 1 = complete
-    LaunchedEffect(activeCmd) {
-        if (activeCmd != null) { cmdPhase = 0; delay(2600); cmdPhase = 1 }
-    }
+    var cmdPhase by remember { mutableStateOf(0) }
+    LaunchedEffect(activeCmd) { if (activeCmd != null) { cmdPhase = 0; delay(2600); cmdPhase = 1 } }
 
-    Box(Modifier.fillMaxSize().background(Sb.base).scanlines()) {
+    var ludicrous by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxSize().background(Sb.metalDark)) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxSize().metal(rivets = true).verticalScroll(rememberScrollState()).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            BridgeHeader(uptime, tick)
-            AlertTicker()
-            MockWarning()
-            StatusPanel(tick)
-            CommandConsole(onCommand = { activeCmd = it })
-            AccessLog(tick)
-            ManualOverride(
+            HeaderBar(uptime, tick)
+            CentralMonitor(tick)
+            SubsystemGrid(tick)
+            FlipBank(
                 themeDark = s.theme == ThemeMode.DARK,
                 amoled = s.amoledBlack,
                 scanlines = s.scanlines,
+                boot = s.bootAnimation,
                 onTheme = { vm.update { st -> st.copy(theme = if (st.theme == ThemeMode.DARK) ThemeMode.LIGHT else ThemeMode.DARK) } },
                 onAmoled = { vm.update { st -> st.copy(amoledBlack = !st.amoledBlack) } },
                 onScanlines = { vm.update { st -> st.copy(scanlines = !st.scanlines) } },
+                onBoot = { vm.update { st -> st.copy(bootAnimation = !st.bootAnimation) } },
             )
-            BridgeFooter()
-            Spacer(Modifier.height(8.dp))
+            DotMatrix()
+            ControlArray(onCommand = { activeCmd = it }, onLudicrous = { ludicrous = true })
+            Footer()
+            Spacer(Modifier.height(6.dp))
         }
 
         if (activeCmd != null) {
-            ProcessingOverlay(
-                command = activeCmd!!,
-                phase = cmdPhase,
-                spinner = SPINNER[tick % SPINNER.size],
-                onDismiss = { activeCmd = null },
-            )
+            ProcessingOverlay(activeCmd!!, cmdPhase, SPINNER[tick % SPINNER.size]) { activeCmd = null }
+        }
+        if (ludicrous) {
+            LudicrousOverlay { ludicrous = false }
         }
     }
 }
 
 private val SPINNER = listOf("|", "/", "—", "\\")
 
+// --- zones ----------------------------------------------------------------------------------------
+
 @Composable
-private fun BridgeHeader(uptime: Long, tick: Int) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        mono("ADVISORY–ADMINISTRATIVE", Sb.amber, 8f, spacing = 2f, align = TextAlign.Center)
-        mono("ARGUS DYNAMICS // BRIDGE CONSOLE", Sb.silver, 17f, FontWeight.Bold, TextAlign.Center, 1f,
-            Modifier.fillMaxWidth())
-        mono("SPACEBALL ONE · DECK 1 · PANEL IS PURELY DECORATIVE", Sb.dim, 8f, align = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Readout("UPTIME", "${uptime}s", Sb.green, Modifier.weight(1f))
-            Readout("LOAD", "87%", Sb.green, Modifier.weight(1f))
-            Readout("SCHWARTZ", "STABLE", Sb.amber, Modifier.weight(1f))
+private fun HeaderBar(uptime: Long, tick: Int) {
+    Column(Modifier.fillMaxWidth().metal().padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IndicatorLight(Sb.green, tick % 2 == 0)
+                IndicatorLight(Sb.amber, tick % 3 == 0)
+                IndicatorLight(Sb.red, false)
+            }
+            mono("SPACEBALL ONE", Sb.silver, 13f, FontWeight.Bold, TextAlign.Center, 2f,
+                Modifier.weight(1f))
+            IndicatorLight(Sb.green, true)
         }
+        mono("ARGUS DYNAMICS · BRIDGE CONSOLE · DECK 1", Sb.dim, 7f, align = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth())
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Readout("CHRONOMETER", "T+ ${uptime}", Sb.green, Modifier.weight(1.2f))
+            Readout("SYS LOAD", "87%", Sb.amber, Modifier.weight(1f))
+            Readout("STATUS", "NOMINAL", Sb.green, Modifier.weight(1f))
+        }
+        NeonBar(87, Sb.amber)
     }
 }
 
 @Composable
 private fun Readout(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier.beveled(false).background(Sb.well).padding(horizontal = 8.dp, vertical = 6.dp)) {
-        mono("SYS: $label", Sb.dim, 7f, spacing = 1f)
-        mono(value, color, 13f, FontWeight.Bold)
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AlertTicker() {
-    val text = listOf(
-        "WARNING: AUXILIARY POWER CONDUIT 7-B HUMMING AT UNUSUAL FREQUENCY",
-        "ADVISORY: TUESDAY IS LIKELY TO OCCUR",
-        "CRITICAL: PRINTER OUT OF TONER (AGAIN)",
-        "SYS: COMBOLINGUS LEVELS NOMINAL",
-        "ADVISORY–ADMINISTRATIVE: FORM 27-B/6 REMAINS UNFILED",
-        "WARRNING: SPELL-CHECK SUBSYSTEM OFFLINE",
-        "SYS: SCHWARTZ FIELD STABLE — DO NOT INVERT",
-    ).joinToString("   ////   ")
-    Box(
-        Modifier.fillMaxWidth().beveled(false).background(Sb.well).padding(vertical = 5.dp, horizontal = 8.dp),
-    ) {
-        mono(text, Sb.amber, 10f, spacing = 1f, modifier = Modifier.fillMaxWidth().basicMarquee())
+    Column(modifier.recessed().padding(horizontal = 7.dp, vertical = 5.dp)) {
+        mono(label, Sb.dim, 6.5f, spacing = 1f)
+        mono(value, color, 12f, FontWeight.Bold)
     }
 }
 
 @Composable
-private fun MockWarning() {
-    var ack by remember { mutableStateOf(false) }
-    if (ack) return
-    Row(
-        Modifier.fillMaxWidth().beveled().background(Sb.panel).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            mono("WARN: BRIDGE CONSOLE INITIALIZED", Sb.amber, 11f, FontWeight.Bold)
-            mono("All systems nominal. No action is required, possible, or advisable.", Sb.dim, 9f)
-        }
-        SbButton("ACKNOWLEDGE", Sb.amber) { ack = true }
-    }
-}
-
-@Composable
-private fun StatusPanel(tick: Int) {
-    Panel("STATUS DISPLAY — VERIFIED (PROBABLY)") {
-        val animated = listOf(
-            Triple("SHIP INTEGRITY", 0, Sb.green),
-            Triple("LIFE SUPPORT", 11, Sb.amber),
-            Triple("CABIN PRESSURE", 23, Sb.green),
-            Triple("PRINTER TONER", 37, Sb.red),
-        )
-        animated.forEach { (label, seed, color) ->
-            val pct = (62 + (sin((tick + seed) / 4.0) * 22).toInt()).coerceIn(2, 99)
-            MetricRow(label, "$pct%", color, pct)
-        }
-        // Permanently impossible / bureaucratic readouts.
-        MetricRow("CPU LOAD", "87%", Sb.green, 87)
-        MetricRow("FUEL RESERVES", "0% — SHIP IN MOTION", Sb.red, 0)
-        MetricRow("NAVIGATION", "OFFLINE — AT FTL SPEED", Sb.red, null)
-        MetricRow("DIPLOMATIC RELATIONS", "UNKNOWN", Sb.dim, null)
-        MetricRow("MEMO DISTRIBUTION", "412 PENDING", Sb.amber, null)
-    }
-}
-
-@Composable
-private fun MetricRow(label: String, value: String, color: Color, pct: Int?) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            mono(label, Sb.silver, 10f, spacing = 1f)
-            mono(value, color, 10f, FontWeight.Bold)
-        }
-        if (pct != null) {
-            Spacer(Modifier.height(3.dp))
-            PixelBar(pct, color)
-        }
-    }
-}
-
-@Composable
-private fun PixelBar(pct: Int, color: Color) {
-    val cells = 24
-    val on = (pct * cells / 100).coerceIn(0, cells)
-    Row(Modifier.fillMaxWidth().height(7.dp), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-        repeat(cells) { i ->
-            Box(Modifier.weight(1f).height(7.dp).background(if (i < on) color else Sb.edgeDark))
-        }
-    }
-}
-
-@Composable
-private fun CommandConsole(onCommand: (String) -> Unit) {
-    Panel("COMMAND CONSOLE — AUTHORIZED USE ONLY") {
-        val cmds = listOf(
-            "INITIALIZE NAVIGATION SUBSYSTEM",
-            "QUERY DEEP SPACE PROTOCOLS",
-            "RESET COFFEE MAKER",
-            "AUDIT THE AUDIT LOG",
-            "ENGAGE LUDICROUS SPEED",
-            "DISPENSE BEVERAGE MODULE",
-            "SYNERGIZE INTERFACE MATRICES",
-            "REALIGN PARADIGMATIC VERTICALS",
-        )
-        // Two-column grid of physical-feeling buttons.
-        cmds.chunked(2).forEach { rowCmds ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowCmds.forEach { cmd ->
-                    ConsoleKey(cmd, Modifier.weight(1f)) { onCommand(cmd) }
-                }
-                if (rowCmds.size == 1) Spacer(Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun ConsoleKey(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    var pressed by remember { mutableStateOf(false) }
-    LaunchedEffect(pressed) { if (pressed) { delay(140); pressed = false } }
-    Box(
-        modifier
-            .height(58.dp)
-            .beveled(raised = !pressed)
-            .background(if (pressed) Sb.silver.copy(alpha = 0.20f) else Sb.panel)
-            .clickable { pressed = true; onClick() }
-            .padding(6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        mono(label, if (pressed) Sb.green else Sb.silver, 9f, FontWeight.Bold, TextAlign.Center, 0.6f)
-    }
-}
-
-@Composable
-private fun AccessLog(tick: Int) {
+private fun CentralMonitor(tick: Int) {
     val lines = remember { mutableStateListOf<String>() }
-    var clock by remember { mutableStateOf(52_327L) } // fake HH:MM:SS source
+    var clock by remember { mutableStateOf(52_327L) }
     LaunchedEffect(Unit) {
         while (true) {
-            clock += Random.nextInt(1, 4)
+            clock += (1..3).random()
             val h = (clock / 3600) % 24; val m = (clock / 60) % 60; val sec = clock % 60
-            val stamp = "%02d:%02d:%02d".format(h, m, sec)
-            lines.add(0, "$stamp | ${LOG_EVENTS.random()}")
-            if (lines.size > 14) lines.removeAt(lines.size - 1)
-            delay(1400)
+            lines.add(0, "%02d:%02d:%02d │ %s".format(h, m, sec, LOG_EVENTS.random()))
+            if (lines.size > 9) lines.removeAt(lines.size - 1)
+            delay(1500)
         }
     }
-    Panel("ACCESS LOG VIEWER — [SCROLLING]") {
-        Column(Modifier.fillMaxWidth().beveled(false).background(Sb.well).padding(8.dp)) {
-            if (lines.isEmpty()) mono("…awaiting events…", Sb.dim, 9f)
-            lines.forEach { line ->
-                val color = when {
-                    "DELETED" in line || "ROGUE" in line -> Sb.red
-                    "VERIFIED" in line || "SUCCESS" in line -> Sb.green
-                    else -> Sb.dim
+    Column(Modifier.fillMaxWidth()) {
+        Nameplate("CENTRAL MONITOR — DIAGNOSTIC FEED")
+        NeonScreen(Modifier.fillMaxWidth().height(196.dp)) {
+            Column(Modifier.fillMaxSize()) {
+                if (lines.isEmpty()) mono("> awaiting telemetry…", Sb.green, 9f)
+                lines.forEach { line ->
+                    val color = when {
+                        "DELETED" in line || "ROGUE" in line -> Sb.red
+                        "VERIFIED" in line || "SUCCESS" in line -> Sb.green
+                        else -> Sb.green.copy(alpha = 0.82f)
+                    }
+                    mono(line, color, 8.5f, spacing = 0.3f, modifier = Modifier.fillMaxWidth())
                 }
-                mono(line, color, 9f, spacing = 0.4f, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -335,129 +299,381 @@ private val LOG_EVENTS = listOf(
     "USER ACCESSED BRIDGE CONSOLE",
     "AUTHORIZATION VERIFIED (PROBABLY)",
     "ENVIRONMENTAL CONTROLS QUERIED",
-    "ROGUE PROCESS DETECTED: [DELETED BY SECURITY]",
+    "ROGUE PROCESS DETECTED: [DELETED]",
     "COFFEE MAKER PINGED — NO REPLY",
     "AUDIT LOG AUDITED SUCCESSFULLY",
     "MEMO 412 ESCALATED TO COMMITTEE",
-    "INERTIAL DAMPENERS RECALIBRATED (UNCHANGED)",
+    "INERTIAL DAMPENERS RECALIBRATED",
     "PERMISSION ELEVATED, THEN REVOKED",
     "SCHWARTZ RING POLISHED",
-    "FORM 27-B/6 STAMPED 'PENDING'",
     "SUBSYSTEM 7-B HUMMED OMINOUSLY",
 )
 
 @Composable
-private fun ManualOverride(
-    themeDark: Boolean,
-    amoled: Boolean,
-    scanlines: Boolean,
-    onTheme: () -> Unit,
-    onAmoled: () -> Unit,
-    onScanlines: () -> Unit,
+private fun SubsystemGrid(tick: Int) {
+    Column(Modifier.fillMaxWidth()) {
+        Nameplate("SUBSYSTEM MONITORING")
+        Column(Modifier.fillMaxWidth().metal().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Two needle gauges + bar mini-panels.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                CircularGauge("SHIP INTEGRITY", wobble(tick, 0, 80, 96), Sb.green, Modifier.weight(1f))
+                CircularGauge("LIFE SUPPORT", wobble(tick, 5, 55, 74), Sb.amber, Modifier.weight(1f))
+                CircularGauge("REACTOR", wobble(tick, 9, 60, 88), Sb.green, Modifier.weight(1f))
+            }
+            SubPanel("CABIN PRESSURE", "${wobble(tick, 2, 70, 92)} kPa", wobble(tick, 2, 70, 92), Sb.green)
+            SubPanel("CPU LOAD", "87% — HELD", 87, Sb.amber)
+            SubPanel("FUEL RESERVES", "0% — SHIP IN MOTION", 0, Sb.red)
+            SubPanel("NAVIGATION", "OFFLINE — AT FTL SPEED", null, Sb.red)
+            SubPanel("DIPLOMATIC RELATIONS", "UNKNOWN", null, Sb.dim)
+        }
+    }
+}
+
+private fun wobble(tick: Int, seed: Int, lo: Int, hi: Int): Int {
+    val mid = (lo + hi) / 2.0; val amp = (hi - lo) / 2.0
+    return (mid + sin((tick + seed) / 4.0) * amp).toInt().coerceIn(0, 100)
+}
+
+@Composable
+private fun SubPanel(label: String, value: String, pct: Int?, color: Color) {
+    Column(Modifier.fillMaxWidth().recessed().padding(7.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            mono(label, Sb.silver, 8.5f, FontWeight.Bold, spacing = 0.8f)
+            mono(stateWord(pct, color), color, 7.5f, FontWeight.Bold)
+        }
+        mono(value, color, 9.5f, FontWeight.Bold, modifier = Modifier.padding(top = 1.dp))
+        if (pct != null) { Spacer(Modifier.height(4.dp)); NeonBar(pct, color) }
+    }
+}
+
+private fun stateWord(pct: Int?, color: Color): String = when {
+    color == Sb.red -> "CRITICAL"
+    color == Sb.amber -> "CAUTION"
+    pct == null -> "—"
+    pct < 25 -> "LOW"
+    else -> "NOMINAL"
+}
+
+@Composable
+private fun NeonBar(pct: Int, color: Color) {
+    val cells = 22
+    val on = (pct * cells / 100).coerceIn(0, cells)
+    Row(Modifier.fillMaxWidth().height(8.dp), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+        repeat(cells) { i ->
+            Box(Modifier.weight(1f).fillMaxHeight()
+                .background(if (i < on) color else Sb.metalDark)
+                .drawBehind { if (i < on) drawRect(Color.White.copy(alpha = 0.18f), size = Size(size.width, size.height * 0.4f)) })
+        }
+    }
+}
+
+@Composable
+private fun CircularGauge(label: String, pct: Int, color: Color, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Canvas(Modifier.size(60.dp)) {
+            val stroke = 5.dp.toPx()
+            val d = size.minDimension - stroke
+            val tl = Offset((size.width - d) / 2, (size.height - d) / 2)
+            val sz = Size(d, d)
+            drawArc(Sb.metalDark, 135f, 270f, false, tl, sz, style = Stroke(stroke, cap = StrokeCap.Round))
+            drawArc(color, 135f, 270f * pct / 100f, false, tl, sz, style = Stroke(stroke, cap = StrokeCap.Round))
+            val ang = Math.toRadians((135f + 270f * pct / 100f).toDouble())
+            val cx = size.width / 2; val cy = size.height / 2; val nr = d / 2 * 0.86f
+            drawLine(Sb.silver, Offset(cx, cy), Offset(cx + (cos(ang) * nr).toFloat(), cy + (sin(ang) * nr).toFloat()), 2.dp.toPx())
+            drawCircle(Sb.silver, 3.dp.toPx(), Offset(cx, cy))
+        }
+        mono("$pct%", color, 11f, FontWeight.Bold)
+        mono(label, Sb.silver, 6.5f, align = TextAlign.Center, modifier = Modifier.width(74.dp))
+    }
+}
+
+@Composable
+private fun IndicatorLight(color: Color, on: Boolean) {
+    Canvas(Modifier.size(9.dp)) {
+        drawCircle(Sb.metalDark, size.minDimension / 2)
+        drawCircle(if (on) color else color.copy(alpha = 0.18f), size.minDimension / 2 * 0.72f)
+        if (on) drawCircle(color.copy(alpha = 0.4f), size.minDimension / 2, style = Stroke(1.5.dp.toPx()))
+    }
+}
+
+@Composable
+private fun Nameplate(text: String) {
+    Box(Modifier.fillMaxWidth().background(Sb.metalDark).padding(horizontal = 8.dp, vertical = 3.dp)) {
+        mono(text, Sb.amber, 8f, FontWeight.Bold, spacing = 1.6f)
+    }
+}
+
+// --- flip-switch bank (the ONLY real controls) ---------------------------------------------------
+
+@Composable
+private fun FlipBank(
+    themeDark: Boolean, amoled: Boolean, scanlines: Boolean, boot: Boolean,
+    onTheme: () -> Unit, onAmoled: () -> Unit, onScanlines: () -> Unit, onBoot: () -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().beveled().background(Sb.panel)) {
-        Row(
-            Modifier.fillMaxWidth().clickable { open = !open }.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column {
-                mono("MANUAL OVERRIDE", Sb.red, 12f, FontWeight.Bold, spacing = 1f)
-                mono("AUTHORIZED PERSONNEL ONLY · DO NOT TOUCH", Sb.dim, 8f)
+    Column(Modifier.fillMaxWidth()) {
+        Nameplate("MANUAL OVERRIDE — AUTHORIZED PERSONNEL ONLY")
+        Column(Modifier.fillMaxWidth().metal().padding(10.dp)) {
+            mono("WARN: these are armed. (they adjust display settings.)", Sb.dim, 7.5f)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                FlipSwitch("CASCADE", themeDark, onTheme)
+                FlipSwitch("SHUTDOWN", amoled, onAmoled)
+                FlipSwitch("DAMPENERS", scanlines, onScanlines)
+                FlipSwitch("IGNITION", boot, onBoot)
             }
-            mono(if (open) "▼ OPEN" else "▶ SEALED", Sb.red, 10f, FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            mono("theme · true-black · scanlines · boot-sequence", Sb.dim, 6.5f, align = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth())
         }
-        if (open) {
-            Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                mono("If you know what these do, you have too much clearance.", Sb.amber, 8f)
-                OverrideSwitch("INITIATE CASCADE PROTOCOL", "actually: dark ↔ light theme", themeDark, onTheme)
-                OverrideSwitch("EMERGENCY SYSTEMS SHUTDOWN", "actually: true-black surfaces", amoled, onAmoled)
-                OverrideSwitch("RECALIBRATE INERTIAL DAMPENERS", "actually: CRT scanline FX", scanlines, onScanlines)
+    }
+}
+
+@Composable
+private fun FlipSwitch(label: String, on: Boolean, onToggle: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onToggle() }) {
+        Canvas(Modifier.width(30.dp).height(50.dp)) {
+            val cr = CornerRadius(4.dp.toPx())
+            drawRoundRect(Sb.metalDark, cornerRadius = cr)
+            drawRoundRect(Color.Black, cornerRadius = cr, style = Stroke(1.5.dp.toPx()))
+            val pad = 4.dp.toPx()
+            val knobH = (size.height - pad * 2) * 0.46f
+            val top = if (on) pad else size.height - pad - knobH
+            val knob = if (on) Sb.green else Sb.metalLight
+            drawRoundRect(knob, topLeft = Offset(pad, top), size = Size(size.width - pad * 2, knobH),
+                cornerRadius = CornerRadius(3.dp.toPx()))
+            if (on) drawRoundRect(Sb.green.copy(alpha = 0.45f), topLeft = Offset(pad - 2, top - 2),
+                size = Size(size.width - pad * 2 + 4, knobH + 4), cornerRadius = CornerRadius(3.dp.toPx()),
+                style = Stroke(2.dp.toPx()))
+        }
+        mono(label, if (on) Sb.green else Sb.silver, 6.5f, FontWeight.Bold, TextAlign.Center,
+            modifier = Modifier.width(48.dp))
+        mono(if (on) "ARMED" else "SAFE", if (on) Sb.green else Sb.dim, 6f, align = TextAlign.Center)
+    }
+}
+
+// --- dot-matrix ticker ----------------------------------------------------------------------------
+
+@Composable
+private fun DotMatrix() {
+    val inf = rememberInfiniteTransition(label = "dm")
+    val phase by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(280, easing = LinearEasing)), label = "dm")
+    var idx by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(2600); idx += 1 } }
+    val msg = DM_MSGS[idx % DM_MSGS.size]
+    Box(Modifier.fillMaxWidth().recessed().padding(horizontal = 8.dp, vertical = 6.dp)) {
+        // dot-matrix texture behind the LED text
+        Box(Modifier.fillMaxWidth().height(16.dp).drawBehind {
+            val d = 3.dp.toPx()
+            var y = 1.dp.toPx()
+            while (y < size.height) {
+                var x = 0f
+                while (x < size.width) { drawCircle(Color.White.copy(alpha = 0.04f), 0.6.dp.toPx(), Offset(x, y)); x += d }
+                y += d
+            }
+        }) {
+            mono(msg, if (phase > 0.5f) Sb.amber else Sb.gold, 9f, FontWeight.Bold, spacing = 1.5f,
+                modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+private val DM_MSGS = listOf(
+    ">> ADVISORY: TUESDAY IS LIKELY TO OCCUR",
+    ">> WARRNING: SPELL-CHECK SUBSYSTEM OFFLINE",
+    ">> CRITICAL: PRINTER OUT OF TONER (AGAIN)",
+    ">> SYS: COMBOLINGUS LEVELS NOMINAL",
+    ">> ADVISORY-ADMINISTRATIVE: FORM 27-B/6 UNFILED",
+    ">> SCHWARTZ FIELD STABLE — DO NOT INVERT",
+)
+
+// --- lower control array --------------------------------------------------------------------------
+
+@Composable
+private fun ControlArray(onCommand: (String) -> Unit, onLudicrous: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Nameplate("COMMAND ARRAY")
+        Column(Modifier.fillMaxWidth().metal().padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                DomeButton(Sb.green, "NAV") { onCommand("INITIALIZE NAVIGATION SUBSYSTEM") }
+                DomeButton(Sb.amber, "COFFEE") { onCommand("RESET COFFEE MAKER") }
+                DomeButton(Sb.purple, "AUDIT") { onCommand("AUDIT THE AUDIT LOG") }
+                DomeButton(Sb.neon, "DEEP-SP") { onCommand("QUERY DEEP SPACE PROTOCOLS") }
+                DomeButton(Sb.gold, "BEVRG") { onCommand("DISPENSE BEVERAGE MODULE") }
+            }
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                LudicrousButton(onLudicrous)
             }
         }
     }
 }
 
 @Composable
-private fun OverrideSwitch(label: String, real: String, on: Boolean, onToggle: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().beveled(raised = !on)
-            .background(if (on) Sb.red.copy(alpha = 0.16f) else Sb.well)
-            .clickable { onToggle() }.padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(Modifier.weight(1f)) {
-            mono("CRITICAL: $label", if (on) Sb.red else Sb.silver, 10f, FontWeight.Bold)
-            mono(real, Sb.dim, 8f)
+private fun DomeButton(color: Color, label: String, onClick: () -> Unit, diameter: Dp = 46.dp) {
+    var pressed by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Canvas(Modifier.size(diameter).clickable { pressed = true; onClick() }) {
+            val r = size.minDimension / 2; val c = center
+            drawCircle(Sb.metalDark, r, c)
+            drawCircle(Sb.metalLight.copy(alpha = 0.55f), r, c, style = Stroke(2f))
+            val inner = r * (if (pressed) 0.7f else 0.8f)
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(color, color.copy(alpha = 0.55f), color.copy(alpha = 0.18f)),
+                    center = c - Offset(r * 0.3f, r * 0.3f), radius = inner * 1.5f,
+                ), inner, c,
+            )
+            if (pressed) drawCircle(Color.White.copy(alpha = 0.35f), inner * 0.55f, c)
+            drawCircle(Color.White.copy(alpha = 0.55f), inner * 0.16f, c - Offset(r * 0.32f, r * 0.32f))
         }
-        mono(if (on) "● ARMED" else "○ SAFE", if (on) Sb.red else Sb.green, 10f, FontWeight.Bold)
+        mono(label, Sb.silver, 6.5f, FontWeight.Bold, TextAlign.Center, modifier = Modifier.width(diameter + 8.dp))
     }
 }
 
 @Composable
-private fun BridgeFooter() {
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        mono("STATUS: UNDER REVIEW (SINCE 2847)", Sb.dim, 8f, modifier = Modifier.fillMaxWidth(),
-            align = TextAlign.Center)
-        mono("LAST ACCESSED BY: SYSTEM ADMIN (UNAUTHORIZED)", Sb.dim, 8f,
-            modifier = Modifier.fillMaxWidth(), align = TextAlign.Center)
-        mono("all systems nominal (citation needed) — we ain't found shit", Sb.edgeLight, 7f,
-            modifier = Modifier.fillMaxWidth(), align = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun Panel(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().beveled().background(Sb.panel)) {
-        Box(Modifier.fillMaxWidth().background(Sb.edgeDark).padding(horizontal = 8.dp, vertical = 4.dp)) {
-            mono(title, Sb.amber, 9f, FontWeight.Bold, spacing = 1.5f)
+private fun LudicrousButton(onClick: () -> Unit) {
+    var pressed by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed) { if (pressed) { delay(160); pressed = false } }
+    val inf = rememberInfiniteTransition(label = "lud")
+    val glow by inf.animateFloat(0.3f, 1f, infiniteRepeatable(tween(680), RepeatMode.Reverse), label = "g")
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        mono("⚠  LUDICROUS SPEED  ⚠", Sb.red, 10f, FontWeight.Bold, TextAlign.Center, 1f)
+        Spacer(Modifier.height(5.dp))
+        Canvas(Modifier.size(98.dp).clickable { pressed = true; onClick() }) {
+            val r = size.minDimension / 2; val c = center
+            // hazard guard ring
+            drawCircle(Sb.gold.copy(alpha = 0.22f), r, c)
+            drawCircle(Sb.metalDark, r * 0.88f, c)
+            drawCircle(Sb.gold.copy(alpha = glow * 0.85f), r * 0.88f, c, style = Stroke(3.dp.toPx()))
+            val inner = r * (if (pressed) 0.58f else 0.64f)
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Sb.redHot, Sb.red, Color(0xFF7A0A18)),
+                    center = c - Offset(r * 0.22f, r * 0.22f), radius = inner * 1.6f,
+                ), inner, c,
+            )
+            drawCircle(Color.White.copy(alpha = 0.22f + glow * 0.2f), inner * 0.5f, c - Offset(r * 0.2f, r * 0.2f))
         }
-        Column(Modifier.fillMaxWidth().padding(10.dp)) { content() }
+        Spacer(Modifier.height(3.dp))
+        mono("PRESS TO ENGAGE", Sb.dim, 7f, align = TextAlign.Center)
     }
 }
 
 @Composable
-private fun SbButton(label: String, color: Color, onClick: () -> Unit) {
-    Box(
-        Modifier.beveled().background(Sb.base).clickable { onClick() }.padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        mono(label, color, 10f, FontWeight.Bold, spacing = 1f)
+private fun Footer() {
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        mono("STATUS: UNDER REVIEW (SINCE 2847) · LAST ACCESS: SYSTEM ADMIN (UNAUTHORIZED)", Sb.dim, 7f,
+            align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        mono("all systems nominal (citation needed) — we ain't found shit", Sb.metalLight, 6.5f,
+            align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
+
+// --- overlays -------------------------------------------------------------------------------------
 
 @Composable
 private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDismiss: () -> Unit) {
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.93f)).scanlines()
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.94f))
             .clickable(enabled = phase == 1) { onDismiss() },
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.fillMaxWidth(0.86f).beveled().background(Sb.panel).padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.fillMaxWidth(0.86f).metal().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (phase == 0) {
-                mono("$spinner  PROCESSING  $spinner", Sb.green, 18f, FontWeight.Bold, TextAlign.Center, 2f,
-                    Modifier.fillMaxWidth())
+                mono("$spinner  PROCESSING  $spinner", Sb.green, 18f, FontWeight.Bold, TextAlign.Center, 2f, Modifier.fillMaxWidth())
                 mono("EXECUTING: $command", Sb.silver, 10f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                mono("PLEASE STAND BY · SYSTEM LOAD AT 87%", Sb.amber, 9f, align = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth())
-                mono("ESTIMATED TIME REMAINING: CALCULATING…", Sb.dim, 9f, align = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(4.dp))
-                PixelBar(87, Sb.green)
+                mono("PLEASE STAND BY · SYSTEM LOAD AT 87%", Sb.amber, 9f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                mono("ESTIMATED TIME REMAINING: CALCULATING…", Sb.dim, 9f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(4.dp)); NeonBar(87, Sb.green)
             } else {
                 mono("OPERATION COMPLETE", Sb.green, 18f, FontWeight.Bold, TextAlign.Center, 2f, Modifier.fillMaxWidth())
                 mono(command, Sb.silver, 10f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                mono("STATUS: NOMINAL · NO EFFECT DETECTED · THIS IS FINE", Sb.amber, 9f, align = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth())
+                mono("STATUS: NOMINAL · NO EFFECT DETECTED · THIS IS FINE", Sb.amber, 9f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(4.dp))
-                SbButton("PROCEED", Sb.green, onDismiss)
+                Box(Modifier.metal().clickable { onDismiss() }.padding(horizontal = 16.dp, vertical = 9.dp)) {
+                    mono("PROCEED", Sb.green, 11f, FontWeight.Bold, spacing = 1f)
+                }
             }
         }
+    }
+}
+
+/** LUDICROUS SPEED: warp-streak acceleration → white flash → scrolling plaid ("we've gone to plaid"). */
+@Composable
+private fun LudicrousOverlay(onDone: () -> Unit) {
+    val stars = remember {
+        List(170) {
+            val a = kotlin.random.Random.nextDouble(0.0, 2 * PI)
+            Triple(cos(a).toFloat(), sin(a).toFloat(), kotlin.random.Random.nextFloat())
+        }
+    }
+    val t = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { t.animateTo(1f, tween(5600, easing = LinearEasing)); onDone() }
+    val inf = rememberInfiniteTransition(label = "plaid")
+    val scroll by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "scroll")
+
+    Box(Modifier.fillMaxSize().background(Color.Black).clickable { onDone() }, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val p = t.value
+            val center = Offset(size.width / 2, size.height / 2)
+            when {
+                p < 0.52f -> {
+                    val a = p / 0.52f
+                    val speed = a * a
+                    val maxR = size.minDimension * 0.8f
+                    stars.forEach { (dx, dy, seed) ->
+                        val dir = Offset(dx, dy)
+                        val r0 = seed * maxR * (0.15f + speed)
+                        val len = (3f + speed * 280f) * (0.4f + seed)
+                        val s0 = center + dir * r0
+                        val e0 = center + dir * (r0 + len)
+                        drawLine(Color.White.copy(alpha = (0.3f + 0.65f * speed).coerceAtMost(1f)), s0, e0, 1f + speed * 3f)
+                    }
+                }
+                p < 0.6f -> drawRect(Color.White.copy(alpha = (1f - (p - 0.52f) / 0.08f).coerceIn(0f, 1f)))
+                else -> drawPlaid(scroll)
+            }
+        }
+        val p = t.value
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            when {
+                p < 0.52f -> mono("PREPARE FOR LUDICROUS SPEED", Sb.amber, 15f, FontWeight.Bold, TextAlign.Center, 2f)
+                p < 0.6f -> {}
+                else -> {
+                    mono("★  LUDICROUS SPEED  ★", Color.White, 22f, FontWeight.Bold, TextAlign.Center, 3f)
+                    Spacer(Modifier.height(10.dp))
+                    mono("WE'VE GONE TO PLAID", Sb.gold, 15f, FontWeight.Bold, TextAlign.Center, 2f)
+                    Spacer(Modifier.height(16.dp))
+                    mono("tap to disengage", Sb.silver, 9f, align = TextAlign.Center)
+                }
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawPlaid(scroll: Float) {
+    drawRect(Color(0xFF06140A))
+    val palette = listOf(
+        Color(0xFF1E7D34), Color(0xFF0C3F19), Color(0xFFB23A2E), Color(0xFF20407A), Color(0xFFE0C040),
+    )
+    val band = 30.dp.toPx()
+    val period = band * palette.size
+    val oy = (scroll * period) % period
+    val ox = (scroll * period * 0.7f) % period
+    var idx = 0; var y = -period + oy
+    while (y < size.height) {
+        drawRect(palette[idx % palette.size].copy(alpha = 0.42f), Offset(0f, y), Size(size.width, band))
+        drawRect(Color.White.copy(alpha = 0.06f), Offset(0f, y), Size(size.width, 1.5.dp.toPx()))
+        y += band; idx++
+    }
+    idx = 0; var x = -period + ox
+    while (x < size.width) {
+        drawRect(palette[idx % palette.size].copy(alpha = 0.42f), Offset(x, 0f), Size(band, size.height))
+        drawRect(Color.White.copy(alpha = 0.06f), Offset(x, 0f), Size(1.5.dp.toPx(), size.height))
+        x += band; idx++
     }
 }
