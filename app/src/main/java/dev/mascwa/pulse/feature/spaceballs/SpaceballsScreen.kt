@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +59,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.pow
 import kotlin.math.sin
 
 /* -------------------------------------------------------------------------------------------------
@@ -86,6 +88,15 @@ private object Sb {
     val silver = Color(0xFFD8DCE2)
     val dim = Color(0xFF8A8F97)
 }
+
+/** Bright hyperspace streak colours — the multicoloured stars in the Spaceballs ludicrous-speed jump. */
+private val StreakColors = listOf(
+    Color(0xFFFF3030), Color(0xFFFF8A00), Color(0xFFFFE000), Color(0xFF32FF6A),
+    Color(0xFF24E0FF), Color(0xFF3A6BFF), Color(0xFFFF3DDA), Color(0xFFFFFFFF),
+)
+
+private fun streakColor(s: FloatArray): Color =
+    StreakColors[(s[4] * StreakColors.size).toInt().coerceIn(0, StreakColors.size - 1)]
 
 // --- hardware modifiers --------------------------------------------------------------------------
 
@@ -605,20 +616,21 @@ private fun ProcessingOverlay(command: String, phase: Int, spinner: String, onDi
 /**
  * LUDICROUS SPEED — the Spaceballs (1987) jump, beat for beat:
  *   BRACE ("Ludicrous speed, GO!", seatbelts fastened, engines charging) → violent g-force
- *   star-streak JUMP with a hyperspace tunnel + screen shake → white BLAST flash → scrolling tartan
- *   PLAID ("They've gone to plaid!") → OVERSHOOT ("We've passed them!") as the ship streaks off to a
+ *   star-streak JUMP with the gridded tunnel + screen shake → white BLAST flash → the full PLAID
+ *   tunnel ("They've gone to plaid!") → OVERSHOOT ("We've passed them!") as the ship streaks off to a
  *   vanishing point. Params-only (one star list); every position is computed in the draw pass, so
  *   there is zero per-frame allocation.
  */
 @Composable
 private fun LudicrousOverlay(onDone: () -> Unit) {
-    // Each star: unit ray (x, y), radial seed, brightness — one allocation, reused every frame.
+    // Each star: unit ray (x, y), radial seed, brightness, colour seed — one alloc, reused per frame.
     val stars = remember {
-        List(220) {
+        List(240) {
             val a = kotlin.random.Random.nextDouble(0.0, 2 * PI)
             floatArrayOf(
                 cos(a).toFloat(), sin(a).toFloat(),
                 kotlin.random.Random.nextFloat(), 0.5f + kotlin.random.Random.nextFloat() * 0.5f,
+                kotlin.random.Random.nextFloat(),
             )
         }
     }
@@ -651,40 +663,49 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                 p < accelEnd -> {
                     val a = (p - braceEnd) / (accelEnd - braceEnd)
                     val speed = a * a
-                    // Violent shake at the punch, and a blue hyperspace tunnel bloom out of the centre.
+                    // Violent shake as the gridded tunnel builds out of the vanishing point.
                     val jit = speed * 7.dp.toPx()
                     val c = base + Offset(sin(p * 257f) * jit, cos(p * 193f) * jit)
-                    val tunnelR = maxR * (0.25f + speed * 0.7f)
-                    drawCircle(
-                        Brush.radialGradient(
-                            listOf(Sb.neonHot.copy(alpha = 0.30f * speed), Color.Transparent), c, tunnelR,
-                        ),
-                        tunnelR, c,
-                    )
+                    drawTunnel(flow = scroll, burst = speed, intensity = speed, pivot = c)
                     stars.forEach { s ->
                         val dir = Offset(s[0], s[1])
-                        val r0 = (0.12f + speed) * maxR * (0.2f + s[2])
+                        val r0 = (0.10f + speed) * maxR * (0.2f + s[2])
                         val len = (4f + speed * 360f) * (0.4f + s[2])
                         drawLine(
-                            Color.White.copy(alpha = (0.35f + 0.6f * speed).coerceAtMost(1f)),
-                            c + dir * r0, c + dir * (r0 + len), 1f + speed * 3.5f, cap = StrokeCap.Round,
+                            streakColor(s).copy(alpha = (0.40f + 0.55f * speed).coerceAtMost(1f)),
+                            c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3f, cap = StrokeCap.Round,
                         )
                     }
                 }
                 p < flashEnd -> drawRect(
                     Color.White.copy(alpha = (1f - (p - accelEnd) / (flashEnd - accelEnd)).coerceIn(0f, 1f)),
                 )
-                p < plaidEnd -> drawPlaid(scroll)
+                p < plaidEnd -> {
+                    // PLAID: the full Spaceballs tunnel — orange wall-grid converging on a burst,
+                    // multicoloured stars streaking past it, flying forward.
+                    val pulse = 0.8f + 0.2f * sin(scroll * 6.2832f)
+                    drawTunnel(flow = scroll, burst = pulse, intensity = 1f, pivot = base)
+                    stars.forEach { s ->
+                        val dir = Offset(s[0], s[1])
+                        val phase = (scroll + s[2]) % 1f
+                        val r0 = phase * maxR * (0.6f + s[2])
+                        val len = (40f + 240f * phase) * (0.4f + s[2])
+                        drawLine(
+                            streakColor(s).copy(alpha = 0.85f * (1f - phase * 0.4f)),
+                            base + dir * r0, base + dir * (r0 + len), 2f + s[3] * 1.5f, cap = StrokeCap.Round,
+                        )
+                    }
+                }
                 else -> {
-                    // Overshoot: the plaid recedes as the ship streaks off to a vanishing point.
+                    // Overshoot: the tunnel recedes as the ship streaks off to a vanishing point.
                     val q = (p - plaidEnd) / (1f - plaidEnd)
                     val pull = 1f - q
-                    drawPlaid(scroll, alpha = pull)
+                    drawTunnel(flow = scroll, burst = pull * pull, intensity = pull, pivot = base)
                     stars.forEach { s ->
                         val dir = Offset(s[0], s[1])
                         val r1 = (0.15f + s[2]) * maxR * (0.3f + pull)
                         val r0 = r1 + 220f * pull * (0.4f + s[2])
-                        drawLine(Color.White.copy(alpha = 0.5f * pull), base + dir * r0, base + dir * r1, 2f, cap = StrokeCap.Round)
+                        drawLine(streakColor(s).copy(alpha = 0.5f * pull), base + dir * r0, base + dir * r1, 2f, cap = StrokeCap.Round)
                     }
                     drawCircle(Color.White.copy(alpha = pull), 2f + 6f * pull, base)
                 }
@@ -703,14 +724,24 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     }
                 }
                 p < flashEnd -> {}
-                p < plaidEnd -> {
+                p < plaidEnd -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 24.dp, vertical = 18.dp),
+                ) {
                     mono("★   LUDICROUS  SPEED   ★", Color.White, 20f, FontWeight.Bold, TextAlign.Center, 3f)
                     Spacer(Modifier.height(12.dp))
                     mono("THEY'VE GONE TO PLAID!", Sb.gold, 18f, FontWeight.Bold, TextAlign.Center, 2f)
                     Spacer(Modifier.height(18.dp))
                     mono("tap to disengage", Sb.silver, 9f, align = TextAlign.Center)
                 }
-                else -> {
+                else -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                ) {
                     mono("WE'VE PASSED THEM!", Sb.neonHot, 18f, FontWeight.Bold, TextAlign.Center, 2f)
                     Spacer(Modifier.height(10.dp))
                     mono("...  ALL  STOP", Sb.silver, 12f, FontWeight.Normal, TextAlign.Center, 2f)
@@ -721,42 +752,76 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
 }
 
 /**
- * Authentic scrolling tartan — a repeating "sett" of coloured bands woven warp × weft. The vertical
- * pass is drawn at half alpha so crossings blend like a real weave (two thread colours meeting), which
- * is what reads as plaid rather than a flat grid. Royal-Stewart-flavoured bright sett; scrolls diagonally.
+ * The Spaceballs ludicrous-speed tunnel: a square wall-grid of orange "graph-paper" lines in
+ * perspective, converging on a blazing vanishing-point burst — the criss-cross grid is the "plaid".
+ *   • rails  — lines from the vanishing point out to the tunnel mouth (the length-wise wall lines;
+ *              the four corners are the box edges).
+ *   • rings  — nested squares expanding out of the centre (the forward rush).
+ *   • burst  — a white/gold flare with star rays at the vanishing point.
+ * `intensity` fades the grid in during the jump; `burst` scales/pulses the flare; `flow` (0..1) drives
+ * the forward motion. Everything is computed in the draw pass — no retained buffers.
  */
-private fun DrawScope.drawPlaid(scroll: Float, alpha: Float = 1f) {
-    val red = Color(0xFFC8102E)
-    val navy = Color(0xFF1B2A6B)
-    val green = Color(0xFF0F7A34)
-    val yellow = Color(0xFFF2C200)
-    val white = Color(0xFFF5F5F5)
-    val black = Color(0xFF0A0A0A)
-    // (colour, width in dp) — one repeat of the sett, symmetric like a real tartan.
-    val sett = listOf(
-        red to 24f, black to 2f, yellow to 2f, black to 2f, red to 8f,
-        navy to 14f, white to 2f, navy to 14f, red to 8f,
-        green to 16f, yellow to 2f, green to 16f, red to 8f,
+private fun DrawScope.drawTunnel(flow: Float, burst: Float, intensity: Float, pivot: Offset) {
+    drawRect(Color(0xFF050304))
+    val orange = Color(0xFFFF7A00)
+    val amber = Color(0xFFFFC050)
+    val outerHalf = size.maxDimension * 0.62f
+    val nearHalf = 4.dp.toPx()
+    val ratio = 1.55f
+
+    // Rails: vanishing point → evenly spaced points around the tunnel-mouth square (i == 0 == box edge).
+    val perSide = 6
+    for (sIdx in 0 until 4) {
+        for (i in 0 until perSide) {
+            val f = i.toFloat() / perSide
+            val end = when (sIdx) {
+                0 -> Offset(pivot.x - outerHalf + 2 * outerHalf * f, pivot.y - outerHalf)
+                1 -> Offset(pivot.x + outerHalf, pivot.y - outerHalf + 2 * outerHalf * f)
+                2 -> Offset(pivot.x + outerHalf - 2 * outerHalf * f, pivot.y + outerHalf)
+                else -> Offset(pivot.x - outerHalf, pivot.y + outerHalf - 2 * outerHalf * f)
+            }
+            val corner = i == 0
+            drawLine(
+                (if (corner) amber else orange).copy(alpha = (0.16f + 0.34f * intensity).coerceIn(0f, 1f)),
+                pivot, end, if (corner) 2f else 1f, cap = StrokeCap.Round,
+            )
+        }
+    }
+
+    // Rings: nested squares expanding out of the centre — flying forward.
+    var k = 0
+    while (true) {
+        val d = k + flow
+        val half = nearHalf * ratio.pow(d)
+        if (half > outerHalf) break
+        val near = 1f - half / outerHalf
+        val alpha = ((0.15f + 0.7f * near) * (0.4f + 0.6f * intensity)).coerceIn(0f, 1f)
+        drawRect(
+            orange.copy(alpha = alpha),
+            topLeft = Offset(pivot.x - half, pivot.y - half),
+            size = Size(half * 2, half * 2),
+            style = Stroke(width = 1f + 2.5f * near),
+        )
+        k++
+    }
+
+    // Burst: the vanishing-point flare.
+    val flareR = (size.minDimension * 0.17f * burst.coerceIn(0f, 1.2f)).coerceAtLeast(1f)
+    drawCircle(
+        Brush.radialGradient(
+            listOf(Color.White, Color(0xFFFFE060), orange.copy(alpha = 0.55f), Color.Transparent),
+            pivot, flareR,
+        ),
+        flareR, pivot,
     )
-    val period = (sett.sumOf { it.second.toDouble() }).toFloat() * 1.dp.toPx()
-    drawRect(Color(0xFF120406).copy(alpha = alpha))
-    val off = (scroll * period) % period
-    // Weft (horizontal bands) — opaque ground.
-    var y = off - period
-    var i = 0
-    while (y < size.height) {
-        val (col, w) = sett[i % sett.size]
-        val wp = w.dp.toPx()
-        drawRect(col.copy(alpha = alpha), Offset(0f, y), Size(size.width, wp + 0.5f))
-        y += wp; i++
+    for (j in 0 until 8) {
+        val ang = (PI * j / 8).toFloat()
+        val dx = cos(ang) * flareR * 2.2f
+        val dy = sin(ang) * flareR * 2.2f
+        drawLine(
+            Color.White.copy(alpha = (0.8f * burst).coerceIn(0f, 1f)),
+            Offset(pivot.x - dx, pivot.y - dy), Offset(pivot.x + dx, pivot.y + dy), 2f, cap = StrokeCap.Round,
+        )
     }
-    // Warp (vertical bands) — half alpha so crossings blend into the weave.
-    var x = off - period
-    i = 0
-    while (x < size.width) {
-        val (col, w) = sett[i % sett.size]
-        val wp = w.dp.toPx()
-        drawRect(col.copy(alpha = 0.5f * alpha), Offset(x, 0f), Size(wp + 0.5f, size.height))
-        x += wp; i++
-    }
+    drawCircle(Color.White.copy(alpha = burst.coerceIn(0f, 1f)), flareR * 0.18f, pivot)
 }
