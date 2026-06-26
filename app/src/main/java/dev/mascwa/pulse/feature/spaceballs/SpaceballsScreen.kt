@@ -755,20 +755,28 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                             }
                         }
                         e < lightEnd -> {
-                            // LIGHT SPEED — the ship takes off; stars stretch into long WHITE streaks,
-                            // accelerating, with a hard g-force shake (Helmet hanging on / lifting off).
+                            // LIGHT SPEED — the starfield stretches into long white streaks rushing
+                            // radially out of a central point (classic hyperspace), accelerating, with a
+                            // hard g-force shake (Helmet hanging on / lifting off).
                             val a = (e - braceEnd) / (lightEnd - braceEnd)
                             val speed = a * a
                             val jit = if (reduceMotion) 0f else (0.25f + speed) * 11.dp.toPx()
                             val c = base + Offset(sin(e * 47f) * jit, cos(e * 39f) * jit)
+                            val glowR = maxR * (0.18f + 0.2f * speed)
+                            drawCircle(
+                                Brush.radialGradient(listOf(Color.White.copy(alpha = 0.3f * speed), Color.Transparent), c, glowR),
+                                glowR, c, blendMode = BlendMode.Plus,
+                            )
+                            val rush = if (reduceMotion) 0.4f else scroll * 2.4f
                             stars.forEach { s ->
                                 val dir = Offset(s[0], s[1])
-                                val phaseR = (scroll + s[2]) % 1f
-                                val r0 = phaseR * maxR * (0.6f + s[2])
-                                val len = (30f + 380f * phaseR) * (0.4f + s[2]) * (0.3f + 0.7f * speed)
+                                val phaseR = (rush + s[2]) % 1f
+                                val out = phaseR * phaseR                // accelerate outward (slow far, fast near)
+                                val r0 = out * maxR * (0.5f + s[2])
+                                val len = (16f + 640f * out) * (0.45f + s[2]) * (0.3f + 0.7f * speed)
                                 drawLine(
-                                    Color.White.copy(alpha = (0.85f * (1f - phaseR * 0.4f)) * (0.4f + 0.6f * speed)),
-                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 2.5f,
+                                    Color.White.copy(alpha = (1f - phaseR * 0.25f) * (0.4f + 0.6f * speed)),
+                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3.5f * phaseR,
                                     cap = StrokeCap.Round, blendMode = BlendMode.Plus,
                                 )
                             }
