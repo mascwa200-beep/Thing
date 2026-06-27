@@ -175,6 +175,9 @@ data class JarvisSettings(
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
     val githubToken: String = "",
+    /** Auto-upload scrubbed crash/debug reports to the repo's `debug-reports` branch for remote reading.
+     *  Needs the GitHub token; secrets are stripped before anything leaves the device. */
+    val debugReports: Boolean = true,
     /**
      * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
      * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
@@ -390,6 +393,19 @@ data class AppSettings(
      *  project, a topic, "device health"). Drives the feed's MONITORING line. Never chat content. */
     val jarvisFeedTopic: String = "",
 )
+
+/**
+ * Every live credential value the app holds, as plain strings — the single source of truth for "what must
+ * never leave the device in cleartext." Mirrors [dev.mascwa.pulse.data.settings.SettingsBackup.redactSecrets]'s
+ * canonical set (apiKeys, jarvis tokens, Spotify OAuth) so a newly-added secret is covered by construction.
+ * Used by the debug-report uploader for exact-match scrubbing (the load-bearing pass that catches opaque,
+ * pattern-evading tokens like a Spotify `BQ…` blob or a hyphenated `sk-or-v1-…` key). Blanks are filtered out.
+ */
+fun AppSettings.allSecretValues(): List<String> = listOf(
+    apiKeys.newsApi, apiKeys.fred, apiKeys.eia, apiKeys.finnhub, apiKeys.openWeatherMap, apiKeys.nasa,
+    jarvis.githubToken, jarvis.modelToken, jarvis.cloudApiKey,
+    spotify.accessToken, spotify.refreshToken, spotify.pendingVerifier,
+).map { it.trim() }.filter { it.isNotBlank() }
 
 /** Sensible International defaults for first launch. */
 object DefaultData {

@@ -43,6 +43,7 @@ import java.util.Locale
 fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     val entries by vm.entries.collectAsState()
+    val uploadStatus by vm.uploadStatus.collectAsState()
     val context = LocalContext.current
     var expanded by remember { mutableStateOf<CrashEntry?>(null) }
 
@@ -70,10 +71,28 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Uncaught faults are logged on-device and never leave the phone. Native (C++) " +
-                    "crashes can't be captured here.",
+                "Uncaught faults are logged on-device. Native (C++) crashes can't be captured here. " +
+                    "Crash reports auto-upload (scrubbed of secrets) to the repo's debug-reports branch " +
+                    "on next launch when a GitHub token is set; toggle it off in Settings → Diagnostics.",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
             )
+
+            NeonPanel(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { vm.sendReport() },
+                borderColor = c.accent.copy(alpha = 0.6f),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "▲ SEND DEBUG REPORT TO REPO",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
+                    )
+                    uploadStatus?.let {
+                        Text(it, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+                    }
+                }
+            }
 
             if (BuildConfig.DEBUG) {
                 NeonPanel(

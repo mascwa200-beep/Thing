@@ -203,11 +203,13 @@ class UsageRepository(
         const val LOG_CAP = 300
         const val LABEL_MAX = 200
 
-        /** Known API-key / token shapes (OpenAI, GitHub, Google, Slack) + Bearer headers. */
+        /** Known API-key / token shapes (OpenAI/OpenRouter, GitHub, Google, Slack) + Bearer headers.
+         *  Kept in step with [dev.mascwa.pulse.core.util.SecretScrub.PATTERNS] (hyphenated sk- keys, PATs). */
         val SECRET_PATTERNS = listOf(
             Regex("(?i)\\bbearer\\s+[A-Za-z0-9._\\-]{10,}"),
-            Regex("\\bsk-[A-Za-z0-9]{16,}"),
+            Regex("\\bsk-[A-Za-z0-9\\-]{12,}"),
             Regex("\\bgh[pousr]_[A-Za-z0-9]{16,}"),
+            Regex("\\bgithub_pat_[A-Za-z0-9_]{20,}"),
             Regex("\\bAIza[0-9A-Za-z_\\-]{20,}"),
             Regex("\\bxox[baprs]-[A-Za-z0-9\\-]{10,}"),
         )

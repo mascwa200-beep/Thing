@@ -284,6 +284,13 @@ class AppContainer(private val appContext: Context) {
     val crashReporter: dev.mascwa.pulse.crash.CrashReporter by lazy {
         dev.mascwa.pulse.crash.CrashReporter(appContext)
     }
+    /** Uploads scrubbed crash/debug reports to the repo's `debug-reports` branch (opt-in) for remote
+     *  reading. Reuses the repo-scoped GitHub token; never touches main/dev or opens a PR. */
+    val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {
+        dev.mascwa.pulse.data.diagnostics.DebugUploader(
+            appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository,
+        )
+    }
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
         listOf(
