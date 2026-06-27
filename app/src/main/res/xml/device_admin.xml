@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Device-admin policy declaration for Pulse. Deliberately requests NO intrusive policies (no wipe, lock,
-  password or storage-encryption enforcement). Being a Device Owner is needed purely to unlock the
-  documented Wi-Fi-toggle privilege used by Trusted Network Mode; an empty policy set keeps the privilege
-  minimal.
+  Device-admin policy declaration for Pulse. The Wi-Fi-toggle privilege (Trusted Network Mode) and USB
+  data-signaling control need no policy here — they're Device-Owner-inherent. The camera and failed-unlock
+  wipe controls DO require the matching policies below, or the platform throws when they're called. All of
+  these are opt-in in Settings (default off) and reversible; the owner provisioned the device deliberately.
 -->
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-policies />
+    <uses-policies>
+        <!-- "Disable all cameras" toggle (setCameraDisabled). -->
+        <disable-camera />
+        <!-- "Wipe after N failed unlocks" anti-theft control (setMaximumFailedPasswordsForWipe). -->
+        <watch-login />
+        <wipe-data />
+    </uses-policies>
 </device-admin>
