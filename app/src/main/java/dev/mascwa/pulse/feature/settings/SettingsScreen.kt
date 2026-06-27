@@ -227,6 +227,55 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 }
             }
 
+            // ----- Device-owner security policies (effective only once provisioned) -----
+            item {
+                val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
+                val isOwner = remember { dpc.isDeviceOwner() }
+                val usbSupported = remember { dpc.usbDataControlSupported() }
+                var usbDataOn by remember { mutableStateOf(dpc.isUsbDataEnabled()) }
+                var camDisabled by remember { mutableStateOf(dpc.isCameraDisabled()) }
+                var wipeN by remember { mutableStateOf(dpc.maxFailedForWipe()) }
+                PrefSection("Device-owner controls") {
+                    if (!isOwner) {
+                        Text(
+                            "These hardware-backed protections need Pulse provisioned as Device Owner (see " +
+                                "“Device owner” above). Until then they're inert.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    PrefSwitch(
+                        "Disable USB data (charging only)",
+                        if (usbSupported) "Cut the USB data lines so a cable can only charge — anti-forensic. " +
+                            "Turn back on here to use adb / file transfer again."
+                        else "This device can't disable USB data signaling.",
+                        checked = !usbDataOn,
+                        enabled = isOwner && usbSupported,
+                    ) { disable -> if (dpc.setUsbDataEnabled(!disable)) usbDataOn = !disable }
+                    PrefSwitch(
+                        "Disable all cameras",
+                        "Hardware-disable every camera, device-wide, until turned back off here.",
+                        checked = camDisabled,
+                        enabled = isOwner,
+                    ) { disable -> if (dpc.setCameraDisabled(disable)) camDisabled = disable }
+                    SingleChoiceRow(
+                        "Wipe after failed unlocks",
+                        wipeN,
+                        listOf(0 to "Off", 10 to "10 tries", 20 to "20 tries", 30 to "30 tries"),
+                        enabled = isOwner,
+                    ) { n -> if (dpc.setMaxFailedForWipe(n)) wipeN = n }
+                    if (wipeN > 0) {
+                        Text(
+                            "⚠ After $wipeN wrong unlock attempts the device factory-resets. Anti-theft — set to Off to disable.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+
             // ----- Special access & restricted settings -----
             item {
                 PrefSection("Special access & restricted settings") {
