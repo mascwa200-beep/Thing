@@ -42,6 +42,9 @@ object TrustedNetwork {
     data class State(
         val disabledByUs: Boolean = false,
         val lastDisableMs: Long = 0L,
+        /** We've positively confirmed being on a home network at least once — a precondition for ever
+         *  concluding we've "left home". Without it, an unreadable SSID can't be mistaken for departure. */
+        val wasHome: Boolean = false,
     )
 
     data class Decision(
@@ -79,13 +82,24 @@ object TrustedNetwork {
             }
         }
 
-        val atHome = obs.onWifi && isHome(config, obs.ssid)
-        if (atHome) {
-            // Home is back (or we never left): hold the radio on and clear our disabled flag.
-            return Decision(Action.HOLD, State(disabledByUs = false), "on home Wi-Fi")
+        // With no home networks configured, the mode has no safe notion of "away" — never disable; and if
+        // we'd disabled the radio under an earlier config, restore it rather than strand it off.
+        if (config.homeSsids.isEmpty()) {
+            return if (state.disabledByUs && !obs.wifiRadioOn) {
+                Decision(Action.ENABLE_WIFI, state.copy(disabledByUs = false), "no home networks set — restoring Wi-Fi")
+            } else {
+                Decision(Action.HOLD, state.copy(disabledByUs = false), "no home networks set — Trusted Network Mode idle")
+            }
         }
 
-        // --- We are away from home. ---
+        val atHome = obs.onWifi && isHome(config, obs.ssid)
+        if (atHome) {
+            // Home is back (or we never left): hold the radio on, clear the disabled flag, and record that
+            // we've genuinely seen home — the precondition for ever concluding we later left it.
+            return Decision(Action.HOLD, state.copy(disabledByUs = false, wasHome = true), "on home Wi-Fi")
+        }
+
+        // --- Not currently confirmed at home. ---
 
         // If we turned the radio off, it can't see home while off; re-enable to re-probe once the window passes.
         if (state.disabledByUs && !obs.wifiRadioOn) {
@@ -96,16 +110,32 @@ object TrustedNetwork {
             }
         }
 
-        // Dual verification: lost home (above) AND cellular is up AND the radio is still on to turn off.
-        if (obs.wifiRadioOn && obs.cellularUp) {
+        // "Confirmed away" must be a POSITIVE fact, not merely a failure to identify the network. We're away
+        // only if we're not associated with any Wi-Fi at all, OR we're on a *readable* SSID that isn't home.
+        // Being on Wi-Fi with an UNREADABLE SSID (e.g. no location permission) is unknown → never "away".
+        val ssidReadable = normalizeSsid(obs.ssid) != null
+        val confirmedAway = !obs.onWifi || (ssidReadable && !isHome(config, obs.ssid))
+
+        // Dual verification AND a confirmed departure from a home we'd actually seen, before ever disabling:
+        //  - we've been on home Wi-Fi before (state.wasHome),
+        //  - we're now confirmably away,
+        //  - cellular is up to carry us, and
+        //  - the radio is still on to turn off.
+        if (state.wasHome && confirmedAway && obs.wifiRadioOn && obs.cellularUp) {
             return Decision(
                 Action.DISABLE_WIFI,
-                State(disabledByUs = true, lastDisableMs = nowMs),
+                state.copy(disabledByUs = true, lastDisableMs = nowMs),
                 "left home + cellular active — disabling Wi-Fi",
             )
         }
 
-        // Away but no confirmed cellular fallback yet — never disable on loss of home alone.
-        return Decision(Action.HOLD, state, "away — awaiting cellular fallback before disabling Wi-Fi")
+        // Hold in every other case — and say why, for the network event log.
+        val reason = when {
+            !state.wasHome -> "haven't confirmed home Wi-Fi yet — holding (won't disable)"
+            !confirmedAway -> "on Wi-Fi but network unconfirmed — holding (won't disable)"
+            !obs.cellularUp -> "away — awaiting cellular fallback before disabling Wi-Fi"
+            else -> "holding"
+        }
+        return Decision(Action.HOLD, state, reason)
     }
 }

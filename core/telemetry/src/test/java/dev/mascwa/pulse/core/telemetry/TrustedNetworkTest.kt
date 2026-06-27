@@ -50,12 +50,68 @@ class TrustedNetworkTest {
         val d = TrustedNetwork.evaluate(
             home,
             obs(onWifi = true, ssid = "CoffeeShop", cellularUp = true, wifiRadioOn = true),
-            TrustedNetwork.State(),
+            TrustedNetwork.State(wasHome = true), // we'd confirmed home before leaving
             nowMs = 1_000L,
         )
         assertEquals(TrustedNetwork.Action.DISABLE_WIFI, d.action)
         assertTrue(d.state.disabledByUs)
         assertEquals(1_000L, d.state.lastDisableMs)
+    }
+
+    // --- Safety guards against false "away" (the home-Wi-Fi-disconnect bug) ---
+
+    @Test
+    fun doesNotDisableWhenOnWifiButSsidUnreadable() {
+        // Sitting on home Wi-Fi but the SSID can't be read (no location permission) — must NOT be mistaken
+        // for "away" and disable the radio, even with cellular up and a prior confirmed-home.
+        val d = TrustedNetwork.evaluate(
+            home,
+            obs(onWifi = true, ssid = null, cellularUp = true, wifiRadioOn = true),
+            TrustedNetwork.State(wasHome = true),
+            nowMs = 1_000L,
+        )
+        assertEquals(TrustedNetwork.Action.HOLD, d.action)
+        assertFalse(d.state.disabledByUs)
+    }
+
+    @Test
+    fun doesNotDisableBeforeHomeEverConfirmed() {
+        // Cold start while already on a foreign network — never disable until we've actually seen home.
+        val d = TrustedNetwork.evaluate(
+            home,
+            obs(onWifi = true, ssid = "CoffeeShop", cellularUp = true, wifiRadioOn = true),
+            TrustedNetwork.State(), // wasHome = false
+            nowMs = 1_000L,
+        )
+        assertEquals(TrustedNetwork.Action.HOLD, d.action)
+        assertFalse(d.state.disabledByUs)
+    }
+
+    @Test
+    fun doesNotDisableWithNoHomeNetworksConfigured() {
+        val noHome = home.copy(homeSsids = emptySet())
+        val d = TrustedNetwork.evaluate(
+            noHome,
+            obs(onWifi = false, ssid = null, cellularUp = true, wifiRadioOn = true),
+            TrustedNetwork.State(wasHome = true),
+            nowMs = 1_000L,
+        )
+        assertEquals(TrustedNetwork.Action.HOLD, d.action)
+        assertFalse(d.state.disabledByUs)
+    }
+
+    @Test
+    fun restoresWifiWhenHomeNetworksClearedAfterWeDisabledIt() {
+        // The user removed all home networks while we had the radio off — never strand it.
+        val noHome = home.copy(homeSsids = emptySet())
+        val d = TrustedNetwork.evaluate(
+            noHome,
+            obs(onWifi = false, ssid = null, cellularUp = true, wifiRadioOn = false),
+            TrustedNetwork.State(disabledByUs = true, lastDisableMs = 0L, wasHome = true),
+            nowMs = 1_000L,
+        )
+        assertEquals(TrustedNetwork.Action.ENABLE_WIFI, d.action)
+        assertFalse(d.state.disabledByUs)
     }
 
     @Test
