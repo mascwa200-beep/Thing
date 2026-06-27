@@ -317,6 +317,44 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 }
             }
 
+            // ----- GrapheneOS hardening (surface the OS's own controls; they beat app-level versions) -----
+            item {
+                val isGraphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context).isGraphene }
+                val sandboxedPlay = remember { dev.mascwa.pulse.core.device.GrapheneOs.hasSandboxedPlay(context) }
+                PrefSection("GrapheneOS hardening") {
+                    if (!isGraphene) {
+                        Text(
+                            "GrapheneOS not detected — these are pointers to GrapheneOS's own hardening controls.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    PrefClickable(
+                        "Exploit protection (Memory Tagging)",
+                        value = "App info",
+                        subtitle = "GrapheneOS can enable hardware Memory Tagging (MTE) + stricter exploit " +
+                            "protection per app, using the Tensor chip. Toggle it for Pulse in App info → " +
+                            "GrapheneOS settings. (Better than forcing it in the build — you stay in control.)",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                    PrefClickable(
+                        "USB-C port control",
+                        subtitle = "For the strongest anti-forensic USB lockdown, prefer GrapheneOS's native " +
+                            "Settings → Security → “USB-C port” → charging-only when locked. It's OS-level and " +
+                            "more robust than the app's Device-Owner USB toggle above.",
+                        onClick = { dev.mascwa.pulse.core.util.openSecuritySettings(context) },
+                    )
+                    PrefClickable(
+                        "Sandboxed Google Play",
+                        value = if (sandboxedPlay) "Installed ✓" else "Not installed",
+                        subtitle = "GrapheneOS runs Play Services as a normal sandboxed app (no privileged " +
+                            "access). Pulse needs none of it — it's purely informational.",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                }
+            }
+
             // ----- Special access & restricted settings -----
             item {
                 PrefSection("Special access & restricted settings") {

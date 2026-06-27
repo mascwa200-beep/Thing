@@ -186,6 +186,12 @@ fun openAccessibilitySettings(context: Context): Boolean =
 fun openUsageAccessSettings(context: Context): Boolean =
     launch(context, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
 
+/** Opens the system Security settings (where GrapheneOS's USB-C port control + auto-reboot live). Falls
+ *  back to the main Settings screen if a device doesn't expose the security panel directly. */
+fun openSecuritySettings(context: Context): Boolean =
+    launch(context, Intent(Settings.ACTION_SECURITY_SETTINGS)) ||
+        launch(context, Intent(Settings.ACTION_SETTINGS))
+
 /** Opens a system settings panel by [which] (wifi/bluetooth/location/display/sound/battery/data/nfc/apps),
  *  or the main Settings screen when blank/unknown. */
 fun openSettingsPanel(context: Context, which: String): Boolean {
