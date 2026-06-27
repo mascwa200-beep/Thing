@@ -929,6 +929,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             "On-device only.",
                         onClick = { vm.clearTasks() },
                     )
+                    PrefSwitch(
+                        "Reflect on memories",
+                        "Periodically distil recent moments into higher-level insights J.A.R.V.I.S. keeps " +
+                            "(Mnemosyne reflection). Uses the cloud brain, throttled; off = raw moments only.",
+                        s.jarvis.reflectionEnabled,
+                    ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
                     PrefClickable(
                         "Clear episodic memory",
                         subtitle = "Forget the timestamped moments J.A.R.V.I.S. remembers from your " +

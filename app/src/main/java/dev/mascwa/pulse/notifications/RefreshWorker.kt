@@ -113,6 +113,12 @@ class RefreshWorker(
             }
         }
 
+        // --- Mnemosyne reflection: synthesise recent episodic observations into higher-level REFLECTION
+        // memories (cloud-gated + throttled inside the engine; silent — surfaces in the Memory screen). ---
+        if (jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
+            runCatching { container.reflectionEngine.reflectIfDue() }
+        }
+
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         runCatching {
             val now = System.currentTimeMillis()
