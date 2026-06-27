@@ -46,8 +46,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -161,6 +165,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             ?.isDeviceOwnerApp(context.packageName) == true
                     }.getOrDefault(false)
                 }
+                val attestScope = rememberCoroutineScope()
+                var attestRunning by remember { mutableStateOf(false) }
+                var attestation by remember {
+                    mutableStateOf<dev.mascwa.pulse.core.device.DeviceAttestation.Report?>(null)
+                }
                 PrefSection("Device & OS") {
                     PrefClickable(
                         "Hardware",
@@ -178,9 +187,37 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefClickable(
                         "Device owner",
                         value = if (deviceOwner) "Provisioned ✓" else "Not set",
-                        subtitle = "Unlocks Trusted-Network Wi-Fi control. Provision once via adb: " +
-                            "dpm set-device-owner ${context.packageName}/.security.PulseDeviceAdminReceiver",
+                        // NOTE: this is NOT the "Allow restricted settings" toggle — Device Owner is a separate,
+                        // higher-privilege state that can only be set over adb, and only on a device with no
+                        // accounts. The class must be the absolute name (the applicationId carries a `.debug`
+                        // suffix the manifest namespace doesn't, so a relative `.security.…` would resolve wrong).
+                        subtitle = "Separate from restricted settings — provision once over adb on a device with " +
+                            "NO accounts:\nadb shell dpm set-device-owner " +
+                            "${context.packageName}/dev.mascwa.pulse.security.PulseDeviceAdminReceiver",
                         onClick = {},
+                    )
+                    PrefClickable(
+                        "Hardware attestation",
+                        value = when {
+                            attestRunning -> "checking…"
+                            attestation == null -> "tap to verify"
+                            attestation?.verdict?.let { it.verifiedBoot && it.bootloaderLocked } == true -> "Verified ✓"
+                            attestation?.available == true -> "see below"
+                            else -> "unavailable"
+                        },
+                        subtitle = attestationSubtitle(attestation, attestRunning),
+                        onClick = {
+                            if (!attestRunning) {
+                                attestRunning = true
+                                attestScope.launch {
+                                    val r = withContext(Dispatchers.IO) {
+                                        dev.mascwa.pulse.core.device.DeviceAttestation().run()
+                                    }
+                                    attestation = r
+                                    attestRunning = false
+                                }
+                            }
+                        },
                     )
                     PrefClickable(
                         "GrapheneOS per-app controls",
@@ -1058,6 +1095,25 @@ private fun AddContactRow(onAdd: (dev.mascwa.pulse.data.settings.EmergencyContac
             dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },
         )
     }
+}
+
+/** Subtitle for the "Hardware attestation" row — shows the verdict and surfaces the verified-boot key so
+ *  it can be recorded (the GrapheneOS key isn't on file yet, so this is how we capture the real value). */
+private fun attestationSubtitle(
+    report: dev.mascwa.pulse.core.device.DeviceAttestation.Report?,
+    running: Boolean,
+): String {
+    if (running) return "Probing the secure element…"
+    if (report == null) {
+        return "Cryptographically prove verified boot + genuine GrapheneOS via the Titan M2 (key attestation) — " +
+            "stronger than the app-presence heuristic above."
+    }
+    if (!report.available || report.info == null) {
+        return "Unavailable: ${report.error ?: "no hardware attestation on this device"}"
+    }
+    val summary = report.verdict?.summary ?: "Attestation record parsed."
+    val key = report.info?.verifiedBootKeyHex
+    return if (key != null) "$summary\nVerified-boot key: $key" else summary
 }
 
 @Composable
