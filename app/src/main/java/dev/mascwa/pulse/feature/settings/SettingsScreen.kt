@@ -178,8 +178,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefClickable(
                         "Device owner",
                         value = if (deviceOwner) "Provisioned ✓" else "Not set",
-                        subtitle = "Unlocks Trusted-Network Wi-Fi control. Provision once via adb: " +
-                            "dpm set-device-owner ${context.packageName}/.security.PulseDeviceAdminReceiver",
+                        // NOTE: this is NOT the "Allow restricted settings" toggle — Device Owner is a separate,
+                        // higher-privilege state that can only be set over adb, and only on a device with no
+                        // accounts. The class must be the absolute name (the applicationId carries a `.debug`
+                        // suffix the manifest namespace doesn't, so a relative `.security.…` would resolve wrong).
+                        subtitle = "Separate from restricted settings — provision once over adb on a device with " +
+                            "NO accounts:\nadb shell dpm set-device-owner " +
+                            "${context.packageName}/dev.mascwa.pulse.security.PulseDeviceAdminReceiver",
                         onClick = {},
                     )
                     PrefClickable(
