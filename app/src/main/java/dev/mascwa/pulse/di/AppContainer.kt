@@ -440,6 +440,11 @@ class AppContainer(private val appContext: Context) {
     val curiosityEngine: dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine by lazy {
         dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine(jarvisMemory, inferenceEngine, settingsRepository)
     }
+    /** Mnemosyne reflection: synthesise recent episodic observations into higher-level REFLECTION memories
+     *  (cloud-gated + throttled). Driven periodically from RefreshWorker. */
+    val reflectionEngine: dev.mascwa.pulse.jarvis.reflection.ReflectionEngine by lazy {
+        dev.mascwa.pulse.jarvis.reflection.ReflectionEngine(memoryStream, inferenceEngine, settingsRepository)
+    }
 
     /** Compass is stateful per-screen, so hand out a fresh controller each time. */
     fun newCompassController(): CompassController = CompassController(appContext)

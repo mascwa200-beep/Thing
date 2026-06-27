@@ -178,6 +178,9 @@ data class JarvisSettings(
     /** Auto-upload scrubbed crash/debug reports to the repo's `debug-reports` branch for remote reading.
      *  Needs the GitHub token; secrets are stripped before anything leaves the device. */
     val debugReports: Boolean = true,
+    /** Periodically synthesise recent episodic observations into higher-level REFLECTION memories
+     *  (Mnemosyne). Cloud-gated + throttled; a no-op without a working cloud brain. */
+    val reflectionEnabled: Boolean = true,
     /**
      * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
      * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.
@@ -384,6 +387,8 @@ data class AppSettings(
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,
     val curiosityIndex: Int = 0,
+    /** When the Mnemosyne reflection pass last ran (throttle). */
+    val lastReflectionMs: Long = 0,
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
      *  Adjustable via the Settings slider; clamped to a sane range where used. */
     val tickerSpeed: Float = 1.0f,
