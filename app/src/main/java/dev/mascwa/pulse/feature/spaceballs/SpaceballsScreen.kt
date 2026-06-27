@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -777,28 +778,37 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                             }
                         }
                         e < lightEnd -> {
-                            // LIGHT SPEED — the starfield stretches into long white streaks rushing
-                            // radially out of a central point (classic hyperspace), accelerating, with a
-                            // hard g-force shake (Helmet hanging on / lifting off).
+                            // THE JUMP (the crux) — the windshield view: a horizontal SWEPT streak field.
+                            // Warm amber ceiling bands across the top; white + multicolour streaks rake out
+                            // of a HIGH, OFF-CENTRE vanishing point (NOT a centred radial burst). Shake peaks.
                             val a = (e - braceEnd) / (lightEnd - braceEnd)
                             val speed = a * a
-                            val jit = if (reduceMotion) 0f else (0.25f + speed) * 11.dp.toPx()
-                            val c = base + Offset(sin(e * 47f) * jit, cos(e * 39f) * jit)
-                            val glowR = maxR * (0.18f + 0.2f * speed)
-                            drawCircle(
-                                Brush.radialGradient(listOf(Color.White.copy(alpha = 0.3f * speed), Color.Transparent), c, glowR),
-                                glowR, c, blendMode = BlendMode.Plus,
+                            val jit = if (reduceMotion) 0f else (0.3f + speed) * 13.dp.toPx()
+                            val vp = Offset(size.width * 0.68f, size.height * 0.30f) +
+                                Offset(sin(e * 47f) * jit, cos(e * 39f) * jit)
+                            // warm amber/orange ceiling bands across the top third
+                            drawRect(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFFF9A2E).copy(alpha = 0.5f * speed),
+                                        Color(0xFFCC5A14).copy(alpha = 0.22f * speed),
+                                        Color.Transparent,
+                                    ),
+                                    0f, size.height * 0.36f,
+                                ),
+                                size = Size(size.width, size.height * 0.36f),
                             )
                             val rush = if (reduceMotion) 0.4f else scroll * 2.4f
                             stars.forEach { s ->
                                 val dir = Offset(s[0], s[1])
                                 val phaseR = (rush + s[2]) % 1f
-                                val out = phaseR * phaseR                // accelerate outward (slow far, fast near)
-                                val r0 = out * maxR * (0.5f + s[2])
-                                val len = (16f + 640f * out) * (0.45f + s[2]) * (0.3f + 0.7f * speed)
+                                val out = phaseR * phaseR
+                                val r0 = out * maxR * (0.45f + s[2])
+                                val len = (18f + 640f * out) * (0.4f + s[2]) * (0.3f + 0.7f * speed)
+                                val col = if (s[4] < 0.55f) Color.White else streakColor(s)
                                 drawLine(
-                                    Color.White.copy(alpha = (1f - phaseR * 0.25f) * (0.4f + 0.6f * speed)),
-                                    c + dir * r0, c + dir * (r0 + len), 1.5f + speed * 3.5f * phaseR,
+                                    col.copy(alpha = (1f - phaseR * 0.25f) * (0.4f + 0.6f * speed)),
+                                    vp + dir * r0, vp + dir * (r0 + len), 1.5f + speed * 3f * phaseR,
                                     cap = StrokeCap.Round, blendMode = BlendMode.Plus,
                                 )
                             }
@@ -822,6 +832,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                                 )
                             }
                             drawBurst(c, a, a)
+                            drawTartanWash(a) // the translucent crossing tartan — what makes it read as plaid
                         }
                     }
                 }
@@ -833,6 +844,7 @@ private fun LudicrousOverlay(onDone: () -> Unit) {
                     drawShaft(scroll, 1f, c)
                     cruiseStreaks(stars, scroll, c, maxR)
                     drawBurst(c, breath, 1f)
+                    drawTartanWash(1f) // the crossing tartan wash layered OVER the tunnel grid = plaid
                     if (phase == 4) drawRect(Lud.WALL_RED.copy(alpha = 0.35f + 0.25f * blink))
                 }
                 5 -> {
@@ -947,16 +959,73 @@ private fun EngageText(stage: Int, blink: State<Float>) {
             }
             // 3) After GO the ship climbs — the speed sign pops up ONE tier at a time, in order.
             3 -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                mono("LIGHT  SPEED", Color.White, 24f, FontWeight.Bold, TextAlign.Center, 4f)
-                Spacer(Modifier.height(14.dp))
+                SpeedSignPanel("LIGHT  SPEED")
+                Spacer(Modifier.height(16.dp))
                 mono("MY BRAINS ARE GOING INTO MY FEET!", Sb.amber.copy(alpha = 0.85f), 11f, FontWeight.Bold, TextAlign.Center, 1f)
             }
-            4 -> mono("RIDICULOUS  SPEED", Sb.amber, 24f, FontWeight.Bold, TextAlign.Center, 4f)
-            5 -> mono(
-                "LUDICROUS  SPEED", Sb.redHot, 26f, FontWeight.Bold, TextAlign.Center, 4f,
-                Modifier.graphicsLayer { alpha = blink.value }, // flash via the draw phase — no recomposition
-            )
+            4 -> SpeedSignPanel("RIDICULOUS  SPEED")
+            5 -> SpeedSignPanel("LUDICROUS  SPEED", Modifier.graphicsLayer { alpha = blink.value })
             else -> {}
+        }
+    }
+}
+
+/** A green phosphor dot-matrix speed-sign panel (LIGHT/RIDICULOUS/LUDICROUS), scanline-textured. */
+@Composable
+private fun SpeedSignPanel(label: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .background(Color(0xFF03100A), RoundedCornerShape(6.dp))
+            .padding(horizontal = 24.dp, vertical = 14.dp)
+            .drawWithContent {
+                drawContent()
+                var y = 0f
+                val gap = 3.dp.toPx()
+                while (y < size.height) {
+                    drawRect(Color.Black.copy(alpha = 0.3f), Offset(0f, y), Size(size.width, 1.4.dp.toPx()))
+                    y += gap
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label, color = Color(0xFF33FF66), fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold,
+            fontSize = 22.sp, letterSpacing = 5.sp, textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * The translucent crossing tartan WASH that actually reads as "plaid" — two diagonal colour families
+ * (±25°) in muted tartan tones (amber/red/teal/cream) laid over the scene; crossing the orthogonal
+ * tunnel grid is what makes the eye read tartan. `alpha` (0..1) fades the whole wash in.
+ */
+private fun DrawScope.drawTartanWash(alpha: Float) {
+    if (alpha <= 0.01f) return
+    val cols = listOf(Color(0xFFE0A33A), Color(0xFFB23A2E), Color(0xFF2C8C8C), Color(0xFFE9DCC2))
+    val spacing = 30.dp.toPx()
+    val diag = sqrt(size.width * size.width + size.height * size.height)
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    for (fam in 0..1) {
+        val rad = (if (fam == 0) 25f else -25f) * (PI.toFloat() / 180f)
+        val dx = cos(rad)
+        val dy = sin(rad)
+        val px = -dy // perpendicular (the spacing direction)
+        val py = dx
+        val n = (diag / spacing).toInt() + 1
+        var i = -n
+        while (i <= n) {
+            val off = i * spacing
+            val mx = cx + px * off
+            val my = cy + py * off
+            val col = cols[((i % cols.size) + cols.size) % cols.size]
+            val wdt = if (i % 4 == 0) 7.dp.toPx() else 3.dp.toPx()
+            drawLine(
+                col.copy(alpha = 0.38f * alpha),
+                Offset(mx - dx * diag, my - dy * diag), Offset(mx + dx * diag, my + dy * diag), wdt,
+            )
+            i++
         }
     }
 }
@@ -1029,17 +1098,9 @@ private fun FlybyDialogue(line: Int) {
     }
 }
 
-/** A bright Royal-Stewart-flavoured tartan "sett" (colour, width dp) — the plaid weave for the flyby wake. */
-private val TartanSett = listOf(
-    Color(0xFFC8102E) to 26f, Color(0xFF111111) to 3f, Color(0xFFF2C200) to 3f, Color(0xFF111111) to 3f,
-    Color(0xFFC8102E) to 8f, Color(0xFF14377D) to 14f, Color(0xFFF5F5F5) to 3f, Color(0xFF14377D) to 14f,
-    Color(0xFFC8102E) to 8f, Color(0xFF1B5E20) to 16f, Color(0xFFF2C200) to 3f, Color(0xFF1B5E20) to 16f,
-    Color(0xFFC8102E) to 8f,
-)
-
 /**
- * Beat 4 exterior: from near the Eagle 5, Spaceball One streaks left→right across a starfield, leaving a
- * ribbon of woven plaid light fading out behind it. `p` (0..1) drives the flyby; no retained buffers.
+ * Beat 4 — the "they've gone to plaid" view: Spaceball One streaks past (three circular engine glows)
+ * over a starfield, with the translucent crossing tartan WASH (the plaid) composited over the frame.
  */
 private fun DrawScope.drawFlyby(p: Float, stars: List<FloatArray>) {
     drawRect(Color.Black)
@@ -1048,57 +1109,29 @@ private fun DrawScope.drawFlyby(p: Float, stars: List<FloatArray>) {
         val y = (s[1] * 0.5f + 0.5f) * size.height
         drawCircle(Color.White.copy(alpha = 0.18f + 0.4f * s[3]), 1f + s[3], Offset(x, y))
     }
-    val shipY = size.height * 0.46f
-    val shipLen = size.minDimension * 0.42f
-    val shipH = size.minDimension * 0.055f
+    // Spaceball One streaking left→right, three circular engine glows flaring at the tail.
+    val shipY = size.height * 0.5f
+    val shipLen = size.minDimension * 0.38f
+    val shipH = size.minDimension * 0.05f
     val noseX = -shipLen + (size.width + shipLen * 2f) * p
     val tailX = noseX - shipLen
-    // A big woven TARTAN wake — the plaid we see the most of: a real warp×weft weave (crossing colour
-    // bands, the vertical pass half-alpha so crossings blend) fading in from the left up to the ship.
-    val bandH = size.minDimension * 0.52f
-    val top = shipY - bandH / 2f
-    val trailEnd = tailX.coerceAtLeast(2f)
-    run { // warp — horizontal colour bands, faded in from the left
-        var y = top
-        var i = 0
-        while (y < top + bandH) {
-            val (col, w) = TartanSett[i % TartanSett.size]
-            val wp = w.dp.toPx()
-            drawRect(
-                Brush.horizontalGradient(listOf(Color.Transparent, col.copy(alpha = 0.9f)), 0f, trailEnd),
-                topLeft = Offset(0f, y), size = Size(trailEnd, wp + 0.5f),
-            )
-            y += wp; i++
-        }
-    }
-    run { // weft — vertical colour bands at half alpha so crossings blend into the tartan; x-faded
-        var x = 0f
-        var i = 0
-        while (x < trailEnd) {
-            val (col, w) = TartanSett[i % TartanSett.size]
-            val wp = w.dp.toPx()
-            drawRect(col.copy(alpha = 0.5f * (x / trailEnd)), Offset(x, top), Size(wp + 0.5f, bandH))
-            x += wp; i++
-        }
-    }
-    // Spaceball One — a grey ribbed capsule with an engine flare at the tail.
-    if (noseX > 0f && tailX < size.width) {
+    if (noseX > -shipLen * 0.5f && tailX < size.width) {
         drawRoundRect(
             Brush.verticalGradient(listOf(Color(0xFFB8BDC4), Color(0xFF6A6F77), Color(0xFF2C3036))),
             topLeft = Offset(tailX, shipY - shipH / 2f), size = Size(shipLen, shipH),
             cornerRadius = CornerRadius(shipH / 2f, shipH / 2f),
         )
-        var bx = tailX + shipLen * 0.22f
-        while (bx < noseX - shipLen * 0.12f) {
-            drawCircle(Color(0xFF9A9FA7), shipH * 0.2f, Offset(bx, shipY - shipH * 0.16f))
-            bx += shipLen * 0.16f
+        for (k in 0..2) {
+            val gy = shipY + (k - 1) * shipH * 0.55f
+            val gR = shipH * 0.5f
+            drawCircle(
+                Brush.radialGradient(listOf(Color.White, Color(0xFFFFC04D), Color.Transparent), Offset(tailX, gy), gR),
+                gR, Offset(tailX, gy), blendMode = BlendMode.Plus,
+            )
         }
-        val flareR = shipH * 1.5f
-        drawCircle(
-            Brush.radialGradient(listOf(Color.White, Color(0xFFFFC04D), Color.Transparent), Offset(tailX, shipY), flareR),
-            flareR, Offset(tailX, shipY), blendMode = BlendMode.Plus,
-        )
     }
+    // THE PLAID — the translucent crossing tartan wash, fading in as the ship passes.
+    drawTartanWash((p * 2.5f).coerceIn(0f, 1f))
 }
 
 /**
