@@ -9,6 +9,7 @@ import dev.mascwa.pulse.core.util.SecretScrub
 import dev.mascwa.pulse.crash.CrashReporter
 import dev.mascwa.pulse.data.selfcode.GitHubRepo
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.allSecretValues
 import dev.mascwa.pulse.data.usage.UsageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,16 +78,12 @@ class DebugUploader(
 
     private suspend fun hasToken(): Boolean = repo.token() != null
 
-    /** Live credential values to redact by exact match — every secret the app actually holds. */
+    /** Live credential values to redact by exact match — every secret the app actually holds, read from
+     *  the authoritative [allSecretValues] accessor (apiKeys + jarvis tokens + Spotify OAuth), so a
+     *  newly-added secret is covered by construction rather than hand-enumerated here. The exact-match pass
+     *  is what catches opaque, pattern-evading tokens (a Spotify `BQ…` blob, a hyphenated `sk-or-v1-…` key). */
     private suspend fun liveSecrets(): List<String> = runCatching {
-        val s = settings.current()
-        val keys = mutableListOf(s.jarvis.githubToken, s.jarvis.modelToken, s.jarvis.cloudApiKey)
-        // Pull every value out of the apiKeys holder via its data-class toString (field=value, …).
-        runCatching {
-            val inner = s.apiKeys.toString().substringAfter('(', "").substringBeforeLast(')')
-            inner.split(", ").forEach { kv -> keys += kv.substringAfter('=', "") }
-        }
-        keys.map { it.trim() }.filter { it.length >= 8 }
+        settings.current().allSecretValues().filter { it.length >= 8 }
     }.getOrDefault(emptyList())
 
     private suspend fun buildBundle(kind: String, crashText: String?): String {
@@ -138,11 +135,19 @@ class DebugUploader(
     }.getOrDefault(emptySet())
 
     private fun markSent(id: String) {
-        runCatching { uploadedMarker.appendText(id + "\n") }
+        runCatching {
+            uploadedMarker.appendText(id + "\n")
+            // Keep the marker bounded — CrashReporter only ever retains a handful of entries, so the last
+            // MARKER_CAP ids are always enough to de-dupe; rewrite to the tail when it drifts over.
+            val lines = uploadedMarker.readLines().filter { it.isNotBlank() }
+            if (lines.size > MARKER_CAP) uploadedMarker.writeText(lines.takeLast(MARKER_CAP).joinToString("\n") + "\n")
+        }
     }
 
     private companion object {
         const val BRANCH = "debug-reports"
+        /** Upper bound on remembered "already uploaded" crash ids (CrashReporter keeps far fewer). */
+        const val MARKER_CAP = 50
         val TS = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.US)
     }
 }

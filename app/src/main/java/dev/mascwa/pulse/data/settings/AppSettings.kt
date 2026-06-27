@@ -394,6 +394,19 @@ data class AppSettings(
     val jarvisFeedTopic: String = "",
 )
 
+/**
+ * Every live credential value the app holds, as plain strings — the single source of truth for "what must
+ * never leave the device in cleartext." Mirrors [dev.mascwa.pulse.data.settings.SettingsBackup.redactSecrets]'s
+ * canonical set (apiKeys, jarvis tokens, Spotify OAuth) so a newly-added secret is covered by construction.
+ * Used by the debug-report uploader for exact-match scrubbing (the load-bearing pass that catches opaque,
+ * pattern-evading tokens like a Spotify `BQ…` blob or a hyphenated `sk-or-v1-…` key). Blanks are filtered out.
+ */
+fun AppSettings.allSecretValues(): List<String> = listOf(
+    apiKeys.newsApi, apiKeys.fred, apiKeys.eia, apiKeys.finnhub, apiKeys.openWeatherMap, apiKeys.nasa,
+    jarvis.githubToken, jarvis.modelToken, jarvis.cloudApiKey,
+    spotify.accessToken, spotify.refreshToken, spotify.pendingVerifier,
+).map { it.trim() }.filter { it.isNotBlank() }
+
 /** Sensible International defaults for first launch. */
 object DefaultData {
     val watchlist = listOf(
