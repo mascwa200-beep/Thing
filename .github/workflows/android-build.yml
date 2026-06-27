@@ -2,7 +2,12 @@ name: Android Build
 
 on:
   push:
-    branches: ["**"]
+    # Build on every code branch, but skip the telemetry-only `debug-reports` branch the in-app
+    # uploader writes to — it carries scrubbed crash reports (no code), so a build/republish there
+    # would only churn the version with identical code. (Later `!` pattern wins over `**`.)
+    branches:
+      - "**"
+      - "!debug-reports"
   workflow_dispatch:
 
 permissions:

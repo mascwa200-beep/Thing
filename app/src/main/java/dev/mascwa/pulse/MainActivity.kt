@@ -101,6 +101,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Upload any crash reports recorded since last launch (scrubbed → debug-reports branch). Done off
+        // the crash path (the JVM is unstable mid-crash); opt-in + no-op without a token; never crashes launch.
+        lifecycleScope.launch {
+            runCatching { app.container.debugUploader.uploadPendingCrashes() }
+        }
         // Auto-update runs from onStart (fires on cold launch + every foreground return).
 
         setContent {

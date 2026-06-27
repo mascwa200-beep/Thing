@@ -175,6 +175,9 @@ data class JarvisSettings(
     val agentToolsEnabled: Boolean = false,
     /** Optional GitHub token for the read-only repo tool (private repos / higher rate limit). */
     val githubToken: String = "",
+    /** Auto-upload scrubbed crash/debug reports to the repo's `debug-reports` branch for remote reading.
+     *  Needs the GitHub token; secrets are stripped before anything leaves the device. */
+    val debugReports: Boolean = true,
     /**
      * Which chat template to wrap prompts in. [ChatFormat.AUTO] picks ChatML/Gemma from the model
      * URL; switch to [ChatFormat.PLAIN] if a model's replies come out garbled or double-templated.

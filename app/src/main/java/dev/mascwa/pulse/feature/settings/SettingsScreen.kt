@@ -234,6 +234,23 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     )
                 }
             }
+
+            // ----- Diagnostics & debug reporting -----
+            item {
+                PrefSection("Diagnostics") {
+                    PrefSwitch(
+                        "Auto-send debug reports",
+                        "On a crash, upload a secret-scrubbed report to the repo's debug-reports branch on " +
+                            "next launch (needs a GitHub token) so issues can be read remotely.",
+                        s.jarvis.debugReports,
+                    ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(debugReports = v)) } }
+                    PrefClickable(
+                        "Crash console",
+                        subtitle = "View recorded faults and send a debug report now.",
+                        onClick = onOpenCrashLog,
+                    )
+                }
+            }
             item { HorizontalDivider() }
 
             // ----- Appearance -----
