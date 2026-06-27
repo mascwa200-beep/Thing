@@ -34,17 +34,23 @@ class SettingsRepository(
     /** Atomically read-modify-write the settings object. */
     suspend fun update(transform: (AppSettings) -> AppSettings) {
         context.dataStore.edit { prefs ->
-            val existing = prefs[key]?.let { decode(it) } ?: AppSettings()
-            val updated = transform(existing)
+            val raw = prefs[key]
+            val existing = raw?.let { decode(it) }
+            // A blob EXISTS but couldn't be decoded/decrypted (e.g. a transient Keystore hiccup). Refuse to
+            // overwrite it — writing transform(defaults) here would clobber the real settings, INCLUDING
+            // every saved credential, with defaults. Skip this write; the next one (once the Keystore is
+            // readable again) will apply cleanly.
+            if (raw != null && existing == null) return@edit
+            val updated = transform(existing ?: AppSettings())
             prefs[key] = persist(updated)
         }
     }
 
-    /** Decode a stored blob, transparently decrypting it when it's one of our at-rest ciphertexts.
-     *  Legacy plaintext is read as-is; a decrypt that fails falls through to a plaintext decode attempt
-     *  so settings are never lost. */
+    /** Decode a stored blob, decrypting it when it's one of our at-rest ciphertexts. Legacy plaintext is
+     *  read as-is. An encrypted blob that can't be decrypted returns null (NOT the raw ciphertext) so
+     *  callers can tell "undecodable existing data" from "no data" and avoid clobbering it. */
     private fun decode(raw: String): AppSettings? {
-        val plaintext = if (SecretCrypto.isEncrypted(raw)) SecretCrypto.decrypt(raw) ?: raw else raw
+        val plaintext = if (SecretCrypto.isEncrypted(raw)) (SecretCrypto.decrypt(raw) ?: return null) else raw
         return runCatching { json.decodeFromString(AppSettings.serializer(), plaintext) }.getOrNull()
     }
 
