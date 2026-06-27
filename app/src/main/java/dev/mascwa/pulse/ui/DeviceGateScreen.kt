@@ -34,6 +34,8 @@ fun DeviceGateScreen(
     result: DeviceGate.Result,
     grapheneOk: Boolean,
     osDetail: String,
+    attestationOk: Boolean? = null,
+    attestationDetail: String? = null,
     onContinue: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -69,6 +71,9 @@ fun DeviceGateScreen(
                 detail = "${result.detectedModel} (${result.detectedDevice})",
             )
             Requirement(label = "GrapheneOS", ok = grapheneOk, detail = osDetail)
+            if (attestationDetail != null) {
+                Requirement(label = "Hardware attestation", ok = attestationOk == true, detail = attestationDetail)
+            }
 
             Button(onClick = onContinue, modifier = Modifier.padding(top = 24.dp)) {
                 Text("Continue anyway")

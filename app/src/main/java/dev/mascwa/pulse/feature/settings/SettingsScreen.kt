@@ -201,7 +201,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         value = when {
                             attestRunning -> "checking…"
                             attestation == null -> "tap to verify"
-                            attestation?.verdict?.let { it.verifiedBoot && it.bootloaderLocked } == true -> "Verified ✓"
+                            attestation?.verdict?.grapheneVerified == true -> "GrapheneOS ✓"
                             attestation?.available == true -> "see below"
                             else -> "unavailable"
                         },

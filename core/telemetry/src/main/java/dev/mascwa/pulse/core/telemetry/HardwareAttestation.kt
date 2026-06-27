@@ -41,17 +41,23 @@ object HardwareAttestation {
         val bootloaderLocked: Boolean,
         val verifiedBoot: Boolean,
         val grapheneKeyMatch: Boolean?,
+        /** The full GrapheneOS pass: hardware-backed, bootloader locked, verified-boot key matches a known
+         *  GrapheneOS key, and boot state is Self-signed (the GrapheneOS norm) or Verified. */
+        val grapheneVerified: Boolean,
         val summary: String,
     )
 
     /**
-     * Known GrapheneOS verified-boot keys (hex), per device, to match against. Intentionally **empty**
-     * until the real value is read off a genuine Pixel 10 Pro XL on GrapheneOS and added here — fabricating
-     * a fingerprint would either false-accept or (worse, if it gates the app) false-reject and lock the
-     * owner out. Until populated, [verdict] reports the match as "unknown" and surfaces the read key so it
-     * can be recorded.
+     * Known GrapheneOS verified-boot keys (hex, lowercase), per device, to match against. Read off genuine
+     * hardware — never fabricated (gating on a wrong fingerprint would lock the owner out). On GrapheneOS
+     * the bootloader is re-locked against GrapheneOS's own AVB key, so attestation reports verified-boot
+     * state **Self-signed** (not Verified) plus this key — that combination is the real signature of
+     * GrapheneOS, which the verdict treats as a pass.
+     *  - Pixel 10 Pro XL ("mustang"): read off the owner's provisioned device, 2026-06.
      */
-    val GRAPHENE_VERIFIED_BOOT_KEYS: Set<String> = emptySet()
+    val GRAPHENE_VERIFIED_BOOT_KEYS: Set<String> = setOf(
+        "141d7fc32af7958a416f2661b37cf6f27bfb376fb5ce616aeaa27a82c7a04f74",
+    )
 
     // The rootOfTrust field is context-tag [704] inside an AuthorizationList.
     private const val TAG_ROOT_OF_TRUST = 704
@@ -98,6 +104,11 @@ object HardwareAttestation {
         val key = info.verifiedBootKeyHex?.lowercase()
         val match: Boolean? = if (knownGrapheneVerifiedBootKeys.isEmpty() || key == null) null
         else key in knownGrapheneVerifiedBootKeys.map { it.lowercase() }
+        // GrapheneOS re-locks the bootloader against its OWN key → attestation reports Self-signed (not
+        // Verified). The genuine-GrapheneOS signal is therefore: hardware + locked + key match + a boot
+        // state of Self-signed or Verified. (Requiring Verified alone would wrongly reject GrapheneOS.)
+        val grapheneVerified = hardware && locked && match == true &&
+            (info.verifiedBootState == BootState.SELF_SIGNED || info.verifiedBootState == BootState.VERIFIED)
 
         val summary = buildString {
             append(if (hardware) (if (strongBox) "StrongBox (secure element)" else "Hardware (TEE)") else "Software-only")
@@ -112,14 +123,15 @@ object HardwareAttestation {
                 },
             )
             append(
-                when (match) {
-                    true -> " · GrapheneOS key MATCH ✓"
-                    false -> " · GrapheneOS key mismatch ✗"
-                    null -> " · GrapheneOS key not yet on file (report the key below)"
+                when {
+                    grapheneVerified -> " · genuine GrapheneOS ✓ (re-locked with GrapheneOS's key)"
+                    match == true -> " · GrapheneOS key MATCH ✓"
+                    match == false -> " · GrapheneOS key mismatch ✗"
+                    else -> " · GrapheneOS key not yet on file (report the key below)"
                 },
             )
         }
-        return Verdict(hardware, strongBox, locked, verifiedBoot, match, summary)
+        return Verdict(hardware, strongBox, locked, verifiedBoot, match, grapheneVerified, summary)
     }
 
     // --- minimal DER reader ----------------------------------------------------------------------
