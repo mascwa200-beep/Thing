@@ -31,6 +31,18 @@ object GrapheneOs {
             else "GrapheneOS not detected"
     }
 
+    /** Whether GrapheneOS's optional **sandboxed Google Play** is set up (the gmscompat layer and/or the
+     *  user-profile Play Services package). Informational — GrapheneOS runs Play as a normal sandboxed app. */
+    fun hasSandboxedPlay(context: Context): Boolean {
+        val pm = context.packageManager
+        return listOf("app.grapheneos.gmscompat", "com.google.android.gms").any { pkg ->
+            runCatching {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(pkg, 0); true
+            }.getOrDefault(false)
+        }
+    }
+
     fun detect(context: Context): Status {
         val signals = mutableListOf<String>()
         val pm = context.packageManager

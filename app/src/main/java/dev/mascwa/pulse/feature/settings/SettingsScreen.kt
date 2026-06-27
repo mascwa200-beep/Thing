@@ -235,6 +235,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 var usbDataOn by remember { mutableStateOf(dpc.isUsbDataEnabled()) }
                 var camDisabled by remember { mutableStateOf(dpc.isCameraDisabled()) }
                 var wipeN by remember { mutableStateOf(dpc.maxFailedForWipe()) }
+                var pendingWipe by remember { mutableStateOf<Int?>(null) }
+                var wipeError by remember { mutableStateOf(false) }
                 PrefSection("Device-owner controls") {
                     if (!isOwner) {
                         Text(
@@ -264,7 +266,16 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         wipeN,
                         listOf(0 to "Off", 10 to "10 tries", 20 to "20 tries", 30 to "30 tries"),
                         enabled = isOwner,
-                    ) { n -> if (dpc.setMaxFailedForWipe(n)) wipeN = n }
+                    ) { n ->
+                        wipeError = false
+                        if (n <= 0) {
+                            // Disarming is safe — apply immediately.
+                            if (dpc.setMaxFailedForWipe(0)) wipeN = 0 else wipeError = true
+                        } else {
+                            // Arming a factory-reset is irreversible-on-trigger — confirm first.
+                            pendingWipe = n
+                        }
+                    }
                     if (wipeN > 0) {
                         Text(
                             "⚠ After $wipeN wrong unlock attempts the device factory-resets. Anti-theft — set to Off to disable.",
@@ -273,6 +284,74 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         )
                     }
+                    if (wipeError) {
+                        Text(
+                            "Couldn't apply that — the system rejected the value (it enforces a minimum). Try a higher count.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+                pendingWipe?.let { n ->
+                    AlertDialog(
+                        onDismissRequest = { pendingWipe = null },
+                        title = { Text("Arm device wipe?") },
+                        text = {
+                            Text(
+                                "After $n wrong unlock attempts, this device will FACTORY-RESET — erasing " +
+                                    "everything on it. This is an anti-theft measure and can't be undone once it " +
+                                    "triggers. Set it to Off any time to disarm.",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                if (dpc.setMaxFailedForWipe(n)) { wipeN = n; wipeError = false } else wipeError = true
+                                pendingWipe = null
+                            }) { Text("Arm wipe") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingWipe = null }) { Text("Cancel") }
+                        },
+                    )
+                }
+            }
+
+            // ----- GrapheneOS hardening (surface the OS's own controls; they beat app-level versions) -----
+            item {
+                val isGraphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context).isGraphene }
+                val sandboxedPlay = remember { dev.mascwa.pulse.core.device.GrapheneOs.hasSandboxedPlay(context) }
+                PrefSection("GrapheneOS hardening") {
+                    if (!isGraphene) {
+                        Text(
+                            "GrapheneOS not detected — these are pointers to GrapheneOS's own hardening controls.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    PrefClickable(
+                        "Exploit protection (Memory Tagging)",
+                        value = "App info",
+                        subtitle = "GrapheneOS can enable hardware Memory Tagging (MTE) + stricter exploit " +
+                            "protection per app, using the Tensor chip. Toggle it for Pulse in App info → " +
+                            "GrapheneOS settings. (Better than forcing it in the build — you stay in control.)",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                    PrefClickable(
+                        "USB-C port control",
+                        subtitle = "For the strongest anti-forensic USB lockdown, prefer GrapheneOS's native " +
+                            "Settings → Security → “USB-C port” → charging-only when locked. It's OS-level and " +
+                            "more robust than the app's Device-Owner USB toggle above.",
+                        onClick = { dev.mascwa.pulse.core.util.openSecuritySettings(context) },
+                    )
+                    PrefClickable(
+                        "Sandboxed Google Play",
+                        value = if (sandboxedPlay) "Installed ✓" else "Not installed",
+                        subtitle = "GrapheneOS runs Play Services as a normal sandboxed app (no privileged " +
+                            "access). Pulse needs none of it — it's purely informational.",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
                 }
             }
 
