@@ -1,6 +1,8 @@
 package dev.mascwa.pulse.security
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -45,6 +47,7 @@ class TrustedNetworkMonitor(
     private var state = TrustedNetwork.State()
     private var lastReason: String? = null
     private var notifiedUnprovisioned = false
+    private var notifiedNoLocation = false
     private var registered = false
     private var collectorStarted = false
 
@@ -84,7 +87,10 @@ class TrustedNetworkMonitor(
     }
 
     private fun trigger() {
-        scope.launch { mutex.withLock { evaluateOnce() } }
+        // evaluateOnce() already takes the mutex — DON'T wrap it again. kotlinx Mutex is NOT reentrant, so
+        // double-locking here deadlocked the coroutine forever (and leaked one per network callback),
+        // freezing every re-evaluation after the first — including the re-enable/recovery path.
+        scope.launch { evaluateOnce() }
     }
 
     private suspend fun evaluateOnce() = mutex.withLock { evaluateLocked() }
@@ -96,6 +102,23 @@ class TrustedNetworkMonitor(
             homeSsids = sec.homeSsids.toSet(),
             reprobeAfterMs = sec.reprobeMinutes.coerceIn(1, 24 * 60) * 60_000L,
         )
+        // Reading the connected Wi-Fi SSID needs location permission (Android 10+). Without it the mode
+        // can't tell home from away, so the core safely holds — but make that visible instead of silent.
+        if (config.enabled && config.homeSsids.isNotEmpty() && !hasLocationPermission()) {
+            if (!notifiedNoLocation) {
+                usage.log("network", "Trusted Network Mode idle — location permission needed to read your Wi-Fi name")
+                notifier.notifySecurity(
+                    id = 7611,
+                    title = "Trusted Network Mode needs location",
+                    body = "Grant Pulse location access so it can tell your home Wi-Fi from others. Until " +
+                        "then it won't change your Wi-Fi.",
+                )
+                notifiedNoLocation = true
+            }
+        } else {
+            notifiedNoLocation = false
+        }
+
         val obs = observe()
         val decision = TrustedNetwork.evaluate(config, obs, state, System.currentTimeMillis())
         state = decision.state
@@ -142,6 +165,10 @@ class TrustedNetworkMonitor(
             wifiRadioOn = wifi.isWifiEnabled(),
         )
     }
+
+    private fun hasLocationPermission(): Boolean =
+        appContext.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
     private fun activeHasTransport(transport: Int): Boolean {
         val c = cm ?: return false
