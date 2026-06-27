@@ -425,6 +425,57 @@ The three steerable follow-ups, each its own CI-green slice (all squash-merged +
 - ⚠️ All #113–#115 on-device-unverified (CI compile-gates only). The ICY read especially wants a real run
   (SomaFM streams are the reliable ones). **Open / steerable next:** owner's call.
 
+### GrapheneOS / Pixel security arc + Spaceballs Ludicrous Speed (this session, #197–#200 merged + a WiFi/audit batch)
+Owner moved the project onto a **hardware-security** track on their real device (Pixel 10 Pro XL on GrapheneOS,
+now **provisioned as a Device Owner** via adb). Also a long Spaceballs "Ludicrous Speed" visual arc landed first.
+- **Spaceballs Ludicrous Speed** (in #197): `feature/spaceballs/SpaceballsScreen.kt` rebuilt to a movie-accurate
+  sequence per the owner's REBUILD BRIEF — swept amber streak field, crossing-diagonal tartan wash, green
+  dot-matrix signs, two-stage EMERGENCY STOP → snap. Smoothness fix: read animation `State` only in draw/layer
+  lambdas (no per-frame recomposition). All tunables in a top-of-file `Lud` CONFIG.
+- **Auto debug reporting (#197):** `data/diagnostics/DebugUploader.kt` + `core/util/SecretScrub.kt` — on launch,
+  uploads scrubbed crash/diagnostic bundles (build/device/os/gate + latest fault + recent activity + own logcat)
+  to a dedicated **`debug-reports`** branch via the repo token, so I can read them remotely. `AppSettings.allSecretValues()`
+  is the single authoritative secret list (apiKeys + jarvis tokens + Spotify OAuth) for exact-match scrubbing.
+  CI excludes the `debug-reports` branch so reports don't churn the version. Opt-in (default on), no-op without a token.
+- **Device gate → Pixel 10 Pro XL on GrapheneOS (#197):** `core/device/GrapheneOs.kt` heuristic detection + the gate
+  requires both; Settings gained Device & OS / Special access / Accessibility sections. Honest scope: GrapheneOS
+  doesn't grant a sideloaded app more power; restricted-settings stay user-granted.
+- **Device-Owner provisioning:** owner ran `adb shell dpm set-device-owner dev.mascwa.pulse.debug/dev.mascwa.pulse.security.PulseDeviceAdminReceiver`
+  (only works on a device with NO accounts → factory-reset-first). Fixed a buggy in-app adb hint that used a relative
+  class name (the `.debug` applicationId suffix made it resolve wrong). **This is the load-bearing event** — it makes
+  `WifiPolicyController.setWifiEnabled` and the device-policy controls actually take effect (previously no-ops).
+- **Hardware attestation (#198/#199):** `core:telemetry/HardwareAttestation.kt` (pure DER parser for the Keystore
+  key-attestation extension, CI-tested against synthetic records incl. the `[704]` tag) + `core/device/DeviceAttestation.kt`
+  (StrongBox-backed probe). Reads verified-boot state, lock state, and the verified-boot KEY. **On-device confirmed:**
+  the owner's device reports StrongBox + locked + **Self-signed** + the GrapheneOS `mustang` verified-boot key
+  `141d7fc3…c7a04f74` (now in `GRAPHENE_VERIFIED_BOOT_KEYS`). KEY INSIGHT: GrapheneOS re-locks against its own key, so
+  the genuine signal is **Self-signed (not Verified) + key match** — `verdict.grapheneVerified`. The device gate now
+  rests on attestation (lockout-proof: passes via key OR integrity+heuristic; only a hardware-integrity failure blocks;
+  "Continue anyway" + persisted ack remain). Diagnostic also in Settings → Device & OS → Hardware attestation.
+- **Device-owner controls (#200):** `security/DevicePolicyController.kt` + Settings → "Device-owner controls" — USB
+  data lockdown (charging-only, anti-forensic), camera kill switch, wipe-after-N-failed-unlocks (now confirm-gated).
+  `res/xml/device_admin.xml` declares `<disable-camera/><watch-login/><wipe-data/>` (capabilities only).
+- **WiFi-disconnect BUG + network/security audit (pushed, pending merge as of this handoff):** owner reported Pulse
+  disabling home WiFi while home — because Device Owner made Trusted Network Mode's radio toggle real, exposing latent
+  bugs. **(a)** `core:telemetry/TrustedNetwork.kt`: an unreadable SSID (needs location permission, often denied on
+  GrapheneOS) was read as "away" → disable. Now "away" must be a POSITIVE fact (off WiFi, or a readable non-home SSID)
+  + new `State.wasHome` precondition + no-home-configured = idle. **(b)** A read-only audit subagent caught a BLOCKER:
+  `TrustedNetworkMonitor.trigger()` double-locked a non-reentrant Mutex → every network callback deadlocked, freezing
+  recovery (sticky disable). Fixed. Plus location-permission awareness (notify when the SSID can't be read). **(c)**
+  Audit also fixed a credential-loss path in `SettingsRepository` (a decrypt failure reset all settings to defaults on
+  next write → now refuses to clobber an undecodable blob) and gated the wipe control behind a confirm dialog.
+- **StrongBox at-rest encryption:** `SecretCrypto.kt` now binds the settings AES key to the Titan M2 secure element
+  (`enc2:` alias), used only after a round-trip self-test passes (else falls back to the original TEE `enc1:` key —
+  can never strand settings). Backward-compatible with existing `enc1:` blobs.
+- **GrapheneOS hardening surface:** Settings → "GrapheneOS hardening" points to the OS's own (stronger) controls —
+  per-app MTE/exploit protection (App info), native USB-C charging-only-when-locked, sandboxed-Play detection. We do
+  NOT force MTE in the manifest (native libs could break; user stays in control).
+- ⚠️ On-device-unverified (CI compile-gates only): all of the above's runtime behaviour — esp. the WiFi state machine
+  on the real device, the device-policy toggles (USB/camera/wipe), StrongBox round-trip, and attestation gating.
+  **Open / steerable:** MEDIUM audit items deliberately not changed (cloud OkHttp client is in a core module that can't
+  import the app's cleartext guard, and base URLs are a fixed HTTPS enum; `usesCleartextTraffic` can't be scoped without
+  breaking radio's arbitrary http stream hosts). Mnemosyne reflection WorkManager pass still pending owner Haiku verify.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
