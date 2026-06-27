@@ -151,6 +151,91 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
             item { HorizontalDivider() }
 
+            // ----- Device, OS & special access -----
+            item {
+                val graphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context) }
+                val gate = remember { dev.mascwa.pulse.core.device.DeviceGate.evaluate() }
+                val deviceOwner = remember {
+                    runCatching {
+                        context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                            ?.isDeviceOwnerApp(context.packageName) == true
+                    }.getOrDefault(false)
+                }
+                PrefSection("Device & OS") {
+                    PrefClickable(
+                        "Hardware",
+                        value = if (gate.isMatch) "Pixel 10 Pro XL ✓" else "Unsupported",
+                        subtitle = "Detected: ${gate.detectedModel} (${gate.detectedDevice})",
+                        onClick = {},
+                    )
+                    PrefClickable(
+                        "Operating system",
+                        value = if (graphene.isGraphene) "GrapheneOS ✓" else "Not detected",
+                        subtitle = if (graphene.isGraphene) "Signals: ${graphene.signals.joinToString(", ")}"
+                        else "This build is intended for GrapheneOS; detection is heuristic.",
+                        onClick = {},
+                    )
+                    PrefClickable(
+                        "Device owner",
+                        value = if (deviceOwner) "Provisioned ✓" else "Not set",
+                        subtitle = "Unlocks Trusted-Network Wi-Fi control. Provision once via adb: " +
+                            "dpm set-device-owner ${context.packageName}/.security.PulseDeviceAdminReceiver",
+                        onClick = {},
+                    )
+                    PrefClickable(
+                        "GrapheneOS per-app controls",
+                        subtitle = "Network, Sensors & Storage Scopes for Pulse (GrapheneOS-exclusive) live in App info.",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                }
+            }
+
+            // ----- Special access & restricted settings -----
+            item {
+                PrefSection("Special access & restricted settings") {
+                    PrefClickable(
+                        "Allow restricted settings",
+                        subtitle = "Sideloaded apps are blocked from sensitive toggles on Android 13+. Open App info, " +
+                            "tap ⋮ (top-right) → “Allow restricted settings”, then grant what you need.",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                    PrefClickable(
+                        "Usage access",
+                        subtitle = "Lets the on-device security audit read per-app data/battery use.",
+                        onClick = { dev.mascwa.pulse.core.util.openUsageAccessSettings(context) },
+                    )
+                    PrefClickable(
+                        "Install unknown apps",
+                        subtitle = "Required so the in-app updater can install the new APK.",
+                        onClick = { dev.mascwa.pulse.core.util.requestInstallPermission(context) },
+                    )
+                    PrefClickable(
+                        "App info",
+                        subtitle = "Per-app permissions, restricted-settings toggle, and (on GrapheneOS) Network/Sensors.",
+                        onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
+                    )
+                }
+            }
+
+            // ----- Accessibility -----
+            item {
+                PrefSection("Accessibility") {
+                    PrefSwitch("High contrast", "Stronger contrast across the UI", s.highContrast) { v ->
+                        vm.update { it.copy(highContrast = v) }
+                    }
+                    PrefSwitch("Haptics", "Vibration feedback on key actions", s.haptics) { v ->
+                        vm.update { it.copy(haptics = v) }
+                    }
+                    PrefClickable(
+                        "System accessibility",
+                        subtitle = "Font & display size, TalkBack, colour correction, and “remove animations” " +
+                            "(Pulse honours reduce-motion).",
+                        onClick = { dev.mascwa.pulse.core.util.openAccessibilitySettings(context) },
+                    )
+                }
+            }
+            item { HorizontalDivider() }
+
             // ----- Appearance -----
             item {
                 PrefSection("Appearance") {

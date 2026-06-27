@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
 
         val factory = PulseViewModelFactory(app.container)
         val gateResult = DeviceGate.evaluate()
+        val graphene = dev.mascwa.pulse.core.device.GrapheneOs.detect(this)
         val startRoute = intent?.getStringExtra(EXTRA_ROUTE)
         runCatching { app.container.usageRepository.log("lifecycle", "app opened") }
 
@@ -116,7 +117,8 @@ class MainActivity : ComponentActivity() {
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
-                val gated = !gateResult.isMatch && !acknowledged && !settings.deviceGateAcknowledged
+                val gated = (!gateResult.isMatch || !graphene.isGraphene) &&
+                    !acknowledged && !settings.deviceGateAcknowledged
 
                 // Ask for notification permission once on Android 13+.
                 LaunchedEffect(Unit) {
@@ -151,6 +153,8 @@ class MainActivity : ComponentActivity() {
                     if (gated) {
                         DeviceGateScreen(
                             result = gateResult,
+                            grapheneOk = graphene.isGraphene,
+                            osDetail = graphene.summary,
                             onContinue = {
                                 acknowledged = true
                                 lifecycleScope.launch {

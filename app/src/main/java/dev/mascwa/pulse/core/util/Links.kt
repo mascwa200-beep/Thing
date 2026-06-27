@@ -168,6 +168,24 @@ fun installApk(context: Context, file: File): Boolean {
     return runCatching { context.startActivity(intent); true }.getOrDefault(false)
 }
 
+/**
+ * Opens this app's App-info page. For a sideloaded build this is also where the user taps the ⋮ menu →
+ * "Allow restricted settings" (Android 13+) and where GrapheneOS's per-app Network / Sensors / Storage
+ * Scopes controls live.
+ */
+fun openAppInfo(context: Context): Boolean = launch(
+    context,
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
+)
+
+/** Opens the system Accessibility settings (font/display size, TalkBack, colour correction, services). */
+fun openAccessibilitySettings(context: Context): Boolean =
+    launch(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+
+/** Opens "Usage access" so the user can grant it (used by the on-device security audit). */
+fun openUsageAccessSettings(context: Context): Boolean =
+    launch(context, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+
 /** Opens a system settings panel by [which] (wifi/bluetooth/location/display/sound/battery/data/nfc/apps),
  *  or the main Settings screen when blank/unknown. */
 fun openSettingsPanel(context: Context, which: String): Boolean {
