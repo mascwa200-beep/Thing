@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -23,12 +24,15 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.mascwa.pulse.core.device.DeviceGate
+import dev.mascwa.pulse.core.telemetry.HardwareAttestation
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.di.PulseViewModelFactory
 import dev.mascwa.pulse.ui.DeviceGateScreen
 import dev.mascwa.pulse.ui.PulseApp
 import dev.mascwa.pulse.ui.theme.NightwireTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -122,7 +126,31 @@ class MainActivity : ComponentActivity() {
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
-                val gated = (!gateResult.isMatch || !graphene.isGraphene) &&
+                // Hardware attestation runs once, async, and STRENGTHENS the gate: a genuine result is
+                // cryptographic proof (locked bootloader + the GrapheneOS verified-boot key), and a device
+                // that fails hardware integrity (unlocked bootloader / unverified boot / not hardware-backed)
+                // is distrusted even if the spoofable heuristic passes. It can never lock the owner out —
+                // when attestation is unavailable or still pending it defers to the heuristic, and the
+                // "Continue anyway" acknowledgement persists.
+                val attestation by produceState<dev.mascwa.pulse.core.device.DeviceAttestation.Report?>(null) {
+                    value = withContext(Dispatchers.IO) {
+                        runCatching { dev.mascwa.pulse.core.device.DeviceAttestation().run() }.getOrNull()
+                    }
+                }
+                val heuristicOk = gateResult.isMatch && graphene.isGraphene
+                val attestationTrusted: Boolean? = attestation?.let { r ->
+                    val v = r.verdict
+                    if (r.available && v != null) {
+                        val st = r.info?.verifiedBootState
+                        val integrityOk = v.hardwareBacked && v.bootloaderLocked &&
+                            st != HardwareAttestation.BootState.UNVERIFIED &&
+                            st != HardwareAttestation.BootState.FAILED
+                        v.grapheneVerified || (integrityOk && heuristicOk)
+                    } else {
+                        null // attestation unavailable on this device → defer to the heuristic
+                    }
+                }
+                val gated = !(attestationTrusted ?: heuristicOk) &&
                     !acknowledged && !settings.deviceGateAcknowledged
 
                 // Ask for notification permission once on Android 13+.
@@ -160,6 +188,9 @@ class MainActivity : ComponentActivity() {
                             result = gateResult,
                             grapheneOk = graphene.isGraphene,
                             osDetail = graphene.summary,
+                            attestationOk = attestation?.verdict?.grapheneVerified,
+                            attestationDetail = attestation?.verdict?.summary
+                                ?: attestation?.error,
                             onContinue = {
                                 acknowledged = true
                                 lifecycleScope.launch {
