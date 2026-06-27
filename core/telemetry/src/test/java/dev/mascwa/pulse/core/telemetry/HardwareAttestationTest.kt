@@ -105,6 +105,22 @@ class HardwareAttestationTest {
     }
 
     @Test
+    fun selfSignedWithMatchingKeyIsGenuineGrapheneOs() {
+        // GrapheneOS re-locks against its own key → StrongBox attestation, bootloader locked, boot state
+        // Self-signed (1), and the verified-boot key matches. This must read as a pass, not a warning.
+        val key = ByteArray(32) { 0x3C }
+        val record = keyDescription(2, 2, rootOfTrust(key, locked = true, state = 1, hash = null))
+        val info = HardwareAttestation.parse(record)!!
+        assertEquals(HardwareAttestation.BootState.SELF_SIGNED, info.verifiedBootState)
+        val v = HardwareAttestation.verdict(info, setOf(info.verifiedBootKeyHex!!))
+        assertFalse(v.verifiedBoot)        // not "Verified"…
+        assertTrue(v.grapheneVerified)     // …but a genuine-GrapheneOS pass
+        assertTrue(v.summary.contains("genuine GrapheneOS"))
+        // Self-signed but the key isn't known → NOT a pass (could be any custom-keyed OS).
+        assertFalse(HardwareAttestation.verdict(info, setOf("deadbeef")).grapheneVerified)
+    }
+
+    @Test
     fun unlockedUnverifiedRecordIsFlagged() {
         val record = keyDescription(1, 1, rootOfTrust(ByteArray(4), locked = false, state = 2, hash = null))
         val info = HardwareAttestation.parse(record)!!
