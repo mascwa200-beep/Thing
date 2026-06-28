@@ -69,6 +69,7 @@ fun JarvisSetupScreen(
     onBack: () -> Unit,
     onOpenApprovals: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
+    onOpenDossier: () -> Unit = {},
 ) {
     val c = Pulse.colors
     val url by vm.url.collectAsState()
@@ -170,6 +171,9 @@ fun JarvisSetupScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         NeonButton(text = "LOCKDOWN", enabled = true, color = c.magenta, onClick = vm::runLockdown)
                         NeonButton(text = "CLEAR CHAT", enabled = true, color = c.muted, onClick = vm::clearChat)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        NeonButton(text = "DOSSIER", enabled = true, color = c.violet, onClick = onOpenDossier)
                     }
                 }
             }
