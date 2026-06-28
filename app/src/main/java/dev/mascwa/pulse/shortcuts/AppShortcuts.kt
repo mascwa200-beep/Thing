@@ -22,10 +22,10 @@ object AppShortcuts {
     fun install(context: Context) {
         runCatching {
             val shortcuts = listOf(
-                shortcut(context, "jarvis", "J.A.R.V.I.S.", "Ask J.A.R.V.I.S.", Routes.JARVIS),
-                shortcut(context, "markets", "Markets", "Markets", Routes.MARKETS),
-                shortcut(context, "nav", "Navigate", "Navigation map", Routes.NAV),
-                shortcut(context, "sos", "SOS", "Emergency SOS", Routes.SOS),
+                shortcut(context, "jarvis", "J.A.R.V.I.S.", "Ask J.A.R.V.I.S.", Routes.JARVIS, R.drawable.ic_shortcut_jarvis),
+                shortcut(context, "markets", "Markets", "Markets", Routes.MARKETS, R.drawable.ic_shortcut_markets),
+                shortcut(context, "nav", "Navigate", "Navigation map", Routes.NAV, R.drawable.ic_shortcut_nav),
+                shortcut(context, "sos", "SOS", "Emergency SOS", Routes.SOS, R.drawable.ic_shortcut_sos),
             )
             ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
         }
@@ -33,6 +33,7 @@ object AppShortcuts {
 
     private fun shortcut(
         context: Context, id: String, short: String, long: String, route: String,
+        @androidx.annotation.DrawableRes iconRes: Int,
     ): ShortcutInfoCompat {
         // A shortcut intent MUST declare an action; the route extra drives the in-app deep link.
         val intent = Intent(context, MainActivity::class.java)
@@ -41,7 +42,7 @@ object AppShortcuts {
         return ShortcutInfoCompat.Builder(context, id)
             .setShortLabel(short)
             .setLongLabel(long)
-            .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+            .setIcon(IconCompat.createWithResource(context, iconRes))
             .setIntent(intent)
             .build()
     }
