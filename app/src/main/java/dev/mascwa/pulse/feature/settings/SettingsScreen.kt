@@ -449,28 +449,6 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         "Show the clock-line data (objective · weather · markets) on the J.A.R.V.I.S. wallpaper",
                         s.liveWallpaperReadout,
                     ) { v -> vm.update { it.copy(liveWallpaperReadout = v) } }
-                    PrefClickable(
-                        "Add Reactor Dial quick-tile",
-                        subtitle = "A Quick Settings tile that opens the arc-reactor app dial from anywhere.",
-                        onClick = {
-                            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                runCatching {
-                                    context.getSystemService(android.app.StatusBarManager::class.java)
-                                        ?.requestAddTileService(
-                                            android.content.ComponentName(
-                                                context, dev.mascwa.pulse.feature.dial.ReactorDialTileService::class.java,
-                                            ),
-                                            "Reactor Dial",
-                                            android.graphics.drawable.Icon.createWithResource(
-                                                context, dev.mascwa.pulse.R.drawable.ic_dial_tile,
-                                            ),
-                                            context.mainExecutor,
-                                            { _ -> },
-                                        )
-                                }
-                            }
-                        },
-                    )
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }
