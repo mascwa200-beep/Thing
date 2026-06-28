@@ -40,6 +40,11 @@ class JarvisWallpaperService : WallpaperService() {
     private data class Snapshot(
         val lines: List<Pair<String, Int>> = emptyList(),
         val battery: Int = -1,
+        val spark: List<Float> = emptyList(),     // normalized 0..1 series for the graph (real market sparkline)
+        val sparkLabel: String = "RTLM-57",
+        val memPct: Int = -1,                     // device RAM used %
+        val kp: Double = -1.0,                    // geomagnetic K-index 0..9
+        val markers: List<FloatArray> = emptyList(), // radar points: [nx, ny, kind] (0 you, 1 quake, 2 waypoint)
     )
 
     private inner class ReactorEngine : WallpaperService.Engine() {
@@ -95,6 +100,11 @@ class JarvisWallpaperService : WallpaperService() {
                 val c = app.container
                 val s = runCatching { c.settingsRepository.current() }.getOrNull()
                 val out = mutableListOf<Pair<String, Int>>()
+                var spark: List<Float> = emptyList()
+                var sparkLabel = "RTLM-57"
+                var kp = -1.0
+                val markers = mutableListOf<FloatArray>()
+
                 runCatching {
                     s?.let { st -> st.waypoints.firstOrNull { it.id == st.activeWaypointId }?.label }
                         ?.let { out.add("OBJ  ${it.take(30)}" to INK) }
@@ -106,24 +116,54 @@ class JarvisWallpaperService : WallpaperService() {
                             out.add("WX   ${Formatters.number(cur.temperature, 0)}° · ${WeatherCode.describe(cur.weatherCode)}" to INK)
                         }
                 }
+                // Markets: movers for the feed + the top mover's real intraday sparkline for the graph.
                 runCatching {
-                    c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
+                    val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
                         .filter { it.changePercent != null }
-                        .sortedByDescending { abs(it.changePercent ?: 0.0) }.take(2)
-                        .forEach { q ->
-                            val pct = q.changePercent ?: 0.0
-                            out.add("MKT  ${q.label.take(12)}  ${if (pct >= 0) "+" else ""}${"%.2f".format(pct)}%" to if (pct >= 0) POSITIVE else NEGATIVE)
-                        }
+                    val sorted = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
+                    sorted.take(2).forEach { q ->
+                        val pct = q.changePercent ?: 0.0
+                        out.add("MKT  ${q.label.take(12)}  ${if (pct >= 0) "+" else ""}${"%.2f".format(pct)}%" to if (pct >= 0) POSITIVE else NEGATIVE)
+                    }
+                    val top = sorted.firstOrNull { it.sparkline.size >= 2 }
+                    if (top != null) {
+                        val sl = top.sparkline
+                        val mn = sl.minOrNull() ?: 0.0
+                        val mx = sl.maxOrNull() ?: 1.0
+                        val rng = (mx - mn).let { if (it == 0.0) 1.0 else it }
+                        spark = sl.map { ((it - mn) / rng).toFloat() }
+                        sparkLabel = top.label.take(10).uppercase()
+                    }
                 }
                 runCatching {
                     c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.title
                         ?.let { out.add("NET  ${it.take(38)}" to CYAN) }
                 }
+                runCatching { kp = c.spaceWeatherRepository.fetch(force = false).data?.kp ?: -1.0 }
+                // Radar markers: your saved location + recent earthquakes/incidents + the active waypoint, by lat/lon.
+                runCatching {
+                    val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
+                    if (saved != null) {
+                        markers.add(floatArrayOf(((saved.longitude + 180.0) / 360.0).toFloat(), ((90.0 - saved.latitude) / 180.0).toFloat(), 0f))
+                        c.safetyRepository.fetch(saved.latitude, saved.longitude, force = false).data?.incidents.orEmpty().take(8).forEach { ev ->
+                            markers.add(floatArrayOf(((ev.longitude + 180.0) / 360.0).toFloat(), ((90.0 - ev.latitude) / 180.0).toFloat(), 1f))
+                        }
+                    }
+                    s?.let { st -> st.waypoints.firstOrNull { it.id == st.activeWaypointId } }?.let { wp ->
+                        markers.add(floatArrayOf(((wp.longitude + 180.0) / 360.0).toFloat(), ((90.0 - wp.latitude) / 180.0).toFloat(), 2f))
+                    }
+                }
+                val memPct = runCatching {
+                    val am = applicationContext.getSystemService(android.app.ActivityManager::class.java)
+                    val mi = android.app.ActivityManager.MemoryInfo()
+                    am?.getMemoryInfo(mi)
+                    if (mi.totalMem > 0L) (((mi.totalMem - mi.availMem) * 100.0) / mi.totalMem).toInt() else -1
+                }.getOrDefault(-1)
                 val battery = runCatching {
                     applicationContext.getSystemService(BatteryManager::class.java)
                         ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
                 }.getOrDefault(-1)
-                snapshot = Snapshot(out, battery)
+                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers)
             }
         }
 
@@ -147,7 +187,7 @@ drawTelemetryTicks(canvas, p, cx, h * 0.045f, w * 0.9f, t)
 drawTelemetryTicks(canvas, p, cx, h * 0.965f, w * 0.9f, t)
 
 // ===== Top corner dials =====
-drawFineDial(canvas, p, w * 0.17f, h * 0.135f, unit * 0.085f, t)
+drawFineDial(canvas, p, w * 0.17f, h * 0.135f, unit * 0.085f, t, snap.kp)
 drawTurbineDial(canvas, p, w * 0.83f, h * 0.135f, unit * 0.085f, t)
 
 // ===== Inline clock block (centred) =====
@@ -176,11 +216,11 @@ run {
 }
 
 // ===== Wave graph + sync loading bar =====
-drawWaveGraph(canvas, p, w * 0.07f, h * 0.20f, w * 0.62f, h * 0.265f, t)
-drawLoadingBar(canvas, p, w * 0.07f, h * 0.285f, w * 0.93f, h * 0.315f, t, ((t / 120L) % 100L).toInt(), "SYNC")
+drawWaveGraph(canvas, p, w * 0.07f, h * 0.20f, w * 0.62f, h * 0.265f, t, snap.spark, snap.sparkLabel)
+drawLoadingBar(canvas, p, w * 0.07f, h * 0.285f, w * 0.93f, h * 0.315f, t, if (snap.memPct in 0..100) snap.memPct else ((t / 120L) % 100L).toInt(), "MEM")
 
 // ===== Central world radar =====
-drawWorldRadar(canvas, p, cx, h * 0.49f, unit * 0.33f, t)
+drawWorldRadar(canvas, p, cx, h * 0.49f, unit * 0.33f, t, snap.markers)
 
 // ===== Lower instruments =====
 drawMolecule(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t)
@@ -396,7 +436,7 @@ private fun drawTelemetryTicks(c: Canvas, p: Paint, cx: Float, y: Float, span: F
 }
 
 // ===== drawWorldRadar =====
-private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long) {
+private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, markers: List<FloatArray>) {
     val r = 0.78f * rad
 
     val nAmerica = arrayOf(
@@ -525,31 +565,37 @@ private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float
 
     c.restore()
 
-    // ---- 6) Amber diamond markers ----
-    val markers = arrayOf(
-        floatArrayOf(0.22f, 0.30f), floatArrayOf(0.55f, 0.40f),
-        floatArrayOf(0.5f, 0.6f), floatArrayOf(0.78f, 0.66f)
+    // ---- 6) Real geo markers: your location (cyan), recent quakes/incidents (amber), waypoint (white) ----
+    val pts = if (markers.isNotEmpty()) markers else listOf(
+        floatArrayOf(0.22f, 0.30f, 1f), floatArrayOf(0.55f, 0.40f, 1f), floatArrayOf(0.78f, 0.66f, 1f)
     )
     var mi = 0
-    while (mi < markers.size) {
-        val mx = mapX(markers[mi][0])
-        val my = mapY(markers[mi][1])
-        val mpulse = 0.5f + 0.5f * sin((t / 320.0) + mi * 1.3).toFloat()
-        val msz = rad * 0.022f
-        val dia = Path()
-        dia.moveTo(mx, my - msz)
-        dia.lineTo(mx + msz, my)
-        dia.lineTo(mx, my + msz)
-        dia.lineTo(mx - msz, my)
-        dia.close()
-        p.style = Paint.Style.FILL
-        p.color = withAlpha(AMBER, 0.25f + 0.55f * mpulse)
-        c.drawPath(dia, p)
-        p.style = Paint.Style.STROKE
-        p.color = withAlpha(AMBER, 0.50f + 0.40f * mpulse)
-        p.strokeWidth = rad * 0.005f
-        c.drawPath(dia, p)
-        c.drawLine(mx, my - msz, mx, my - msz * 2.0f, p)
+    while (mi < pts.size) {
+        val m = pts[mi]
+        val mx = mapX(m[0].coerceIn(0f, 1f))
+        val my = mapY(m[1].coerceIn(0f, 1f))
+        val dx = mx - cx
+        val dy = my - cy
+        if (dx * dx + dy * dy <= r * r) {
+            val kind = if (m.size > 2) m[2].toInt() else 1
+            val col = when (kind) { 0 -> CYAN; 2 -> WHITE; else -> AMBER }
+            val mpulse = 0.5f + 0.5f * sin((t / 320.0) + mi * 1.3).toFloat()
+            val msz = rad * 0.022f
+            val dia = Path()
+            dia.moveTo(mx, my - msz)
+            dia.lineTo(mx + msz, my)
+            dia.lineTo(mx, my + msz)
+            dia.lineTo(mx - msz, my)
+            dia.close()
+            p.style = Paint.Style.FILL
+            p.color = withAlpha(col, 0.25f + 0.55f * mpulse)
+            c.drawPath(dia, p)
+            p.style = Paint.Style.STROKE
+            p.color = withAlpha(col, 0.50f + 0.40f * mpulse)
+            p.strokeWidth = rad * 0.005f
+            c.drawPath(dia, p)
+            c.drawLine(mx, my - msz, mx, my - msz * 2.0f, p)
+        }
         mi++
     }
 
@@ -768,7 +814,7 @@ private fun drawTurbineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Floa
 }
 
 // ===== drawFineDial =====
-private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long) {
+private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, kp: Double) {
     p.style = Paint.Style.STROKE
     p.pathEffect = null
     p.shader = null
@@ -814,7 +860,8 @@ private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, 
     c.drawArc(arcRect, -60f, 34f, false, p)
     p.clearShadowLayer()
 
-    val sweep = ((t.toDouble() / 60.0) % 360.0)
+    // Needle points to the real geomagnetic K-index (0..9 -> 0..270 deg from top); sweeps if unknown.
+    val sweep = if (kp in 0.0..9.0) (kp / 9.0) * 270.0 else ((t.toDouble() / 60.0) % 360.0)
     val ang = Math.toRadians(sweep - 90.0)
     val ca = cos(ang)
     val sa = sin(ang)
@@ -873,6 +920,14 @@ private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, 
     p.color = withFullAlpha(WHITE)
     c.drawCircle(cx, cy, rad * 0.04f, p)
 
+    run {
+        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER; textSize = rad * 0.22f
+            color = withAlpha(CYAN, 0.9f)
+        }
+        c.drawText(if (kp in 0.0..9.0) "Kp ${"%.1f".format(kp)}" else "Kp --", cx, cy + rad * 1.42f, lab)
+    }
+
     p.style = Paint.Style.FILL
     p.strokeWidth = 0f
     p.pathEffect = null
@@ -881,7 +936,7 @@ private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, 
 }
 
 // ===== drawWaveGraph =====
-private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b: Float, t: Long) {
+private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b: Float, t: Long, series: List<Float>, seriesLabel: String) {
     val w = r - l
     val h = b - top
     val unit = if (w < h) w else h
@@ -947,17 +1002,35 @@ private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b
     c.drawLine(px0, mid, px1, mid, p)
     p.pathEffect = null
 
-    val samples = 40
     val path = Path()
-    var i = 0
-    while (i <= samples) {
-        val frac = i.toFloat() / samples.toFloat()
-        val x = px0 + pw * frac
-        val s1 = sin(i * 0.5 + t / 300.0).toFloat() * 0.6f
-        val s2 = sin(i * 1.7 + t / 170.0).toFloat() * 0.4f
-        val y = mid + amp * (s1 + s2)
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        i++
+    var endX = px1
+    var endY = mid
+    if (series.size >= 2) {
+        // Real series (normalized 0..1) -> the panel.
+        val n = series.size
+        var i = 0
+        while (i < n) {
+            val frac = i.toFloat() / (n - 1).toFloat()
+            val x = px0 + pw * frac
+            val y = py1 - series[i].coerceIn(0f, 1f) * ph
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            endX = x; endY = y
+            i++
+        }
+    } else {
+        // Fallback animated trace until the real sparkline is cached.
+        val samples = 40
+        var i = 0
+        while (i <= samples) {
+            val frac = i.toFloat() / samples.toFloat()
+            val x = px0 + pw * frac
+            val s1 = sin(i * 0.5 + t / 300.0).toFloat() * 0.6f
+            val s2 = sin(i * 1.7 + t / 170.0).toFloat() * 0.4f
+            val y = mid + amp * (s1 + s2)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            endX = x; endY = y
+            i++
+        }
     }
 
     p.style = Paint.Style.STROKE
@@ -967,16 +1040,11 @@ private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b
     c.drawPath(path, p)
     p.clearShadowLayer()
 
-    run {
-        val s1 = sin(samples * 0.5 + t / 300.0).toFloat() * 0.6f
-        val s2 = sin(samples * 1.7 + t / 170.0).toFloat() * 0.4f
-        val ey = mid + amp * (s1 + s2)
-        p.style = Paint.Style.FILL
-        p.color = withFullAlpha(WHITE)
-        p.setShadowLayer(unit * 0.04f, 0f, 0f, withFullAlpha(CYAN))
-        c.drawCircle(px1, ey, unit * 0.018f, p)
-        p.clearShadowLayer()
-    }
+    p.style = Paint.Style.FILL
+    p.color = withFullAlpha(WHITE)
+    p.setShadowLayer(unit * 0.04f, 0f, 0f, withFullAlpha(CYAN))
+    c.drawCircle(endX, endY, unit * 0.018f, p)
+    p.clearShadowLayer()
 
     p.style = Paint.Style.STROKE
     p.strokeWidth = unit * 0.008f
@@ -997,7 +1065,7 @@ private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b
         textSize = unit * 0.07f
         color = withAlpha(CYAN, 0.9f)
     }
-    c.drawText("RTLM-57", px0 + unit * 0.01f, top + pad + unit * 0.085f, label)
+    c.drawText(seriesLabel.ifBlank { "RTLM-57" }, px0 + unit * 0.01f, top + pad + unit * 0.085f, label)
 
     p.style = Paint.Style.FILL
     p.pathEffect = null
