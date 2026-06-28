@@ -161,7 +161,10 @@ class ActiveMatrixService : Service() {
                 batteryWarned = true
                 val msg = "Battery critical at ${ctx.batteryPct}% — conserving power, sir."
                 update("⚠ $msg")
-                runCatching { container?.textToSpeech?.speak(msg) }
+                // Speak only when not mid-command: a TTS speak() here QUEUE_FLUSHes an in-flight spoken
+                // reply, dropping its done-callback so the wake mic never re-arms. The notification still
+                // shows regardless. (Mirrors maybeSpeakProactive's `capturing` guard.)
+                if (!capturing) runCatching { container?.textToSpeech?.speak(msg) }
             }
         } else if (ctx.isCharging || ctx.batteryPct >= BATTERY_RECOVER_PCT) {
             lowPowerConserve = false
@@ -239,7 +242,9 @@ class ActiveMatrixService : Service() {
                 if (inConsole) {
                     vosk.stop()
                     update("Paused — console has the mic.")
-                } else if (waking) {
+                } else if (waking && !capturing) {
+                    // Don't re-arm the wake mic while a command capture is in flight — the command flow
+                    // owns the mic and re-arms itself (its timeout/error paths always clear `capturing`).
                     listenForWake(vosk)
                 }
             }
@@ -554,8 +559,10 @@ class ActiveMatrixService : Service() {
     override fun onDestroy() {
         observing = false
         waking = false
+        capturing = false
         runCatching { container?.voskSpeech?.stop() }
         runCatching { container?.deviceSpeech?.cancel() } // release the system recognizer + mic
+        runCatching { container?.textToSpeech?.stop() }    // don't keep talking after "Stand down"
         voiceScope.cancel()
         scope.cancel()
         super.onDestroy()
