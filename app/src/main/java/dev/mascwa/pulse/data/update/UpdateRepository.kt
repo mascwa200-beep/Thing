@@ -126,8 +126,10 @@ class UpdateRepository(
      * only on an explicit **false**, so a cancelled-but-published build is still offered.
      */
     private suspend fun isBuildGreen(code: Int, headers: Map<String, String>): Boolean? {
+        // Scope to the build workflow: `run_number` is per-workflow, so querying all runs would let a
+        // future second workflow with the same number be matched first and give a wrong verdict.
         val runs = runCatching {
-            http.getJson("$API/actions/runs?per_page=30", RunList.serializer(), headers)
+            http.getJson("$API/actions/workflows/$WORKFLOW/runs?per_page=20", RunList.serializer(), headers)
         }.getOrNull() ?: return null
         val run = runs.workflow_runs.firstOrNull { it.run_number == code } ?: return null
         return when {
@@ -179,6 +181,8 @@ class UpdateRepository(
     companion object {
         const val API = "https://api.github.com/repos/mascwa200-beep/Thing"
         const val TAG = "latest"
+        // The CI workflow whose run_number == the shipped versionCode (the green-gate looks it up by number).
+        private const val WORKFLOW = "android-build.yml"
         private val BUILD_NUM = Regex("#(\\d+)")
     }
 }
