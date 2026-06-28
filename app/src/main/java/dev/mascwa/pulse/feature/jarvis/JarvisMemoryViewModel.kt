@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.jarvis
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Memory
+import dev.mascwa.pulse.core.telemetry.Procedure
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task
 import dev.mascwa.pulse.core.telemetry.TaskBoard
@@ -13,6 +14,7 @@ import dev.mascwa.pulse.data.interests.InterestStore
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.db.AgentNoteEntity
 import dev.mascwa.pulse.data.memory.MemoryStreamStore
+import dev.mascwa.pulse.data.procedure.ProcedureStore
 import dev.mascwa.pulse.data.profile.ProfileStore
 import dev.mascwa.pulse.data.tasks.TaskStore
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +35,7 @@ class JarvisMemoryViewModel(
     private val memoryStream: MemoryStreamStore,
     private val interestStore: InterestStore,
     private val findingStore: FindingStore,
+    private val procedureStore: ProcedureStore,
 ) : ViewModel() {
 
     val notes: StateFlow<List<AgentNoteEntity>> =
@@ -57,6 +60,11 @@ class JarvisMemoryViewModel(
     /** J.A.R.V.I.S.'s curated findings (newest first), unseen surfaced with a badge. */
     val findings: StateFlow<List<Finding>> = findingStore.findingsFlow
 
+    /** Learned procedures ("skills"), most-reliable first — view + curate. */
+    val procedures: StateFlow<List<Procedure>> = procedureStore.proceduresFlow
+        .map { list -> list.sortedWith(compareByDescending<Procedure> { it.reliability }.thenByDescending { it.lastUsedMs }) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
         // Trigger a load so the profile + task + episodic + interest + finding flows populate on open.
         viewModelScope.launch { runCatching { profileStore.all() } }
@@ -64,6 +72,7 @@ class JarvisMemoryViewModel(
         viewModelScope.launch { runCatching { memoryStream.all() } }
         viewModelScope.launch { runCatching { interestStore.all() } }
         viewModelScope.launch { runCatching { findingStore.load() } }
+        viewModelScope.launch { runCatching { procedureStore.all() } }
     }
 
     fun edit(id: Long, text: String) {
@@ -132,5 +141,15 @@ class JarvisMemoryViewModel(
     /** Forget all findings. */
     fun clearFindings() {
         viewModelScope.launch { runCatching { findingStore.clear() } }
+    }
+
+    /** Forget a single learned procedure (by name). */
+    fun forgetProcedure(name: String) {
+        viewModelScope.launch { runCatching { procedureStore.forget(name) } }
+    }
+
+    /** Forget all learned procedures. */
+    fun clearProcedures() {
+        viewModelScope.launch { runCatching { procedureStore.clear() } }
     }
 }

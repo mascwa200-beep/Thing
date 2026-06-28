@@ -54,6 +54,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val episodic by vm.episodic.collectAsState()
     val interests by vm.interests.collectAsState()
     val findings by vm.findings.collectAsState()
+    val procedures by vm.procedures.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -185,6 +186,46 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                     MemButton("CLEAR FINDINGS", c.magenta) { vm.clearFindings() }
                 }
             }
+
+            item { SectionBar("PROCEDURES · ${procedures.size}") }
+            if (procedures.isEmpty()) {
+                item {
+                    Text(
+                        "No procedures learned yet. When J.A.R.V.I.S. carries out a multi-step request with " +
+                            "tools and it works, he remembers the recipe here — so a similar goal later follows " +
+                            "the known plan. They appear here to review and forget.",
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    )
+                }
+            }
+            items(procedures, key = { it.name }) { proc ->
+                ProcedureCard(proc, c, onForget = { vm.forgetProcedure(proc.name) })
+            }
+            if (procedures.isNotEmpty()) {
+                item {
+                    MemButton("CLEAR PROCEDURES", c.magenta) { vm.clearProcedures() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProcedureCard(proc: dev.mascwa.pulse.core.telemetry.Procedure, c: NightwirePalette, onForget: () -> Unit) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "${(proc.reliability * 100).toInt()}% · ${proc.timesApplied}×",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.positive,
+                )
+                if (!proc.practiced()) {
+                    Text("LEARNING", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                }
+            }
+            Text(proc.name, fontFamily = JetBrainsMono, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            Text(proc.steps.joinToString(" → "), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent)
+            MemButton("FORGET", c.magenta, onForget)
         }
     }
 }
