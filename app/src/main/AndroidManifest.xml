@@ -255,6 +255,18 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- Quick Settings tile that opens the Reactor Dial from anywhere (reliable touch entry). -->
+        <service
+            android:name=".feature.dial.ReactorDialTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_dial_tile"
+            android:label="Reactor Dial"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- J.A.R.V.I.S. arc-reactor live wallpaper. Reads only on-device cached Pulse data; drawn
              procedurally (no bitmaps). Set it from Settings → Appearance → J.A.R.V.I.S. live wallpaper. -->
         <service
