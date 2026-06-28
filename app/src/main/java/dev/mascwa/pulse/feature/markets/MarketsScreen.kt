@@ -246,11 +246,21 @@ private fun MoodBanner(mood: MarketMood.Mood) {
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
                 modifier = Modifier.padding(top = 4.dp),
             )
-            Text(
-                mood.detail,
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    mood.detail,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+                Text(
+                    "net ${if (mood.netChangePct >= 0) "+" else ""}${"%.2f".format(mood.netChangePct)}%",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = c.trend(mood.netChangePct >= 0),
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
         }
     }
 }
