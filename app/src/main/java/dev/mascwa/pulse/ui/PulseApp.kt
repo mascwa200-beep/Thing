@@ -378,15 +378,21 @@ fun PulseApp(
         }
     }
 
-    // Deep-link from a notification tap.
+    // Deep-link from a notification tap or a launcher shortcut.
     LaunchedEffect(startRoute) {
-        if (!startRoute.isNullOrBlank() && startRoute != Routes.HOME &&
-            TOP_DESTINATIONS.any { it.route == startRoute }
-        ) {
-            navigateTopLevel(startRoute)
+        if (!startRoute.isNullOrBlank() && startRoute != Routes.HOME) {
+            when {
+                TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
+                // Launcher shortcuts can target non-top routes (e.g. NAV, SOS, QUESTS).
+                startRoute in SHORTCUT_ROUTES ->
+                    runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
+            }
         }
     }
 }
+
+/** Non-top routes reachable directly from a launcher shortcut (see AppShortcuts). */
+private val SHORTCUT_ROUTES = setOf(Routes.NAV, Routes.SOS, Routes.QUESTS)
 
 /** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH
  *  feeds (and their sub-screens) in the same Fallout look as the PIP-BOY and QUESTS tabs. */

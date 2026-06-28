@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
         val graphene = dev.mascwa.pulse.core.device.GrapheneOs.detect(this)
         val startRoute = intent?.getStringExtra(EXTRA_ROUTE)
         runCatching { app.container.usageRepository.log("lifecycle", "app opened") }
+        // Launcher integration: long-press app shortcuts (deep-link into J.A.R.V.I.S./Markets/NAV/SOS).
+        runCatching { dev.mascwa.pulse.shortcuts.AppShortcuts.install(this) }
 
         // Schedule the background refresh worker per the user's settings. Guarded so a startup
         // hiccup (settings read, scheduling, or a service start) can never crash the launch.
@@ -247,6 +249,12 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
             runCatching { app.container.securityAuditStore.flushNow() }
+            // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
+            runCatching {
+                dev.mascwa.pulse.shortcuts.UnreadBadge.publish(
+                    this@MainActivity, app.container.findingStore.unseenCount(),
+                )
+            }
         }
         super.onStop()
     }
