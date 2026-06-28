@@ -444,6 +444,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             }
                         },
                     )
+                    PrefSwitch(
+                        "Live wallpaper readout",
+                        "Show the clock-line data (objective · weather · markets) on the J.A.R.V.I.S. wallpaper",
+                        s.liveWallpaperReadout,
+                    ) { v -> vm.update { it.copy(liveWallpaperReadout = v) } }
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }

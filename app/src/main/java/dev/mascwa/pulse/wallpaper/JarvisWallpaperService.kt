@@ -58,6 +58,7 @@ class JarvisWallpaperService : WallpaperService() {
         @Volatile private var snapshot = Snapshot()
         @Volatile private var bgColor = VOID
         @Volatile private var accentColor = SKY
+        @Volatile private var showReadout = true
 
         private val frame = Runnable { drawFrame() }
 
@@ -120,6 +121,7 @@ class JarvisWallpaperService : WallpaperService() {
                 // Look straight from the user's Pulse appearance settings.
                 bgColor = if (s?.amoledBlack == true) BLACK else VOID
                 accentColor = s?.accentColor?.argb?.toInt() ?: SKY
+                showReadout = s?.liveWallpaperReadout ?: true
 
                 val objective = s?.let { st ->
                     st.waypoints.firstOrNull { it.id == st.activeWaypointId }?.label
@@ -192,22 +194,24 @@ class JarvisWallpaperService : WallpaperService() {
                 cx, h * 0.61f, text,
             )
 
-            // Glanceable Pulse readout.
-            val snap = snapshot
-            text.textSize = unit * 0.030f
-            var y = h * 0.675f
-            val lineH = unit * 0.046f
-            if (snap.objective.isNotBlank()) {
-                text.color = withAlpha(INK, 0.92f)
-                canvas.drawText("OBJ  ${snap.objective}", cx, y, text); y += lineH
-            }
-            if (snap.weather.isNotBlank()) {
-                text.color = withAlpha(INK, 0.92f)
-                canvas.drawText("WX   ${snap.weather}", cx, y, text); y += lineH
-            }
-            if (snap.mover.isNotBlank()) {
-                text.color = withFullAlpha(if (snap.moverUp) POSITIVE else NEGATIVE)
-                canvas.drawText("MKT  ${snap.mover}", cx, y, text); y += lineH
+            // Glanceable Pulse readout (toggle in Settings → Appearance → "Live wallpaper readout").
+            if (showReadout) {
+                val snap = snapshot
+                text.textSize = unit * 0.030f
+                var y = h * 0.675f
+                val lineH = unit * 0.046f
+                if (snap.objective.isNotBlank()) {
+                    text.color = withAlpha(INK, 0.92f)
+                    canvas.drawText("OBJ  ${snap.objective}", cx, y, text); y += lineH
+                }
+                if (snap.weather.isNotBlank()) {
+                    text.color = withAlpha(INK, 0.92f)
+                    canvas.drawText("WX   ${snap.weather}", cx, y, text); y += lineH
+                }
+                if (snap.mover.isNotBlank()) {
+                    text.color = withFullAlpha(if (snap.moverUp) POSITIVE else NEGATIVE)
+                    canvas.drawText("MKT  ${snap.mover}", cx, y, text); y += lineH
+                }
             }
 
             text.color = withAlpha(MUTED, 0.7f)
