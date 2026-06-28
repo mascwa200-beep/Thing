@@ -76,7 +76,11 @@ class JarvisViewModel(
     private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
+    private val procedureStore: dev.mascwa.pulse.data.procedure.ProcedureStore,
 ) : ViewModel() {
+
+    /** The ordered tool names the last agent run used — captured for procedure learning. */
+    private var lastToolSequence: List<String> = emptyList()
 
     /** A curiosity question awaiting the user's answer, then their confirm of the distilled fact. */
     private data class PendingLearn(val question: String, val staged: String? = null)
@@ -360,12 +364,18 @@ class JarvisViewModel(
                 val reply = if (useAgent) generateWithAgent(intent.text) else generateDirect(intent.text)
                 memory.append(Speaker.JARVIS, reply)
                 logChat("chat-out", reply)
+                val ok = reply.isNotBlank() && !reply.trimStart().startsWith("//")
                 // Cerebellum: learn whether the agent vs. direct path reliably handles requests like this.
                 val sig = dev.mascwa.pulse.core.telemetry.Cerebellum.signature(intent.text)
                 if (sig.isNotBlank()) {
-                    val ok = reply.isNotBlank() && !reply.trimStart().startsWith("//")
                     cerebellum.observe("req:$sig", if (useAgent) "agent" else "direct", ok)
                 }
+                // Procedure library ("skills"): learn the multi-step tool RECIPE this request used, so a
+                // similar goal can follow the known plan. Only the agent path produces a tool sequence.
+                if (useAgent && lastToolSequence.size >= 2) {
+                    procedureStore.observe(intent.text, lastToolSequence, ok)
+                }
+                lastToolSequence = emptyList()
                 speakIfEnabled(reply)
                 maybeBeCurious()
             }
@@ -542,6 +552,10 @@ class JarvisViewModel(
         if (tasks.isNotBlank()) {
             prompt += "\n\nThe user's open tasks you're tracking (follow up proactively; keep current via the `task` tool):\n" + tasks
         }
+        val procedures = runCatching { procedureStore.digest() }.getOrDefault("")
+        if (procedures.isNotBlank()) {
+            prompt += "\n\n" + procedures
+        }
         return prompt
     }
 
@@ -557,13 +571,19 @@ class JarvisViewModel(
             recent
         }
         val sb = StringBuilder()
+        val toolSeq = mutableListOf<String>()
         agent.run(text, composePersona(), history).collect { step ->
             when (step.kind) {
                 AgentOrchestrator.Kind.THINKING -> _streaming.value = "◌ reasoning…"
-                AgentOrchestrator.Kind.TOOL -> _streaming.value = "⚙ ${step.text}"
+                AgentOrchestrator.Kind.TOOL -> {
+                    // step.text is "<toolName> <args>" — keep just the tool name for the procedure recipe.
+                    toolSeq += step.text.substringBefore(' ').trim()
+                    _streaming.value = "⚙ ${step.text}"
+                }
                 AgentOrchestrator.Kind.FINAL -> sb.append(step.text)
             }
         }
+        lastToolSequence = toolSeq.filter { it.isNotBlank() }
         return sb.toString().ifBlank { "…" }
     }
 

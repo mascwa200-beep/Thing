@@ -239,6 +239,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching { app.container.usageRepository.flushNow() }
             runCatching { app.container.cerebellumStore.flushNow() }
+            runCatching { app.container.procedureStore.flushNow() }
             runCatching { app.container.profileStore.flushNow() }
             runCatching { app.container.taskStore.flushNow() }
             runCatching { app.container.memoryStream.flushNow() }

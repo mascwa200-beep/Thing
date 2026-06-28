@@ -82,6 +82,10 @@ class AppContainer(private val appContext: Context) {
     val cerebellumStore: dev.mascwa.pulse.data.cerebellum.CerebellumStore by lazy {
         dev.mascwa.pulse.data.cerebellum.CerebellumStore(appContext, json)
     }
+    /** Mnemosyne procedure library ("skills"): learned multi-step tool sequences, fed by agent runs. */
+    val procedureStore: dev.mascwa.pulse.data.procedure.ProcedureStore by lazy {
+        dev.mascwa.pulse.data.procedure.ProcedureStore(appContext, json)
+    }
 
     /** Structured user profile: durable preferences / interests / projects, injected into context. */
     val profileStore: dev.mascwa.pulse.data.profile.ProfileStore by lazy {
