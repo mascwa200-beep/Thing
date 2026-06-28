@@ -422,6 +422,28 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             item {
                 PrefSection("Appearance") {
                     AccentSwatchRow(selected = s.accentColor, onSelect = { a -> vm.update { it.copy(accentColor = a) } })
+                    PrefClickable(
+                        "J.A.R.V.I.S. live wallpaper",
+                        subtitle = "Arc-reactor home screen with a live readout (clock · objective · weather · markets). " +
+                            "Uses your accent + AMOLED choice above.",
+                        onClick = {
+                            // Open the system live-wallpaper preview pre-pointed at our service; fall back to the
+                            // chooser if the direct preview action isn't supported. Class ref = correct package
+                            // even with the .debug applicationId suffix.
+                            val component = android.content.ComponentName(
+                                context, dev.mascwa.pulse.wallpaper.JarvisWallpaperService::class.java,
+                            )
+                            val direct = android.content.Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                                .putExtra(android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
+                            runCatching { context.startActivity(direct) }.onFailure {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER),
+                                    )
+                                }
+                            }
+                        },
+                    )
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }

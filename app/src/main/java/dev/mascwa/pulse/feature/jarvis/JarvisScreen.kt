@@ -133,10 +133,11 @@ fun JarvisScreen(
             }
         },
     ) { innerPadding ->
-        // PulseScaffold sets contentWindowInsets(0,0,0,0), so NOTHING here consumes the IME inset except
-        // this imePadding() — it lifts the bottom input bar to sit on top of the soft keyboard. (Removing it
-        // dropped the input behind the keyboard.) The idle reactor fills the weight(1f) space above, so the
-        // input seats just below it, flush against the keyboard.
+        // The chat bar docks FLUSH on the soft keyboard (Claude-app style). PulseApp wraps this screen in a
+        // Box that consumes the outer Scaffold padding (the bottom-nav height) as an inset, so this imePadding()
+        // lifts the bar by (keyboard − nav-bar) and seats it exactly on the keyboard's top edge — not one
+        // nav-bar height above it (the old gap) nor behind it (no imePadding at all). The idle reactor fills
+        // the weight(1f) space above, so the input bar always sits at the very bottom of the content.
         Column(Modifier.fillMaxSize().padding(innerPadding).imePadding()) {
             StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)

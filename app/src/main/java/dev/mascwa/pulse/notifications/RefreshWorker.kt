@@ -327,6 +327,11 @@ class RefreshWorker(
             }
         }
 
+        // Refresh the Nova/TeslaUnread unread-count badge on the app icon (best-effort).
+        runCatching {
+            dev.mascwa.pulse.shortcuts.UnreadBadge.publish(applicationContext, container.findingStore.unseenCount())
+        }
+
         writeState(state)
         return Result.success()
     }

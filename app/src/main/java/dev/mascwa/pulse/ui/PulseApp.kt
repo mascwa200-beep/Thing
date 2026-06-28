@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -300,11 +301,20 @@ fun PulseApp(
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
             composable(Routes.JARVIS) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.jarvis.JarvisScreen(
-                    vm,
-                    onBack = { navController.popBackStack() },
-                    onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
-                )
+                // The console chat bar must dock FLUSH on the soft keyboard (Claude-app style). The outer
+                // Scaffold pads the NavHost above the bottom nav bar with a *raw* padding that imePadding()
+                // can't see, so imePadding() alone over-lifts the bar by one nav-bar height (the reported gap).
+                // Consuming that padding as an inset here makes JarvisScreen's imePadding() lift by
+                // (keyboard − nav-bar), seating the bar exactly on top of the keyboard. Scoped to JARVIS only.
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxSize().consumeWindowInsets(innerPadding),
+                ) {
+                    dev.mascwa.pulse.feature.jarvis.JarvisScreen(
+                        vm,
+                        onBack = { navController.popBackStack() },
+                        onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
+                    )
+                }
             }
             composable(Routes.JARVIS_SETUP) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel = viewModel(factory = factory)
@@ -368,15 +378,21 @@ fun PulseApp(
         }
     }
 
-    // Deep-link from a notification tap.
+    // Deep-link from a notification tap or a launcher shortcut.
     LaunchedEffect(startRoute) {
-        if (!startRoute.isNullOrBlank() && startRoute != Routes.HOME &&
-            TOP_DESTINATIONS.any { it.route == startRoute }
-        ) {
-            navigateTopLevel(startRoute)
+        if (!startRoute.isNullOrBlank() && startRoute != Routes.HOME) {
+            when {
+                TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
+                // Launcher shortcuts can target non-top routes (e.g. NAV, SOS, QUESTS).
+                startRoute in SHORTCUT_ROUTES ->
+                    runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
+            }
         }
     }
 }
+
+/** Non-top routes reachable directly from a launcher shortcut (see AppShortcuts). */
+private val SHORTCUT_ROUTES = setOf(Routes.NAV, Routes.SOS, Routes.QUESTS)
 
 /** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH
  *  feeds (and their sub-screens) in the same Fallout look as the PIP-BOY and QUESTS tabs. */
