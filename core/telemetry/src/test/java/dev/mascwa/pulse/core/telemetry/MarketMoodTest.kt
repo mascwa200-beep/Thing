@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.core.telemetry
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,5 +48,23 @@ class MarketMoodTest {
     fun nonFiniteValuesAreIgnoredInTheCount() {
         val m = MarketMood.summarize(listOf(1.0, 2.0, Double.NaN))!!
         assertTrue(m.detail.contains("of 2"))
+    }
+
+    @Test
+    fun structuredBreadthFieldsArePopulated() {
+        val m = MarketMood.summarize(listOf(2.0, -1.0, 0.0, 4.0))!!
+        assertEquals(2, m.up)
+        assertEquals(1, m.down)
+        assertEquals(1, m.flat)
+        assertEquals(4, m.total)
+        assertEquals(0.5, m.upShare, 1e-9)
+    }
+
+    @Test
+    fun netChangeIsTheEqualWeightedAverageOfFiniteChanges() {
+        // (2 - 1 + 0 + 3) / 4 = 1.0; the non-finite value is excluded from both count and average.
+        val m = MarketMood.summarize(listOf(2.0, -1.0, 0.0, 3.0, Double.POSITIVE_INFINITY))!!
+        assertEquals(4, m.total)
+        assertEquals(1.0, m.netChangePct, 1e-9)
     }
 }

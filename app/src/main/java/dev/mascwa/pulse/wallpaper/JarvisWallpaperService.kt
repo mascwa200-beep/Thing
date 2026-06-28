@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.weather.WeatherCode
@@ -128,9 +129,13 @@ class JarvisWallpaperService : WallpaperService() {
                 runCatching {
                     val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
                         .filter { it.changePercent != null }
-                    breadthUp = quotes.count { (it.changePercent ?: 0.0) > 0.0 }
-                    breadthDown = quotes.count { (it.changePercent ?: 0.0) < 0.0 }
-                    breadthNet = if (quotes.isNotEmpty()) quotes.map { it.changePercent ?: 0.0 }.average() else 0.0
+                    // Breadth (up/down counts + net average) comes from the CI-tested core so the HUD
+                    // and the Markets screen agree on the definition.
+                    MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let { mood ->
+                        breadthUp = mood.up
+                        breadthDown = mood.down
+                        breadthNet = mood.netChangePct
+                    }
                     val sorted = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
                     sorted.take(2).forEach { q ->
                         val pct = q.changePercent ?: 0.0
