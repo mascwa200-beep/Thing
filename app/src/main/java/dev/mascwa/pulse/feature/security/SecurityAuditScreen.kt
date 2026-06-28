@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +48,10 @@ fun SecurityAuditScreen(vm: SecurityAuditViewModel, onBack: () -> Unit) {
     val scanning by vm.scanning.collectAsState()
     val status by vm.status.collectAsState()
     val context = LocalContext.current
+    // Usage-access is a binder call (AppOps). Compute it ONCE per scan, not on every recomposition — calling
+    // it inline meant it fired on each frame, and during a scan it contended with the heavy package-manager
+    // binder transaction on the main thread → ANR ("Pulse isn't responding"). Re-checks after each scan.
+    val usageAccess = remember(view.lastScanMs) { runCatching { vm.hasUsageAccess() }.getOrDefault(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
@@ -89,7 +94,7 @@ fun SecurityAuditScreen(vm: SecurityAuditViewModel, onBack: () -> Unit) {
             }
 
             // Usage Access hint — needed for the data-drain / exfil checks.
-            if (!vm.hasUsageAccess()) {
+            if (!usageAccess) {
                 item {
                     NeonPanel(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

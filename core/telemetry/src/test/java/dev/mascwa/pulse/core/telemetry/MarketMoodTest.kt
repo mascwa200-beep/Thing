@@ -15,7 +15,8 @@ class MarketMoodTest {
     @Test
     fun broadlyHigherWhenMostUp() {
         val m = MarketMood.summarize(listOf(1.0, 2.0, 0.5, 3.0, -0.2))!!
-        assertTrue(m.headline.contains("broadly higher", ignoreCase = true))
+        assertTrue(m.headline.contains("Mostly up", ignoreCase = true))
+        assertTrue(m.plain.contains("worth more", ignoreCase = true))
         assertTrue(m.detail.contains("4 up"))
         assertTrue(m.detail.contains("1 down"))
         assertTrue(m.detail.contains("of 5"))
@@ -24,7 +25,8 @@ class MarketMoodTest {
     @Test
     fun broadlyLowerWhenMostDown() {
         val m = MarketMood.summarize(listOf(-1.0, -2.0, -0.5, -3.0, 0.2))!!
-        assertTrue(m.headline.contains("broadly lower", ignoreCase = true))
+        assertTrue(m.headline.contains("Mostly down", ignoreCase = true))
+        assertTrue(m.plain.contains("worth less", ignoreCase = true))
     }
 
     @Test
