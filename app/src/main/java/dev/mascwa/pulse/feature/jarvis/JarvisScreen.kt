@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -132,11 +133,11 @@ fun JarvisScreen(
             }
         },
     ) { innerPadding ->
-        // The window is `adjustResize` (manifest), so it already shrinks the content above the soft
-        // keyboard — exactly like every other screen. Do NOT also add imePadding(): that double-counts the
-        // keyboard inset, leaving a full keyboard-height GAP between the input bar and the keyboard. Letting
-        // the resize alone seat the bar makes it sit flush against the keyboard while typing.
-        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+        // PulseScaffold sets contentWindowInsets(0,0,0,0), so NOTHING here consumes the IME inset except
+        // this imePadding() — it lifts the bottom input bar to sit on top of the soft keyboard. (Removing it
+        // dropped the input behind the keyboard.) The idle reactor fills the weight(1f) space above, so the
+        // input seats just below it, flush against the keyboard.
+        Column(Modifier.fillMaxSize().padding(innerPadding).imePadding()) {
             StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)
 
