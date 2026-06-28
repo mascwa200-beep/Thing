@@ -40,8 +40,15 @@ class DialWidgetProvider : AppWidgetProvider() {
     private suspend fun loadSlots(context: Context): List<String> {
         val app = context.applicationContext as? PulseApplication ?: return ReactorDialViewModel.normalizeSlots(emptyList())
         val s = runCatching { app.container.settingsRepository.current() }.getOrNull()
-        return ReactorDialViewModel.normalizeSlots(s?.reactorDialSlots ?: emptyList())
+        val raw = ReactorDialViewModel.normalizeSlots(s?.reactorDialSlots ?: emptyList())
+        // Show the pinned apps alphabetically by name (matches the in-app dial), empties last.
+        val pm = context.packageManager
+        val sorted = raw.filter { it.isNotEmpty() }.distinct().sortedBy { labelOf(pm, it).lowercase() }
+        return raw.indices.map { sorted.getOrNull(it) ?: "" }
     }
+
+    private fun labelOf(pm: PackageManager, pkg: String): String =
+        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
 
     private fun render(context: Context, manager: AppWidgetManager, id: Int, slots: List<String>) {
         val views = RemoteViews(context.packageName, R.layout.widget_dial)

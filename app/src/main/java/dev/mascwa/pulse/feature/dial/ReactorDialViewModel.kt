@@ -36,7 +36,24 @@ class ReactorDialViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, normalizeSlots(emptyList()))
 
     init {
-        viewModelScope.launch(Dispatchers.IO) { _apps.value = loadApps() }
+        viewModelScope.launch(Dispatchers.IO) {
+            _apps.value = loadApps()
+            // Now that labels are known, arrange any existing pins alphabetically (one-time, only if needed).
+            runCatching {
+                val cur = normalizeSlots(settings.current().reactorDialSlots)
+                val sorted = sortedSlots(cur)
+                if (sorted != cur) {
+                    settings.update { it.copy(reactorDialSlots = sorted) }
+                    dev.mascwa.pulse.widget.DialWidgetProvider.refresh(appContext)
+                }
+            }
+        }
+    }
+
+    /** The pins arranged alphabetically by app name, empties last, normalized to [NUM_SLOTS]. */
+    private fun sortedSlots(list: List<String>): List<String> {
+        val filled = list.filter { it.isNotEmpty() }.distinct().sortedBy { labelFor(it).lowercase() }
+        return (0 until NUM_SLOTS).map { filled.getOrNull(it) ?: "" }
     }
 
     private fun loadApps(): List<AppEntry> = runCatching {
@@ -55,7 +72,7 @@ class ReactorDialViewModel(
         settings.update { s ->
             val list = normalizeSlots(s.reactorDialSlots).toMutableList()
             if (slot in list.indices) list[slot] = packageName
-            s.copy(reactorDialSlots = list)
+            s.copy(reactorDialSlots = sortedSlots(list))
         }
         dev.mascwa.pulse.widget.DialWidgetProvider.refresh(appContext)
     }
@@ -64,7 +81,7 @@ class ReactorDialViewModel(
         settings.update { s ->
             val list = normalizeSlots(s.reactorDialSlots).toMutableList()
             if (slot in list.indices) list[slot] = ""
-            s.copy(reactorDialSlots = list)
+            s.copy(reactorDialSlots = sortedSlots(list))
         }
         dev.mascwa.pulse.widget.DialWidgetProvider.refresh(appContext)
     }
