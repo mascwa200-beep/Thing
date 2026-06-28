@@ -2,4 +2,6 @@
 <paths>
     <!-- The downloaded update APK lives in cacheDir/apk/ (see UpdateRepository). -->
     <cache-path name="apk" path="apk/" />
+    <!-- Photos captured by the camera for the J.A.R.V.I.S. console live in cacheDir/camera/. -->
+    <cache-path name="camera" path="camera/" />
 </paths>

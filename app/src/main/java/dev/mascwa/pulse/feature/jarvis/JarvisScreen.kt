@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -24,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Image
@@ -132,9 +132,11 @@ fun JarvisScreen(
             }
         },
     ) { innerPadding ->
-        // imePadding lifts the input bar above the soft keyboard — the window is edge-to-edge
-        // (MainActivity.enableEdgeToEdge), so it doesn't auto-resize for the IME on its own.
-        Column(Modifier.fillMaxSize().padding(innerPadding).imePadding()) {
+        // The window is `adjustResize` (manifest), so it already shrinks the content above the soft
+        // keyboard — exactly like every other screen. Do NOT also add imePadding(): that double-counts the
+        // keyboard inset, leaving a full keyboard-height GAP between the input bar and the keyboard. Letting
+        // the resize alone seat the bar makes it sit flush against the keyboard while typing.
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
             StatusLine(engineState, cloudStatus)
             if (banter.isNotBlank()) BanterLine(banter)
 
@@ -349,6 +351,17 @@ private fun InputBar(
         }
         attachOpen = false
     }
+    // Take a photo with the camera (Claude.ai parity) → interpreted via the same vision path as a gallery
+    // image. The capture writes into a FileProvider URI we hand the camera app.
+    val context = LocalContext.current
+    var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success && !busy) {
+            cameraUri?.let { onSendImage(it, input) }
+            input = ""
+        }
+        attachOpen = false
+    }
     val listening = voice is VoiceInputState.Listening || voice is VoiceInputState.Preparing
     Column {
         VoiceLine(voice)
@@ -389,6 +402,14 @@ private fun InputBar(
                             )
                         },
                     ) { Icon(Icons.Filled.Image, contentDescription = "Attach image", tint = c.sky) }
+                    IconButton(
+                        onClick = {
+                            if (!busy) {
+                                val uri = dev.mascwa.pulse.core.util.createCameraImageUri(context)
+                                if (uri != null) { cameraUri = uri; takePhoto.launch(uri) }
+                            }
+                        },
+                    ) { Icon(Icons.Filled.PhotoCamera, contentDescription = "Take photo", tint = c.sky) }
                     IconButton(onClick = { if (!busy) pickFile.launch("*/*") }) {
                         Icon(Icons.Filled.AttachFile, contentDescription = "Attach file", tint = c.sky)
                     }
