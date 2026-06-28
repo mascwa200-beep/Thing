@@ -8,7 +8,9 @@ package dev.mascwa.pulse.core.telemetry
  */
 object MarketMood {
 
-    data class Mood(val headline: String, val detail: String)
+    /** [headline] is a short, plain summary; [plain] is a full-sentence explanation anyone can follow;
+     *  [detail] is the raw count (X up · Y down of N). */
+    data class Mood(val headline: String, val detail: String, val plain: String)
 
     fun summarize(changesPct: List<Double>): Mood? {
         val changes = changesPct.filter { it.isFinite() }
@@ -18,18 +20,24 @@ object MarketMood {
         val flat = changes.size - up - down
         val total = changes.size
         val upShare = up.toDouble() / total
-        val headline = when {
-            upShare >= 0.70 -> "Risk-on — broadly higher"
-            upShare >= 0.55 -> "Leaning higher"
-            upShare <= 0.30 -> "Risk-off — broadly lower"
-            upShare <= 0.45 -> "Leaning lower"
-            else -> "Mixed / rangebound"
+        // Plain English, no trading jargon (no "risk-on"/"rangebound") — a non-investor should get it.
+        val (headline, plain) = when {
+            upShare >= 0.70 ->
+                "Mostly up today" to "Most of the markets we track are worth more than they were yesterday."
+            upShare >= 0.55 ->
+                "More up than down" to "A few more markets are higher today than are lower."
+            upShare <= 0.30 ->
+                "Mostly down today" to "Most of the markets we track are worth less than they were yesterday."
+            upShare <= 0.45 ->
+                "More down than up" to "A few more markets are lower today than are higher."
+            else ->
+                "Mixed — up and down" to "It's an even split — about as many markets are up as are down today."
         }
         val detail = buildString {
             append("$up up · $down down")
             if (flat > 0) append(" · $flat flat")
             append(" of $total")
         }
-        return Mood(headline, detail)
+        return Mood(headline, detail, plain)
     }
 }

@@ -90,10 +90,11 @@ object MarketExplainers {
             mag < 3 -> "a notable move"
             else -> "a big move"
         }
-        val dir = if (pct >= 0) "up" else "down"
+        val up = pct >= 0
         return Explainer(
-            "${if (pct >= 0) "▲" else "▼"} ${String.format("%.2f", abs(pct))}% today — $size",
-            "Price is $dir ${String.format("%.2f", abs(pct))}% versus the previous close.",
+            "${if (up) "▲" else "▼"} ${String.format("%.2f", abs(pct))}% today — $size",
+            "In plain terms: it's worth ${String.format("%.2f", abs(pct))}% ${if (up) "more" else "less"} " +
+                "than it was at yesterday's closing price.",
         )
     }
 
@@ -106,37 +107,45 @@ object MarketExplainers {
 
     /** Generic definition for an asset class (used when a specific blurb isn't known). */
     fun assetClass(type: String, label: String = "this"): String = when (type.uppercase()) {
-        "INDEX" -> "A stock-market index — a basket that tracks a whole market's direction in one number."
-        "STOCK" -> "Shares of $label — you own a slice of the company; the price is what one share trades at."
-        "FOREX" -> "A currency pair — how much of one currency it takes to buy another."
-        "COMMODITY" -> "A raw material traded globally; its price feeds through to real-world costs."
-        "CRYPTO" -> "A cryptocurrency — a decentralised digital asset that trades 24/7."
-        else -> "A tradable market instrument."
+        "INDEX" -> "A stock-market index — one number that shows how a whole group of companies is doing today, " +
+            "so you don't have to check each one."
+        "STOCK" -> "Shares of $label — owning one means you own a tiny piece of the company. The price is what " +
+            "a single piece costs to buy or sell right now."
+        "FOREX" -> "A pair of currencies — it shows how much of one country's money it takes to buy another's."
+        "COMMODITY" -> "A raw material (like oil or gold) bought and sold worldwide. Its price flows through to " +
+            "everyday costs like fuel and food."
+        "CRYPTO" -> "A digital currency that no bank or government runs. It can be bought and sold all day, every day."
+        else -> "A market you can buy and sell."
     }
 
     private val BLURBS: Map<String, String> = mapOf(
-        "^spx" to "The S&P 500 — the 500 biggest U.S. companies; the headline gauge of the U.S. market.",
-        "^ndq" to "The Nasdaq 100 — 100 largest non-financial Nasdaq firms; tech-heavy and growth-tilted.",
-        "^dji" to "The Dow Jones — 30 large U.S. blue-chip companies; price-weighted and widely quoted.",
-        "^rut" to "The Russell 2000 — 2,000 U.S. small-cap companies; a read on smaller, domestic firms.",
-        "^ftm" to "The FTSE 100 — the 100 biggest companies on the London Stock Exchange.",
-        "^dax" to "The DAX — 40 major German blue-chips traded in Frankfurt.",
-        "^cac" to "The CAC 40 — 40 major French companies traded in Paris.",
-        "^nkx" to "The Nikkei 225 — 225 large Japanese companies; Tokyo's headline index.",
-        "^hsi" to "The Hang Seng — the main index of large companies listed in Hong Kong.",
-        "^vix" to "The VIX — the market's 'fear gauge'; expected S&P 500 swings. It spikes when markets get nervous.",
-        "eurusd" to "Euro vs U.S. dollar — how many dollars one euro buys. The world's most-traded pair.",
-        "gbpusd" to "British pound vs U.S. dollar ('cable') — how many dollars one pound buys.",
+        "^spx" to "The S&P 500 — tracks the 500 biggest U.S. companies together. When people say \"the U.S. " +
+            "stock market,\" this is usually the number they mean.",
+        "^ndq" to "The Nasdaq 100 — the 100 biggest U.S. companies outside of banking, mostly tech names like " +
+            "Apple and Microsoft.",
+        "^dji" to "The Dow Jones — 30 huge, household-name U.S. companies. One of the oldest and most-quoted " +
+            "market numbers.",
+        "^rut" to "The Russell 2000 — around 2,000 smaller U.S. companies. A read on how smaller businesses are doing.",
+        "^ftm" to "The FTSE 100 — the 100 biggest companies on the London stock market; the UK's headline number.",
+        "^dax" to "The DAX — 40 of Germany's biggest companies, traded in Frankfurt.",
+        "^cac" to "The CAC 40 — 40 of France's biggest companies, traded in Paris.",
+        "^nkx" to "The Nikkei 225 — 225 big Japanese companies; Japan's headline market number.",
+        "^hsi" to "The Hang Seng — the main market number for big companies in Hong Kong.",
+        "^vix" to "The VIX — the market's \"fear gauge.\" It rises when investors get nervous and expect big " +
+            "swings, and falls when things feel calm.",
+        "eurusd" to "Euro vs U.S. dollar — how many dollars one euro buys. The world's most-traded currency pair.",
+        "gbpusd" to "British pound vs U.S. dollar — how many dollars one pound buys.",
         "usdjpy" to "U.S. dollar vs Japanese yen — how many yen one dollar buys.",
-        "gc.f" to "Gold — the classic safe-haven store of value; tends to rise when fear or inflation climbs.",
-        "si.f" to "Silver — a precious metal that's also an industrial input, so it's more volatile than gold.",
-        "cl.f" to "WTI crude — the U.S. oil benchmark; a major driver of fuel and shipping costs.",
-        "cb.f" to "Brent crude — the global oil benchmark used to price most of the world's crude.",
-        "bitcoin" to "Bitcoin — the original and largest cryptocurrency; often treated as 'digital gold'.",
-        "ethereum" to "Ethereum — the leading smart-contract platform; powers most of crypto's apps.",
-        "solana" to "Solana — a fast, low-fee blockchain popular for apps and trading.",
-        "ripple" to "XRP — a token built for fast, cheap cross-border payments.",
-        "binancecoin" to "BNB — the token of the Binance ecosystem, used for fees and apps.",
-        "dogecoin" to "Dogecoin — a meme-origin cryptocurrency with a large, active community.",
+        "gc.f" to "Gold — people often buy it to feel safe when prices rise or markets get scary. Seen as a " +
+            "steady place to park money.",
+        "si.f" to "Silver — a precious metal that's also used in industry, so its price swings around more than gold's.",
+        "cl.f" to "U.S. crude oil — the benchmark price for American oil. It feeds straight into fuel and shipping costs.",
+        "cb.f" to "Brent crude — the benchmark used to price most of the world's oil.",
+        "bitcoin" to "Bitcoin — the first and biggest cryptocurrency. Often called \"digital gold.\"",
+        "ethereum" to "Ethereum — the network most crypto apps are built on; its coin is the second-biggest.",
+        "solana" to "Solana — a fast, cheap-to-use blockchain popular for apps and trading.",
+        "ripple" to "XRP — a coin built for sending money across borders quickly and cheaply.",
+        "binancecoin" to "BNB — the coin of Binance, a big crypto exchange; used to pay fees and run apps.",
+        "dogecoin" to "Dogecoin — a cryptocurrency that started as a meme but has a big, active fan base.",
     )
 }

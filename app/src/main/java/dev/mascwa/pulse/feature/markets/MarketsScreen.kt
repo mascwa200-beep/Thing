@@ -139,6 +139,7 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
                         MarketMood.summarize(all.mapNotNull { it.changePercent })?.let { mood ->
                             item(key = "mood") { MoodBanner(mood) }
                         }
+                        item(key = "tap_hint") { TapHint() }
 
                         if (gainers.isNotEmpty()) {
                             item(key = "h_gain") { SectionLabel("Top gainers") }
@@ -207,6 +208,16 @@ private fun SectionLabel(text: String) {
     CyberHeader(text)
 }
 
+/** Tells first-timers the rows are tappable — where the plain-English explanations live. */
+@Composable
+private fun TapHint() {
+    Text(
+        "Tap any row below for a plain-English explanation of what it is and what today's move means.",
+        fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pulse.colors.muted,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+    )
+}
+
 @Composable
 private fun MoodBanner(mood: MarketMood.Mood) {
     val c = Pulse.colors
@@ -231,8 +242,13 @@ private fun MoodBanner(mood: MarketMood.Mood) {
                 modifier = Modifier.padding(top = 6.dp),
             )
             Text(
+                mood.plain,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
                 mood.detail,
-                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
