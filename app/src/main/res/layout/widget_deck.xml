@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:padding="10dp">
+
+    <!-- The "rotary" deck: all apps as cards; swipe to spin, each peels from / returns to the stack. -->
+    <StackView
+        android:id="@+id/deck_stack"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:loopViews="true"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/deck_empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/widget_deck_empty"
+        android:textColor="#5E708C"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:text="REACTOR DECK · SWIPE"
+        android:textColor="#5AD1FF"
+        android:textSize="8sp"
+        android:letterSpacing="0.15" />
+</FrameLayout>
