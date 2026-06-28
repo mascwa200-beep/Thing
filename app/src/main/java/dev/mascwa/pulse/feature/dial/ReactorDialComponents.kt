@@ -17,10 +17,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +91,10 @@ internal fun AppPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val c = Pulse.colors
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query, apps) {
+        if (query.isBlank()) apps else apps.filter { it.label.contains(query.trim(), ignoreCase = true) }
+    }
     Dialog(onDismissRequest = onDismiss) {
         Surface(color = c.panel, shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(14.dp)) {
@@ -93,6 +103,24 @@ internal fun AppPickerDialog(
                     fontFamily = JetBrainsMono, fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.sky,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
+                // Search — long app lists are painful to scroll.
+                Box(
+                    Modifier.fillMaxWidth()
+                        .border(1.dp, c.sky.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
+                        cursorBrush = SolidColor(c.sky),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (query.isEmpty()) {
+                        Text("Search apps…", fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted)
+                    }
+                }
                 if (hasCurrent) {
                     Text(
                         "✕  Clear this slot",
@@ -101,7 +129,7 @@ internal fun AppPickerDialog(
                     )
                 }
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(apps, key = { it.packageName }) { app ->
+                    items(filtered, key = { it.packageName }) { app ->
                         Row(
                             Modifier.fillMaxWidth().clickable { onPick(app.packageName) }.padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
