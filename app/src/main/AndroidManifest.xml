@@ -163,6 +163,24 @@
                 android:resource="@xml/pulse_widget_info" />
         </receiver>
 
+        <!-- Live data-feed widget: auto-cycles markets · fuel · economy/inflation · news. Backed by a
+             RemoteViewsService collection; the AdapterViewFlipper auto-advances. -->
+        <receiver
+            android:name=".widget.FeedWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_feed_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/feed_widget_info" />
+        </receiver>
+        <service
+            android:name=".widget.FeedRemoteViewsService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <!-- Four J.A.R.V.I.S. widgets (STATUS / OBJECTIVE / FINDING / BRIEF). Each opens a config screen on
              placement to choose HIGH-contrast or TRANSPARENT (text-only) mode. They share one layout +
              provider info; the renderer derives the content from the receiver class. -->

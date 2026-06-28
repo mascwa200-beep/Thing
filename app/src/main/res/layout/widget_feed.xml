@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_feed_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="14dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PULSE · LIVE FEED"
+        android:textColor="#5AD1FF"
+        android:textStyle="bold"
+        android:textSize="11sp"
+        android:letterSpacing="0.12" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp">
+
+        <AdapterViewFlipper
+            android:id="@+id/widget_feed_flipper"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:autoStart="true"
+            android:flipInterval="6000"
+            android:loopViews="true"
+            android:inAnimation="@android:anim/fade_in"
+            android:outAnimation="@android:anim/fade_out" />
+
+        <TextView
+            android:id="@+id/widget_feed_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:text="Open Pulse to load the live feed"
+            android:textColor="#5E708C"
+            android:textSize="12sp" />
+    </FrameLayout>
+</LinearLayout>
