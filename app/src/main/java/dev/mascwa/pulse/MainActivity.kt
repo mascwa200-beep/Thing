@@ -47,6 +47,11 @@ class MainActivity : ComponentActivity() {
     /** Wall-clock of the last auto-update check, so a quick app-switch doesn't re-hit GitHub each resume. */
     private var lastAutoUpdateCheckMs = 0L
 
+    /** The pending deep-link route (notification tap or launcher shortcut). Held as Compose state and
+     *  updated on every new intent, so a WARM launch (app already running) re-navigates — not just a cold
+     *  start. Paired with launchMode=singleTop so the running instance receives [onNewIntent]. */
+    private val pendingRouteState = mutableStateOf<String?>(null)
+
     /**
      * If auto-update is on, check for a GREEN (CI-passed) build newer than what we last prompted to
      * install — and if found, download it and launch the system installer (the user taps "Update" once).
@@ -79,7 +84,7 @@ class MainActivity : ComponentActivity() {
         val factory = PulseViewModelFactory(app.container)
         val gateResult = DeviceGate.evaluate()
         val graphene = dev.mascwa.pulse.core.device.GrapheneOs.detect(this)
-        val startRoute = intent?.getStringExtra(EXTRA_ROUTE)
+        pendingRouteState.value = intent?.getStringExtra(EXTRA_ROUTE)
         runCatching { app.container.usageRepository.log("lifecycle", "app opened") }
         // Launcher integration: long-press app shortcuts (deep-link into J.A.R.V.I.S./Markets/NAV/SOS).
         runCatching { dev.mascwa.pulse.shortcuts.AppShortcuts.install(this) }
@@ -204,12 +209,13 @@ class MainActivity : ComponentActivity() {
                     } else {
                         PulseApp(
                             factory = factory,
-                            startRoute = startRoute,
+                            startRoute = pendingRouteState.value,
                             isOnline = online,
                             onRouteVisit = { route ->
                                 app.container.usageRepository.record(route)
                                 app.container.usageRepository.log("nav", route)
                             },
+                            onStartRouteConsumed = { pendingRouteState.value = null },
                         )
                     }
                     // (The visual "always watching" overlay was removed — J.A.R.V.I.S.'s awareness is
@@ -224,6 +230,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Warm-launch deep link (e.g. a launcher shortcut tapped while Pulse is already running): publish
+        // the new route so the composition re-navigates. Ignore intents without a route (a plain re-open).
+        intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRouteState.value = it }
     }
 
     override fun onStart() {
