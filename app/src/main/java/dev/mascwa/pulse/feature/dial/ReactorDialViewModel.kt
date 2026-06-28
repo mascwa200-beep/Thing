@@ -57,6 +57,7 @@ class ReactorDialViewModel(
             if (slot in list.indices) list[slot] = packageName
             s.copy(reactorDialSlots = list)
         }
+        dev.mascwa.pulse.widget.DialWidgetProvider.refresh(appContext)
     }
 
     fun clear(slot: Int) = viewModelScope.launch {
@@ -65,6 +66,7 @@ class ReactorDialViewModel(
             if (slot in list.indices) list[slot] = ""
             s.copy(reactorDialSlots = list)
         }
+        dev.mascwa.pulse.widget.DialWidgetProvider.refresh(appContext)
     }
 
     /** Launch the pinned app. Returns false if it has no launch intent (e.g. uninstalled since pinned). */
