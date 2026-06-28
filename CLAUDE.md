@@ -546,6 +546,49 @@ Owner-driven batch on dev branch `claude/loving-edison-bd65oa`; all CI-green, sq
   smaller chunks. **Open / steerable:** tune dial node radius/count/labels from a screenshot; a Home entry point
   for the dial; the wallpaper-touch reliability is an OS limit (QS tile is the dependable entry).
 
+### Reactor Deck + Iron-Man-OS wallpaper + breadth/mood + trace-driven fixes (this session cont., #215–#229 all merged)
+Context (#215–#221, owner-driven via screenshots): the in-app Reactor **Dial** was removed leaving only the
+self-contained **Reactor Deck** widget (a StackView app-deck); the live wallpaper was rebuilt from a single
+arc-reactor into a dense **"Iron-Man-OS" HUD** (world-map radar + corner dials + gauges + waveform + loading
+bar + data panel), then **wired to real on-device cached data** (top-mover sparkline, RAM%, geo radar markers,
+battery, Kp). Then this batch:
+- **Wallpaper turbine→solar wind + breadth panel (#222):** the turbine dial's spin scales with live solar-wind
+  km/s (`SOL <n>` label); the decorative "molecule" became a **market-breadth panel** (`drawBreadth`: up/down
+  counts + up-share % + green/red split bar) — fed from the watchlist quotes already fetched.
+- **Net % on the breadth panel (#223):** added the equal-weighted average daily % change (`NET +x.xx%`,
+  sign-coloured, auto-sized) under the up-share headline.
+- **Centralized breadth on the CI-tested core (#224):** `MarketMood.Mood` now also exposes `up/down/flat/total`,
+  `upShare`, and **`netChangePct`** (raw average — documented as NOT the mood input); the wallpaper reads these
+  from `MarketMood.summarize` instead of recounting inline (HUD + Markets screen share one definition). +2 tests.
+- **Mood headline on the wallpaper (#225):** the breadth panel now renders `MarketMood`'s plain-English headline
+  ("MOSTLY UP TODAY" etc.), tri-state coloured on the 0.55/0.45 boundaries, auto-fit via `measureText`.
+- **Data-panel polish (#226):** the live-feed news line was prefixed `NET` (network) which collided with the
+  breadth `NET` (net change) → renamed `NEWS`; added a plain-English geomagnetic line (`SPC  Kp 3.0 — Quiet`)
+  via the CI-tested `SpaceWeatherExplainers.kp`, amber when storming. No new fetch.
+- **Markets mood banner net % (#227):** surfaced `MarketMood.netChangePct` in-app beside the up/down detail as a
+  sign-coloured `net +0.42%` (`c.trend`).
+- **Trace-driven RADIO fix (#228):** found by tracing the playback stack — a *permanent* ExoPlayer error
+  (dead/incompatible station, common with the Radio Browser list) set `Status.ERROR` but never released the
+  player or stopped the service (`RadioService` only tears down on `IDLE`), leaking an ExoPlayer holding
+  **audio focus** + an orphaned `mediaPlayback` foreground service/notification. New `failPermanently()`
+  releases the player, cancels the meta poll, keeps `ERROR` in-app, and stops the service — wired into every
+  terminal-error site. Plus a superseded-tune guard at the top of `startPlayer()` (fast-switch could play the
+  wrong station). Rejected the trace's `RadioService` "IDLE-first startForeground" false-positive.
+- **Trace-driven VOICE fix (#229):** three defensive guards on `ActiveMatrixService` keyed on the existing
+  `capturing`/lifecycle flags — `onDestroy` now stops TTS (it kept talking after "Stand down"); the
+  `consoleActive` collector re-arms `listenForWake` only `&& !capturing` (console open/close during a command
+  capture could open a 2nd mic session); the critical-battery warning speaks only `!capturing` (mid-reply it
+  `QUEUE_FLUSH`ed the in-flight TTS and stranded the wake mic). **Deferred (need on-device verify):** a single
+  idempotent `rearmWake()` funnel, cancelling the system recognizer on console-open, Vosk `shutdown()` vs `stop()`.
+- **Security review (clean, no PR):** verified the debug-report scrub path — `DebugUploader.buildBundle` runs the
+  whole bundle through `SecretScrub` (exact-value pass from the authoritative `allSecretValues()` + key-shape
+  patterns; Bearer pattern runs before the `authorization:` pattern so `Authorization: Bearer <tok>` is fully
+  covered); path/commit-message carry only `crash`/`manual`. No leak; `allSecretValues()` complete vs the data classes.
+- ⚠️ All #222–#229 on-device-unverified (CI compile-gates only). The radio teardown + voice mic lifecycle
+  especially want a real run on the Pixel. **Open / steerable:** the deferred voice-concurrency items; whether the
+  wallpaper breadth/mood density needs trimming; more trace-driven hardening of other subsystems (updater,
+  RefreshWorker, nav routing).
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
