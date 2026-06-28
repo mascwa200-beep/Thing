@@ -41,6 +41,10 @@
     <string name="channel_reminders_name">Reminders</string>
     <string name="channel_reminders_desc">Reminders you ask J.A.R.V.I.S. to set</string>
 
+    <!-- J.A.R.V.I.S. live wallpaper -->
+    <string name="wallpaper_jarvis_label">J.A.R.V.I.S. HUD</string>
+    <string name="wallpaper_jarvis_desc">Stark-style arc-reactor home screen with a live Pulse readout — clock, active objective, weather and top market mover.</string>
+
     <!-- J.A.R.V.I.S. home-screen widgets -->
     <string name="widget_jarvis_status">J.A.R.V.I.S. Status</string>
     <string name="widget_jarvis_objective">J.A.R.V.I.S. Objective</string>
