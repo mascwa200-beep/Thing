@@ -331,6 +331,16 @@ class RefreshWorker(
         runCatching {
             dev.mascwa.pulse.shortcuts.UnreadBadge.publish(applicationContext, container.findingStore.unseenCount())
         }
+        // Nudge the live-feed widget to reload from this fetch (its own update period is the 30-min floor).
+        runCatching {
+            val mgr = android.appwidget.AppWidgetManager.getInstance(applicationContext)
+            val ids = mgr.getAppWidgetIds(
+                android.content.ComponentName(applicationContext, dev.mascwa.pulse.widget.FeedWidgetProvider::class.java),
+            )
+            if (ids.isNotEmpty()) {
+                mgr.notifyAppWidgetViewDataChanged(ids, dev.mascwa.pulse.R.id.widget_feed_flipper)
+            }
+        }
 
         writeState(state)
         return Result.success()
