@@ -57,8 +57,6 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.social.SocialViewModel(c.socialRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.search.SearchViewModel::class.java) ->
                 dev.mascwa.pulse.feature.search.SearchViewModel(c.settingsRepository)
-            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.dial.ReactorDialViewModel::class.java) ->
-                dev.mascwa.pulse.feature.dial.ReactorDialViewModel(c.applicationContext, c.settingsRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.RadarViewModel::class.java) ->
                 dev.mascwa.pulse.feature.tacnet.RadarViewModel(c.radarRepository, c.locationProvider, c.spaceWeatherRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.TelemetryViewModel::class.java) ->

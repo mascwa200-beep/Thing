@@ -52,9 +52,6 @@ object Routes {
     const val RADAR = "radar"
     const val TELEMETRY = "telemetry"
 
-    // Reactor Dial — arc-reactor rotary app launcher
-    const val DIAL = "dial"
-
     // J.A.R.V.I.S. Matrix (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"

@@ -182,19 +182,6 @@
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
-        <!-- Reactor Dial widget: the reactor core ringed by the user's pinned apps, tappable to launch. -->
-        <receiver
-            android:name=".widget.DialWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_dial_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/dial_widget_info" />
-        </receiver>
-
         <!-- Reactor Deck widget — a StackView "rotary" of all apps; tap a card to launch (via the trampoline). -->
         <receiver
             android:name=".widget.ReactorDeckWidgetProvider"
@@ -290,18 +277,6 @@
             android:name=".feature.tacnet.RadioService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-
-        <!-- Quick Settings tile that opens the Reactor Dial from anywhere (reliable touch entry). -->
-        <service
-            android:name=".feature.dial.ReactorDialTileService"
-            android:exported="true"
-            android:icon="@drawable/ic_dial_tile"
-            android:label="Reactor Dial"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
 
         <!-- J.A.R.V.I.S. arc-reactor live wallpaper. Reads only on-device cached Pulse data; drawn
              procedurally (no bitmaps). Set it from Settings → Appearance → J.A.R.V.I.S. live wallpaper. -->
