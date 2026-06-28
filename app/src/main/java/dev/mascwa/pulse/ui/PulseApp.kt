@@ -314,6 +314,7 @@ fun PulseApp(
                         vm,
                         onBack = { navController.popBackStack() },
                         onOpenSetup = { navController.navigate(Routes.JARVIS_SETUP) },
+                        onOpenDial = { navController.navigate(Routes.DIAL) { launchSingleTop = true } },
                     )
                 }
             }
@@ -333,6 +334,12 @@ fun PulseApp(
             composable(Routes.JARVIS_MEMORY) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.jarvis.JarvisMemoryScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Reactor Dial — arc-reactor rotary app launcher ----
+            composable(Routes.DIAL) {
+                val vm: dev.mascwa.pulse.feature.dial.ReactorDialViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.dial.ReactorDialScreen(vm, onClose = { navController.popBackStack() })
             }
 
             // ---- 3D cyberpunk navigation map (OBJECTIVES manager folded in as a sub-tab) ----

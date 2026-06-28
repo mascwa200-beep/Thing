@@ -3,6 +3,8 @@ package dev.mascwa.pulse.feature.jarvis
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,6 +71,7 @@ fun JarvisScreen(
     vm: JarvisViewModel,
     onBack: () -> Unit,
     onOpenSetup: () -> Unit = {},
+    onOpenDial: () -> Unit = {},
 ) {
     val c = Pulse.colors
     val messages by vm.messages.collectAsState()
@@ -151,15 +154,15 @@ fun JarvisScreen(
                 ) {
                     HudReactor(
                         color = c.sky, accent = c.accent, active = false,
-                        modifier = Modifier.size(208.dp),
+                        modifier = Modifier.size(208.dp).clip(CircleShape).clickable { onOpenDial() },
                     )
                     Text(
                         "J.A.R.V.I.S.",
                         fontFamily = JetBrainsMono, fontSize = 22.sp, letterSpacing = 9.sp, color = c.sky,
                     )
                     Text(
-                        "STARK HUD INTERFACE · ONLINE",
-                        fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 3.sp, color = c.muted,
+                        "TAP THE REACTOR · APP DIAL",
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 3.sp, color = c.sky.copy(alpha = 0.7f),
                     )
                 }
             } else {
