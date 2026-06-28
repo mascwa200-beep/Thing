@@ -50,6 +50,7 @@ class JarvisWallpaperService : WallpaperService() {
         val breadthUp: Int = 0,                   // watchlist instruments up on the day
         val breadthDown: Int = 0,                 // watchlist instruments down on the day
         val breadthNet: Double = 0.0,             // equal-weighted average % change across the watchlist
+        val breadthMood: String = "",             // plain-English breadth headline (MarketMood)
     )
 
     private inner class ReactorEngine : WallpaperService.Engine() {
@@ -112,6 +113,7 @@ class JarvisWallpaperService : WallpaperService() {
                 var breadthUp = 0
                 var breadthDown = 0
                 var breadthNet = 0.0
+                var breadthMood = ""
                 val markers = mutableListOf<FloatArray>()
 
                 runCatching {
@@ -135,6 +137,7 @@ class JarvisWallpaperService : WallpaperService() {
                         breadthUp = mood.up
                         breadthDown = mood.down
                         breadthNet = mood.netChangePct
+                        breadthMood = mood.headline
                     }
                     val sorted = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
                     sorted.take(2).forEach { q ->
@@ -183,7 +186,7 @@ class JarvisWallpaperService : WallpaperService() {
                     applicationContext.getSystemService(BatteryManager::class.java)
                         ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
                 }.getOrDefault(-1)
-                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers, solarWind, breadthUp, breadthDown, breadthNet)
+                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers, solarWind, breadthUp, breadthDown, breadthNet, breadthMood)
             }
         }
 
@@ -243,7 +246,7 @@ drawLoadingBar(canvas, p, w * 0.07f, h * 0.285f, w * 0.93f, h * 0.315f, t, if (s
 drawWorldRadar(canvas, p, cx, h * 0.49f, unit * 0.33f, t, snap.markers)
 
 // ===== Lower instruments =====
-drawBreadth(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t, snap.breadthUp, snap.breadthDown, snap.breadthNet)
+drawBreadth(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t, snap.breadthUp, snap.breadthDown, snap.breadthNet, snap.breadthMood)
 drawPercentGauge(canvas, p, w * 0.74f, h * 0.685f, unit * 0.135f, t, snap.battery.coerceIn(0, 100), "PWR")
 
 // ===== Live data panel =====
@@ -1211,7 +1214,7 @@ private fun drawLoadingBar(c: Canvas, p: Paint, l: Float, top: Float, r: Float, 
 }
 
 // ===== drawBreadth (market breadth: watchlist up vs down) =====
-private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, t: Long, up: Int, down: Int, net: Double) {
+private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, t: Long, up: Int, down: Int, net: Double, mood: String) {
     p.clearShadowLayer()
     p.shader = null
     p.pathEffect = null
@@ -1237,6 +1240,27 @@ private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, 
     lab.textSize = size * 0.05f
     lab.color = withAlpha(CYAN, 0.6f + 0.3f * breath)
     c.drawText("MKT BREADTH", cx - size * 0.42f, cy - size * 0.30f, lab)
+
+    // Plain-English mood headline (auto-sized to fit the panel), tri-state coloured to match the
+    // direction (POSITIVE leaning up / NEGATIVE leaning down / AMBER mixed, on MarketMood's boundaries).
+    if (mood.isNotEmpty()) {
+        val moodText = mood.uppercase()
+        val moodColor = when {
+            upFrac >= 0.55f -> POSITIVE
+            upFrac <= 0.45f -> NEGATIVE
+            else -> AMBER
+        }
+        val moodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
+        }
+        val baseMoodSize = size * 0.052f
+        moodPaint.textSize = baseMoodSize
+        val avail = size * 0.84f
+        val measured = moodPaint.measureText(moodText)
+        if (measured > avail && measured > 0f) moodPaint.textSize = baseMoodSize * (avail / measured)
+        moodPaint.color = withFullAlpha(moodColor)
+        c.drawText(moodText, cx, cy - size * 0.215f, moodPaint)
+    }
 
     // Big up-share percent (breadth headline).
     val pct = Paint(Paint.ANTI_ALIAS_FLAG).apply {
