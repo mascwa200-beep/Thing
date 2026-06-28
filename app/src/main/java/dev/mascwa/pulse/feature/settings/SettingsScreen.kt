@@ -778,22 +778,22 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
-                    EditableValueRow("NewsAPI.org", masked(s.apiKeys.newsApi)) { v ->
+                    EditableValueRow("NewsAPI.org", masked(s.apiKeys.newsApi), "https://newsapi.org/register") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(newsApi = v.trim())) }
                     }
-                    EditableValueRow("FRED (US economy)", masked(s.apiKeys.fred)) { v ->
+                    EditableValueRow("FRED (US economy)", masked(s.apiKeys.fred), "https://fredaccount.stlouisfed.org/apikeys") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(fred = v.trim())) }
                     }
-                    EditableValueRow("EIA (US fuel)", masked(s.apiKeys.eia)) { v ->
+                    EditableValueRow("EIA (US fuel)", masked(s.apiKeys.eia), "https://www.eia.gov/opendata/register.php") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(eia = v.trim())) }
                     }
-                    EditableValueRow("Finnhub (markets)", masked(s.apiKeys.finnhub)) { v ->
+                    EditableValueRow("Finnhub (markets)", masked(s.apiKeys.finnhub), "https://finnhub.io/register") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(finnhub = v.trim())) }
                     }
-                    EditableValueRow("OpenWeatherMap", masked(s.apiKeys.openWeatherMap)) { v ->
+                    EditableValueRow("OpenWeatherMap", masked(s.apiKeys.openWeatherMap), "https://home.openweathermap.org/api_keys") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(openWeatherMap = v.trim())) }
                     }
-                    EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa)) { v ->
+                    EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa), "https://api.nasa.gov/") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(nasa = v.trim())) }
                     }
                 }
@@ -1016,9 +1016,20 @@ private fun masked(key: String): String =
 // ---------- small reusable rows / dialogs ----------
 
 @Composable
-private fun EditableValueRow(title: String, value: String, onSet: (String) -> Unit) {
+private fun EditableValueRow(title: String, value: String, helpUrl: String? = null, onSet: (String) -> Unit) {
     var show by remember { mutableStateOf(false) }
     PrefClickable(title, value = value, onClick = { show = true })
+    if (helpUrl != null) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Text(
+            "Get a free key →",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
+                .clickable { dev.mascwa.pulse.core.util.openUrl(context, helpUrl) }
+                .padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
+        )
+    }
     if (show) {
         TextEditDialog(title, initial = if (value == "Not set" || value.startsWith("••••")) "" else value,
             onDismiss = { show = false }, onConfirm = { onSet(it); show = false })

@@ -455,6 +455,13 @@ fun JarvisSetupScreen(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
+            Text(
+                "Get a token → https://github.com/settings/tokens",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .clickable { openUrl(context, "https://github.com/settings/tokens") },
+            )
 
             SettingToggle(
                 title = "AUTONOMOUS SELF-CODING",
