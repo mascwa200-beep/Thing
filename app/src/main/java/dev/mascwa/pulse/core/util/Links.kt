@@ -128,6 +128,14 @@ fun setTimer(context: Context, seconds: Int, message: String): Boolean {
 fun openCamera(context: Context): Boolean =
     launch(context, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
 
+/** A FileProvider content URI the camera can write a captured photo into (cacheDir/camera/). Pass it to
+ *  the `TakePicture` contract, then read it back as the captured image. Null if the file can't be made. */
+fun createCameraImageUri(context: Context): Uri? = runCatching {
+    val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+    val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+}.getOrNull()
+
 /** Opens the contacts app. */
 fun openContacts(context: Context): Boolean =
     launch(context, Intent(Intent.ACTION_VIEW).setData(ContactsContract.Contacts.CONTENT_URI))
