@@ -65,6 +65,7 @@ fun PulseApp(
     startRoute: String?,
     isOnline: Boolean = true,
     onRouteVisit: (String) -> Unit = {},
+    onStartRouteConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     var offlineDismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -380,13 +381,17 @@ fun PulseApp(
 
     // Deep-link from a notification tap or a launcher shortcut.
     LaunchedEffect(startRoute) {
-        if (!startRoute.isNullOrBlank() && startRoute != Routes.HOME) {
-            when {
-                TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
-                // Launcher shortcuts can target non-top routes (e.g. NAV, SOS, QUESTS).
-                startRoute in SHORTCUT_ROUTES ->
-                    runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
+        if (!startRoute.isNullOrBlank()) {
+            if (startRoute != Routes.HOME) {
+                when {
+                    TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
+                    // Launcher shortcuts can target non-top routes (e.g. NAV, SOS, QUESTS).
+                    startRoute in SHORTCUT_ROUTES ->
+                        runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
+                }
             }
+            // Consume it so re-tapping the SAME shortcut after navigating away fires again.
+            onStartRouteConsumed()
         }
     }
 }
