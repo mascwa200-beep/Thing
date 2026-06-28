@@ -324,6 +324,7 @@ fun PulseApp(
                     onBack = { navController.popBackStack() },
                     onOpenApprovals = { navController.navigate(Routes.JARVIS_APPROVALS) },
                     onOpenMemory = { navController.navigate(Routes.JARVIS_MEMORY) },
+                    onOpenDossier = { navController.navigate(Routes.JARVIS_DOSSIER) },
                 )
             }
             composable(Routes.JARVIS_APPROVALS) {
@@ -333,6 +334,10 @@ fun PulseApp(
             composable(Routes.JARVIS_MEMORY) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisMemoryViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.jarvis.JarvisMemoryScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.JARVIS_DOSSIER) {
+                val vm: dev.mascwa.pulse.feature.jarvis.JarvisDossierViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.jarvis.JarvisDossierScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- 3D cyberpunk navigation map (OBJECTIVES manager folded in as a sub-tab) ----

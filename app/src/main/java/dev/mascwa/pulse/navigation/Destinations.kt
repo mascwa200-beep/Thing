@@ -57,6 +57,7 @@ object Routes {
     const val JARVIS_SETUP = "jarvis_setup"
     const val JARVIS_APPROVALS = "jarvis_approvals"
     const val JARVIS_MEMORY = "jarvis_memory"
+    const val JARVIS_DOSSIER = "jarvis_dossier"
 
     // 3D cyberpunk navigation map
     const val NAV = "nav"
