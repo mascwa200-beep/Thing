@@ -476,6 +476,32 @@ now **provisioned as a Device Owner** via adb). Also a long Spaceballs "Ludicrou
   import the app's cleartext guard, and base URLs are a fixed HTTPS enum; `usesCleartextTraffic` can't be scoped without
   breaking radio's arbitrary http stream hosts). Mnemosyne reflection WorkManager pass still pending owner Haiku verify.
 
+### Reflection pass · console fixes · Phase 4 skills (this session cont., #202–#206 merged + a procedure tool)
+- **Mnemosyne reflection pass (#202):** `jarvis/reflection/ReflectionEngine.kt` — when enough recent
+  observation-importance accrues, the model synthesises 1–3 higher-level INSIGHTS from the top seeds, recorded
+  as `MemoryKind.REFLECTION`. Cloud-gated (no-op unless a backend is Ready) + throttled ~4h via
+  `AppSettings.lastReflectionMs`; driven from `RefreshWorker` beside the curiosity pass. Surfaces in recall
+  (`retrieve` scores all kinds) + the Memory screen (violet REFLECTION tag). Toggle: Settings → Storage
+  "Reflect on memories". Completes observe → retrieve → **reflect**.
+- **J.A.R.V.I.S. console fixes (#203):** keyboard-flush — the window is `adjustResize`, so `JarvisScreen`'s
+  extra `imePadding()` double-counted the IME inset (full keyboard-height gap); dropped it so the input seats
+  flush. Camera capture — the ⊕ pop-out gained "Take photo" (`TakePicture` → FileProvider `cacheDir/camera/`
+  → vision path), matching Claude.ai's image/camera/file attach.
+- **Get-a-key links (#204):** each API-key field now has a tappable provider link (`EditableValueRow(helpUrl)`
+  for the Optional keys; a "Get a token →" link by the GitHub token) — for re-entry after the factory reset.
+- **Mnemosyne Phase 4 — procedural "skills" (#204 slice 1, #205 slice 2, #206 slice 3 + a `procedure` tool):**
+  a `Procedure` is a learned, named, reusable multi-step TOOL SEQUENCE that solved a class of goal — distinct
+  from Cerebellum's single-action reflexes and from self-coding. Pure `core:telemetry/ProcedureLibrary.kt`
+  (keywords/learn/recall/digest/capped; Jaccard cue match ≥0.34; learns only from ≥2-step SUCCESSFUL agent
+  runs; practiced ≥2, reliable ≥60%; + 8 CI tests). `data/procedure/ProcedureStore.kt` mirrors CerebellumStore.
+  `JarvisViewModel.generateWithAgent` collects the run's ordered tool names; the Chat handler calls
+  `procedureStore.observe(request, sequence, ok)`; `composePersona` injects `digest()` so familiar goals follow
+  the known plan. View/curate in the Memory screen's PROCEDURES section. `procedure` JarvisTool for explicit
+  introspection/recall (parity with `reflex`). End-to-end: learn → use → see/curate.
+- ⚠️ All on-device-unverified (CI compile-gates only) — esp. the keyboard-flush, camera capture, and the
+  reflection/procedure behaviour with the cloud key set. **Open / steerable:** R8/minify (needs device verify);
+  emulator baseline profile (needs SDK); UI declutter (owner-driven).
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
