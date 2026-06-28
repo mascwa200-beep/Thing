@@ -134,6 +134,8 @@ object RadioController {
     /** Build (or rebuild) the ExoPlayer for [station] on the tuned [audioUrl]. Main thread only. */
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     private fun startPlayer(app: Context, station: RadioStation, audioUrl: String) {
+        // A newer tune may have superseded this one while we resolved / posted to main — don't clobber it.
+        if (_state.value.tuned?.streamUrl != station.streamUrl) return
         retries = 0
         releasePlayerInternal()
         runCatching {
@@ -166,7 +168,7 @@ object RadioController {
                         Player.STATE_READY -> _state.value = RadioState(station, Status.ON_AIR)
                         // A live stream shouldn't end; a brief drop often recovers on a re-prepare, so
                         // retry a couple of times before surfacing it.
-                        Player.STATE_ENDED -> retryOrFail(station, audioUrl, "stream ended")
+                        Player.STATE_ENDED -> retryOrFail(app, station, audioUrl, "stream ended")
                         else -> {}
                     }
                 }
@@ -175,14 +177,14 @@ object RadioController {
                     if (_state.value.tuned?.streamUrl != station.streamUrl) return
                     // Transient network errors recover on a re-prepare; permanent ones (bad status, parse,
                     // decoder) won't, so fail fast on those with a readable code.
-                    if (isTransient(error)) retryOrFail(station, audioUrl, error.errorCodeName)
-                    else _state.value = RadioState(station, Status.ERROR, error.errorCodeName)
+                    if (isTransient(error)) retryOrFail(app, station, audioUrl, error.errorCodeName)
+                    else failPermanently(app, station, error.errorCodeName)
                 }
             })
             exo.playWhenReady = true
             exo.prepare()
             player = exo
-        }.onFailure { _state.value = RadioState(station, Status.ERROR, it.message) }
+        }.onFailure { failPermanently(app, station, it.message) }
     }
 
     /** Network/IO errors are worth a retry; container-parse / decoder / bad-HTTP errors are not. */
@@ -190,9 +192,9 @@ object RadioController {
         error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
     /** Re-prepare the stream after a short delay, up to [MAX_RETRIES]; otherwise show [reason]. */
-    private fun retryOrFail(station: RadioStation, audioUrl: String, reason: String) {
+    private fun retryOrFail(app: Context, station: RadioStation, audioUrl: String, reason: String) {
         if (retries >= MAX_RETRIES) {
-            _state.value = RadioState(station, Status.ERROR, reason)
+            failPermanently(app, station, reason)
             return
         }
         retries++
@@ -203,14 +205,14 @@ object RadioController {
                 if (_state.value.tuned?.streamUrl != station.streamUrl) return@runOnMain
                 val exo = player
                 if (exo == null) {
-                    _state.value = RadioState(station, Status.ERROR, reason)
+                    failPermanently(app, station, reason)
                     return@runOnMain
                 }
                 runCatching {
                     exo.setMediaItem(MediaItem.fromUri(audioUrl))
                     exo.prepare()
                     exo.playWhenReady = true
-                }.onFailure { _state.value = RadioState(station, Status.ERROR, reason) }
+                }.onFailure { failPermanently(app, station, reason) }
             }
         }
     }
@@ -242,6 +244,17 @@ object RadioController {
                 delay(30_000)
             }
         }
+    }
+
+    /** A permanently-failed tune: keep the error visible in the UI, but release the player (freeing its
+     *  audio focus + decoder) and stop the foreground service. Nothing retries a permanent failure, so
+     *  holding either is pure leak — and it left an orphaned `mediaPlayback` service + notification up. */
+    private fun failPermanently(app: Context, station: RadioStation, reason: String?) {
+        metaJob?.cancel()
+        _nowPlaying.value = null
+        runOnMain { releasePlayerInternal() }
+        _state.value = RadioState(station, Status.ERROR, reason)
+        runCatching { app.stopService(Intent(app, RadioService::class.java)) }
     }
 
     /** Release the player — MUST be called on the main thread (ExoPlayer is single-thread-affine). */
