@@ -48,6 +48,7 @@ class JarvisWallpaperService : WallpaperService() {
         val solarWind: Double = -1.0,             // solar wind speed km/s (drives the turbine spin)
         val breadthUp: Int = 0,                   // watchlist instruments up on the day
         val breadthDown: Int = 0,                 // watchlist instruments down on the day
+        val breadthNet: Double = 0.0,             // equal-weighted average % change across the watchlist
     )
 
     private inner class ReactorEngine : WallpaperService.Engine() {
@@ -109,6 +110,7 @@ class JarvisWallpaperService : WallpaperService() {
                 var solarWind = -1.0
                 var breadthUp = 0
                 var breadthDown = 0
+                var breadthNet = 0.0
                 val markers = mutableListOf<FloatArray>()
 
                 runCatching {
@@ -128,6 +130,7 @@ class JarvisWallpaperService : WallpaperService() {
                         .filter { it.changePercent != null }
                     breadthUp = quotes.count { (it.changePercent ?: 0.0) > 0.0 }
                     breadthDown = quotes.count { (it.changePercent ?: 0.0) < 0.0 }
+                    breadthNet = if (quotes.isNotEmpty()) quotes.map { it.changePercent ?: 0.0 }.average() else 0.0
                     val sorted = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
                     sorted.take(2).forEach { q ->
                         val pct = q.changePercent ?: 0.0
@@ -175,7 +178,7 @@ class JarvisWallpaperService : WallpaperService() {
                     applicationContext.getSystemService(BatteryManager::class.java)
                         ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
                 }.getOrDefault(-1)
-                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers, solarWind, breadthUp, breadthDown)
+                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers, solarWind, breadthUp, breadthDown, breadthNet)
             }
         }
 
@@ -235,7 +238,7 @@ drawLoadingBar(canvas, p, w * 0.07f, h * 0.285f, w * 0.93f, h * 0.315f, t, if (s
 drawWorldRadar(canvas, p, cx, h * 0.49f, unit * 0.33f, t, snap.markers)
 
 // ===== Lower instruments =====
-drawBreadth(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t, snap.breadthUp, snap.breadthDown)
+drawBreadth(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t, snap.breadthUp, snap.breadthDown, snap.breadthNet)
 drawPercentGauge(canvas, p, w * 0.74f, h * 0.685f, unit * 0.135f, t, snap.battery.coerceIn(0, 100), "PWR")
 
 // ===== Live data panel =====
@@ -1203,7 +1206,7 @@ private fun drawLoadingBar(c: Canvas, p: Paint, l: Float, top: Float, r: Float, 
 }
 
 // ===== drawBreadth (market breadth: watchlist up vs down) =====
-private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, t: Long, up: Int, down: Int) {
+private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, t: Long, up: Int, down: Int, net: Double) {
     p.clearShadowLayer()
     p.shader = null
     p.pathEffect = null
@@ -1230,15 +1233,27 @@ private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, 
     lab.color = withAlpha(CYAN, 0.6f + 0.3f * breath)
     c.drawText("MKT BREADTH", cx - size * 0.42f, cy - size * 0.30f, lab)
 
-    // Big up-share percent.
+    // Big up-share percent (breadth headline).
     val pct = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
     }
-    pct.textSize = size * 0.17f
+    pct.textSize = size * 0.15f
     pct.color = withFullAlpha(if (bullish) POSITIVE else NEGATIVE)
     pct.setShadowLayer(size * 0.04f, 0f, 0f, withAlpha(if (bullish) POSITIVE else NEGATIVE, 0.6f))
-    c.drawText("$upPct%", cx, cy + size * 0.02f, pct)
+    c.drawText("$upPct%", cx, cy - size * 0.04f, pct)
     pct.clearShadowLayer()
+
+    // Net average % change across the basket (signed).
+    val netUp = net >= 0.0
+    val netStr = "NET ${if (netUp) "+" else ""}${"%.2f".format(net)}%"
+    val netPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
+    }
+    netPaint.textSize = size * 0.06f
+    netPaint.color = withFullAlpha(if (netUp) POSITIVE else NEGATIVE)
+    netPaint.setShadowLayer(size * 0.02f, 0f, 0f, withAlpha(if (netUp) POSITIVE else NEGATIVE, 0.5f))
+    c.drawText(netStr, cx, cy + size * 0.06f, netPaint)
+    netPaint.clearShadowLayer()
 
     // Split bar: green (up) | red (down).
     val barL = cx - size * 0.40f
