@@ -403,8 +403,9 @@ fun PulseApp(
     }
 }
 
-/** Non-top routes reachable directly from a launcher shortcut (see AppShortcuts). */
-private val SHORTCUT_ROUTES = setOf(Routes.NAV, Routes.SOS, Routes.QUESTS)
+/** Non-top routes reachable directly from a launcher shortcut (see AppShortcuts) or a deep link (e.g. the
+ *  wallpaper double-tap → the Reactor Dial). */
+private val SHORTCUT_ROUTES = setOf(Routes.NAV, Routes.SOS, Routes.QUESTS, Routes.DIAL)
 
 /** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH
  *  feeds (and their sub-screens) in the same Fallout look as the PIP-BOY and QUESTS tabs. */

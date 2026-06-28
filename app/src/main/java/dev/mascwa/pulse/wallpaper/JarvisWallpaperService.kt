@@ -1,16 +1,21 @@
 package dev.mascwa.pulse.wallpaper
 
+import android.app.WallpaperManager
+import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
+import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.weather.WeatherCode
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +66,34 @@ class JarvisWallpaperService : WallpaperService() {
         @Volatile private var showReadout = true
 
         private val frame = Runnable { drawFrame() }
+        private var lastTapMs = 0L
+
+        override fun onCreate(surfaceHolder: SurfaceHolder) {
+            super.onCreate(surfaceHolder)
+            // Ask the host to forward taps (delivered as onCommand COMMAND_TAP).
+            setTouchEventsEnabled(true)
+        }
+
+        // Double-tap the wallpaper → open the Reactor Dial. Best-effort: only launchers that forward
+        // COMMAND_TAP deliver this, and background-activity-launch can be restricted on some OS builds.
+        override fun onCommand(action: String?, x: Int, y: Int, z: Int, extras: Bundle?, resultRequested: Boolean): Bundle? {
+            if (action == WallpaperManager.COMMAND_TAP) {
+                val now = SystemClock.uptimeMillis()
+                if (now - lastTapMs in 1..DOUBLE_TAP_MS) {
+                    lastTapMs = 0L
+                    runCatching {
+                        startActivity(
+                            Intent(this@JarvisWallpaperService, MainActivity::class.java)
+                                .putExtra(MainActivity.EXTRA_ROUTE, Routes.DIAL)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                } else {
+                    lastTapMs = now
+                }
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested)
+        }
 
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
@@ -310,6 +343,7 @@ class JarvisWallpaperService : WallpaperService() {
 
         const val FRAME_MS = 33L            // ~30 fps while visible
         const val DATA_INTERVAL_MS = 60_000L
+        const val DOUBLE_TAP_MS = 450L      // wallpaper double-tap window → open the Reactor Dial
 
         fun withAlpha(base: Int, a: Float): Int =
             (base and 0x00FFFFFF) or (((a.coerceIn(0f, 1f) * 255f).toInt()) shl 24)
