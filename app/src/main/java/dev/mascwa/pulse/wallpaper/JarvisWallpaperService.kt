@@ -14,6 +14,7 @@ import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.MarketMood
+import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.weather.WeatherCode
@@ -156,12 +157,14 @@ class JarvisWallpaperService : WallpaperService() {
                 }
                 runCatching {
                     c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.title
-                        ?.let { out.add("NET  ${it.take(38)}" to CYAN) }
+                        ?.let { out.add("NEWS ${it.take(38)}" to CYAN) }
                 }
                 runCatching {
                     val sw = c.spaceWeatherRepository.fetch(force = false).data
                     kp = sw?.kp ?: -1.0
                     solarWind = sw?.solarWindSpeed ?: -1.0
+                    // Plain-English geomagnetic line (reuses the CI-tested explainer); amber when storming.
+                    if (kp >= 0.0) out.add("SPC  ${SpaceWeatherExplainers.kp(kp).headline}" to if (kp >= 5.0) AMBER else CYAN)
                 }
                 // Radar markers: your saved location + recent earthquakes/incidents + the active waypoint, by lat/lon.
                 runCatching {
