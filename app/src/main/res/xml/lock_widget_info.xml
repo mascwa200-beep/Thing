@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compact glanceable widget. widgetCategory includes `keyguard` so systems/launchers that support
+     lock-screen widget placement (newer Android / lock-screen widget apps) offer it there; everywhere
+     else it's a small home-screen widget. previewLayout is the same static layout (no collection), so
+     the picker can always render it. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_lock"
+    android:previewLayout="@layout/widget_lock"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen|keyguard" />

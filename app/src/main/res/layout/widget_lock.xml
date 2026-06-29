@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compact, glanceable widget intended for the lock screen (and the home screen): active objective,
+     weather, top market mover. Bright text on a dark rounded plate so it stays legible over any
+     lock-screen wallpaper. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_lock_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widget_lock_objective"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="PULSE"
+        android:textColor="#5AD1FF"
+        android:textStyle="bold"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/widget_lock_weather"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#A9B8CE"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/widget_lock_market"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#E6EFFA"
+        android:textSize="12sp" />
+</LinearLayout>

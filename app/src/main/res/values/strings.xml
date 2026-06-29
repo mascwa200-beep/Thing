@@ -44,6 +44,9 @@
     <!-- Live data-feed widget -->
     <string name="widget_feed_label">Pulse Live Feed</string>
 
+    <!-- Compact lock-screen / glanceable widget -->
+    <string name="widget_lock_label">Pulse Lock</string>
+
     <!-- Reactor Deck widget (rotary app deck) -->
     <string name="widget_deck_label">Reactor Deck</string>
     <string name="widget_deck_empty">Loading apps…</string>
