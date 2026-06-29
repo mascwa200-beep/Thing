@@ -589,6 +589,29 @@ battery, Kp). Then this batch:
   wallpaper breadth/mood density needs trimming; more trace-driven hardening of other subsystems (updater,
   RefreshWorker, nav routing).
 
+### "Blackbox" tamper-evident audit ledger — Slice 1 (this session cont.)
+Owner uploaded a second, unrelated **`com.jarvis.app`** APK (a *system-control* J.A.R.V.I.S. — **no LLM**;
+Shizuku/Sui + local VPN firewall + accessibility input-remap + device-admin console + an overlay HUD + a
+cryptographic blackbox) and asked how hard porting its features into Pulse would be. Verdict: architecture
+fits well (same Kotlin/Compose/coroutines/baseline-profile stack; its `core/module`+`core/capability`+`state`
+mirrors `AppContainer`/`core:telemetry`), but it's a compiled APK so it's *reimplement-from-design*, and the
+privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human-gate surface. Picked the
+**blackbox tamper-evident ledger** as the highest-value, CI-safe first port.
+- **Slice 1 (pure core, this slice):** `core:telemetry/AuditLedger.kt` (+ `AuditLedgerTest.kt`, 14 cases,
+  CI-gated) — a hash-chained audit log: `AuditEntry` (seq·time·`AuditEventType`·label·detail·prevHash·hash),
+  `Canonical` (length-prefixed, JSON-free, reproducible byte encoding so a hash recomputes identically),
+  `HashChain` (`append` links each entry's SHA-256 over its canonical content **+ the prior hash**; `verify`
+  walks the chain and returns the first break — seq gap / broken link / altered content — as
+  `VerificationResult`), and a pure `LedgerStore`/`InMemoryLedgerStore`. SHA-256 via `MessageDigest` (works
+  identically on the JVM unit tests and Android). Altering/reordering/deleting/inserting any past entry is
+  detected. Validated the algorithm + every test's expected break-point with an independent Python reimpl
+  (kotlinc isn't installed locally; CI is the compile gate — the standalone gradle compiler jars choke on
+  enum codegen, an env artifact, not a code issue).
+- **Next slices (planned):** Keystore-signing the head hash (EC, reuse `SecretCrypto`); an encrypted-file
+  `LedgerStore` (mirror ProfileStore's debounced flush); RFC-3161 trusted-timestamp anchoring (independent
+  proof-of-time); then **wire `DebugUploader`/self-code-apply/device-policy through it** so what Pulse already
+  records becomes signed + verifiable. A Memory/Settings surface to view + `verify()` the chain.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
