@@ -4,10 +4,10 @@
      else it's a small home-screen widget. previewLayout is the same static layout (no collection), so
      the picker can always render it. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="110dp"
-    android:minHeight="40dp"
-    android:targetCellWidth="2"
-    android:targetCellHeight="1"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_lock"
     android:previewLayout="@layout/widget_lock"

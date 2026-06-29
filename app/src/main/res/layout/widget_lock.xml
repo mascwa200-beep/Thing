@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Compact, glanceable widget intended for the lock screen (and the home screen): active objective,
-     weather, top market mover. Bright text on a dark rounded plate so it stays legible over any
-     lock-screen wallpaper. -->
+<!-- Transparent lock-screen / glanceable widget. Deliberately over-stuffed for its size: greeting,
+     objective, full weather, markets + breadth, space weather, fuel, economy, news, tasks and device.
+     No background plate — every line carries a drop shadow so it stays legible over any wallpaper.
+     Lines with no data are hidden (GONE) at render time. Resizable, so it can grow to fit it all. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_lock_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/widget_bg"
-    android:gravity="center_vertical"
-    android:padding="12dp">
+    android:padding="10dp">
 
     <TextView
-        android:id="@+id/widget_lock_objective"
+        android:id="@+id/lock_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:maxLines="1"
@@ -20,25 +19,162 @@
         android:text="PULSE"
         android:textColor="#5AD1FF"
         android:textStyle="bold"
-        android:textSize="14sp" />
+        android:textSize="13sp"
+        android:letterSpacing="0.06"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
 
     <TextView
-        android:id="@+id/widget_lock_weather"
+        android:id="@+id/lock_objective"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="3dp"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="#A9B8CE"
-        android:textSize="12sp" />
+        android:textColor="#E9F4FF"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
 
     <TextView
-        android:id="@+id/widget_lock_market"
+        android:id="@+id/lock_wx"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="3dp"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="#E6EFFA"
-        android:textSize="12sp" />
+        android:textColor="#E9F4FF"
+        android:textSize="12sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_wx2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_market"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#E9F4FF"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_breadth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_space"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_fuel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_econ"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_news"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textColor="#E9F4FF"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#C7D4E6"
+        android:textSize="11sp"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
+
+    <TextView
+        android:id="@+id/lock_sys"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#8FA3BC"
+        android:textSize="10sp"
+        android:letterSpacing="0.04"
+        android:shadowColor="#E6000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4" />
 </LinearLayout>
