@@ -19,7 +19,10 @@ import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.weather.WeatherCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,9 +35,13 @@ import kotlin.math.abs
  * top headline, the lead task, and device power/network. No background plate — every line carries a drop
  * shadow so it stays legible over any wallpaper; lines with no data hide themselves.
  *
- * Reads ONLY on-device cached data (no background GPS, nothing forced), runs off the main thread via
- * goAsync, and is fully defensive per source so a missing feed never blanks the widget. Whether it can
- * be placed on the lock screen specifically depends on the OS/launcher (declared `keyguard`-eligible).
+ * Reads ONLY on-device cached data (no background GPS, nothing forced). The data sources can still hit
+ * the network on a cold cache, so the whole batch runs in PARALLEL and is bounded by a short timeout —
+ * the widget always renders inside goAsync's window, even on a slow link or when network is denied
+ * per-app (e.g. GrapheneOS). Fully defensive per source; a missing feed only hides its own line.
+ *
+ * Whether it can be placed on the lock screen specifically depends on the OS/launcher: the AOSP launcher
+ * GrapheneOS ships doesn't expose lock-screen widget slots, so there it loads as a home-screen widget.
  */
 class LockWidgetProvider : AppWidgetProvider() {
 
@@ -101,12 +108,26 @@ class LockWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    private data class Net(
+        val wx: String = "",
+        val wx2: String = "",
+        val market: String = "",
+        val marketColor: Int = 0xFFE9F4FF.toInt(),
+        val breadth: String = "",
+        val space: String = "",
+        val fuel: String = "",
+        val econ: String = "",
+        val news: String = "",
+        val task: String = "",
+    )
+
     private suspend fun load(context: Context): Glance {
         val app = context.applicationContext as? PulseApplication ?: return Glance()
         val c = app.container
         val s = runCatching { c.settingsRepository.current() }.getOrNull()
         val ctx = runCatching { c.deviceContextProvider.snapshot() }.getOrNull()
 
+        // --- Instant fields (no I/O) ---
         val greeting = when (ctx?.dayPart) {
             DayPart.MORNING -> "GOOD MORNING"
             DayPart.AFTERNOON -> "GOOD AFTERNOON"
@@ -116,106 +137,117 @@ class LockWidgetProvider : AppWidgetProvider() {
         }
         val date = runCatching { SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date()) }.getOrNull().orEmpty()
         val header = if (date.isNotEmpty()) "$greeting · ${date.uppercase()}" else greeting
-
         val objective = s?.let { st -> st.waypoints.firstOrNull { it.id == st.activeWaypointId }?.label }
             ?.let { "◎ ${it.take(34)}" }.orEmpty()
-
-        // Weather — two dense lines.
-        var wx = ""
-        var wx2 = ""
-        runCatching {
-            val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
-            val wd = saved?.let { c.weatherRepository.fetch(it.latitude, it.longitude, it.name, force = false).data }
-            val cur = wd?.current
-            if (wd != null && cur != null) {
-                val u = wd.tempUnitSymbol
-                val feels = cur.apparentTemperature?.let { " · feels ${Formatters.number(it, 0)}$u" }.orEmpty()
-                wx = "WX  ${Formatters.number(cur.temperature, 0)}$u$feels · ${WeatherCode.describe(cur.weatherCode)}"
-                val day = wd.daily.firstOrNull()
-                val hilo = if (day?.tempMax != null && day.tempMin != null) {
-                    "↑${Formatters.number(day.tempMax, 0)}$u ↓${Formatters.number(day.tempMin, 0)}$u"
-                } else ""
-                val rh = cur.humidity?.let { "${it.toInt()}% RH" }.orEmpty()
-                val aqi = wd.airQuality?.usAqi?.let { "AQI ${it.toInt()}" }.orEmpty()
-                wx2 = listOf(hilo, rh, aqi).filter { it.isNotBlank() }.joinToString("  ·  ")
-            }
-        }
-
-        // Markets — top mover + breadth/net.
-        var market = ""
-        var marketColor = INK
-        var breadth = ""
-        runCatching {
-            val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty().filter { it.changePercent != null }
-            quotes.maxByOrNull { abs(it.changePercent ?: 0.0) }?.let { mover ->
-                val pct = mover.changePercent ?: 0.0
-                market = "MKT  ${mover.label}  ${signed(pct)}%"
-                marketColor = if (pct >= 0) POSITIVE else NEGATIVE
-            }
-            MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let { mood ->
-                breadth = "${mood.headline.uppercase()}  ·  NET ${signed(mood.netChangePct)}%  ·  ${mood.up}▲ ${mood.down}▼"
-            }
-        }
-
-        // Space weather — plain-English geomagnetic state.
-        var space = ""
-        runCatching {
-            c.spaceWeatherRepository.fetch(force = false).data?.kp?.let { kp ->
-                space = "SPC  ${SpaceWeatherExplainers.kp(kp).headline}"
-            }
-        }
-
-        // Fuel / energy benchmark.
-        var fuel = ""
-        runCatching {
-            c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
-                val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
-                val pct = b.changePercent?.let { " ${signed(it)}%" }.orEmpty()
-                fuel = "FUEL  ${b.label} $price$pct".trim()
-            }
-        }
-
-        // Economy / inflation indicator.
-        var econ = ""
-        runCatching {
-            c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
-                .firstOrNull { it.latest != null }?.let { series ->
-                    series.latest?.let { pt ->
-                        econ = "ECON  ${series.indicatorTitle.take(22)}: ${"%.1f".format(pt.value)} ${series.unit}".trim()
-                    }
-                }
-        }
-
-        // Top headline.
-        var news = ""
-        runCatching {
-            c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.let { a ->
-                news = "NEWS  ${a.source.uppercase()} · ${a.title}".take(90)
-            }
-        }
-
-        // Lead task + how many more are pending.
-        var task = ""
-        runCatching {
-            val pending = TaskBoard.pending(c.taskStore.all())
-            pending.firstOrNull()?.let {
-                val more = if (pending.size > 1) "   (+${pending.size - 1})" else ""
-                task = "TASK  ${it.title.take(34)}$more"
-            }
-        }
-
-        // Device — power + network.
         val sys = ctx?.let {
             val batt = if (it.batteryPct >= 0) "${it.batteryPct}%" else "—"
             val chg = if (it.isCharging) " ⚡" else ""
             "SYS  PWR $batt$chg  ·  ${it.network.name}"
         }.orEmpty()
 
-        return Glance(header, objective, wx, wx2, market, marketColor, breadth, space, fuel, econ, news, task, sys)
+        // --- Network-capable fields: parallel + bounded, so a cold cache / slow link / no-network
+        //     (GrapheneOS per-app denial) can't blow goAsync's window. On timeout we render what we have. ---
+        val n = withTimeoutOrNull(6_000L) {
+            coroutineScope {
+                val wxJob = async {
+                    runCatching {
+                        val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
+                        val wd = saved?.let { c.weatherRepository.fetch(it.latitude, it.longitude, it.name, force = false).data }
+                        val cur = wd?.current
+                        if (wd != null && cur != null) {
+                            val u = wd.tempUnitSymbol
+                            val feels = cur.apparentTemperature?.let { " · feels ${Formatters.number(it, 0)}$u" }.orEmpty()
+                            val wx = "WX  ${Formatters.number(cur.temperature, 0)}$u$feels · ${WeatherCode.describe(cur.weatherCode)}"
+                            val day = wd.daily.firstOrNull()
+                            val hilo = if (day?.tempMax != null && day.tempMin != null) {
+                                "↑${Formatters.number(day.tempMax, 0)}$u ↓${Formatters.number(day.tempMin, 0)}$u"
+                            } else ""
+                            val rh = cur.humidity?.let { "${it.toInt()}% RH" }.orEmpty()
+                            val aqi = wd.airQuality?.usAqi?.let { "AQI ${it.toInt()}" }.orEmpty()
+                            wx to listOf(hilo, rh, aqi).filter { it.isNotBlank() }.joinToString("  ·  ")
+                        } else "" to ""
+                    }.getOrDefault("" to "")
+                }
+                val mktJob = async {
+                    runCatching {
+                        val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty().filter { it.changePercent != null }
+                        var m = ""
+                        var col = 0xFFE9F4FF.toInt()
+                        var br = ""
+                        quotes.maxByOrNull { abs(it.changePercent ?: 0.0) }?.let { mover ->
+                            val pct = mover.changePercent ?: 0.0
+                            m = "MKT  ${mover.label}  ${signed(pct)}%"
+                            col = if (pct >= 0) POSITIVE else NEGATIVE
+                        }
+                        MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let { mood ->
+                            br = "${mood.headline.uppercase()}  ·  NET ${signed(mood.netChangePct)}%  ·  ${mood.up}▲ ${mood.down}▼"
+                        }
+                        Triple(m, col, br)
+                    }.getOrDefault(Triple("", 0xFFE9F4FF.toInt(), ""))
+                }
+                val spaceJob = async {
+                    runCatching {
+                        c.spaceWeatherRepository.fetch(force = false).data?.kp?.let { "SPC  ${SpaceWeatherExplainers.kp(it).headline}" }.orEmpty()
+                    }.getOrDefault("")
+                }
+                val fuelJob = async {
+                    runCatching {
+                        c.fuelRepository.fetch(force = false).data?.benchmarks?.firstOrNull()?.let { b ->
+                            val price = b.price?.let { "$${"%.2f".format(it)}" }.orEmpty()
+                            val pct = b.changePercent?.let { " ${signed(it)}%" }.orEmpty()
+                            "FUEL  ${b.label} $price$pct".trim()
+                        }.orEmpty()
+                    }.getOrDefault("")
+                }
+                val econJob = async {
+                    runCatching {
+                        c.economyRepository.fetchDashboard(force = false).data?.series.orEmpty()
+                            .firstOrNull { it.latest != null }?.let { series ->
+                                series.latest?.let { pt -> "ECON  ${series.indicatorTitle.take(22)}: ${"%.1f".format(pt.value)} ${series.unit}".trim() }
+                            }.orEmpty()
+                    }.getOrDefault("")
+                }
+                val newsJob = async {
+                    runCatching {
+                        c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.let { a ->
+                            "NEWS  ${a.source.uppercase()} · ${a.title}".take(90)
+                        }.orEmpty()
+                    }.getOrDefault("")
+                }
+                val taskJob = async {
+                    runCatching {
+                        val pending = TaskBoard.pending(c.taskStore.all())
+                        pending.firstOrNull()?.let {
+                            val more = if (pending.size > 1) "   (+${pending.size - 1})" else ""
+                            "TASK  ${it.title.take(34)}$more"
+                        }.orEmpty()
+                    }.getOrDefault("")
+                }
+
+                val (wx, wx2) = wxJob.await()
+                val (market, marketColor, breadth) = mktJob.await()
+                Net(wx, wx2, market, marketColor, breadth, spaceJob.await(), fuelJob.await(), econJob.await(), newsJob.await(), taskJob.await())
+            }
+        } ?: Net()
+
+        return Glance(
+            header = header,
+            objective = objective,
+            wx = n.wx,
+            wx2 = n.wx2,
+            market = n.market,
+            marketColor = n.marketColor,
+            breadth = n.breadth,
+            space = n.space,
+            fuel = n.fuel,
+            econ = n.econ,
+            news = n.news,
+            task = n.task,
+            sys = sys,
+        )
     }
 
     private companion object {
-        val INK = 0xFFE9F4FF.toInt()
         val POSITIVE = 0xFF46F9A0.toInt()
         val NEGATIVE = 0xFFFF4D6D.toInt()
         fun signed(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)
