@@ -607,10 +607,20 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   detected. Validated the algorithm + every test's expected break-point with an independent Python reimpl
   (kotlinc isn't installed locally; CI is the compile gate — the standalone gradle compiler jars choke on
   enum codegen, an env artifact, not a code issue).
-- **Next slices (planned):** Keystore-signing the head hash (EC, reuse `SecretCrypto`); an encrypted-file
-  `LedgerStore` (mirror ProfileStore's debounced flush); RFC-3161 trusted-timestamp anchoring (independent
-  proof-of-time); then **wire `DebugUploader`/self-code-apply/device-policy through it** so what Pulse already
-  records becomes signed + verifiable. A Memory/Settings surface to view + `verify()` the chain.
+- **Slice 2 (on-device persistence + first producer, this slice):** `data/blackbox/AuditLedgerStore.kt`
+  — mirrors ProfileStore (in-memory `HashChain` authoritative + Mutex + debounced flush; flush-on-stop;
+  clear-cancels-flush). Persisted blob is **encrypted at rest via `SecretCrypto`** (StrongBox/TEE AES-GCM;
+  plaintext fallback if no secure element); the chain is what proves integrity, encryption adds
+  confidentiality of the operational `detail`. **Undecodable-blob guard** (the SettingsRepository lesson):
+  a present-but-unreadable blob → keep in-memory empty AND refuse to flush, so a transient decrypt failure
+  can't erase prior evidence. Exposes `record(type,label,detail)`, `entries()`, `verify()`, `entriesFlow`
+  (for a future surface), `clear()`. Wired in `AppContainer.auditLedgerStore`; **first producer:**
+  `DebugUploader` records a `DIAGNOSTIC` `debug.upload.<kind>` entry on every successful report upload
+  (path only — no content). ⚠️ On-device-unverified (CI compile-gates only): the StrongBox round-trip,
+  the flush/persist, and the producer firing.
+- **Next slices (planned):** Keystore-**sign** the head hash (EC, reuse the Keystore) so the chain's tip is
+  non-repudiable; RFC-3161 trusted-timestamp anchoring (independent proof-of-time); wire more producers
+  (self-code-apply, device-policy, attestation); a Memory/Settings surface to view + `verify()` the chain.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
