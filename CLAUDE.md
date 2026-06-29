@@ -589,6 +589,57 @@ battery, Kp). Then this batch:
   wallpaper breadth/mood density needs trimming; more trace-driven hardening of other subsystems (updater,
   RefreshWorker, nav routing).
 
+### "Blackbox" tamper-evident audit ledger — Slice 1 (this session cont.)
+Owner uploaded a second, unrelated **`com.jarvis.app`** APK (a *system-control* J.A.R.V.I.S. — **no LLM**;
+Shizuku/Sui + local VPN firewall + accessibility input-remap + device-admin console + an overlay HUD + a
+cryptographic blackbox) and asked how hard porting its features into Pulse would be. Verdict: architecture
+fits well (same Kotlin/Compose/coroutines/baseline-profile stack; its `core/module`+`core/capability`+`state`
+mirrors `AppContainer`/`core:telemetry`), but it's a compiled APK so it's *reimplement-from-design*, and the
+privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human-gate surface. Picked the
+**blackbox tamper-evident ledger** as the highest-value, CI-safe first port.
+- **Slice 1 (pure core, this slice):** `core:telemetry/AuditLedger.kt` (+ `AuditLedgerTest.kt`, 14 cases,
+  CI-gated) — a hash-chained audit log: `AuditEntry` (seq·time·`AuditEventType`·label·detail·prevHash·hash),
+  `Canonical` (length-prefixed, JSON-free, reproducible byte encoding so a hash recomputes identically),
+  `HashChain` (`append` links each entry's SHA-256 over its canonical content **+ the prior hash**; `verify`
+  walks the chain and returns the first break — seq gap / broken link / altered content — as
+  `VerificationResult`), and a pure `LedgerStore`/`InMemoryLedgerStore`. SHA-256 via `MessageDigest` (works
+  identically on the JVM unit tests and Android). Altering/reordering/deleting/inserting any past entry is
+  detected. Validated the algorithm + every test's expected break-point with an independent Python reimpl
+  (kotlinc isn't installed locally; CI is the compile gate — the standalone gradle compiler jars choke on
+  enum codegen, an env artifact, not a code issue).
+- **Slice 2 (on-device persistence + first producer, this slice):** `data/blackbox/AuditLedgerStore.kt`
+  — mirrors ProfileStore (in-memory `HashChain` authoritative + Mutex + debounced flush; flush-on-stop;
+  clear-cancels-flush). Persisted blob is **encrypted at rest via `SecretCrypto`** (StrongBox/TEE AES-GCM;
+  plaintext fallback if no secure element); the chain is what proves integrity, encryption adds
+  confidentiality of the operational `detail`. **Undecodable-blob guard** (the SettingsRepository lesson):
+  a present-but-unreadable blob → keep in-memory empty AND refuse to flush, so a transient decrypt failure
+  can't erase prior evidence. Exposes `record(type,label,detail)`, `entries()`, `verify()`, `entriesFlow`
+  (for a future surface), `clear()`. Wired in `AppContainer.auditLedgerStore`; **first producer:**
+  `DebugUploader` records a `DIAGNOSTIC` `debug.upload.<kind>` entry on every successful report upload
+  (path only — no content). ⚠️ On-device-unverified (CI compile-gates only): the StrongBox round-trip,
+  the flush/persist, and the producer firing.
+- **Slice 3 (head-signing core, this slice):** `core:telemetry/LedgerSignature.kt` (+ `LedgerSignatureTest.kt`,
+  6 cases, CI-gated) — makes the chain's tip **non-repudiable**: an attacker who rewrites the whole chain
+  (recomputing every hash so `verify` passes) still can't forge a head signature without the private key.
+  Pure JCA core: a `LedgerSigner` interface (`sign(bytes)` / `publicKeySpki()`, on-device impl is
+  Keystore-backed) + `LedgerSignature.verify(headHashHex, sig, spki)` (EC P-256 / `SHA256withECDSA`, X.509
+  SPKI decode, fully defensive → false) + a `signHead(hex, privateKey)` test/in-process overload. JCA works
+  identically on JVM tests + Android; validated locally via a javac twin (6/6) since the standalone gradle
+  compiler can't run here.
+- **Slice 4 (on-device signing wired in, this slice):** `security/KeystoreLedgerSigner.kt` implements the
+  `LedgerSigner` interface with an **EC P-256 key in AndroidKeyStore** (StrongBox-preferred, TEE fallback —
+  mirrors `SecretCrypto`'s alias/fallback; `PURPOSE_SIGN` + `DIGEST_SHA256`; private key never leaves the
+  secure element; fully defensive → null). Wired into `AuditLedgerStore` (`AppContainer` passes it): `flush()`
+  now **signs the current head** and persists `headSig` + `publicKeySpki` (base64) in the `Stored` blob
+  (backward-compatible — added fields default null, `ignoreUnknownKeys`/`coerceInputValues` on); load captures
+  them; new **`headSignatureValid()`** verifies the persisted seal via `LedgerSignature.verify` (null when
+  unsigned/unavailable; the chain-integrity `verify()` stands alone). Now an attacker who rewrites the whole
+  chain on disk still can't forge the head signature. ⚠️ On-device-unverified (CI compile-gates only): the
+  Keystore keygen (esp. StrongBox path), sign-on-flush, and verify-on-load.
+- **Next slices (planned):** RFC-3161 trusted-timestamp anchoring (independent proof-of-time; pure ASN.1
+  core + an Android TSA fetch); more producers (self-code-apply, device-policy, attestation); a Memory/Settings
+  surface to view the chain + show `verify()` / `headSignatureValid()`.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

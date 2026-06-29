@@ -35,6 +35,7 @@ class DebugUploader(
     private val crashReporter: CrashReporter,
     private val usage: UsageRepository,
     private val settings: SettingsRepository,
+    private val audit: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
 ) {
     private val appContext = context.applicationContext
     private val dir = File(appContext.filesDir, "diagnostics").apply { runCatching { mkdirs() } }
@@ -127,6 +128,8 @@ class DebugUploader(
         }
         val path = "reports/" + System.currentTimeMillis() + "-" + kind + ".md"
         repo.putFile(path, bundle, "debug: $kind report", BRANCH, null)
+        // Audit the upload in the tamper-evident ledger (the path is a branch path, not content).
+        audit.record(dev.mascwa.pulse.core.telemetry.AuditEventType.DIAGNOSTIC, "debug.upload.$kind", path)
         Result.Ok(path) as Result
     }.getOrElse { Result.Failed(it.message ?: "upload failed") }
 

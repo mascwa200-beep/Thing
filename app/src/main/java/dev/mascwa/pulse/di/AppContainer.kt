@@ -290,9 +290,16 @@ class AppContainer(private val appContext: Context) {
     }
     /** Uploads scrubbed crash/debug reports to the repo's `debug-reports` branch (opt-in) for remote
      *  reading. Reuses the repo-scoped GitHub token; never touches main/dev or opens a PR. */
+    /** Tamper-evident audit ledger (blackbox). Producers record into it; verify() re-checks the chain.
+     *  The head is signed by a secure-element EC key so the chain's tip is non-repudiable. */
+    val auditLedgerStore: dev.mascwa.pulse.data.blackbox.AuditLedgerStore by lazy {
+        dev.mascwa.pulse.data.blackbox.AuditLedgerStore(
+            appContext, json, dev.mascwa.pulse.security.KeystoreLedgerSigner(),
+        )
+    }
     val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {
         dev.mascwa.pulse.data.diagnostics.DebugUploader(
-            appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository,
+            appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository, auditLedgerStore,
         )
     }
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
