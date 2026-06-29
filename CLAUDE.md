@@ -626,10 +626,19 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   SPKI decode, fully defensive → false) + a `signHead(hex, privateKey)` test/in-process overload. JCA works
   identically on JVM tests + Android; validated locally via a javac twin (6/6) since the standalone gradle
   compiler can't run here.
-- **Next slices (planned):** `security/KeystoreLedgerSigner` (EC key in AndroidKeyStore, StrongBox-preferred)
-  + wire it into `AuditLedgerStore` (persist + check the head signature on flush/load); RFC-3161
-  trusted-timestamp anchoring (independent proof-of-time); more producers (self-code-apply, device-policy,
-  attestation); a Memory/Settings surface to view + `verify()` the chain.
+- **Slice 4 (on-device signing wired in, this slice):** `security/KeystoreLedgerSigner.kt` implements the
+  `LedgerSigner` interface with an **EC P-256 key in AndroidKeyStore** (StrongBox-preferred, TEE fallback —
+  mirrors `SecretCrypto`'s alias/fallback; `PURPOSE_SIGN` + `DIGEST_SHA256`; private key never leaves the
+  secure element; fully defensive → null). Wired into `AuditLedgerStore` (`AppContainer` passes it): `flush()`
+  now **signs the current head** and persists `headSig` + `publicKeySpki` (base64) in the `Stored` blob
+  (backward-compatible — added fields default null, `ignoreUnknownKeys`/`coerceInputValues` on); load captures
+  them; new **`headSignatureValid()`** verifies the persisted seal via `LedgerSignature.verify` (null when
+  unsigned/unavailable; the chain-integrity `verify()` stands alone). Now an attacker who rewrites the whole
+  chain on disk still can't forge the head signature. ⚠️ On-device-unverified (CI compile-gates only): the
+  Keystore keygen (esp. StrongBox path), sign-on-flush, and verify-on-load.
+- **Next slices (planned):** RFC-3161 trusted-timestamp anchoring (independent proof-of-time; pure ASN.1
+  core + an Android TSA fetch); more producers (self-code-apply, device-policy, attestation); a Memory/Settings
+  surface to view the chain + show `verify()` / `headSignatureValid()`.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.blackbox
 
 import android.content.Context
+import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -9,6 +10,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.AuditEntry
 import dev.mascwa.pulse.core.telemetry.AuditEventType
 import dev.mascwa.pulse.core.telemetry.HashChain
+import dev.mascwa.pulse.core.telemetry.LedgerSignature
+import dev.mascwa.pulse.core.telemetry.LedgerSigner
 import dev.mascwa.pulse.core.telemetry.VerificationResult
 import dev.mascwa.pulse.security.SecretCrypto
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +52,7 @@ private val Context.blackboxDataStore: DataStore<Preferences> by preferencesData
 class AuditLedgerStore(
     private val context: Context,
     private val json: Json,
+    private val signer: LedgerSigner? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     @Serializable
@@ -63,7 +67,11 @@ class AuditLedgerStore(
     )
 
     @Serializable
-    private data class Stored(val entries: List<StoredEntry> = emptyList())
+    private data class Stored(
+        val entries: List<StoredEntry> = emptyList(),
+        val headSig: String? = null,       // base64 ECDSA signature over the persisted head hash
+        val publicKeySpki: String? = null, // base64 X.509 SPKI of the signing key
+    )
 
     private val prefsKey = stringPreferencesKey("ledger_blob")
     private val mutex = Mutex()
@@ -71,6 +79,12 @@ class AuditLedgerStore(
 
     /** A stored blob existed but couldn't be read — refuse to flush so we never clobber the evidence. */
     private var corrupt = false
+
+    // The head signature as it was last persisted — checked by [headSignatureValid] (proof the on-disk
+    // chain was sealed by this device's key). Captured at load; the live head is re-signed on each flush.
+    private var loadedHeadHash: String? = null
+    private var loadedHeadSig: ByteArray? = null
+    private var loadedSpki: ByteArray? = null
 
     private val _entriesFlow = MutableStateFlow<List<AuditEntry>>(emptyList())
     /** Live, newest-handling-left-to-the-UI view of the chain (for a future Memory/Settings surface). */
@@ -100,7 +114,11 @@ class AuditLedgerStore(
                     corrupt = true // blob present but unreadable → preserve, don't overwrite
                     HashChain()
                 } else {
-                    HashChain(parsed.entries.map { it.domain() })
+                    HashChain(parsed.entries.map { it.domain() }).also { c ->
+                        loadedHeadHash = c.headHash
+                        loadedHeadSig = parsed.headSig?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
+                        loadedSpki = parsed.publicKeySpki?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
+                    }
                 }
             }
             loaded.also { chain = it; _entriesFlow.value = it.entries() }
@@ -129,12 +147,28 @@ class AuditLedgerStore(
     /** Re-verify the whole chain (incl. the on-disk round-trip): is it intact, and if not, where did it break? */
     suspend fun verify(): VerificationResult = ensureLoaded().let { mutex.withLock { it.verify() } }
 
+    /**
+     * Whether the persisted head signature verifies against the persisted key — proof the chain on disk
+     * was sealed by this device's secure-element key. `null` when nothing is signed yet (empty ledger, or
+     * signing unavailable on this device); the [verify] chain-integrity check stands on its own regardless.
+     */
+    suspend fun headSignatureValid(): Boolean? {
+        ensureLoaded()
+        val head = loadedHeadHash ?: return null
+        val sig = loadedHeadSig ?: return null
+        val spki = loadedSpki ?: return null
+        return LedgerSignature.verify(head, sig, spki)
+    }
+
     /** Wipe the ledger (user-initiated). Cancels any buffered flush and clears the corrupt guard. */
     suspend fun clear() {
         flushJobCancel()
         mutex.withLock {
             chain = HashChain()
             corrupt = false
+            loadedHeadHash = null
+            loadedHeadSig = null
+            loadedSpki = null
             _entriesFlow.value = emptyList()
         }
         runCatching { context.blackboxDataStore.edit { it.remove(prefsKey) } }
@@ -163,11 +197,25 @@ class AuditLedgerStore(
 
     private suspend fun flush() {
         if (corrupt) return // never overwrite an undecodable blob
-        val snapshot = mutex.withLock { chain?.let { c -> Stored(c.entries().map { it.stored() }) } } ?: return
+        // Snapshot the head + entries under the lock; sign outside it (Keystore I/O is comparatively slow).
+        val (head, storedEntries) = mutex.withLock {
+            chain?.let { c -> c.headHash to c.entries().map { it.stored() } }
+        } ?: return
+        val sig = signer?.sign(LedgerSignature.headBytes(head))
+        val spki = sig?.let { signer?.publicKeySpki() } // only emit a key when we actually produced a signature
+        val snapshot = Stored(
+            entries = storedEntries,
+            headSig = sig?.let { Base64.encodeToString(it, Base64.NO_WRAP) },
+            publicKeySpki = spki?.let { Base64.encodeToString(it, Base64.NO_WRAP) },
+        )
         runCatching {
             val plain = json.encodeToString(Stored.serializer(), snapshot)
             val blob = SecretCrypto.encrypt(plain) ?: plain // plaintext fallback if no secure element
             context.blackboxDataStore.edit { it[prefsKey] = blob }
+            // Track what's now sealed on disk so headSignatureValid() reflects the latest flush this session.
+            loadedHeadHash = head
+            loadedHeadSig = sig
+            loadedSpki = spki
         }
     }
 
