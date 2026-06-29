@@ -295,6 +295,7 @@ class AppContainer(private val appContext: Context) {
     val auditLedgerStore: dev.mascwa.pulse.data.blackbox.AuditLedgerStore by lazy {
         dev.mascwa.pulse.data.blackbox.AuditLedgerStore(
             appContext, json, dev.mascwa.pulse.security.KeystoreLedgerSigner(),
+            dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
     val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {

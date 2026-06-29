@@ -647,10 +647,20 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   real response in the test; local kotlinc frontend type-checked it (a `ByteArray.ifEmpty` non-existence bug
   was caught + fixed). A trusted timestamp proves the ledger head existed at/before the TSA's clock, so a
   forger can't back-date a rewritten chain.
-- **Next slices (planned):** the Android TSA fetch (OkHttp POST `application/timestamp-query`, opt-in,
-  best-effort) wired into `AuditLedgerStore` to anchor the head + persist the token; more producers
-  (self-code-apply, device-policy, attestation); a Memory/Settings surface to view the chain + show
-  `verify()` / `headSignatureValid()` / the latest anchor time.
+- **Slice 5b (Android TSA fetch wired in, this slice):** `data/blackbox/TsaClient.kt` POSTs the
+  `Rfc3161.buildTimeStampQuery` (over SHA-256 of the head-hash ASCII) to a public **HTTPS** TSA
+  (`freetsa.org` primary, `timestamp.sectigo.com` fallback — DigiCert is http-only; HTTPS dodges the
+  cleartext-egress guard) via a new `HttpClient.postBinary`, parses with `Rfc3161.parseResponse`, returns
+  the granted token (fully defensive → null). Wired into `AuditLedgerStore.anchorHead()` (opt-in,
+  network-bound, call from a UI control / worker — never per-record): stamps the current head, persists the
+  token (base64) + `genTimeMs` + which head it covers in the `Stored` blob (3 new defaulted fields,
+  backward-compatible); load captures them; `anchorTimeMs()`/`anchoredHead()` surface it. Validated the
+  fetch+parse end-to-end against real **freetsa + sectigo + DigiCert** responses (all granted, genTime
+  parsed) via the Python twin. `AppContainer` passes `TsaClient(http)`. ⚠️ On-device-unverified: the live
+  fetch + the anchor persistence.
+- **Next slices (planned):** a trigger for `anchorHead()` (Settings "Anchor now" button and/or a periodic
+  RefreshWorker pass); more producers (self-code-apply via `ApprovalGate`, device-policy, attestation); a
+  Memory/Settings surface to view the chain + show `verify()` / `headSignatureValid()` / the latest anchor time.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
