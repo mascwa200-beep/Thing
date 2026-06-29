@@ -618,9 +618,18 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   `DebugUploader` records a `DIAGNOSTIC` `debug.upload.<kind>` entry on every successful report upload
   (path only — no content). ⚠️ On-device-unverified (CI compile-gates only): the StrongBox round-trip,
   the flush/persist, and the producer firing.
-- **Next slices (planned):** Keystore-**sign** the head hash (EC, reuse the Keystore) so the chain's tip is
-  non-repudiable; RFC-3161 trusted-timestamp anchoring (independent proof-of-time); wire more producers
-  (self-code-apply, device-policy, attestation); a Memory/Settings surface to view + `verify()` the chain.
+- **Slice 3 (head-signing core, this slice):** `core:telemetry/LedgerSignature.kt` (+ `LedgerSignatureTest.kt`,
+  6 cases, CI-gated) — makes the chain's tip **non-repudiable**: an attacker who rewrites the whole chain
+  (recomputing every hash so `verify` passes) still can't forge a head signature without the private key.
+  Pure JCA core: a `LedgerSigner` interface (`sign(bytes)` / `publicKeySpki()`, on-device impl is
+  Keystore-backed) + `LedgerSignature.verify(headHashHex, sig, spki)` (EC P-256 / `SHA256withECDSA`, X.509
+  SPKI decode, fully defensive → false) + a `signHead(hex, privateKey)` test/in-process overload. JCA works
+  identically on JVM tests + Android; validated locally via a javac twin (6/6) since the standalone gradle
+  compiler can't run here.
+- **Next slices (planned):** `security/KeystoreLedgerSigner` (EC key in AndroidKeyStore, StrongBox-preferred)
+  + wire it into `AuditLedgerStore` (persist + check the head signature on flush/load); RFC-3161
+  trusted-timestamp anchoring (independent proof-of-time); more producers (self-code-apply, device-policy,
+  attestation); a Memory/Settings surface to view + `verify()` the chain.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
