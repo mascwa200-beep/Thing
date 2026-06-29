@@ -672,9 +672,16 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   (USB/camera/wipe) via `SettingsViewModel.recordDevicePolicy`. With slice 2's `DebugUploader` producer, the
   ledger now captures the three sensitive event classes. ⚠️ On-device-unverified (CI compile-gates only): the
   Memory section render, the anchor/verify/clear actions, and the producers firing.
-- **Blackbox ledger: COMPLETE** (observe → hash-chain → sign → anchor → surface). Possible follow-ups: a
-  periodic `RefreshWorker` anchor pass; an attestation producer; porting more `com.jarvis.app` subsystems
-  (overlay HUD spec, egress kill-switch, input-remap) — all owner-gated (privileged / protected-path surface).
+- **Blackbox ledger: COMPLETE** (observe → hash-chain → sign → anchor → surface).
+- **Follow-up — periodic auto-anchor (this slice):** `RefreshWorker` gained an opt-in, ~daily, best-effort
+  anchor pass: when `AppSettings.autoAnchorLedger` is on and the head advanced since the last anchor
+  (`headHash()` ≠ `anchoredHead()`, ≠ genesis), it calls `auditLedgerStore.anchorHead()` and stamps
+  `lastLedgerAnchorMs` (throttle mirrors the curiosity pass). New store accessor `headHash()`. Settings →
+  Storage toggle **"Auto-anchor audit ledger"** (default OFF — it's an external TSA call, sends only a hash;
+  the manual ANCHOR NOW button is always available). So the head gets independently timestamped between
+  manual anchors. ⚠️ On-device-unverified (CI compile-gates only). Remaining follow-ups: an attestation
+  producer; porting more `com.jarvis.app` subsystems (overlay HUD spec, egress kill-switch, input-remap) —
+  all owner-gated (privileged / protected-path surface).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

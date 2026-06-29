@@ -156,6 +156,9 @@ class AuditLedgerStore(
     /** Current chain entries (oldest first). */
     suspend fun entries(): List<AuditEntry> = ensureLoaded().let { mutex.withLock { it.entries() } }
 
+    /** The current chain head hash (genesis for an empty ledger) — lets a caller see if it needs anchoring. */
+    suspend fun headHash(): String = ensureLoaded().let { mutex.withLock { it.headHash } }
+
     /** Re-verify the whole chain (incl. the on-disk round-trip): is it intact, and if not, where did it break? */
     suspend fun verify(): VerificationResult = ensureLoaded().let { mutex.withLock { it.verify() } }
 

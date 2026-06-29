@@ -998,6 +998,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             "self-code & device-policy events). On-device only.",
                         onClick = { vm.clearAuditLedger() },
                     )
+                    PrefSwitch(
+                        "Auto-anchor audit ledger",
+                        "Periodically timestamp the tamper-evident log to a public RFC-3161 authority " +
+                            "(independent proof-of-time). Sends only a hash, ~once a day. Off = anchor " +
+                            "manually from J.A.R.V.I.S. → Memory.",
+                        s.autoAnchorLedger,
+                    ) { v -> vm.update { it.copy(autoAnchorLedger = v) } }
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",

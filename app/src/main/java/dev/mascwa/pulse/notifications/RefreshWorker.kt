@@ -119,6 +119,26 @@ class RefreshWorker(
             runCatching { container.reflectionEngine.reflectIfDue() }
         }
 
+        // --- Blackbox ledger: periodic RFC-3161 anchor (opt-in, throttled ~daily, best-effort) so the head
+        // is independently timestamped between manual anchors. Sends only a hash to a public TSA. ---
+        if (settings.autoAnchorLedger) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val anchorIntervalMs = 24L * 60 * 60 * 1000 // at most once a day
+                if (now - settings.lastLedgerAnchorMs >= anchorIntervalMs) {
+                    val head = container.auditLedgerStore.headHash()
+                    // Only anchor when the head advanced since the last anchor (don't re-stamp the same head).
+                    if (head != dev.mascwa.pulse.core.telemetry.HashChain.GENESIS_HASH &&
+                        head != container.auditLedgerStore.anchoredHead()
+                    ) {
+                        if (container.auditLedgerStore.anchorHead()) {
+                            container.settingsRepository.update { it.copy(lastLedgerAnchorMs = now) }
+                        }
+                    }
+                }
+            }
+        }
+
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         runCatching {
             val now = System.currentTimeMillis()
