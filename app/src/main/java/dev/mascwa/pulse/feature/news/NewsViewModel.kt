@@ -18,7 +18,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class NewsTab(val key: String, val title: String, val category: NewsCategory?, val custom: Boolean)
+data class NewsTab(
+    val key: String,
+    val title: String,
+    val category: NewsCategory?,
+    val custom: Boolean,
+    val breaking: Boolean = false,
+)
 
 data class NewsUiState(
     val tabs: List<NewsTab> = emptyList(),
@@ -47,6 +53,8 @@ class NewsViewModel(
                 .distinctUntilChanged()
                 .collect { hasCustom ->
                     val tabs = buildList {
+                        // Breaking leads: the freshest stories across topics, "just reported on".
+                        add(NewsTab("BREAKING", "Breaking", null, custom = false, breaking = true))
                         NewsCategory.entries.forEach { add(NewsTab(it.name, it.title, it, false)) }
                         if (hasCustom) add(NewsTab("MYFEEDS", "My Feeds", null, true))
                     }
@@ -92,9 +100,11 @@ class NewsViewModel(
         }
     }
 
-    private suspend fun fetchTab(tab: NewsTab, force: Boolean): Fetched<List<Article>> =
-        if (tab.custom) repo.fetchCustomFeeds(force)
-        else repo.fetchCategory(tab.category!!, force)
+    private suspend fun fetchTab(tab: NewsTab, force: Boolean): Fetched<List<Article>> = when {
+        tab.breaking -> repo.fetchBreaking(force)
+        tab.custom -> repo.fetchCustomFeeds(force)
+        else -> repo.fetchCategory(tab.category!!, force)
+    }
 
     fun refresh() {
         if (_state.value.searchMode) search(_state.value.query)

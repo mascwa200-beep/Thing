@@ -4,6 +4,7 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.network.RssItem
 import dev.mascwa.pulse.core.network.RssParser
+import dev.mascwa.pulse.core.telemetry.BreakingNews
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.settings.CustomFeed
@@ -23,6 +24,11 @@ class NewsRepository(
     private val settings: SettingsRepository,
 ) {
     private val ttl = 15 * 60 * 1000L // 15 minutes
+    private val breakingTtl = 5 * 60 * 1000L // the Breaking feed stays fresher than the per-category feeds
+    // High-signal categories pooled into the Breaking feed (each reuses its own category cache).
+    private val breakingSources = listOf(
+        NewsCategory.TOP, NewsCategory.WORLD, NewsCategory.POLITICS, NewsCategory.BUSINESS, NewsCategory.TECH,
+    )
 
     suspend fun fetchCategory(category: NewsCategory, force: Boolean): Fetched<List<Article>> {
         val s = settings.current()
@@ -37,6 +43,43 @@ class NewsRepository(
             val fresh = loadCategory(category, s)
             cache.write(key, fresh, ListSerializer(Article.serializer()))
             Fetched(fresh, false)
+        } catch (e: Exception) {
+            cache.readAny(key, ListSerializer(Article.serializer()))?.let {
+                return Fetched(it.value, true, it.savedAtMs)
+            }
+            throw e
+        }
+    }
+
+    /**
+     * The BREAKING feed: "the stuff that just got reported on." Aggregates a few high-signal categories,
+     * dedupes, sorts newest-first and keeps the freshest (recent-window, falling back to the freshest
+     * overall when it's a quiet stretch) via the CI-tested [BreakingNews] core. Each source reuses its own
+     * 15-min category cache, so this is cheap once any of those tabs has loaded; the merged result has its
+     * own short TTL. Per-source failures are tolerated (a flaky topic never blanks Breaking).
+     */
+    suspend fun fetchBreaking(force: Boolean): Fetched<List<Article>> {
+        val key = "news_breaking"
+        if (!force) {
+            cache.read(key, breakingTtl, ListSerializer(Article.serializer()))?.let {
+                return Fetched(it.value, true, it.savedAtMs)
+            }
+        }
+        return try {
+            val pooled = coroutineScope {
+                breakingSources.map { cat ->
+                    async { runCatching { fetchCategory(cat, force).data }.getOrDefault(emptyList()) }
+                }.flatMap { it.await() }
+            }
+            val selected = BreakingNews.select(
+                pooled,
+                System.currentTimeMillis(),
+                key = { it.url.ifBlank { it.title } },
+                timeMs = { it.publishedEpochMs },
+            )
+            if (selected.isEmpty()) throw java.io.IOException("No breaking stories right now — pull to refresh.")
+            cache.write(key, selected, ListSerializer(Article.serializer()))
+            Fetched(selected, false)
         } catch (e: Exception) {
             cache.readAny(key, ListSerializer(Article.serializer()))?.let {
                 return Fetched(it.value, true, it.savedAtMs)
