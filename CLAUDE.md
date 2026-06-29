@@ -636,9 +636,21 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   unsigned/unavailable; the chain-integrity `verify()` stands alone). Now an attacker who rewrites the whole
   chain on disk still can't forge the head signature. ⚠️ On-device-unverified (CI compile-gates only): the
   Keystore keygen (esp. StrongBox path), sign-on-flush, and verify-on-load.
-- **Next slices (planned):** RFC-3161 trusted-timestamp anchoring (independent proof-of-time; pure ASN.1
-  core + an Android TSA fetch); more producers (self-code-apply, device-policy, attestation); a Memory/Settings
-  surface to view the chain + show `verify()` / `headSignatureValid()`.
+- **Slice 5 (RFC-3161 timestamp core, this slice):** `core:telemetry/Rfc3161.kt` (+ `Rfc3161Test.kt`, 6
+  cases, CI-gated) — pure proof-of-time core. `buildTimeStampQuery(imprint, nonce, certReq)` hand-encodes
+  the DER `TimeStampReq` over a SHA-256 imprint (**byte-for-byte equal to `openssl ts -query`**, validated
+  locally); `parseResponse(der)` defensively reads the `TimeStampResp` → PKI status + the raw
+  `timeStampToken` (persisted verbatim as the anchor) + `genTimeMs` (the TSTInfo `genTime`, found by a TLV
+  scan that descends into the CMS `eContent` OCTET STRING — the one non-obvious bit, caught against a real
+  token). DER built/parsed by hand, mirroring `HardwareAttestation`; no Android types. Validated end-to-end
+  against a **real DigiCert TSA** (POST → granted, genTime parsed exactly) via a Python twin + the embedded
+  real response in the test; local kotlinc frontend type-checked it (a `ByteArray.ifEmpty` non-existence bug
+  was caught + fixed). A trusted timestamp proves the ledger head existed at/before the TSA's clock, so a
+  forger can't back-date a rewritten chain.
+- **Next slices (planned):** the Android TSA fetch (OkHttp POST `application/timestamp-query`, opt-in,
+  best-effort) wired into `AuditLedgerStore` to anchor the head + persist the token; more producers
+  (self-code-apply, device-policy, attestation); a Memory/Settings surface to view the chain + show
+  `verify()` / `headSignatureValid()` / the latest anchor time.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
