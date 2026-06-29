@@ -658,9 +658,23 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   fetch+parse end-to-end against real **freetsa + sectigo + DigiCert** responses (all granted, genTime
   parsed) via the Python twin. `AppContainer` passes `TsaClient(http)`. ⚠️ On-device-unverified: the live
   fetch + the anchor persistence.
-- **Next slices (planned):** a trigger for `anchorHead()` (Settings "Anchor now" button and/or a periodic
-  RefreshWorker pass); more producers (self-code-apply via `ApprovalGate`, device-policy, attestation); a
-  Memory/Settings surface to view the chain + show `verify()` / `headSignatureValid()` / the latest anchor time.
+- **Slice 6 (surface + trigger + producers — completes the port, this slice):** the ledger is now visible,
+  verifiable and fed by real events. **Memory screen** gained an **AUDIT LEDGER** section (mirrors PROFILE/
+  TASKS/EPISODIC): a one-line integrity readout (`verify()` intact/broken · `headSignatureValid()` ·
+  last-anchor relative time), the entries newest-first (`#seq · type · relative-time · label · detail`), an
+  **ANCHOR NOW** button (`anchorLedger()` → `anchorHead()`, best-effort) and **CLEAR LEDGER**. Deliberately
+  **no per-entry FORGET** — append-only/tamper-evident, removing one entry would break the chain. `JarvisMemoryViewModel`
+  gained `auditLedger` (+ `audit`/`ledgerStatus`/`anchoring` flows, `refreshLedgerStatus`/`anchorLedger`/
+  `clearAuditLedger`); factory wires `c.auditLedgerStore`. **Settings → Storage** gained **"Verify audit
+  ledger"** (inline status via `SettingsViewModel.verifyAuditLedger`) + **"Clear audit ledger"**. **Producers:**
+  `AppContainer.commitCode` records a `SELF_CODE` `selfcode.apply` entry on every human-gated self-code apply
+  (goal + PR, no secrets); the Settings device-owner toggles record `SECURITY` `devicepolicy.<action>` entries
+  (USB/camera/wipe) via `SettingsViewModel.recordDevicePolicy`. With slice 2's `DebugUploader` producer, the
+  ledger now captures the three sensitive event classes. ⚠️ On-device-unverified (CI compile-gates only): the
+  Memory section render, the anchor/verify/clear actions, and the producers firing.
+- **Blackbox ledger: COMPLETE** (observe → hash-chain → sign → anchor → surface). Possible follow-ups: a
+  periodic `RefreshWorker` anchor pass; an attestation producer; porting more `com.jarvis.app` subsystems
+  (overlay HUD spec, egress kill-switch, input-remap) — all owner-gated (privileged / protected-path surface).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

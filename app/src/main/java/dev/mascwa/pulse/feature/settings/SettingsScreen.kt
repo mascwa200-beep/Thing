@@ -254,13 +254,23 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         else "This device can't disable USB data signaling.",
                         checked = !usbDataOn,
                         enabled = isOwner && usbSupported,
-                    ) { disable -> if (dpc.setUsbDataEnabled(!disable)) usbDataOn = !disable }
+                    ) { disable ->
+                        if (dpc.setUsbDataEnabled(!disable)) {
+                            usbDataOn = !disable
+                            vm.recordDevicePolicy("usb_data", "enabled=${!disable}")
+                        }
+                    }
                     PrefSwitch(
                         "Disable all cameras",
                         "Hardware-disable every camera, device-wide, until turned back off here.",
                         checked = camDisabled,
                         enabled = isOwner,
-                    ) { disable -> if (dpc.setCameraDisabled(disable)) camDisabled = disable }
+                    ) { disable ->
+                        if (dpc.setCameraDisabled(disable)) {
+                            camDisabled = disable
+                            vm.recordDevicePolicy("camera_disabled", "$disable")
+                        }
+                    }
                     SingleChoiceRow(
                         "Wipe after failed unlocks",
                         wipeN,
@@ -270,7 +280,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         wipeError = false
                         if (n <= 0) {
                             // Disarming is safe — apply immediately.
-                            if (dpc.setMaxFailedForWipe(0)) wipeN = 0 else wipeError = true
+                            if (dpc.setMaxFailedForWipe(0)) {
+                                wipeN = 0
+                                vm.recordDevicePolicy("wipe_after_fails", "0")
+                            } else wipeError = true
                         } else {
                             // Arming a factory-reset is irreversible-on-trigger — confirm first.
                             pendingWipe = n
@@ -306,7 +319,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         },
                         confirmButton = {
                             TextButton(onClick = {
-                                if (dpc.setMaxFailedForWipe(n)) { wipeN = n; wipeError = false } else wipeError = true
+                                if (dpc.setMaxFailedForWipe(n)) {
+                                    wipeN = n; wipeError = false
+                                    vm.recordDevicePolicy("wipe_after_fails", "$n")
+                                } else wipeError = true
                                 pendingWipe = null
                             }) { Text("Arm wipe") }
                         },
@@ -920,6 +936,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
 
             // ----- Storage & about -----
             item {
+                val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
@@ -967,6 +984,19 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         subtitle = "Forget the timestamped moments J.A.R.V.I.S. remembers from your " +
                             "conversations (recalled by recency, importance & relevance). On-device only.",
                         onClick = { vm.clearMemoryStream() },
+                    )
+                    PrefClickable(
+                        "Verify audit ledger",
+                        value = ledgerStatus,
+                        subtitle = "Re-check the tamper-evident blackbox log — chain integrity, hardware " +
+                            "signature & last trusted-time anchor. View the full log in J.A.R.V.I.S. → Memory.",
+                        onClick = { vm.verifyAuditLedger() },
+                    )
+                    PrefClickable(
+                        "Clear audit ledger",
+                        subtitle = "Wipe the on-device tamper-evident audit log (diagnostic uploads, " +
+                            "self-code & device-policy events). On-device only.",
+                        onClick = { vm.clearAuditLedger() },
                     )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)

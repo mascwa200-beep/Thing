@@ -390,6 +390,14 @@ class AppContainer(private val appContext: Context) {
                             dev.mascwa.pulse.data.jarvis.db.NoteSource.INFERENCE,
                         )
                     }
+                    // Record the human-gated self-mod in the tamper-evident ledger (goal + which PR; no secrets).
+                    runCatching {
+                        auditLedgerStore.record(
+                            dev.mascwa.pulse.core.telemetry.AuditEventType.SELF_CODE,
+                            "selfcode.apply",
+                            "${action.payload["goal"].orEmpty().take(120)} — ${result.substringBefore(" — ").take(40)}",
+                        )
+                    }
                 }
                 result
             },

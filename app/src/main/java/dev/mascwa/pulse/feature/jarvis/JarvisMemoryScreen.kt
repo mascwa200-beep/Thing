@@ -55,6 +55,9 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
     val interests by vm.interests.collectAsState()
     val findings by vm.findings.collectAsState()
     val procedures by vm.procedures.collectAsState()
+    val audit by vm.audit.collectAsState()
+    val ledgerStatus by vm.ledgerStatus.collectAsState()
+    val anchoring by vm.anchoring.collectAsState()
 
     PulseScaffold(
         title = "MEMORY",
@@ -205,6 +208,56 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
                 item {
                     MemButton("CLEAR PROCEDURES", c.magenta) { vm.clearProcedures() }
                 }
+            }
+
+            item { SectionBar("AUDIT LEDGER · ${audit.size}") }
+            item {
+                Text(
+                    ledgerStatus.ifBlank {
+                        "A tamper-evident log of sensitive events (diagnostic uploads, self-code, device " +
+                            "policy). Each entry is hash-chained to the last and the head is hardware-signed, " +
+                            "so any edit, reorder or deletion is detectable. Append-only — entries can't be " +
+                            "removed individually (that would break the chain); you can anchor it to trusted " +
+                            "time or clear the whole log."
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                )
+            }
+            items(audit, key = { it.seq }) { entry ->
+                AuditCard(entry, c)
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MemButton(if (anchoring) "ANCHORING…" else "ANCHOR NOW", c.accent) {
+                        if (!anchoring) vm.anchorLedger()
+                    }
+                    if (audit.isNotEmpty()) {
+                        MemButton("CLEAR LEDGER", c.magenta) { vm.clearAuditLedger() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuditCard(entry: dev.mascwa.pulse.core.telemetry.AuditEntry, c: NightwirePalette) {
+    NeonPanel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("#${entry.seq}", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                Text(
+                    entry.type.name,
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.accent,
+                )
+                Text(
+                    DateUtils.getRelativeTimeSpanString(entry.timeMs).toString(),
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+                )
+            }
+            Text(entry.label, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            if (entry.detail.isNotBlank()) {
+                Text(entry.detail, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
             }
         }
     }
