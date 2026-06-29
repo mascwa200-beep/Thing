@@ -164,6 +164,20 @@
                 android:resource="@xml/pulse_widget_info" />
         </receiver>
 
+        <!-- Compact glanceable widget, lock-screen-eligible (widgetCategory keyguard|home_screen):
+             active objective + weather + top market mover. -->
+        <receiver
+            android:name=".widget.LockWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_lock_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/lock_widget_info" />
+        </receiver>
+
         <!-- Live data-feed widget: auto-cycles markets · fuel · economy/inflation · news. Backed by a
              RemoteViewsService collection; the AdapterViewFlipper auto-advances. -->
         <receiver
