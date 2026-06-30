@@ -298,6 +298,13 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
+    /** Runtime self-test for the blackbox ledger (chain · secure-element signature · encryption · TSA). */
+    val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest by lazy {
+        dev.mascwa.pulse.data.blackbox.LedgerSelfTest(
+            dev.mascwa.pulse.security.KeystoreLedgerSigner(),
+            dev.mascwa.pulse.data.blackbox.TsaClient(http),
+        )
+    }
     val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {
         dev.mascwa.pulse.data.diagnostics.DebugUploader(
             appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository, auditLedgerStore,

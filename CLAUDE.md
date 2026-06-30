@@ -679,9 +679,17 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   `lastLedgerAnchorMs` (throttle mirrors the curiosity pass). New store accessor `headHash()`. Settings →
   Storage toggle **"Auto-anchor audit ledger"** (default OFF — it's an external TSA call, sends only a hash;
   the manual ANCHOR NOW button is always available). So the head gets independently timestamped between
-  manual anchors. ⚠️ On-device-unverified (CI compile-gates only). Remaining follow-ups: an attestation
-  producer; porting more `com.jarvis.app` subsystems (overlay HUD spec, egress kill-switch, input-remap) —
-  all owner-gated (privileged / protected-path surface).
+  manual anchors. ⚠️ On-device-unverified (CI compile-gates only).
+- **Follow-up — runtime self-test (this slice, owner asked "how do I know it worked?"):**
+  `data/blackbox/LedgerSelfTest.kt` exercises the ledger's REAL machinery on-device and reports each check
+  pass/fail — (1) hash chain links + tamper detection, (2) the secure-element EC key signs a head + verifies
+  (forgery rejected), (3) `SecretCrypto` encrypt→decrypt round-trip, (4) a live RFC-3161 TSA fetch (bounded
+  by `withTimeoutOrNull(20s)`). Runs against throwaway data + the real crypto/network components, so it
+  never touches the live ledger. `AppContainer.ledgerSelfTest`; `SettingsViewModel.runLedgerSelfTest()` →
+  `ledgerSelfTestResult` flow; **Settings → Storage → "Run ledger self-test"** (shows "Running…", then an
+  AlertDialog listing ✓/✗ per check + detail). This is the owner's on-device verification path for everything
+  CI can only compile-gate. Remaining follow-ups: an attestation producer; porting more `com.jarvis.app`
+  subsystems (overlay HUD spec, egress kill-switch, input-remap) — all owner-gated (privileged surface).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

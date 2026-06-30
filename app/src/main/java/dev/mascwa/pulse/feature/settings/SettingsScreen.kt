@@ -937,6 +937,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             // ----- Storage & about -----
             item {
                 val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
+                val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
+                val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
@@ -1005,6 +1007,15 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             "manually from J.A.R.V.I.S. → Memory.",
                         s.autoAnchorLedger,
                     ) { v -> vm.update { it.copy(autoAnchorLedger = v) } }
+                    PrefClickable(
+                        "Run ledger self-test",
+                        value = if (selfTestRunning) "Running…" else null,
+                        subtitle = "Exercise the blackbox ledger on this device — the hash chain, the " +
+                            "secure-element signature, at-rest encryption and a live trusted-timestamp " +
+                            "fetch — and report what actually works. Uses throwaway data; doesn't touch " +
+                            "your real log.",
+                        onClick = { vm.runLedgerSelfTest() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
@@ -1014,6 +1025,39 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),
+                    )
+                }
+                selfTest?.let { report ->
+                    AlertDialog(
+                        onDismissRequest = { vm.dismissLedgerSelfTest() },
+                        title = {
+                            Text(
+                                if (report.allOk) "Ledger self-test — all ${report.total} passed"
+                                else "Ledger self-test — ${report.passed}/${report.total} passed",
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                report.checks.forEach { ch ->
+                                    Column {
+                                        Text(
+                                            "${if (ch.ok) "✓" else "✗"}  ${ch.name}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (ch.ok) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.error,
+                                        )
+                                        Text(
+                                            ch.detail,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { vm.dismissLedgerSelfTest() }) { Text("Done") }
+                        },
                     )
                 }
             }

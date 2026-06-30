@@ -39,7 +39,30 @@ class SettingsViewModel(
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
     private val wifi: dev.mascwa.pulse.security.WifiPolicyController,
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
+    private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
 ) : ViewModel() {
+
+    private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
+    /** Result of the ledger self-test (null = not run / dialog dismissed). */
+    val ledgerSelfTestResult: StateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?> = _selfTest
+
+    private val _selfTestRunning = MutableStateFlow(false)
+    val ledgerSelfTestRunning: StateFlow<Boolean> = _selfTestRunning
+
+    /** Run the on-device ledger self-test (chain · secure-element signature · encryption · live TSA). */
+    fun runLedgerSelfTest() {
+        if (_selfTestRunning.value) return
+        viewModelScope.launch {
+            _selfTestRunning.value = true
+            _selfTest.value = runCatching { ledgerSelfTest.run() }.getOrNull()
+            _selfTestRunning.value = false
+        }
+    }
+
+    /** Dismiss the self-test result dialog. */
+    fun dismissLedgerSelfTest() {
+        _selfTest.value = null
+    }
 
     private val _selfCode = MutableStateFlow("")
     /** Status line for the self-coding "propose a change" action. */
