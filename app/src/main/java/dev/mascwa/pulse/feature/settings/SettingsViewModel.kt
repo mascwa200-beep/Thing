@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.settings
 
 import android.content.Context
 import android.net.Uri
+import android.text.format.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.cache.DiskCache
@@ -37,11 +38,73 @@ class SettingsViewModel(
     private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
     private val wifi: dev.mascwa.pulse.security.WifiPolicyController,
+    private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
+    private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
 ) : ViewModel() {
+
+    private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
+    /** Result of the ledger self-test (null = not run / dialog dismissed). */
+    val ledgerSelfTestResult: StateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?> = _selfTest
+
+    private val _selfTestRunning = MutableStateFlow(false)
+    val ledgerSelfTestRunning: StateFlow<Boolean> = _selfTestRunning
+
+    /** Run the on-device ledger self-test (chain · secure-element signature · encryption · live TSA). */
+    fun runLedgerSelfTest() {
+        if (_selfTestRunning.value) return
+        viewModelScope.launch {
+            _selfTestRunning.value = true
+            _selfTest.value = runCatching { ledgerSelfTest.run() }.getOrNull()
+            _selfTestRunning.value = false
+        }
+    }
+
+    /** Dismiss the self-test result dialog. */
+    fun dismissLedgerSelfTest() {
+        _selfTest.value = null
+    }
 
     private val _selfCode = MutableStateFlow("")
     /** Status line for the self-coding "propose a change" action. */
     val selfCodeStatus: StateFlow<String> = _selfCode
+
+    private val _auditLedger = MutableStateFlow("Tap to verify")
+    /** Inline integrity readout for the Settings "Verify audit ledger" control. */
+    val auditLedgerStatus: StateFlow<String> = _auditLedger
+
+    /** Re-check the audit ledger's chain integrity + head signature + last anchor, shown inline. */
+    fun verifyAuditLedger() {
+        _auditLedger.value = "Verifying…"
+        viewModelScope.launch {
+            _auditLedger.value = runCatching {
+                val v = auditLedger.verify()
+                val signed = auditLedger.headSignatureValid()
+                val anchorMs = auditLedger.anchorTimeMs()
+                buildList {
+                    add(if (v.valid) "Intact" else "BROKEN at #${v.brokenAtSeq}")
+                    when (signed) {
+                        true -> add("signed")
+                        false -> add("bad signature")
+                        null -> {}
+                    }
+                    if (anchorMs != null) add("anchored ${DateUtils.getRelativeTimeSpanString(anchorMs)}")
+                }.joinToString(" · ")
+            }.getOrDefault("Couldn't verify")
+        }
+    }
+
+    /** Record a device-policy change in the tamper-evident ledger (content-free label + detail). */
+    fun recordDevicePolicy(action: String, detail: String) {
+        runCatching { auditLedger.record(dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY, "devicepolicy.$action", detail) }
+    }
+
+    /** Wipe the audit ledger. */
+    fun clearAuditLedger() {
+        viewModelScope.launch {
+            runCatching { auditLedger.clear() }
+            _auditLedger.value = "Cleared"
+        }
+    }
 
     /** Have J.A.R.V.I.S. draft a change for [goal] and stage it for approval. [path] is optional — leave
      *  it blank and J.A.R.V.I.S. picks the file itself; approve the staged change to open the PR. */

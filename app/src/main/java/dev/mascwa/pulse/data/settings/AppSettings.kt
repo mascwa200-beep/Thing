@@ -391,6 +391,10 @@ data class AppSettings(
     val curiosityIndex: Int = 0,
     /** When the Mnemosyne reflection pass last ran (throttle). */
     val lastReflectionMs: Long = 0,
+    /** Periodically anchor the blackbox audit ledger head to a public RFC-3161 TSA (opt-in; sends only a
+     *  hash). [lastLedgerAnchorMs] throttles it (~daily). The manual "Anchor now" button is always available. */
+    val autoAnchorLedger: Boolean = false,
+    val lastLedgerAnchorMs: Long = 0,
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
      *  Adjustable via the Settings slider; clamped to a sane range where used. */
     val tickerSpeed: Float = 1.0f,

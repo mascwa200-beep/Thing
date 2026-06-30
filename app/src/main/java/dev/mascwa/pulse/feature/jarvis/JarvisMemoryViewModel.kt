@@ -1,12 +1,15 @@
 package dev.mascwa.pulse.feature.jarvis
 
+import android.text.format.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.AuditEntry
 import dev.mascwa.pulse.core.telemetry.Memory
 import dev.mascwa.pulse.core.telemetry.Procedure
 import dev.mascwa.pulse.core.telemetry.ProfileEntry
 import dev.mascwa.pulse.core.telemetry.Task
 import dev.mascwa.pulse.core.telemetry.TaskBoard
+import dev.mascwa.pulse.data.blackbox.AuditLedgerStore
 import dev.mascwa.pulse.data.findings.Finding
 import dev.mascwa.pulse.data.findings.FindingStore
 import dev.mascwa.pulse.data.interests.Interest
@@ -17,8 +20,10 @@ import dev.mascwa.pulse.data.memory.MemoryStreamStore
 import dev.mascwa.pulse.data.procedure.ProcedureStore
 import dev.mascwa.pulse.data.profile.ProfileStore
 import dev.mascwa.pulse.data.tasks.TaskStore
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,6 +41,7 @@ class JarvisMemoryViewModel(
     private val interestStore: InterestStore,
     private val findingStore: FindingStore,
     private val procedureStore: ProcedureStore,
+    private val auditLedger: AuditLedgerStore,
 ) : ViewModel() {
 
     val notes: StateFlow<List<AgentNoteEntity>> =
@@ -65,6 +71,19 @@ class JarvisMemoryViewModel(
         .map { list -> list.sortedWith(compareByDescending<Procedure> { it.reliability }.thenByDescending { it.lastUsedMs }) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The tamper-evident audit ledger, newest entry first. Append-only — entries can't be individually
+     *  forgotten (that would break the hash chain); the whole ledger can be cleared. */
+    val audit: StateFlow<List<AuditEntry>> = auditLedger.entriesFlow
+        .map { list -> list.sortedByDescending { it.seq } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _ledgerStatus = MutableStateFlow("")
+    /** A one-line integrity readout: chain intact/broken · hardware-signed · last anchor time. */
+    val ledgerStatus: StateFlow<String> = _ledgerStatus.asStateFlow()
+
+    private val _anchoring = MutableStateFlow(false)
+    val anchoring: StateFlow<Boolean> = _anchoring.asStateFlow()
+
     init {
         // Trigger a load so the profile + task + episodic + interest + finding flows populate on open.
         viewModelScope.launch { runCatching { profileStore.all() } }
@@ -73,6 +92,48 @@ class JarvisMemoryViewModel(
         viewModelScope.launch { runCatching { interestStore.all() } }
         viewModelScope.launch { runCatching { findingStore.load() } }
         viewModelScope.launch { runCatching { procedureStore.all() } }
+        viewModelScope.launch { runCatching { auditLedger.entries() } }
+        refreshLedgerStatus()
+    }
+
+    /** Recompute the audit-ledger integrity readout (chain verify + head signature + anchor time). */
+    fun refreshLedgerStatus() {
+        viewModelScope.launch {
+            val line = runCatching {
+                val v = auditLedger.verify()
+                val signed = auditLedger.headSignatureValid()
+                val anchorMs = auditLedger.anchorTimeMs()
+                buildList {
+                    add(if (v.valid) "chain intact" else "⚠ BROKEN at #${v.brokenAtSeq}")
+                    when (signed) {
+                        true -> add("hardware-signed")
+                        false -> add("⚠ signature invalid")
+                        null -> {}
+                    }
+                    if (anchorMs != null) add("anchored ${DateUtils.getRelativeTimeSpanString(anchorMs)}")
+                }.joinToString(" · ")
+            }.getOrDefault("")
+            _ledgerStatus.value = line
+        }
+    }
+
+    /** Anchor the current head to a trusted timestamp authority (best-effort, network-bound). */
+    fun anchorLedger() {
+        if (_anchoring.value) return
+        viewModelScope.launch {
+            _anchoring.value = true
+            runCatching { auditLedger.anchorHead() }
+            _anchoring.value = false
+            refreshLedgerStatus()
+        }
+    }
+
+    /** Wipe the whole audit ledger (the only curation the chain allows). */
+    fun clearAuditLedger() {
+        viewModelScope.launch {
+            runCatching { auditLedger.clear() }
+            refreshLedgerStatus()
+        }
     }
 
     fun edit(id: Long, text: String) {

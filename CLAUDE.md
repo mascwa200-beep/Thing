@@ -636,9 +636,60 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   unsigned/unavailable; the chain-integrity `verify()` stands alone). Now an attacker who rewrites the whole
   chain on disk still can't forge the head signature. ⚠️ On-device-unverified (CI compile-gates only): the
   Keystore keygen (esp. StrongBox path), sign-on-flush, and verify-on-load.
-- **Next slices (planned):** RFC-3161 trusted-timestamp anchoring (independent proof-of-time; pure ASN.1
-  core + an Android TSA fetch); more producers (self-code-apply, device-policy, attestation); a Memory/Settings
-  surface to view the chain + show `verify()` / `headSignatureValid()`.
+- **Slice 5 (RFC-3161 timestamp core, this slice):** `core:telemetry/Rfc3161.kt` (+ `Rfc3161Test.kt`, 6
+  cases, CI-gated) — pure proof-of-time core. `buildTimeStampQuery(imprint, nonce, certReq)` hand-encodes
+  the DER `TimeStampReq` over a SHA-256 imprint (**byte-for-byte equal to `openssl ts -query`**, validated
+  locally); `parseResponse(der)` defensively reads the `TimeStampResp` → PKI status + the raw
+  `timeStampToken` (persisted verbatim as the anchor) + `genTimeMs` (the TSTInfo `genTime`, found by a TLV
+  scan that descends into the CMS `eContent` OCTET STRING — the one non-obvious bit, caught against a real
+  token). DER built/parsed by hand, mirroring `HardwareAttestation`; no Android types. Validated end-to-end
+  against a **real DigiCert TSA** (POST → granted, genTime parsed exactly) via a Python twin + the embedded
+  real response in the test; local kotlinc frontend type-checked it (a `ByteArray.ifEmpty` non-existence bug
+  was caught + fixed). A trusted timestamp proves the ledger head existed at/before the TSA's clock, so a
+  forger can't back-date a rewritten chain.
+- **Slice 5b (Android TSA fetch wired in, this slice):** `data/blackbox/TsaClient.kt` POSTs the
+  `Rfc3161.buildTimeStampQuery` (over SHA-256 of the head-hash ASCII) to a public **HTTPS** TSA
+  (`freetsa.org` primary, `timestamp.sectigo.com` fallback — DigiCert is http-only; HTTPS dodges the
+  cleartext-egress guard) via a new `HttpClient.postBinary`, parses with `Rfc3161.parseResponse`, returns
+  the granted token (fully defensive → null). Wired into `AuditLedgerStore.anchorHead()` (opt-in,
+  network-bound, call from a UI control / worker — never per-record): stamps the current head, persists the
+  token (base64) + `genTimeMs` + which head it covers in the `Stored` blob (3 new defaulted fields,
+  backward-compatible); load captures them; `anchorTimeMs()`/`anchoredHead()` surface it. Validated the
+  fetch+parse end-to-end against real **freetsa + sectigo + DigiCert** responses (all granted, genTime
+  parsed) via the Python twin. `AppContainer` passes `TsaClient(http)`. ⚠️ On-device-unverified: the live
+  fetch + the anchor persistence.
+- **Slice 6 (surface + trigger + producers — completes the port, this slice):** the ledger is now visible,
+  verifiable and fed by real events. **Memory screen** gained an **AUDIT LEDGER** section (mirrors PROFILE/
+  TASKS/EPISODIC): a one-line integrity readout (`verify()` intact/broken · `headSignatureValid()` ·
+  last-anchor relative time), the entries newest-first (`#seq · type · relative-time · label · detail`), an
+  **ANCHOR NOW** button (`anchorLedger()` → `anchorHead()`, best-effort) and **CLEAR LEDGER**. Deliberately
+  **no per-entry FORGET** — append-only/tamper-evident, removing one entry would break the chain. `JarvisMemoryViewModel`
+  gained `auditLedger` (+ `audit`/`ledgerStatus`/`anchoring` flows, `refreshLedgerStatus`/`anchorLedger`/
+  `clearAuditLedger`); factory wires `c.auditLedgerStore`. **Settings → Storage** gained **"Verify audit
+  ledger"** (inline status via `SettingsViewModel.verifyAuditLedger`) + **"Clear audit ledger"**. **Producers:**
+  `AppContainer.commitCode` records a `SELF_CODE` `selfcode.apply` entry on every human-gated self-code apply
+  (goal + PR, no secrets); the Settings device-owner toggles record `SECURITY` `devicepolicy.<action>` entries
+  (USB/camera/wipe) via `SettingsViewModel.recordDevicePolicy`. With slice 2's `DebugUploader` producer, the
+  ledger now captures the three sensitive event classes. ⚠️ On-device-unverified (CI compile-gates only): the
+  Memory section render, the anchor/verify/clear actions, and the producers firing.
+- **Blackbox ledger: COMPLETE** (observe → hash-chain → sign → anchor → surface).
+- **Follow-up — periodic auto-anchor (this slice):** `RefreshWorker` gained an opt-in, ~daily, best-effort
+  anchor pass: when `AppSettings.autoAnchorLedger` is on and the head advanced since the last anchor
+  (`headHash()` ≠ `anchoredHead()`, ≠ genesis), it calls `auditLedgerStore.anchorHead()` and stamps
+  `lastLedgerAnchorMs` (throttle mirrors the curiosity pass). New store accessor `headHash()`. Settings →
+  Storage toggle **"Auto-anchor audit ledger"** (default OFF — it's an external TSA call, sends only a hash;
+  the manual ANCHOR NOW button is always available). So the head gets independently timestamped between
+  manual anchors. ⚠️ On-device-unverified (CI compile-gates only).
+- **Follow-up — runtime self-test (this slice, owner asked "how do I know it worked?"):**
+  `data/blackbox/LedgerSelfTest.kt` exercises the ledger's REAL machinery on-device and reports each check
+  pass/fail — (1) hash chain links + tamper detection, (2) the secure-element EC key signs a head + verifies
+  (forgery rejected), (3) `SecretCrypto` encrypt→decrypt round-trip, (4) a live RFC-3161 TSA fetch (bounded
+  by `withTimeoutOrNull(20s)`). Runs against throwaway data + the real crypto/network components, so it
+  never touches the live ledger. `AppContainer.ledgerSelfTest`; `SettingsViewModel.runLedgerSelfTest()` →
+  `ledgerSelfTestResult` flow; **Settings → Storage → "Run ledger self-test"** (shows "Running…", then an
+  AlertDialog listing ✓/✗ per check + detail). This is the owner's on-device verification path for everything
+  CI can only compile-gate. Remaining follow-ups: an attestation producer; porting more `com.jarvis.app`
+  subsystems (overlay HUD spec, egress kill-switch, input-remap) — all owner-gated (privileged surface).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

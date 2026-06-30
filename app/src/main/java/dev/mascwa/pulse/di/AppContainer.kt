@@ -295,6 +295,14 @@ class AppContainer(private val appContext: Context) {
     val auditLedgerStore: dev.mascwa.pulse.data.blackbox.AuditLedgerStore by lazy {
         dev.mascwa.pulse.data.blackbox.AuditLedgerStore(
             appContext, json, dev.mascwa.pulse.security.KeystoreLedgerSigner(),
+            dev.mascwa.pulse.data.blackbox.TsaClient(http),
+        )
+    }
+    /** Runtime self-test for the blackbox ledger (chain · secure-element signature · encryption · TSA). */
+    val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest by lazy {
+        dev.mascwa.pulse.data.blackbox.LedgerSelfTest(
+            dev.mascwa.pulse.security.KeystoreLedgerSigner(),
+            dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
     val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {
@@ -387,6 +395,14 @@ class AppContainer(private val appContext: Context) {
                         jarvisMemory.remember(
                             "Self-code change you shipped: ${action.payload["goal"].orEmpty().take(120)} — $result",
                             dev.mascwa.pulse.data.jarvis.db.NoteSource.INFERENCE,
+                        )
+                    }
+                    // Record the human-gated self-mod in the tamper-evident ledger (goal + which PR; no secrets).
+                    runCatching {
+                        auditLedgerStore.record(
+                            dev.mascwa.pulse.core.telemetry.AuditEventType.SELF_CODE,
+                            "selfcode.apply",
+                            "${action.payload["goal"].orEmpty().take(120)} — ${result.substringBefore(" — ").take(40)}",
                         )
                     }
                 }

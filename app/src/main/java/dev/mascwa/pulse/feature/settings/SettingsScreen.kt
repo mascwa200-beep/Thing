@@ -254,13 +254,23 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         else "This device can't disable USB data signaling.",
                         checked = !usbDataOn,
                         enabled = isOwner && usbSupported,
-                    ) { disable -> if (dpc.setUsbDataEnabled(!disable)) usbDataOn = !disable }
+                    ) { disable ->
+                        if (dpc.setUsbDataEnabled(!disable)) {
+                            usbDataOn = !disable
+                            vm.recordDevicePolicy("usb_data", "enabled=${!disable}")
+                        }
+                    }
                     PrefSwitch(
                         "Disable all cameras",
                         "Hardware-disable every camera, device-wide, until turned back off here.",
                         checked = camDisabled,
                         enabled = isOwner,
-                    ) { disable -> if (dpc.setCameraDisabled(disable)) camDisabled = disable }
+                    ) { disable ->
+                        if (dpc.setCameraDisabled(disable)) {
+                            camDisabled = disable
+                            vm.recordDevicePolicy("camera_disabled", "$disable")
+                        }
+                    }
                     SingleChoiceRow(
                         "Wipe after failed unlocks",
                         wipeN,
@@ -270,7 +280,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         wipeError = false
                         if (n <= 0) {
                             // Disarming is safe — apply immediately.
-                            if (dpc.setMaxFailedForWipe(0)) wipeN = 0 else wipeError = true
+                            if (dpc.setMaxFailedForWipe(0)) {
+                                wipeN = 0
+                                vm.recordDevicePolicy("wipe_after_fails", "0")
+                            } else wipeError = true
                         } else {
                             // Arming a factory-reset is irreversible-on-trigger — confirm first.
                             pendingWipe = n
@@ -306,7 +319,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         },
                         confirmButton = {
                             TextButton(onClick = {
-                                if (dpc.setMaxFailedForWipe(n)) { wipeN = n; wipeError = false } else wipeError = true
+                                if (dpc.setMaxFailedForWipe(n)) {
+                                    wipeN = n; wipeError = false
+                                    vm.recordDevicePolicy("wipe_after_fails", "$n")
+                                } else wipeError = true
                                 pendingWipe = null
                             }) { Text("Arm wipe") }
                         },
@@ -920,6 +936,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
 
             // ----- Storage & about -----
             item {
+                val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
+                val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
+                val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
@@ -968,6 +987,35 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             "conversations (recalled by recency, importance & relevance). On-device only.",
                         onClick = { vm.clearMemoryStream() },
                     )
+                    PrefClickable(
+                        "Verify audit ledger",
+                        value = ledgerStatus,
+                        subtitle = "Re-check the tamper-evident blackbox log — chain integrity, hardware " +
+                            "signature & last trusted-time anchor. View the full log in J.A.R.V.I.S. → Memory.",
+                        onClick = { vm.verifyAuditLedger() },
+                    )
+                    PrefClickable(
+                        "Clear audit ledger",
+                        subtitle = "Wipe the on-device tamper-evident audit log (diagnostic uploads, " +
+                            "self-code & device-policy events). On-device only.",
+                        onClick = { vm.clearAuditLedger() },
+                    )
+                    PrefSwitch(
+                        "Auto-anchor audit ledger",
+                        "Periodically timestamp the tamper-evident log to a public RFC-3161 authority " +
+                            "(independent proof-of-time). Sends only a hash, ~once a day. Off = anchor " +
+                            "manually from J.A.R.V.I.S. → Memory.",
+                        s.autoAnchorLedger,
+                    ) { v -> vm.update { it.copy(autoAnchorLedger = v) } }
+                    PrefClickable(
+                        "Run ledger self-test",
+                        value = if (selfTestRunning) "Running…" else null,
+                        subtitle = "Exercise the blackbox ledger on this device — the hash chain, the " +
+                            "secure-element signature, at-rest encryption and a live trusted-timestamp " +
+                            "fetch — and report what actually works. Uses throwaway data; doesn't touch " +
+                            "your real log.",
+                        onClick = { vm.runLedgerSelfTest() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
@@ -977,6 +1025,39 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),
+                    )
+                }
+                selfTest?.let { report ->
+                    AlertDialog(
+                        onDismissRequest = { vm.dismissLedgerSelfTest() },
+                        title = {
+                            Text(
+                                if (report.allOk) "Ledger self-test — all ${report.total} passed"
+                                else "Ledger self-test — ${report.passed}/${report.total} passed",
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                report.checks.forEach { ch ->
+                                    Column {
+                                        Text(
+                                            "${if (ch.ok) "✓" else "✗"}  ${ch.name}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (ch.ok) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.error,
+                                        )
+                                        Text(
+                                            ch.detail,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { vm.dismissLedgerSelfTest() }) { Text("Done") }
+                        },
                     )
                 }
             }

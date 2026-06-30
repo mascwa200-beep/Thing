@@ -7,8 +7,10 @@ import kotlinx.serialization.json.Json
 import okhttp3.Cache
 import okhttp3.Dispatcher
 import okhttp3.Headers.Companion.toHeaders
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -81,6 +83,25 @@ class HttpClient(
                     total to type
                 }
             }
+        }
+    }
+
+    /** POST raw [body] with [contentType], returning the response bytes. Throws on non-2xx / transport failure. */
+    suspend fun postBinary(
+        url: String,
+        body: ByteArray,
+        contentType: String,
+        accept: String = "*/*",
+        headers: Map<String, String> = emptyMap(),
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .headers((mapOf("User-Agent" to USER_AGENT, "Accept" to accept) + headers).toHeaders())
+            .post(body.toRequestBody(contentType.toMediaType()))
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
+            resp.body?.bytes() ?: throw IOException("empty response")
         }
     }
 

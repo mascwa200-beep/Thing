@@ -53,6 +53,7 @@ class AuditLedgerStore(
     private val context: Context,
     private val json: Json,
     private val signer: LedgerSigner? = null,
+    private val tsa: TsaClient? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     @Serializable
@@ -69,8 +70,11 @@ class AuditLedgerStore(
     @Serializable
     private data class Stored(
         val entries: List<StoredEntry> = emptyList(),
-        val headSig: String? = null,       // base64 ECDSA signature over the persisted head hash
-        val publicKeySpki: String? = null, // base64 X.509 SPKI of the signing key
+        val headSig: String? = null,        // base64 ECDSA signature over the persisted head hash
+        val publicKeySpki: String? = null,  // base64 X.509 SPKI of the signing key
+        val anchorTokenB64: String? = null, // base64 RFC-3161 timeStampToken anchoring a head
+        val anchorGenTimeMs: Long? = null,  // the TSA's asserted time for that anchor
+        val anchorHeadHash: String? = null, // which head hash the anchor covers
     )
 
     private val prefsKey = stringPreferencesKey("ledger_blob")
@@ -85,6 +89,11 @@ class AuditLedgerStore(
     private var loadedHeadHash: String? = null
     private var loadedHeadSig: ByteArray? = null
     private var loadedSpki: ByteArray? = null
+
+    // The latest RFC-3161 anchor (independent proof-of-time for a head). Persisted + surfaced for the UI.
+    private var anchorTokenB64: String? = null
+    private var anchorGenTimeMs: Long? = null
+    private var anchorHeadHash: String? = null
 
     private val _entriesFlow = MutableStateFlow<List<AuditEntry>>(emptyList())
     /** Live, newest-handling-left-to-the-UI view of the chain (for a future Memory/Settings surface). */
@@ -118,6 +127,9 @@ class AuditLedgerStore(
                         loadedHeadHash = c.headHash
                         loadedHeadSig = parsed.headSig?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
                         loadedSpki = parsed.publicKeySpki?.let { runCatching { Base64.decode(it, Base64.NO_WRAP) }.getOrNull() }
+                        anchorTokenB64 = parsed.anchorTokenB64
+                        anchorGenTimeMs = parsed.anchorGenTimeMs
+                        anchorHeadHash = parsed.anchorHeadHash
                     }
                 }
             }
@@ -144,6 +156,9 @@ class AuditLedgerStore(
     /** Current chain entries (oldest first). */
     suspend fun entries(): List<AuditEntry> = ensureLoaded().let { mutex.withLock { it.entries() } }
 
+    /** The current chain head hash (genesis for an empty ledger) — lets a caller see if it needs anchoring. */
+    suspend fun headHash(): String = ensureLoaded().let { mutex.withLock { it.headHash } }
+
     /** Re-verify the whole chain (incl. the on-disk round-trip): is it intact, and if not, where did it break? */
     suspend fun verify(): VerificationResult = ensureLoaded().let { mutex.withLock { it.verify() } }
 
@@ -160,6 +175,40 @@ class AuditLedgerStore(
         return LedgerSignature.verify(head, sig, spki)
     }
 
+    /**
+     * Best-effort: anchor the current chain head to a trusted timestamp authority (RFC-3161) and persist
+     * the token + asserted time. Independent proof the chain existed at/before the TSA's clock. Opt-in and
+     * fully defensive — returns false (no-op) when no [TsaClient] is configured, the chain is empty, or the
+     * TSA can't be reached. Network-bound; call sparingly (a UI control / periodic worker), not per-record.
+     */
+    suspend fun anchorHead(): Boolean {
+        val client = tsa ?: return false
+        ensureLoaded()
+        val head = mutex.withLock { chain?.headHash } ?: return false
+        if (head == HashChain.GENESIS_HASH) return false // nothing recorded yet
+        val token = client.stamp(head.toByteArray(Charsets.US_ASCII)) ?: return false
+        val tokenB64 = token.token?.let { Base64.encodeToString(it, Base64.NO_WRAP) } ?: return false
+        mutex.withLock {
+            anchorTokenB64 = tokenB64
+            anchorGenTimeMs = token.genTimeMs
+            anchorHeadHash = head
+        }
+        flushNow() // persist the anchor immediately
+        return true
+    }
+
+    /** The TSA-asserted time (epoch millis) of the latest anchor, or null if never anchored. */
+    suspend fun anchorTimeMs(): Long? {
+        ensureLoaded()
+        return anchorGenTimeMs
+    }
+
+    /** The head hash the latest anchor covers (so the UI can tell if it's still current), or null. */
+    suspend fun anchoredHead(): String? {
+        ensureLoaded()
+        return anchorHeadHash
+    }
+
     /** Wipe the ledger (user-initiated). Cancels any buffered flush and clears the corrupt guard. */
     suspend fun clear() {
         flushJobCancel()
@@ -169,6 +218,9 @@ class AuditLedgerStore(
             loadedHeadHash = null
             loadedHeadSig = null
             loadedSpki = null
+            anchorTokenB64 = null
+            anchorGenTimeMs = null
+            anchorHeadHash = null
             _entriesFlow.value = emptyList()
         }
         runCatching { context.blackboxDataStore.edit { it.remove(prefsKey) } }
@@ -195,18 +247,32 @@ class AuditLedgerStore(
         }
     }
 
+    private class FlushSnap(
+        val head: String,
+        val entries: List<StoredEntry>,
+        val anchorTokenB64: String?,
+        val anchorGenTimeMs: Long?,
+        val anchorHeadHash: String?,
+    )
+
     private suspend fun flush() {
         if (corrupt) return // never overwrite an undecodable blob
-        // Snapshot the head + entries under the lock; sign outside it (Keystore I/O is comparatively slow).
-        val (head, storedEntries) = mutex.withLock {
-            chain?.let { c -> c.headHash to c.entries().map { it.stored() } }
+        // Snapshot head + entries + anchor under the lock; sign outside it (Keystore I/O is comparatively slow).
+        val snap = mutex.withLock {
+            chain?.let { c ->
+                FlushSnap(c.headHash, c.entries().map { it.stored() }, anchorTokenB64, anchorGenTimeMs, anchorHeadHash)
+            }
         } ?: return
+        val head = snap.head
         val sig = signer?.sign(LedgerSignature.headBytes(head))
         val spki = sig?.let { signer?.publicKeySpki() } // only emit a key when we actually produced a signature
         val snapshot = Stored(
-            entries = storedEntries,
+            entries = snap.entries,
             headSig = sig?.let { Base64.encodeToString(it, Base64.NO_WRAP) },
             publicKeySpki = spki?.let { Base64.encodeToString(it, Base64.NO_WRAP) },
+            anchorTokenB64 = snap.anchorTokenB64,
+            anchorGenTimeMs = snap.anchorGenTimeMs,
+            anchorHeadHash = snap.anchorHeadHash,
         )
         runCatching {
             val plain = json.encodeToString(Stored.serializer(), snapshot)
