@@ -395,6 +395,11 @@ data class AppSettings(
      *  hash). [lastLedgerAnchorMs] throttles it (~daily). The manual "Anchor now" button is always available. */
     val autoAnchorLedger: Boolean = false,
     val lastLedgerAnchorMs: Long = 0,
+    /** Dedupe for the hardware-attestation audit producer: the last recorded posture signature (record
+     *  only when it CHANGES — a posture change is a real security event; identical verdicts are noise) and
+     *  when the probe last ran (so the worker doesn't re-attest on every tick). */
+    val lastAttestationSig: String = "",
+    val lastAttestationCheckMs: Long = 0,
     /** Auto-scroll speed multiplier for the home markets ticker (1.0 = default; higher = faster).
      *  Adjustable via the Settings slider; clamped to a sane range where used. */
     val tickerSpeed: Float = 1.0f,

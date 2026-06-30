@@ -688,8 +688,22 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   never touches the live ledger. `AppContainer.ledgerSelfTest`; `SettingsViewModel.runLedgerSelfTest()` →
   `ledgerSelfTestResult` flow; **Settings → Storage → "Run ledger self-test"** (shows "Running…", then an
   AlertDialog listing ✓/✗ per check + detail). This is the owner's on-device verification path for everything
-  CI can only compile-gate. Remaining follow-ups: an attestation producer; porting more `com.jarvis.app`
-  subsystems (overlay HUD spec, egress kill-switch, input-remap) — all owner-gated (privileged surface).
+  CI can only compile-gate.
+- **Follow-up — attestation producer (this slice):** the ledger now records the device's **hardware-attestation
+  posture** as a `SECURITY` `device.attestation` entry. New `AppContainer.deviceAttestation`
+  (`DeviceAttestation()`, stateless StrongBox probe). A `RefreshWorker` pass runs the probe (throttled ~6h
+  via `AppSettings.lastAttestationCheckMs`) and records **only when the posture signature CHANGES** (dedupe
+  via `lastAttestationSig` = `grapheneVerified|hardwareBacked|strongBox|bootloaderLocked|verifiedBoot|verifiedBootKeyHex`)
+  — a posture change (bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost) is a real security
+  event; identical verdicts are deduped so the append-only log isn't spammed (≈1 entry ever + one per real
+  change). The ledger `detail` is the content-free `verdict.summary` (the key hex rides only in the dedupe
+  sig in settings, never the ledger; it's a public OS-signing-key fingerprint anyway). Chosen over the
+  recon's "record at the MainActivity gate" option because that fires every cold launch → spam. Adversarially
+  reviewed inline (the orchestration workflow hit an infra permission error) across correctness/privacy/
+  integration; the only edge (a flush-debounce kill window) is identical to every existing producer. ⚠️
+  On-device-unverified (CI compile-gates only): the periodic probe + record firing. Remaining follow-ups:
+  porting more `com.jarvis.app` subsystems (overlay HUD spec, egress kill-switch, input-remap) — all
+  owner-gated (privileged surface).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
