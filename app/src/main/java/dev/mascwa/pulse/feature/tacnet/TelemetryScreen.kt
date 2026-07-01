@@ -922,6 +922,11 @@ private fun WastelandPanel(
                 TravelStat("PLAYED", formatPlayTime(travel.playMs), c)
             }
             GameButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", c.sky, onScan)
+            if (locations.isNotEmpty()) {
+                WastelandMap(locations, gps, c, Modifier.fillMaxWidth().height(200.dp)) { id ->
+                    selectedId = if (selectedId == id) null else id
+                }
+            }
             if (locations.isEmpty()) {
                 Text(
                     if (gps == null) "No fix yet. Grant location and give it a moment."
