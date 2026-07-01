@@ -68,6 +68,7 @@ data class Character(
     val perkPicks: Int = 0,
     val inventory: Map<String, Int> = emptyMap(),
     val companion: String? = null,
+    val reputation: Map<String, Int> = emptyMap(),
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -241,6 +242,29 @@ object SpecialGame {
         val item = Items.byId(id) ?: return c
         if (c.caps < item.value) return c
         return addItem(c.copy(caps = c.caps - item.value), id, 1)
+    }
+
+    // --- Faction reputation ---
+
+    /** The character's reputation points with [kind]. */
+    fun rep(c: Character, kind: LocationKind): Int = c.reputation[kind.name] ?: 0
+
+    /** Add [amount] reputation with [kind] (clamped to [Reputation.MAX]; never negative). */
+    fun addRep(c: Character, kind: LocationKind, amount: Int): Character {
+        val next = (rep(c, kind) + amount).coerceIn(0, Reputation.MAX)
+        return c.copy(reputation = c.reputation + (kind.name to next))
+    }
+
+    /**
+     * Buy item [id] from a [kind] shop at that faction's reputation discount, and earn a little standing.
+     * No-op if unknown or unaffordable at the discounted price.
+     */
+    fun buyItemAt(c: Character, id: String, kind: LocationKind): Character {
+        val item = Items.byId(id) ?: return c
+        val price = Reputation.discountedPrice(item.value, rep(c, kind))
+        if (c.caps < price) return c
+        val bought = addItem(c.copy(caps = c.caps - price), id, 1)
+        return addRep(bought, kind, Reputation.PER_PURCHASE)
     }
 
     /** Whether [c] can craft [r] — holds every input and meets the recipe's stat gate. */
