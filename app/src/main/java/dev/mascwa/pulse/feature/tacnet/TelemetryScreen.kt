@@ -73,6 +73,8 @@ import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GestureType
 import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.GameClock
+import dev.mascwa.pulse.core.telemetry.LocationGate
 import dev.mascwa.pulse.core.telemetry.LocationKind
 import dev.mascwa.pulse.core.telemetry.RepTier
 import dev.mascwa.pulse.core.telemetry.Reputation
@@ -132,6 +134,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val travel by vm.travel.collectAsStateWithLifecycle()
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val daily by vm.daily.collectAsStateWithLifecycle()
+    val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -180,6 +183,14 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             EffectsPanel(t, gps != null, c)
 
             PipHeader("S.P.E.C.I.A.L.")
+            if (dayBanner.isNotEmpty()) {
+                Text(
+                    dayBanner,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                    color = c.amber, letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
             lastUnlock?.let { a ->
                 UnlockBanner(a, c) { vm.dismissUnlock() }
                 Spacer(Modifier.height(8.dp))
@@ -1092,7 +1103,11 @@ private fun WastelandPanel(
                     LocationRow(loc, dist, selectedId == loc.id, c) {
                         selectedId = if (selectedId == loc.id) null else loc.id
                     }
-                    if (selectedId == loc.id) LocationSheet(loc, ch, c, onBuy, onTalk)
+                    if (selectedId == loc.id) {
+                        // Pokémon-Go rule: you must physically BE at the shop (within reach) to trade/talk.
+                        val here = LocationGate.isAtLocation(gps?.latitude, gps?.longitude, loc)
+                        LocationSheet(loc, ch, here, dist, c, onBuy, onTalk)
+                    }
                 }
             }
         }
@@ -1127,7 +1142,15 @@ private fun LocationRow(loc: GameLocation, distanceM: Double?, open: Boolean, c:
 }
 
 @Composable
-private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette, onBuy: (String, LocationKind) -> Unit, onTalk: (Encounter, LocationKind) -> Unit) {
+private fun LocationSheet(
+    loc: GameLocation,
+    ch: Character,
+    atLocation: Boolean,
+    distanceM: Double?,
+    c: NightwirePalette,
+    onBuy: (String, LocationKind) -> Unit,
+    onTalk: (Encounter, LocationKind) -> Unit,
+) {
     val npc = GameLocations.npcName(loc.kind, loc.id.hashCode())
     val repPts = SpecialGame.rep(ch, loc.kind)
     val tier = Reputation.tier(repPts)
@@ -1136,6 +1159,14 @@ private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette,
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(GameLocations.greeting(loc.kind, npc), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        if (!atLocation) {
+            // Out of reach — show wares as a lure, but you have to walk there to deal.
+            Text(
+                "▸ TRAVEL HERE TO TRADE" + (distanceM?.let { " — ${Geo.formatDistance(it)} away" } ?: " — location unknown"),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                color = c.amber, letterSpacing = 0.5.sp,
+            )
+        }
         Text(
             "WARES · ${tier.label}${if (tier.discountPct > 0) " −${tier.discountPct}%" else ""}",
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
@@ -1144,10 +1175,15 @@ private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette,
         GameLocations.stock(loc.kind).forEach { id ->
             Items.byId(id)?.let { item ->
                 val price = Reputation.discountedPrice(item.value, repPts)
-                ShopRow(item, price, ch.caps >= price, c) { onBuy(id, loc.kind) }
+                // Buyable only when you're physically at the shop AND can afford it.
+                ShopRow(item, price, atLocation && ch.caps >= price, c) { onBuy(id, loc.kind) }
             }
         }
-        GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc), loc.kind) }
+        if (atLocation) {
+            GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc), loc.kind) }
+        } else {
+            Text("Talk to $npc when you arrive.", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
     }
 }
 

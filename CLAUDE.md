@@ -844,6 +844,36 @@ but keep the interactive/Pokémon-Go part. What would CDPR have made if they bui
   **explicit arming tap** first (owner asked) — the still-timer only runs after "◉ TAP TO ARM THE HOLD", so a
   phone resting on a table can't auto-commit; SHAKE/FLICK stay immediate (they can't fire at rest).
 
+### S.P.E.C.I.A.L. → a Fallout LIFE-SIM ("The Sims but I'm the Sim") — accepted brief, in progress
+Owner's vision: turn the RPG into a Fallout-styled life-sim that **bleeds into reality**. (1) **Constant
+camera/mic ambient sensing** → the game reads what's going on / what it hears and generates its strategy
+(encounters/difficulty/flavour) from that. (2) **Geofenced purchasing** — you must **physically be at** a
+real map location to buy/trade there (true Pokémon-Go). (3) **Day tracking** — the game counts wasteland
+days. (4) **Generative missions/quests/storylines** driven by what it **sees, hears, and knows about you**
+(profile interests/wants/needs + tasks + memory + location + time). Framing: *"The Sims but I get to be the
+Sim,"* Fallout-styled. **Authorization (owner, explicit):** GrapheneOS, Pulse is **Device Owner**, single
+user, on-device-first — "it's all authorized on my behalf." Invariants kept: on-device-first (ambient
+sensing/classification stays on-device; no raw camera/audio leaves without opt-in — the credential-scrub /
+privacy-first pattern extends to raw sensor data), human-gate for self-code, isProtected denylist.
+- **Architecture / slice plan** (pure CI-tested cores in `core:telemetry` first, on-device sensing/UI after —
+  the established pattern): **[1] geofence + days (this slice)** → **[2] Perception core** (`SceneSignals`→
+  `SceneContext`: setting/activity/social distilled from camera-scene + sound labels + light/motion/time →
+  strategy modifiers; pure) → **[3] on-device camera/mic capture + classifiers** (heavy, on-device-only) →
+  **[4] Story/Quest director core** (compose personalised quests/story beats from profile+tasks+scene+
+  location+day+character; deterministic seed for CI, LLM flavour on-device cloud-gated) → **[5] director
+  wiring + UI**.
+- **Slice 1 — geofenced purchase + day tracking (this slice):** two pure CI-tested cores +
+  `LocationGateTest`/`GameClockTest` (13 cases, locally kotlinc-validated + green). **`LocationGate`**
+  (`isAtLocation`/`distanceTo`/`reachHint`, 60 m reach, reuses `TravelFilter.distanceMeters` — no app Geo
+  dep) gates the map: `WastelandPanel`'s `LocationSheet` now takes `atLocation`+`distanceM`; when you're **not**
+  within reach it shows the wares as a lure with **"▸ TRAVEL HERE TO TRADE — Nm away"** and the BUY rows +
+  TALK are disabled — buyable only when physically at the shop AND affordable. **`GameClock`** (`dayNumber`/
+  `daysSurvived`/`phase`→`DayPhase`/`banner`/`isNewDay`) + `SpecialGameStore.startedAtMs` (persisted in the
+  Stored blob, stamped on first load, migrates old saves, re-stamped on `reset()`) + `startedFlow`;
+  `TelemetryViewModel.dayBanner` (rebuilt each tick from start-ms + now + hour) renders a **"DAY 3 · DUSK"**
+  banner under the S.P.E.C.I.A.L. header. ⚠️ On-device-unverified (CI compile-gates only): the presence gate
+  with a live GPS fix + the day banner advancing.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

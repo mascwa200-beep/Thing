@@ -91,6 +91,8 @@ class SpecialGameStore(
         val claimed: List<String> = emptyList(),
         val streak: Int = 0,
         val streakDay: Long = -1,
+        // Wall-clock ms when this operative's story began — drives the wasteland day counter (Day 1, 2, …).
+        val startedAtMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -119,6 +121,12 @@ class SpecialGameStore(
     private var claimed: Set<String> = emptySet()
     private var streak = 0
     private var streakDay = -1L
+    // When the operative's story began (wall-clock ms) — the anchor for the wasteland day counter.
+    private var startedAtMs = 0L
+
+    private val _started = MutableStateFlow(0L)
+    /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
+    val startedFlow: StateFlow<Long> = _started.asStateFlow()
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -191,11 +199,15 @@ class SpecialGameStore(
                 baseTravelM = stored.baseTravelM; basePlaces = stored.basePlaces
                 claimed = stored.claimed.toSet()
                 streak = stored.streak.coerceAtLeast(0); streakDay = stored.streakDay
+                startedAtMs = stored.startedAtMs
             }
+            // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
+            if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
+            _started.value = startedAtMs
             loaded = true
             justLoaded = true
         }
-        if (justLoaded) { publishMetrics(); refreshDaily() }
+        if (justLoaded) { scheduleFlush(); publishMetrics(); refreshDaily() }
     }
 
     /** Build the current metric snapshot: character progress + counters + the fed-in app-usage/travel. */
@@ -481,6 +493,7 @@ class SpecialGameStore(
             _lastUnlock.value = null
             lastXpVisits = -1 // re-baseline app-usage XP so the fresh operative doesn't get a dump
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
+            startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -502,6 +515,7 @@ class SpecialGameStore(
             dailyDay = dailyDay, baseWins = baseWins, baseVentures = baseVentures, baseCrits = baseCrits,
             baseTravelM = baseTravelM, basePlaces = basePlaces, claimed = claimed.toList(),
             streak = streak, streakDay = streakDay,
+            startedAtMs = startedAtMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }

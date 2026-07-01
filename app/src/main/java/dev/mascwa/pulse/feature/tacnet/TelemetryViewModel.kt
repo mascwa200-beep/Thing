@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.GameClock
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.data.sensors.Telemetry
 import dev.mascwa.pulse.data.usage.UsageRepository
@@ -53,6 +54,15 @@ class TelemetryViewModel(
     /** The real world the operative is standing in — bends stat checks. Rebuilt each telemetry tick. */
     private val _env = MutableStateFlow(EnvContext())
     val env: StateFlow<EnvContext> = _env.asStateFlow()
+
+    /** The wasteland day banner ("DAY 3 · DUSK") — advances with your real life. Rebuilt each tick. */
+    private val _dayBanner = MutableStateFlow("")
+    val dayBanner: StateFlow<String> = _dayBanner.asStateFlow()
+
+    private fun updateDayBanner() {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        _dayBanner.value = GameClock.banner(game.startedFlow.value, System.currentTimeMillis(), hour)
+    }
 
     // --- Achievements (the grind: app usage + game progress → rewards) ---
     val unlockedAchievements: StateFlow<Set<String>> = game.unlockedFlow
@@ -194,9 +204,11 @@ class TelemetryViewModel(
                     }
                 }
             }
+            updateDayBanner()
             while (true) {
                 controller.refreshSystem()
                 _env.value = buildEnv(controller.telemetry.value)
+                updateDayBanner()
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)
