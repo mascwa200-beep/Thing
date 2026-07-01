@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Encounter
+import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.core.telemetry.SpecialEncounters
@@ -54,6 +55,7 @@ class SpecialGameStore(
         val currentEncounterId: String? = null,
         val perks: List<String> = emptyList(),
         val perkPicks: Int = 0,
+        val inventory: Map<String, Int> = emptyMap(),
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -74,6 +76,7 @@ class SpecialGameStore(
         level = level, xp = xp, caps = caps, hp = hp, unspent = unspent,
         seen = seen.toList(), currentEncounterId = currentEncounterId,
         perks = perks.toList(), perkPicks = perkPicks,
+        inventory = inventory,
     )
 
     private fun Stored.domain(): Character {
@@ -87,6 +90,7 @@ class SpecialGameStore(
             caps = caps.coerceAtLeast(0), hp = hp.coerceAtLeast(0), unspent = unspent.coerceAtLeast(0),
             seen = seen.toSet(), currentEncounterId = currentEncounterId,
             perks = perks.toSet(), perkPicks = perkPicks.coerceAtLeast(0),
+            inventory = inventory.filterValues { it > 0 },
         )
     }
 
@@ -119,16 +123,38 @@ class SpecialGameStore(
         }
     }
 
-    /** Resolve [choiceIndex] of the active encounter with a fresh die roll; publishes the [Resolution]. */
-    fun choose(choiceIndex: Int) {
+    /**
+     * Resolve [choiceIndex] of the active encounter with a fresh die roll; publishes the [Resolution].
+     * [env] is the real-world context (temperature/light/motion/… bends the check) and [useItemId] is an
+     * optional CHEM consumed to buff this check — both flow in from the ViewModel.
+     */
+    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             val encounter = encounterFor(c) ?: return@launch
             val roll = random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, roll)
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, roll, env, useItemId)
             _character.value = resolution.character
             _resolution.value = resolution
+            scheduleFlush()
+        }
+    }
+
+    /** Use an AID item from the pack to heal (no-op if none held or it isn't an AID). */
+    fun useItem(itemId: String) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.useAid(_character.value, itemId)
+            scheduleFlush()
+        }
+    }
+
+    /** Sell one of [itemId] for caps. */
+    fun sellItem(itemId: String) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.sellItem(_character.value, itemId)
             scheduleFlush()
         }
     }

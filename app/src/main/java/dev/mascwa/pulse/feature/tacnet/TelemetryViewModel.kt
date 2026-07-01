@@ -2,11 +2,14 @@ package dev.mascwa.pulse.feature.tacnet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.data.sensors.Telemetry
 import dev.mascwa.pulse.data.sensors.TelemetryController
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
+import dev.mascwa.pulse.data.weather.WeatherRepository
+import java.util.Calendar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,7 @@ class TelemetryViewModel(
     private val location: LocationProvider,
     private val settings: SettingsRepository,
     private val game: dev.mascwa.pulse.data.game.SpecialGameStore,
+    private val weather: WeatherRepository,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -41,18 +45,51 @@ class TelemetryViewModel(
         game.characterFlow.map { game.encounterFor(it) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The real world the operative is standing in — bends stat checks. Rebuilt each telemetry tick. */
+    private val _env = MutableStateFlow(EnvContext())
+    val env: StateFlow<EnvContext> = _env.asStateFlow()
+
+    // Outdoor temperature (°C) + daylight, fetched once from the weather service on start (best-effort).
+    private var weatherTempC: Double? = null
+    private var weatherIsDay: Boolean? = null
+
     /** Draw the next encounter to face. */
     fun venture() = game.venture()
-    /** Resolve a choice in the active encounter (rolls the die). */
-    fun choose(choiceIndex: Int) = game.choose(choiceIndex)
+    /** Resolve a choice in the active encounter — with the current real-world context + an optional CHEM. */
+    fun choose(choiceIndex: Int, useItemId: String? = null) = game.choose(choiceIndex, _env.value, useItemId)
     /** Spend an unspent point on a stat. */
     fun allocate(s: dev.mascwa.pulse.core.telemetry.Special) = game.allocate(s)
     /** Choose a perk (spends a perk pick). */
     fun choosePerk(perkId: String) = game.choosePerk(perkId)
+    /** Use an AID item from the pack to heal. */
+    fun useItem(itemId: String) = game.useItem(itemId)
+    /** Sell one of an item for caps. */
+    fun sellItem(itemId: String) = game.sellItem(itemId)
     /** Get back up after being downed. */
     fun revive() = game.revive()
     /** Start the game over with a fresh operative. */
     fun resetGame() = game.reset()
+
+    /** Distil the live telemetry snapshot + cached weather + clock into the game's [EnvContext]. */
+    private fun buildEnv(t: Telemetry): EnvContext {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val online = t.netType != "OFFLINE" && t.netType != "—"
+        return EnvContext(
+            outdoorTempC = weatherTempC,
+            isDay = weatherIsDay ?: (hour in 7..19),
+            lightLux = t.lightLux,
+            pressureHpa = t.pressureHpa,
+            altitudeM = t.pressureAltitudeM,
+            motionG = t.accelG,
+            batteryPct = t.batteryPct,
+            charging = t.charging,
+            hourOfDay = hour,
+            online = online,
+        )
+    }
+
+    private fun toCelsius(t: Double, unitSymbol: String): Double =
+        if (unitSymbol.contains("F")) (t - 32.0) * 5.0 / 9.0 else t
 
     /** The user's chosen operator portrait (content URI) for the STATUS>CND section, or "" if none. */
     val portraitUri: StateFlow<String> = settings.settings
@@ -74,11 +111,25 @@ class TelemetryViewModel(
 
     fun start() {
         controller.start()
+        _env.value = buildEnv(controller.telemetry.value)
         if (ticker?.isActive == true) return
         ticker = viewModelScope.launch {
-            launch { if (location.hasPermission()) _gps.value = location.current() }
+            launch {
+                if (!location.hasPermission()) return@launch
+                val loc = location.current() ?: return@launch
+                _gps.value = loc
+                // Best-effort outdoor temperature (in °C) + daylight, so the wasteland reacts to real weather.
+                runCatching {
+                    val w = weather.fetch(loc.latitude, loc.longitude, loc.name, force = false).data
+                    w.current?.let { cur ->
+                        cur.temperature?.let { weatherTempC = toCelsius(it, w.tempUnitSymbol) }
+                        weatherIsDay = cur.isDay
+                    }
+                }
+            }
             while (true) {
                 controller.refreshSystem()
+                _env.value = buildEnv(controller.telemetry.value)
                 pushLog()
                 delay(1500)
             }
