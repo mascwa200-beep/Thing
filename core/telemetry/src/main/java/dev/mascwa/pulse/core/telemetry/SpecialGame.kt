@@ -23,13 +23,14 @@ enum class Special(val letter: Char, val display: String, val blurb: String) {
     LUCK('L', "LUCK", "Fortune — the wasteland's thumb on the scale."),
 }
 
-/** A reward/penalty applied when a [Choice] resolves. Deltas; [hp] negative = damage. */
+/** A reward/penalty applied when a [Choice] resolves. Deltas; [hp] negative = damage. [items] = loot dropped (id → count). */
 data class Outcome(
     val text: String,
     val xp: Int = 0,
     val caps: Int = 0,
     val hp: Int = 0,
     val statPoint: Boolean = false,
+    val items: Map<String, Int> = emptyMap(),
 )
 
 /**
@@ -65,6 +66,7 @@ data class Character(
     val currentEncounterId: String? = null,
     val perks: Set<String> = emptySet(),
     val perkPicks: Int = 0,
+    val inventory: Map<String, Int> = emptyMap(),
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -134,19 +136,40 @@ object SpecialGame {
     }
 
     /**
-     * Resolve [choiceIndex] of [encounter] for [character] with die [roll]. Applies the winning/losing
-     * outcome (crit doubles XP + adds bonus caps), advances XP/level, marks a non-repeatable encounter
-     * seen, and clears the current encounter. Pure — same inputs, same result.
+     * Resolve [choiceIndex] of [encounter] for [character] with die [roll]. The check value stacks the
+     * character's base stat + perks + carried GEAR + the real-world [env] modifier + an optional [useItemId]
+     * CHEM (consumed for this check). Applies the winning/losing outcome (crit doubles XP + adds bonus caps,
+     * loot dropped), advances XP/level, marks a non-repeatable encounter seen, and clears the current
+     * encounter. Pure — same inputs, same result. [env]/[useItemId] default to none, so existing callers
+     * behave exactly as before.
      */
-    fun resolve(character: Character, encounter: Encounter, choiceIndex: Int, roll: Int): Resolution {
+    fun resolve(
+        character: Character,
+        encounter: Encounter,
+        choiceIndex: Int,
+        roll: Int,
+        env: EnvContext? = null,
+        useItemId: String? = null,
+    ): Resolution {
         val choice = encounter.choices.getOrNull(choiceIndex)
             ?: return Resolution(false, false, Outcome("Nothing happens."), character, roll)
+
+        // A CHEM only "fires" (and is consumed) when it's held and matches this check's stat.
+        val activeChem: Item? = useItemId?.let { Items.byId(it) }?.takeIf {
+            it.kind == ItemKind.CHEM &&
+                (character.inventory[it.id] ?: 0) > 0 &&
+                choice.stat != null && it.statBonus == choice.stat
+        }
 
         val critMargin = if (perkLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
-            val statValue = character.stat(choice.stat) + perkStatBonus(character, choice.stat)
+            val statValue = character.stat(choice.stat) +
+                perkStatBonus(character, choice.stat) +
+                gearStatBonus(character, choice.stat) +
+                (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
+                (activeChem?.statBonusAmt ?: 0)
             check(statValue, choice.difficulty, character.stat(Special.LUCK), roll, critMargin)
         }
 
@@ -164,9 +187,58 @@ object SpecialGame {
         }
 
         var updated = applyOutcome(character, outcome)
+        if (activeChem != null) updated = removeItem(updated, activeChem.id, 1)
         if (!encounter.repeatable) updated = updated.copy(seen = updated.seen + encounter.id)
         updated = updated.copy(currentEncounterId = null)
         return Resolution(result.success, result.crit, outcome, updated, roll)
+    }
+
+    // --- Inventory + items ---
+
+    /** Passive bonus from carried GEAR that boosts checks gated by [s] (each distinct piece counts once). */
+    fun gearStatBonus(c: Character, s: Special): Int = c.inventory.entries.sumOf { (id, qty) ->
+        if (qty <= 0) return@sumOf 0
+        val item = Items.byId(id)
+        if (item != null && item.kind == ItemKind.GEAR && item.statBonus == s) item.statBonusAmt else 0
+    }
+
+    /** Add [qty] of item [id] to the inventory (no-op for unknown ids or non-positive counts). */
+    fun addItem(c: Character, id: String, qty: Int = 1): Character {
+        if (qty <= 0 || Items.byId(id) == null) return c
+        return c.copy(inventory = c.inventory + (id to (c.inventory[id] ?: 0) + qty))
+    }
+
+    /** Remove [qty] of item [id]; drops the key when the count hits zero. */
+    fun removeItem(c: Character, id: String, qty: Int = 1): Character {
+        val have = c.inventory[id] ?: 0
+        if (have <= 0 || qty <= 0) return c
+        val next = have - qty
+        val inv = if (next <= 0) c.inventory - id else c.inventory + (id to next)
+        return c.copy(inventory = inv)
+    }
+
+    /** Use an AID item from the inventory to heal (consumed; no-op if none held or it isn't an AID). */
+    fun useAid(c: Character, id: String): Character {
+        val item = Items.byId(id) ?: return c
+        if (item.kind != ItemKind.AID || item.healAmt <= 0) return c
+        if ((c.inventory[id] ?: 0) <= 0) return c
+        val healed = c.copy(hp = (c.hp + item.healAmt).coerceIn(0, c.maxHp))
+        return removeItem(healed, id, 1)
+    }
+
+    /** Sell one of item [id] for half its [Item.value] in caps (min 1). No-op if none held. */
+    fun sellItem(c: Character, id: String): Character {
+        val item = Items.byId(id) ?: return c
+        if ((c.inventory[id] ?: 0) <= 0) return c
+        val gain = (item.value / 2).coerceAtLeast(1)
+        return removeItem(c.copy(caps = c.caps + gain), id, 1)
+    }
+
+    /** Buy one of item [id] for its [Item.value] in caps. No-op if the character can't afford it. */
+    fun buyItem(c: Character, id: String): Character {
+        val item = Items.byId(id) ?: return c
+        if (c.caps < item.value) return c
+        return addItem(c.copy(caps = c.caps - item.value), id, 1)
     }
 
     /** Add XP, cascading level-ups (each grants an unspent point + heals to full on the level). */
@@ -243,6 +315,7 @@ object SpecialGame {
             hp = (character.hp + o.hp).coerceIn(0, character.maxHp),
             unspent = character.unspent + if (o.statPoint) 1 else 0,
         )
+        for ((id, qty) in o.items) updated = addItem(updated, id, qty)
         if (o.xp > 0) updated = gainXp(updated, o.xp)
         return updated
     }
