@@ -9,8 +9,11 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
 import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.DailyObjective
+import dev.mascwa.pulse.core.telemetry.DailyObjectives
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
@@ -34,6 +37,14 @@ import kotlinx.serialization.json.Json
 import kotlin.random.Random
 
 private val Context.specialDataStore: DataStore<Preferences> by preferencesDataStore(name = "pulse_special")
+
+/** Today's daily-objective state for the UI: the three objectives, today's progress, what's claimed, streak. */
+data class DailyState(
+    val objectives: List<DailyObjective> = emptyList(),
+    val metrics: TodayMetrics = TodayMetrics(),
+    val claimed: Set<String> = emptySet(),
+    val streak: Int = 0,
+)
 
 /**
  * On-device persistence + play surface for the [SpecialGame] — the STAT-tab wasteland RPG. In-memory
@@ -68,6 +79,17 @@ class SpecialGameStore(
         val unlocked: List<String> = emptyList(),
         // App-usage XP baseline: the total app-visit count we last granted XP for (-1 = not yet baselined).
         val lastXpVisits: Int = -1,
+        // Daily objectives: the day the baseline is for (epoch-day, -1 = none), the counter baselines at day
+        // start, what's been claimed today, and the all-3-a-day play streak.
+        val dailyDay: Long = -1,
+        val baseWins: Int = 0,
+        val baseVentures: Int = 0,
+        val baseCrits: Int = 0,
+        val baseTravelM: Int = 0,
+        val basePlaces: Int = 0,
+        val claimed: List<String> = emptyList(),
+        val streak: Int = 0,
+        val streakDay: Long = -1,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -86,6 +108,16 @@ class SpecialGameStore(
     private var extFeatures = 0
     private var extDistanceM = 0
     private var extPlaces = 0
+    // Daily-objective state.
+    private var dailyDay = -1L
+    private var baseWins = 0
+    private var baseVentures = 0
+    private var baseCrits = 0
+    private var baseTravelM = 0
+    private var basePlaces = 0
+    private var claimed: Set<String> = emptySet()
+    private var streak = 0
+    private var streakDay = -1L
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -106,6 +138,10 @@ class SpecialGameStore(
     private val _metrics = MutableStateFlow(GameMetrics())
     /** The live metric snapshot achievements are measured against (for progress bars). */
     val metricsFlow: StateFlow<GameMetrics> = _metrics.asStateFlow()
+
+    private val _daily = MutableStateFlow(DailyState())
+    /** Today's daily objectives + progress + streak (for the DAILY panel). */
+    val dailyFlow: StateFlow<DailyState> = _daily.asStateFlow()
 
     /** Dismiss the one-shot unlock banner. */
     fun dismissUnlock() { _lastUnlock.value = null }
@@ -148,11 +184,16 @@ class SpecialGameStore(
                 unlocked = stored.unlocked.toSet()
                 _unlocked.value = unlocked
                 lastXpVisits = stored.lastXpVisits
+                dailyDay = stored.dailyDay
+                baseWins = stored.baseWins; baseVentures = stored.baseVentures; baseCrits = stored.baseCrits
+                baseTravelM = stored.baseTravelM; basePlaces = stored.basePlaces
+                claimed = stored.claimed.toSet()
+                streak = stored.streak.coerceAtLeast(0); streakDay = stored.streakDay
             }
             loaded = true
             justLoaded = true
         }
-        if (justLoaded) publishMetrics()
+        if (justLoaded) { publishMetrics(); refreshDaily() }
     }
 
     /** Build the current metric snapshot: character progress + counters + the fed-in app-usage/travel. */
@@ -181,6 +222,62 @@ class SpecialGameStore(
             scheduleFlush()
         }
         publishMetrics()
+        refreshDaily()
+    }
+
+    // --- Daily objectives ---
+    private fun currentDay(): Long = java.time.LocalDate.now().toEpochDay()
+
+    /** On a new local day, capture the day's counter baselines and clear the claimed set. */
+    private fun rolloverIfNewDay() {
+        val today = currentDay()
+        if (dailyDay == today) return
+        dailyDay = today
+        baseWins = wins; baseVentures = ventures; baseCrits = crits
+        baseTravelM = extDistanceM; basePlaces = extPlaces
+        claimed = emptySet()
+        scheduleFlush()
+    }
+
+    /** Progress made *today* — current lifetime counters minus the day's baseline. */
+    private fun todayMetrics(): TodayMetrics = TodayMetrics(
+        wins = (wins - baseWins).coerceAtLeast(0),
+        ventures = (ventures - baseVentures).coerceAtLeast(0),
+        crits = (crits - baseCrits).coerceAtLeast(0),
+        travelM = (extDistanceM - baseTravelM).coerceAtLeast(0),
+        places = (extPlaces - basePlaces).coerceAtLeast(0),
+    )
+
+    /** Roll the day over if needed, then publish today's objectives + progress + streak. */
+    private fun refreshDaily() {
+        rolloverIfNewDay()
+        _daily.value = DailyState(
+            objectives = DailyObjectives.forDay(dailyDay.coerceAtLeast(0)),
+            metrics = todayMetrics(),
+            claimed = claimed,
+            streak = streak,
+        )
+    }
+
+    /** Claim a completed daily objective's reward (once); advances the streak when all three are claimed. */
+    fun claimDaily(objectiveId: String) {
+        scope.launch {
+            ensureLoaded()
+            rolloverIfNewDay()
+            val today = dailyDay
+            val objectives = DailyObjectives.forDay(today.coerceAtLeast(0))
+            val obj = objectives.firstOrNull { it.id == objectiveId } ?: return@launch
+            if (obj.id in claimed) return@launch
+            if (!DailyObjectives.isComplete(obj, todayMetrics())) return@launch
+            _character.value = DailyObjectives.applyReward(_character.value, obj)
+            claimed = claimed + obj.id
+            if (objectives.all { it.id in claimed }) {
+                streak = if (streakDay == today - 1) streak + 1 else 1
+                streakDay = today
+            }
+            runAchievementCheck()
+            scheduleFlush()
+        }
     }
 
     /**
@@ -375,6 +472,7 @@ class SpecialGameStore(
             _unlocked.value = emptySet()
             _lastUnlock.value = null
             lastXpVisits = -1 // re-baseline app-usage XP so the fresh operative doesn't get a dump
+            dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -393,6 +491,9 @@ class SpecialGameStore(
         val snapshot = _character.value.stored().copy(
             wins = wins, crits = crits, ventures = ventures, unlocked = unlocked.toList(),
             lastXpVisits = lastXpVisits,
+            dailyDay = dailyDay, baseWins = baseWins, baseVentures = baseVentures, baseCrits = baseCrits,
+            baseTravelM = baseTravelM, basePlaces = basePlaces, claimed = claimed.toList(),
+            streak = streak, streakDay = streakDay,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
