@@ -2,8 +2,11 @@ package dev.mascwa.pulse.feature.tacnet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.data.sensors.Telemetry
+import dev.mascwa.pulse.data.usage.UsageRepository
 import dev.mascwa.pulse.data.sensors.TelemetryController
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
@@ -31,6 +34,7 @@ class TelemetryViewModel(
     private val settings: SettingsRepository,
     private val game: dev.mascwa.pulse.data.game.SpecialGameStore,
     private val weather: WeatherRepository,
+    private val usage: UsageRepository,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -48,6 +52,12 @@ class TelemetryViewModel(
     /** The real world the operative is standing in — bends stat checks. Rebuilt each telemetry tick. */
     private val _env = MutableStateFlow(EnvContext())
     val env: StateFlow<EnvContext> = _env.asStateFlow()
+
+    // --- Achievements (the grind: app usage + game progress → rewards) ---
+    val unlockedAchievements: StateFlow<Set<String>> = game.unlockedFlow
+    val lastUnlock: StateFlow<Achievement?> = game.lastUnlockFlow
+    val gameMetrics: StateFlow<GameMetrics> = game.metricsFlow
+    fun dismissUnlock() = game.dismissUnlock()
 
     // Outdoor temperature (°C) + daylight, fetched once from the weather service on start (best-effort).
     private var weatherTempC: Double? = null
@@ -112,6 +122,13 @@ class TelemetryViewModel(
     fun start() {
         controller.start()
         _env.value = buildEnv(controller.telemetry.value)
+        // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).
+        viewModelScope.launch {
+            runCatching {
+                val snap = usage.snapshot()
+                game.setExternalMetrics(snap.totalEvents, snap.features.size, 0, 0)
+            }
+        }
         if (ticker?.isActive == true) return
         ticker = viewModelScope.launch {
             launch {
