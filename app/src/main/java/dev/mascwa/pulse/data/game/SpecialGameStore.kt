@@ -12,6 +12,7 @@ import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.core.telemetry.SpecialEncounters
@@ -295,6 +296,17 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.sellItem(_character.value, itemId)
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /** Craft [recipeId] at the workbench (consumes inputs, yields the output + a little XP). */
+    fun craft(recipeId: String) {
+        scope.launch {
+            ensureLoaded()
+            val recipe = Recipes.byId(recipeId) ?: return@launch
+            _character.value = SpecialGame.craft(_character.value, recipe)
             runAchievementCheck()
             scheduleFlush()
         }

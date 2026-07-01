@@ -91,6 +91,8 @@ class TelemetryViewModel(
     fun useItem(itemId: String) = game.useItem(itemId)
     /** Sell one of an item for caps. */
     fun sellItem(itemId: String) = game.sellItem(itemId)
+    /** Craft a recipe at the workbench. */
+    fun craft(recipeId: String) = game.craft(recipeId)
     /** Get back up after being downed. */
     fun revive() = game.revive()
     /** Start the game over with a fresh operative. */
