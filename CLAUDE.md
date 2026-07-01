@@ -873,6 +873,16 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   `TelemetryViewModel.dayBanner` (rebuilt each tick from start-ms + now + hour) renders a **"DAY 3 · DUSK"**
   banner under the S.P.E.C.I.A.L. header. ⚠️ On-device-unverified (CI compile-gates only): the presence gate
   with a live GPS fix + the day banner advancing.
+- **Slice 2 — perception core (this slice):** `core:telemetry/Perception.kt` (+ `PerceptionTest`, 15 cases,
+  locally kotlinc-validated + green) — the PURE, CI-tested brain of "constant camera/mic → strategy." Takes
+  the text labels an on-device classifier produces (`PerceptLabel` scene + sound tags) plus light/motion/hour
+  (`SceneSignals`) and `distill`s them into a `SceneContext` (`Setting` INDOOR/OUTDOOR/VEHICLE, `Activity`
+  STILL/MOVING/COMMUTING, `Social` ALONE/VOICES/CROWD, `LightLevel`, `DayPhase`, top tags + a `describe()`
+  line). `strategy(ctx)` → `SceneStrategy` (which `Special` themes the wasteland favours next, a clamped
+  ±1 `tempoNudge`, a flavour line for the story director). Keyword-vocab + threshold logic → deterministic →
+  CI-gated. **Privacy invariant:** only text-label summaries reach the core — no pixels/audio, nothing leaves
+  the device. **NOT yet wired** (foundation): next is the on-device camera/mic sampler + classifier feeding
+  `SceneSignals`, then folding `strategy.favored` into encounter selection + `flavor` into the story director.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
