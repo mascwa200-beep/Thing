@@ -11,6 +11,7 @@ object SpecialEncounters {
     private const val EASY = 8
     private const val MED = 12
     private const val HARD = 16
+    private const val BOSS = 19 // brutal — beatable only with built-up stats + perks/gear/chems/a companion
 
     private fun win(text: String, xp: Int, caps: Int = 0, hp: Int = 0, point: Boolean = false, items: Map<String, Int> = emptyMap()) =
         Outcome(text, xp = xp, caps = caps, hp = hp, statPoint = point, items = items)
@@ -501,6 +502,63 @@ object SpecialEncounters {
                     win("Too slow, too heavy — you tire them out and drop them clean.", xp = 58, caps = 44,
                         items = mapOf("runner_boots" to 1)),
                     lose("One swing you don't dodge is all it takes.", hp = -19)),
+            ),
+        ),
+        // --- BOSS FIGHTS — rare, level-gated, brutal, with unique big loot. One-time each. ---
+        Encounter(
+            id = "boss_raider_king", title = "★ THE RAIDER KING", minLevel = 5,
+            prompt = "The warband parts for their king — a scarred giant in welded plate, a chain-gun for an arm. 'Kneel, or be a lesson.'",
+            choices = listOf(
+                Choice("Break him in single combat.", Special.STRENGTH, BOSS,
+                    win("You put the king in the dirt. His band names YOU their liege — and empties his war-chest at your feet.", xp = 120, caps = 90, point = true,
+                        items = mapOf("runner_boots" to 1, "rare_alloy" to 1)),
+                    lose("The chain-gun speaks. You barely crawl away.", hp = -26)),
+                Choice("Slip his guard and end it fast.", Special.AGILITY, BOSS,
+                    win("One perfect opening is all you need. The band scatters; the spoils don't.", xp = 116, caps = 80,
+                        items = mapOf("grip_gloves" to 1, "circuit_board" to 2)),
+                    lose("He's faster than a man that size has any right to be.", hp = -24)),
+            ),
+        ),
+        Encounter(
+            id = "boss_alpha_deathclaw", title = "★ THE ALPHA DEATHCLAW", minLevel = 7,
+            prompt = "It stands three metres of scarred muscle and talon, and it has decided this valley is not big enough for both of you.",
+            choices = listOf(
+                Choice("Stand and trade blows with a legend.", Special.STRENGTH, BOSS,
+                    win("Impossibly, you outlast it. The hide alone is a fortune; the respect is priceless.", xp = 140, caps = 70, point = true,
+                        items = mapOf("rare_alloy" to 2, "auto_injector" to 1)),
+                    lose("A single swipe folds you like paper.", hp = -30)),
+                Choice("Read its rhythm and strike the beat between.", Special.PERCEPTION, BOSS,
+                    win("You see the tell before the talon. It never lands a blow.", xp = 136, caps = 75,
+                        items = mapOf("optics_visor" to 1, "rare_alloy" to 1)),
+                    lose("You blink. It doesn't.", hp = -28)),
+            ),
+        ),
+        Encounter(
+            id = "boss_overlord", title = "★ THE SUPER MUTANT OVERLORD", minLevel = 9,
+            prompt = "A behemoth in scavenged armour drags a fridge-sized club, warband at its heels. 'LITTLE THING WANTS TO DIE LOUD.'",
+            choices = listOf(
+                Choice("Meet a mountain with a mountain's own force.", Special.STRENGTH, BOSS,
+                    win("You topple the overlord; its warband bows to the new strongest thing in the wastes.", xp = 150, caps = 110, point = true,
+                        items = mapOf("leather_rig" to 1, "rare_alloy" to 2)),
+                    lose("The club comes down. So do you.", hp = -32)),
+                Choice("Turn its own warband against it.", Special.CHARISMA, BOSS,
+                    win("A few words in the right ears, and the overlord dies at its own crew's hands. You inherit the spoils.", xp = 146, caps = 130,
+                        items = mapOf("comms_badge" to 1, "circuit_board" to 2)),
+                    lose("Mutants aren't as gullible as they look.", hp = -22)),
+            ),
+        ),
+        Encounter(
+            id = "boss_mainframe", title = "★ THE ROGUE MAINFRAME", minLevel = 11,
+            prompt = "A pre-war war-computer wakes as you enter, turrets tracking, a cold voice counting your heartbeats. 'INTRUDER. RESOLVING.'",
+            choices = listOf(
+                Choice("Out-think a machine that thinks in nanoseconds.", Special.INTELLIGENCE, BOSS,
+                    win("You feed it a paradox it can't resolve. It powers down its guns — and opens its vaults.", xp = 165, caps = 140, point = true,
+                        items = mapOf("data_slate" to 1, "optics_visor" to 1, "rare_alloy" to 2)),
+                    lose("The turrets resolve you first.", hp = -30)),
+                Choice("Ghost through its sensors and pull the core.", Special.AGILITY, BOSS,
+                    win("Between sweeps of its sensors, you reach the core and rip it free. Silence, and salvage.", xp = 158, caps = 120,
+                        items = mapOf("circuit_board" to 3, "auto_injector" to 1)),
+                    lose("It had one more sensor than you counted.", hp = -28)),
             ),
         ),
         // --- Repeatable filler so the game never runs dry ---

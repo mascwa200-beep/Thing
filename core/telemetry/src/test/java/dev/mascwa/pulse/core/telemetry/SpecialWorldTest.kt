@@ -220,6 +220,20 @@ class SpecialWorldTest {
         assertEquals(ids.size, ids.toSet().size)
     }
 
+    @Test fun bossEncountersAreLevelGated() {
+        val boss = Encounter(
+            "b", "Boss", "p",
+            listOf(Choice("fight", Special.STRENGTH, 19, Outcome("win", xp = 100), Outcome("lose", hp = -20))),
+            minLevel = 6,
+        )
+        // A level-1 char can't draw it (not eligible, nothing else eligible).
+        assertNull(SpecialGame.nextEncounter(char(), listOf(boss), 0))
+        // A level-6 char can.
+        assertEquals("b", SpecialGame.nextEncounter(char().copy(level = 6), listOf(boss), 0)?.id)
+        // And the shipped catalog actually has level-gated bosses.
+        assertTrue(SpecialEncounters.ALL.any { it.minLevel >= 5 })
+    }
+
     @Test fun allEncounterLootIdsAreValid() {
         // Guards against a typo in any hand-written encounter drop id (would silently drop nothing on-device).
         SpecialEncounters.ALL.forEach { enc ->

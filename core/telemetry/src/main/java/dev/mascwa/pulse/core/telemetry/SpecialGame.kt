@@ -45,13 +45,14 @@ data class Choice(
     val failure: Outcome,
 )
 
-/** A wasteland scenario. Non-[repeatable] encounters are retired once seen. */
+/** A wasteland scenario. Non-[repeatable] encounters are retired once seen. [minLevel] gates tough/boss fights. */
 data class Encounter(
     val id: String,
     val title: String,
     val prompt: String,
     val choices: List<Choice>,
     val repeatable: Boolean = false,
+    val minLevel: Int = 0,
 )
 
 /** The player's persistent state. [stats] each clamp to 1..10; [hp] clamps to [maxHp]. */
@@ -357,11 +358,12 @@ object SpecialGame {
         return if (s == Special.ENDURANCE) updated.copy(hp = (character.hp + Character.HP_PER_END).coerceAtMost(updated.maxHp)) else updated
     }
 
-    /** Pick the next encounter: prefer unseen (or repeatable) ones; [roll] chooses within the pool. */
+    /** Pick the next encounter: level-gated, preferring unseen (or repeatable) ones; [roll] chooses within the pool. */
     fun nextEncounter(character: Character, all: List<Encounter>, roll: Int): Encounter? {
         if (all.isEmpty()) return null
-        val fresh = all.filter { it.repeatable || it.id !in character.seen }
-        val pool = if (fresh.isNotEmpty()) fresh else all.filter { it.repeatable }
+        val eligible = all.filter { character.level >= it.minLevel } // tough/boss fights unlock with level
+        val fresh = eligible.filter { it.repeatable || it.id !in character.seen }
+        val pool = if (fresh.isNotEmpty()) fresh else eligible.filter { it.repeatable }
         if (pool.isEmpty()) return null
         return pool[roll.coerceAtLeast(0) % pool.size]
     }
