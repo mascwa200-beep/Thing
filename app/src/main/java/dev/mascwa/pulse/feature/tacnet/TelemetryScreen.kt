@@ -61,8 +61,13 @@ import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.GameLocation
+import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.Environment
+import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.game.TravelStats
+import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.Item
 import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
@@ -107,6 +112,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
     val gameMetrics by vm.gameMetrics.collectAsStateWithLifecycle()
     val lastUnlock by vm.lastUnlock.collectAsStateWithLifecycle()
+    val locations by vm.locations.collectAsStateWithLifecycle()
+    val travel by vm.travel.collectAsStateWithLifecycle()
+    val scanning by vm.scanning.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -169,6 +177,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 onUseItem = { vm.useItem(it) },
                 onSellItem = { vm.sellItem(it) },
             )
+            Spacer(Modifier.height(8.dp))
+            WastelandPanel(locations, travel, scanning, gps, character, c,
+                onScan = { vm.scanArea() }, onBuy = { vm.buy(it) }, onTalk = { vm.talk(it) })
             Spacer(Modifier.height(8.dp))
             AchievementsPanel(unlocked, gameMetrics, c)
 
@@ -886,6 +897,124 @@ private fun rewardText(a: Achievement): String = buildList {
     if (a.rewardCaps > 0) add("+${a.rewardCaps} caps")
     a.rewardItemId?.let { id -> Items.byId(id)?.let { add(it.name) } }
 }.joinToString(", ")
+
+/** The Pokémon-Go layer: real shops near you become traders/medics/… — buy, talk, and track your travel. */
+@Composable
+private fun WastelandPanel(
+    locations: List<GameLocation>,
+    travel: TravelStats,
+    scanning: Boolean,
+    gps: DeviceLocation?,
+    ch: Character,
+    c: NightwirePalette,
+    onScan: () -> Unit,
+    onBuy: (String) -> Unit,
+    onTalk: (Encounter) -> Unit,
+) {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("WASTELAND MAP", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.sky, letterSpacing = 1.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TravelStat("WALKED", Geo.formatDistance(travel.distanceM), c)
+                TravelStat("PLACES", "${travel.placesVisited}", c)
+                TravelStat("PLAYED", formatPlayTime(travel.playMs), c)
+            }
+            GameButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", c.sky, onScan)
+            if (locations.isEmpty()) {
+                Text(
+                    if (gps == null) "No fix yet. Grant location and give it a moment."
+                    else "Nothing scanned. Tap SCAN AREA to find real shops nearby.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                )
+            } else {
+                locations.forEach { loc ->
+                    val dist = gps?.let { Geo.distanceMeters(it.latitude, it.longitude, loc.lat, loc.lon) }
+                    LocationRow(loc, dist, selectedId == loc.id, c) {
+                        selectedId = if (selectedId == loc.id) null else loc.id
+                    }
+                    if (selectedId == loc.id) LocationSheet(loc, ch, c, onBuy, onTalk)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TravelStat(label: String, value: String, c: NightwirePalette) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+        Text(label, fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted, letterSpacing = 1.sp)
+    }
+}
+
+@Composable
+private fun LocationRow(loc: GameLocation, distanceM: Double?, open: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, if (open) c.sky.copy(alpha = 0.7f) else c.line, RoundedCornerShape(4.dp))
+            .background(c.sky.copy(alpha = if (open) 0.1f else 0.04f))
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(loc.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink)
+            Text("${loc.kind.title} · ${loc.kind.role}", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
+        if (distanceM != null) {
+            Text(Geo.formatDistance(distanceM), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.sky)
+        }
+    }
+}
+
+@Composable
+private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette, onBuy: (String) -> Unit, onTalk: (Encounter) -> Unit) {
+    val npc = GameLocations.npcName(loc.kind, loc.id.hashCode())
+    Column(
+        Modifier.fillMaxWidth().padding(top = 4.dp, start = 8.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(GameLocations.greeting(loc.kind, npc), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        Text("WARES", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.amber, letterSpacing = 1.sp)
+        GameLocations.stock(loc.kind).forEach { id ->
+            Items.byId(id)?.let { item -> ShopRow(item, ch.caps >= item.value, c) { onBuy(id) } }
+        }
+        GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc)) }
+    }
+}
+
+@Composable
+private fun ShopRow(item: Item, affordable: Boolean, c: NightwirePalette, onBuy: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(item.name, fontFamily = JetBrainsMono, fontSize = 10.sp, color = if (affordable) c.ink else c.muted)
+            Text(item.desc, fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted)
+        }
+        val col = if (affordable) c.amber else c.muted
+        Box(
+            Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, col.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+                .background(col.copy(alpha = 0.1f))
+                .then(if (affordable) Modifier.clickable(onClick = onBuy) else Modifier)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            Text("BUY ${item.value}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col)
+        }
+    }
+}
+
+/** "1h 23m" / "12m" / "45s" from a play-time in ms. */
+private fun formatPlayTime(ms: Long): String {
+    val totalSec = ms / 1000
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return when {
+        h > 0 -> "${h}h ${m}m"
+        m > 0 -> "${m}m"
+        else -> "${s}s"
+    }
+}
 
 /** A rough pass-odds label for a stat check — how many of the 10 die faces would succeed. */
 private fun oddsLabel(stat: Int, difficulty: Int, luck: Int): String {

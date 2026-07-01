@@ -263,6 +263,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
             runCatching { app.container.securityAuditStore.flushNow() }
+            runCatching { app.container.gameWorldStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(
