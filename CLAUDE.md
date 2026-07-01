@@ -905,6 +905,21 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   the camera/mic sampler is wired; **read-only** (completion detection + reward granting is the next slice).
   ⚠️ On-device-unverified (CI compile-gates only); the profile/task stores load app-wide via J.A.R.V.I.S., so
   quests fill in as those load (graceful — the combine re-emits).
+- **Slice 5 — quest completion + reward loop (this slice):** the QUESTS panel is now a real loop.
+  `core:telemetry/QuestLog.kt` (+ `QuestLogTest`, 11 cases, locally green) is the pure completion engine:
+  `QuestMetrics` (live counters) + `ActiveQuest` (an issued quest FROZEN with a metric baseline) + `QuestLogState`
+  (active + `completedIds`) → `progress` (delta from baseline for walk/wins/ventures/places; absolute for
+  survive-day / task-left-pending), `isComplete`, `view`, and `sync` (retire completions → reward, top up from
+  freshly-composed quests by new id only [never re-issue a completed id → no farming; daily dodges this via the
+  day-in-id]). `data/game/QuestStore.kt` persists `QuestLogState` (mirrors ProfileStore; **Mutex-guarded
+  read-modify-write** so rapid emissions can't double-complete), exposes `quests: StateFlow<List<QuestView>>` +
+  `completed: SharedFlow<Quest>`. `TelemetryViewModel` drives `questStore.sync(composed, metrics)` from a
+  `combine` (interests + tasks + nearby + `game.metricsFlow` + `_day`), collects `completed` →
+  `game.awardQuest(caps, xp)` (new `SpecialGameStore` method: caps + `SpecialGame.gainXp`) + a one-shot
+  `questCompleted` banner. UI: `QuestCard` now shows a **progress bar + `done/target` + ✓ COMPLETE**, and a
+  **QUEST COMPLETE reward banner**. `resetGame` clears the quest log. Wired via `AppContainer.questStore` +
+  factory. ⚠️ On-device-unverified (CI compile-gates only). **Remaining life-sim slice:** the on-device
+  camera/mic sampler feeding `Perception.SceneSignals` (makes scene live; currently default/neutral).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

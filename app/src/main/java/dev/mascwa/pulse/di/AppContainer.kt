@@ -106,6 +106,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.game.GameWorldStore(appContext, json, overpassRepository)
     }
 
+    /** Persists + tracks the personalised quest log (completion + rewards) for the life-sim. */
+    val questStore: dev.mascwa.pulse.data.game.QuestStore by lazy {
+        dev.mascwa.pulse.data.game.QuestStore(appContext, json)
+    }
+
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)

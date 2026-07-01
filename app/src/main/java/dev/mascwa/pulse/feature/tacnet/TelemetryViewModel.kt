@@ -9,6 +9,8 @@ import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.LifeContext
 import dev.mascwa.pulse.core.telemetry.ProfileCategory
 import dev.mascwa.pulse.core.telemetry.Quest
+import dev.mascwa.pulse.core.telemetry.QuestMetrics
+import dev.mascwa.pulse.core.telemetry.QuestView
 import dev.mascwa.pulse.core.telemetry.SceneContext
 import dev.mascwa.pulse.core.telemetry.StoryDirector
 import dev.mascwa.pulse.core.telemetry.TaskBoard
@@ -46,6 +48,7 @@ class TelemetryViewModel(
     private val gameWorld: dev.mascwa.pulse.data.game.GameWorldStore,
     private val profileStore: dev.mascwa.pulse.data.profile.ProfileStore,
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
+    private val questStore: dev.mascwa.pulse.data.game.QuestStore,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -79,18 +82,19 @@ class TelemetryViewModel(
     }
 
     /**
-     * Personalised quests generated from your real life — pending tasks (TaskStore), profiled interests
-     * (ProfileStore), the real places nearby (GameWorldStore) and the day/level. Recomposes whenever any of
-     * those change. Scene stays default until the on-device camera/mic sampler is wired. Pure + deterministic
-     * via [StoryDirector]; read-only surface for now (completion/reward tracking is a follow-up).
+     * Drives the quest log: composes personalised quests from your real life — pending tasks (TaskStore),
+     * profiled interests (ProfileStore), the real places nearby (GameWorldStore) and the day/level — paired
+     * with a live [QuestMetrics] snapshot (from the game metrics + travel), whenever any of those change.
+     * Scene stays default until the on-device camera/mic sampler is wired. Pure + deterministic via
+     * [StoryDirector]; the [questStore] then tracks completion + rewards.
      */
-    val quests: StateFlow<List<Quest>> = combine(
+    private val questDriver = combine(
         profileStore.entriesFlow,
         taskStore.tasksFlow,
         gameWorld.locationsFlow,
-        game.characterFlow,
+        game.metricsFlow,
         _day,
-    ) { entries, tasks, locs, character, day ->
+    ) { entries, tasks, locs, gm, day ->
         val interests = entries
             .filter {
                 it.category == ProfileCategory.INTEREST ||
@@ -99,18 +103,46 @@ class TelemetryViewModel(
             }
             .sortedByDescending { it.weight }
             .map { it.text }
-        StoryDirector.compose(
+        val pending = TaskBoard.pending(tasks).map { it.title }
+        val composed = StoryDirector.compose(
             LifeContext(
                 interests = interests,
-                pendingTasks = TaskBoard.pending(tasks).map { it.title },
+                pendingTasks = pending,
                 scene = SceneContext(),
                 nearbyKinds = locs.map { it.kind }.toSet(),
                 day = day,
-                level = character.level,
+                level = gm.level,
             ),
             seed = day.toLong(),
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        val metrics = QuestMetrics(
+            distanceM = gm.distanceM, wins = gm.wins, ventures = gm.ventures,
+            places = gm.placesVisited, day = day, pendingTasks = pending.toSet(),
+        )
+        composed to metrics
+    }
+
+    /** The live quest log, rendered with progress + completion — for the QUESTS panel. */
+    val quests: StateFlow<List<QuestView>> = questStore.quests
+
+    private val _questDone = MutableStateFlow<Quest?>(null)
+    /** The most-recently-completed quest, for a one-shot reward banner (cleared via [dismissQuestComplete]). */
+    val questCompleted: StateFlow<Quest?> = _questDone.asStateFlow()
+    fun dismissQuestComplete() { _questDone.value = null }
+
+    init {
+        // Subscribe to completions FIRST (so a first-tick completion isn't missed), then drive the log on
+        // every life/metric change; grant rewards + a one-shot banner as quests complete.
+        viewModelScope.launch {
+            questStore.completed.collect { q ->
+                game.awardQuest(q.rewardCaps, q.rewardXp)
+                _questDone.value = q
+            }
+        }
+        viewModelScope.launch {
+            questDriver.collect { (composed, metrics) -> questStore.sync(composed, metrics) }
+        }
+    }
 
     // --- Achievements (the grind: app usage + game progress → rewards) ---
     val unlockedAchievements: StateFlow<Set<String>> = game.unlockedFlow
@@ -171,7 +203,7 @@ class TelemetryViewModel(
     /** Get back up after being downed. */
     fun revive() = game.revive()
     /** Start the game over with a fresh operative. */
-    fun resetGame() = game.reset()
+    fun resetGame() { game.reset(); questStore.clear() }
 
     /** Distil the live telemetry snapshot + cached weather + clock into the game's [EnvContext]. */
     private fun buildEnv(t: Telemetry): EnvContext {

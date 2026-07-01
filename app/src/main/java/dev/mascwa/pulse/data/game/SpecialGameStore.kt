@@ -500,6 +500,19 @@ class SpecialGameStore(
         }
     }
 
+    /** Grant a completed quest's reward — caps + XP (with any level-ups) — into the character. */
+    fun awardQuest(caps: Int, xp: Int) {
+        scope.launch {
+            ensureLoaded()
+            var c = _character.value
+            if (caps != 0) c = c.copy(caps = (c.caps + caps).coerceAtLeast(0))
+            if (xp != 0) c = SpecialGame.gainXp(c, xp)
+            _character.value = c
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
         flushJob = scope.launch {

@@ -89,7 +89,9 @@ import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
 import dev.mascwa.pulse.core.telemetry.Quest
+import dev.mascwa.pulse.core.telemetry.QuestGoal
 import dev.mascwa.pulse.core.telemetry.QuestKind
+import dev.mascwa.pulse.core.telemetry.QuestView
 import dev.mascwa.pulse.core.telemetry.Recipe
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
@@ -138,6 +140,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val daily by vm.daily.collectAsStateWithLifecycle()
     val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
     val quests by vm.quests.collectAsStateWithLifecycle()
+    val questDone by vm.questCompleted.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -193,6 +196,10 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                     color = c.amber, letterSpacing = 2.sp,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
+            }
+            questDone?.let { q ->
+                QuestCompleteBanner(q, c) { vm.dismissQuestComplete() }
+                Spacer(Modifier.height(8.dp))
             }
             if (quests.isNotEmpty()) {
                 QuestsPanel(quests, c)
@@ -1062,6 +1069,26 @@ private fun UnlockBanner(a: Achievement, c: NightwirePalette, onDismiss: () -> U
     }
 }
 
+@Composable
+private fun QuestCompleteBanner(q: Quest, c: NightwirePalette, onDismiss: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("✓ QUEST COMPLETE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = c.amber, letterSpacing = 1.sp)
+                Text(q.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+                Text("Reward · +${q.rewardXp} XP · +${q.rewardCaps} caps", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber)
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, c.muted.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                    .clickable(onClick = onDismiss).padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text("OK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.muted)
+            }
+        }
+    }
+}
+
 /** A compact "+40 XP, +30 caps, Field Medkit" reward summary for an achievement. */
 private fun rewardText(a: Achievement): String = buildList {
     if (a.rewardXp > 0) add("+${a.rewardXp} XP")
@@ -1123,23 +1150,26 @@ private fun WastelandPanel(
 
 /** The personalised quest board — your real tasks/interests/nearby places/day, as Fallout missions. */
 @Composable
-private fun QuestsPanel(quests: List<Quest>, c: NightwirePalette) {
+private fun QuestsPanel(quests: List<QuestView>, c: NightwirePalette) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("QUESTS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
                 color = c.amber, letterSpacing = 1.sp)
-            quests.forEach { q -> QuestCard(q, c) }
+            quests.forEach { v -> QuestCard(v, c) }
         }
     }
 }
 
 @Composable
-private fun QuestCard(q: Quest, c: NightwirePalette) {
+private fun QuestCard(v: QuestView, c: NightwirePalette) {
+    val q = v.quest
     val kindColor = when (q.kind) {
         QuestKind.MAIN -> c.amber
         QuestKind.SIDE -> c.ink
         QuestKind.DAILY -> c.positive
     }
+    val frac = if (q.target > 0) (v.done.toFloat() / q.target).coerceIn(0f, 1f) else 1f
+    val unit = if (q.goal == QuestGoal.WALK_DISTANCE) " m" else ""
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
             .border(1.dp, kindColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
@@ -1155,8 +1185,15 @@ private fun QuestCard(q: Quest, c: NightwirePalette) {
         }
         Text(q.brief, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
         Text(q.source, fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted)
-        Text("REWARD · ${q.rewardXp} XP · ${q.rewardCaps} caps", fontFamily = ChakraPetch,
-            fontWeight = FontWeight.Bold, fontSize = 8.sp, color = c.amber, letterSpacing = 0.5.sp)
+        SegBar(frac, if (v.complete) c.positive else kindColor, c)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (v.complete) "✓ COMPLETE" else "${v.done} / ${q.target}$unit",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = if (v.complete) c.positive else c.muted,
+            )
+            Text("${q.rewardXp} XP · ${q.rewardCaps} caps", fontFamily = ChakraPetch,
+                fontWeight = FontWeight.Bold, fontSize = 8.sp, color = c.amber, letterSpacing = 0.5.sp)
+        }
     }
 }
 
