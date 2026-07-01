@@ -145,6 +145,18 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val c = Pulse.colors
 
     val context = LocalContext.current
+
+    // Ambient seeing needs the camera permission — request it once when the game screen opens; the sampler
+    // stays a no-op until granted, then vm.start() picks it up (labels feed the perceived scene).
+    val requestCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.start()
+    }
+    LaunchedEffect(Unit) {
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            runCatching { requestCamera.launch(android.Manifest.permission.CAMERA) }
+        }
+    }
+
     val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {

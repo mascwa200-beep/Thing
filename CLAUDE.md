@@ -955,6 +955,23 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   hears/senses (voices→CHARISMA, motion/dark→AGILITY/PERCEPTION/ENDURANCE) biases which encounters appear.
   +1 core test (76 SpecialGame-suite green). This closes the perception→gameplay loop for the AUDIO half; the
   camera "sees" half (ImageClassifier + CameraX) remains the last slice.
+- **Slice 8 — on-device ambient SEEING (camera; owner chose "alternate back + front"):** the perception
+  brain now sees as well as hears. `data/perception/CameraPerceptionSampler.kt` runs **CameraX ImageAnalysis
+  bound to a self-managed `LifecycleRegistry`** (the sampler IS its own `LifecycleOwner`, so it works
+  headless — no Activity), classifying brief frames through the **MediaPipe EfficientNet-Lite image
+  classifier fully on-device** (new deps: `tasks-vision` 0.10.21 + CameraX 1.4.1 core/camera2/lifecycle) →
+  object/scene `PerceptLabel`s. It **dwells on the BACK camera** (your surroundings) and **flips to the FRONT
+  every FRONT_EVERY cycles** for a brief peek (owner's choice; rebinds only on camera change). Privacy: only
+  text labels; each frame classified in memory + discarded, nothing stored/sent; fully defensive (no
+  CAMERA/model/hardware → publishes nothing → neutral scene). ~4 MB model fetched once (`HttpClient.download`
+  → filesDir, out of the APK). `TelemetryViewModel.sceneContext` grew to a **4-arg combine** (sounds + scenes
+  + movement + light) → `Perception.distill`, so real `Setting` (INDOOR/OUTDOOR/VEHICLE) now comes from what
+  the camera sees. Manifest gained `CAMERA` + `camera.any` (not required); the STAT tab requests CAMERA on
+  open (`vm.start()` re-picks it up on grant). Wired via `AppContainer.cameraPerceptionSampler` + factory;
+  start/stop tied to the game-screen lifecycle. **Completes camera/mic sensing — the game now sees, hears,
+  knows you, tracks days, and geofences.** ⚠️ On-device-unverified (CI compile-gates only, and the CameraX +
+  MediaPipe-vision API surface is validated only by CI having the jars): the camera path, model download,
+  back/front alternation, and permission flow are entirely owner-verify on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

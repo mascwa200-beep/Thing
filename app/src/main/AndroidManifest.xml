@@ -54,6 +54,11 @@
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Ambient SEEING for the life-sim: short camera frames are classified on-device (object/scene labels)
+         and immediately discarded — no image is ever stored or transmitted (opt-in, runtime-gated). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"

@@ -49,6 +49,10 @@ mediapipeGenai = "0.10.27"
 # MediaPipe Tasks Audio (YAMNet sound classification) — on-device ambient hearing for the life-sim.
 # 0.10.21 is the newest tasks-audio published to Google Maven (genai releases run ahead of it).
 mediapipeTasksAudio = "0.10.21"
+# MediaPipe Tasks Vision (EfficientNet-Lite image classification) — on-device ambient SEEING for the life-sim.
+mediapipeTasksVision = "0.10.21"
+# CameraX — the ambient camera sampler (ImageAnalysis bound to a headless lifecycle).
+camerax = "1.4.1"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -114,6 +118,12 @@ androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exop
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
 # On-device audio classification (YAMNet) — the life-sim's ambient hearing.
 mediapipe-tasks-audio = { group = "com.google.mediapipe", name = "tasks-audio", version.ref = "mediapipeTasksAudio" }
+# On-device image classification (EfficientNet-Lite) — the life-sim's ambient seeing.
+mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipeTasksVision" }
+# CameraX (ambient camera sampler).
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }

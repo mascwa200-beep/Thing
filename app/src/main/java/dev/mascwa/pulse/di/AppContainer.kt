@@ -116,6 +116,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.perception.AmbientPerceptionSampler(appContext, http)
     }
 
+    /** On-device ambient seeing (MediaPipe EfficientNet-Lite via CameraX) → the life-sim's SceneContext. */
+    val cameraPerceptionSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler by lazy {
+        dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
+    }
+
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)

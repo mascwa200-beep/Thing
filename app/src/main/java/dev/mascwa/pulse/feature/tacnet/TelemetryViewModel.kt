@@ -55,6 +55,7 @@ class TelemetryViewModel(
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
     private val questStore: dev.mascwa.pulse.data.game.QuestStore,
     private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
+    private val cameraSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -106,11 +107,13 @@ class TelemetryViewModel(
 
     val sceneContext: StateFlow<SceneContext> = combine(
         sampler.soundLabels,
+        cameraSampler.sceneLabels,
         movementIntensity.distinctUntilChanged { a, b -> moving(a) == moving(b) },
         telemetry.distinctUntilChanged { a, b -> lightBand(a.lightLux) == lightBand(b.lightLux) },
-    ) { sounds, move, t ->
+    ) { sounds, scenes, move, t ->
         Perception.distill(
             SceneSignals(
+                sceneLabels = scenes,
                 soundLabels = sounds,
                 lightLux = t.lightLux,
                 movement = move,
@@ -299,6 +302,7 @@ class TelemetryViewModel(
     fun start() {
         controller.start()
         sampler.start() // on-device ambient hearing while the game screen is open (no-op without mic)
+        cameraSampler.start() // on-device ambient seeing (no-op without the camera permission)
         _env.value = buildEnv(controller.telemetry.value)
         // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).
         viewModelScope.launch {
@@ -352,6 +356,7 @@ class TelemetryViewModel(
     fun stop() {
         controller.stop()
         sampler.stop() // release the mic when the game screen isn't visible
+        cameraSampler.stop() // release the camera when the game screen isn't visible
         ticker?.cancel()
     }
 
