@@ -301,9 +301,15 @@ class TelemetryViewModel(
 
     fun start() {
         controller.start()
-        sampler.start() // on-device ambient hearing while the game screen is open (no-op without mic)
-        cameraSampler.start() // on-device ambient seeing (no-op without the camera permission)
         _env.value = buildEnv(controller.telemetry.value)
+        // Ambient camera/mic sensing runs only when the owner has it enabled (privacy/battery control); the
+        // samplers are still individually no-ops without their permissions.
+        viewModelScope.launch {
+            if (runCatching { settings.current().ambientSensing }.getOrDefault(true)) {
+                sampler.start()      // on-device ambient hearing (no-op without mic)
+                cameraSampler.start() // on-device ambient seeing (no-op without the camera permission)
+            }
+        }
         // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).
         viewModelScope.launch {
             runCatching {

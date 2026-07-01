@@ -613,6 +613,14 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             // ----- Security & network (Trusted Network Mode + encryption) -----
             item {
                 PrefSection("Security & network") {
+                    PrefSwitch(
+                        "Ambient sensing (game)",
+                        "Let the S.P.E.C.I.A.L. game sense your surroundings via the camera + mic while its " +
+                            "screen is open — classified on-device to text labels only, nothing stored or sent. " +
+                            "Off = the game uses a neutral scene and the camera/mic are never touched.",
+                        checked = s.ambientSensing,
+                        onChange = { v -> vm.update { it.copy(ambientSensing = v) } },
+                    )
                     PrefClickable(
                         "Security auditor",
                         subtitle = "Read-only, local-only audit: app permissions, trust store, encryption & " +

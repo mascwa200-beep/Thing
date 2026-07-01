@@ -972,6 +972,18 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   knows you, tracks days, and geofences.** ⚠️ On-device-unverified (CI compile-gates only, and the CameraX +
   MediaPipe-vision API surface is validated only by CI having the jars): the camera path, model download,
   back/front alternation, and permission flow are entirely owner-verify on the Pixel.
+- **The full life-sim batch (gesture encounters + slices 1–8) merged to `main` as PR #259** (squash `a5a4b0e`);
+  dev branch re-synced. The game now sees, hears, knows you, tracks days, geofences, and rewards real-life
+  quests. **CI-green through the camera slice (#956).**
+
+### Life-sim follow-up — ambient-sensing privacy toggle (post-#259, new PR)
+Owner asked (re camera): the ambient camera/mic sensing activates the camera whenever the STAT screen opens
+(the GrapheneOS indicator lights up), so it needs an off switch. `AppSettings.ambientSensing` (default ON,
+serializable → backward-compatible); `TelemetryViewModel.start()` now gates `sampler.start()`/
+`cameraSampler.start()` on `settings.current().ambientSensing` (samplers stay individually no-op without
+their permissions too). Settings → **Security & network → "Ambient sensing (game)"** toggle. Takes effect on
+the next game-screen open (navigating to Settings pauses the game → stops the samplers → returning re-reads
+the setting). ⚠️ On-device-unverified (CI compile-gates only).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
