@@ -6,6 +6,12 @@ import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameClock
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.LifeContext
+import dev.mascwa.pulse.core.telemetry.ProfileCategory
+import dev.mascwa.pulse.core.telemetry.Quest
+import dev.mascwa.pulse.core.telemetry.SceneContext
+import dev.mascwa.pulse.core.telemetry.StoryDirector
+import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.sensors.Telemetry
 import dev.mascwa.pulse.data.usage.UsageRepository
 import dev.mascwa.pulse.data.sensors.TelemetryController
@@ -18,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -37,6 +44,8 @@ class TelemetryViewModel(
     private val weather: WeatherRepository,
     private val usage: UsageRepository,
     private val gameWorld: dev.mascwa.pulse.data.game.GameWorldStore,
+    private val profileStore: dev.mascwa.pulse.data.profile.ProfileStore,
+    private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -59,10 +68,49 @@ class TelemetryViewModel(
     private val _dayBanner = MutableStateFlow("")
     val dayBanner: StateFlow<String> = _dayBanner.asStateFlow()
 
+    /** The current wasteland day number — drives quest generation (a StateFlow so quests roll over daily). */
+    private val _day = MutableStateFlow(1)
+
     private fun updateDayBanner() {
+        val now = System.currentTimeMillis()
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        _dayBanner.value = GameClock.banner(game.startedFlow.value, System.currentTimeMillis(), hour)
+        _dayBanner.value = GameClock.banner(game.startedFlow.value, now, hour)
+        _day.value = GameClock.dayNumber(game.startedFlow.value, now)
     }
+
+    /**
+     * Personalised quests generated from your real life — pending tasks (TaskStore), profiled interests
+     * (ProfileStore), the real places nearby (GameWorldStore) and the day/level. Recomposes whenever any of
+     * those change. Scene stays default until the on-device camera/mic sampler is wired. Pure + deterministic
+     * via [StoryDirector]; read-only surface for now (completion/reward tracking is a follow-up).
+     */
+    val quests: StateFlow<List<Quest>> = combine(
+        profileStore.entriesFlow,
+        taskStore.tasksFlow,
+        gameWorld.locationsFlow,
+        game.characterFlow,
+        _day,
+    ) { entries, tasks, locs, character, day ->
+        val interests = entries
+            .filter {
+                it.category == ProfileCategory.INTEREST ||
+                    it.category == ProfileCategory.PROJECT ||
+                    it.category == ProfileCategory.PREFERENCE
+            }
+            .sortedByDescending { it.weight }
+            .map { it.text }
+        StoryDirector.compose(
+            LifeContext(
+                interests = interests,
+                pendingTasks = TaskBoard.pending(tasks).map { it.title },
+                scene = SceneContext(),
+                nearbyKinds = locs.map { it.kind }.toSet(),
+                day = day,
+                level = character.level,
+            ),
+            seed = day.toLong(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // --- Achievements (the grind: app usage + game progress → rewards) ---
     val unlockedAchievements: StateFlow<Set<String>> = game.unlockedFlow

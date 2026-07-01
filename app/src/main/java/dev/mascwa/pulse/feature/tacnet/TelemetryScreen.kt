@@ -88,6 +88,8 @@ import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
+import dev.mascwa.pulse.core.telemetry.Quest
+import dev.mascwa.pulse.core.telemetry.QuestKind
 import dev.mascwa.pulse.core.telemetry.Recipe
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
@@ -135,6 +137,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val daily by vm.daily.collectAsStateWithLifecycle()
     val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
+    val quests by vm.quests.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -190,6 +193,10 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                     color = c.amber, letterSpacing = 2.sp,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
+            }
+            if (quests.isNotEmpty()) {
+                QuestsPanel(quests, c)
+                Spacer(Modifier.height(8.dp))
             }
             lastUnlock?.let { a ->
                 UnlockBanner(a, c) { vm.dismissUnlock() }
@@ -1111,6 +1118,45 @@ private fun WastelandPanel(
                 }
             }
         }
+    }
+}
+
+/** The personalised quest board — your real tasks/interests/nearby places/day, as Fallout missions. */
+@Composable
+private fun QuestsPanel(quests: List<Quest>, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("QUESTS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.amber, letterSpacing = 1.sp)
+            quests.forEach { q -> QuestCard(q, c) }
+        }
+    }
+}
+
+@Composable
+private fun QuestCard(q: Quest, c: NightwirePalette) {
+    val kindColor = when (q.kind) {
+        QuestKind.MAIN -> c.amber
+        QuestKind.SIDE -> c.ink
+        QuestKind.DAILY -> c.positive
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, kindColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+            .background(kindColor.copy(alpha = 0.05f))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("◆ ${q.kind.label}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 8.sp,
+                color = kindColor, letterSpacing = 1.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(q.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink)
+        }
+        Text(q.brief, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        Text(q.source, fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted)
+        Text("REWARD · ${q.rewardXp} XP · ${q.rewardCaps} caps", fontFamily = ChakraPetch,
+            fontWeight = FontWeight.Bold, fontSize = 8.sp, color = c.amber, letterSpacing = 0.5.sp)
     }
 }
 

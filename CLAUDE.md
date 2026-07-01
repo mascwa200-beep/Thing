@@ -894,6 +894,17 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   origin for transparency; no profile/task text leaves the device. **NOT yet wired:** next is a `QuestStore`
   pulling interests (ProfileStore) + tasks (TaskStore) + nearby kinds (GameWorldStore) + day/level →
   `compose`, a QUESTS surface, and completion/reward tracking.
+- **Slice 4 — quest director WIRED + QUESTS surface (this slice):** `TelemetryViewModel` gained
+  `profileStore` + `taskStore` (via `PulseViewModelFactory`) and a `quests: StateFlow<List<Quest>>` built by
+  `combine`-ing `profileStore.entriesFlow` (INTEREST/PROJECT/PREFERENCE → interests, weight-sorted) +
+  `taskStore.tasksFlow` (`TaskBoard.pending` → titles) + `gameWorld.locationsFlow` (→ nearby `LocationKind`s)
+  + `game.characterFlow` (level) + a `_day` StateFlow (from `GameClock.dayNumber`, updated each tick so
+  quests roll over daily) → `StoryDirector.compose(seed = day)`. New **QUESTS panel** on the STAT tab
+  (`QuestsPanel`/`QuestCard` — MAIN gold / SIDE white / DAILY green, brief + `source` + reward). Your real
+  tasks/interests/nearby places now show as Fallout missions. **Scene stays default `SceneContext()`** until
+  the camera/mic sampler is wired; **read-only** (completion detection + reward granting is the next slice).
+  ⚠️ On-device-unverified (CI compile-gates only); the profile/task stores load app-wide via J.A.R.V.I.S., so
+  quests fill in as those load (graceful — the combine re-emits).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
