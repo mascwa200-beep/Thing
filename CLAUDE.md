@@ -883,6 +883,17 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   CI-gated. **Privacy invariant:** only text-label summaries reach the core — no pixels/audio, nothing leaves
   the device. **NOT yet wired** (foundation): next is the on-device camera/mic sampler + classifier feeding
   `SceneSignals`, then folding `strategy.favored` into encounter selection + `flavor` into the story director.
+- **Slice 3 — story/quest director core (this slice):** `core:telemetry/StoryDirector.kt` (+
+  `StoryDirectorTest`, 11 cases, locally kotlinc-validated + green) — the "knows about you" generative
+  payoff. `compose(LifeContext, seed)` builds up to 4 personalised `Quest`s from your real life: a **MAIN**
+  from your top pending task (`COMPLETE_TASK`, else a `SURVIVE_DAYS` arc), a **SIDE** from a profiled
+  interest (`WALK_DISTANCE` when you're out/moving, else `VENTURE`), a **SIDE** `VISIT_KIND` for a real place
+  nearby (ties to the geofenced map), and a **DAILY** `WIN_ENCOUNTERS` scaled to level + flavoured by the
+  perceived `SceneContext`. Every `QuestGoal` is a real-world signal the game already tracks, so playing
+  nudges your actual life. Deterministic given (context, seed) → CI-gated; `source` names the real-life
+  origin for transparency; no profile/task text leaves the device. **NOT yet wired:** next is a `QuestStore`
+  pulling interests (ProfileStore) + tasks (TaskStore) + nearby kinds (GameWorldStore) + day/level →
+  `compose`, a QUESTS surface, and completion/reward tracking.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
