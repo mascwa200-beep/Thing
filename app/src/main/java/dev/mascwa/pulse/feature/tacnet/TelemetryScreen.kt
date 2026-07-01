@@ -51,6 +51,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.Choice
+import dev.mascwa.pulse.core.telemetry.Encounter
+import dev.mascwa.pulse.core.telemetry.Resolution
+import dev.mascwa.pulse.core.telemetry.Special
+import dev.mascwa.pulse.core.telemetry.SpecialGame
 import dev.mascwa.pulse.data.sensors.Telemetry
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PipHeader
@@ -80,6 +86,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val gps by vm.gps.collectAsStateWithLifecycle()
     val log by vm.log.collectAsStateWithLifecycle()
     val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
+    val character by vm.character.collectAsStateWithLifecycle()
+    val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
+    val resolution by vm.gameResolution.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -114,7 +123,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
     ) {
             PipHeader("Operator")
-            OperatorPortrait(portraitUri, dev.mascwa.pulse.BuildConfig.VERSION_CODE, c) {
+            OperatorPortrait(portraitUri, character.level, c) {
                 runCatching { pickPortrait.launch(arrayOf("image/*")) }
             }
 
@@ -128,7 +137,13 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             EffectsPanel(t, gps != null, c)
 
             PipHeader("S.P.E.C.I.A.L.")
-            SpecialPanel(t, c)
+            SpecialGamePanel(
+                character, encounter, resolution, c,
+                onVenture = { vm.venture() },
+                onChoose = { vm.choose(it) },
+                onAllocate = { vm.allocate(it) },
+                onRevive = { vm.revive() },
+            )
 
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
@@ -472,62 +487,211 @@ private fun EffectsPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
     }
 }
 
-/** A Fallout S.P.E.C.I.A.L. attribute, mapped to a real device capability (1–10). */
-private data class SpecialStat(val letter: Char, val name: String, val value: Int, val desc: String)
+// ---- S.P.E.C.I.A.L. — a playable wasteland RPG. The seven stats gate encounter choices; play to
+//      earn XP/caps, level up, and allocate points. The character persists (SpecialGameStore). ----
 
-/** The 7 SPECIAL attributes derived from live device state — iconic Fallout, grounded in real data:
- *  Strength = power, Perception = sensors, Endurance = thermal, Charisma = link, Intelligence = memory,
- *  Agility = free headroom, Luck = the build. */
-private fun specialStats(t: Telemetry): List<SpecialStat> {
-    fun pct10(p: Int) = (1 + p * 9 / 100).coerceIn(1, 10)
-    val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
-    val freeMem = if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100) / t.memTotalMb).toInt() else 0
-    val sensors = listOf(t.pressureHpa, t.magneticUt, t.lightLux, t.accelG, t.gyroDps).count { it != null }
-    val temp = t.batteryTempC ?: 25f
-    val endurance = (((45f - temp) / 25f) * 10f).toInt().coerceIn(1, 10)
-    val charisma = (if (t.netType.isNotBlank()) 8 else 2).coerceIn(1, 10)
-    val intelligence = (t.memTotalMb / 1500).toInt().coerceIn(1, 10)
-    val level = dev.mascwa.pulse.BuildConfig.VERSION_CODE
-    return listOf(
-        SpecialStat('S', "STRENGTH", pct10(bat), "Power reserves — what you carry through the day."),
-        SpecialStat('P', "PERCEPTION", (1 + sensors * 9 / 5).coerceIn(1, 10), "Sensor acuity — awareness of your surroundings."),
-        SpecialStat('E', "ENDURANCE", endurance, "Resilience — staying cool under load."),
-        SpecialStat('C', "CHARISMA", charisma, "Connection — your link to the world."),
-        SpecialStat('I', "INTELLIGENCE", intelligence, "Cognition — the memory to think with."),
-        SpecialStat('A', "AGILITY", pct10(freeMem), "Responsiveness — free headroom to act fast."),
-        SpecialStat('L', "LUCK", (level % 10) + 1, "Fortune — favours the prepared. (Build $level)"),
-    )
-}
-
-/** The S.P.E.C.I.A.L. readout (Fallout STATS>SPECIAL): the seven attributes as device capabilities. */
 @Composable
-private fun SpecialPanel(t: Telemetry, c: NightwirePalette) {
+private fun SpecialGamePanel(
+    ch: Character,
+    encounter: Encounter?,
+    resolution: Resolution?,
+    c: NightwirePalette,
+    onVenture: () -> Unit,
+    onChoose: (Int) -> Unit,
+    onAllocate: (Special) -> Unit,
+    onRevive: () -> Unit,
+) {
     PipFrame(Modifier.fillMaxWidth()) {
-        Column { specialStats(t).forEach { SpecialRow(it, c) } }
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            GameVitals(ch, c)
+            Spacer(Modifier.height(4.dp))
+            if (ch.unspent > 0) {
+                Text(
+                    "LEVEL UP — ${ch.unspent} point${if (ch.unspent > 1) "s" else ""} to spend. Tap ＋ to raise a stat.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                    modifier = Modifier.padding(vertical = 3.dp),
+                )
+            }
+            Special.entries.forEach { s ->
+                SpecialGameRow(s, ch.stat(s), ch.unspent > 0 && ch.stat(s) < 10, c) { onAllocate(s) }
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    when {
+        ch.down -> DownedPanel(c, onRevive)
+        encounter != null -> EncounterPanel(encounter, ch, c, onChoose)
+        else -> IdlePanel(resolution, c, onVenture)
     }
 }
 
-/** One SPECIAL row: the letter, the attribute name + description, and the 1–10 value on the right. */
 @Composable
-private fun SpecialRow(s: SpecialStat, c: NightwirePalette) {
+private fun GameVitals(ch: Character, c: NightwirePalette) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text("LVL ${ch.level}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.accent)
+        Text("◆ ${ch.caps} CAPS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.amber)
+        Text(
+            "HP ${ch.hp}/${ch.maxHp}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            color = if (ch.hp <= ch.maxHp / 4) c.negative else c.positive,
+        )
+    }
+    SegBar((ch.xp.toFloat() / ch.xpToNext).coerceIn(0f, 1f), c.accent, c)
+    Text("XP ${ch.xp} / ${ch.xpToNext}", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+}
+
+@Composable
+private fun SegBar(frac: Float, color: Color, c: NightwirePalette) {
+    Canvas(Modifier.fillMaxWidth().height(6.dp)) {
+        val segs = 24
+        val gap = 2f
+        val segW = (size.width - gap * (segs - 1)) / segs
+        val lit = (frac.coerceIn(0f, 1f) * segs).roundToInt()
+        val dim = c.lineSoft.copy(alpha = 0.35f)
+        for (i in 0 until segs) {
+            drawRect(if (i < lit) color else dim, topLeft = Offset(i * (segW + gap), 0f), size = Size(segW, size.height))
+        }
+    }
+}
+
+@Composable
+private fun SpecialGameRow(s: Special, value: Int, canAllocate: Boolean, c: NightwirePalette, onAllocate: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .drawBehind {
                 drawRect(c.accent.copy(alpha = 0.08f))
                 drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
             }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("${s.letter}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp,
-            color = c.accent, modifier = Modifier.width(26.dp))
+            color = c.accent, modifier = Modifier.width(24.dp))
         Column(Modifier.weight(1f)) {
-            Text(s.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+            Text(s.display, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
                 color = c.ink, letterSpacing = 0.8.sp)
-            Text(s.desc, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+            Text(s.blurb, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
         }
-        Text("${s.value}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp,
+        Text("$value", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp,
             color = c.accent, modifier = Modifier.padding(start = 10.dp))
+        if (canAllocate) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(26.dp).clip(RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.18f))
+                    .border(1.dp, c.amber.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).clickable(onClick = onAllocate),
+                contentAlignment = Alignment.Center,
+            ) { Text("＋", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.amber) }
+        }
+    }
+}
+
+@Composable
+private fun EncounterPanel(e: Encounter, ch: Character, c: NightwirePalette, onChoose: (Int) -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(e.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = c.amber, letterSpacing = 1.sp)
+            Text(e.prompt, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+            e.choices.forEachIndexed { i, choice -> ChoiceButton(choice, ch, c) { onChoose(i) } }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceButton(choice: Choice, ch: Character, c: NightwirePalette, onClick: () -> Unit) {
+    val gate = choice.stat
+    val tag = if (gate == null) "SAFE" else oddsLabel(ch.stat(gate), choice.difficulty, ch.stat(Special.LUCK))
+    val tagColor = when (tag) {
+        "SURE", "SAFE" -> c.positive
+        "LIKELY" -> c.accent
+        "EVEN" -> c.ink
+        "RISKY" -> c.amber
+        else -> c.negative
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = 0.05f))
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(choice.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+            Text(
+                if (gate == null) "no check" else "${gate.display} check · DC ${choice.difficulty}",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Text(tag, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = tagColor, letterSpacing = 1.sp)
+    }
+}
+
+/** A rough pass-odds label for a stat check — how many of the 10 die faces would succeed. */
+private fun oddsLabel(stat: Int, difficulty: Int, luck: Int): String {
+    val passes = (1..SpecialGame.DIE).count { SpecialGame.check(stat, difficulty, luck, it).success }
+    return when {
+        passes >= 9 -> "SURE"
+        passes >= 6 -> "LIKELY"
+        passes == 5 -> "EVEN"
+        passes >= 2 -> "RISKY"
+        else -> "LONGSHOT"
+    }
+}
+
+@Composable
+private fun IdlePanel(resolution: Resolution?, c: NightwirePalette, onVenture: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (resolution != null) {
+                val o = resolution.outcome
+                Text(
+                    if (resolution.crit) "CRITICAL SUCCESS" else if (resolution.success) "SUCCESS" else "FAILURE",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp,
+                    color = if (resolution.success) c.positive else c.negative,
+                )
+                Text(o.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+                val rewards = buildList {
+                    if (o.xp > 0) add("+${o.xp} XP")
+                    if (o.caps != 0) add("${if (o.caps > 0) "+" else ""}${o.caps} caps")
+                    if (o.hp != 0) add("${if (o.hp > 0) "+" else ""}${o.hp} HP")
+                    if (o.statPoint) add("+1 point")
+                }.joinToString("    ")
+                if (rewards.isNotBlank()) {
+                    Text(rewards, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.amber)
+                }
+            } else {
+                Text(
+                    "The wasteland waits. Venture out — your S.P.E.C.I.A.L. decides how it goes.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                )
+            }
+            GameButton(if (resolution != null) "VENTURE ON ▸" else "VENTURE OUT ▸", c.accent, onVenture)
+        }
+    }
+}
+
+@Composable
+private fun DownedPanel(c: NightwirePalette, onRevive: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.negative) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("YOU WENT DOWN", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = c.negative, letterSpacing = 1.sp)
+            Text(
+                "The wasteland got the better of you. Patch up to venture again — it'll cost a quarter of your caps.",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            GameButton("PATCH UP ✚", c.negative, onRevive)
+        }
+    }
+}
+
+@Composable
+private fun GameButton(label: String, color: Color, onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp, color = color)
     }
 }
 

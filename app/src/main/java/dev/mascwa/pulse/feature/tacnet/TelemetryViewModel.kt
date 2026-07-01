@@ -26,9 +26,31 @@ class TelemetryViewModel(
     private val controller: TelemetryController,
     private val location: LocationProvider,
     private val settings: SettingsRepository,
+    private val game: dev.mascwa.pulse.data.game.SpecialGameStore,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
+
+    // --- S.P.E.C.I.A.L. game (the STAT-tab wasteland RPG) ---
+    /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
+    val character: StateFlow<dev.mascwa.pulse.core.telemetry.Character> = game.characterFlow
+    /** The most recent encounter outcome to surface, or null. */
+    val gameResolution: StateFlow<dev.mascwa.pulse.core.telemetry.Resolution?> = game.resolutionFlow
+    /** The encounter the player is currently facing, derived from the character. */
+    val currentEncounter: StateFlow<dev.mascwa.pulse.core.telemetry.Encounter?> =
+        game.characterFlow.map { game.encounterFor(it) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Draw the next encounter to face. */
+    fun venture() = game.venture()
+    /** Resolve a choice in the active encounter (rolls the die). */
+    fun choose(choiceIndex: Int) = game.choose(choiceIndex)
+    /** Spend an unspent point on a stat. */
+    fun allocate(s: dev.mascwa.pulse.core.telemetry.Special) = game.allocate(s)
+    /** Get back up after being downed. */
+    fun revive() = game.revive()
+    /** Start the game over with a fresh operative. */
+    fun resetGame() = game.reset()
 
     /** The user's chosen operator portrait (content URI) for the STATUS>CND section, or "" if none. */
     val portraitUri: StateFlow<String> = settings.settings

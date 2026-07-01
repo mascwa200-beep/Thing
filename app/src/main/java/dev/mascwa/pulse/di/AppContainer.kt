@@ -96,6 +96,10 @@ class AppContainer(private val appContext: Context) {
     val taskStore: dev.mascwa.pulse.data.tasks.TaskStore by lazy {
         dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
     }
+    /** The S.P.E.C.I.A.L. game save (STAT-tab wasteland RPG) — character sheet + current encounter. */
+    val specialGameStore: dev.mascwa.pulse.data.game.SpecialGameStore by lazy {
+        dev.mascwa.pulse.data.game.SpecialGameStore(appContext, json)
+    }
 
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
