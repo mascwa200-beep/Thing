@@ -139,6 +139,41 @@ class RefreshWorker(
             }
         }
 
+        // --- Hardware-attestation posture into the ledger: record ONLY when the verdict changes (a posture
+        // change — bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost — is a real security
+        // event; identical verdicts are deduped so the append-only log isn't spammed). Local-only probe, no
+        // network; the secure-element probe is throttled to ~6h so it doesn't run on every worker tick. ---
+        runCatching {
+            val now = System.currentTimeMillis()
+            val attestIntervalMs = 6L * 60 * 60 * 1000 // probe the secure element at most every ~6h
+            if (now - settings.lastAttestationCheckMs >= attestIntervalMs) {
+                val report = container.deviceAttestation.run()
+                val v = report.verdict
+                val sig: String
+                val detail: String
+                if (v != null) {
+                    sig = "${v.grapheneVerified}|${v.hardwareBacked}|${v.strongBox}|${v.bootloaderLocked}|" +
+                        "${v.verifiedBoot}|${report.info?.verifiedBootKeyHex.orEmpty()}"
+                    detail = v.summary
+                } else {
+                    sig = "unavailable|${report.error.orEmpty()}"
+                    detail = "attestation unavailable" + (report.error?.let { ": ${it.take(80)}" }.orEmpty())
+                }
+                if (sig != settings.lastAttestationSig) {
+                    container.auditLedgerStore.record(
+                        dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
+                        "device.attestation",
+                        detail,
+                    )
+                    container.settingsRepository.update {
+                        it.copy(lastAttestationSig = sig, lastAttestationCheckMs = now)
+                    }
+                } else {
+                    container.settingsRepository.update { it.copy(lastAttestationCheckMs = now) }
+                }
+            }
+        }
+
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         runCatching {
             val now = System.currentTimeMillis()

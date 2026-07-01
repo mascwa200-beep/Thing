@@ -305,6 +305,11 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
+    /** Stateless hardware key-attestation probe (StrongBox-backed). Read-only; used to record the device's
+     *  security posture into the audit ledger when it changes. */
+    val deviceAttestation: dev.mascwa.pulse.core.device.DeviceAttestation by lazy {
+        dev.mascwa.pulse.core.device.DeviceAttestation()
+    }
     val debugUploader: dev.mascwa.pulse.data.diagnostics.DebugUploader by lazy {
         dev.mascwa.pulse.data.diagnostics.DebugUploader(
             appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository, auditLedgerStore,
