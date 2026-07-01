@@ -747,7 +747,19 @@ S.P.E.C.I.A.L. section becomes the game, OPERATOR LEVEL → the character's game
   (VENTURE OUT / last outcome + rewards + VENTURE ON), `DownedPanel` (PATCH UP). OPERATOR "LEVEL" now shows
   the character's game level, not `BuildConfig.VERSION_CODE`. All in the existing Pip-Boy style (`PipFrame`,
   `ChakraPetch`/`JetBrainsMono`, palette). ⚠️ On-device-unverified (CI compile-gates only): the play loop
-  render + persistence on the Pixel.
+  render + persistence on the Pixel. (Slices 1–3 merged as #241.)
+- **Slice 4 — perks + more content (this slice):** `core:telemetry/Perks.kt` (`Perk` + 11 perks: per-stat
+  +2-to-checks, Scrounger +25% caps, Fast Learner +25% XP, Field Medic heal-on-win, Born Lucky easier crits).
+  Engine: `Character` gains `perks: Set<String>` + `perkPicks`; `gainXp` grants a perk pick every EVEN level;
+  `check` gained an optional `critMargin` (default `CRIT_MARGIN`, backward-compat); `resolve` applies the
+  owned perks (stat bonus to the check, easier crit margin, and on a win scales caps/XP + heals); new
+  `choosePerk`/`perkStatBonus`. `SpecialEncounters` grew 19 → 28 (super-mutant, mole rats, caravan job,
+  power-armor frame, number station, stray dog, sandstorm, card sharp, sniper). `SpecialGameTest` +8 perk
+  cases (30 total). Store persists `perks`/`perkPicks` (defaulted → old saves load) + `choosePerk`; VM
+  delegates; UI adds a `PerkChoicePanel` (shown when `perkPicks > 0`, lists un-owned perks) + an owned-perks
+  line. Validated: kotlinc frontend clean + a Python twin (9/9, truncating division to match Kotlin `/`).
+  ⚠️ On-device-unverified (CI compile-gates only). **Open follow-ups (offered):** stats also fed by real
+  app-usage XP; more encounter content.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

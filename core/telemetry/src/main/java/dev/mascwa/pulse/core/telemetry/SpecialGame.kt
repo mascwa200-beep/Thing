@@ -63,6 +63,8 @@ data class Character(
     val unspent: Int = 0,
     val seen: Set<String> = emptySet(),
     val currentEncounterId: String? = null,
+    val perks: Set<String> = emptySet(),
+    val perkPicks: Int = 0,
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -104,6 +106,9 @@ object SpecialGame {
     /** A pass this far over the difficulty (or a natural [DIE]) is a critical — doubled XP + bonus caps. */
     const val CRIT_MARGIN = 6
 
+    /** The [CRIT_MARGIN] the "Born Lucky" perk swaps in — crits come easier. */
+    const val LUCKY_CRIT_MARGIN = 3
+
     /** A fresh operative: every stat at [Character.START_STAT], with [Character.START_POINTS] to spend. */
     fun newCharacter(): Character {
         val base = Special.entries.associateWith { Character.START_STAT }
@@ -116,7 +121,7 @@ object SpecialGame {
      * natural 1 always fails. Otherwise `stat + roll + luckMod ≥ difficulty`, where LUCK tilts the odds
      * by (luck − 5) / 2 (i.e. −2 at LUCK 1 … +2 at LUCK 10).
      */
-    fun check(statValue: Int, difficulty: Int, luck: Int, roll: Int): CheckResult {
+    fun check(statValue: Int, difficulty: Int, luck: Int, roll: Int, critMargin: Int = CRIT_MARGIN): CheckResult {
         val luckMod = (luck - 5) / 2
         val total = statValue + roll + luckMod
         val success = when {
@@ -124,7 +129,7 @@ object SpecialGame {
             roll <= 1 -> false
             else -> total >= difficulty
         }
-        val crit = success && (roll >= DIE || total >= difficulty + CRIT_MARGIN)
+        val crit = success && (roll >= DIE || total >= difficulty + critMargin)
         return CheckResult(success, crit, total, roll)
     }
 
@@ -137,15 +142,25 @@ object SpecialGame {
         val choice = encounter.choices.getOrNull(choiceIndex)
             ?: return Resolution(false, false, Outcome("Nothing happens."), character, roll)
 
+        val critMargin = if (perkLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
-            check(character.stat(choice.stat), choice.difficulty, character.stat(Special.LUCK), roll)
+            val statValue = character.stat(choice.stat) + perkStatBonus(character, choice.stat)
+            check(statValue, choice.difficulty, character.stat(Special.LUCK), roll, critMargin)
         }
 
         var outcome = if (result.success) choice.success else choice.failure
         if (result.crit && result.success) {
             outcome = outcome.copy(xp = outcome.xp * 2, caps = outcome.caps + outcome.caps / 2)
+        }
+        // Perks reward success: +% caps / +% XP, and a little healing.
+        if (result.success) {
+            outcome = outcome.copy(
+                caps = pctScale(outcome.caps, perkCapsPct(character)),
+                xp = pctScale(outcome.xp, perkXpPct(character)),
+                hp = outcome.hp + perkHealOnWin(character),
+            )
         }
 
         var updated = applyOutcome(character, outcome)
@@ -160,16 +175,40 @@ object SpecialGame {
         var level = character.level
         var xp = character.xp + amount
         var unspent = character.unspent
+        var perkPicks = character.perkPicks
         var leveled = false
         while (xp >= level * Character.XP_PER_LEVEL) {
             xp -= level * Character.XP_PER_LEVEL
             level++
             unspent++
+            if (level % 2 == 0) perkPicks++ // a perk to pick every even level
             leveled = true
         }
-        val advanced = character.copy(level = level, xp = xp, unspent = unspent)
+        val advanced = character.copy(level = level, xp = xp, unspent = unspent, perkPicks = perkPicks)
         return if (leveled) advanced.copy(hp = advanced.maxHp) else advanced
     }
+
+    /** Choose a perk (spends a perk pick; no-op without a pick, an unknown id, or one already owned). */
+    fun choosePerk(character: Character, perkId: String): Character {
+        if (character.perkPicks <= 0) return character
+        if (perkId in character.perks) return character
+        if (Perks.byId(perkId) == null) return character
+        return character.copy(perks = character.perks + perkId, perkPicks = character.perkPicks - 1)
+    }
+
+    // --- Perk effect resolution (an owned perk set → its stacked bonuses) ---
+    private fun owned(c: Character): List<Perk> = Perks.ALL.filter { it.id in c.perks }
+
+    /** Total bonus a character's perks grant to checks gated by [s]. */
+    fun perkStatBonus(c: Character, s: Special): Int = owned(c).filter { it.statBonus == s }.sumOf { it.statBonusAmt }
+
+    private fun perkCapsPct(c: Character): Int = owned(c).sumOf { it.capsBonusPct }
+    private fun perkXpPct(c: Character): Int = owned(c).sumOf { it.xpBonusPct }
+    private fun perkHealOnWin(c: Character): Int = owned(c).sumOf { it.healOnWin }
+    private fun perkLuckierCrits(c: Character): Boolean = owned(c).any { it.luckierCrits }
+
+    /** Scale a positive reward by a percentage (no-op for zero pct or non-positive rewards). */
+    private fun pctScale(value: Int, pct: Int): Int = if (pct == 0 || value <= 0) value else value + value * pct / 100
 
     /** Spend one unspent point on [s] (no-op at 0 points or when the stat is already 10). */
     fun allocate(character: Character, s: Special): Character {
