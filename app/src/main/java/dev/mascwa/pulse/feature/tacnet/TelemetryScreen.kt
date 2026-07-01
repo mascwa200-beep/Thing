@@ -61,6 +61,9 @@ import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Companion
 import dev.mascwa.pulse.core.telemetry.Companions
+import dev.mascwa.pulse.core.telemetry.DailyObjective
+import dev.mascwa.pulse.core.telemetry.DailyObjectives
+import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
@@ -68,6 +71,7 @@ import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.Environment
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.game.DailyState
 import dev.mascwa.pulse.data.game.TravelStats
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.Item
@@ -119,6 +123,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val locations by vm.locations.collectAsStateWithLifecycle()
     val travel by vm.travel.collectAsStateWithLifecycle()
     val scanning by vm.scanning.collectAsStateWithLifecycle()
+    val daily by vm.daily.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -169,6 +174,10 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             PipHeader("S.P.E.C.I.A.L.")
             lastUnlock?.let { a ->
                 UnlockBanner(a, c) { vm.dismissUnlock() }
+                Spacer(Modifier.height(8.dp))
+            }
+            if (daily.objectives.isNotEmpty()) {
+                DailyPanel(daily, c) { vm.claimDaily(it) }
                 Spacer(Modifier.height(8.dp))
             }
             SpecialGamePanel(
@@ -1125,6 +1134,51 @@ private fun CompanionHireRow(comp: Companion, affordable: Boolean, c: NightwireP
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) {
             Text("HIRE ${comp.cost}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col, letterSpacing = 0.5.sp)
+        }
+    }
+}
+
+/** Daily objectives — three rotating goals a day, each claimable when done, feeding the play streak. */
+@Composable
+private fun DailyPanel(daily: DailyState, c: NightwirePalette, onClaim: (String) -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.positive) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("DAILY OBJECTIVES", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                    color = c.positive, letterSpacing = 1.sp)
+                if (daily.streak > 0) {
+                    Text("▲ ${daily.streak}-DAY STREAK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp, color = c.amber, letterSpacing = 0.5.sp)
+                }
+            }
+            daily.objectives.forEach { o -> DailyObjRow(o, daily.metrics, o.id in daily.claimed, c) { onClaim(o.id) } }
+        }
+    }
+}
+
+@Composable
+private fun DailyObjRow(o: DailyObjective, m: TodayMetrics, claimed: Boolean, c: NightwirePalette, onClaim: () -> Unit) {
+    val done = DailyObjectives.isComplete(o, m)
+    val prog = DailyObjectives.progress(o, m)
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            val reward = buildList {
+                if (o.rewardXp > 0) add("+${o.rewardXp} XP")
+                if (o.rewardCaps > 0) add("+${o.rewardCaps} caps")
+                o.rewardItemId?.let { id -> Items.byId(id)?.let { add(it.name) } }
+            }.joinToString(", ")
+            Text(o.description, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                color = if (claimed) c.muted else c.ink)
+            Spacer(Modifier.height(2.dp))
+            SegBar((prog.toFloat() / o.target).coerceIn(0f, 1f), c.positive, c)
+            Text("$prog / ${o.target}${if (reward.isNotEmpty()) "  ·  $reward" else ""}",
+                fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        when {
+            claimed -> Text("✓", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.positive)
+            done -> InvAction("CLAIM", c.positive, onClaim)
+            else -> Text("${(prog * 100 / o.target.coerceAtLeast(1))}%", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
         }
     }
 }

@@ -60,6 +60,11 @@ class TelemetryViewModel(
     val gameMetrics: StateFlow<GameMetrics> = game.metricsFlow
     fun dismissUnlock() = game.dismissUnlock()
 
+    // --- Daily objectives (the daily grind loop) ---
+    val daily: StateFlow<dev.mascwa.pulse.data.game.DailyState> = game.dailyFlow
+    /** Claim a completed daily objective's reward. */
+    fun claimDaily(objectiveId: String) = game.claimDaily(objectiveId)
+
     // --- Wasteland map (real shops → game locations + real-world travel) ---
     val locations: StateFlow<List<dev.mascwa.pulse.core.telemetry.GameLocation>> = gameWorld.locationsFlow
     val travel: StateFlow<dev.mascwa.pulse.data.game.TravelStats> = gameWorld.travelFlow
