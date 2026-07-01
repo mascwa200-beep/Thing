@@ -11,21 +11,34 @@ class PerceptionTest {
     private fun sound(vararg labels: String) = labels.map { PerceptLabel(it, 0.8f) }
 
     @Test fun outdoorMovingDaytime() {
-        val ctx = Perception.distill(SceneSignals(sceneLabels = scene("city street", "sky"), motionG = 1.3f, hourOfDay = 12))
+        val ctx = Perception.distill(SceneSignals(sceneLabels = scene("city street", "sky"), movement = 0.3f, hourOfDay = 12))
         assertEquals(Setting.OUTDOOR, ctx.setting)
         assertEquals(Activity.MOVING, ctx.activity)
         assertEquals(DayPhase.DAY, ctx.phase)
     }
 
     @Test fun vehicleFromDashboardAndRoad() {
-        val ctx = Perception.distill(SceneSignals(sceneLabels = scene("dashboard", "road"), motionG = 1.4f))
+        val ctx = Perception.distill(SceneSignals(sceneLabels = scene("dashboard", "road"), movement = 0.3f))
         assertEquals(Setting.VEHICLE, ctx.setting)
         assertEquals(Activity.COMMUTING, ctx.activity)
     }
 
     @Test fun vehicleFromEngineSoundWhileMoving() {
-        val ctx = Perception.distill(SceneSignals(soundLabels = sound("engine"), motionG = 1.5f))
+        val ctx = Perception.distill(SceneSignals(soundLabels = sound("engine"), movement = 0.3f))
         assertEquals(Setting.VEHICLE, ctx.setting)
+    }
+
+    @Test fun restingPhoneIsStill() {
+        // The reported bug: a still phone read as "moving". A tiny movement intensity (noise/bias) is STILL.
+        assertEquals(Activity.STILL, Perception.distill(SceneSignals(movement = 0.03f)).activity)
+        assertEquals(Activity.STILL, Perception.distill(SceneSignals(movement = 0.07f)).activity) // brief handling
+    }
+
+    @Test fun engineSoundWhileStationaryIsNotAVehicle() {
+        // Hearing traffic/an engine while at rest must NOT read as "in transit".
+        val ctx = Perception.distill(SceneSignals(soundLabels = sound("engine", "traffic"), movement = 0.02f))
+        assertEquals(Activity.STILL, ctx.activity)
+        assertEquals(false, ctx.setting == Setting.VEHICLE)
     }
 
     @Test fun indoorWithVoices() {

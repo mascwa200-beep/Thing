@@ -937,6 +937,17 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   voice is active → falls back to neutral, by design). **Next (camera half):** an ImageClassifier
   (`tasks-vision` + CameraX + CAMERA permission) for scene/object labels → the "sees" half; wiring
   `SceneStrategy.favored` into encounter *selection* (currently only flavours the story).
+- **BUG FIX — "it thinks I'm moving while stationary":** both "moving" derivations thresholded the RAW
+  gravity-inclusive accel magnitude (`accelG = |a|/g`, ~1.0 at rest), so sensor bias/handling could trip
+  them and the `distinctUntilChanged` throttle then *stuck* on MOVING. Fixed by switching to a **smoothed
+  deviation-from-rest intensity** (`EWMA(|accelG − 1|)`, ~0 at rest): (a) `Perception.SceneSignals.motionG`→
+  **`movement`** (intensity), `MOTION_MOVING_G 1.10`→`MOVEMENT_THRESHOLD 0.09`, `moving = movement ≥ 0.09`;
+  VEHICLE now also **requires motion** (engine sounds while stationary ≠ in transit). (b) `Environment`
+  (the game's stat-modifier world) had the SAME bug — `EnvContext.motionG`→**`movement`**, `MOVING_G 1.3`→
+  `MOVING_INTENSITY 0.09` (drives the CONDITIONS "On the move" AGI+1/PER−1 + the "moving" encounter tag).
+  (c) `TelemetryViewModel.movementIntensity` = an Eagerly `StateFlow` (EWMA, `MOTION_SMOOTH 0.8`) feeding
+  BOTH `sceneContext` and `buildEnv`. +4 core tests (resting/handling → STILL; stationary engine ≠ vehicle);
+  83 core tests green. Owner-tunable consts. ⚠️ Threshold feel is on-device-tunable on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

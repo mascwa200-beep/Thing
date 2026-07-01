@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -91,22 +92,28 @@ class TelemetryViewModel(
      * the live light/motion sensors and the clock. Drives the quest director's flavour + (future) encounter
      * strategy. Neutral until the sampler produces labels; light/motion/time keep it partially live regardless.
      */
-    // Coarse buckets mirroring Perception's own thresholds — so tiny accelerometer/light jitter doesn't
-    // re-run the distillation on every sensor event (only when a perception-relevant boundary is crossed).
+    // Coarse buckets so tiny sensor jitter doesn't re-run the distillation on every sensor event (only when
+    // a perception-relevant boundary is crossed).
     private fun lightBand(lux: Float?): Int = lux?.let { if (it < 12f) 0 else if (it >= 250f) 2 else 1 } ?: -1
-    private fun movingBucket(g: Float?): Boolean = (g ?: 0f) >= 1.10f
+    private fun moving(intensity: Float): Boolean = intensity >= Perception.MOVEMENT_THRESHOLD
+
+    // Smoothed movement intensity — an EWMA of the accelerometer's deviation from rest (|accel/g − 1|), NOT
+    // the raw ~1 g magnitude. A still phone reads ~0 (so it can't be mistaken for walking), and a brief
+    // handling spike is damped out. This is the fix for "it thinks I'm moving while stationary".
+    private val movementIntensity: StateFlow<Float> = telemetry.scan(0f) { ewma, t ->
+        ewma * MOTION_SMOOTH + kotlin.math.abs((t.accelG ?: 1f) - 1f) * (1f - MOTION_SMOOTH)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
 
     val sceneContext: StateFlow<SceneContext> = combine(
         sampler.soundLabels,
-        telemetry.distinctUntilChanged { a, b ->
-            lightBand(a.lightLux) == lightBand(b.lightLux) && movingBucket(a.accelG) == movingBucket(b.accelG)
-        },
-    ) { sounds, t ->
+        movementIntensity.distinctUntilChanged { a, b -> moving(a) == moving(b) },
+        telemetry.distinctUntilChanged { a, b -> lightBand(a.lightLux) == lightBand(b.lightLux) },
+    ) { sounds, move, t ->
         Perception.distill(
             SceneSignals(
                 soundLabels = sounds,
                 lightLux = t.lightLux,
-                motionG = t.accelG,
+                movement = move,
                 hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
             ),
         )
@@ -259,7 +266,7 @@ class TelemetryViewModel(
             lightLux = t.lightLux,
             pressureHpa = t.pressureHpa,
             altitudeM = t.pressureAltitudeM,
-            motionG = t.accelG,
+            movement = movementIntensity.value, // smoothed deviation-from-rest, not raw ~1 g magnitude
             batteryPct = t.batteryPct,
             charging = t.charging,
             hourOfDay = hour,
@@ -360,5 +367,7 @@ class TelemetryViewModel(
 
     private companion object {
         const val GPS_POLL_MS = 10_000L
+        // EWMA retention for the movement estimator (higher = smoother/slower; owner-tunable on the Pixel).
+        const val MOTION_SMOOTH = 0.8f
     }
 }

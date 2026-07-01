@@ -19,7 +19,13 @@ data class SceneSignals(
     val sceneLabels: List<PerceptLabel> = emptyList(),
     val soundLabels: List<PerceptLabel> = emptyList(),
     val lightLux: Float? = null,
-    val motionG: Float? = null,
+    /**
+     * Movement INTENSITY — ~0 when the device is at rest, rising with sustained motion. NOT the raw
+     * accelerometer magnitude (which sits at ~1 g at rest): the caller passes a smoothed deviation from
+     * 1 g (`|accel/g − 1|`), so a still phone reads ~0 and can't be mistaken for walking, and a brief
+     * handling spike is damped out. Null = unknown → treated as still.
+     */
+    val movement: Float? = null,
     val hourOfDay: Int = 12,
 )
 
@@ -85,7 +91,8 @@ object Perception {
     private val NATURE = setOf("bird", "wind", "water", "rain", "nature", "insect", "waves")
     private val SILENCE = setOf("silence", "quiet", "still")
 
-    private const val MOTION_MOVING_G = 1.10f  // |accel| above this ≈ walking/handling
+    /** Smoothed movement intensity at/above this ≈ genuinely on the move (a still phone reads ~0). */
+    const val MOVEMENT_THRESHOLD = 0.09f
     private const val LUX_DARK = 12f
     private const val LUX_BRIGHT = 250f
     private const val MIN_CONF = 0.30f         // labels below this confidence are ignored
@@ -104,10 +111,10 @@ object Perception {
         val vehicleHits = scene.hits(VEHICLE) + sound.hits(TRAFFIC)
         val outdoorHits = scene.hits(OUTDOOR)
         val indoorHits = scene.hits(INDOOR)
-        val moving = (s.motionG ?: 0f) >= MOTION_MOVING_G
+        val moving = (s.movement ?: 0f) >= MOVEMENT_THRESHOLD
 
         val setting = when {
-            vehicleHits >= 2 || (vehicleHits >= 1 && moving) -> Setting.VEHICLE
+            vehicleHits >= 1 && moving -> Setting.VEHICLE  // "in transit" needs real motion, not just engine sounds
             outdoorHits > indoorHits && outdoorHits > 0 -> Setting.OUTDOOR
             indoorHits > 0 -> Setting.INDOOR
             outdoorHits > 0 -> Setting.OUTDOOR

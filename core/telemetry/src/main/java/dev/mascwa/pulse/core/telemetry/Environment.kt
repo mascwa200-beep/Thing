@@ -23,8 +23,11 @@ data class EnvContext(
     val pressureHpa: Float? = null,
     /** Barometric altitude in metres (null without a barometer). */
     val altitudeM: Float? = null,
-    /** Acceleration magnitude in g. Around 1.0 at rest; higher means moving/shaky. */
-    val motionG: Float? = null,
+    /**
+     * Movement INTENSITY — ~0 at rest, rising with sustained motion (a smoothed deviation of the accel
+     * magnitude from 1 g, NOT the raw ~1 g magnitude), so a still phone can't be read as "moving".
+     */
+    val movement: Float? = null,
     /** Battery level 0..100 (null if unknown). */
     val batteryPct: Int? = null,
     /** Whether the device is charging (a low-battery penalty lifts while charging). */
@@ -53,7 +56,7 @@ object Environment {
     const val HIGH_ALT_M = 1500f
 
     // Motion (g) — moving helps AGILITY but hurts PERCEPTION focus.
-    const val MOVING_G = 1.3f
+    const val MOVING_INTENSITY = 0.09f  // smoothed movement intensity at/above this ≈ on the move
 
     // Battery — a failing device is bad luck.
     const val LOW_BATT = 15
@@ -87,7 +90,7 @@ object Environment {
             out += EnvEffect(Special.ENDURANCE, -1, "Thin air")
         }
 
-        if (env.motionG != null && env.motionG >= MOVING_G) {
+        if (env.movement != null && env.movement >= MOVING_INTENSITY) {
             out += EnvEffect(Special.AGILITY, +1, "On the move")
             out += EnvEffect(Special.PERCEPTION, -1, "Unsteady")
         }
@@ -119,7 +122,7 @@ object Environment {
         val dark = !env.isDay || (env.lightLux != null && env.lightLux <= DARK_LUX)
         out += if (dark) "night" else "day"
         if (env.altitudeM != null && env.altitudeM >= HIGH_ALT_M) out += "high_altitude"
-        if (env.motionG != null && env.motionG >= MOVING_G) out += "moving"
+        if (env.movement != null && env.movement >= MOVING_INTENSITY) out += "moving"
         if (env.batteryPct != null && env.batteryPct <= LOW_BATT && !env.charging) out += "low_power"
         if (!env.online) out += "offline"
         return out
