@@ -761,6 +761,54 @@ S.P.E.C.I.A.L. section becomes the game, OPERATOR LEVEL → the character's game
   ⚠️ On-device-unverified (CI compile-gates only). **Open follow-ups (offered):** stats also fed by real
   app-usage XP; more encounter content.
 
+### S.P.E.C.I.A.L. → a real-world game — the "bleed into reality" expansion (this session, #243–#248 all merged)
+Owner asked to grow the STAT-tab RPG into a game that "bleeds into the real world": achievements (usage-
+driven), inventory/items, NPCs/dialogue, real-world telemetry/temperature-driven checks, and a Pokémon-Go
+map on real shop data (places visited / distance / time). Built as **6 CI-green slices**, each squash-merged
++ re-synced. Pure logic went into `core:telemetry` (CI-gated); the Android layer is compile-gated only, and
+each large Android slice was adversarially compile-reviewed by a subagent before merge. **All on-device
+runtime behaviour (GPS/Overpass/weather/MapLibre render, persistence) is owner-verify — CI can't prove it.**
+- **Slice 1 (#243) — items + inventory + environment (pure core):** `core:telemetry/Items.kt` (22-item
+  catalog: AID heal / CHEM one-check buff / GEAR passive / JUNK sell / QUEST; original homage names) +
+  `Environment.kt` (`EnvContext` distilled from device+weather → deterministic stat modifiers: cold/heat
+  tax END, night hurts PER/helps AGI, thin air taxes END, motion helps AGI/hurts PER, low battery = bad
+  LUCK; effects stack). `SpecialGame.resolve` gained optional `env` + `useItemId`; `Character.inventory`,
+  `Outcome.items` loot; `addItem/removeItem/useAid/sellItem/buyItem/gearStatBonus`. +28 tests.
+- **Slice 2 + 3-core (#244) — on-device wiring + achievements engine:** `SpecialGameStore` persists
+  inventory + `choose(env,useItemId)`; `TelemetryViewModel` builds a live `EnvContext` each tick from
+  `Telemetry` + a best-effort `WeatherRepository` outdoor temp (→ °C via unit symbol). Loot drops on ~9
+  encounters. STAT-tab UI: **CONDITIONS** readout, **PACK** (USE/SELL), **PREP A CHEM** in encounters.
+  Plus `core:telemetry/Achievements.kt` (18-achievement catalog over combat/progression/economy/**app
+  usage**/**travel** with XP/caps/item rewards; `GameMetrics`/`evaluate`/`progress`/`applyReward`; +9 tests).
+- **Slice 3b (#245) — achievements live on-device:** `SpecialGameStore` gained lifetime counters
+  (wins/crits/ventures) + unlocked set, `runAchievementCheck` (grants rewards on unlock), split metrics
+  setters. VM feeds real usage (`setUsageMetrics`). STAT-tab **ACHIEVEMENTS** panel (progress bars) + a
+  one-shot **UNLOCK banner**.
+- **Slice 4 (#246) — locations/NPCs/dialogue (pure core):** `core:telemetry/GameLocations.kt` —
+  `LocationKind` (TRADER/MEDIC/FIXER/BARKEEP/OUTPOST), `GameLocation`, `NpcAction` (Shop|Talk),
+  `kindFor(osmCategory)`, `stock(kind)`, `npcName`/`greeting`, and `conversation()` = a repeatable
+  single-choice CHARISMA encounter reusing `SpecialGame.resolve` (perks/LUCK/env/crits all apply). +8 tests.
+- **Slice 5a (#247) — the real-world map (data + travel + shop/talk loop):** `data/game/GameWorldStore.kt`
+  — **per-kind Overpass queries** turn real OSM shops into `GameLocation`s (Place carries no category, so
+  classify by which query it came from); tracks walked distance (jitter/jump-filtered GPS deltas), distinct
+  locations reached (≤60 m), and time played — **aggregate + on-device only** (persisted blob is 3 numbers +
+  a set of ids, never a raw trace). `SpecialGameStore.buy`/`resolveTalk` + `setTravelMetrics`. VM polls GPS
+  every 10 s, accrues play-time, feeds travel achievements. STAT-tab **WASTELAND MAP** panel (WALKED/PLACES/
+  PLAYED + SCAN AREA + nearby list → per-location shop [buy, caps-gated] + TALK).
+- **Slice 5b (#248) — the literal MapLibre map:** `feature/tacnet/WastelandMap.kt` — clones NAV's MapLibre-
+  in-Compose wiring (lifecycle `MapView`, OpenFreeMap style, player + per-kind-coloured location
+  `CircleLayer`s via a GeoJSON `color` prop, tap→`queryRenderedFeatures`→select). **Compact/embedded:** map
+  gestures disabled so it pans with the player (recentre on first fix) and page-scroll passes through; taps
+  still select. Reuses the existing maplibre dep (no new deps). Map dot ids == `GameWorldStore` ids, so the
+  map and the list stay in sync.
+- **Verification pattern this run:** the pure cores were locally run with kotlinc 2.0.21 (needs
+  `trove4j` + `kotlinx-coroutines` + `annotations` on the compiler classpath — the earlier "enum codegen
+  crash" was really a missing-`trove4j` artifact, NOT a code issue); all game tests green (SpecialGame/
+  SpecialWorld/Achievements/GameLocations). Android slices: subagent compile-review (all returned clean) +
+  CI. **Open / owner-steerable:** the offered app-usage-XP + more-encounters follow-ups; a full-screen
+  wasteland map (embedded one has gestures off); a Settings "clear travel history" (store `clear()` exists,
+  UI not wired); haggle/discount at shops; richer branching dialogue.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
