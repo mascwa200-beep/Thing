@@ -35,6 +35,7 @@ class TelemetryViewModel(
     private val game: dev.mascwa.pulse.data.game.SpecialGameStore,
     private val weather: WeatherRepository,
     private val usage: UsageRepository,
+    private val gameWorld: dev.mascwa.pulse.data.game.GameWorldStore,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -58,6 +59,21 @@ class TelemetryViewModel(
     val lastUnlock: StateFlow<Achievement?> = game.lastUnlockFlow
     val gameMetrics: StateFlow<GameMetrics> = game.metricsFlow
     fun dismissUnlock() = game.dismissUnlock()
+
+    // --- Wasteland map (real shops → game locations + real-world travel) ---
+    val locations: StateFlow<List<dev.mascwa.pulse.core.telemetry.GameLocation>> = gameWorld.locationsFlow
+    val travel: StateFlow<dev.mascwa.pulse.data.game.TravelStats> = gameWorld.travelFlow
+    val scanning: StateFlow<Boolean> = gameWorld.scanningFlow
+
+    /** Scan the area around the last GPS fix for nearby real shops → game locations. */
+    fun scanArea() {
+        val loc = _gps.value ?: return
+        gameWorld.refresh(loc.latitude, loc.longitude)
+    }
+    /** Buy an item from a shop. */
+    fun buy(itemId: String) = game.buy(itemId)
+    /** Talk to an NPC — resolves the conversation with the current real-world context. */
+    fun talk(encounter: dev.mascwa.pulse.core.telemetry.Encounter) = game.resolveTalk(encounter, _env.value)
 
     // Outdoor temperature (°C) + daylight, fetched once from the weather service on start (best-effort).
     private var weatherTempC: Double? = null
@@ -126,7 +142,7 @@ class TelemetryViewModel(
         viewModelScope.launch {
             runCatching {
                 val snap = usage.snapshot()
-                game.setExternalMetrics(snap.totalEvents, snap.features.size, 0, 0)
+                game.setUsageMetrics(snap.totalEvents, snap.features.size)
             }
         }
         if (ticker?.isActive == true) return
@@ -135,6 +151,7 @@ class TelemetryViewModel(
                 if (!location.hasPermission()) return@launch
                 val loc = location.current() ?: return@launch
                 _gps.value = loc
+                gameWorld.onLocation(loc.latitude, loc.longitude)
                 // Best-effort outdoor temperature (in °C) + daylight, so the wasteland reacts to real weather.
                 runCatching {
                     val w = weather.fetch(loc.latitude, loc.longitude, loc.name, force = false).data
@@ -144,9 +161,24 @@ class TelemetryViewModel(
                     }
                 }
             }
+            // Real-world travel (distance/places) → travel achievements.
+            launch { gameWorld.travelFlow.collect { game.setTravelMetrics(it.distanceM.toInt(), it.placesVisited) } }
+            // Poll GPS periodically so walking accumulates distance + reaches nearby locations.
+            launch {
+                while (true) {
+                    delay(GPS_POLL_MS)
+                    if (location.hasPermission()) {
+                        location.current()?.let {
+                            _gps.value = it
+                            gameWorld.onLocation(it.latitude, it.longitude)
+                        }
+                    }
+                }
+            }
             while (true) {
                 controller.refreshSystem()
                 _env.value = buildEnv(controller.telemetry.value)
+                gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)
             }
@@ -167,5 +199,9 @@ class TelemetryViewModel(
         val lux = t.lightLux?.roundToInt()?.toString() ?: "--"
         val line = "[$ts] baro=${baro}hPa mag=${mag}uT g=$g lux=$lux net=${t.netType}"
         _log.update { (listOf(line) + it).take(40) }
+    }
+
+    private companion object {
+        const val GPS_POLL_MS = 10_000L
     }
 }

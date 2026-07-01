@@ -176,18 +176,52 @@ class SpecialGameStore(
         publishMetrics()
     }
 
-    /**
-     * Feed real app-usage + travel metrics in from the ViewModel (usage snapshot / travel tracker), then
-     * re-check the usage/travel achievements.
-     */
-    fun setExternalMetrics(appVisits: Int, distinctFeatures: Int, distanceM: Int, placesVisited: Int) {
+    /** Feed real app-usage metrics (from the usage snapshot); re-checks usage achievements. */
+    fun setUsageMetrics(appVisits: Int, distinctFeatures: Int) {
         scope.launch {
             ensureLoaded()
             extVisits = appVisits
             extFeatures = distinctFeatures
+            runAchievementCheck()
+        }
+    }
+
+    /** Feed real-world travel metrics (from the game-world tracker); re-checks travel achievements. */
+    fun setTravelMetrics(distanceM: Int, placesVisited: Int) {
+        scope.launch {
+            ensureLoaded()
             extDistanceM = distanceM
             extPlaces = placesVisited
             runAchievementCheck()
+        }
+    }
+
+    /** Buy one of [itemId] at a shop (spends caps via [SpecialGame.buyItem]); re-checks achievements. */
+    fun buy(itemId: String) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.buyItem(_character.value, itemId)
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /**
+     * Resolve an NPC conversation [encounter] (from [dev.mascwa.pulse.core.telemetry.GameLocations]) with a
+     * fresh die roll + the real-world [env]. Publishes the [Resolution] (so the shared banner shows the
+     * outcome) without touching the current wasteland encounter — conversations are repeatable.
+     */
+    fun resolveTalk(encounter: Encounter, env: EnvContext? = null) {
+        scope.launch {
+            ensureLoaded()
+            val roll = random.nextInt(1, SpecialGame.DIE + 1)
+            val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env)
+            _character.value = resolution.character
+            _resolution.value = resolution
+            if (resolution.success) wins++
+            if (resolution.crit) crits++
+            runAchievementCheck()
+            scheduleFlush()
         }
     }
 

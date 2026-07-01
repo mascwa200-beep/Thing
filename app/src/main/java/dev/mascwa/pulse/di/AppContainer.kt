@@ -101,6 +101,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.game.SpecialGameStore(appContext, json)
     }
 
+    /** The Pokémon-Go layer: real nearby shops → game locations + real-world travel tracking. */
+    val gameWorldStore: dev.mascwa.pulse.data.game.GameWorldStore by lazy {
+        dev.mascwa.pulse.data.game.GameWorldStore(appContext, json, overpassRepository)
+    }
+
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)
