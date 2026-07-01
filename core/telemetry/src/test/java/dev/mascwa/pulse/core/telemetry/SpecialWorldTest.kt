@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -211,5 +212,16 @@ class SpecialWorldTest {
         val r = SpecialGame.resolve(char(), enc, 0, roll = SpecialGame.DIE) // natural 10 → guaranteed win
         assertTrue(r.success)
         assertEquals(2, r.character.inventory["scrap_metal"])
+    }
+
+    @Test fun allEncounterLootIdsAreValid() {
+        // Guards against a typo in any hand-written encounter drop id (would silently drop nothing on-device).
+        SpecialEncounters.ALL.forEach { enc ->
+            enc.choices.forEach { ch ->
+                (ch.success.items.keys + ch.failure.items.keys).forEach { id ->
+                    assertNotNull("Unknown loot id '$id' in encounter ${enc.id}", Items.byId(id))
+                }
+            }
+        }
     }
 }

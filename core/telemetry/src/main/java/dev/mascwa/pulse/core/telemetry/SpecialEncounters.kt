@@ -12,8 +12,8 @@ object SpecialEncounters {
     private const val MED = 12
     private const val HARD = 16
 
-    private fun win(text: String, xp: Int, caps: Int = 0, hp: Int = 0, point: Boolean = false) =
-        Outcome(text, xp = xp, caps = caps, hp = hp, statPoint = point)
+    private fun win(text: String, xp: Int, caps: Int = 0, hp: Int = 0, point: Boolean = false, items: Map<String, Int> = emptyMap()) =
+        Outcome(text, xp = xp, caps = caps, hp = hp, statPoint = point, items = items)
 
     private fun lose(text: String, hp: Int = 0, caps: Int = 0) =
         Outcome(text, xp = 0, caps = caps, hp = hp)
@@ -25,7 +25,8 @@ object SpecialEncounters {
             prompt = "A pre-war vault door is jammed half-open. Cold air — and the glint of untouched supplies — leaks from the dark beyond.",
             choices = listOf(
                 Choice("Set your shoulder and heave it wide.", Special.STRENGTH, MED,
-                    win("Hinges shriek and give. The cache inside is yours.", xp = 32, caps = 30),
+                    win("Hinges shriek and give. The cache inside is yours.", xp = 32, caps = 30,
+                        items = mapOf("medkit" to 1, "scrap_metal" to 1)),
                     lose("It doesn't budge, and something in your back does instead.", hp = -10)),
                 Choice("Slip through the gap sideways.", Special.AGILITY, EASY,
                     win("You fold through the gap and grab what you can reach.", xp = 16, caps = 14),
@@ -52,7 +53,8 @@ object SpecialEncounters {
             prompt = "A humming RobCo terminal guards a sealed supply room. The password prompt blinks, patient.",
             choices = listOf(
                 Choice("Brute the login from the memory dump.", Special.INTELLIGENCE, HARD,
-                    win("Likely words fall away one by one — ACCESS GRANTED. The room is stocked.", xp = 60, caps = 45),
+                    win("Likely words fall away one by one — ACCESS GRANTED. The room is stocked.", xp = 60, caps = 45,
+                        items = mapOf("circuit_board" to 1, "focus_tabs" to 1)),
                     lose("LOCKOUT. The terminal fries a capacitor and your patience.", hp = -6)),
                 Choice("Rip the casing and hotwire it.", Special.STRENGTH, MED,
                     win("Sparks, a satisfying clunk — the door slides.", xp = 30, caps = 20),
@@ -100,7 +102,8 @@ object SpecialEncounters {
             prompt = "A slab of highway blocks the pass. There's a gap up top, and a crushed truck you could clear below.",
             choices = listOf(
                 Choice("Heave the truck's cab aside.", Special.STRENGTH, HARD,
-                    win("Steel groans and rolls. The way clears — and there's a stash in the cab.", xp = 58, caps = 40),
+                    win("Steel groans and rolls. The way clears — and there's a stash in the cab.", xp = 58, caps = 40,
+                        items = mapOf("grip_gloves" to 1, "scrap_metal" to 2)),
                     lose("It shifts, then settles back on your fingers.", hp = -12)),
                 Choice("Free-climb to the gap up top.", Special.AGILITY, MED,
                     win("Handhold by handhold, you crest the slab and drop clean on the far side.", xp = 32),
@@ -136,7 +139,8 @@ object SpecialEncounters {
             prompt = "A pre-war floor safe sits in the manager's office, dial intact, contents unknown.",
             choices = listOf(
                 Choice("Feel out the tumblers by ear.", Special.PERCEPTION, HARD,
-                    win("Three clicks and a turn. It swings open on a tidy stack of caps.", xp = 58, caps = 55),
+                    win("Three clicks and a turn. It swings open on a tidy stack of caps.", xp = 58, caps = 55,
+                        items = mapOf("owl_drops" to 1)),
                     lose("You lose the count and the dial resets. Again.", hp = 0)),
                 Choice("Pry the hinges with a crowbar.", Special.STRENGTH, MED,
                     win("The door peels back with a shriek. Not subtle, but effective.", xp = 30, caps = 30),
@@ -172,7 +176,8 @@ object SpecialEncounters {
             prompt = "Eggs — a whole clutch of them, worth a fortune to the right buyer. The mother is somewhere close.",
             choices = listOf(
                 Choice("Grab an egg and go, quiet as death.", Special.AGILITY, HARD,
-                    win("One egg, two heartbeats, and you're gone. She never wakes.", xp = 70, caps = 60),
+                    win("One egg, two heartbeats, and you're gone. She never wakes.", xp = 70, caps = 60,
+                        items = mapOf("rare_alloy" to 1, "adrenaline" to 1)),
                     lose("A talon catches your pack as you flee.", hp = -20)),
                 Choice("Trust the wasteland to look after you.", Special.LUCK, HARD,
                     win("The wind's your way, the mother's out hunting. You clean out the nest.", xp = 66, caps = 70, point = true),
@@ -220,7 +225,8 @@ object SpecialEncounters {
             prompt = "Clear water bubbles up between the rocks — the first you've seen in days. The geiger clicks softly.",
             choices = listOf(
                 Choice("Drink deep and trust your gut.", Special.ENDURANCE, MED,
-                    win("Your body shrugs off the rads. The water is worth a hundred caps of purified.", xp = 34, hp = 8),
+                    win("Your body shrugs off the rads. The water is worth a hundred caps of purified.", xp = 34, hp = 8,
+                        items = mapOf("clean_water" to 2)),
                     lose("It goes down cold and comes back up hot.", hp = -12)),
                 Choice("Test it before you touch it.", Special.PERCEPTION, EASY,
                     win("A filter, a look, a careful sip. Safe enough, and refreshing.", xp = 20, hp = 5),
@@ -256,7 +262,8 @@ object SpecialEncounters {
             prompt = "A brahmin caravan master eyes your gear. 'Guard us to the next town? Half now, half there — if we make it.'",
             choices = listOf(
                 Choice("Take the job and go the distance.", Special.ENDURANCE, MED,
-                    win("Three days, two ambushes, no losses. They pay in full, plus a bonus.", xp = 38, caps = 40),
+                    win("Three days, two ambushes, no losses. They pay in full, plus a bonus.", xp = 38, caps = 40,
+                        items = mapOf("ration_pack" to 2, "comms_badge" to 1)),
                     lose("You flag on the second day and they dock your pay.", hp = -8, caps = -5)),
                 Choice("Talk the fee up first.", Special.CHARISMA, EASY,
                     win("You name your worth and they pay it, grumbling.", xp = 20, caps = 22),
@@ -268,7 +275,8 @@ object SpecialEncounters {
             prompt = "A suit of power armor stands locked in a maintenance frame, fusion core still humming. The release is seized.",
             choices = listOf(
                 Choice("Trip the release logic.", Special.INTELLIGENCE, HARD,
-                    win("The frame hisses open. You strip a fortune in fusion cells and salvage.", xp = 64, caps = 60),
+                    win("The frame hisses open. You strip a fortune in fusion cells and salvage.", xp = 64, caps = 60,
+                        items = mapOf("rare_alloy" to 1, "leather_rig" to 1, "circuit_board" to 1)),
                     lose("You cross a wire and the frame clamps shut for good.", hp = -6)),
                 Choice("Force the frame arms apart.", Special.STRENGTH, HARD,
                     win("Steel screams and yields. The core alone is worth the sweat.", xp = 58, caps = 45),
@@ -341,7 +349,8 @@ object SpecialEncounters {
             prompt = "Another block of pre-war ruins. Rubble, rebar, and maybe something worth the dust in your lungs.",
             choices = listOf(
                 Choice("Dig through the likeliest pile.", Special.PERCEPTION, EASY,
-                    win("Under a slab: a cache of caps and a usable stimpak.", xp = 15, caps = 12, hp = 4),
+                    win("Under a slab: a cache of caps and a field dressing.", xp = 15, caps = 12, hp = 4,
+                        items = mapOf("bandage" to 1)),
                     lose("Just rubble and a splinter for your trouble.", hp = -3)),
                 Choice("Trust your gut on where to look.", Special.LUCK, MED,
                     win("Your instinct pays — a sealed footlocker, half full.", xp = 26, caps = 22),
@@ -353,10 +362,12 @@ object SpecialEncounters {
             prompt = "A caravan wreck rusts in the ditch, picked over but not, perhaps, all the way.",
             choices = listOf(
                 Choice("Force open the strongbox under the seat.", Special.STRENGTH, EASY,
-                    win("The lid pops. Caps, and a coil of good rope.", xp = 15, caps = 14),
+                    win("The lid pops. Caps, and a coil of good wire.", xp = 15, caps = 14,
+                        items = mapOf("wire_spool" to 1, "scrap_metal" to 1)),
                     lose("The box wins. Your knuckles lose.", hp = -4)),
                 Choice("Hotwire what's left of the electronics.", Special.INTELLIGENCE, MED,
-                    win("You coax the last charge out of a fusion cell — worth real caps.", xp = 26, caps = 24),
+                    win("You coax the last charge out of a fusion cell — worth real caps.", xp = 26, caps = 24,
+                        items = mapOf("circuit_board" to 1)),
                     lose("A stored charge bites back.", hp = -7)),
             ),
         ),

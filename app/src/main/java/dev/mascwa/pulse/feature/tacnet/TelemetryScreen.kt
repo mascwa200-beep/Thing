@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +58,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Encounter
+import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.Environment
+import dev.mascwa.pulse.core.telemetry.Item
+import dev.mascwa.pulse.core.telemetry.ItemKind
+import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
 import dev.mascwa.pulse.core.telemetry.Resolution
@@ -91,6 +100,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val character by vm.character.collectAsStateWithLifecycle()
     val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
     val resolution by vm.gameResolution.collectAsStateWithLifecycle()
+    val env by vm.env.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -140,12 +150,14 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 
             PipHeader("S.P.E.C.I.A.L.")
             SpecialGamePanel(
-                character, encounter, resolution, c,
+                character, encounter, resolution, env, c,
                 onVenture = { vm.venture() },
-                onChoose = { vm.choose(it) },
+                onChoose = { i, chem -> vm.choose(i, chem) },
                 onAllocate = { vm.allocate(it) },
                 onRevive = { vm.revive() },
                 onChoosePerk = { vm.choosePerk(it) },
+                onUseItem = { vm.useItem(it) },
+                onSellItem = { vm.sellItem(it) },
             )
 
             PipHeader("Vitals")
@@ -498,12 +510,15 @@ private fun SpecialGamePanel(
     ch: Character,
     encounter: Encounter?,
     resolution: Resolution?,
+    env: EnvContext,
     c: NightwirePalette,
     onVenture: () -> Unit,
-    onChoose: (Int) -> Unit,
+    onChoose: (Int, String?) -> Unit,
     onAllocate: (Special) -> Unit,
     onRevive: () -> Unit,
     onChoosePerk: (String) -> Unit,
+    onUseItem: (String) -> Unit,
+    onSellItem: (String) -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -528,6 +543,10 @@ private fun SpecialGamePanel(
             }
         }
     }
+    Spacer(Modifier.height(8.dp))
+    ConditionsPanel(env, c)
+    Spacer(Modifier.height(8.dp))
+    InventoryPanel(ch, c, onUseItem, onSellItem)
     if (ch.perkPicks > 0) {
         Spacer(Modifier.height(8.dp))
         PerkChoicePanel(ch, c, onChoosePerk)
@@ -537,6 +556,86 @@ private fun SpecialGamePanel(
         ch.down -> DownedPanel(c, onRevive)
         encounter != null -> EncounterPanel(encounter, ch, c, onChoose)
         else -> IdlePanel(resolution, c, onVenture)
+    }
+}
+
+/** The real world, made visible: how the current conditions bend your checks right now. */
+@Composable
+private fun ConditionsPanel(env: EnvContext, c: NightwirePalette) {
+    val effects = Environment.effects(env)
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("CONDITIONS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.sky, letterSpacing = 1.sp)
+            if (effects.isEmpty()) {
+                Text("Conditions nominal — the wasteland isn't tipping the scales.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            } else {
+                effects.forEach { e ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(e.reason, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink)
+                        Text(
+                            "${e.stat.display.take(3)} ${if (e.delta >= 0) "+" else "−"}${kotlin.math.abs(e.delta)}",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                            color = if (e.delta >= 0) c.positive else c.negative,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The player's pack: AID to heal, GEAR/CHEM held, junk to sell. USE (aid) + SELL per row. */
+@Composable
+private fun InventoryPanel(ch: Character, c: NightwirePalette, onUseItem: (String) -> Unit, onSellItem: (String) -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("PACK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.amber, letterSpacing = 1.sp)
+            val items = Items.ALL.mapNotNull { item ->
+                val qty = ch.inventory[item.id] ?: 0
+                if (qty > 0) item to qty else null
+            }
+            if (items.isEmpty()) {
+                Text("Empty. Venture out and loot the wasteland.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            } else {
+                items.forEach { (item, qty) -> InventoryRow(item, qty, c, onUseItem, onSellItem) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryRow(item: Item, qty: Int, c: NightwirePalette, onUseItem: (String) -> Unit, onSellItem: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.05f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("${item.name}${if (qty > 1) "  ×$qty" else ""}", fontFamily = ChakraPetch,
+                fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.ink)
+            Text(item.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+        if (item.kind == ItemKind.AID) {
+            InvAction("USE", c.positive) { onUseItem(item.id) }
+            Spacer(Modifier.width(8.dp))
+        }
+        InvAction("SELL ${(item.value / 2).coerceAtLeast(1)}", c.amber) { onSellItem(item.id) }
+    }
+}
+
+@Composable
+private fun InvAction(label: String, color: Color, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+            .background(color.copy(alpha = 0.1f)).clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
+        Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = color, letterSpacing = 0.5.sp)
     }
 }
 
@@ -634,21 +733,55 @@ private fun SpecialGameRow(s: Special, value: Int, canAllocate: Boolean, c: Nigh
 }
 
 @Composable
-private fun EncounterPanel(e: Encounter, ch: Character, c: NightwirePalette, onChoose: (Int) -> Unit) {
+private fun EncounterPanel(e: Encounter, ch: Character, c: NightwirePalette, onChoose: (Int, String?) -> Unit) {
+    // CHEMs the player is carrying — tap one to prep it; it fires only on a choice gated by its stat.
+    val chems = Items.ALL.filter { it.kind == ItemKind.CHEM && (ch.inventory[it.id] ?: 0) > 0 }
+    var selectedChem by remember(e.id) { mutableStateOf<String?>(null) }
     PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(e.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                 color = c.amber, letterSpacing = 1.sp)
             Text(e.prompt, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
-            e.choices.forEachIndexed { i, choice -> ChoiceButton(choice, ch, c) { onChoose(i) } }
+            if (chems.isNotEmpty()) {
+                Text("PREP A CHEM", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                    color = c.sky, letterSpacing = 1.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    chems.forEach { chem ->
+                        val on = selectedChem == chem.id
+                        ChemChip("${chem.name} +${chem.statBonusAmt} ${chem.statBonus?.letter ?: ' '}", on, c) {
+                            selectedChem = if (on) null else chem.id
+                        }
+                    }
+                }
+            }
+            e.choices.forEachIndexed { i, choice -> ChoiceButton(choice, ch, selectedChem, c) { onChoose(i, selectedChem) } }
         }
     }
 }
 
 @Composable
-private fun ChoiceButton(choice: Choice, ch: Character, c: NightwirePalette, onClick: () -> Unit) {
+private fun ChemChip(label: String, on: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    val col = if (on) c.sky else c.muted
+    Box(
+        Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, col.copy(alpha = if (on) 0.9f else 0.4f), RoundedCornerShape(3.dp))
+            .background(c.sky.copy(alpha = if (on) 0.16f else 0.04f)).clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, color = if (on) c.sky else c.ink)
+    }
+}
+
+@Composable
+private fun ChoiceButton(choice: Choice, ch: Character, selectedChem: String?, c: NightwirePalette, onClick: () -> Unit) {
     val gate = choice.stat
-    val tag = if (gate == null) "SAFE" else oddsLabel(ch.stat(gate), choice.difficulty, ch.stat(Special.LUCK))
+    // A prepped CHEM only counts toward the odds when it matches this choice's stat gate.
+    val chemBonus = if (gate != null) {
+        val chem = selectedChem?.let { Items.byId(it) }
+        if (chem != null && chem.kind == ItemKind.CHEM && chem.statBonus == gate && (ch.inventory[chem.id] ?: 0) > 0) chem.statBonusAmt else 0
+    } else 0
+    val bonus = if (gate != null) SpecialGame.perkStatBonus(ch, gate) + SpecialGame.gearStatBonus(ch, gate) + chemBonus else 0
+    val effStat = if (gate != null) ch.stat(gate) + bonus else 0
+    val tag = if (gate == null) "SAFE" else oddsLabel(effStat, choice.difficulty, ch.stat(Special.LUCK))
     val tagColor = when (tag) {
         "SURE", "SAFE" -> c.positive
         "LIKELY" -> c.accent
@@ -665,8 +798,12 @@ private fun ChoiceButton(choice: Choice, ch: Character, c: NightwirePalette, onC
         Column(Modifier.weight(1f)) {
             Text(choice.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
             Text(
-                if (gate == null) "no check" else "${gate.display} check · DC ${choice.difficulty}",
-                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp),
+                buildString {
+                    append(if (gate == null) "no check" else "${gate.display} check · DC ${choice.difficulty}")
+                    if (bonus != 0) append("  (${if (bonus > 0) "+" else ""}$bonus)")
+                },
+                fontFamily = JetBrainsMono, fontSize = 8.sp,
+                color = if (bonus > 0) c.positive else c.muted, modifier = Modifier.padding(top = 2.dp),
             )
         }
         Text(tag, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = tagColor, letterSpacing = 1.sp)
