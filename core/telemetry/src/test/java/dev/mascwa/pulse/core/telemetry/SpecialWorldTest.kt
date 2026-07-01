@@ -80,7 +80,7 @@ class SpecialWorldTest {
     }
 
     @Test fun motionHelpsAgilityHurtsPerception() {
-        val env = EnvContext(motionG = 1.5f)
+        val env = EnvContext(movement = 0.3f)
         assertEquals(1, Environment.statBonus(env, Special.AGILITY))
         assertEquals(-1, Environment.statBonus(env, Special.PERCEPTION))
     }

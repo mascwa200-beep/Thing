@@ -17,6 +17,20 @@ class SpecialGameTest {
         ),
     )
 
+    @Test fun nextEncounterBiasesTowardFavouredStats() {
+        val strengthEnc = Encounter("s", "S", "p", listOf(Choice("heave", Special.STRENGTH, 8, Outcome("w"), Outcome("l"))), repeatable = true)
+        val charismaEnc = Encounter("c", "C", "p", listOf(Choice("charm", Special.CHARISMA, 8, Outcome("w"), Outcome("l"))), repeatable = true)
+        val pool = listOf(strengthEnc, charismaEnc)
+        val c = SpecialGame.newCharacter()
+        // Favouring CHARISMA should pick the charisma encounter regardless of the roll (only one match).
+        assertEquals("c", SpecialGame.nextEncounter(c, pool, roll = 0, favored = setOf(Special.CHARISMA))?.id)
+        assertEquals("c", SpecialGame.nextEncounter(c, pool, roll = 1, favored = setOf(Special.CHARISMA))?.id)
+        // A favoured stat no encounter tests → falls back to the full pool (variety preserved).
+        assertNotNull(SpecialGame.nextEncounter(c, pool, roll = 0, favored = setOf(Special.LUCK)))
+        // No bias → original behaviour.
+        assertNotNull(SpecialGame.nextEncounter(c, pool, roll = 0))
+    }
+
     @Test
     fun newCharacterHasExpectedStart() {
         val c = SpecialGame.newCharacter()

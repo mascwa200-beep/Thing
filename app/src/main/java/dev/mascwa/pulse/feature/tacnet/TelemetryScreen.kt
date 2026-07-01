@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
 import dev.mascwa.pulse.core.telemetry.Character
@@ -68,7 +70,11 @@ import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
+import dev.mascwa.pulse.core.telemetry.GestureType
+import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.GameClock
+import dev.mascwa.pulse.core.telemetry.LocationGate
 import dev.mascwa.pulse.core.telemetry.LocationKind
 import dev.mascwa.pulse.core.telemetry.RepTier
 import dev.mascwa.pulse.core.telemetry.Reputation
@@ -82,6 +88,10 @@ import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
+import dev.mascwa.pulse.core.telemetry.Quest
+import dev.mascwa.pulse.core.telemetry.QuestGoal
+import dev.mascwa.pulse.core.telemetry.QuestKind
+import dev.mascwa.pulse.core.telemetry.QuestView
 import dev.mascwa.pulse.core.telemetry.Recipe
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
@@ -94,6 +104,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -127,9 +138,25 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val travel by vm.travel.collectAsStateWithLifecycle()
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val daily by vm.daily.collectAsStateWithLifecycle()
+    val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
+    val quests by vm.quests.collectAsStateWithLifecycle()
+    val questDone by vm.questCompleted.collectAsStateWithLifecycle()
+    val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
+
+    // Ambient seeing needs the camera permission — request it once when the game screen opens; the sampler
+    // stays a no-op until granted, then vm.start() picks it up (labels feed the perceived scene).
+    val requestCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.start()
+    }
+    LaunchedEffect(Unit) {
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            runCatching { requestCamera.launch(android.Manifest.permission.CAMERA) }
+        }
+    }
+
     val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -175,6 +202,27 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             EffectsPanel(t, gps != null, c)
 
             PipHeader("S.P.E.C.I.A.L.")
+            if (dayBanner.isNotEmpty()) {
+                Text(
+                    dayBanner,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                    color = c.amber, letterSpacing = 2.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Text(
+                "PERCEIVES · ${scene.describe()}",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.sky,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+            )
+            questDone?.let { q ->
+                QuestCompleteBanner(q, c) { vm.dismissQuestComplete() }
+                Spacer(Modifier.height(8.dp))
+            }
+            if (quests.isNotEmpty()) {
+                QuestsPanel(quests, c)
+                Spacer(Modifier.height(8.dp))
+            }
             lastUnlock?.let { a ->
                 UnlockBanner(a, c) { vm.dismissUnlock() }
                 Spacer(Modifier.height(8.dp))
@@ -184,9 +232,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 Spacer(Modifier.height(8.dp))
             }
             SpecialGamePanel(
-                character, encounter, resolution, env, c,
+                character, encounter, resolution, env, vm.telemetryFlow, c,
                 onVenture = { vm.venture() },
-                onChoose = { i, chem -> vm.choose(i, chem) },
+                onChoose = { i, chem, roll -> vm.choose(i, chem, roll) },
                 onAllocate = { vm.allocate(it) },
                 onRevive = { vm.revive() },
                 onChoosePerk = { vm.choosePerk(it) },
@@ -553,9 +601,10 @@ private fun SpecialGamePanel(
     encounter: Encounter?,
     resolution: Resolution?,
     env: EnvContext,
+    telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
     c: NightwirePalette,
     onVenture: () -> Unit,
-    onChoose: (Int, String?) -> Unit,
+    onChoose: (Int, String?, Int) -> Unit,
     onAllocate: (Special) -> Unit,
     onRevive: () -> Unit,
     onChoosePerk: (String) -> Unit,
@@ -605,7 +654,7 @@ private fun SpecialGamePanel(
     Spacer(Modifier.height(8.dp))
     when {
         ch.down -> DownedPanel(c, onRevive)
-        encounter != null -> EncounterPanel(encounter, ch, c, onChoose)
+        encounter != null -> EncounterPanel(encounter, ch, telemetry, c, onChoose)
         else -> IdlePanel(resolution, c, onVenture)
     }
 }
@@ -783,11 +832,97 @@ private fun SpecialGameRow(s: Special, value: Int, canAllocate: Boolean, c: Nigh
     }
 }
 
+// Gesture-detection tunables (owner-tuned on the Pixel; motion is accelerometer g-force / gyro dps).
+private const val POLL_MS = 50L            // sensor sampling cadence for gesture detection
+private const val FLICK_MIN_G = 1.9f       // a sharp flick spikes |accel| this high…
+private const val FLICK_GREAT_G = 3.2f     // …and this high is a flawless one
+private const val SHAKE_FIRE = 6.0f        // integrated shake energy needed to commit a shake
+private const val SHAKE_GREAT_PEAK = 1.4f  // peak jolt (|g−1|) that counts as a flawless shake
+private const val SHAKE_DECAY = 0.85f      // per-sample decay of the shake integrator
+private const val STILL_GYRO = 14f         // below this rotation (dps)…
+private const val STILL_ACC = 0.07f        // …and |accel−1g| within this counts as "dead still"
+private const val STILL_HOLD_MS = 1200L    // hold still this long to commit
+private const val STILL_GREAT_MS = 2200L   // …this long is flawless
+private const val PERF_FLOOR = 0.5f        // completing a gesture at all is never graded below this
+
+/**
+ * The encounter — CP2077-on-mobile. Each approach is a stat-gated action (`[STR 12] …`) you commit to by
+ * PERFORMING it: shake for brute stats, flick for AGILITY, hold dead still for mind/nerve. The phone's
+ * accelerometer/gyro grade the performance (0..1) → the check's die. No buttons.
+ */
 @Composable
-private fun EncounterPanel(e: Encounter, ch: Character, c: NightwirePalette, onChoose: (Int, String?) -> Unit) {
-    // CHEMs the player is carrying — tap one to prep it; it fires only on a choice gated by its stat.
+private fun EncounterPanel(
+    e: Encounter,
+    ch: Character,
+    telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
+    c: NightwirePalette,
+    onResolve: (Int, String?, Int) -> Unit,
+) {
     val chems = Items.ALL.filter { it.kind == ItemKind.CHEM && (ch.inventory[it.id] ?: 0) > 0 }
     var selectedChem by remember(e.id) { mutableStateOf<String?>(null) }
+    var resolved by remember(e.id) { mutableStateOf(false) }
+    var meter by remember(e.id) { mutableStateOf(0f) }
+    // HOLD STILL must be armed by a tap first — else a phone resting on a table would auto-commit the scan.
+    var holdArmed by remember(e.id) { mutableStateOf(false) }
+
+    // Which motions this scene accepts, from its choices' stats.
+    val wanted: Set<GestureType> = remember(e.id) {
+        e.choices.mapNotNull { it.stat?.let { s -> Gestures.forStat(s) } }.toSet()
+    }
+    val holdNeedsArm = GestureType.HOLD in wanted
+
+    // Live sensor detection → resolve the matching approach with a performance-graded roll. Polls at a
+    // fixed cadence (StateFlow is conflated, so a "hold still" wouldn't re-emit) — robust for all gestures.
+    LaunchedEffect(e.id) {
+        // No gesture-gated approach (all-safe scene, if content ever adds one) → resolve the first, automatically.
+        if (wanted.isEmpty()) {
+            kotlinx.coroutines.delay(500)
+            resolved = true
+            onResolve(0, selectedChem, Gestures.performanceRoll(0.7f))
+            return@LaunchedEffect
+        }
+        var shakeE = 0f
+        var shakePeak = 0f
+        var stillMs = 0L
+        while (!resolved) {
+            val t = telemetry.value
+            val g = t.accelG ?: 1f
+            val gyro = abs(t.gyroDps ?: 0f)
+            val jolt = abs(g - 1f)
+
+            shakeE = shakeE * SHAKE_DECAY + jolt
+            if (jolt > shakePeak) shakePeak = jolt
+            // The still-timer only runs once the player has armed the hold — no accidental resting-on-a-table commit.
+            if (holdArmed && gyro < STILL_GYRO && jolt < STILL_ACC) stillMs += POLL_MS else stillMs = 0
+
+            meter = listOfNotNull(
+                if (GestureType.FLICK in wanted) ((g - 1f) / (FLICK_GREAT_G - 1f)).coerceIn(0f, 1f) else null,
+                if (GestureType.SHAKE in wanted) (shakeE / SHAKE_FIRE).coerceIn(0f, 1f) else null,
+                if (GestureType.HOLD in wanted) (stillMs.toFloat() / STILL_HOLD_MS).coerceIn(0f, 1f) else null,
+            ).maxOrNull() ?: 0f
+
+            val done: Pair<GestureType, Float>? = when {
+                GestureType.FLICK in wanted && g > FLICK_MIN_G ->
+                    GestureType.FLICK to ((g - FLICK_MIN_G) / (FLICK_GREAT_G - FLICK_MIN_G)).coerceIn(0f, 1f)
+                GestureType.SHAKE in wanted && shakeE > SHAKE_FIRE ->
+                    GestureType.SHAKE to (shakePeak / SHAKE_GREAT_PEAK).coerceIn(0f, 1f)
+                GestureType.HOLD in wanted && stillMs > STILL_HOLD_MS ->
+                    GestureType.HOLD to ((stillMs - STILL_HOLD_MS).toFloat() / (STILL_GREAT_MS - STILL_HOLD_MS)).coerceIn(0f, 1f)
+                else -> null
+            }
+            if (done != null) {
+                resolved = true
+                // The choice whose stat uses this gesture — if several, the one you're strongest in.
+                val idx = e.choices.indices
+                    .filter { i -> e.choices[i].stat?.let { Gestures.forStat(it) == done.first } == true }
+                    .maxByOrNull { i -> ch.stat(e.choices[i].stat!!) } ?: 0
+                onResolve(idx, selectedChem, Gestures.performanceRoll(done.second.coerceAtLeast(PERF_FLOOR)))
+                break
+            }
+            kotlinx.coroutines.delay(POLL_MS)
+        }
+    }
+
     PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(e.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
@@ -805,7 +940,39 @@ private fun EncounterPanel(e: Encounter, ch: Character, c: NightwirePalette, onC
                     }
                 }
             }
-            e.choices.forEachIndexed { i, choice -> ChoiceButton(choice, ch, selectedChem, c) { onChoose(i, selectedChem) } }
+            e.choices.forEach { choice -> ApproachRow(choice, ch, selectedChem, c) }
+            Spacer(Modifier.height(2.dp))
+            SegBar(meter, if (resolved) c.positive else c.sky, c)
+            when {
+                resolved -> Text("⟳ COMMITTING…", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp, color = c.positive, letterSpacing = 0.5.sp)
+                // HOLD scene, not yet armed → require an explicit tap so a still phone can't auto-commit.
+                holdNeedsArm && !holdArmed -> {
+                    val others = (wanted - GestureType.HOLD).joinToString(" · ") { it.label }
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+                            .border(1.dp, c.sky.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                            .background(c.sky.copy(alpha = 0.08f)).clickable { holdArmed = true }
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                    ) {
+                        Text(
+                            "◉ TAP TO ARM THE HOLD — then keep the phone dead still" +
+                                if (others.isNotEmpty()) "   ·   or $others now" else "",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                            color = c.sky, letterSpacing = 0.5.sp,
+                        )
+                    }
+                }
+                holdNeedsArm && holdArmed -> Text(
+                    "◉ ARMED — HOLD DEAD STILL" +
+                        (wanted - GestureType.HOLD).joinToString(" · ") { it.label }.let { if (it.isNotEmpty()) "   ·   or $it" else "" },
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.amber, letterSpacing = 0.5.sp,
+                )
+                else -> Text(
+                    "▸ PERFORM AN ACTION — " + wanted.joinToString(" · ") { it.label },
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.sky, letterSpacing = 0.5.sp,
+                )
+            }
         }
     }
 }
@@ -822,10 +989,10 @@ private fun ChemChip(label: String, on: Boolean, c: NightwirePalette, onClick: (
     }
 }
 
+/** A stat-gated approach, CP2077-style: `[STR 12] Heave it wide  ▸ SHAKE`, coloured by your odds. Read-only. */
 @Composable
-private fun ChoiceButton(choice: Choice, ch: Character, selectedChem: String?, c: NightwirePalette, onClick: () -> Unit) {
+private fun ApproachRow(choice: Choice, ch: Character, selectedChem: String?, c: NightwirePalette) {
     val gate = choice.stat
-    // A prepped CHEM only counts toward the odds when it matches this choice's stat gate.
     val chemBonus = if (gate != null) {
         val chem = selectedChem?.let { Items.byId(it) }
         if (chem != null && chem.kind == ItemKind.CHEM && chem.statBonus == gate && (ch.inventory[chem.id] ?: 0) > 0) chem.statBonusAmt else 0
@@ -840,21 +1007,22 @@ private fun ChoiceButton(choice: Choice, ch: Character, selectedChem: String?, c
         "RISKY" -> c.amber
         else -> c.negative
     }
+    val gesture = gate?.let { Gestures.forStat(it) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
-            .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = 0.05f))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+            .border(1.dp, tagColor.copy(alpha = 0.45f), RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = 0.05f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(choice.text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
             Text(
-                buildString {
-                    append(if (gate == null) "no check" else "${gate.display} check · DC ${choice.difficulty}")
-                    if (bonus != 0) append("  (${if (bonus > 0) "+" else ""}$bonus)")
-                },
-                fontFamily = JetBrainsMono, fontSize = 8.sp,
-                color = if (bonus > 0) c.positive else c.muted, modifier = Modifier.padding(top = 2.dp),
+                (if (gate != null) "[${gate.display.take(3)} ${choice.difficulty}] " else "[SAFE] ") + choice.text,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+            )
+            Text(
+                (gesture?.let { "▸ ${it.label}" } ?: "▸ automatic") + (if (bonus != 0) "   (${if (bonus > 0) "+" else ""}$bonus)" else ""),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                color = if (gesture != null) c.sky else c.muted, letterSpacing = 0.5.sp, modifier = Modifier.padding(top = 2.dp),
             )
         }
         Text(tag, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = tagColor, letterSpacing = 1.sp)
@@ -919,6 +1087,26 @@ private fun UnlockBanner(a: Achievement, c: NightwirePalette, onDismiss: () -> U
     }
 }
 
+@Composable
+private fun QuestCompleteBanner(q: Quest, c: NightwirePalette, onDismiss: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("✓ QUEST COMPLETE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = c.amber, letterSpacing = 1.sp)
+                Text(q.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+                Text("Reward · +${q.rewardXp} XP · +${q.rewardCaps} caps", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber)
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, c.muted.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                    .clickable(onClick = onDismiss).padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text("OK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.muted)
+            }
+        }
+    }
+}
+
 /** A compact "+40 XP, +30 caps, Field Medkit" reward summary for an achievement. */
 private fun rewardText(a: Achievement): String = buildList {
     if (a.rewardXp > 0) add("+${a.rewardXp} XP")
@@ -967,9 +1155,62 @@ private fun WastelandPanel(
                     LocationRow(loc, dist, selectedId == loc.id, c) {
                         selectedId = if (selectedId == loc.id) null else loc.id
                     }
-                    if (selectedId == loc.id) LocationSheet(loc, ch, c, onBuy, onTalk)
+                    if (selectedId == loc.id) {
+                        // Pokémon-Go rule: you must physically BE at the shop (within reach) to trade/talk.
+                        val here = LocationGate.isAtLocation(gps?.latitude, gps?.longitude, loc)
+                        LocationSheet(loc, ch, here, dist, c, onBuy, onTalk)
+                    }
                 }
             }
+        }
+    }
+}
+
+/** The personalised quest board — your real tasks/interests/nearby places/day, as Fallout missions. */
+@Composable
+private fun QuestsPanel(quests: List<QuestView>, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("QUESTS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.amber, letterSpacing = 1.sp)
+            quests.forEach { v -> QuestCard(v, c) }
+        }
+    }
+}
+
+@Composable
+private fun QuestCard(v: QuestView, c: NightwirePalette) {
+    val q = v.quest
+    val kindColor = when (q.kind) {
+        QuestKind.MAIN -> c.amber
+        QuestKind.SIDE -> c.ink
+        QuestKind.DAILY -> c.positive
+    }
+    val frac = if (q.target > 0) (v.done.toFloat() / q.target).coerceIn(0f, 1f) else 1f
+    val unit = if (q.goal == QuestGoal.WALK_DISTANCE) " m" else ""
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, kindColor.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+            .background(kindColor.copy(alpha = 0.05f))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("◆ ${q.kind.label}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 8.sp,
+                color = kindColor, letterSpacing = 1.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(q.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink)
+        }
+        Text(q.brief, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        Text(q.source, fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted)
+        SegBar(frac, if (v.complete) c.positive else kindColor, c)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (v.complete) "✓ COMPLETE" else "${v.done} / ${q.target}$unit",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = if (v.complete) c.positive else c.muted,
+            )
+            Text("${q.rewardXp} XP · ${q.rewardCaps} caps", fontFamily = ChakraPetch,
+                fontWeight = FontWeight.Bold, fontSize = 8.sp, color = c.amber, letterSpacing = 0.5.sp)
         }
     }
 }
@@ -1002,7 +1243,15 @@ private fun LocationRow(loc: GameLocation, distanceM: Double?, open: Boolean, c:
 }
 
 @Composable
-private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette, onBuy: (String, LocationKind) -> Unit, onTalk: (Encounter, LocationKind) -> Unit) {
+private fun LocationSheet(
+    loc: GameLocation,
+    ch: Character,
+    atLocation: Boolean,
+    distanceM: Double?,
+    c: NightwirePalette,
+    onBuy: (String, LocationKind) -> Unit,
+    onTalk: (Encounter, LocationKind) -> Unit,
+) {
     val npc = GameLocations.npcName(loc.kind, loc.id.hashCode())
     val repPts = SpecialGame.rep(ch, loc.kind)
     val tier = Reputation.tier(repPts)
@@ -1011,6 +1260,14 @@ private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette,
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(GameLocations.greeting(loc.kind, npc), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
+        if (!atLocation) {
+            // Out of reach — show wares as a lure, but you have to walk there to deal.
+            Text(
+                "▸ TRAVEL HERE TO TRADE" + (distanceM?.let { " — ${Geo.formatDistance(it)} away" } ?: " — location unknown"),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                color = c.amber, letterSpacing = 0.5.sp,
+            )
+        }
         Text(
             "WARES · ${tier.label}${if (tier.discountPct > 0) " −${tier.discountPct}%" else ""}",
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
@@ -1019,10 +1276,15 @@ private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette,
         GameLocations.stock(loc.kind).forEach { id ->
             Items.byId(id)?.let { item ->
                 val price = Reputation.discountedPrice(item.value, repPts)
-                ShopRow(item, price, ch.caps >= price, c) { onBuy(id, loc.kind) }
+                // Buyable only when you're physically at the shop AND can afford it.
+                ShopRow(item, price, atLocation && ch.caps >= price, c) { onBuy(id, loc.kind) }
             }
         }
-        GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc), loc.kind) }
+        if (atLocation) {
+            GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc), loc.kind) }
+        } else {
+            Text("Talk to $npc when you arrive.", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
     }
 }
 

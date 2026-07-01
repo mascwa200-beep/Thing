@@ -106,6 +106,21 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.game.GameWorldStore(appContext, json, overpassRepository)
     }
 
+    /** Persists + tracks the personalised quest log (completion + rewards) for the life-sim. */
+    val questStore: dev.mascwa.pulse.data.game.QuestStore by lazy {
+        dev.mascwa.pulse.data.game.QuestStore(appContext, json)
+    }
+
+    /** On-device ambient hearing (MediaPipe YAMNet) → the life-sim's perceived SceneContext. */
+    val ambientPerceptionSampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler by lazy {
+        dev.mascwa.pulse.data.perception.AmbientPerceptionSampler(appContext, http)
+    }
+
+    /** On-device ambient seeing (MediaPipe EfficientNet-Lite via CameraX) → the life-sim's SceneContext. */
+    val cameraPerceptionSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler by lazy {
+        dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
+    }
+
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)

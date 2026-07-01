@@ -91,6 +91,8 @@ class SpecialGameStore(
         val claimed: List<String> = emptyList(),
         val streak: Int = 0,
         val streakDay: Long = -1,
+        // Wall-clock ms when this operative's story began — drives the wasteland day counter (Day 1, 2, …).
+        val startedAtMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -119,6 +121,12 @@ class SpecialGameStore(
     private var claimed: Set<String> = emptySet()
     private var streak = 0
     private var streakDay = -1L
+    // When the operative's story began (wall-clock ms) — the anchor for the wasteland day counter.
+    private var startedAtMs = 0L
+
+    private val _started = MutableStateFlow(0L)
+    /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
+    val startedFlow: StateFlow<Long> = _started.asStateFlow()
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -191,11 +199,15 @@ class SpecialGameStore(
                 baseTravelM = stored.baseTravelM; basePlaces = stored.basePlaces
                 claimed = stored.claimed.toSet()
                 streak = stored.streak.coerceAtLeast(0); streakDay = stored.streakDay
+                startedAtMs = stored.startedAtMs
             }
+            // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
+            if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
+            _started.value = startedAtMs
             loaded = true
             justLoaded = true
         }
-        if (justLoaded) { publishMetrics(); refreshDaily() }
+        if (justLoaded) { scheduleFlush(); publishMetrics(); refreshDaily() }
     }
 
     /** Build the current metric snapshot: character progress + counters + the fed-in app-usage/travel. */
@@ -351,13 +363,16 @@ class SpecialGameStore(
     fun encounterFor(c: Character): Encounter? =
         c.currentEncounterId?.let { id -> SpecialEncounters.ALL.firstOrNull { it.id == id } }
 
-    /** Draw the next encounter to face (no-op if one is already active or the player is downed). */
-    fun venture() {
+    /**
+     * Draw the next encounter to face (no-op if one is already active or the player is downed). [favored]
+     * biases selection toward the perceived scene's stats (from the on-device perception), when supplied.
+     */
+    fun venture(favored: Set<Special> = emptySet()) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             if (c.down || c.currentEncounterId != null) return@launch
-            val next = SpecialGame.nextEncounter(c, SpecialEncounters.ALL, random.nextInt(0, 100_000)) ?: return@launch
+            val next = SpecialGame.nextEncounter(c, SpecialEncounters.ALL, random.nextInt(0, 100_000), favored) ?: return@launch
             _resolution.value = null
             _character.value = c.copy(currentEncounterId = next.id)
             ventures++
@@ -371,13 +386,14 @@ class SpecialGameStore(
      * [env] is the real-world context (temperature/light/motion/… bends the check) and [useItemId] is an
      * optional CHEM consumed to buff this check — both flow in from the ViewModel.
      */
-    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null) {
+    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null, roll: Int? = null) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             val encounter = encounterFor(c) ?: return@launch
-            val roll = random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, roll, env, useItemId)
+            // The die comes from how well the player physically performed the gesture, when supplied.
+            val r = roll ?: random.nextInt(1, SpecialGame.DIE + 1)
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId)
             _character.value = resolution.character
             _resolution.value = resolution
             if (resolution.success) wins++
@@ -480,7 +496,21 @@ class SpecialGameStore(
             _lastUnlock.value = null
             lastXpVisits = -1 // re-baseline app-usage XP so the fresh operative doesn't get a dump
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
+            startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /** Grant a completed quest's reward — caps + XP (with any level-ups) — into the character. */
+    fun awardQuest(caps: Int, xp: Int) {
+        scope.launch {
+            ensureLoaded()
+            var c = _character.value
+            if (caps != 0) c = c.copy(caps = (c.caps + caps).coerceAtLeast(0))
+            if (xp != 0) c = SpecialGame.gainXp(c, xp)
+            _character.value = c
             runAchievementCheck()
             scheduleFlush()
         }
@@ -501,6 +531,7 @@ class SpecialGameStore(
             dailyDay = dailyDay, baseWins = baseWins, baseVentures = baseVentures, baseCrits = baseCrits,
             baseTravelM = baseTravelM, basePlaces = basePlaces, claimed = claimed.toList(),
             streak = streak, streakDay = streakDay,
+            startedAtMs = startedAtMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }

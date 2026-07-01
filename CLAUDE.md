@@ -809,6 +809,170 @@ runtime behaviour (GPS/Overpass/weather/MapLibre render, persistence) is owner-v
   wasteland map (embedded one has gestures off); a Settings "clear travel history" (store `clear()` exists,
   UI not wired); haggle/discount at shops; richer branching dialogue.
 
+### S.P.E.C.I.A.L. — more game features + the CP2077-on-mobile gesture redesign (this session cont., #249–#258 merged + gesture slice)
+Owner: "keep adding game features," then a hard redesign ask — "This game can't be just a bunch of text and
+some options anymore. Make it more user choice based but not with some lousy type-your-answers improvement.
+It must have nothing to do with a keyboard or typing or choosing the two-or-more-options buttons." When asked
+how, the owner chose (AskUserQuestion → Other): **"Do what CDPR's Cyberpunk 2077 did with the stat-based game,
+but keep the interactive/Pokémon-Go part. What would CDPR have made if they built CP2077 on mobile?"**
+- **Added game systems (all CI-green pure cores + on-device wiring, #249–#258):** **crafting**
+  (`core:telemetry/Crafting.kt` — `Recipe`, workbench turns JUNK→GEAR/AID for XP; `WorkbenchPanel`),
+  **companions** (`Companions.kt` — hireable NPCs that grant passive check bonuses / luckier crits;
+  `CompanionPanel`), **daily objectives** (`DailyObjectives.kt` — a rotating daily grind loop with claimable
+  rewards; `DailyPanel`), **faction reputation** (`Reputation.kt` — per-`LocationKind` standing that
+  discounts shops + is earned by trading/winning talks; rep-aware `buyAt`/`resolveTalk`; `ReputationPanel`),
+  and **boss fights** (rare, level-gated, brutal encounters in `SpecialEncounters`). Each mirrored the
+  established store/VM/UI pattern; `SpecialGameStore` persists the new `Character` fields (recipes are
+  content, companion/reputation/daily persisted), locally kotlinc-validated + subagent compile-review + CI.
+- **The CP2077-on-mobile answer — physical-gesture encounter resolution (this slice, in progress):** the
+  encounter UI no longer has choice buttons. Each approach is shown **CP2077-style as a stat gate** —
+  `[STR 12] Heave it wide  ▸ SHAKE` — coloured by your live odds, and you **commit to it by performing the
+  action with the phone**, not tapping. Pure CI-tested core `core:telemetry/Gestures.kt` (+ `GesturesTest`,
+  3 cases, 30 total green): `GestureType` (**SHAKE** = STRENGTH/ENDURANCE/LUCK, **FLICK** = AGILITY,
+  **HOLD STILL** = PERCEPTION/INTELLIGENCE/CHARISMA), `forStat`, and `performanceRoll(0f..1f → 1..DIE)` — a
+  flawless gesture over a built stat lands a crit, a sloppy one under-statted hurts. On-device: a rewritten
+  `EncounterPanel` runs a fixed-cadence (`POLL_MS`) `LaunchedEffect` over the live `TelemetryController`
+  accelerometer/gyro (`accelG`/`gyroDps`) — detects the shake energy / flick spike / dead-still hold, grades
+  it 0..1, and calls `choose(idx, chem, performanceRoll(quality))`. `SpecialGameStore.choose`/
+  `TelemetryViewModel.choose` gained an optional `roll: Int?` (the graded die; random when null) +
+  `telemetryFlow`. A live meter (`SegBar`) shows gesture progress; CHEM prep + the odds label are kept.
+  Polls `telemetry.value` (not `.collect`) because a StateFlow is conflated and a perfectly-still phone
+  wouldn't re-emit. All thresholds are top-of-file owner-tunable consts (`FLICK_MIN_G`, `SHAKE_FIRE`,
+  `STILL_HOLD_MS`, …). The map shop/**TALK** buttons (the Pokémon-Go part) stay as-is per the owner's "keep
+  the interactive part." ⚠️ **On-device-unverified — the gesture thresholds and sensor feel are entirely
+  CI-unprovable; the owner tunes SHAKE/FLICK/HOLD sensitivity on the Pixel.** A HOLD scene now requires an
+  **explicit arming tap** first (owner asked) — the still-timer only runs after "◉ TAP TO ARM THE HOLD", so a
+  phone resting on a table can't auto-commit; SHAKE/FLICK stay immediate (they can't fire at rest).
+
+### S.P.E.C.I.A.L. → a Fallout LIFE-SIM ("The Sims but I'm the Sim") — accepted brief, in progress
+Owner's vision: turn the RPG into a Fallout-styled life-sim that **bleeds into reality**. (1) **Constant
+camera/mic ambient sensing** → the game reads what's going on / what it hears and generates its strategy
+(encounters/difficulty/flavour) from that. (2) **Geofenced purchasing** — you must **physically be at** a
+real map location to buy/trade there (true Pokémon-Go). (3) **Day tracking** — the game counts wasteland
+days. (4) **Generative missions/quests/storylines** driven by what it **sees, hears, and knows about you**
+(profile interests/wants/needs + tasks + memory + location + time). Framing: *"The Sims but I get to be the
+Sim,"* Fallout-styled. **Authorization (owner, explicit):** GrapheneOS, Pulse is **Device Owner**, single
+user, on-device-first — "it's all authorized on my behalf." Invariants kept: on-device-first (ambient
+sensing/classification stays on-device; no raw camera/audio leaves without opt-in — the credential-scrub /
+privacy-first pattern extends to raw sensor data), human-gate for self-code, isProtected denylist.
+- **Architecture / slice plan** (pure CI-tested cores in `core:telemetry` first, on-device sensing/UI after —
+  the established pattern): **[1] geofence + days (this slice)** → **[2] Perception core** (`SceneSignals`→
+  `SceneContext`: setting/activity/social distilled from camera-scene + sound labels + light/motion/time →
+  strategy modifiers; pure) → **[3] on-device camera/mic capture + classifiers** (heavy, on-device-only) →
+  **[4] Story/Quest director core** (compose personalised quests/story beats from profile+tasks+scene+
+  location+day+character; deterministic seed for CI, LLM flavour on-device cloud-gated) → **[5] director
+  wiring + UI**.
+- **Slice 1 — geofenced purchase + day tracking (this slice):** two pure CI-tested cores +
+  `LocationGateTest`/`GameClockTest` (13 cases, locally kotlinc-validated + green). **`LocationGate`**
+  (`isAtLocation`/`distanceTo`/`reachHint`, 60 m reach, reuses `TravelFilter.distanceMeters` — no app Geo
+  dep) gates the map: `WastelandPanel`'s `LocationSheet` now takes `atLocation`+`distanceM`; when you're **not**
+  within reach it shows the wares as a lure with **"▸ TRAVEL HERE TO TRADE — Nm away"** and the BUY rows +
+  TALK are disabled — buyable only when physically at the shop AND affordable. **`GameClock`** (`dayNumber`/
+  `daysSurvived`/`phase`→`DayPhase`/`banner`/`isNewDay`) + `SpecialGameStore.startedAtMs` (persisted in the
+  Stored blob, stamped on first load, migrates old saves, re-stamped on `reset()`) + `startedFlow`;
+  `TelemetryViewModel.dayBanner` (rebuilt each tick from start-ms + now + hour) renders a **"DAY 3 · DUSK"**
+  banner under the S.P.E.C.I.A.L. header. ⚠️ On-device-unverified (CI compile-gates only): the presence gate
+  with a live GPS fix + the day banner advancing.
+- **Slice 2 — perception core (this slice):** `core:telemetry/Perception.kt` (+ `PerceptionTest`, 15 cases,
+  locally kotlinc-validated + green) — the PURE, CI-tested brain of "constant camera/mic → strategy." Takes
+  the text labels an on-device classifier produces (`PerceptLabel` scene + sound tags) plus light/motion/hour
+  (`SceneSignals`) and `distill`s them into a `SceneContext` (`Setting` INDOOR/OUTDOOR/VEHICLE, `Activity`
+  STILL/MOVING/COMMUTING, `Social` ALONE/VOICES/CROWD, `LightLevel`, `DayPhase`, top tags + a `describe()`
+  line). `strategy(ctx)` → `SceneStrategy` (which `Special` themes the wasteland favours next, a clamped
+  ±1 `tempoNudge`, a flavour line for the story director). Keyword-vocab + threshold logic → deterministic →
+  CI-gated. **Privacy invariant:** only text-label summaries reach the core — no pixels/audio, nothing leaves
+  the device. **NOT yet wired** (foundation): next is the on-device camera/mic sampler + classifier feeding
+  `SceneSignals`, then folding `strategy.favored` into encounter selection + `flavor` into the story director.
+- **Slice 3 — story/quest director core (this slice):** `core:telemetry/StoryDirector.kt` (+
+  `StoryDirectorTest`, 11 cases, locally kotlinc-validated + green) — the "knows about you" generative
+  payoff. `compose(LifeContext, seed)` builds up to 4 personalised `Quest`s from your real life: a **MAIN**
+  from your top pending task (`COMPLETE_TASK`, else a `SURVIVE_DAYS` arc), a **SIDE** from a profiled
+  interest (`WALK_DISTANCE` when you're out/moving, else `VENTURE`), a **SIDE** `VISIT_KIND` for a real place
+  nearby (ties to the geofenced map), and a **DAILY** `WIN_ENCOUNTERS` scaled to level + flavoured by the
+  perceived `SceneContext`. Every `QuestGoal` is a real-world signal the game already tracks, so playing
+  nudges your actual life. Deterministic given (context, seed) → CI-gated; `source` names the real-life
+  origin for transparency; no profile/task text leaves the device. **NOT yet wired:** next is a `QuestStore`
+  pulling interests (ProfileStore) + tasks (TaskStore) + nearby kinds (GameWorldStore) + day/level →
+  `compose`, a QUESTS surface, and completion/reward tracking.
+- **Slice 4 — quest director WIRED + QUESTS surface (this slice):** `TelemetryViewModel` gained
+  `profileStore` + `taskStore` (via `PulseViewModelFactory`) and a `quests: StateFlow<List<Quest>>` built by
+  `combine`-ing `profileStore.entriesFlow` (INTEREST/PROJECT/PREFERENCE → interests, weight-sorted) +
+  `taskStore.tasksFlow` (`TaskBoard.pending` → titles) + `gameWorld.locationsFlow` (→ nearby `LocationKind`s)
+  + `game.characterFlow` (level) + a `_day` StateFlow (from `GameClock.dayNumber`, updated each tick so
+  quests roll over daily) → `StoryDirector.compose(seed = day)`. New **QUESTS panel** on the STAT tab
+  (`QuestsPanel`/`QuestCard` — MAIN gold / SIDE white / DAILY green, brief + `source` + reward). Your real
+  tasks/interests/nearby places now show as Fallout missions. **Scene stays default `SceneContext()`** until
+  the camera/mic sampler is wired; **read-only** (completion detection + reward granting is the next slice).
+  ⚠️ On-device-unverified (CI compile-gates only); the profile/task stores load app-wide via J.A.R.V.I.S., so
+  quests fill in as those load (graceful — the combine re-emits).
+- **Slice 5 — quest completion + reward loop (this slice):** the QUESTS panel is now a real loop.
+  `core:telemetry/QuestLog.kt` (+ `QuestLogTest`, 11 cases, locally green) is the pure completion engine:
+  `QuestMetrics` (live counters) + `ActiveQuest` (an issued quest FROZEN with a metric baseline) + `QuestLogState`
+  (active + `completedIds`) → `progress` (delta from baseline for walk/wins/ventures/places; absolute for
+  survive-day / task-left-pending), `isComplete`, `view`, and `sync` (retire completions → reward, top up from
+  freshly-composed quests by new id only [never re-issue a completed id → no farming; daily dodges this via the
+  day-in-id]). `data/game/QuestStore.kt` persists `QuestLogState` (mirrors ProfileStore; **Mutex-guarded
+  read-modify-write** so rapid emissions can't double-complete), exposes `quests: StateFlow<List<QuestView>>` +
+  `completed: SharedFlow<Quest>`. `TelemetryViewModel` drives `questStore.sync(composed, metrics)` from a
+  `combine` (interests + tasks + nearby + `game.metricsFlow` + `_day`), collects `completed` →
+  `game.awardQuest(caps, xp)` (new `SpecialGameStore` method: caps + `SpecialGame.gainXp`) + a one-shot
+  `questCompleted` banner. UI: `QuestCard` now shows a **progress bar + `done/target` + ✓ COMPLETE**, and a
+  **QUEST COMPLETE reward banner**. `resetGame` clears the quest log. Wired via `AppContainer.questStore` +
+  factory. ⚠️ On-device-unverified (CI compile-gates only).
+- **Slice 6 — on-device ambient HEARING (this slice, owner chose "on-device classifiers"):** the Perception
+  brain is now live via the mic. `data/perception/AmbientPerceptionSampler.kt` samples short mic clips and
+  runs each through the **MediaPipe YAMNet audio classifier fully on-device** (`tasks-audio` 0.10.21, new
+  dep; RunningMode.AUDIO_CLIPS; `createAudioRecord`→`AudioData.load`→`classify`), publishing recognised sound
+  labels (speech/music/traffic/crowd/silence) as `PerceptLabel`s. **Privacy:** only text labels are produced;
+  raw audio is classified then discarded, never persisted/sent. Fully defensive — no RECORD_AUDIO (already a
+  granted perm from voice), no model, or any hardware/classifier failure → publishes nothing → neutral scene.
+  The ~4 MB YAMNet model is **fetched once on first use** (`HttpClient.download` → filesDir, kept out of the
+  APK) and cached. `TelemetryViewModel.sceneContext` = `combine(sampler.soundLabels, telemetry)` →
+  `Perception.distill` (light/motion/clock too), **throttled** via a bucketed `distinctUntilChanged` so
+  accelerometer jitter doesn't re-distill; it feeds `LifeContext.scene` in the quest driver (via a
+  `lifeInputs`+`scene` two-stage combine, since >5 flows) so the story director flavours by what you're doing.
+  A **"PERCEIVES · <describe>"** readout on the STAT tab surfaces it for on-device verification. Sampler
+  start/stop tied to the game screen lifecycle. ⚠️ **On-device-unverified — the MediaPipe audio path, model
+  download, and mic behaviour are entirely CI-unprovable; owner verifies on the Pixel** (mic may be busy while
+  voice is active → falls back to neutral, by design). **Next (camera half):** an ImageClassifier
+  (`tasks-vision` + CameraX + CAMERA permission) for scene/object labels → the "sees" half; wiring
+  `SceneStrategy.favored` into encounter *selection* (currently only flavours the story).
+- **BUG FIX — "it thinks I'm moving while stationary":** both "moving" derivations thresholded the RAW
+  gravity-inclusive accel magnitude (`accelG = |a|/g`, ~1.0 at rest), so sensor bias/handling could trip
+  them and the `distinctUntilChanged` throttle then *stuck* on MOVING. Fixed by switching to a **smoothed
+  deviation-from-rest intensity** (`EWMA(|accelG − 1|)`, ~0 at rest): (a) `Perception.SceneSignals.motionG`→
+  **`movement`** (intensity), `MOTION_MOVING_G 1.10`→`MOVEMENT_THRESHOLD 0.09`, `moving = movement ≥ 0.09`;
+  VEHICLE now also **requires motion** (engine sounds while stationary ≠ in transit). (b) `Environment`
+  (the game's stat-modifier world) had the SAME bug — `EnvContext.motionG`→**`movement`**, `MOVING_G 1.3`→
+  `MOVING_INTENSITY 0.09` (drives the CONDITIONS "On the move" AGI+1/PER−1 + the "moving" encounter tag).
+  (c) `TelemetryViewModel.movementIntensity` = an Eagerly `StateFlow` (EWMA, `MOTION_SMOOTH 0.8`) feeding
+  BOTH `sceneContext` and `buildEnv`. +4 core tests (resting/handling → STILL; stationary engine ≠ vehicle);
+  83 core tests green. Owner-tunable consts. ⚠️ Threshold feel is on-device-tunable on the Pixel.
+- **Slice 7 — perception now shapes GAMEPLAY (not just flavour):** `SpecialGame.nextEncounter` gained an
+  optional `favored: Set<Special>` — when any eligible encounter tests a favoured stat, the pick is drawn
+  from those (else the full pool, so variety holds). `SpecialGameStore.venture(favored)` passes it;
+  `TelemetryViewModel.venture()` supplies `Perception.strategy(sceneContext.value).favored`, so what the game
+  hears/senses (voices→CHARISMA, motion/dark→AGILITY/PERCEPTION/ENDURANCE) biases which encounters appear.
+  +1 core test (76 SpecialGame-suite green). This closes the perception→gameplay loop for the AUDIO half; the
+  camera "sees" half (ImageClassifier + CameraX) remains the last slice.
+- **Slice 8 — on-device ambient SEEING (camera; owner chose "alternate back + front"):** the perception
+  brain now sees as well as hears. `data/perception/CameraPerceptionSampler.kt` runs **CameraX ImageAnalysis
+  bound to a self-managed `LifecycleRegistry`** (the sampler IS its own `LifecycleOwner`, so it works
+  headless — no Activity), classifying brief frames through the **MediaPipe EfficientNet-Lite image
+  classifier fully on-device** (new deps: `tasks-vision` 0.10.21 + CameraX 1.4.1 core/camera2/lifecycle) →
+  object/scene `PerceptLabel`s. It **dwells on the BACK camera** (your surroundings) and **flips to the FRONT
+  every FRONT_EVERY cycles** for a brief peek (owner's choice; rebinds only on camera change). Privacy: only
+  text labels; each frame classified in memory + discarded, nothing stored/sent; fully defensive (no
+  CAMERA/model/hardware → publishes nothing → neutral scene). ~4 MB model fetched once (`HttpClient.download`
+  → filesDir, out of the APK). `TelemetryViewModel.sceneContext` grew to a **4-arg combine** (sounds + scenes
+  + movement + light) → `Perception.distill`, so real `Setting` (INDOOR/OUTDOOR/VEHICLE) now comes from what
+  the camera sees. Manifest gained `CAMERA` + `camera.any` (not required); the STAT tab requests CAMERA on
+  open (`vm.start()` re-picks it up on grant). Wired via `AppContainer.cameraPerceptionSampler` + factory;
+  start/stop tied to the game-screen lifecycle. **Completes camera/mic sensing — the game now sees, hears,
+  knows you, tracks days, and geofences.** ⚠️ On-device-unverified (CI compile-gates only, and the CameraX +
+  MediaPipe-vision API surface is validated only by CI having the jars): the camera path, model download,
+  back/front alternation, and permission flow are entirely owner-verify on the Pixel.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
