@@ -75,10 +75,11 @@ class TelemetryViewModel(
         val loc = _gps.value ?: return
         gameWorld.refresh(loc.latitude, loc.longitude)
     }
-    /** Buy an item from a shop. */
-    fun buy(itemId: String) = game.buy(itemId)
-    /** Talk to an NPC — resolves the conversation with the current real-world context. */
-    fun talk(encounter: dev.mascwa.pulse.core.telemetry.Encounter) = game.resolveTalk(encounter, _env.value)
+    /** Buy an item from a [kind] shop — faction reputation discounts it + earns standing. */
+    fun buy(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) = game.buyAt(itemId, kind)
+    /** Talk to a [kind] NPC — resolves the conversation with the real-world context; a win earns rep. */
+    fun talk(encounter: dev.mascwa.pulse.core.telemetry.Encounter, kind: dev.mascwa.pulse.core.telemetry.LocationKind) =
+        game.resolveTalk(encounter, kind, _env.value)
 
     // Outdoor temperature (°C) + daylight, fetched once from the weather service on start (best-effort).
     private var weatherTempC: Double? = null

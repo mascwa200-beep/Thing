@@ -69,6 +69,9 @@ import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.LocationKind
+import dev.mascwa.pulse.core.telemetry.RepTier
+import dev.mascwa.pulse.core.telemetry.Reputation
 import dev.mascwa.pulse.core.telemetry.Environment
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.game.DailyState
@@ -195,7 +198,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(8.dp))
             WastelandPanel(locations, travel, scanning, gps, character, c,
-                onScan = { vm.scanArea() }, onBuy = { vm.buy(it) }, onTalk = { vm.talk(it) })
+                onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
             Spacer(Modifier.height(8.dp))
             AchievementsPanel(unlocked, gameMetrics, c)
 
@@ -593,6 +596,8 @@ private fun SpecialGamePanel(
     WorkbenchPanel(ch, c, onCraft)
     Spacer(Modifier.height(8.dp))
     CompanionPanel(ch, c, onHireCompanion, onDismissCompanion)
+    Spacer(Modifier.height(8.dp))
+    ReputationPanel(ch, c)
     if (ch.perkPicks > 0) {
         Spacer(Modifier.height(8.dp))
         PerkChoicePanel(ch, c, onChoosePerk)
@@ -931,8 +936,8 @@ private fun WastelandPanel(
     ch: Character,
     c: NightwirePalette,
     onScan: () -> Unit,
-    onBuy: (String) -> Unit,
-    onTalk: (Encounter) -> Unit,
+    onBuy: (String, LocationKind) -> Unit,
+    onTalk: (Encounter, LocationKind) -> Unit,
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
@@ -997,23 +1002,32 @@ private fun LocationRow(loc: GameLocation, distanceM: Double?, open: Boolean, c:
 }
 
 @Composable
-private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette, onBuy: (String) -> Unit, onTalk: (Encounter) -> Unit) {
+private fun LocationSheet(loc: GameLocation, ch: Character, c: NightwirePalette, onBuy: (String, LocationKind) -> Unit, onTalk: (Encounter, LocationKind) -> Unit) {
     val npc = GameLocations.npcName(loc.kind, loc.id.hashCode())
+    val repPts = SpecialGame.rep(ch, loc.kind)
+    val tier = Reputation.tier(repPts)
     Column(
         Modifier.fillMaxWidth().padding(top = 4.dp, start = 8.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(GameLocations.greeting(loc.kind, npc), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink)
-        Text("WARES", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.amber, letterSpacing = 1.sp)
+        Text(
+            "WARES · ${tier.label}${if (tier.discountPct > 0) " −${tier.discountPct}%" else ""}",
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+            color = if (tier.discountPct > 0) c.positive else c.amber, letterSpacing = 1.sp,
+        )
         GameLocations.stock(loc.kind).forEach { id ->
-            Items.byId(id)?.let { item -> ShopRow(item, ch.caps >= item.value, c) { onBuy(id) } }
+            Items.byId(id)?.let { item ->
+                val price = Reputation.discountedPrice(item.value, repPts)
+                ShopRow(item, price, ch.caps >= price, c) { onBuy(id, loc.kind) }
+            }
         }
-        GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc)) }
+        GameButton("TALK TO $npc", c.sky) { onTalk(GameLocations.conversation(loc.kind, npc), loc.kind) }
     }
 }
 
 @Composable
-private fun ShopRow(item: Item, affordable: Boolean, c: NightwirePalette, onBuy: () -> Unit) {
+private fun ShopRow(item: Item, price: Int, affordable: Boolean, c: NightwirePalette, onBuy: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(item.name, fontFamily = JetBrainsMono, fontSize = 10.sp, color = if (affordable) c.ink else c.muted)
@@ -1026,7 +1040,7 @@ private fun ShopRow(item: Item, affordable: Boolean, c: NightwirePalette, onBuy:
                 .then(if (affordable) Modifier.clickable(onClick = onBuy) else Modifier)
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) {
-            Text("BUY ${item.value}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col)
+            Text("BUY $price", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col)
         }
     }
 }
@@ -1179,6 +1193,29 @@ private fun DailyObjRow(o: DailyObjective, m: TodayMetrics, claimed: Boolean, c:
             claimed -> Text("✓", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.positive)
             done -> InvAction("CLAIM", c.positive, onClaim)
             else -> Text("${(prog * 100 / o.target.coerceAtLeast(1))}%", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+        }
+    }
+}
+
+/** Faction standing: your reputation with each kind of wasteland shop, and the discount it earns. */
+@Composable
+private fun ReputationPanel(ch: Character, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("REPUTATION", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.sky, letterSpacing = 1.sp)
+            LocationKind.entries.forEach { kind ->
+                val pts = SpecialGame.rep(ch, kind)
+                val tier = Reputation.tier(pts)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(kind.title, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink)
+                    Text(
+                        "${tier.label}${if (tier.discountPct > 0) " · −${tier.discountPct}% shops" else ""}",
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                        color = if (tier == RepTier.NEUTRAL) c.muted else c.positive,
+                    )
+                }
+            }
         }
     }
 }
