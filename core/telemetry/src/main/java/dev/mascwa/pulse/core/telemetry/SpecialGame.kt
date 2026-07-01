@@ -358,14 +358,27 @@ object SpecialGame {
         return if (s == Special.ENDURANCE) updated.copy(hp = (character.hp + Character.HP_PER_END).coerceAtMost(updated.maxHp)) else updated
     }
 
-    /** Pick the next encounter: level-gated, preferring unseen (or repeatable) ones; [roll] chooses within the pool. */
-    fun nextEncounter(character: Character, all: List<Encounter>, roll: Int): Encounter? {
+    /**
+     * Pick the next encounter: level-gated, preferring unseen (or repeatable) ones; [roll] chooses within the
+     * pool. [favored] biases selection toward the perceived scene — when any eligible encounter tests one of
+     * those stats, the pick is drawn from those (so what you're really doing/hearing shapes what you face),
+     * falling back to the whole pool otherwise so variety is preserved.
+     */
+    fun nextEncounter(
+        character: Character,
+        all: List<Encounter>,
+        roll: Int,
+        favored: Set<Special> = emptySet(),
+    ): Encounter? {
         if (all.isEmpty()) return null
         val eligible = all.filter { character.level >= it.minLevel } // tough/boss fights unlock with level
         val fresh = eligible.filter { it.repeatable || it.id !in character.seen }
         val pool = if (fresh.isNotEmpty()) fresh else eligible.filter { it.repeatable }
         if (pool.isEmpty()) return null
-        return pool[roll.coerceAtLeast(0) % pool.size]
+        val biased = if (favored.isEmpty()) emptyList()
+            else pool.filter { enc -> enc.choices.mapNotNull { it.stat }.any { it in favored } }
+        val chosen = if (biased.isNotEmpty()) biased else pool
+        return chosen[roll.coerceAtLeast(0) % chosen.size]
     }
 
     /** Get back up after being downed: full HP, minus a quarter of your caps as the toll. */

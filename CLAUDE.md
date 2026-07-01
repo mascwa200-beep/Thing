@@ -948,6 +948,13 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   (c) `TelemetryViewModel.movementIntensity` = an Eagerly `StateFlow` (EWMA, `MOTION_SMOOTH 0.8`) feeding
   BOTH `sceneContext` and `buildEnv`. +4 core tests (resting/handling → STILL; stationary engine ≠ vehicle);
   83 core tests green. Owner-tunable consts. ⚠️ Threshold feel is on-device-tunable on the Pixel.
+- **Slice 7 — perception now shapes GAMEPLAY (not just flavour):** `SpecialGame.nextEncounter` gained an
+  optional `favored: Set<Special>` — when any eligible encounter tests a favoured stat, the pick is drawn
+  from those (else the full pool, so variety holds). `SpecialGameStore.venture(favored)` passes it;
+  `TelemetryViewModel.venture()` supplies `Perception.strategy(sceneContext.value).favored`, so what the game
+  hears/senses (voices→CHARISMA, motion/dark→AGILITY/PERCEPTION/ENDURANCE) biases which encounters appear.
+  +1 core test (76 SpecialGame-suite green). This closes the perception→gameplay loop for the AUDIO half; the
+  camera "sees" half (ImageClassifier + CameraX) remains the last slice.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

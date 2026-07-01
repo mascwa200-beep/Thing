@@ -363,13 +363,16 @@ class SpecialGameStore(
     fun encounterFor(c: Character): Encounter? =
         c.currentEncounterId?.let { id -> SpecialEncounters.ALL.firstOrNull { it.id == id } }
 
-    /** Draw the next encounter to face (no-op if one is already active or the player is downed). */
-    fun venture() {
+    /**
+     * Draw the next encounter to face (no-op if one is already active or the player is downed). [favored]
+     * biases selection toward the perceived scene's stats (from the on-device perception), when supplied.
+     */
+    fun venture(favored: Set<Special> = emptySet()) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             if (c.down || c.currentEncounterId != null) return@launch
-            val next = SpecialGame.nextEncounter(c, SpecialEncounters.ALL, random.nextInt(0, 100_000)) ?: return@launch
+            val next = SpecialGame.nextEncounter(c, SpecialEncounters.ALL, random.nextInt(0, 100_000), favored) ?: return@launch
             _resolution.value = null
             _character.value = c.copy(currentEncounterId = next.id)
             ventures++

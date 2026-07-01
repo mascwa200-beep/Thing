@@ -227,7 +227,8 @@ class TelemetryViewModel(
     private var weatherIsDay: Boolean? = null
 
     /** Draw the next encounter to face. */
-    fun venture() = game.venture()
+    /** Draw the next encounter, biased toward what the game perceives you doing/hearing right now. */
+    fun venture() = game.venture(Perception.strategy(sceneContext.value).favored)
     /**
      * Resolve a choice in the active encounter — with the real-world context, an optional CHEM, and an
      * optional [roll] (supplied by the gesture-performance grade; random if null).
