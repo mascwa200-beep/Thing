@@ -60,6 +60,7 @@ class SpecialGameStore(
         val perks: List<String> = emptyList(),
         val perkPicks: Int = 0,
         val inventory: Map<String, Int> = emptyMap(),
+        val companion: String? = null,
         // Lifetime counters + unlocked achievements (defaulted → old saves load).
         val wins: Int = 0,
         val crits: Int = 0,
@@ -114,7 +115,7 @@ class SpecialGameStore(
         level = level, xp = xp, caps = caps, hp = hp, unspent = unspent,
         seen = seen.toList(), currentEncounterId = currentEncounterId,
         perks = perks.toList(), perkPicks = perkPicks,
-        inventory = inventory,
+        inventory = inventory, companion = companion,
     )
 
     private fun Stored.domain(): Character {
@@ -129,6 +130,7 @@ class SpecialGameStore(
             seen = seen.toSet(), currentEncounterId = currentEncounterId,
             perks = perks.toSet(), perkPicks = perkPicks.coerceAtLeast(0),
             inventory = inventory.filterValues { it > 0 },
+            companion = companion,
         )
     }
 
@@ -308,6 +310,25 @@ class SpecialGameStore(
             val recipe = Recipes.byId(recipeId) ?: return@launch
             _character.value = SpecialGame.craft(_character.value, recipe)
             runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /** Hire companion [companionId] for caps (replaces any current one). */
+    fun hireCompanion(companionId: String) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.hireCompanion(_character.value, companionId)
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /** Send the active companion away. */
+    fun dismissCompanion() {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.dismissCompanion(_character.value)
             scheduleFlush()
         }
     }
