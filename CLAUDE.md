@@ -716,6 +716,26 @@ gone, and the trampoline + `dial_card_bg` drawable were used only by the deck), 
 zero dangling references (`Spaceballs`/`ReactorDeck`/`Dashboard`/`widget_deck`/`pulsedeck` all NONE) + XML
 well-formed. The `Reactor Deck` / `Reactor Dial` / `Spaceballs Ludicrous Speed` entries above are history now.
 
+### S.P.E.C.I.A.L. → a real game (owner: "make S.P.E.C.I.A.L. actually do something, write a whole game")
+The PIP-BOY STAT tab's S.P.E.C.I.A.L. was decorative — `TelemetryScreen.specialStats(t)` maps device metrics
+(battery→STR, sensors→PER, RAM→INT, versionCode→LUCK/LEVEL) recomputed every frame, no persistence. Turning
+it into a real wasteland RPG: a persistent character you build by playing stat-gated encounters. Design kept
+(the two screenshots ARE the current app): `PipFrame`/banded `SpecialRow`/`pipBoyPalette` preserved; the
+S.P.E.C.I.A.L. section becomes the game, OPERATOR LEVEL → the character's game level.
+- **Slice 1 (pure engine + content + tests, this slice):** `core:telemetry/SpecialGame.kt` — `Special`
+  (7 attrs), `Character` (stats 1–10 · level · xp · caps · hp · unspent points · seen), `Encounter`/`Choice`/
+  `Outcome`; `check` (`stat + d10 + luckMod ≥ difficulty`; natural 10 crits, natural 1 fumbles; LUCK tilts
+  ±2), `resolve` (crit doubles xp + bonus caps; marks non-repeatable seen), `gainXp` (cascading level-ups →
+  +1 point + heal), `allocate` (raise a stat, cap 10, END lifts maxHp), `nextEncounter` (avoid-seen →
+  repeatable fallback), `revive` (full HP, −25% caps). `core:telemetry/SpecialEncounters.kt` — 19 hand-written
+  encounters covering all 7 stats × easy/med/hard, incl. 2 repeatable SCAV_* so it never runs dry. Deterministic
+  (roll injected) → CI-testable: `SpecialGameTest.kt` (22 cases). Validated: kotlinc frontend type-checked
+  clean + a Python twin (20/20) confirming the math + every test's expected values.
+- **Next slices:** `data/game/SpecialGameStore.kt` (persist the character + current encounter, mirror
+  ProfileStore; injects the Random for rolls/selection) → wire into `AppContainer` + `TelemetryViewModel` →
+  the interactive STAT-tab UI (VENTURE OUT → encounter panel w/ stat-gated choices + pass preview → outcome
+  + rewards; tap-to-allocate on level-up; LEVEL/XP/CAPS/HP header), all in the existing Pip-Boy style.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
