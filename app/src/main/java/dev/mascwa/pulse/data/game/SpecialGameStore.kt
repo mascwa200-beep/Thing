@@ -72,6 +72,7 @@ class SpecialGameStore(
         val perkPicks: Int = 0,
         val inventory: Map<String, Int> = emptyMap(),
         val companion: String? = null,
+        val reputation: Map<String, Int> = emptyMap(),
         // Lifetime counters + unlocked achievements (defaulted → old saves load).
         val wins: Int = 0,
         val crits: Int = 0,
@@ -151,7 +152,7 @@ class SpecialGameStore(
         level = level, xp = xp, caps = caps, hp = hp, unspent = unspent,
         seen = seen.toList(), currentEncounterId = currentEncounterId,
         perks = perks.toList(), perkPicks = perkPicks,
-        inventory = inventory, companion = companion,
+        inventory = inventory, companion = companion, reputation = reputation,
     )
 
     private fun Stored.domain(): Character {
@@ -167,6 +168,7 @@ class SpecialGameStore(
             perks = perks.toSet(), perkPicks = perkPicks.coerceAtLeast(0),
             inventory = inventory.filterValues { it > 0 },
             companion = companion,
+            reputation = reputation.filterValues { it > 0 },
         )
     }
 
@@ -311,11 +313,11 @@ class SpecialGameStore(
         }
     }
 
-    /** Buy one of [itemId] at a shop (spends caps via [SpecialGame.buyItem]); re-checks achievements. */
-    fun buy(itemId: String) {
+    /** Buy one of [itemId] at a [kind] shop — faction reputation discounts the price + earns standing. */
+    fun buyAt(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) {
         scope.launch {
             ensureLoaded()
-            _character.value = SpecialGame.buyItem(_character.value, itemId)
+            _character.value = SpecialGame.buyItemAt(_character.value, itemId, kind)
             runAchievementCheck()
             scheduleFlush()
         }
@@ -326,12 +328,17 @@ class SpecialGameStore(
      * fresh die roll + the real-world [env]. Publishes the [Resolution] (so the shared banner shows the
      * outcome) without touching the current wasteland encounter — conversations are repeatable.
      */
-    fun resolveTalk(encounter: Encounter, env: EnvContext? = null) {
+    fun resolveTalk(encounter: Encounter, kind: dev.mascwa.pulse.core.telemetry.LocationKind? = null, env: EnvContext? = null) {
         scope.launch {
             ensureLoaded()
             val roll = random.nextInt(1, SpecialGame.DIE + 1)
             val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env)
-            _character.value = resolution.character
+            var updated = resolution.character
+            // A good conversation earns standing with that faction.
+            if (resolution.success && kind != null) {
+                updated = SpecialGame.addRep(updated, kind, dev.mascwa.pulse.core.telemetry.Reputation.PER_TALK)
+            }
+            _character.value = updated
             _resolution.value = resolution
             if (resolution.success) wins++
             if (resolution.crit) crits++
