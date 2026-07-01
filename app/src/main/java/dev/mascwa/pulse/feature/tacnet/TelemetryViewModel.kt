@@ -151,7 +151,7 @@ class TelemetryViewModel(
                 if (!location.hasPermission()) return@launch
                 val loc = location.current() ?: return@launch
                 _gps.value = loc
-                gameWorld.onLocation(loc.latitude, loc.longitude)
+                gameWorld.onLocation(loc.latitude, loc.longitude, loc.accuracyM)
                 // Best-effort outdoor temperature (in °C) + daylight, so the wasteland reacts to real weather.
                 runCatching {
                     val w = weather.fetch(loc.latitude, loc.longitude, loc.name, force = false).data
@@ -170,7 +170,7 @@ class TelemetryViewModel(
                     if (location.hasPermission()) {
                         location.current()?.let {
                             _gps.value = it
-                            gameWorld.onLocation(it.latitude, it.longitude)
+                            gameWorld.onLocation(it.latitude, it.longitude, it.accuracyM)
                         }
                     }
                 }

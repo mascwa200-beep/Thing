@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.LocationKind
+import dev.mascwa.pulse.core.telemetry.TravelFilter
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.places.OverpassRepository
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +71,10 @@ class GameWorldStore(
     private var distanceM = 0.0
     private var placesVisited = emptySet<String>()
     private var playMs = 0L
-    private var lastFix: Pair<Double, Double>? = null
+    // The last position we *committed* distance from. Distance only accrues once the player moves clear of
+    // the GPS-uncertainty circle around this anchor — so standing still (jitter) never adds distance.
+    private var anchorLat: Double? = null
+    private var anchorLon: Double? = null
 
     private val _locations = MutableStateFlow<List<GameLocation>>(emptyList())
     val locationsFlow: StateFlow<List<GameLocation>> = _locations.asStateFlow()
@@ -126,18 +130,27 @@ class GameWorldStore(
         }
     }
 
-    /** Feed a GPS fix: accumulate walked distance (noise/jump filtered) + mark any location reached. */
-    fun onLocation(lat: Double, lon: Double) {
+    /**
+     * Feed a GPS fix: accrue walked distance only for *real* movement, and mark any location reached.
+     * [accuracyM] is the fix's horizontal accuracy (metres) — the key to not counting a stationary phone as
+     * walking. A fix must clear an uncertainty-sized radius from the last committed anchor before it counts,
+     * so GPS wander while you sit still adds nothing; genuine walking (which leaves that radius) does.
+     */
+    fun onLocation(lat: Double, lon: Double, accuracyM: Float? = null) {
         scope.launch {
             ensureLoaded()
-            lastFix?.let { (plat, plon) ->
-                val d = Geo.distanceMeters(plat, plon, lat, lon)
-                if (d in MIN_STEP_M..MAX_STEP_M) distanceM += d
-            }
-            lastFix = lat to lon
-            _locations.value.forEach { loc ->
-                if (loc.id !in placesVisited && Geo.distanceMeters(lat, lon, loc.lat, loc.lon) <= VISIT_RADIUS_M) {
-                    placesVisited = placesVisited + loc.id
+            // Distance accrual is the CI-tested pure filter — jitter never counts, real walking does.
+            val res = TravelFilter.step(anchorLat, anchorLon, lat, lon, accuracyM?.toDouble())
+            distanceM += res.addedM
+            anchorLat = res.anchorLat
+            anchorLon = res.anchorLon
+
+            // Only trust a reasonably accurate fix to mark a location "reached".
+            if (accuracyM == null || accuracyM <= TravelFilter.MAX_ACCURACY_M) {
+                _locations.value.forEach { loc ->
+                    if (loc.id !in placesVisited && Geo.distanceMeters(lat, lon, loc.lat, loc.lon) <= VISIT_RADIUS_M) {
+                        placesVisited = placesVisited + loc.id
+                    }
                 }
             }
             publishTravel()
@@ -161,7 +174,7 @@ class GameWorldStore(
         flushJob?.cancel()
         scope.launch {
             mutex.withLock {
-                distanceM = 0.0; placesVisited = emptySet(); playMs = 0L; lastFix = null
+                distanceM = 0.0; placesVisited = emptySet(); playMs = 0L; anchorLat = null; anchorLon = null
             }
             publishTravel()
             runCatching { context.gameWorldDataStore.edit { it.remove(prefsKey) } }
@@ -192,8 +205,6 @@ class GameWorldStore(
         const val RADIUS_M = 2000
         const val PER_KIND = 6
         const val MAX_LOCATIONS = 24
-        const val MIN_STEP_M = 3.0    // below this is GPS jitter
-        const val MAX_STEP_M = 250.0  // above this is a fix jump, not walking
         const val VISIT_RADIUS_M = 60.0
         const val FLUSH_DELAY_MS = 2_000L
     }
