@@ -93,6 +93,10 @@ class TelemetryViewModel(
     fun sellItem(itemId: String) = game.sellItem(itemId)
     /** Craft a recipe at the workbench. */
     fun craft(recipeId: String) = game.craft(recipeId)
+    /** Hire a companion for caps. */
+    fun hireCompanion(companionId: String) = game.hireCompanion(companionId)
+    /** Dismiss the active companion. */
+    fun dismissCompanion() = game.dismissCompanion()
     /** Get back up after being downed. */
     fun revive() = game.revive()
     /** Start the game over with a fresh operative. */

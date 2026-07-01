@@ -67,6 +67,7 @@ data class Character(
     val perks: Set<String> = emptySet(),
     val perkPicks: Int = 0,
     val inventory: Map<String, Int> = emptyMap(),
+    val companion: String? = null,
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -161,13 +162,14 @@ object SpecialGame {
                 choice.stat != null && it.statBonus == choice.stat
         }
 
-        val critMargin = if (perkLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
+        val critMargin = if (perkLuckierCrits(character) || companionLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
             val statValue = character.stat(choice.stat) +
                 perkStatBonus(character, choice.stat) +
                 gearStatBonus(character, choice.stat) +
+                companionStatBonus(character, choice.stat) +
                 (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
                 (activeChem?.statBonusAmt ?: 0)
             check(statValue, choice.difficulty, character.stat(Special.LUCK), roll, critMargin)
@@ -182,7 +184,7 @@ object SpecialGame {
             outcome = outcome.copy(
                 caps = pctScale(outcome.caps, perkCapsPct(character)),
                 xp = pctScale(outcome.xp, perkXpPct(character)),
-                hp = outcome.hp + perkHealOnWin(character),
+                hp = outcome.hp + perkHealOnWin(character) + companionHealOnWin(character),
             )
         }
 
@@ -295,6 +297,27 @@ object SpecialGame {
     private fun perkXpPct(c: Character): Int = owned(c).sumOf { it.xpBonusPct }
     private fun perkHealOnWin(c: Character): Int = owned(c).sumOf { it.healOnWin }
     private fun perkLuckierCrits(c: Character): Boolean = owned(c).any { it.luckierCrits }
+
+    // --- Companion effect resolution (the one active hired ally) ---
+    private fun activeCompanion(c: Character): Companion? = c.companion?.let { Companions.byId(it) }
+
+    /** The bonus the active companion grants to checks gated by [s]. */
+    fun companionStatBonus(c: Character, s: Special): Int =
+        activeCompanion(c)?.takeIf { it.statBonus == s }?.statBonusAmt ?: 0
+
+    private fun companionHealOnWin(c: Character): Int = activeCompanion(c)?.healOnWin ?: 0
+    private fun companionLuckierCrits(c: Character): Boolean = activeCompanion(c)?.luckierCrits ?: false
+
+    /** Hire companion [id] for its caps cost (replaces any current one). No-op if unknown, already hired, or too poor. */
+    fun hireCompanion(c: Character, id: String): Character {
+        val comp = Companions.byId(id) ?: return c
+        if (c.companion == id) return c
+        if (c.caps < comp.cost) return c
+        return c.copy(caps = c.caps - comp.cost, companion = id)
+    }
+
+    /** Send the active companion on their way (no refund). */
+    fun dismissCompanion(c: Character): Character = c.copy(companion = null)
 
     /** Scale a positive reward by a percentage (no-op for zero pct or non-positive rewards). */
     private fun pctScale(value: Int, pct: Int): Int = if (pct == 0 || value <= 0) value else value + value * pct / 100

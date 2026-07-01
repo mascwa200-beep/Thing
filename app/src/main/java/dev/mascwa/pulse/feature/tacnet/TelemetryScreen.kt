@@ -59,6 +59,8 @@ import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
+import dev.mascwa.pulse.core.telemetry.Companion
+import dev.mascwa.pulse.core.telemetry.Companions
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
@@ -179,6 +181,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 onUseItem = { vm.useItem(it) },
                 onSellItem = { vm.sellItem(it) },
                 onCraft = { vm.craft(it) },
+                onHireCompanion = { vm.hireCompanion(it) },
+                onDismissCompanion = { vm.dismissCompanion() },
             )
             Spacer(Modifier.height(8.dp))
             WastelandPanel(locations, travel, scanning, gps, character, c,
@@ -546,6 +550,8 @@ private fun SpecialGamePanel(
     onUseItem: (String) -> Unit,
     onSellItem: (String) -> Unit,
     onCraft: (String) -> Unit,
+    onHireCompanion: (String) -> Unit,
+    onDismissCompanion: () -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -576,6 +582,8 @@ private fun SpecialGamePanel(
     InventoryPanel(ch, c, onUseItem, onSellItem)
     Spacer(Modifier.height(8.dp))
     WorkbenchPanel(ch, c, onCraft)
+    Spacer(Modifier.height(8.dp))
+    CompanionPanel(ch, c, onHireCompanion, onDismissCompanion)
     if (ch.perkPicks > 0) {
         Spacer(Modifier.height(8.dp))
         PerkChoicePanel(ch, c, onChoosePerk)
@@ -1068,6 +1076,55 @@ private fun RecipeRow(r: Recipe, craftable: Boolean, c: NightwirePalette, onCraf
                 .padding(horizontal = 8.dp, vertical = 5.dp),
         ) {
             Text("CRAFT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col, letterSpacing = 0.5.sp)
+        }
+    }
+}
+
+/** The companion: one hired ally who helps on every encounter. Hire (for caps), swap, or dismiss. */
+@Composable
+private fun CompanionPanel(ch: Character, c: NightwirePalette, onHire: (String) -> Unit, onDismiss: () -> Unit) {
+    val active = ch.companion?.let { Companions.byId(it) }
+    PipFrame(Modifier.fillMaxWidth(), accent = c.violet) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("COMPANION", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.violet, letterSpacing = 1.sp)
+            if (active != null) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("● ${active.name}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.violet)
+                        Text(active.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                    }
+                    InvAction("DISMISS", c.negative) { onDismiss() }
+                }
+                Text("HIRE ANOTHER (swaps)", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.muted, letterSpacing = 1.sp)
+            }
+            Companions.ALL.filter { it.id != ch.companion }.forEach { comp ->
+                CompanionHireRow(comp, ch.caps >= comp.cost, c) { onHire(comp.id) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanionHireRow(comp: Companion, affordable: Boolean, c: NightwirePalette, onHire: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.violet.copy(alpha = 0.05f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(comp.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (affordable) c.ink else c.muted)
+            Text(comp.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
+        val col = if (affordable) c.amber else c.muted
+        Box(
+            Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, col.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+                .background(col.copy(alpha = 0.1f))
+                .then(if (affordable) Modifier.clickable(onClick = onHire) else Modifier)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            Text("HIRE ${comp.cost}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col, letterSpacing = 0.5.sp)
         }
     }
 }
