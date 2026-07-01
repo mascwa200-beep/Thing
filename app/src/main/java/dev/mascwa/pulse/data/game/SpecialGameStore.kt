@@ -64,6 +64,8 @@ class SpecialGameStore(
         val crits: Int = 0,
         val ventures: Int = 0,
         val unlocked: List<String> = emptyList(),
+        // App-usage XP baseline: the total app-visit count we last granted XP for (-1 = not yet baselined).
+        val lastXpVisits: Int = -1,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -76,6 +78,7 @@ class SpecialGameStore(
     private var crits = 0
     private var ventures = 0
     private var unlocked: Set<String> = emptySet()
+    private var lastXpVisits = -1
     // External metrics the ViewModel feeds in (real app usage + travel) for usage/travel achievements.
     private var extVisits = 0
     private var extFeatures = 0
@@ -141,6 +144,7 @@ class SpecialGameStore(
                 ventures = stored.ventures.coerceAtLeast(0)
                 unlocked = stored.unlocked.toSet()
                 _unlocked.value = unlocked
+                lastXpVisits = stored.lastXpVisits
             }
             loaded = true
             justLoaded = true
@@ -176,10 +180,21 @@ class SpecialGameStore(
         publishMetrics()
     }
 
-    /** Feed real app-usage metrics (from the usage snapshot); re-checks usage achievements. */
+    /**
+     * Feed real app-usage metrics (from the usage snapshot). Grants XP for NEW app usage since the last
+     * check — using Pulse levels your operative — then re-checks usage achievements. The first call after a
+     * save just baselines (no retro-dump for usage that happened before this existed).
+     */
     fun setUsageMetrics(appVisits: Int, distinctFeatures: Int) {
         scope.launch {
             ensureLoaded()
+            if (lastXpVisits < 0) {
+                lastXpVisits = appVisits // baseline — don't grant XP for usage before the game was tracking it
+            } else if (appVisits > lastXpVisits) {
+                val gained = (appVisits - lastXpVisits) * XP_PER_VISIT
+                lastXpVisits = appVisits
+                if (gained > 0) _character.value = SpecialGame.gainXp(_character.value, gained)
+            }
             extVisits = appVisits
             extFeatures = distinctFeatures
             runAchievementCheck()
@@ -326,6 +341,7 @@ class SpecialGameStore(
             unlocked = emptySet()
             _unlocked.value = emptySet()
             _lastUnlock.value = null
+            lastXpVisits = -1 // re-baseline app-usage XP so the fresh operative doesn't get a dump
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -343,6 +359,7 @@ class SpecialGameStore(
     private suspend fun flush() {
         val snapshot = _character.value.stored().copy(
             wins = wins, crits = crits, ventures = ventures, unlocked = unlocked.toList(),
+            lastXpVisits = lastXpVisits,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
@@ -351,5 +368,6 @@ class SpecialGameStore(
 
     private companion object {
         const val FLUSH_DELAY_MS = 1_000L
+        const val XP_PER_VISIT = 3 // XP granted per new app-screen visit (using Pulse levels your operative)
     }
 }
