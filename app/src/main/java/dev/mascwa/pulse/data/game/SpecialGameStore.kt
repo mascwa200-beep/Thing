@@ -52,6 +52,8 @@ class SpecialGameStore(
         val unspent: Int = 0,
         val seen: List<String> = emptyList(),
         val currentEncounterId: String? = null,
+        val perks: List<String> = emptyList(),
+        val perkPicks: Int = 0,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -71,6 +73,7 @@ class SpecialGameStore(
         stats = stats.entries.associate { it.key.name to it.value },
         level = level, xp = xp, caps = caps, hp = hp, unspent = unspent,
         seen = seen.toList(), currentEncounterId = currentEncounterId,
+        perks = perks.toList(), perkPicks = perkPicks,
     )
 
     private fun Stored.domain(): Character {
@@ -83,6 +86,7 @@ class SpecialGameStore(
             stats = filled, level = level.coerceAtLeast(1), xp = xp.coerceAtLeast(0),
             caps = caps.coerceAtLeast(0), hp = hp.coerceAtLeast(0), unspent = unspent.coerceAtLeast(0),
             seen = seen.toSet(), currentEncounterId = currentEncounterId,
+            perks = perks.toSet(), perkPicks = perkPicks.coerceAtLeast(0),
         )
     }
 
@@ -134,6 +138,15 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.allocate(_character.value, s)
+            scheduleFlush()
+        }
+    }
+
+    /** Choose a perk [perkId] (spends a perk pick). */
+    fun choosePerk(perkId: String) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.choosePerk(_character.value, perkId)
             scheduleFlush()
         }
     }

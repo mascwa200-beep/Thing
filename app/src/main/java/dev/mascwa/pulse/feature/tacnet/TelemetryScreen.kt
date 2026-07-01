@@ -54,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Encounter
+import dev.mascwa.pulse.core.telemetry.Perk
+import dev.mascwa.pulse.core.telemetry.Perks
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.core.telemetry.SpecialGame
@@ -143,6 +145,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 onChoose = { vm.choose(it) },
                 onAllocate = { vm.allocate(it) },
                 onRevive = { vm.revive() },
+                onChoosePerk = { vm.choosePerk(it) },
             )
 
             PipHeader("Vitals")
@@ -500,6 +503,7 @@ private fun SpecialGamePanel(
     onChoose: (Int) -> Unit,
     onAllocate: (Special) -> Unit,
     onRevive: () -> Unit,
+    onChoosePerk: (String) -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -515,13 +519,58 @@ private fun SpecialGamePanel(
             Special.entries.forEach { s ->
                 SpecialGameRow(s, ch.stat(s), ch.unspent > 0 && ch.stat(s) < 10, c) { onAllocate(s) }
             }
+            if (ch.perks.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "PERKS · " + ch.perks.mapNotNull { Perks.byId(it)?.name }.joinToString(" · "),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive,
+                )
+            }
         }
+    }
+    if (ch.perkPicks > 0) {
+        Spacer(Modifier.height(8.dp))
+        PerkChoicePanel(ch, c, onChoosePerk)
     }
     Spacer(Modifier.height(8.dp))
     when {
         ch.down -> DownedPanel(c, onRevive)
         encounter != null -> EncounterPanel(encounter, ch, c, onChoose)
         else -> IdlePanel(resolution, c, onVenture)
+    }
+}
+
+@Composable
+private fun PerkChoicePanel(ch: Character, c: NightwirePalette, onChoose: (String) -> Unit) {
+    val available = Perks.ALL.filter { it.id !in ch.perks }
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "CHOOSE A PERK · ${ch.perkPicks} available", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 13.sp, color = c.amber, letterSpacing = 1.sp,
+            )
+            if (available.isEmpty()) {
+                Text("You've earned every perk. Legend.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+            } else {
+                available.forEach { perk -> PerkRow(perk, c) { onChoose(perk.id) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PerkRow(perk: Perk, c: NightwirePalette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.amber.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.06f))
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(perk.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink)
+            Text(perk.desc, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+        Text("TAKE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = c.amber, letterSpacing = 1.sp)
     }
 }
 

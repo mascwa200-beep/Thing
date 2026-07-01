@@ -47,6 +47,8 @@ class TelemetryViewModel(
     fun choose(choiceIndex: Int) = game.choose(choiceIndex)
     /** Spend an unspent point on a stat. */
     fun allocate(s: dev.mascwa.pulse.core.telemetry.Special) = game.allocate(s)
+    /** Choose a perk (spends a perk pick). */
+    fun choosePerk(perkId: String) = game.choosePerk(perkId)
     /** Get back up after being downed. */
     fun revive() = game.revive()
     /** Start the game over with a fresh operative. */

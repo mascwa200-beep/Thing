@@ -193,4 +193,87 @@ class SpecialGameTest {
         assertEquals("every S.P.E.C.I.A.L. stat should gate at least one choice", Special.entries.toSet(), gated)
         assertTrue("needs a repeatable encounter so it never runs dry", all.any { it.repeatable })
     }
+
+    // --- Perks ---
+
+    private fun withLuck(luck: Int): Character {
+        val stats = SpecialGame.newCharacter().stats.toMutableMap().apply { put(Special.LUCK, luck) }
+        return SpecialGame.newCharacter().copy(stats = stats)
+    }
+
+    @Test
+    fun perkStatBonusReflectsOwnedPerks() {
+        val c = SpecialGame.newCharacter().copy(perks = setOf("strong_back"))
+        assertEquals(2, SpecialGame.perkStatBonus(c, Special.STRENGTH))
+        assertEquals(0, SpecialGame.perkStatBonus(c, Special.LUCK))
+    }
+
+    @Test
+    fun aStatPerkCanTipAFailingCheckToSuccess() {
+        // STR 4, LUCK 5 (luckMod 0), DC 12, roll 6 -> 10 < 12 fails; +2 from Strong Back -> 12 passes.
+        val enc = Encounter("str", "S", "p", listOf(
+            Choice("force", Special.STRENGTH, 12, Outcome("w", xp = 20, caps = 20), Outcome("l", hp = -5)),
+        ))
+        val base = withLuck(5)
+        assertFalse(SpecialGame.resolve(base, enc, 0, 6).success)
+        assertTrue(SpecialGame.resolve(base.copy(perks = setOf("strong_back")), enc, 0, 6).success)
+    }
+
+    @Test
+    fun scroungerScalesWinCaps() {
+        val enc = Encounter("e", "E", "p", listOf(Choice("take", null, 0, Outcome("w", caps = 20), Outcome("l"))))
+        val c = SpecialGame.newCharacter().copy(perks = setOf("scrounger"), caps = 0)
+        val r = SpecialGame.resolve(c, enc, 0, 5)
+        assertEquals(25, r.outcome.caps) // 20 + 25%
+        assertEquals(25, r.character.caps)
+    }
+
+    @Test
+    fun fastLearnerScalesWinXp() {
+        val enc = Encounter("e", "E", "p", listOf(Choice("take", null, 0, Outcome("w", xp = 40), Outcome("l"))))
+        val r = SpecialGame.resolve(SpecialGame.newCharacter().copy(perks = setOf("fast_learner")), enc, 0, 5)
+        assertEquals(50, r.outcome.xp) // 40 + 25%
+    }
+
+    @Test
+    fun bornLuckyMakesCritsEasier() {
+        // STR 8, LUCK 5, DC 8, roll 5 -> total 13. Normal crit needs >=14 (no); Born Lucky needs >=11 (yes).
+        val enc = Encounter("e", "E", "p", listOf(Choice("do", Special.STRENGTH, 8, Outcome("w", xp = 10), Outcome("l"))))
+        val strong = SpecialGame.newCharacter().copy(
+            stats = SpecialGame.newCharacter().stats.toMutableMap().apply { put(Special.STRENGTH, 8); put(Special.LUCK, 5) },
+        )
+        assertFalse(SpecialGame.resolve(strong, enc, 0, 5).crit)
+        assertTrue(SpecialGame.resolve(strong.copy(perks = setOf("born_lucky")), enc, 0, 5).crit)
+    }
+
+    @Test
+    fun levelingGrantsAPerkPickOnEvenLevels() {
+        val c = SpecialGame.newCharacter().copy(unspent = 0, perkPicks = 0)
+        assertEquals(1, SpecialGame.gainXp(c, c.xpToNext).perkPicks)      // reached level 2 (even)
+        val l3 = SpecialGame.gainXp(c, 350)                               // levels 2 + 3 crossed
+        assertEquals(3, l3.level)
+        assertEquals(1, l3.perkPicks)                                     // only level 2 is even
+    }
+
+    @Test
+    fun choosePerkSpendsAPickAndValidates() {
+        val c = SpecialGame.newCharacter().copy(perkPicks = 1)
+        val ok = SpecialGame.choosePerk(c, "scrounger")
+        assertTrue("scrounger" in ok.perks)
+        assertEquals(0, ok.perkPicks)
+
+        val noPicks = SpecialGame.newCharacter() // perkPicks 0
+        assertEquals(noPicks, SpecialGame.choosePerk(noPicks, "scrounger"))
+        assertEquals(c, SpecialGame.choosePerk(c, "does_not_exist"))                       // unknown id
+        val owned = SpecialGame.newCharacter().copy(perkPicks = 1, perks = setOf("scrounger"))
+        assertEquals(owned, SpecialGame.choosePerk(owned, "scrounger"))                    // already owned
+    }
+
+    @Test
+    fun perkLibraryIsSane() {
+        assertTrue(Perks.ALL.size >= 8)
+        assertEquals(Perks.ALL.size, Perks.ALL.map { it.id }.toSet().size)
+        assertNotNull(Perks.byId("scrounger"))
+        assertNull(Perks.byId("nope"))
+    }
 }
