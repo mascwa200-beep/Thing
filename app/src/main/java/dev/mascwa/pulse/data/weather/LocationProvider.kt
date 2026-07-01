@@ -21,7 +21,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.coroutines.resume
 
-data class DeviceLocation(val latitude: Double, val longitude: Double, val name: String)
+data class DeviceLocation(
+    val latitude: Double,
+    val longitude: Double,
+    val name: String,
+    /** Horizontal accuracy in metres (68% confidence), or null if the fix didn't report it. */
+    val accuracyM: Float? = null,
+)
 
 /** Reverse-geocoded administrative context for a coordinate (for region-scoped lookups like radio). */
 data class GeoPlace(
@@ -54,7 +60,7 @@ class LocationProvider(private val context: Context) {
         // faster first fix, and no failed Play-Services round-trip.
         val loc = (if (isGmsAvailable()) fusedFix() else null) ?: managerFix() ?: lastKnown() ?: return null
         val name = reverseGeocode(loc.latitude, loc.longitude) ?: formatCoords(loc.latitude, loc.longitude)
-        return DeviceLocation(loc.latitude, loc.longitude, name)
+        return DeviceLocation(loc.latitude, loc.longitude, name, if (loc.hasAccuracy()) loc.accuracy else null)
     }
 
     /**
