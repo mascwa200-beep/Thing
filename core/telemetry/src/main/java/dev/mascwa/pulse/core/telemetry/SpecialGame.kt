@@ -241,6 +241,23 @@ object SpecialGame {
         return addItem(c.copy(caps = c.caps - item.value), id, 1)
     }
 
+    /** Whether [c] can craft [r] — holds every input and meets the recipe's stat gate. */
+    fun canCraft(c: Character, r: Recipe): Boolean {
+        if (Items.byId(r.outputId) == null) return false
+        if (r.stat != null && c.stat(r.stat) < r.minStat) return false
+        return r.inputs.all { (id, qty) -> (c.inventory[id] ?: 0) >= qty }
+    }
+
+    /** Craft [r]: consume its inputs, yield its output, grant its XP. No-op if [canCraft] is false. */
+    fun craft(c: Character, r: Recipe): Character {
+        if (!canCraft(c, r)) return c
+        var updated = c
+        for ((id, qty) in r.inputs) updated = removeItem(updated, id, qty)
+        updated = addItem(updated, r.outputId, r.outputQty)
+        if (r.xp > 0) updated = gainXp(updated, r.xp)
+        return updated
+    }
+
     /** Add XP, cascading level-ups (each grants an unspent point + heals to full on the level). */
     fun gainXp(character: Character, amount: Int): Character {
         if (amount <= 0) return character

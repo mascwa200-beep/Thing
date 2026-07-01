@@ -73,6 +73,8 @@ import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
+import dev.mascwa.pulse.core.telemetry.Recipe
+import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.core.telemetry.SpecialGame
@@ -176,6 +178,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 onChoosePerk = { vm.choosePerk(it) },
                 onUseItem = { vm.useItem(it) },
                 onSellItem = { vm.sellItem(it) },
+                onCraft = { vm.craft(it) },
             )
             Spacer(Modifier.height(8.dp))
             WastelandPanel(locations, travel, scanning, gps, character, c,
@@ -542,6 +545,7 @@ private fun SpecialGamePanel(
     onChoosePerk: (String) -> Unit,
     onUseItem: (String) -> Unit,
     onSellItem: (String) -> Unit,
+    onCraft: (String) -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -570,6 +574,8 @@ private fun SpecialGamePanel(
     ConditionsPanel(env, c)
     Spacer(Modifier.height(8.dp))
     InventoryPanel(ch, c, onUseItem, onSellItem)
+    Spacer(Modifier.height(8.dp))
+    WorkbenchPanel(ch, c, onCraft)
     if (ch.perkPicks > 0) {
         Spacer(Modifier.height(8.dp))
         PerkChoicePanel(ch, c, onChoosePerk)
@@ -1018,6 +1024,51 @@ private fun formatPlayTime(ms: Long): String {
         h > 0 -> "${h}h ${m}m"
         m > 0 -> "${m}m"
         else -> "${s}s"
+    }
+}
+
+/** The workbench: turn scavenged junk into gear/aid. Shows recipes you have at least one material for. */
+@Composable
+private fun WorkbenchPanel(ch: Character, c: NightwirePalette, onCraft: (String) -> Unit) {
+    val relevant = Recipes.ALL.filter { r -> r.inputs.keys.any { (ch.inventory[it] ?: 0) > 0 } }
+    PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("WORKBENCH", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.amber, letterSpacing = 1.sp)
+            if (relevant.isEmpty()) {
+                Text("Scavenge materials (scrap, wire, boards) to craft gear here.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            } else {
+                relevant.forEach { r -> RecipeRow(r, SpecialGame.canCraft(ch, r), c) { onCraft(r.id) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecipeRow(r: Recipe, craftable: Boolean, c: NightwirePalette, onCraft: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.05f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("${r.name} → ${Items.byId(r.outputId)?.name ?: r.outputId}", fontFamily = ChakraPetch,
+                fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (craftable) c.ink else c.muted)
+            val needs = r.inputs.entries.joinToString(" + ") { (id, qty) -> "$qty× ${Items.byId(id)?.name ?: id}" } +
+                (r.stat?.let { " · ${it.display.take(3)} ${r.minStat}" } ?: "")
+            Text(needs, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+        }
+        val col = if (craftable) c.positive else c.muted
+        Box(
+            Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, col.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+                .background(col.copy(alpha = 0.1f))
+                .then(if (craftable) Modifier.clickable(onClick = onCraft) else Modifier)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        ) {
+            Text("CRAFT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = col, letterSpacing = 0.5.sp)
+        }
     }
 }
 
