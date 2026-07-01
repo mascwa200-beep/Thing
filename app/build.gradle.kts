@@ -181,6 +181,9 @@ dependencies {
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
 
+    // On-device audio classification (MediaPipe YAMNet) — the life-sim's ambient hearing.
+    implementation(libs.mediapipe.tasks.audio)
+
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.
     implementation(libs.vosk.android)

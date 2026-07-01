@@ -46,6 +46,9 @@ composeCharts = "0.1.2"
 # 0.10.25+ is required to load the LiteRT-LM `.litertlm` model format; 0.10.24 only
 # opened legacy `.task` zip bundles (hence "Unable to open zip archive" on a .litertlm).
 mediapipeGenai = "0.10.27"
+# MediaPipe Tasks Audio (YAMNet sound classification) — on-device ambient hearing for the life-sim.
+# 0.10.21 is the newest tasks-audio published to Google Maven (genai releases run ahead of it).
+mediapipeTasksAudio = "0.10.21"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -109,6 +112,8 @@ androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exop
 
 # On-device LLM
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+# On-device audio classification (YAMNet) — the life-sim's ambient hearing.
+mediapipe-tasks-audio = { group = "com.google.mediapipe", name = "tasks-audio", version.ref = "mediapipeTasksAudio" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }

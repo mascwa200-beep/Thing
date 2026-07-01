@@ -141,6 +141,7 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
     val quests by vm.quests.collectAsStateWithLifecycle()
     val questDone by vm.questCompleted.collectAsStateWithLifecycle()
+    val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -194,9 +195,14 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                     dayBanner,
                     fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
                     color = c.amber, letterSpacing = 2.sp,
-                    modifier = Modifier.padding(bottom = 6.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            Text(
+                "PERCEIVES · ${scene.describe()}",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.sky,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+            )
             questDone?.let { q ->
                 QuestCompleteBanner(q, c) { vm.dismissQuestComplete() }
                 Spacer(Modifier.height(8.dp))

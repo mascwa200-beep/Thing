@@ -918,8 +918,25 @@ privacy-first pattern extends to raw sensor data), human-gate for self-code, isP
   `game.awardQuest(caps, xp)` (new `SpecialGameStore` method: caps + `SpecialGame.gainXp`) + a one-shot
   `questCompleted` banner. UI: `QuestCard` now shows a **progress bar + `done/target` + ✓ COMPLETE**, and a
   **QUEST COMPLETE reward banner**. `resetGame` clears the quest log. Wired via `AppContainer.questStore` +
-  factory. ⚠️ On-device-unverified (CI compile-gates only). **Remaining life-sim slice:** the on-device
-  camera/mic sampler feeding `Perception.SceneSignals` (makes scene live; currently default/neutral).
+  factory. ⚠️ On-device-unverified (CI compile-gates only).
+- **Slice 6 — on-device ambient HEARING (this slice, owner chose "on-device classifiers"):** the Perception
+  brain is now live via the mic. `data/perception/AmbientPerceptionSampler.kt` samples short mic clips and
+  runs each through the **MediaPipe YAMNet audio classifier fully on-device** (`tasks-audio` 0.10.21, new
+  dep; RunningMode.AUDIO_CLIPS; `createAudioRecord`→`AudioData.load`→`classify`), publishing recognised sound
+  labels (speech/music/traffic/crowd/silence) as `PerceptLabel`s. **Privacy:** only text labels are produced;
+  raw audio is classified then discarded, never persisted/sent. Fully defensive — no RECORD_AUDIO (already a
+  granted perm from voice), no model, or any hardware/classifier failure → publishes nothing → neutral scene.
+  The ~4 MB YAMNet model is **fetched once on first use** (`HttpClient.download` → filesDir, kept out of the
+  APK) and cached. `TelemetryViewModel.sceneContext` = `combine(sampler.soundLabels, telemetry)` →
+  `Perception.distill` (light/motion/clock too), **throttled** via a bucketed `distinctUntilChanged` so
+  accelerometer jitter doesn't re-distill; it feeds `LifeContext.scene` in the quest driver (via a
+  `lifeInputs`+`scene` two-stage combine, since >5 flows) so the story director flavours by what you're doing.
+  A **"PERCEIVES · <describe>"** readout on the STAT tab surfaces it for on-device verification. Sampler
+  start/stop tied to the game screen lifecycle. ⚠️ **On-device-unverified — the MediaPipe audio path, model
+  download, and mic behaviour are entirely CI-unprovable; owner verifies on the Pixel** (mic may be busy while
+  voice is active → falls back to neutral, by design). **Next (camera half):** an ImageClassifier
+  (`tasks-vision` + CameraX + CAMERA permission) for scene/object labels → the "sees" half; wiring
+  `SceneStrategy.favored` into encounter *selection* (currently only flavours the story).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

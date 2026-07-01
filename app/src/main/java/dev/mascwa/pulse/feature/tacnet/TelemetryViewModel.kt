@@ -7,11 +7,14 @@ import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameClock
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.LifeContext
+import dev.mascwa.pulse.core.telemetry.LocationKind
+import dev.mascwa.pulse.core.telemetry.Perception
 import dev.mascwa.pulse.core.telemetry.ProfileCategory
 import dev.mascwa.pulse.core.telemetry.Quest
 import dev.mascwa.pulse.core.telemetry.QuestMetrics
 import dev.mascwa.pulse.core.telemetry.QuestView
 import dev.mascwa.pulse.core.telemetry.SceneContext
+import dev.mascwa.pulse.core.telemetry.SceneSignals
 import dev.mascwa.pulse.core.telemetry.StoryDirector
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.sensors.Telemetry
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -49,6 +53,7 @@ class TelemetryViewModel(
     private val profileStore: dev.mascwa.pulse.data.profile.ProfileStore,
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
     private val questStore: dev.mascwa.pulse.data.game.QuestStore,
+    private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -82,13 +87,42 @@ class TelemetryViewModel(
     }
 
     /**
-     * Drives the quest log: composes personalised quests from your real life — pending tasks (TaskStore),
-     * profiled interests (ProfileStore), the real places nearby (GameWorldStore) and the day/level — paired
-     * with a live [QuestMetrics] snapshot (from the game metrics + travel), whenever any of those change.
-     * Scene stays default until the on-device camera/mic sampler is wired. Pure + deterministic via
-     * [StoryDirector]; the [questStore] then tracks completion + rewards.
+     * What the game perceives around you — distilled from the on-device audio classifier's sound labels plus
+     * the live light/motion sensors and the clock. Drives the quest director's flavour + (future) encounter
+     * strategy. Neutral until the sampler produces labels; light/motion/time keep it partially live regardless.
      */
-    private val questDriver = combine(
+    // Coarse buckets mirroring Perception's own thresholds — so tiny accelerometer/light jitter doesn't
+    // re-run the distillation on every sensor event (only when a perception-relevant boundary is crossed).
+    private fun lightBand(lux: Float?): Int = lux?.let { if (it < 12f) 0 else if (it >= 250f) 2 else 1 } ?: -1
+    private fun movingBucket(g: Float?): Boolean = (g ?: 0f) >= 1.10f
+
+    val sceneContext: StateFlow<SceneContext> = combine(
+        sampler.soundLabels,
+        telemetry.distinctUntilChanged { a, b ->
+            lightBand(a.lightLux) == lightBand(b.lightLux) && movingBucket(a.accelG) == movingBucket(b.accelG)
+        },
+    ) { sounds, t ->
+        Perception.distill(
+            SceneSignals(
+                soundLabels = sounds,
+                lightLux = t.lightLux,
+                motionG = t.accelG,
+                hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
+            ),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SceneContext())
+
+    private data class LifeInputs(
+        val interests: List<String>,
+        val pending: List<String>,
+        val kinds: Set<LocationKind>,
+        val level: Int,
+        val day: Int,
+        val metrics: QuestMetrics,
+    )
+
+    // The life signals (tasks/interests/nearby/day/metrics), gathered from the stores.
+    private val lifeInputs = combine(
         profileStore.entriesFlow,
         taskStore.tasksFlow,
         gameWorld.locationsFlow,
@@ -104,22 +138,32 @@ class TelemetryViewModel(
             .sortedByDescending { it.weight }
             .map { it.text }
         val pending = TaskBoard.pending(tasks).map { it.title }
+        LifeInputs(
+            interests = interests, pending = pending, kinds = locs.map { it.kind }.toSet(),
+            level = gm.level, day = day,
+            metrics = QuestMetrics(gm.distanceM, gm.wins, gm.ventures, gm.placesVisited, day, pending.toSet()),
+        )
+    }
+
+    /**
+     * Drives the quest log: composes personalised quests from your real life (pending tasks, profiled
+     * interests, nearby places, day/level) + the perceived [sceneContext], paired with a live [QuestMetrics]
+     * snapshot, whenever any of those change. Pure + deterministic via [StoryDirector]; the [questStore]
+     * then tracks completion + rewards.
+     */
+    private val questDriver = combine(lifeInputs, sceneContext) { inp, scene ->
         val composed = StoryDirector.compose(
             LifeContext(
-                interests = interests,
-                pendingTasks = pending,
-                scene = SceneContext(),
-                nearbyKinds = locs.map { it.kind }.toSet(),
-                day = day,
-                level = gm.level,
+                interests = inp.interests,
+                pendingTasks = inp.pending,
+                scene = scene,
+                nearbyKinds = inp.kinds,
+                day = inp.day,
+                level = inp.level,
             ),
-            seed = day.toLong(),
+            seed = inp.day.toLong(),
         )
-        val metrics = QuestMetrics(
-            distanceM = gm.distanceM, wins = gm.wins, ventures = gm.ventures,
-            places = gm.placesVisited, day = day, pendingTasks = pending.toSet(),
-        )
-        composed to metrics
+        composed to inp.metrics
     }
 
     /** The live quest log, rendered with progress + completion — for the QUESTS panel. */
@@ -246,6 +290,7 @@ class TelemetryViewModel(
 
     fun start() {
         controller.start()
+        sampler.start() // on-device ambient hearing while the game screen is open (no-op without mic)
         _env.value = buildEnv(controller.telemetry.value)
         // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).
         viewModelScope.launch {
@@ -298,6 +343,7 @@ class TelemetryViewModel(
 
     fun stop() {
         controller.stop()
+        sampler.stop() // release the mic when the game screen isn't visible
         ticker?.cancel()
     }
 
