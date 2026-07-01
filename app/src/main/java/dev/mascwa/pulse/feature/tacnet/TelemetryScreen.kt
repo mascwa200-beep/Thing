@@ -819,11 +819,14 @@ private fun EncounterPanel(
     var selectedChem by remember(e.id) { mutableStateOf<String?>(null) }
     var resolved by remember(e.id) { mutableStateOf(false) }
     var meter by remember(e.id) { mutableStateOf(0f) }
+    // HOLD STILL must be armed by a tap first — else a phone resting on a table would auto-commit the scan.
+    var holdArmed by remember(e.id) { mutableStateOf(false) }
 
     // Which motions this scene accepts, from its choices' stats.
     val wanted: Set<GestureType> = remember(e.id) {
         e.choices.mapNotNull { it.stat?.let { s -> Gestures.forStat(s) } }.toSet()
     }
+    val holdNeedsArm = GestureType.HOLD in wanted
 
     // Live sensor detection → resolve the matching approach with a performance-graded roll. Polls at a
     // fixed cadence (StateFlow is conflated, so a "hold still" wouldn't re-emit) — robust for all gestures.
@@ -846,7 +849,8 @@ private fun EncounterPanel(
 
             shakeE = shakeE * SHAKE_DECAY + jolt
             if (jolt > shakePeak) shakePeak = jolt
-            if (gyro < STILL_GYRO && jolt < STILL_ACC) stillMs += POLL_MS else stillMs = 0
+            // The still-timer only runs once the player has armed the hold — no accidental resting-on-a-table commit.
+            if (holdArmed && gyro < STILL_GYRO && jolt < STILL_ACC) stillMs += POLL_MS else stillMs = 0
 
             meter = listOfNotNull(
                 if (GestureType.FLICK in wanted) ((g - 1f) / (FLICK_GREAT_G - 1f)).coerceIn(0f, 1f) else null,
@@ -896,10 +900,36 @@ private fun EncounterPanel(
             e.choices.forEach { choice -> ApproachRow(choice, ch, selectedChem, c) }
             Spacer(Modifier.height(2.dp))
             SegBar(meter, if (resolved) c.positive else c.sky, c)
-            Text(
-                if (resolved) "⟳ COMMITTING…" else "▸ PERFORM AN ACTION — " + wanted.joinToString(" · ") { it.label },
-                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.sky, letterSpacing = 0.5.sp,
-            )
+            when {
+                resolved -> Text("⟳ COMMITTING…", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp, color = c.positive, letterSpacing = 0.5.sp)
+                // HOLD scene, not yet armed → require an explicit tap so a still phone can't auto-commit.
+                holdNeedsArm && !holdArmed -> {
+                    val others = (wanted - GestureType.HOLD).joinToString(" · ") { it.label }
+                    Box(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+                            .border(1.dp, c.sky.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                            .background(c.sky.copy(alpha = 0.08f)).clickable { holdArmed = true }
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                    ) {
+                        Text(
+                            "◉ TAP TO ARM THE HOLD — then keep the phone dead still" +
+                                if (others.isNotEmpty()) "   ·   or $others now" else "",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
+                            color = c.sky, letterSpacing = 0.5.sp,
+                        )
+                    }
+                }
+                holdNeedsArm && holdArmed -> Text(
+                    "◉ ARMED — HOLD DEAD STILL" +
+                        (wanted - GestureType.HOLD).joinToString(" · ") { it.label }.let { if (it.isNotEmpty()) "   ·   or $it" else "" },
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.amber, letterSpacing = 0.5.sp,
+                )
+                else -> Text(
+                    "▸ PERFORM AN ACTION — " + wanted.joinToString(" · ") { it.label },
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = c.sky, letterSpacing = 0.5.sp,
+                )
+            }
         }
     }
 }

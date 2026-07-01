@@ -840,8 +840,9 @@ but keep the interactive/Pokémon-Go part. What would CDPR have made if they bui
   wouldn't re-emit. All thresholds are top-of-file owner-tunable consts (`FLICK_MIN_G`, `SHAKE_FIRE`,
   `STILL_HOLD_MS`, …). The map shop/**TALK** buttons (the Pokémon-Go part) stay as-is per the owner's "keep
   the interactive part." ⚠️ **On-device-unverified — the gesture thresholds and sensor feel are entirely
-  CI-unprovable; the owner tunes SHAKE/FLICK/HOLD sensitivity on the Pixel.** Note: a HOLD scene auto-commits
-  if the phone rests still (that IS "hold still") — intended; owner may want a start-arming tap later.
+  CI-unprovable; the owner tunes SHAKE/FLICK/HOLD sensitivity on the Pixel.** A HOLD scene now requires an
+  **explicit arming tap** first (owner asked) — the still-timer only runs after "◉ TAP TO ARM THE HOLD", so a
+  phone resting on a table can't auto-commit; SHAKE/FLICK stay immediate (they can't fire at rest).
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
