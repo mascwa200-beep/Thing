@@ -6,9 +6,12 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.mascwa.pulse.core.telemetry.Achievement
+import dev.mascwa.pulse.core.telemetry.Achievements
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.core.telemetry.SpecialEncounters
@@ -56,12 +59,28 @@ class SpecialGameStore(
         val perks: List<String> = emptyList(),
         val perkPicks: Int = 0,
         val inventory: Map<String, Int> = emptyMap(),
+        // Lifetime counters + unlocked achievements (defaulted → old saves load).
+        val wins: Int = 0,
+        val crits: Int = 0,
+        val ventures: Int = 0,
+        val unlocked: List<String> = emptyList(),
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
     private val mutex = Mutex()
     private var loaded = false
     private var flushJob: Job? = null
+
+    // Lifetime achievement counters (persisted alongside the character).
+    private var wins = 0
+    private var crits = 0
+    private var ventures = 0
+    private var unlocked: Set<String> = emptySet()
+    // External metrics the ViewModel feeds in (real app usage + travel) for usage/travel achievements.
+    private var extVisits = 0
+    private var extFeatures = 0
+    private var extDistanceM = 0
+    private var extPlaces = 0
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -70,6 +89,21 @@ class SpecialGameStore(
     private val _resolution = MutableStateFlow<Resolution?>(null)
     /** The most recent encounter outcome to surface (cleared when a new encounter is drawn). */
     val resolutionFlow: StateFlow<Resolution?> = _resolution.asStateFlow()
+
+    private val _unlocked = MutableStateFlow<Set<String>>(emptySet())
+    /** Ids of unlocked achievements. */
+    val unlockedFlow: StateFlow<Set<String>> = _unlocked.asStateFlow()
+
+    private val _lastUnlock = MutableStateFlow<Achievement?>(null)
+    /** The most recently unlocked achievement, for a one-shot banner (cleared via [dismissUnlock]). */
+    val lastUnlockFlow: StateFlow<Achievement?> = _lastUnlock.asStateFlow()
+
+    private val _metrics = MutableStateFlow(GameMetrics())
+    /** The live metric snapshot achievements are measured against (for progress bars). */
+    val metricsFlow: StateFlow<GameMetrics> = _metrics.asStateFlow()
+
+    /** Dismiss the one-shot unlock banner. */
+    fun dismissUnlock() { _lastUnlock.value = null }
 
     private fun Character.stored() = Stored(
         stats = stats.entries.associate { it.key.name to it.value },
@@ -95,14 +129,65 @@ class SpecialGameStore(
     }
 
     private suspend fun ensureLoaded() {
+        var justLoaded = false
         mutex.withLock {
-            if (loaded) return
-            val raw = context.specialDataStore.data.first()[prefsKey]
-            val character = raw
+            if (loaded) return@withLock
+            val stored = context.specialDataStore.data.first()[prefsKey]
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
-                ?.domain()
-            if (character != null) _character.value = character // else keep the fresh newCharacter()
+            if (stored != null) {
+                _character.value = stored.domain() // else keep the fresh newCharacter()
+                wins = stored.wins.coerceAtLeast(0)
+                crits = stored.crits.coerceAtLeast(0)
+                ventures = stored.ventures.coerceAtLeast(0)
+                unlocked = stored.unlocked.toSet()
+                _unlocked.value = unlocked
+            }
             loaded = true
+            justLoaded = true
+        }
+        if (justLoaded) publishMetrics()
+    }
+
+    /** Build the current metric snapshot: character progress + counters + the fed-in app-usage/travel. */
+    private fun currentMetrics(): GameMetrics {
+        val c = _character.value
+        return GameMetrics(
+            level = c.level, wins = wins, crits = crits, ventures = ventures,
+            perks = c.perks.size, distinctItems = c.inventory.size, caps = c.caps,
+            appVisits = extVisits, distinctFeatures = extFeatures,
+            distanceM = extDistanceM, placesVisited = extPlaces,
+        )
+    }
+
+    private fun publishMetrics() { _metrics.value = currentMetrics() }
+
+    /** Evaluate achievements against current state; grant rewards for newly cleared ones; always republish. */
+    private fun runAchievementCheck() {
+        val fresh = Achievements.evaluate(currentMetrics(), unlocked)
+        if (fresh.isNotEmpty()) {
+            var updated = _character.value
+            fresh.forEach { updated = Achievements.applyReward(updated, it) }
+            _character.value = updated
+            unlocked = unlocked + fresh.map { it.id }
+            _unlocked.value = unlocked
+            _lastUnlock.value = fresh.last()
+            scheduleFlush()
+        }
+        publishMetrics()
+    }
+
+    /**
+     * Feed real app-usage + travel metrics in from the ViewModel (usage snapshot / travel tracker), then
+     * re-check the usage/travel achievements.
+     */
+    fun setExternalMetrics(appVisits: Int, distinctFeatures: Int, distanceM: Int, placesVisited: Int) {
+        scope.launch {
+            ensureLoaded()
+            extVisits = appVisits
+            extFeatures = distinctFeatures
+            extDistanceM = distanceM
+            extPlaces = placesVisited
+            runAchievementCheck()
         }
     }
 
@@ -119,6 +204,8 @@ class SpecialGameStore(
             val next = SpecialGame.nextEncounter(c, SpecialEncounters.ALL, random.nextInt(0, 100_000)) ?: return@launch
             _resolution.value = null
             _character.value = c.copy(currentEncounterId = next.id)
+            ventures++
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -137,6 +224,9 @@ class SpecialGameStore(
             val resolution = SpecialGame.resolve(c, encounter, choiceIndex, roll, env, useItemId)
             _character.value = resolution.character
             _resolution.value = resolution
+            if (resolution.success) wins++
+            if (resolution.crit) crits++
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -146,6 +236,7 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.useAid(_character.value, itemId)
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -155,6 +246,7 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.sellItem(_character.value, itemId)
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -164,6 +256,7 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.allocate(_character.value, s)
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -173,6 +266,7 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.choosePerk(_character.value, perkId)
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -183,6 +277,7 @@ class SpecialGameStore(
             ensureLoaded()
             _character.value = SpecialGame.revive(_character.value)
             _resolution.value = null
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -193,6 +288,12 @@ class SpecialGameStore(
             ensureLoaded()
             _character.value = SpecialGame.newCharacter()
             _resolution.value = null
+            wins = 0; crits = 0; ventures = 0
+            unlocked = emptySet()
+            _unlocked.value = emptySet()
+            _lastUnlock.value = null
+            // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
+            runAchievementCheck()
             scheduleFlush()
         }
     }
@@ -206,7 +307,9 @@ class SpecialGameStore(
     }
 
     private suspend fun flush() {
-        val snapshot = _character.value.stored()
+        val snapshot = _character.value.stored().copy(
+            wins = wins, crits = crits, ventures = ventures, unlocked = unlocked.toList(),
+        )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
         }

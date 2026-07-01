@@ -55,10 +55,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Achievement
+import dev.mascwa.pulse.core.telemetry.Achievements
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.Environment
 import dev.mascwa.pulse.core.telemetry.Item
 import dev.mascwa.pulse.core.telemetry.ItemKind
@@ -101,6 +104,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
     val resolution by vm.gameResolution.collectAsStateWithLifecycle()
     val env by vm.env.collectAsStateWithLifecycle()
+    val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
+    val gameMetrics by vm.gameMetrics.collectAsStateWithLifecycle()
+    val lastUnlock by vm.lastUnlock.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     val context = LocalContext.current
@@ -149,6 +155,10 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             EffectsPanel(t, gps != null, c)
 
             PipHeader("S.P.E.C.I.A.L.")
+            lastUnlock?.let { a ->
+                UnlockBanner(a, c) { vm.dismissUnlock() }
+                Spacer(Modifier.height(8.dp))
+            }
             SpecialGamePanel(
                 character, encounter, resolution, env, c,
                 onVenture = { vm.venture() },
@@ -159,6 +169,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 onUseItem = { vm.useItem(it) },
                 onSellItem = { vm.sellItem(it) },
             )
+            Spacer(Modifier.height(8.dp))
+            AchievementsPanel(unlocked, gameMetrics, c)
 
             PipHeader("Vitals")
             PipFrame(Modifier.fillMaxWidth()) {
@@ -809,6 +821,71 @@ private fun ChoiceButton(choice: Choice, ch: Character, selectedChem: String?, c
         Text(tag, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = tagColor, letterSpacing = 1.sp)
     }
 }
+
+/** The grind, made visible: what you've earned and what's next. Drives return play. */
+@Composable
+private fun AchievementsPanel(unlocked: Set<String>, metrics: GameMetrics, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.positive) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("ACHIEVEMENTS · ${unlocked.size}/${Achievements.ALL.size}", fontFamily = ChakraPetch,
+                fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.positive, letterSpacing = 1.sp)
+            Achievements.ALL.forEach { a -> AchievementRow(a, a.id in unlocked, metrics, c) }
+        }
+    }
+}
+
+@Composable
+private fun AchievementRow(a: Achievement, done: Boolean, metrics: GameMetrics, c: NightwirePalette) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(if (done) "✓" else "○", fontFamily = JetBrainsMono, fontSize = 12.sp,
+            color = if (done) c.positive else c.muted, modifier = Modifier.width(20.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                color = if (done) c.ink else c.muted)
+            Text(a.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            if (!done) {
+                Spacer(Modifier.height(2.dp))
+                SegBar(Achievements.progress(a, metrics), c.positive, c)
+                Text("${metrics.value(a.metric).coerceAtMost(a.threshold)} / ${a.threshold}",
+                    fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.muted)
+            }
+        }
+        val reward = rewardText(a)
+        if (reward.isNotEmpty()) {
+            Text(reward, fontFamily = JetBrainsMono, fontSize = 8.sp,
+                color = if (done) c.amber else c.muted.copy(alpha = 0.6f), modifier = Modifier.padding(start = 6.dp))
+        }
+    }
+}
+
+/** The one-shot "you earned it" banner shown when an achievement clears. */
+@Composable
+private fun UnlockBanner(a: Achievement, c: NightwirePalette, onDismiss: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.positive) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("★ ACHIEVEMENT UNLOCKED", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = c.positive, letterSpacing = 1.sp)
+                Text(a.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+                val reward = rewardText(a)
+                if (reward.isNotEmpty()) Text("Reward · $reward", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber)
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(3.dp)).border(1.dp, c.muted.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                    .clickable(onClick = onDismiss).padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text("OK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.muted)
+            }
+        }
+    }
+}
+
+/** A compact "+40 XP, +30 caps, Field Medkit" reward summary for an achievement. */
+private fun rewardText(a: Achievement): String = buildList {
+    if (a.rewardXp > 0) add("+${a.rewardXp} XP")
+    if (a.rewardCaps > 0) add("+${a.rewardCaps} caps")
+    a.rewardItemId?.let { id -> Items.byId(id)?.let { add(it.name) } }
+}.joinToString(", ")
 
 /** A rough pass-odds label for a stat check — how many of the 10 die faces would succeed. */
 private fun oddsLabel(stat: Int, difficulty: Int, luck: Int): String {
