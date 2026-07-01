@@ -731,10 +731,23 @@ S.P.E.C.I.A.L. section becomes the game, OPERATOR LEVEL → the character's game
   encounters covering all 7 stats × easy/med/hard, incl. 2 repeatable SCAV_* so it never runs dry. Deterministic
   (roll injected) → CI-testable: `SpecialGameTest.kt` (22 cases). Validated: kotlinc frontend type-checked
   clean + a Python twin (20/20) confirming the math + every test's expected values.
-- **Next slices:** `data/game/SpecialGameStore.kt` (persist the character + current encounter, mirror
-  ProfileStore; injects the Random for rolls/selection) → wire into `AppContainer` + `TelemetryViewModel` →
-  the interactive STAT-tab UI (VENTURE OUT → encounter panel w/ stat-gated choices + pass preview → outcome
-  + rewards; tap-to-allocate on level-up; LEVEL/XP/CAPS/HP header), all in the existing Pip-Boy style.
+- **Slice 2 (on-device save, this slice):** `data/game/SpecialGameStore.kt` — mirrors ProfileStore/TaskStore
+  (in-memory `Character` + Mutex + debounced flush; DataStore `pulse_special`). Persists the character +
+  current encounter as a `Stored` blob (stats as `Map<String,Int>`; partial/old saves refill missing stats
+  to START); supplies the randomness the pure engine needs — `venture()` (draw next, guarded on down/active),
+  `choose(i)` (roll d10 → `SpecialGame.resolve` → publish `resolutionFlow`), `allocate(s)`, `revive()`,
+  `reset()`; `characterFlow`/`resolutionFlow`/`encounterFor(c)`. Wired in `AppContainer.specialGameStore` +
+  `TelemetryViewModel` (exposes `character`/`currentEncounter`/`gameResolution` + `venture`/`choose`/
+  `allocate`/`revive`/`resetGame`) via the factory.
+- **Slice 3 (STAT-tab UI, this slice):** `TelemetryScreen` — replaced the device-derived `specialStats`/
+  `SpecialPanel`/`SpecialRow` with the game: `SpecialGamePanel` (LVL/CAPS/HP header + a 24-seg XP bar; the 7
+  banded stat rows now show the CHARACTER's stats, with a ＋ to allocate when `unspent > 0`; a LEVEL-UP
+  banner), `EncounterPanel` (title/prompt + `ChoiceButton`s tagged with the stat gate `· DC n` + a live
+  odds label SURE/LIKELY/EVEN/RISKY/LONGSHOT from `SpecialGame.check` over the 10 die faces), `IdlePanel`
+  (VENTURE OUT / last outcome + rewards + VENTURE ON), `DownedPanel` (PATCH UP). OPERATOR "LEVEL" now shows
+  the character's game level, not `BuildConfig.VERSION_CODE`. All in the existing Pip-Boy style (`PipFrame`,
+  `ChakraPetch`/`JetBrainsMono`, palette). ⚠️ On-device-unverified (CI compile-gates only): the play loop
+  render + persistence on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
