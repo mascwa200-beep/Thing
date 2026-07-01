@@ -705,6 +705,17 @@ privileged pieces (VPN/accessibility/device-admin) touch Pulse's protected/human
   porting more `com.jarvis.app` subsystems (overlay HUD spec, egress kill-switch, input-remap) — all
   owner-gated (privileged surface).
 
+### Removed — both "deck" features (this session, owner asked "remove the entire deck tab and features")
+Owner disambiguated (AskUserQuestion) → **both**. Deleted: (1) the **Spaceballs "DECK" bottom-nav tab** —
+`SpaceballsScreen.kt`, `Routes.SPACEBALLS`, the `TopDestination`, the NavHost `composable`, the now-unused
+`Dashboard` icon import (bottom nav 8→7 tabs); it borrowed the shared `SettingsViewModel`, so no VM removed.
+(2) the **Reactor Deck home-screen widget** — `ReactorDeckWidgetProvider`, `DeckRemoteViewsService`, the
+`feature/dial/DialLaunchTrampolineActivity` (the whole `feature/dial` package — the Reactor Dial was already
+gone, and the trampoline + `dial_card_bg` drawable were used only by the deck), the `widget_deck*` layouts,
+`deck_widget_info.xml`, the two `widget_deck_*` strings, and the manifest receiver/service/activity. Verified
+zero dangling references (`Spaceballs`/`ReactorDeck`/`Dashboard`/`widget_deck`/`pulsedeck` all NONE) + XML
+well-formed. The `Reactor Deck` / `Reactor Dial` / `Spaceballs Ludicrous Speed` entries above are history now.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

@@ -47,10 +47,6 @@
     <!-- Compact lock-screen / glanceable widget -->
     <string name="widget_lock_label">Pulse Lock</string>
 
-    <!-- Reactor Deck widget (rotary app deck) -->
-    <string name="widget_deck_label">Reactor Deck</string>
-    <string name="widget_deck_empty">Loading apps…</string>
-
     <!-- J.A.R.V.I.S. live wallpaper -->
     <string name="wallpaper_jarvis_label">J.A.R.V.I.S. HUD</string>
     <string name="wallpaper_jarvis_desc">Stark-style arc-reactor home screen with a live Pulse readout — clock, active objective, weather and top market mover.</string>
