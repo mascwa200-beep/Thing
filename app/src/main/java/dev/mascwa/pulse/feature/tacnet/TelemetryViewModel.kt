@@ -87,8 +87,15 @@ class TelemetryViewModel(
 
     /** Draw the next encounter to face. */
     fun venture() = game.venture()
-    /** Resolve a choice in the active encounter — with the current real-world context + an optional CHEM. */
-    fun choose(choiceIndex: Int, useItemId: String? = null) = game.choose(choiceIndex, _env.value, useItemId)
+    /**
+     * Resolve a choice in the active encounter — with the real-world context, an optional CHEM, and an
+     * optional [roll] (supplied by the gesture-performance grade; random if null).
+     */
+    fun choose(choiceIndex: Int, useItemId: String? = null, roll: Int? = null) =
+        game.choose(choiceIndex, _env.value, useItemId, roll)
+
+    /** The live device motion (accelerometer/gyro), for grading encounter gestures. */
+    val telemetryFlow: StateFlow<Telemetry> = telemetry
     /** Spend an unspent point on a stat. */
     fun allocate(s: dev.mascwa.pulse.core.telemetry.Special) = game.allocate(s)
     /** Choose a perk (spends a perk pick). */

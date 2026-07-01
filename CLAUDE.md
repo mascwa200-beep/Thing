@@ -809,6 +809,40 @@ runtime behaviour (GPS/Overpass/weather/MapLibre render, persistence) is owner-v
   wasteland map (embedded one has gestures off); a Settings "clear travel history" (store `clear()` exists,
   UI not wired); haggle/discount at shops; richer branching dialogue.
 
+### S.P.E.C.I.A.L. — more game features + the CP2077-on-mobile gesture redesign (this session cont., #249–#258 merged + gesture slice)
+Owner: "keep adding game features," then a hard redesign ask — "This game can't be just a bunch of text and
+some options anymore. Make it more user choice based but not with some lousy type-your-answers improvement.
+It must have nothing to do with a keyboard or typing or choosing the two-or-more-options buttons." When asked
+how, the owner chose (AskUserQuestion → Other): **"Do what CDPR's Cyberpunk 2077 did with the stat-based game,
+but keep the interactive/Pokémon-Go part. What would CDPR have made if they built CP2077 on mobile?"**
+- **Added game systems (all CI-green pure cores + on-device wiring, #249–#258):** **crafting**
+  (`core:telemetry/Crafting.kt` — `Recipe`, workbench turns JUNK→GEAR/AID for XP; `WorkbenchPanel`),
+  **companions** (`Companions.kt` — hireable NPCs that grant passive check bonuses / luckier crits;
+  `CompanionPanel`), **daily objectives** (`DailyObjectives.kt` — a rotating daily grind loop with claimable
+  rewards; `DailyPanel`), **faction reputation** (`Reputation.kt` — per-`LocationKind` standing that
+  discounts shops + is earned by trading/winning talks; rep-aware `buyAt`/`resolveTalk`; `ReputationPanel`),
+  and **boss fights** (rare, level-gated, brutal encounters in `SpecialEncounters`). Each mirrored the
+  established store/VM/UI pattern; `SpecialGameStore` persists the new `Character` fields (recipes are
+  content, companion/reputation/daily persisted), locally kotlinc-validated + subagent compile-review + CI.
+- **The CP2077-on-mobile answer — physical-gesture encounter resolution (this slice, in progress):** the
+  encounter UI no longer has choice buttons. Each approach is shown **CP2077-style as a stat gate** —
+  `[STR 12] Heave it wide  ▸ SHAKE` — coloured by your live odds, and you **commit to it by performing the
+  action with the phone**, not tapping. Pure CI-tested core `core:telemetry/Gestures.kt` (+ `GesturesTest`,
+  3 cases, 30 total green): `GestureType` (**SHAKE** = STRENGTH/ENDURANCE/LUCK, **FLICK** = AGILITY,
+  **HOLD STILL** = PERCEPTION/INTELLIGENCE/CHARISMA), `forStat`, and `performanceRoll(0f..1f → 1..DIE)` — a
+  flawless gesture over a built stat lands a crit, a sloppy one under-statted hurts. On-device: a rewritten
+  `EncounterPanel` runs a fixed-cadence (`POLL_MS`) `LaunchedEffect` over the live `TelemetryController`
+  accelerometer/gyro (`accelG`/`gyroDps`) — detects the shake energy / flick spike / dead-still hold, grades
+  it 0..1, and calls `choose(idx, chem, performanceRoll(quality))`. `SpecialGameStore.choose`/
+  `TelemetryViewModel.choose` gained an optional `roll: Int?` (the graded die; random when null) +
+  `telemetryFlow`. A live meter (`SegBar`) shows gesture progress; CHEM prep + the odds label are kept.
+  Polls `telemetry.value` (not `.collect`) because a StateFlow is conflated and a perfectly-still phone
+  wouldn't re-emit. All thresholds are top-of-file owner-tunable consts (`FLICK_MIN_G`, `SHAKE_FIRE`,
+  `STILL_HOLD_MS`, …). The map shop/**TALK** buttons (the Pokémon-Go part) stay as-is per the owner's "keep
+  the interactive part." ⚠️ **On-device-unverified — the gesture thresholds and sensor feel are entirely
+  CI-unprovable; the owner tunes SHAKE/FLICK/HOLD sensitivity on the Pixel.** Note: a HOLD scene auto-commits
+  if the phone rests still (that IS "hold still") — intended; owner may want a start-arming tap later.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

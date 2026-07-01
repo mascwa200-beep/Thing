@@ -371,13 +371,14 @@ class SpecialGameStore(
      * [env] is the real-world context (temperature/light/motion/… bends the check) and [useItemId] is an
      * optional CHEM consumed to buff this check — both flow in from the ViewModel.
      */
-    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null) {
+    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null, roll: Int? = null) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             val encounter = encounterFor(c) ?: return@launch
-            val roll = random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, roll, env, useItemId)
+            // The die comes from how well the player physically performed the gesture, when supplied.
+            val r = roll ?: random.nextInt(1, SpecialGame.DIE + 1)
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId)
             _character.value = resolution.character
             _resolution.value = resolution
             if (resolution.success) wins++
