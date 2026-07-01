@@ -214,6 +214,12 @@ class SpecialWorldTest {
         assertEquals(2, r.character.inventory["scrap_metal"])
     }
 
+    @Test fun encounterIdsAreUnique() {
+        // A duplicate id would let nextEncounter/seen-tracking treat two encounters as one.
+        val ids = SpecialEncounters.ALL.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+    }
+
     @Test fun allEncounterLootIdsAreValid() {
         // Guards against a typo in any hand-written encounter drop id (would silently drop nothing on-device).
         SpecialEncounters.ALL.forEach { enc ->
