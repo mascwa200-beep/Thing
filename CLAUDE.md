@@ -1073,8 +1073,15 @@ Built as 3 CI-green slices; the game now reads your real self.
   body metrics are on-device only — never transmitted or logged (panel says so); cleared by the game reset.
 - Verification: pure core local kotlinc + 22 tests green; Android layers subagent compile-review clean + CI.
   ⚠️ On-device-unverified (CI compile-gates only): the panel render, the numeric-field commit UX, and the
-  needs decay/meters on the Pixel. **Open / steerable (owner's "etc, etc"):** more life inputs — sleep/energy,
-  mood, diet/nutrition, real-world step count → game energy, appearance/name — each a clean new slice.
+  needs decay/meters on the Pixel.
+- **Batch 2 — ENERGY + MOOD (PR #264, merged, commit `3085d16`):** `LifeStats` grew a third need **ENERGY**
+  (0..100, decays ~3/hr with the others, restored by `rest()`; low saps AGILITY then INTELLIGENCE) and a
+  user-set **MOOD** (0..100, 50 = neutral; ≥75 buffs CHA+LUCK, ≤25 saps CHA). +4 tests (26 total, kotlinc
+  green). Store persists energy (anchored-decay) + mood (both defaulted → old saves neutral; `reset()` clears);
+  VM `rest()`/`setMood()`; LIFE panel gained an Energy gauge, a **REST** button (row now DRINK·WASH·REST) and
+  a Mood field. ⚠️ On-device-unverified (CI compile-gates only).
+- **Open / steerable (owner's "etc, etc"):** more life inputs — operator name/callsign, diet/"well-fed",
+  real-world step count → game energy, appearance — each a clean new slice.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
