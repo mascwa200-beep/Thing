@@ -37,6 +37,26 @@ object Recipes {
             mapOf("medkit" to 1, "circuit_board" to 1), "auto_injector", stat = Special.INTELLIGENCE, minStat = 6, xp = 12),
         Recipe("craft_focus", "Focus Compound", "Refine alloy traces into a focus stimulant.",
             mapOf("rare_alloy" to 1, "wire_spool" to 1), "focus_tabs", stat = Special.INTELLIGENCE, minStat = 6, xp = 8),
+        // --- AID ---
+        Recipe("craft_trauma", "Trauma Patch", "Pack a dressing with a clotting agent for a deeper seal.",
+            mapOf("bandage" to 2, "rare_alloy" to 1), "trauma_patch", xp = 6),
+        Recipe("craft_surgeon", "Surgeon's Kit", "Assemble a full field-surgery kit from a medkit and an injector.",
+            mapOf("medkit" to 1, "auto_injector" to 1), "surgeon_kit", stat = Special.INTELLIGENCE, minStat = 6, xp = 14),
+        // --- GEAR: tier up a +1 piece into its +2 version with a power source ---
+        Recipe("craft_gauntlet", "Power Gauntlet", "Bolt a fusion cell to your grip gloves for a servo-assisted fist.",
+            mapOf("grip_gloves" to 1, "fusion_cell" to 1, "scrap_metal" to 2), "power_gauntlet", stat = Special.INTELLIGENCE, minStat = 6, xp = 14),
+        Recipe("craft_recon", "Recon Optics", "Upgrade the visor with a fusion-fed sensor board.",
+            mapOf("optics_visor" to 1, "fusion_cell" to 1, "circuit_board" to 1), "recon_optics", stat = Special.INTELLIGENCE, minStat = 7, xp = 14),
+        Recipe("craft_webbing", "Combat Webbing", "Weave alloy plating into the rig for real protection.",
+            mapOf("leather_rig" to 1, "fusion_cell" to 1, "scrap_metal" to 2), "combat_webbing", stat = Special.INTELLIGENCE, minStat = 6, xp = 14),
+        Recipe("craft_negotiator", "Negotiator's Suit", "Trim the comms badge into a sharp gold-threaded suit.",
+            mapOf("comms_badge" to 1, "gold_trinket" to 1, "wire_spool" to 2), "negotiator_suit", stat = Special.INTELLIGENCE, minStat = 6, xp = 14),
+        Recipe("craft_servos", "Sprint Servos", "Fit the boots with fusion-driven leg servos.",
+            mapOf("runner_boots" to 1, "fusion_cell" to 1, "rare_alloy" to 1), "sprint_servos", stat = Special.INTELLIGENCE, minStat = 6, xp = 14),
+        Recipe("craft_neural", "Neural Implant", "Fuse a data slate and cells into a cortical implant.",
+            mapOf("data_slate" to 1, "circuit_board" to 2, "fusion_cell" to 1), "neural_implant", stat = Special.INTELLIGENCE, minStat = 8, xp = 18),
+        Recipe("craft_idol", "Fortune Idol", "Cast salvaged gold and alloy into a lucky idol.",
+            mapOf("gold_trinket" to 2, "rare_alloy" to 1), "fortune_idol", stat = Special.LUCK, minStat = 6, xp = 16),
     )
 
     private val byId: Map<String, Recipe> = ALL.associateBy { it.id }
