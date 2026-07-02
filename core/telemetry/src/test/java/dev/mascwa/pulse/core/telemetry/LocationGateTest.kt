@@ -39,4 +39,21 @@ class LocationGateTest {
         assertNull(LocationGate.distanceTo(null, null, shop))
         assertTrue(LocationGate.reachHint(null, null, shop) == "location unknown")
     }
+
+    private val den = WorldSites.siteFor("den1", 40.0, -74.0, "natural=water") // a MONSTER_DEN
+
+    @Test fun siteGatingMirrorsLocationGating() {
+        assertTrue(LocationGate.isAtSite(40.0, -74.0, den))          // standing on it
+        assertNull(LocationGate.reachHint(40.0, -74.0, den))         // no hint when at it
+        assertTrue(LocationGate.isAtSite(40.0002, -74.0, den))       // ~22 m — within reach
+        assertFalse(LocationGate.isAtSite(40.001, -74.0, den))       // ~111 m — out of reach
+        val hint = LocationGate.reachHint(40.001, -74.0, den)
+        assertTrue(hint != null && hint.endsWith("m away"))
+    }
+
+    @Test fun unknownPositionIsNeverAtSite() {
+        assertFalse(LocationGate.isAtSite(null, null, den))
+        assertNull(LocationGate.distanceTo(null, null, den))
+        assertTrue(LocationGate.reachHint(null, null, den) == "location unknown")
+    }
 }
