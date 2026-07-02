@@ -1292,8 +1292,23 @@ home** (couch-play `venture` is to be retired). Built as CI-green slices per the
   scanned → prompt to SCAN AREA. **The loop: map (DATA) → travel to a gang camp/monster den/vault/tribe/ruins
   → STATS ▸ SPECIAL "AT · <site>" → ENGAGE → fight.** ⚠️ On-device-unverified — needs a real GPS fix at a real
   site; owner verifies on the Pixel (flag if gating feels too strict).
-- **Remaining slices:** (5) weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core
-  loop — owner verifies each slice on the Pixel.
+- **Slice 5 — presence-gate scavenging (PR #284, merged):** the last couch-play action falls in line —
+  SCAVENGE now works only while physically AT a wasteland site. `TelemetryViewModel.scavenge()` no-ops unless
+  `siteReach.atSite`; `ScavengePanel` gained an `atSite` flag (off-site → "travel to a site to comb it";
+  on-site → the SCAVENGE button + 3-min cooldown). So rarity-weighted loot + the caps it sells for is found
+  only out in the real world. A distinct weapon *system* is deferred (offered follow-up) — combat GEAR already
+  drops as site loot, so "weapons at real places" is served by site loot + gated scavenge today.
+- **GEO-GATED CORE LOOP COMPLETE (slices 1–5).** The full "to get things and do things, first I must go
+  there" loop is in place: real place → wasteland site (taxonomy + classification) → rendered on the live map
+  (per-type colour, threat size) → **presence-gated fights** (couch-play `venture` retired) → **presence-gated
+  scavenge** (loot/caps only at sites). ⚠️ **PAUSED pending owner Pixel verification** — this reshaped the
+  core loop and is entirely on-device-unverified (needs a real GPS fix at real sites). Do NOT build the
+  weapons system (or more geo features) on top until the owner confirms the loop feels right on the Pixel;
+  if the gating is too strict (can't-play-from-home), add a hybrid/practice mode. **Owner Pixel checklist:**
+  SCAN AREA populates gang camps/monster dens/vaults; walking to one flips STATS ▸ SPECIAL to "AT · <site> ·
+  ENGAGE"; scavenge only works at a site; and the survival tip now rotates ~every 3h (not stuck on "Rule of
+  Threes"). **Open follow-ups (post-verify):** weapons-as-a-system; per-site-type encounter *restriction*
+  (not just bias); site "cleared" cooldown; quests/NPCs tied to specific sites.
 
 ### Survival-tip notification — stuck-on-tip-0 + too-frequent (owner screenshot, PR #282)
 Owner reported (screenshot) the survival tip still showed "Rule of Threes" (tip #0) and fired far too often.
