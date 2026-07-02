@@ -513,8 +513,14 @@ class RefreshWorker(
     private suspend fun readState(): NotifyState =
         container.diskCache.readAny("notify_state", NotifyState.serializer())?.value ?: NotifyState()
 
-    private suspend fun writeState(state: NotifyState) =
-        container.diskCache.write("notify_state", state, NotifyState.serializer())
+    // The worker owns every notify_state field EXCEPT seenTopUrls, which the resident BreakingNewsPulse
+    // poller advances on its own cadence. Re-read the latest blob and keep its seenTopUrls so our (older)
+    // snapshot — held across this whole doWork — doesn't clobber breaking-news dedup written meanwhile.
+    private suspend fun writeState(state: NotifyState) {
+        val latest = container.diskCache.readAny("notify_state", NotifyState.serializer())?.value
+        val merged = if (latest != null) state.copy(seenTopUrls = latest.seenTopUrls) else state
+        container.diskCache.write("notify_state", merged, NotifyState.serializer())
+    }
 
     private fun dayKey(cal: Calendar): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)

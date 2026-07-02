@@ -1220,8 +1220,18 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   BONUS section (active sets + a "1/2 · +n STAT" teaser for in-progress ones). Compile-review subagent clean.
   28 game-core tests green. ⚠️ On-device-unverified (CI compile-gates only).
 - **Item-economy arc now:** 37-item catalog → LOADOUT (+ set bonuses) → crafting tier-up → rarity-weighted
-  loot → SCAVENGE → completion codex → discovery-milestone rewards → gear-set synergies. **Open follow-ups
-  (offered):** a STASH/storage; more encounter/boss content; a new non-item game system.
+  loot → SCAVENGE → completion codex → discovery-milestone rewards → gear-set synergies.
+- **Wasteland world events (PR #278, merged):** a fresh daily mechanic on the `GameClock` day counter — each
+  day gets one deterministic **situation** that favours certain stats (biasing encounter selection) and/or
+  modifies win caps. Pure `core:telemetry/WorldEvents.kt` (+ `WorldEventsTest` 5 cases): `WorldEvent(id,name,
+  desc,favored,capsWinPct)` + `eventFor(day)` — step-7 over 8 events is a full permutation (each once per
+  cycle, no back-to-back repeats; floor-mod keeps day 0/negatives in bounds). 8 events (Radstorm, Bounty
+  Posted, Lucky Star, The Hunt, Market Fair, Gloom, Clear Skies, Calm). Wiring is in-app only (no core
+  signature change): `TelemetryViewModel` derives `worldEvent` in `updateDayBanner()`, folds `favored` into
+  `venture()` (beside perception+circadian) and passes `capsWinPct` to `choose()`; `SpecialGameStore.choose(...,
+  worldCapsPct)` adds a +/- fraction of the win caps post-resolve; a "SITUATION · NAME ▸ …" banner on STATS ▸
+  SPECIAL. Compile-review subagent clean. 33 game-core tests green. ⚠️ On-device-unverified (CI compile-gates).
+  **Open follow-ups (offered):** a STASH/storage; more encounter/boss content; wire world-event shop discounts.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
