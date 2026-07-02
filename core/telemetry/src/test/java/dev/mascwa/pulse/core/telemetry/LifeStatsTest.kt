@@ -99,6 +99,24 @@ class LifeStatsTest {
         assertEquals(-2, LifeStats.statBonus(LifeProfile(hygiene = 10), Special.CHARISMA))
     }
 
+    @Test fun lowEnergyTaxesAgilityThenIntelligence() {
+        assertEquals(-1, LifeStats.statBonus(LifeProfile(energy = 25), Special.AGILITY))
+        val spent = LifeProfile(energy = 10)
+        assertEquals(-2, LifeStats.statBonus(spent, Special.AGILITY))
+        assertEquals(-1, LifeStats.statBonus(spent, Special.INTELLIGENCE))
+    }
+
+    @Test fun moodOnlyBendsAtExtremes() {
+        // Neutral mood (default 50) → no effect.
+        assertEquals(0, LifeStats.statBonus(LifeProfile(mood = 50), Special.CHARISMA))
+        // High spirits → CHA +1, LUCK +1.
+        val happy = LifeProfile(mood = 90)
+        assertEquals(1, LifeStats.statBonus(happy, Special.CHARISMA))
+        assertEquals(1, LifeStats.statBonus(happy, Special.LUCK))
+        // Low spirits → CHA −1.
+        assertEquals(-1, LifeStats.statBonus(LifeProfile(mood = 10), Special.CHARISMA))
+    }
+
     @Test fun describeLabelsEffects() {
         val lines = LifeStats.describe(LifeProfile(realMoney = 500.0))
         assertTrue(lines.any { it.contains("CHA +1") && it.contains("Coin in your pocket") })
@@ -123,9 +141,21 @@ class LifeStatsTest {
         assertEquals(p, LifeStats.decayNeeds(p, 0L))
     }
 
-    @Test fun drinkAndWashRestore() {
+    @Test fun drinkWashRestRestore() {
         assertEquals(100, LifeStats.drink(LifeProfile(hydration = 5)).hydration)
         assertEquals(100, LifeStats.wash(LifeProfile(hygiene = 5)).hygiene)
+        assertEquals(100, LifeStats.rest(LifeProfile(energy = 5)).energy)
+    }
+
+    @Test fun energyDecaysToo() {
+        val p = LifeStats.decayNeeds(LifeProfile(energy = 100), elapsedMs = 10L * 3_600_000L)
+        assertEquals(70, p.energy) // 10h × 3/h
+    }
+
+    @Test fun withMoodClamps() {
+        assertEquals(0, LifeStats.withMood(LifeProfile(), -20).mood)
+        assertEquals(100, LifeStats.withMood(LifeProfile(), 250).mood)
+        assertEquals(60, LifeStats.withMood(LifeProfile(), 60).mood)
     }
 
     @Test fun settersClampInput() {

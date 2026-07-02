@@ -315,7 +315,8 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             life, c,
             onSetHeight = { vm.setHeight(it) }, onSetWeight = { vm.setWeight(it) },
             onSetAge = { vm.setAge(it) }, onSetMoney = { vm.setRealMoney(it) },
-            onDrink = { vm.drink() }, onWash = { vm.wash() },
+            onSetMood = { vm.setMood(it) },
+            onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() },
         )
         Spacer(Modifier.height(8.dp))
 
@@ -441,8 +442,10 @@ private fun LifePanel(
     onSetWeight: (Int) -> Unit,
     onSetAge: (Int) -> Unit,
     onSetMoney: (Double) -> Unit,
+    onSetMood: (Int) -> Unit,
     onDrink: () -> Unit,
     onWash: () -> Unit,
+    onRest: () -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -464,6 +467,7 @@ private fun LifePanel(
                 life.currency, c) {
                 onSetMoney(it.toDoubleOrNull() ?: 0.0)
             }
+            LifeNumberField("Mood", life.mood.toString(), "/100", c) { onSetMood(it.toIntOrNull() ?: 50) }
 
             // Build / age / wealth summary.
             val bits = buildList {
@@ -477,9 +481,11 @@ private fun LifePanel(
             // Needs meters + top-up actions.
             FalloutGauge("Hydration", "${life.hydration}%", life.hydration / 100f, c.sky)
             FalloutGauge("Hygiene", "${life.hygiene}%", life.hygiene / 100f, c.positive)
+            FalloutGauge("Energy", "${life.energy}%", life.energy / 100f, c.amber)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
                 Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
+                Box(Modifier.weight(1f)) { GameButton("REST", c.amber, onRest) }
             }
 
             // How the profile bends your checks right now (mirrors the CONDITIONS readout).
