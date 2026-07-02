@@ -61,6 +61,11 @@ class Notifier(private val context: Context) {
     fun notifyAgenda(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet", NotificationCompat.PRIORITY_HIGH)
 
+    /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
+     *  new tip silently replaces the last); opens the Survival guides. */
+    fun notifyTip(id: Int, title: String, body: String) =
+        post(NotificationChannels.DIGEST, id, "SURVIVAL TIP", title, body, "survival", NotificationCompat.PRIORITY_LOW)
+
     /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
     fun notifyFinding(id: Int, title: String, body: String) =
         post(NotificationChannels.DIGEST, id, "J.A.R.V.I.S.", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)

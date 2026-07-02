@@ -575,6 +575,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
                     PrefSwitch("Survival check-ins (Pip-Boy)", checked = s.notifications.survivalAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalAlerts = v)) } })
+                    PrefSwitch("Survival tips (frequent)", checked = s.notifications.survivalTips, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalTips = v)) } })
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
