@@ -1013,6 +1013,39 @@ OperatorPortrait already uses `character.level` — the screenshot's "LEVEL 888"
   pixel-fidelity judge on the Pixel; the exact `PipChip`/`PipHubTile`/font-size values are easy to tune from a
   screenshot. **The app-wide 3/3 shared-states change is beyond the literal "unify TOOLS" ask — owner can veto.**
 
+### PIP-BOY navigation restructure — STATS/ITEMS/DATA on top, the game split across them (PR #262, merged)
+Owner (2nd STATS screenshot): "make the stats/item/data menu … moved up to the top … Make the Survive,
+Social, Search tabs go inside the stats page. Also, make the whole game have its own dedicated pages in the
+tools tab within the Stats, Items, Data menus as other tabs." Via AskUserQuestion: game split =
+**STAT/INV/DATA**, Survive/Social/Search = **sub-tabs inside STATS**. Shipped in 3 CI-green slices (each
+squash-merged + re-synced); the whole TOOLS UI now lives in the single self-contained **PIP-BOY** device
+(`feature/tacnet/PipBoyScreen.kt`), a section selector (STATS · ITEMS · DATA) + HP/AP gauges on top, a
+per-section sub-tab rail, and a slim `PipUtilBar` (SET/BUG/EXIT + build) at the bottom.
+- **Slice 1 (#262 commit 1):** the STATS/ITEMS/DATA menu + HP/AP `StatGauge`s moved to the TOP (`PipTopNav`),
+  the collapsible bottom nav replaced by `PipUtilBar`. (One CI failure: `Modifier.padding(horizontal=, top=)`
+  is not a valid overload — split to `start/end/top`. The recurring padding lesson.)
+- **Slice 2:** SURVIVE/SOCIAL/SEARCH folded into STATS as sub-tabs (rail now STATUS·SPECIAL·SURVIVE·SOCIAL·
+  SEARCH). Extracted scaffold-free `SurviveBody`/`SocialBody`/`SearchBody` from the standalone PulseScaffold
+  screens (the `*Screen` wrappers kept for Home/hub deep-links); `PipBoyScreen` gained `socialVm`/`searchVm`
+  + an `onOpenRoute` callback (the SURVIVE tiles deep-link to SOS/PLACES/SAFETY/NAV/SURVIVAL/TOOLS). Dropped
+  the three from `FEED_TABS` (now just PIP-BOY); `FeedTabBar` hides itself for a lone tab. TOOLS bottom-nav
+  highlight unchanged (route stays TACNET).
+- **Slice 3:** the monolithic `TelemetryBody` game split across sections — **STATS ▸ STATUS** = pure device
+  telemetry; **STATS ▸ SPECIAL** = the S.P.E.C.I.A.L. character sheet + encounter/idle/downed loop + day
+  banner/PERCEIVES readout + transient level-up/quest-complete/unlock banners; **ITEMS ▸ GEAR** = inventory/
+  workbench/companions/reputation; **DATA ▸ WASTELAND** = daily/quests/wasteland-map(scan/shop/talk)/
+  achievements. Existing app inventory kept as **ITEMS ▸ STORED**. New shared `GameSensors` composable owns
+  the telemetry/ambient-sampler lifecycle + camera-permission request, hosted by each game body so sensors
+  (and the GrapheneOS camera indicator) run **only while a game tab is open** — not on RADIO/MAP/etc. The old
+  `SpecialGamePanel` was replaced by the slimmer `CharacterSheet`; the standalone `TelemetryScreen` route is
+  now a device readout. Section defaults: STATS→STATUS, ITEMS→GEAR, DATA→WASTELAND (`firstOf`). Subagent
+  compile-review came back clean (16-value `when` exhaustiveness, every panel signature, VM members, call
+  sites). ⚠️ All render-blind (CI compile-gates only) — the sub-tab switching, the many-tab DATA rail, and
+  the game-tab layout want eyes on the Pixel. Easy owner tweaks: tab labels/order, whether STATS should keep
+  device+character as one STATUS tab vs the two split tabs, whether WASTELAND (vs MAP) should be the DATA
+  default. There's a brief sensor stop→start on switching between game tabs (each body mounts its own
+  `GameSensors`) — acceptable; lift to `PipBoyScreen` if it feels janky.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
