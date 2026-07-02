@@ -83,6 +83,7 @@ import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GearSets
+import dev.mascwa.pulse.core.telemetry.WorldEvent
 import dev.mascwa.pulse.core.telemetry.GestureType
 import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
@@ -329,6 +330,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val life by vm.life.collectAsStateWithLifecycle()
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
+    val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -355,6 +357,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        WorldEventBanner(worldEvent, c)
         Text(
             "PERCEIVES · ${scene.describe()}",
             fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.sky,
@@ -995,6 +998,23 @@ private fun ConditionsPanel(env: EnvContext, c: NightwirePalette) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** The day's wasteland situation — a flavour banner + a one-line hint of what today changes. */
+@Composable
+private fun WorldEventBanner(event: WorldEvent, c: NightwirePalette) {
+    val effects = buildList {
+        if (event.favored.isNotEmpty()) add("favours ${event.favored.joinToString("/") { it.display }}")
+        if (event.capsWinPct != 0) add("${if (event.capsWinPct > 0) "+" else ""}${event.capsWinPct}% win caps")
+    }
+    Column(Modifier.padding(top = 2.dp)) {
+        Text("SITUATION · ${event.name.uppercase()}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+            fontSize = 10.sp, color = c.violet, letterSpacing = 1.sp)
+        Text(event.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.ink2)
+        if (effects.isNotEmpty()) {
+            Text("▸ ${effects.joinToString(" · ")}", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.positive)
         }
     }
 }
