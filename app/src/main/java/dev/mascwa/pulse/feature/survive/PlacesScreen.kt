@@ -2,6 +2,8 @@ package dev.mascwa.pulse.feature.survive
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,10 +40,11 @@ import dev.mascwa.pulse.data.places.PlaceCategory
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.PipChip
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
@@ -68,7 +71,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PlaceCategory.entries.forEach { cat ->
-                    NeonChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
+                    PipChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
                 }
             }
             val res = state.result
@@ -97,7 +100,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                         }
                         item {
                             Text("Source: OpenStreetMap (Overpass). Coverage varies by area.",
-                                style = MaterialTheme.typography.labelSmall, color = c.muted,
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                                 modifier = Modifier.padding(8.dp))
                         }
                     }
@@ -113,12 +116,12 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
     PipFrame(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(place.name, style = MaterialTheme.typography.titleSmall, color = c.ink)
+                Text(place.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                 Text(
                     "${Geo.formatDistance(place.distanceMeters)} · ${Geo.cardinal(place.bearing)} (${place.bearing.toInt()}°)",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
                 )
-                place.address?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.muted) }
+                place.address?.let { Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted) }
             }
             if (place.phone != null) {
                 IconButton(onClick = onCall) { Icon(Icons.Filled.Call, "Call", tint = c.positive) }
@@ -133,13 +136,16 @@ private fun PermissionPrompt(onGrant: () -> Unit) {
     val c = Pulse.colors
     PipFrame(Modifier.fillMaxWidth().padding(16.dp)) {
         Column {
-            Text("Location needed", style = MaterialTheme.typography.titleMedium, color = c.ink)
+            Text("Location needed", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink)
             Text("Grant location to find the nearest hospitals, shelters and more.",
-                style = MaterialTheme.typography.bodyMedium, color = c.muted,
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 modifier = Modifier.padding(top = 4.dp))
-            androidx.compose.material3.TextButton(onClick = onGrant, modifier = Modifier.padding(top = 6.dp)) {
-                Text("Grant location")
-            }
+            Text(
+                "▸ GRANT LOCATION",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp, color = c.accent,
+                modifier = Modifier.padding(top = 10.dp).border(1.dp, c.accent).clickable { onGrant() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
     }
 }

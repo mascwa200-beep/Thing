@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.common
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -140,6 +141,30 @@ fun PipSelectRow(label: String, selected: Boolean, modifier: Modifier = Modifier
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     )
+}
+
+/**
+ * THE canonical Pip-Boy pick-one chip for horizontal rails (categories/tabs/engines) — FLAT and
+ * rectangular (no cut/rounded corners): the [selected] one is a solid bright-green block with inverted
+ * (void) text, the rest are bright phosphor with a hairline outline. Drop-in for the old cut-corner
+ * `NeonChip` so the feed rails read as the same terminal as the STATS page.
+ */
+@Composable
+fun PipChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    Box(
+        modifier
+            .background(if (selected) c.accent else Color.Transparent)
+            .border(1.dp, if (selected) c.accent else c.line)
+            .clickable { onClick() }
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text.uppercase(),
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
+            color = if (selected) c.void else c.ink,
+        )
+    }
 }
 
 /** A framed label/value tile (terminal version of StatTile) for the feeds. */
