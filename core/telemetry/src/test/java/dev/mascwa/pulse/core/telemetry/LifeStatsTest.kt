@@ -221,6 +221,16 @@ class LifeStatsTest {
         assertEquals(7200, LifeStats.withSteps(LifeProfile(), 7200).stepsToday)
     }
 
+    @Test fun circadianFavoredByHour() {
+        assertEquals(setOf(Special.PERCEPTION, Special.INTELLIGENCE), LifeStats.circadianFavored(8))
+        assertEquals(setOf(Special.STRENGTH, Special.ENDURANCE), LifeStats.circadianFavored(13))
+        assertEquals(setOf(Special.CHARISMA), LifeStats.circadianFavored(19))
+        assertEquals(setOf(Special.AGILITY, Special.LUCK), LifeStats.circadianFavored(2))
+        assertEquals(setOf(Special.AGILITY, Special.LUCK), LifeStats.circadianFavored(23))
+        // Out-of-range hours wrap safely.
+        assertEquals(LifeStats.circadianFavored(2), LifeStats.circadianFavored(26))
+    }
+
     @Test fun withMoodClamps() {
         assertEquals(0, LifeStats.withMood(LifeProfile(), -20).mood)
         assertEquals(100, LifeStats.withMood(LifeProfile(), 250).mood)

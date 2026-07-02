@@ -520,6 +520,11 @@ private fun LifePanel(
                 drivers.forEach { Text("• $it", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2) }
             }
 
+            // Your real hour of day leans the wasteland toward certain encounters (biases content, not maths).
+            val favoured = LifeStats.circadianFavored(env.hourOfDay).joinToString(" · ") { it.display.take(3) }
+            Text("THIS HOUR FAVOURS · $favoured", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 10.sp, color = c.violet, letterSpacing = 1.sp, modifier = Modifier.padding(top = 2.dp))
+
             // How the profile bends your checks right now (mirrors the CONDITIONS readout).
             val fx = LifeStats.describe(life)
             if (fx.isNotEmpty()) {
