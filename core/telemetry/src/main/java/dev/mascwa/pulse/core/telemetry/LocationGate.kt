@@ -33,4 +33,25 @@ object LocationGate {
         if (d <= radiusM) return null
         return if (d < 1_000.0) "${d.toInt()} m away" else "%.1f km away".format(d / 1_000.0)
     }
+
+    // --- WorldSite overloads (the geo-gated wasteland: you must BE at a site to fight/engage there) ---
+
+    /** Great-circle metres from the player to [site], or null when the player's position is unknown. */
+    fun distanceTo(playerLat: Double?, playerLon: Double?, site: WorldSite): Double? {
+        if (playerLat == null || playerLon == null) return null
+        return TravelFilter.distanceMeters(playerLat, playerLon, site.lat, site.lon)
+    }
+
+    /** True only when the player is physically within [radiusM] of [site] (false if position unknown). */
+    fun isAtSite(playerLat: Double?, playerLon: Double?, site: WorldSite, radiusM: Double = REACH_RADIUS_M): Boolean {
+        val d = distanceTo(playerLat, playerLon, site) ?: return false
+        return d <= radiusM
+    }
+
+    /** A "walk here" hint for a [site] out of reach — "120 m away" / "1.4 km away", or null if you're at it. */
+    fun reachHint(playerLat: Double?, playerLon: Double?, site: WorldSite, radiusM: Double = REACH_RADIUS_M): String? {
+        val d = distanceTo(playerLat, playerLon, site) ?: return "location unknown"
+        if (d <= radiusM) return null
+        return if (d < 1_000.0) "${d.toInt()} m away" else "%.1f km away".format(d / 1_000.0)
+    }
 }

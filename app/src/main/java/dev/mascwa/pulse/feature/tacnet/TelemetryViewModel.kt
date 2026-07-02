@@ -16,9 +16,12 @@ import dev.mascwa.pulse.core.telemetry.ProfileCategory
 import dev.mascwa.pulse.core.telemetry.Quest
 import dev.mascwa.pulse.core.telemetry.QuestMetrics
 import dev.mascwa.pulse.core.telemetry.QuestView
+import dev.mascwa.pulse.core.telemetry.LocationGate
 import dev.mascwa.pulse.core.telemetry.SceneContext
 import dev.mascwa.pulse.core.telemetry.WorldEvent
 import dev.mascwa.pulse.core.telemetry.WorldEvents
+import dev.mascwa.pulse.core.telemetry.WorldSite
+import dev.mascwa.pulse.core.telemetry.WorldSites
 import dev.mascwa.pulse.core.telemetry.SceneSignals
 import dev.mascwa.pulse.core.telemetry.StoryDirector
 import dev.mascwa.pulse.core.telemetry.TaskBoard
@@ -49,6 +52,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+
+/** The nearest engageable wasteland [WorldSite], how far it is, and whether you're within reach to fight it. */
+data class SiteReach(val site: WorldSite, val distanceM: Double, val atSite: Boolean)
 
 class TelemetryViewModel(
     private val controller: TelemetryController,
@@ -258,13 +264,21 @@ class TelemetryViewModel(
     private var weatherTempC: Double? = null
     private var weatherIsDay: Boolean? = null
 
-    /** Draw the next encounter to face. */
-    /** Draw the next encounter, biased toward what the game perceives you doing/hearing right now. */
-    fun venture() = game.venture(
-        Perception.strategy(sceneContext.value).favored +
-            dev.mascwa.pulse.core.telemetry.LifeStats.circadianFavored(_env.value.hourOfDay) +
-            _worldEvent.value.favored,
-    )
+    /**
+     * Draw the next encounter to face — GEO-GATED: only when you're physically at a wasteland site (no more
+     * couch play). The site's [WorldSites.favoredStats] biases which encounter appears, unioned with what the
+     * game perceives you doing, the hour of day, and the day's world event.
+     */
+    fun venture() {
+        val reach = siteReach.value
+        if (reach == null || !reach.atSite) return // fully geo-gated — travel to a site to fight
+        game.venture(
+            WorldSites.favoredStats(reach.site.type) +
+                Perception.strategy(sceneContext.value).favored +
+                dev.mascwa.pulse.core.telemetry.LifeStats.circadianFavored(_env.value.hourOfDay) +
+                _worldEvent.value.favored,
+        )
+    }
     /**
      * Resolve a choice in the active encounter — with the real-world context, an optional CHEM, and an
      * optional [roll] (supplied by the gesture-performance grade; random if null).
@@ -361,6 +375,19 @@ class TelemetryViewModel(
 
     private val _gps = MutableStateFlow<DeviceLocation?>(null)
     val gps: StateFlow<DeviceLocation?> = _gps.asStateFlow()
+
+    /**
+     * The nearest wasteland site you can fight/engage at (settlement/tribe/ruins/gang camp/monster den/vault),
+     * with its distance and whether you're physically within reach. Drives the geo-gated encounter loop — you
+     * can only venture when this is at-reach. Recomputed as the GPS fix or the scanned sites change. (Declared
+     * after [_gps] so its initializer sees an initialized flow.)
+     */
+    val siteReach: StateFlow<SiteReach?> = combine(_gps, sites) { gps, list ->
+        list.filter { WorldSites.spawnsEncounter(it.type) }
+            .mapNotNull { s -> LocationGate.distanceTo(gps?.latitude, gps?.longitude, s)?.let { s to it } }
+            .minByOrNull { it.second }
+            ?.let { (s, d) -> SiteReach(s, d, d <= LocationGate.REACH_RADIUS_M) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _log = MutableStateFlow<List<String>>(emptyList())
     val log: StateFlow<List<String>> = _log.asStateFlow()

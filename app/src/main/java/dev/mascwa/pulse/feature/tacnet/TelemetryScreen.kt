@@ -85,6 +85,7 @@ import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GearSets
 import dev.mascwa.pulse.core.telemetry.WorldEvent
 import dev.mascwa.pulse.core.telemetry.WorldSite
+import dev.mascwa.pulse.core.telemetry.WorldSites
 import dev.mascwa.pulse.core.telemetry.GestureType
 import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
@@ -332,6 +333,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val life by vm.life.collectAsStateWithLifecycle()
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
+    val siteReach by vm.siteReach.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -383,7 +385,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         when {
             character.down -> DownedPanel(c) { vm.revive() }
             encounter != null -> EncounterPanel(encounter!!, character, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
-            else -> IdlePanel(resolution, c) { vm.venture() }
+            else -> IdlePanel(resolution, siteReach, c) { vm.venture() }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -2045,7 +2047,7 @@ private fun oddsLabel(stat: Int, difficulty: Int, luck: Int): String {
 }
 
 @Composable
-private fun IdlePanel(resolution: Resolution?, c: NightwirePalette, onVenture: () -> Unit) {
+private fun IdlePanel(resolution: Resolution?, reach: SiteReach?, c: NightwirePalette, onVenture: () -> Unit) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (resolution != null) {
@@ -2065,13 +2067,28 @@ private fun IdlePanel(resolution: Resolution?, c: NightwirePalette, onVenture: (
                 if (rewards.isNotBlank()) {
                     Text(rewards, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.amber)
                 }
-            } else {
-                Text(
-                    "The wasteland waits. Venture out — your S.P.E.C.I.A.L. decides how it goes.",
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
-                )
             }
-            GameButton(if (resolution != null) "VENTURE ON ▸" else "VENTURE OUT ▸", c.accent, onVenture)
+            // GEO-GATED: you can only fight when physically at a wasteland site.
+            when {
+                reach != null && reach.atSite -> {
+                    Text("AT · ${reach.site.name}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp, color = c.sky, letterSpacing = 1.sp)
+                    Text(WorldSites.intro(reach.site), fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink)
+                    GameButton(if (resolution != null) "FIGHT ON ▸" else "ENGAGE ▸", c.accent, onVenture)
+                }
+                reach != null -> {
+                    Text("NEAREST · ${reach.site.name} · ${reach.site.type.label}", fontFamily = ChakraPetch,
+                        fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.amber, letterSpacing = 0.5.sp)
+                    Text("Travel here to engage — ${Geo.formatDistance(reach.distanceM)} away.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                }
+                else -> {
+                    Text(
+                        "No wasteland sites in range. Open the map (DATA ▸ WASTELAND), SCAN AREA, then travel to a gang camp, monster den, vault, tribe or ruins to fight.",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    )
+                }
+            }
         }
     }
 }
