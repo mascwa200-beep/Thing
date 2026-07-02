@@ -1231,7 +1231,23 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   `venture()` (beside perception+circadian) and passes `capsWinPct` to `choose()`; `SpecialGameStore.choose(...,
   worldCapsPct)` adds a +/- fraction of the win caps post-resolve; a "SITUATION · NAME ▸ …" banner on STATS ▸
   SPECIAL. Compile-review subagent clean. 33 game-core tests green. ⚠️ On-device-unverified (CI compile-gates).
-  **Open follow-ups (offered):** a STASH/storage; more encounter/boss content; wire world-event shop discounts.
+- **Encounter content +9 (PR #279):** grew `SpecialEncounters` 45 → 54 across all seven stats + every tier —
+  6 field (Collapsed Overpass, Trader's Dilemma, Irradiated Spring, Old Minefield, Wild Dog Pack, Fortune
+  Teller), 2 bosses (★ The Glowing One L13, ★ The Enclave Colonel L15 — extend the ladder past Mainframe L11),
+  1 repeatable (SCAVENGE — The Subway). Pure content; existing `SpecialWorldTest`/`SpecialGameTest` cover it
+  (59 green). Traced a dup id (`minefield`→`old_minefield`) via the local test run before push.
+- **BUG FIX — survival tips stuck on tip #0 "Rule of Threes" (owner-reported, PR #279):** `notify_state` is
+  shared by two writers — `RefreshWorker` (owns the survival-tip index + all dedup fields) and the resident
+  `BreakingNewsPulse` poller (owns only `seenTopUrls`). BreakingNewsPulse read the blob, did a **slow news
+  fetch**, then wrote its stale pre-fetch snapshot back → clobbered the worker's advanced `survivalTipIndex`/
+  `survivalTipLastMs`; the restored old timestamp reopened the 12-min gate so the same tip re-fired, sticking
+  the rotation on `TIPS[0]` (the "Rule of Threes" tip). Fix: each writer preserves the other's field —
+  BreakingNewsPulse re-reads the latest state immediately before writing (after the fetch) and updates only
+  `seenTopUrls`; `RefreshWorker.writeState` re-reads and keeps the latest `seenTopUrls`. Also protects the
+  other worker-owned dedup fields (survival check-ins, agenda, safety/flight/market) from the same clobber.
+  ⚠️ On-device-unverified — the tip rotation advancing wants a run on the Pixel.
+- **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; wire world-event
+  shop discounts; a new non-item game system.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
