@@ -225,6 +225,8 @@ class TelemetryViewModel(
 
     // --- Wasteland map (real shops → game locations + real-world travel) ---
     val locations: StateFlow<List<dev.mascwa.pulse.core.telemetry.GameLocation>> = gameWorld.locationsFlow
+    /** The geo-gated wasteland sites near you (settlements/tribes/gang camps/monster dens/vaults/shops). */
+    val sites: StateFlow<List<dev.mascwa.pulse.core.telemetry.WorldSite>> = gameWorld.sitesFlow
     val travel: StateFlow<dev.mascwa.pulse.data.game.TravelStats> = gameWorld.travelFlow
     val scanning: StateFlow<Boolean> = gameWorld.scanningFlow
 
