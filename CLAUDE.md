@@ -1169,6 +1169,25 @@ Owner: "add more stuff to the items page." Grew the wasteland item economy and s
   unknown, every shop-stock id is a real item, every stat has passive gear, higher-tier items present.
   ⚠️ On-device-unverified (CI compile-gates only): the LOADOUT panel + richer PACK rows want eyes on the Pixel.
 
+### Item economy — crafting tier-up + rarity-weighted loot table (PR #273, merged, commit — squash)
+Owner: "keep adding features and game stuff to the tools menu autonomously." Two cohesive item-economy
+follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-validated).
+- **Crafting (`core:telemetry/Crafting.kt`), 8 → 17 recipes:** AID gained **Trauma Patch** (dressings +
+  alloy) + INT-gated **Surgeon's Kit** (medkit + injector); a **GEAR tier-up** loop consumes a **+1** piece
+  plus a **fusion cell / gold trinket** to forge its **+2** version — Power Gauntlet, Recon Optics, Combat
+  Webbing, Negotiator's Suit, Sprint Servos, Neural Implant (INT-gated by tier) + the **LUCK**-gated Fortune
+  Idol. Fusion Cell / Gold Trinket now have a use beyond selling. The workbench only surfaces recipes you
+  hold an input for, so the longer list doesn't clutter. `CraftingTest` +2 (tier-up consumes +1 + power
+  source → +2 gear; every tier-up output is real +2 GEAR / high AID); `everyRecipeIdResolvesInItems` guards typos.
+- **Loot (`core:telemetry/LootTable.kt`, + `LootTableTest` 7 cases):** the "rarity drives loot weighting"
+  model the catalog was built toward. `baseWeight` steep by rarity (common salvage often, rare gear rarely);
+  `weight(item, luck)` lifts ONLY the rare tiers (4/5) with LUCK, never lowering common odds; `pick(luck,
+  roll, pool)` is deterministic over an injected `[0,1)` roll (on-device supplies randomness, CI pins the
+  distribution); `scavenge(luck, rolls)` merges a multi-roll bundle to id→count; QUEST items excluded.
+- **Next (in progress):** wire a visible **SCAVENGE** action into DATA ▸ WASTELAND (store+VM+UI) granting
+  `LootTable.scavenge` loot scaled by LUCK — the first player-facing use of the loot core.
+  ⚠️ On-device-unverified (CI compile-gates only) for anything with a runtime surface.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
