@@ -1193,6 +1193,19 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   live `scavengeCooldown` countdown (recomputed each 1.5s tick). UI `ScavengePanel`: a SCAVENGE button that
   dims to a "SEARCHED · 2m 45s" countdown while cooling down + a tap-to-dismiss FOUND readout. Compile-review
   subagent clean. ⚠️ On-device-unverified (CI compile-gates only) — the scavenge loop + cooldown want the Pixel.
+- **Item Codex (PR #275, merged):** a completionist discovery tracker. Every acquisition path (loot/scavenge/
+  shop/craft/encounter reward) marks an item **discovered**, monotonically (using/selling the last one never
+  un-discovers). Pure `core:telemetry/ItemCodex.kt` (+ `ItemCodexTest` 7 cases, kotlinc-validated): `TOTAL`,
+  `found`/`completion`, `discoveredItems`/`undiscovered`, `byKind` breakdown, and a flavour `rank` (Greenhorn
+  → Picker → Scavenger → Collector → Curator → Archivist); stale ids ignored so the count never exceeds
+  `TOTAL`. `SpecialGameStore` keeps a monotonic `discovered` set fed by **ONE collector on `_character`**
+  (unions inventory ids on every change — no per-method hooks), seeded from held items on load, persisted in
+  the `Stored` blob (defaulted → old saves), reset-cleared; `discoveredFlow` exposed. UI `CodexPanel` on
+  ITEMS ▸ GEAR — "CODEX · n/TOTAL", progress bar, per-kind counts, rank, + a masked "??? · KIND ★rarity"
+  teaser of what's still out there. Compile-review subagent clean. ⚠️ On-device-unverified (CI compile-gates).
+- **Item-economy arc now:** 37-item catalog → LOADOUT panel → crafting tier-up → rarity-weighted loot →
+  SCAVENGE → completion codex. **Open follow-ups (offered):** collection-milestone reward achievements
+  (tie the codex to `Achievements`); a STASH/storage; item set bonuses; more encounter content.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
