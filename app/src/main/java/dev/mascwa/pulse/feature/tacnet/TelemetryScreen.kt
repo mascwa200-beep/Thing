@@ -431,6 +431,8 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val daily by vm.daily.collectAsStateWithLifecycle()
     val quests by vm.quests.collectAsStateWithLifecycle()
     val agenda by vm.agenda.collectAsStateWithLifecycle()
+    val lastScavenge by vm.lastScavenge.collectAsStateWithLifecycle()
+    val scavengeCooldown by vm.scavengeCooldown.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -454,6 +456,10 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Wasteland")
         WastelandPanel(locations, travel, scanning, gps, character, c,
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Scavenge")
+        ScavengePanel(lastScavenge, scavengeCooldown, character, c,
+            onScavenge = { vm.scavenge() }, onDismiss = { vm.dismissScavenge() })
         Spacer(Modifier.height(8.dp))
         PipHeader("Achievements")
         AchievementsPanel(unlocked, gameMetrics, c)
@@ -1535,6 +1541,69 @@ private fun WastelandPanel(
             }
         }
     }
+}
+
+/**
+ * SCAVENGE — comb the area for rarity-weighted salvage ([LootTable]) scaled by LUCK. Rate-limited by a
+ * real-time cooldown (the button dims to a countdown), and the last haul shows as a tap-to-dismiss readout.
+ */
+@Composable
+private fun ScavengePanel(
+    haul: Map<String, Int>?,
+    cooldownMs: Long,
+    ch: Character,
+    c: NightwirePalette,
+    onScavenge: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.positive) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("SCAVENGE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.positive, letterSpacing = 1.sp)
+            Text("Comb the area for salvage. Your LUCK (${ch.stat(Special.LUCK)}) tilts the odds toward the rare finds.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            if (cooldownMs > 0L) {
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+                        .border(1.dp, c.muted.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        .background(c.muted.copy(alpha = 0.06f)).padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("SEARCHED · ${formatCooldown(cooldownMs)}", fontFamily = ChakraPetch,
+                        fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp, color = c.muted)
+                }
+            } else {
+                GameButton("SCAVENGE ▸", c.positive, onScavenge)
+            }
+            if (!haul.isNullOrEmpty()) {
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+                        .border(1.dp, c.positive.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .background(c.positive.copy(alpha = 0.06f)).clickable(onClick = onDismiss)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("FOUND", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                            color = c.positive, letterSpacing = 1.sp)
+                        haul.forEach { (id, qty) ->
+                            val item = Items.byId(id)
+                            Text("• ${item?.name ?: id}${if (qty > 1) "  ×$qty" else ""}",
+                                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink)
+                        }
+                        Text("tap to dismiss", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Format a scavenge-cooldown remaining-ms as "2m 45s" / "45s". */
+private fun formatCooldown(ms: Long): String {
+    val total = (ms / 1000).toInt().coerceAtLeast(0)
+    val m = total / 60
+    val s = total % 60
+    return if (m > 0) "${m}m ${s}s" else "${s}s"
 }
 
 /** The personalised quest board — your real tasks/interests/nearby places/day, as Fallout missions. */
