@@ -45,6 +45,20 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
+    PulseScaffold(
+        title = "Search",
+        navigationIcon = {
+            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        },
+    ) { innerPadding ->
+        SearchBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The scaffold-free web-search feed (query box + engine picker) — hosted standalone in [SearchScreen]
+ *  and as the SEARCH sub-tab inside the PIP-BOY STATS page. */
+@Composable
+fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
     val engine by vm.engine.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -57,15 +71,9 @@ fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
         openUrl(context, vm.urlFor(query))
     }
 
-    PulseScaffold(
-        title = "Search",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-        },
-    ) { innerPadding ->
-        Column(
-            Modifier.padding(innerPadding).padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
-        ) {
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
+    ) {
             PipHeader("Query")
             PipFrame(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -114,5 +122,4 @@ fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
                 modifier = Modifier.padding(top = 10.dp, bottom = 24.dp),
             )
         }
-    }
 }

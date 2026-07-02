@@ -120,34 +120,16 @@ fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
     }
 }
 
-/** The STATUS feed body (phone telemetry), scaffold-free for hosting as a PIP-BOY sub-tab. */
+/**
+ * Shared game lifecycle: starts/stops the telemetry + ambient samplers with the composition, and requests
+ * the camera permission once (perception's "seeing" half is a no-op until granted, then vm.start() picks
+ * it up). Every game body hosts this, so sensors run on any game tab (STATUS / S.P.E.C.I.A.L. / GEAR /
+ * WASTELAND) but stop when a non-game feed (RADIO / MAP / …) is open — keeping the camera indicator off
+ * except while actually playing.
+ */
 @Composable
-fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
-    val t by vm.telemetry.collectAsStateWithLifecycle()
-    val gps by vm.gps.collectAsStateWithLifecycle()
-    val log by vm.log.collectAsStateWithLifecycle()
-    val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
-    val character by vm.character.collectAsStateWithLifecycle()
-    val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
-    val resolution by vm.gameResolution.collectAsStateWithLifecycle()
-    val env by vm.env.collectAsStateWithLifecycle()
-    val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
-    val gameMetrics by vm.gameMetrics.collectAsStateWithLifecycle()
-    val lastUnlock by vm.lastUnlock.collectAsStateWithLifecycle()
-    val locations by vm.locations.collectAsStateWithLifecycle()
-    val travel by vm.travel.collectAsStateWithLifecycle()
-    val scanning by vm.scanning.collectAsStateWithLifecycle()
-    val daily by vm.daily.collectAsStateWithLifecycle()
-    val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
-    val quests by vm.quests.collectAsStateWithLifecycle()
-    val questDone by vm.questCompleted.collectAsStateWithLifecycle()
-    val scene by vm.sceneContext.collectAsStateWithLifecycle()
-    val c = Pulse.colors
-
+private fun GameSensors(vm: TelemetryViewModel) {
     val context = LocalContext.current
-
-    // Ambient seeing needs the camera permission — request it once when the game screen opens; the sampler
-    // stays a no-op until granted, then vm.start() picks it up (labels feed the perceived scene).
     val requestCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.start()
     }
@@ -156,16 +138,6 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             runCatching { requestCamera.launch(android.Manifest.permission.CAMERA) }
         }
     }
-
-    val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            vm.setPortrait(uri.toString())
-        }
-    }
-
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -182,147 +154,254 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             vm.stop()
         }
     }
+}
+
+/**
+ * The STATS ▸ STATUS body — the pure device readout (operator portrait, condition, radiation, effects, and
+ * the raw vitals / sensors / system / position / data-stream panels). The S.P.E.C.I.A.L. character, the
+ * wasteland gear and the quests/map/achievements now live on their own PIP-BOY tabs. Scaffold-free.
+ */
+@Composable
+fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
+    GameSensors(vm)
+    val t by vm.telemetry.collectAsStateWithLifecycle()
+    val gps by vm.gps.collectAsStateWithLifecycle()
+    val log by vm.log.collectAsStateWithLifecycle()
+    val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
+    val character by vm.character.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+    val context = LocalContext.current
+
+    val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            vm.setPortrait(uri.toString())
+        }
+    }
 
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-            PipHeader("Operator")
-            OperatorPortrait(portraitUri, character.level, c) {
-                runCatching { pickPortrait.launch(arrayOf("image/*")) }
+        PipHeader("Operator")
+        OperatorPortrait(portraitUri, character.level, c) {
+            runCatching { pickPortrait.launch(arrayOf("image/*")) }
+        }
+
+        PipHeader("Condition")
+        ConditionPanel(t, c)
+
+        PipHeader("Radiation")
+        RadiationPanel(t, c)
+
+        PipHeader("Effects")
+        EffectsPanel(t, gps != null, c)
+
+        PipHeader("Vitals")
+        PipFrame(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FalloutGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
+                FalloutGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
+                    if (t.memTotalMb > 0) t.memUsedMb.toFloat() / t.memTotalMb else 0f, c.violet)
+                FalloutGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
+                    min(1f, (t.lightLux ?: 0f) / 2000f), c.amber)
+                FalloutGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
+                    min(1f, (t.magneticUt ?: 0f) / 100f), c.sky)
+                FalloutGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
+                    min(1f, (t.accelG ?: 0f) / 2f), c.magenta)
             }
+        }
 
-            PipHeader("Condition")
-            ConditionPanel(t, c)
+        PipHeader("Sensors")
+        PipFrame(Modifier.fillMaxWidth()) {
+            Column {
+                FalloutStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
+                FalloutStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
+                FalloutStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                FalloutStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                FalloutStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
+            }
+        }
 
-            PipHeader("Radiation")
-            RadiationPanel(t, c)
+        PipHeader("System")
+        PipFrame(Modifier.fillMaxWidth()) {
+            Column {
+                FalloutStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
+                FalloutStatRow("Power", if (t.charging) "Charging" else "On battery")
+                FalloutStatRow("Network", t.netType)
+                FalloutStatRow("Signal", t.netSignal)
+                FalloutStatRow("Memory used", "${t.memUsedMb} MB")
+            }
+        }
 
-            PipHeader("Effects")
-            EffectsPanel(t, gps != null, c)
-
-            PipHeader("S.P.E.C.I.A.L.")
-            if (dayBanner.isNotEmpty()) {
+        PipHeader("Position")
+        PipFrame(Modifier.fillMaxWidth()) {
+            val loc = gps
+            if (loc != null) {
+                Column {
+                    FalloutStatRow("Latitude", "%.5f".format(loc.latitude))
+                    FalloutStatRow("Longitude", "%.5f".format(loc.longitude))
+                    FalloutStatRow("Place", loc.name)
+                }
+            } else {
                 Text(
-                    dayBanner,
-                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
-                    color = c.amber, letterSpacing = 2.sp,
-                    modifier = Modifier.padding(top = 2.dp),
+                    "No GPS fix yet — grant location and ensure GPS is on. Works without internet.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 )
             }
-            Text(
-                "PERCEIVES · ${scene.describe()}",
-                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.sky,
-                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
-            )
-            questDone?.let { q ->
-                QuestCompleteBanner(q, c) { vm.dismissQuestComplete() }
-                Spacer(Modifier.height(8.dp))
-            }
-            if (quests.isNotEmpty()) {
-                QuestsPanel(quests, c)
-                Spacer(Modifier.height(8.dp))
-            }
-            lastUnlock?.let { a ->
-                UnlockBanner(a, c) { vm.dismissUnlock() }
-                Spacer(Modifier.height(8.dp))
-            }
-            if (daily.objectives.isNotEmpty()) {
-                DailyPanel(daily, c) { vm.claimDaily(it) }
-                Spacer(Modifier.height(8.dp))
-            }
-            SpecialGamePanel(
-                character, encounter, resolution, env, vm.telemetryFlow, c,
-                onVenture = { vm.venture() },
-                onChoose = { i, chem, roll -> vm.choose(i, chem, roll) },
-                onAllocate = { vm.allocate(it) },
-                onRevive = { vm.revive() },
-                onChoosePerk = { vm.choosePerk(it) },
-                onUseItem = { vm.useItem(it) },
-                onSellItem = { vm.sellItem(it) },
-                onCraft = { vm.craft(it) },
-                onHireCompanion = { vm.hireCompanion(it) },
-                onDismissCompanion = { vm.dismissCompanion() },
-            )
-            Spacer(Modifier.height(8.dp))
-            WastelandPanel(locations, travel, scanning, gps, character, c,
-                onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
-            Spacer(Modifier.height(8.dp))
-            AchievementsPanel(unlocked, gameMetrics, c)
+        }
 
-            PipHeader("Vitals")
-            PipFrame(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FalloutGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
-                    FalloutGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
-                        if (t.memTotalMb > 0) t.memUsedMb.toFloat() / t.memTotalMb else 0f, c.violet)
-                    FalloutGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
-                        min(1f, (t.lightLux ?: 0f) / 2000f), c.amber)
-                    FalloutGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
-                        min(1f, (t.magneticUt ?: 0f) / 100f), c.sky)
-                    FalloutGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
-                        min(1f, (t.accelG ?: 0f) / 2f), c.magenta)
-                }
-            }
-
-            PipHeader("Sensors")
-            PipFrame(Modifier.fillMaxWidth()) {
-                Column {
-                    FalloutStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
-                    FalloutStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
-                    FalloutStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                    FalloutStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                    FalloutStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
-                }
-            }
-
-            PipHeader("System")
-            PipFrame(Modifier.fillMaxWidth()) {
-                Column {
-                    FalloutStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
-                    FalloutStatRow("Power", if (t.charging) "Charging" else "On battery")
-                    FalloutStatRow("Network", t.netType)
-                    FalloutStatRow("Signal", t.netSignal)
-                    FalloutStatRow("Memory used", "${t.memUsedMb} MB")
-                }
-            }
-
-            PipHeader("Position")
-            PipFrame(Modifier.fillMaxWidth()) {
-                val loc = gps
-                if (loc != null) {
-                    Column {
-                        FalloutStatRow("Latitude", "%.5f".format(loc.latitude))
-                        FalloutStatRow("Longitude", "%.5f".format(loc.longitude))
-                        FalloutStatRow("Place", loc.name)
-                    }
+        PipHeader("Data stream")
+        PipFrame(Modifier.fillMaxWidth()) {
+            Column {
+                if (log.isEmpty()) {
+                    Text("// initialising sensors…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
                 } else {
-                    Text(
-                        "No GPS fix yet — grant location and ensure GPS is on. Works without internet.",
-                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                    )
-                }
-            }
-
-            PipHeader("Data stream")
-            PipFrame(Modifier.fillMaxWidth()) {
-                Column {
-                    if (log.isEmpty()) {
-                        Text("// initialising sensors…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
-                    } else {
-                        log.forEach { line ->
-                            Text(line, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive, maxLines = 1)
-                        }
+                    log.forEach { line ->
+                        Text(line, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive, maxLines = 1)
                     }
                 }
             }
+        }
 
+        Text(
+            "All values read directly from on-device sensors and the OS — no network required.",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            modifier = Modifier.padding(top = 14.dp, bottom = 24.dp),
+        )
+    }
+}
+
+/**
+ * The STATS ▸ S.P.E.C.I.A.L. body — the character sheet (stats, XP, perks) and the live encounter / idle /
+ * downed play loop, plus the day banner, the perceived-scene readout, and the transient level-up / quest-
+ * complete / achievement-unlock banners (surfaced where you actually play). Scaffold-free.
+ */
+@Composable
+fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
+    GameSensors(vm)
+    val character by vm.character.collectAsStateWithLifecycle()
+    val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
+    val resolution by vm.gameResolution.collectAsStateWithLifecycle()
+    val env by vm.env.collectAsStateWithLifecycle()
+    val lastUnlock by vm.lastUnlock.collectAsStateWithLifecycle()
+    val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
+    val questDone by vm.questCompleted.collectAsStateWithLifecycle()
+    val scene by vm.sceneContext.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        PipHeader("S.P.E.C.I.A.L.")
+        if (dayBanner.isNotEmpty()) {
             Text(
-                "All values read directly from on-device sensors and the OS — no network required.",
-                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                modifier = Modifier.padding(top = 14.dp, bottom = 24.dp),
+                dayBanner,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                color = c.amber, letterSpacing = 2.sp,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
+        Text(
+            "PERCEIVES · ${scene.describe()}",
+            fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.sky,
+            modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+        )
+        questDone?.let { q ->
+            QuestCompleteBanner(q, c) { vm.dismissQuestComplete() }
+            Spacer(Modifier.height(8.dp))
+        }
+        lastUnlock?.let { a ->
+            UnlockBanner(a, c) { vm.dismissUnlock() }
+            Spacer(Modifier.height(8.dp))
+        }
+        CharacterSheet(character, c) { vm.allocate(it) }
+        Spacer(Modifier.height(8.dp))
+        ConditionsPanel(env, c)
+        if (character.perkPicks > 0) {
+            Spacer(Modifier.height(8.dp))
+            PerkChoicePanel(character, c) { vm.choosePerk(it) }
+        }
+        Spacer(Modifier.height(8.dp))
+        when {
+            character.down -> DownedPanel(c) { vm.revive() }
+            encounter != null -> EncounterPanel(encounter!!, character, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
+            else -> IdlePanel(resolution, c) { vm.venture() }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * The ITEMS ▸ GEAR body — the wasteland loadout: inventory (use / sell), the workbench (craft), companions
+ * (hire / dismiss) and faction reputation. Scaffold-free.
+ */
+@Composable
+fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
+    GameSensors(vm)
+    val character by vm.character.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        PipHeader("Inventory")
+        InventoryPanel(character, c, onUseItem = { vm.useItem(it) }, onSellItem = { vm.sellItem(it) })
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Workbench")
+        WorkbenchPanel(character, c) { vm.craft(it) }
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Companions")
+        CompanionPanel(character, c, onHire = { vm.hireCompanion(it) }, onDismiss = { vm.dismissCompanion() })
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Reputation")
+        ReputationPanel(character, c)
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * The DATA ▸ WASTELAND body — the game's data log: daily objectives, personalised quests, the real-world
+ * wasteland map (scan / shop / talk) and achievements. Scaffold-free.
+ */
+@Composable
+fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
+    GameSensors(vm)
+    val character by vm.character.collectAsStateWithLifecycle()
+    val gps by vm.gps.collectAsStateWithLifecycle()
+    val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
+    val gameMetrics by vm.gameMetrics.collectAsStateWithLifecycle()
+    val locations by vm.locations.collectAsStateWithLifecycle()
+    val travel by vm.travel.collectAsStateWithLifecycle()
+    val scanning by vm.scanning.collectAsStateWithLifecycle()
+    val daily by vm.daily.collectAsStateWithLifecycle()
+    val quests by vm.quests.collectAsStateWithLifecycle()
+    val c = Pulse.colors
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        if (daily.objectives.isNotEmpty()) {
+            PipHeader("Daily")
+            DailyPanel(daily, c) { vm.claimDaily(it) }
+            Spacer(Modifier.height(8.dp))
+        }
+        if (quests.isNotEmpty()) {
+            PipHeader("Quests")
+            QuestsPanel(quests, c)
+            Spacer(Modifier.height(8.dp))
+        }
+        PipHeader("Wasteland")
+        WastelandPanel(locations, travel, scanning, gps, character, c,
+            onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Achievements")
+        AchievementsPanel(unlocked, gameMetrics, c)
+        Spacer(Modifier.height(24.dp))
+    }
 }
 
 private fun batteryText(t: Telemetry): String {
@@ -595,25 +674,11 @@ private fun EffectsPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
 // ---- S.P.E.C.I.A.L. — a playable wasteland RPG. The seven stats gate encounter choices; play to
 //      earn XP/caps, level up, and allocate points. The character persists (SpecialGameStore). ----
 
+/** The S.P.E.C.I.A.L. character sheet: the LVL/CAPS/HP vitals + XP bar, a level-up prompt, the seven
+ *  allocatable stat rows and the owned-perks line. The inventory / workbench / companions / reputation
+ *  now live on the ITEMS ▸ GEAR tab; encounters/conditions/perk-picks live on the S.P.E.C.I.A.L. body. */
 @Composable
-private fun SpecialGamePanel(
-    ch: Character,
-    encounter: Encounter?,
-    resolution: Resolution?,
-    env: EnvContext,
-    telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
-    c: NightwirePalette,
-    onVenture: () -> Unit,
-    onChoose: (Int, String?, Int) -> Unit,
-    onAllocate: (Special) -> Unit,
-    onRevive: () -> Unit,
-    onChoosePerk: (String) -> Unit,
-    onUseItem: (String) -> Unit,
-    onSellItem: (String) -> Unit,
-    onCraft: (String) -> Unit,
-    onHireCompanion: (String) -> Unit,
-    onDismissCompanion: () -> Unit,
-) {
+private fun CharacterSheet(ch: Character, c: NightwirePalette, onAllocate: (Special) -> Unit) {
     PipFrame(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             GameVitals(ch, c)
@@ -636,26 +701,6 @@ private fun SpecialGamePanel(
                 )
             }
         }
-    }
-    Spacer(Modifier.height(8.dp))
-    ConditionsPanel(env, c)
-    Spacer(Modifier.height(8.dp))
-    InventoryPanel(ch, c, onUseItem, onSellItem)
-    Spacer(Modifier.height(8.dp))
-    WorkbenchPanel(ch, c, onCraft)
-    Spacer(Modifier.height(8.dp))
-    CompanionPanel(ch, c, onHireCompanion, onDismissCompanion)
-    Spacer(Modifier.height(8.dp))
-    ReputationPanel(ch, c)
-    if (ch.perkPicks > 0) {
-        Spacer(Modifier.height(8.dp))
-        PerkChoicePanel(ch, c, onChoosePerk)
-    }
-    Spacer(Modifier.height(8.dp))
-    when {
-        ch.down -> DownedPanel(c, onRevive)
-        encounter != null -> EncounterPanel(encounter, ch, telemetry, c, onChoose)
-        else -> IdlePanel(resolution, c, onVenture)
     }
 }
 

@@ -281,8 +281,13 @@ fun PulseApp(
                 val objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
                 val navVm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
                 val spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel = viewModel(factory = factory)
+                val socialVm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
+                val searchVm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.tacnet.PipBoyScreen(
                     radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, diaryVm, tasksVm, objectivesVm, navVm, spotifyVm,
+                    socialVm, searchVm,
+                    // The folded-in SURVIVE hub tiles deep-link to the survival tools (SOS/PLACES/…).
+                    onOpenRoute = { route -> navController.navigate(route) { launchSingleTop = true } },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
                 )
             }

@@ -43,34 +43,39 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun SocialScreen(vm: SocialViewModel, onBack: (() -> Unit)? = null) {
-    val tab by vm.tab.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val c = Pulse.colors
-
     PulseScaffold(
         title = "Social",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        Column(Modifier.padding(innerPadding)) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SocialTab.entries.forEach { t ->
-                    PipChip(t.label, selected = t == tab, onClick = { vm.select(t) })
-                }
+        SocialBody(vm, Modifier.padding(innerPadding))
+    }
+}
+
+/** The scaffold-free SOCIAL feed (tab rail + feed list) — hosted standalone in [SocialScreen] and as the
+ *  SOCIAL sub-tab inside the PIP-BOY STATS page. */
+@Composable
+fun SocialBody(vm: SocialViewModel, modifier: Modifier = Modifier) {
+    val tab by vm.tab.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SocialTab.entries.forEach { t ->
+                PipChip(t.label, selected = t == tab, onClick = { vm.select(t) })
             }
-            PullToRefreshBox(isRefreshing = false, onRefresh = { vm.refresh() }) {
-                when (tab) {
-                    SocialTab.LEMMY -> FeedList(vm.lemmy.collectAsStateWithLifecycle().value.let { it },
-                        context, onRetry = { vm.refresh() })
-                    SocialTab.HN -> FeedList(vm.hn.collectAsStateWithLifecycle().value,
-                        context, onRetry = { vm.refresh() })
-                    SocialTab.MASTODON -> MastodonContent(vm, context)
-                }
+        }
+        PullToRefreshBox(isRefreshing = false, onRefresh = { vm.refresh() }) {
+            when (tab) {
+                SocialTab.LEMMY -> FeedList(vm.lemmy.collectAsStateWithLifecycle().value.let { it },
+                    context, onRetry = { vm.refresh() })
+                SocialTab.HN -> FeedList(vm.hn.collectAsStateWithLifecycle().value,
+                    context, onRetry = { vm.refresh() })
+                SocialTab.MASTODON -> MastodonContent(vm, context)
             }
         }
     }

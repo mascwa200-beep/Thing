@@ -54,7 +54,8 @@ import kotlin.math.roundToInt
 /**
  * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy device, organised under the
  * three canonical Pip-Boy sections selected from the global bottom nav (STATS / ITEMS / DATA):
- *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.).
+ *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.), plus the folded-in SURVIVE hub,
+ *             SOCIAL feed and web SEARCH sub-tabs.
  *  - ITEMS  → the collected-inventory view (favourite stations, notes, tracked objectives).
  *  - DATA   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), QUESTS
  *             (objectives log), NOTES (library), RADIO and MUSIC.
@@ -65,7 +66,13 @@ private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"
 
 private enum class PipTab(val label: String, val section: PipSection) {
     STATUS("STATUS", PipSection.STATS),
-    ITEMS("ITEMS", PipSection.ITEMS),
+    SPECIAL("SPECIAL", PipSection.STATS),
+    SURVIVE("SURVIVE", PipSection.STATS),
+    SOCIAL("SOCIAL", PipSection.STATS),
+    SEARCH("SEARCH", PipSection.STATS),
+    GEAR("GEAR", PipSection.ITEMS),
+    STORED("STORED", PipSection.ITEMS),
+    WASTELAND("WASTELAND", PipSection.DATA),
     MAP("MAP", PipSection.DATA),
     RADAR("RADAR", PipSection.DATA),
     ORBIT("ORBIT", PipSection.DATA),
@@ -95,6 +102,9 @@ fun PipBoyScreen(
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
     navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
     spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
+    socialVm: dev.mascwa.pulse.feature.social.SocialViewModel,
+    searchVm: dev.mascwa.pulse.feature.search.SearchViewModel,
+    onOpenRoute: (String) -> Unit = {},
     onBack: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
 ) {
@@ -113,7 +123,13 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
-                    PipTab.ITEMS -> objectivesVm.refresh() // refresh tracked objectives in the inventory
+                    PipTab.SPECIAL -> Unit // the game is live (self-managed via GameSensors)
+                    PipTab.SURVIVE -> Unit // the survive hub is a static tile grid
+                    PipTab.SOCIAL -> socialVm.refresh()
+                    PipTab.SEARCH -> Unit // search has no feed to pull
+                    PipTab.GEAR -> Unit // the game loadout is live
+                    PipTab.STORED -> objectivesVm.refresh() // refresh tracked objectives in the inventory
+                    PipTab.WASTELAND -> Unit // the wasteland map has its own SCAN control
                     PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
                     PipTab.RADAR -> radarVm.refresh()
@@ -130,13 +146,22 @@ fun PipBoyScreen(
         // (also provided app-wide for the TOOLS section; kept here so PIP-BOY is self-contained).
         CompositionLocalProvider(LocalNightwire provides pipBoyPalette) {
             Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
-                PipStatHeader(telem, tab.section)
+                // The STATS / ITEMS / DATA menu (with the HP/AP gauges) now sits at the TOP — the primary
+                // Pip-Boy selector — with the section's sub-tabs and the [SECTION] readout beneath it.
+                PipTopNav(telem, section = tab.section, onSection = { tab = PipTab.firstOf(it) })
                 PipTabRail(tab) { tab = it }
+                PipStatHeader(telem, tab.section)
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
-                        PipTab.ITEMS -> ItemsBody(tasksVm, notesVm, objectivesVm)
+                        PipTab.SPECIAL -> SpecialGameBody(telemetryVm, Modifier.fillMaxSize())
+                        PipTab.SURVIVE -> dev.mascwa.pulse.feature.survive.SurviveBody(onOpenRoute, Modifier.fillMaxSize())
+                        PipTab.SOCIAL -> dev.mascwa.pulse.feature.social.SocialBody(socialVm, Modifier.fillMaxSize())
+                        PipTab.SEARCH -> dev.mascwa.pulse.feature.search.SearchBody(searchVm, Modifier.fillMaxSize())
+                        PipTab.GEAR -> ItemsGameBody(telemetryVm, Modifier.fillMaxSize())
+                        PipTab.STORED -> ItemsBody(tasksVm, notesVm, objectivesVm)
+                        PipTab.WASTELAND -> WastelandDataBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
@@ -153,13 +178,7 @@ fun PipBoyScreen(
                     Canvas(Modifier.matchParentSize()) { crtScanlines(Color.Black.copy(alpha = 0.12f), gap = 3f) }
                 }
 
-                PipBottomNav(
-                    telem,
-                    section = tab.section,
-                    onSection = { tab = PipTab.firstOf(it) },
-                    onOpenSettings = onOpenSettings,
-                    onExit = onBack,
-                )
+                PipUtilBar(onOpenSettings = onOpenSettings, onExit = onBack)
             }
         }
     }
@@ -259,74 +278,50 @@ private fun StatReadout(label: String, value: String) {
 }
 
 /**
- * The bottom Pip-Boy frame: HP/AP gauges over the global section nav (STATS / ITEMS / DATA circular
- * buttons), flanked by the Fallout utility pills (SAVE/LOAD/RESET · ♥ SET/BUG/EXIT), with a
- * `CLOSE ⌄ MENU` label and the build version — pixel-faithful to the reference Pip-Boy bottom bar.
- * The three section circles are the live selector; SET opens Settings, EXIT backs out when wired; the
- * remaining pills are device chrome (rendered dim, non-interactive) to complete the look.
+ * The top Pip-Boy section nav: the HP/AP gauges over the STATS / ITEMS / DATA circular selector — the
+ * primary menu, now at the top of the device. HP = battery, AP = free memory.
  */
 @Composable
-private fun PipBottomNav(
-    t: Telemetry,
-    section: PipSection,
-    onSection: (PipSection) -> Unit,
-    onOpenSettings: (() -> Unit)?,
-    onExit: (() -> Unit)?,
-) {
+private fun PipTopNav(t: Telemetry, section: PipSection, onSection: (PipSection) -> Unit) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
+    Column(Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
+            StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PipSection.entries.forEach { s -> SectionButton(s.label, s == section) { onSection(s) } }
+        }
+    }
+}
+
+/**
+ * The slim bottom Pip-Boy frame: the Fallout utility pills (♥ SET/BUG/EXIT) + the build version.
+ * SET opens Settings, EXIT backs out; BUG is dim chrome. (The section nav + gauges moved to the top.)
+ */
+@Composable
+private fun PipUtilBar(onOpenSettings: (() -> Unit)?, onExit: (() -> Unit)?) {
     val version = "v" + dev.mascwa.pulse.BuildConfig.VERSION_CODE
-    // The WHOLE bottom cluster — HP/AP gauges, the STATS/ITEMS/DATA circles AND the utility pills —
-    // collapses under the CLOSE/OPEN MENU handle, leaving just a thin bar. Default COLLAPSED for the
-    // cleanest resting state; tap OPEN MENU to bring the section nav up. Persists within the session.
-    var menuOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().background(Pip.bg)) {
         // Bright phosphor rule separating the frame from the feed above.
         Canvas(Modifier.fillMaxWidth().height(1.5.dp)) {
             drawLine(Pip.grid, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), size.height)
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            androidx.compose.animation.AnimatedVisibility(menuOpen) {
-                Column(Modifier.fillMaxWidth()) {
-                    // HP / AP gauges (battery / free memory).
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
-                        StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
-                    }
-                    // The global section selector — three Pip-Boy circular buttons.
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PipSection.entries.forEach { s ->
-                            SectionButton(s.label, s == section) { onSection(s) }
-                        }
-                    }
-                    // The Fallout utility pills.
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            UtilPill("SAVE", null); UtilPill("LOAD", null); UtilPill("RESET", null)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
-                            UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
-                        }
-                    }
-                }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("♥", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.mid)
+                UtilPill("SET", onOpenSettings); UtilPill("BUG", null); UtilPill("EXIT", onExit)
             }
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    if (menuOpen) "CLOSE ⌄ MENU" else "OPEN ⌃ MENU",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.mid,
-                    modifier = Modifier.clickable { menuOpen = !menuOpen },
-                )
-                Text("ARGUS DYNAMICS · $version", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
-            }
+            Text("ARGUS DYNAMICS · $version", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.dim)
         }
     }
 }
