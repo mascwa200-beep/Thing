@@ -1203,9 +1203,16 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   the `Stored` blob (defaulted → old saves), reset-cleared; `discoveredFlow` exposed. UI `CodexPanel` on
   ITEMS ▸ GEAR — "CODEX · n/TOTAL", progress bar, per-kind counts, rank, + a masked "??? · KIND ★rarity"
   teaser of what's still out there. Compile-review subagent clean. ⚠️ On-device-unverified (CI compile-gates).
+- **Codex reward achievements (PR #276, merged):** closes the loop **scavenge → discover → codex → reward**.
+  New `AchMetric.ITEMS_DISCOVERED` + `GameMetrics.itemsDiscovered` (defaulted → back-compat) + 3 achievements
+  — **Rag And Bone** (10 items, +30 XP), **Curator** (20, +60 caps + grit_ration), **Archivist** (whole
+  catalog, threshold = `Items.ALL.size` so it tracks growth; +200 caps + fortune_idol + 100 XP).
+  `SpecialGameStore.currentMetrics()` feeds `ItemCodex.found(discovered)`; the discovery collector now
+  `runAchievementCheck()`s after the codex grows (reward-item cascade bounded by the finite unlocked set).
+  `AchievementsTest` +1 (22 game-core tests green). ⚠️ On-device-unverified (CI compile-gates only).
 - **Item-economy arc now:** 37-item catalog → LOADOUT panel → crafting tier-up → rarity-weighted loot →
-  SCAVENGE → completion codex. **Open follow-ups (offered):** collection-milestone reward achievements
-  (tie the codex to `Achievements`); a STASH/storage; item set bonuses; more encounter content.
+  SCAVENGE → completion codex → discovery-milestone rewards. **Open follow-ups (offered):** a STASH/storage;
+  item set bonuses; more encounter content.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
