@@ -269,12 +269,15 @@ class TelemetryViewModel(
     fun setRealMoney(amount: Double) = game.setRealMoney(amount)
     fun setCurrency(code: String) = game.setCurrency(code)
     fun setMood(mood: Int) = game.setMood(mood)
+    fun setName(name: String) = game.setName(name)
     /** Top up hydration (a drink). */
     fun drink() = game.drink()
     /** Freshen up (a wash). */
     fun wash() = game.wash()
     /** Rest up (restore energy). */
     fun rest() = game.rest()
+    /** Eat (restore nourishment). */
+    fun eat() = game.eat()
 
     /** Distil the live telemetry snapshot + cached weather + clock into the game's [EnvContext]. */
     private fun buildEnv(t: Telemetry): EnvContext {

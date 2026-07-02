@@ -106,7 +106,9 @@ class SpecialGameStore(
         val hydrationBase: Int = 100,
         val hygieneBase: Int = 100,
         val energyBase: Int = 100,
+        val nourishmentBase: Int = 100,
         val mood: Int = 50,
+        val operatorName: String = "",
         val needsAnchorMs: Long = 0L,
     )
 
@@ -229,7 +231,8 @@ class SpecialGameStore(
                     heightCm = stored.heightCm, weightKg = stored.weightKg, ageYears = stored.ageYears,
                     realMoney = stored.realMoney, currency = stored.currency.ifBlank { "USD" },
                     hydration = stored.hydrationBase.coerceIn(0, 100), hygiene = stored.hygieneBase.coerceIn(0, 100),
-                    energy = stored.energyBase.coerceIn(0, 100), mood = stored.mood.coerceIn(0, 100),
+                    energy = stored.energyBase.coerceIn(0, 100), nourishment = stored.nourishmentBase.coerceIn(0, 100),
+                    mood = stored.mood.coerceIn(0, 100), operatorName = stored.operatorName.take(LifeStats.MAX_NAME),
                 )
                 needsAnchorMs = stored.needsAnchorMs
             }
@@ -585,6 +588,7 @@ class SpecialGameStore(
     fun setRealMoney(amount: Double) = mutateLife { LifeStats.withMoney(it, amount) }
     fun setCurrency(code: String) = mutateLife { it.copy(currency = code.take(4).ifBlank { "USD" }) }
     fun setMood(mood: Int) = mutateLife { LifeStats.withMood(it, mood) }
+    fun setName(name: String) = mutateLife { LifeStats.withName(it, name) }
 
     /** Top up hydration (a drink). */
     fun drink() = mutateLife { LifeStats.drink(it) }
@@ -592,6 +596,8 @@ class SpecialGameStore(
     fun wash() = mutateLife { LifeStats.wash(it) }
     /** Rest up (restore energy). */
     fun rest() = mutateLife { LifeStats.rest(it) }
+    /** Eat (restore nourishment). */
+    fun eat() = mutateLife { LifeStats.eat(it) }
 
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
@@ -612,7 +618,8 @@ class SpecialGameStore(
             heightCm = lifeBase.heightCm, weightKg = lifeBase.weightKg, ageYears = lifeBase.ageYears,
             realMoney = lifeBase.realMoney, currency = lifeBase.currency,
             hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene,
-            energyBase = lifeBase.energy, mood = lifeBase.mood, needsAnchorMs = needsAnchorMs,
+            energyBase = lifeBase.energy, nourishmentBase = lifeBase.nourishment,
+            mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }

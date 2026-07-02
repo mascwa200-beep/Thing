@@ -313,10 +313,11 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Life")
         LifePanel(
             life, c,
+            onSetName = { vm.setName(it) },
             onSetHeight = { vm.setHeight(it) }, onSetWeight = { vm.setWeight(it) },
             onSetAge = { vm.setAge(it) }, onSetMoney = { vm.setRealMoney(it) },
             onSetMood = { vm.setMood(it) },
-            onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() },
+            onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
         )
         Spacer(Modifier.height(8.dp))
 
@@ -438,6 +439,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 private fun LifePanel(
     life: LifeProfile,
     c: NightwirePalette,
+    onSetName: (String) -> Unit,
     onSetHeight: (Int) -> Unit,
     onSetWeight: (Int) -> Unit,
     onSetAge: (Int) -> Unit,
@@ -446,6 +448,7 @@ private fun LifePanel(
     onDrink: () -> Unit,
     onWash: () -> Unit,
     onRest: () -> Unit,
+    onEat: () -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -454,6 +457,7 @@ private fun LifePanel(
             Text("Your real life bleeds into the wasteland. Stays on this device — never leaves.",
                 fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
 
+            LifeTextField("Name", life.operatorName, "callsign", c) { onSetName(it) }
             LifeNumberField("Height", if (life.heightCm > 0) life.heightCm.toString() else "", "cm", c) {
                 onSetHeight(it.toIntOrNull() ?: 0)
             }
@@ -480,12 +484,14 @@ private fun LifePanel(
 
             // Needs meters + top-up actions.
             FalloutGauge("Hydration", "${life.hydration}%", life.hydration / 100f, c.sky)
-            FalloutGauge("Hygiene", "${life.hygiene}%", life.hygiene / 100f, c.positive)
+            FalloutGauge("Nourishment", "${life.nourishment}%", life.nourishment / 100f, c.magenta)
             FalloutGauge("Energy", "${life.energy}%", life.energy / 100f, c.amber)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FalloutGauge("Hygiene", "${life.hygiene}%", life.hygiene / 100f, c.positive)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
-                Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
+                Box(Modifier.weight(1f)) { GameButton("EAT", c.magenta, onEat) }
                 Box(Modifier.weight(1f)) { GameButton("REST", c.amber, onRest) }
+                Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
             }
 
             // How the profile bends your checks right now (mirrors the CONDITIONS readout).
@@ -536,6 +542,44 @@ private fun LifeNumberField(
             },
         )
         Text(" $unit", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+    }
+}
+
+/**
+ * One labelled free-text input for [LifePanel] (the operator name). Same commit-on-focus-loss discipline as
+ * [LifeNumberField] so the per-tick needs flow can't clobber typing; [hint] shows when empty.
+ */
+@Composable
+private fun LifeTextField(
+    label: String,
+    value: String,
+    hint: String,
+    c: NightwirePalette,
+    onCommit: (String) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it.take(LifeStats.MAX_NAME) },
+            singleLine = true,
+            textStyle = TextStyle(color = c.ink, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 14.sp, textAlign = TextAlign.End),
+            cursorBrush = SolidColor(c.sky),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onCommit(text) }),
+            modifier = Modifier.width(160.dp).background(c.void).border(1.dp, c.line)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .onFocusChanged { if (!it.isFocused) onCommit(text) },
+            decorationBox = { inner ->
+                if (text.isEmpty()) {
+                    Text(hint, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
+                        textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                }
+                inner()
+            },
+        )
     }
 }
 
