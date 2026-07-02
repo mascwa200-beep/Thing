@@ -1275,10 +1275,26 @@ home** (couch-play `venture` is to be retired). Built as CI-green slices per the
   these classify. New `sitesFlow: StateFlow<List<WorldSite>>` (cap `MAX_SITES=32`); the trade sites still
   drive the existing `GameLocation` shop layer (derived from `SiteType.shopKind`) so the current map/shop UI
   is untouched. `TelemetryViewModel.sites` exposed for the render slice. Compile-review clean.
-- **Remaining slices:** (3) render the sites on the wasteland map (per-SiteType coloured markers) → (4)
-  **presence-gate encounters/fights/shop/quests** at sites + retire couch-play `venture` → (5) weapons + money
-  as things found/earned only AT real places. ⚠️ Reshapes the core loop — owner verifies each slice on the
-  Pixel. On-device-unverified so far: the Overpass fetches for the new categories + the classification.
+- **Slice 3 — render sites on the map (PR #282, merged):** `WastelandMap` now plots every nearby `WorldSite`
+  (not just shops) as a dot coloured by `SiteType` + sized by threat (settlements green, tribes tan, gang
+  camps orange, monster dens magenta, vaults bright yellow, ruins grey; bigger = more dangerous).
+  `WastelandMap(sites: List<WorldSite>)` + `siteColorHex(SiteType)` + threat-driven GeoJSON radius; tap fires
+  `onSelect(id)`. `WastelandPanel` gained a `sites` param (map renders from it; shop trade list still on
+  `locations`). Compile-review clean.
+- **Remaining slices:** (4) **presence-gate encounters/fights/shop/quests** at sites + retire couch-play
+  `venture` → (5) weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core loop —
+  owner verifies each slice on the Pixel.
+
+### Survival-tip notification — stuck-on-tip-0 + too-frequent (owner screenshot, PR #282)
+Owner reported (screenshot) the survival tip still showed "Rule of Threes" (tip #0) and fired far too often.
+Root of the recurrence: the rotation used a **persisted cursor** (`survivalTipIndex`); if it ever fails to
+persist it sits at 0 (= "Rule of Threes"), and the 12-min firing floor re-posted it dozens/day (fixed id →
+each re-post jumps to "now"). Fix (`RefreshWorker`): (a) the tip index is now **derived from the wall clock**
+(`bucket = now / gap`, ×131 scramble — coprime with the ~310-tip catalog), so it can NEVER get stuck on tip 0
+regardless of persistence and feels random while covering the whole catalog; (b) frequency cut **12 min → ~3
+hours** (`SURVIVAL_TIP_MIN_GAP_MS`). Complements the earlier `notify_state` concurrency fix (which stopped the
+`BreakingNewsPulse` clobber) — this removes the persisted-cursor dependency entirely. ⚠️ Owner confirms the
+new cadence + rotation on the Pixel once the build lands (must install the updated APK for it to take effect).
 - **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; a new non-item
   game system.
 
