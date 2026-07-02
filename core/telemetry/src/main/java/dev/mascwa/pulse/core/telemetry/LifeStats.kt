@@ -83,7 +83,23 @@ object LifeStats {
     const val HYGIENE_DECAY_PER_HR = 2.0
     const val ENERGY_DECAY_PER_HR = 3.0
     const val NOURISHMENT_DECAY_PER_HR = 3.5
+    /** Energy recovered per hour while the phone is charging — plugged in ≈ resting up. */
+    const val ENERGY_REGEN_PER_HR = 8.0
     private const val MS_PER_HOUR = 3_600_000.0
+
+    // Real-world decay multipliers (the world drives how fast needs drain).
+    private const val HOT_HYDRATION_X = 1.6
+    private const val SCORCHING_HYDRATION_X = 2.2
+    private const val COLD_ENERGY_X = 1.3
+    private const val FRIGID_ENERGY_X = 1.5
+    private const val NIGHT_ENERGY_X = 1.5
+    private const val MOVING_HYDRATION_X = 1.3
+    private const val MOVING_ENERGY_X = 1.4
+    private const val MOVING_NOURISHMENT_X = 1.2
+    private const val MOVING_HYGIENE_X = 1.3
+    // Night is late evening / small hours (local).
+    private const val NIGHT_START_HR = 22
+    private const val NIGHT_END_HR = 6
 
     /** Max length of the cosmetic operator name. */
     const val MAX_NAME = 24
@@ -238,15 +254,59 @@ object LifeStats {
 
     // --- Needs upkeep ---
 
-    /** Decay hydration + hygiene + energy for [elapsedMs] of real time (clamped to 0..100). Deterministic. */
-    fun decayNeeds(p: LifeProfile, elapsedMs: Long): LifeProfile {
+    /** Decay the needs for [elapsedMs] of real time at the base rates (no real-world context). */
+    fun decayNeeds(p: LifeProfile, elapsedMs: Long): LifeProfile = decayNeeds(p, elapsedMs, null)
+
+    /**
+     * Decay the needs for [elapsedMs] of real time, with the real world ([env]) driving the rates: heat
+     * spikes thirst, cold / night / motion drain energy faster, motion also burns food + fouls hygiene —
+     * and while the phone is CHARGING, energy RECOVERS (plugged in ≈ resting). Clamped 0..100; deterministic.
+     * [env] = null → the plain base rates (back-compatible).
+     */
+    fun decayNeeds(p: LifeProfile, elapsedMs: Long, env: EnvContext?): LifeProfile {
         if (elapsedMs <= 0) return p
         val hrs = elapsedMs / MS_PER_HOUR
-        val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
-        val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
-        val en = (p.energy - (hrs * ENERGY_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
-        val nour = (p.nourishment - (hrs * NOURISHMENT_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
+        val tmp = env?.outdoorTempC
+        val scorching = tmp != null && tmp >= Environment.SCORCHING_C
+        val hot = tmp != null && tmp >= Environment.HOT_C
+        val frigid = tmp != null && tmp <= Environment.FRIGID_C
+        val cold = tmp != null && tmp <= Environment.COLD_C
+        val night = env != null && (!env.isDay || env.hourOfDay >= NIGHT_START_HR || env.hourOfDay < NIGHT_END_HR)
+        val moving = (env?.movement ?: 0f) >= Environment.MOVING_INTENSITY
+        val charging = env?.charging == true
+
+        val hydMult = (if (scorching) SCORCHING_HYDRATION_X else if (hot) HOT_HYDRATION_X else 1.0) *
+            (if (moving) MOVING_HYDRATION_X else 1.0)
+        val enMult = (if (frigid) FRIGID_ENERGY_X else if (cold) COLD_ENERGY_X else 1.0) *
+            (if (night) NIGHT_ENERGY_X else 1.0) * (if (moving) MOVING_ENERGY_X else 1.0)
+        val nourMult = if (moving) MOVING_NOURISHMENT_X else 1.0
+        val hygMult = if (moving) MOVING_HYGIENE_X else 1.0
+
+        val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR * hydMult).roundToInt()).coerceIn(0, 100)
+        val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR * hygMult).roundToInt()).coerceIn(0, 100)
+        val nour = (p.nourishment - (hrs * NOURISHMENT_DECAY_PER_HR * nourMult).roundToInt()).coerceIn(0, 100)
+        val en = if (charging) (p.energy + (hrs * ENERGY_REGEN_PER_HR).roundToInt()).coerceIn(0, 100)
+            else (p.energy - (hrs * ENERGY_DECAY_PER_HR * enMult).roundToInt()).coerceIn(0, 100)
         return p.copy(hydration = hyd, hygiene = hyg, energy = en, nourishment = nour)
+    }
+
+    /** Human labels for the real-world factors currently driving need decay — for a live UI readout. */
+    fun needDrivers(env: EnvContext?): List<String> {
+        if (env == null) return emptyList()
+        val out = mutableListOf<String>()
+        val tmp = env.outdoorTempC
+        when {
+            tmp != null && tmp >= Environment.SCORCHING_C -> out += "Scorching — thirst spiking"
+            tmp != null && tmp >= Environment.HOT_C -> out += "Heat — thirst rising"
+            tmp != null && tmp <= Environment.FRIGID_C -> out += "Frigid — tiring fast"
+            tmp != null && tmp <= Environment.COLD_C -> out += "Cold — tiring"
+        }
+        if (!env.isDay || env.hourOfDay >= NIGHT_START_HR || env.hourOfDay < NIGHT_END_HR) {
+            out += "Late hours — weariness setting in"
+        }
+        if ((env.movement ?: 0f) >= Environment.MOVING_INTENSITY) out += "On the move — burning energy & water"
+        if (env.charging) out += "Charging — resting up (energy recovering)"
+        return out
     }
 
     /** Top up hydration (a drink). */

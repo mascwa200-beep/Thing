@@ -304,6 +304,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val questDone by vm.questCompleted.collectAsStateWithLifecycle()
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val life by vm.life.collectAsStateWithLifecycle()
+    val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -312,7 +313,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     ) {
         PipHeader("Life")
         LifePanel(
-            life, c,
+            life, lifeEnv, c,
             onSetName = { vm.setName(it) },
             onSetHeight = { vm.setHeight(it) }, onSetWeight = { vm.setWeight(it) },
             onSetAge = { vm.setAge(it) }, onSetMoney = { vm.setRealMoney(it) },
@@ -438,6 +439,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 @Composable
 private fun LifePanel(
     life: LifeProfile,
+    env: EnvContext,
     c: NightwirePalette,
     onSetName: (String) -> Unit,
     onSetHeight: (Int) -> Unit,
@@ -492,6 +494,14 @@ private fun LifePanel(
                 Box(Modifier.weight(1f)) { GameButton("EAT", c.magenta, onEat) }
                 Box(Modifier.weight(1f)) { GameButton("REST", c.amber, onRest) }
                 Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
+            }
+
+            // What the real world is doing to your needs right now (heat, night, motion, charging).
+            val drivers = LifeStats.needDrivers(env)
+            if (drivers.isNotEmpty()) {
+                Text("REAL-WORLD DRIVERS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = c.sky, letterSpacing = 1.sp, modifier = Modifier.padding(top = 2.dp))
+                drivers.forEach { Text("• $it", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2) }
             }
 
             // How the profile bends your checks right now (mirrors the CONDITIONS readout).
