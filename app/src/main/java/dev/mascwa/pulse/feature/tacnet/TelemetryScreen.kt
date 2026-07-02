@@ -86,6 +86,9 @@ import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GearSets
 import dev.mascwa.pulse.core.telemetry.WorldEvent
+import dev.mascwa.pulse.core.telemetry.Archetype
+import dev.mascwa.pulse.core.telemetry.Legend
+import dev.mascwa.pulse.core.telemetry.Legends
 import dev.mascwa.pulse.core.telemetry.SiteType
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.telemetry.WorldSites
@@ -337,6 +340,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val siteReach by vm.siteReach.collectAsStateWithLifecycle()
+    val legend by vm.legend.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -380,6 +384,8 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
         }
         CharacterSheet(character, c) { vm.allocate(it) }
+        Spacer(Modifier.height(8.dp))
+        LegendPanel(legend, c) { vm.curateTale(it) }
         Spacer(Modifier.height(8.dp))
         ConditionsPanel(env, c)
         if (character.perkPicks > 0) {
@@ -430,6 +436,61 @@ private fun ResetRunControl(c: NightwirePalette, onReset: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirming = false }) { Text("CANCEL") } },
         )
+    }
+}
+
+/**
+ * YOUR TALE — the LARP renown/legend. Your global standing across the wasteland: it bends every shop price
+ * and your CHARISMA in dealings. You can **curate** it (pick an archetype to seed who the world thinks you
+ * are) or **let it grow on its own** from your deeds (winning talks, etc.). Distinct from per-faction rep.
+ */
+@Composable
+private fun LegendPanel(legend: Legend, c: NightwirePalette, onCurate: (Archetype?) -> Unit) {
+    val tier = Legends.tierFor(legend.renown)
+    val shopPct = Legends.shopPricePct(legend.renown)
+    val chaBonus = Legends.charismaBonus(legend.renown)
+    PipFrame(Modifier.fillMaxWidth(), accent = c.violet) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("YOUR TALE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                color = c.violet, letterSpacing = 1.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(tier.label.uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp, color = c.ink, letterSpacing = 1.sp)
+                Text("RENOWN ${if (legend.renown > 0) "+" else ""}${legend.renown}", fontFamily = JetBrainsMono,
+                    fontSize = 10.sp, color = c.violet)
+            }
+            Text(tier.welcome, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2)
+
+            // How your standing bends the world right now.
+            val bends = buildList {
+                if (shopPct != 0) add(if (shopPct < 0) "Shops $shopPct% — cut rates" else "Shops +$shopPct% — gouged")
+                if (chaBonus != 0) add("CHA ${if (chaBonus > 0) "+" else ""}$chaBonus in dealings")
+                if (isEmpty()) add("No sway yet — win talks at sites, or curate a tale below.")
+            }
+            bends.forEach { Text("• $it", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2) }
+
+            // Curate: (re)seed the tale from an archetype. ENIGMA/WANDERER start it blank to grow on its own.
+            Text("CURATE YOUR TALE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.violet, letterSpacing = 1.sp, modifier = Modifier.padding(top = 2.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Archetype.entries.forEach { a ->
+                    val selected = legend.archetype == a
+                    Box(
+                        Modifier.clip(RoundedCornerShape(4.dp))
+                            .border(1.dp, (if (selected) c.violet else c.muted).copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            .background(if (selected) c.violet.copy(alpha = 0.14f) else Color.Transparent)
+                            .clickable { onCurate(a) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text(a.label.uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp, letterSpacing = 0.5.sp, color = if (selected) c.violet else c.ink2)
+                    }
+                }
+            }
+            legend.archetype?.let { a ->
+                Text(a.blurb, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            }
+        }
     }
 }
 

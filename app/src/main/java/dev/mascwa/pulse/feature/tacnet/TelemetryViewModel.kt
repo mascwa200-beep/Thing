@@ -369,6 +369,14 @@ class TelemetryViewModel(
     /** Eat (restore nourishment). */
     fun eat() = game.eat()
 
+    // --- Your wasteland tale (global renown) — curate it, or let it grow from your deeds ---
+    /** Your current tale: renown + the curated archetype. Bends shops + CHARISMA. */
+    val legend: StateFlow<dev.mascwa.pulse.core.telemetry.Legend> =
+        game.characterFlow.map { it.legend }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), dev.mascwa.pulse.core.telemetry.Legend())
+    /** Curate your tale — (re)seed renown from a chosen archetype (null / blank = let it grow on its own). */
+    fun curateTale(archetype: dev.mascwa.pulse.core.telemetry.Archetype?) = game.curateTale(archetype)
+
     // --- Calendar agenda: your real upcoming events → wasteland objectives (on-device, permission-gated) ---
     private var calEvents: List<CalEvent> = emptyList()
     private var lastCalLoadMs = 0L

@@ -8,7 +8,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
+import dev.mascwa.pulse.core.telemetry.Archetype
 import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.DeedKind
+import dev.mascwa.pulse.core.telemetry.Legend
+import dev.mascwa.pulse.core.telemetry.Legends
 import dev.mascwa.pulse.core.telemetry.DailyObjective
 import dev.mascwa.pulse.core.telemetry.DailyObjectives
 import dev.mascwa.pulse.core.telemetry.Encounter
@@ -78,6 +82,9 @@ class SpecialGameStore(
         val inventory: Map<String, Int> = emptyMap(),
         val companion: String? = null,
         val reputation: Map<String, Int> = emptyMap(),
+        // Your wasteland tale (global renown + the curated archetype). Defaulted → old saves load neutral.
+        val legendRenown: Int = 0,
+        val legendArchetype: String? = null,
         // Lifetime counters + unlocked achievements (defaulted → old saves load).
         val wins: Int = 0,
         val crits: Int = 0,
@@ -229,6 +236,7 @@ class SpecialGameStore(
         seen = seen.toList(), currentEncounterId = currentEncounterId,
         perks = perks.toList(), perkPicks = perkPicks,
         inventory = inventory, companion = companion, reputation = reputation,
+        legendRenown = legend.renown, legendArchetype = legend.archetype?.name,
     )
 
     private fun Stored.domain(): Character {
@@ -245,6 +253,10 @@ class SpecialGameStore(
             inventory = inventory.filterValues { it > 0 },
             companion = companion,
             reputation = reputation.filterValues { it > 0 },
+            legend = Legend(
+                renown = legendRenown.coerceIn(Legends.MIN, Legends.MAX),
+                archetype = legendArchetype?.let { runCatching { Archetype.valueOf(it) }.getOrNull() },
+            ),
         )
     }
 
@@ -449,9 +461,12 @@ class SpecialGameStore(
             val roll = random.nextInt(1, SpecialGame.DIE + 1)
             val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env, life = currentLife())
             var updated = resolution.character
-            // A good conversation earns standing with that faction.
-            if (resolution.success && kind != null) {
-                updated = SpecialGame.addRep(updated, kind, dev.mascwa.pulse.core.telemetry.Reputation.PER_TALK)
+            // A good conversation earns standing with that faction — and grows your wasteland tale.
+            if (resolution.success) {
+                if (kind != null) {
+                    updated = SpecialGame.addRep(updated, kind, dev.mascwa.pulse.core.telemetry.Reputation.PER_TALK)
+                }
+                updated = SpecialGame.recordDeed(updated, DeedKind.WON_TALK)
             }
             _character.value = updated
             _resolution.value = resolution
@@ -598,6 +613,18 @@ class SpecialGameStore(
             ensureLoaded()
             _character.value = SpecialGame.allocate(_character.value, s)
             runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /**
+     * Curate your tale — (re)seed your renown from a chosen [archetype] (null / ENIGMA / WANDERER = a blank
+     * slate). The alternative to letting it grow on its own from your deeds ([resolveTalk] etc.).
+     */
+    fun curateTale(archetype: Archetype?) {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.curateLegend(_character.value, archetype)
             scheduleFlush()
         }
     }
