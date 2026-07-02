@@ -385,6 +385,11 @@ data class AppSettings(
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
+    /** Ambient perception for the S.P.E.C.I.A.L. life-sim: while the game (STAT) screen is open, sample the
+     *  camera + mic on-device to sense your surroundings (indoor/outdoor, sounds) and shape the game. Only
+     *  text labels are produced — no image/audio is ever stored or sent. Off = the game uses a neutral scene
+     *  and the camera/mic are never touched. Default ON; the camera indicator shows while it samples. */
+    val ambientSensing: Boolean = true,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,
