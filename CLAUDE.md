@@ -1109,10 +1109,19 @@ Built as 3 CI-green slices; the game now reads your real self.
   CHA, night 22–04 AGI/LUCK). Biases WHICH encounters appear (not check maths → no double-count with the
   darkness/energy effects): `TelemetryViewModel.venture()` unions it with the perception favoured set fed to
   `SpecialGame.nextEncounter`. +1 test (37 total, kotlinc green). LIFE panel shows "THIS HOUR FAVOURS · …".
+- **Batch 7 — calendar-aware AGENDA (PR #269, merged, commit `38ebc5c`):** your real upcoming calendar events
+  become time-boxed wasteland objectives. Pure `core:telemetry/CalendarQuests.kt` (`CalEvent`→`AgendaQuest`
+  via `compose`: still-running or ≤48h-ahead, soonest-first, capped; `describeCountdown` "in 2h 15m"/"now"/
+  "under way"; `imminent` ≤1h; game-flavoured briefing; +7 tests, kotlinc green). `data/calendar/
+  CalendarRepository.kt` reads `CalendarContract.Instances` (expands recurrences), READ_CALENDAR-gated (perm
+  already in manifest), fully defensive → empty. On-device only — event text never leaves the phone.
+  `AppContainer.calendarRepository`; `TelemetryViewModel.agenda` (loads off-main in `refreshAgenda()` on
+  start + ~5-minly; countdowns recompute each tick); `GameSensors` requests READ_CALENDAR (reload on grant);
+  AGENDA panel atop DATA ▸ WASTELAND (imminent = amber). Subagent compile-review clean. ⚠️ On-device-unverified.
 - **Life-sim customization set is now very comprehensive** (height/weight/age/real-money · hydration/hygiene/
-  energy/nourishment · mood · name · world-driven decay · **real step count** · **time-of-day encounter bias**).
-  **Owner-steerable next (bigger, need device/hardware):** BLE heart-rate strap → vitals (manifest already has
-  BLUETOOTH perms), calendar-aware quests (READ_CALENDAR present).
+  energy/nourishment · mood · name · world-driven decay · **real step count** · **time-of-day encounter bias** ·
+  **real calendar → agenda**). **Owner-steerable next (bigger, needs hardware):** BLE heart-rate strap → vitals
+  (manifest already has BLUETOOTH perms) — held pending owner go + a physical strap to verify.
   ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers, steps) is CI-compile-gated only — owner verifies on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
