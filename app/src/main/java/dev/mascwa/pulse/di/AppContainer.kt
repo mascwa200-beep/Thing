@@ -121,6 +121,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
     }
 
+    /** Real calendar → the life-sim's agenda (upcoming events become wasteland objectives; on-device only). */
+    val calendarRepository: dev.mascwa.pulse.data.calendar.CalendarRepository by lazy {
+        dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)
+    }
+
     /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)

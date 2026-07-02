@@ -3,6 +3,9 @@ package dev.mascwa.pulse.feature.tacnet
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Achievement
+import dev.mascwa.pulse.core.telemetry.AgendaQuest
+import dev.mascwa.pulse.core.telemetry.CalEvent
+import dev.mascwa.pulse.core.telemetry.CalendarQuests
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameClock
 import dev.mascwa.pulse.core.telemetry.GameMetrics
@@ -25,8 +28,10 @@ import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -56,6 +61,7 @@ class TelemetryViewModel(
     private val questStore: dev.mascwa.pulse.data.game.QuestStore,
     private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
     private val cameraSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler,
+    private val calendar: dev.mascwa.pulse.data.calendar.CalendarRepository,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -282,6 +288,23 @@ class TelemetryViewModel(
     /** Eat (restore nourishment). */
     fun eat() = game.eat()
 
+    // --- Calendar agenda: your real upcoming events → wasteland objectives (on-device, permission-gated) ---
+    private var calEvents: List<CalEvent> = emptyList()
+    private var lastCalLoadMs = 0L
+    private val _agenda = MutableStateFlow<List<AgendaQuest>>(emptyList())
+    /** Upcoming real calendar events, framed as time-boxed wasteland objectives (empty without permission). */
+    val agenda: StateFlow<List<AgendaQuest>> = _agenda.asStateFlow()
+
+    /** Reload the calendar off the main thread (READ_CALENDAR-gated, defensive) and recompute the agenda. */
+    fun refreshAgenda() {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            lastCalLoadMs = now
+            calEvents = withContext(Dispatchers.IO) { runCatching { calendar.upcoming(now) }.getOrDefault(emptyList()) }
+            _agenda.value = CalendarQuests.compose(calEvents, System.currentTimeMillis())
+        }
+    }
+
     /** Distil the live telemetry snapshot + cached weather + clock into the game's [EnvContext]. */
     private fun buildEnv(t: Telemetry): EnvContext {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -324,6 +347,7 @@ class TelemetryViewModel(
     fun start() {
         controller.start()
         _env.value = buildEnv(controller.telemetry.value)
+        refreshAgenda() // pull the real calendar into the wasteland agenda (no-op without READ_CALENDAR)
         // Ambient camera/mic sensing runs only when the owner has it enabled (privacy/battery control); the
         // samplers are still individually no-ops without their permissions.
         viewModelScope.launch {
@@ -376,6 +400,8 @@ class TelemetryViewModel(
                 updateDayBanner()
                 game.refreshNeeds(_env.value) // real weather/time/motion/charging drive the needs decay
                 controller.telemetry.value.stepCounterRaw?.let { game.setStepCounter(it) } // real steps → activity buff
+                _agenda.value = CalendarQuests.compose(calEvents, System.currentTimeMillis()) // refresh countdowns
+                if (System.currentTimeMillis() - lastCalLoadMs > CAL_RELOAD_MS) refreshAgenda() // reload events ~5-minly
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)
@@ -405,5 +431,7 @@ class TelemetryViewModel(
         const val GPS_POLL_MS = 10_000L
         // EWMA retention for the movement estimator (higher = smoother/slower; owner-tunable on the Pixel).
         const val MOTION_SMOOTH = 0.8f
+        // How often to re-read the calendar (countdowns recompute every tick; events reload only this often).
+        const val CAL_RELOAD_MS = 300_000L
     }
 }
