@@ -38,11 +38,22 @@ class WorldEventsTest {
     @Test fun modifiersAreSane() {
         WorldEvents.ALL.forEach { e ->
             assertTrue("caps modifier in a sane band", e.capsWinPct in -50..50)
+            assertTrue("shop modifier in a sane band", e.shopPct in -50..50)
             e.favored.forEach { assertTrue(it in Special.entries) }
         }
-        // At least one event favours stats and at least one moves caps, so the mechanic actually does something.
+        // At least one event favours stats, one moves caps, and one moves shop prices — the mechanic does something.
         assertTrue(WorldEvents.ALL.any { it.favored.isNotEmpty() })
         assertTrue(WorldEvents.ALL.any { it.capsWinPct != 0 })
+        assertTrue(WorldEvents.ALL.any { it.shopPct != 0 })
+    }
+
+    @Test fun shopPctBendsThePriceConsistently() {
+        val item = Items.byId("medkit")!! // value 40
+        val c = Character(stats = Special.entries.associateWith { 4 }) // no reputation → base = value
+        val base = SpecialGame.shopPrice(item, c, LocationKind.MEDIC, 0)
+        assertTrue(SpecialGame.shopPrice(item, c, LocationKind.MEDIC, -20) < base) // Market Fair discount
+        assertTrue(SpecialGame.shopPrice(item, c, LocationKind.MEDIC, 15) > base)  // Gloom surcharge
+        assertTrue("price never drops below 1", SpecialGame.shopPrice(item, c, LocationKind.MEDIC, -100) >= 1)
     }
 
     @Test fun negativeAndZeroDaysStayInBounds() {

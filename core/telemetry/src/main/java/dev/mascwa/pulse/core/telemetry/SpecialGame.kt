@@ -264,12 +264,22 @@ object SpecialGame {
     }
 
     /**
-     * Buy item [id] from a [kind] shop at that faction's reputation discount, and earn a little standing.
-     * No-op if unknown or unaffordable at the discounted price.
+     * The caps price to buy [item] from a [kind] shop: the faction reputation discount, then the day's world
+     * shop modifier [shopPct] (negative = a discount). Floored at 1 so a purchase always costs something.
+     * Used by both the buy action and the UI, so the shown price matches the charge.
      */
-    fun buyItemAt(c: Character, id: String, kind: LocationKind): Character {
+    fun shopPrice(item: Item, c: Character, kind: LocationKind, shopPct: Int = 0): Int {
+        val base = Reputation.discountedPrice(item.value, rep(c, kind))
+        return (base + base * shopPct / 100).coerceAtLeast(1)
+    }
+
+    /**
+     * Buy item [id] from a [kind] shop at that faction's reputation discount plus the day's world [shopPct]
+     * modifier, and earn a little standing. No-op if unknown or unaffordable at the final price.
+     */
+    fun buyItemAt(c: Character, id: String, kind: LocationKind, shopPct: Int = 0): Character {
         val item = Items.byId(id) ?: return c
-        val price = Reputation.discountedPrice(item.value, rep(c, kind))
+        val price = shopPrice(item, c, kind, shopPct)
         if (c.caps < price) return c
         val bought = addItem(c.copy(caps = c.caps - price), id, 1)
         return addRep(bought, kind, Reputation.PER_PURCHASE)

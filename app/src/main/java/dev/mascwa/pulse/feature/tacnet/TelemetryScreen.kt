@@ -442,6 +442,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val agenda by vm.agenda.collectAsStateWithLifecycle()
     val lastScavenge by vm.lastScavenge.collectAsStateWithLifecycle()
     val scavengeCooldown by vm.scavengeCooldown.collectAsStateWithLifecycle()
+    val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -463,7 +464,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
         }
         PipHeader("Wasteland")
-        WastelandPanel(locations, travel, scanning, gps, character, c,
+        WastelandPanel(locations, travel, scanning, gps, character, worldEvent.shopPct, c,
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
@@ -1008,6 +1009,7 @@ private fun WorldEventBanner(event: WorldEvent, c: NightwirePalette) {
     val effects = buildList {
         if (event.favored.isNotEmpty()) add("favours ${event.favored.joinToString("/") { it.display }}")
         if (event.capsWinPct != 0) add("${if (event.capsWinPct > 0) "+" else ""}${event.capsWinPct}% win caps")
+        if (event.shopPct != 0) add("${if (event.shopPct > 0) "+" else ""}${event.shopPct}% shop prices")
     }
     Column(Modifier.padding(top = 2.dp)) {
         Text("SITUATION · ${event.name.uppercase()}", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
@@ -1593,6 +1595,7 @@ private fun WastelandPanel(
     scanning: Boolean,
     gps: DeviceLocation?,
     ch: Character,
+    shopPct: Int,
     c: NightwirePalette,
     onScan: () -> Unit,
     onBuy: (String, LocationKind) -> Unit,
@@ -1629,7 +1632,7 @@ private fun WastelandPanel(
                     if (selectedId == loc.id) {
                         // Pokémon-Go rule: you must physically BE at the shop (within reach) to trade/talk.
                         val here = LocationGate.isAtLocation(gps?.latitude, gps?.longitude, loc)
-                        LocationSheet(loc, ch, here, dist, c, onBuy, onTalk)
+                        LocationSheet(loc, ch, here, dist, shopPct, c, onBuy, onTalk)
                     }
                 }
             }
@@ -1782,6 +1785,7 @@ private fun LocationSheet(
     ch: Character,
     atLocation: Boolean,
     distanceM: Double?,
+    shopPct: Int,
     c: NightwirePalette,
     onBuy: (String, LocationKind) -> Unit,
     onTalk: (Encounter, LocationKind) -> Unit,
@@ -1802,14 +1806,20 @@ private fun LocationSheet(
                 color = c.amber, letterSpacing = 0.5.sp,
             )
         }
+        val shopTag = when {
+            shopPct < 0 -> "  ·  MARKET ${shopPct}%"
+            shopPct > 0 -> "  ·  MARKET +${shopPct}%"
+            else -> ""
+        }
         Text(
-            "WARES · ${tier.label}${if (tier.discountPct > 0) " −${tier.discountPct}%" else ""}",
+            "WARES · ${tier.label}${if (tier.discountPct > 0) " −${tier.discountPct}%" else ""}$shopTag",
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
-            color = if (tier.discountPct > 0) c.positive else c.amber, letterSpacing = 1.sp,
+            color = if (tier.discountPct > 0 || shopPct < 0) c.positive else c.amber, letterSpacing = 1.sp,
         )
         GameLocations.stock(loc.kind).forEach { id ->
             Items.byId(id)?.let { item ->
-                val price = Reputation.discountedPrice(item.value, repPts)
+                // Price shown = the price charged (rep discount + the day's world shop modifier).
+                val price = SpecialGame.shopPrice(item, ch, loc.kind, shopPct)
                 // Buyable only when you're physically at the shop AND can afford it.
                 ShopRow(item, price, atLocation && ch.caps >= price, c) { onBuy(id, loc.kind) }
             }
