@@ -350,6 +350,8 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onSetHeight = { vm.setHeight(it) }, onSetWeight = { vm.setWeight(it) },
             onSetAge = { vm.setAge(it) }, onSetMoney = { vm.setRealMoney(it) },
             onSetMood = { vm.setMood(it) },
+            onSetWellRead = { vm.setWellRead(it) }, onSetFitness = { vm.setFitness(it) },
+            onSetCommunity = { vm.setCommunity(it) },
             onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
         )
         Spacer(Modifier.height(8.dp))
@@ -568,6 +570,9 @@ private fun LifePanel(
     onSetAge: (Int) -> Unit,
     onSetMoney: (Double) -> Unit,
     onSetMood: (Int) -> Unit,
+    onSetWellRead: (Int) -> Unit,
+    onSetFitness: (Int) -> Unit,
+    onSetCommunity: (Int) -> Unit,
     onDrink: () -> Unit,
     onWash: () -> Unit,
     onRest: () -> Unit,
@@ -595,6 +600,16 @@ private fun LifePanel(
                 onSetMoney(it.toDoubleOrNull() ?: 0.0)
             }
             LifeNumberField("Mood", life.mood.toString(), "/100", c) { onSetMood(it.toIntOrNull() ?: 50) }
+            // How you're doing in real life → tailors your S.P.E.C.I.A.L. (all self-reported, on-device only).
+            LifeNumberField("Well-read", if (life.wellRead > 0) life.wellRead.toString() else "", "/100", c) {
+                onSetWellRead(it.toIntOrNull() ?: 0)
+            }
+            LifeNumberField("In shape", if (life.fitness > 0) life.fitness.toString() else "", "/100", c) {
+                onSetFitness(it.toIntOrNull() ?: 0)
+            }
+            LifeNumberField("Local roots", if (life.community > 0) life.community.toString() else "", "/100", c) {
+                onSetCommunity(it.toIntOrNull() ?: 0)
+            }
 
             // Build / age / wealth summary.
             val bits = buildList {

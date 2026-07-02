@@ -37,6 +37,12 @@ data class LifeProfile(
     val mood: Int = 50,
     /** Real steps walked today (from the device step counter) — an active day buffs ENDURANCE/AGILITY. */
     val stepsToday: Int = 0,
+    /** How well-read you are, 0..100 (self-reported, 0 = unset) — a sharp, schooled mind buffs INTELLIGENCE. */
+    val wellRead: Int = 0,
+    /** How in-shape you are, 0..100 (self-reported, 0 = unset) — real conditioning buffs STRENGTH/ENDURANCE. */
+    val fitness: Int = 0,
+    /** How rooted you are where you live, 0..100 (self-reported, 0 = unset) — standing buffs CHARISMA/PERCEPTION. */
+    val community: Int = 0,
     /** Cosmetic operator name/callsign shown on the LIFE panel (no game effect). */
     val operatorName: String = "",
 )
@@ -113,6 +119,10 @@ object LifeStats {
     // Real-world step thresholds — an active day keeps you fit (a full stride is the classic 10k goal).
     const val ACTIVE_STEPS = 5000
     const val STRIDE_STEPS = 10000
+
+    // Self-reported 0..100 life scores (well-read / in-shape / community roots) — a MID and a HIGH band each.
+    const val SELF_HIGH = 75
+    const val SELF_MID = 40
 
     // Money-tier thresholds, in the profile's currency units (magnitude only).
     const val STEADY_MONEY = 100.0
@@ -251,6 +261,26 @@ object LifeStats {
             out += LifeEffect(Special.ENDURANCE, +1, "Active today (5k+ steps)")
         }
 
+        // How well-read you are (self-reported) sharpens the mind.
+        if (p.wellRead >= SELF_HIGH) out += LifeEffect(Special.INTELLIGENCE, +2, "Well-read")
+        else if (p.wellRead >= SELF_MID) out += LifeEffect(Special.INTELLIGENCE, +1, "A reader")
+
+        // How in-shape you are (self-reported) — the explicit fitness signal beyond raw BMI.
+        if (p.fitness >= SELF_HIGH) {
+            out += LifeEffect(Special.STRENGTH, +1, "In peak shape")
+            out += LifeEffect(Special.ENDURANCE, +1, "Conditioned")
+        } else if (p.fitness >= SELF_MID) {
+            out += LifeEffect(Special.ENDURANCE, +1, "Keeping fit")
+        }
+
+        // Where you live — roots + standing in your community open doors and keep your ear to the ground.
+        if (p.community >= SELF_HIGH) {
+            out += LifeEffect(Special.CHARISMA, +1, "Deep local roots")
+            out += LifeEffect(Special.PERCEPTION, +1, "Ear to the ground")
+        } else if (p.community >= SELF_MID) {
+            out += LifeEffect(Special.CHARISMA, +1, "Known where you live")
+        }
+
         return out
     }
 
@@ -359,4 +389,7 @@ object LifeStats {
     fun withMood(p: LifeProfile, mood: Int): LifeProfile = p.copy(mood = mood.coerceIn(0, 100))
     fun withName(p: LifeProfile, name: String): LifeProfile = p.copy(operatorName = name.take(MAX_NAME))
     fun withSteps(p: LifeProfile, steps: Int): LifeProfile = p.copy(stepsToday = steps.coerceAtLeast(0))
+    fun withWellRead(p: LifeProfile, v: Int): LifeProfile = p.copy(wellRead = v.coerceIn(0, 100))
+    fun withFitness(p: LifeProfile, v: Int): LifeProfile = p.copy(fitness = v.coerceIn(0, 100))
+    fun withCommunity(p: LifeProfile, v: Int): LifeProfile = p.copy(community = v.coerceIn(0, 100))
 }
