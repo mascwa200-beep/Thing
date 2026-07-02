@@ -33,7 +33,12 @@ object BreakingNewsPulse {
             )
         }
         // Accumulate seen titles (bounded) so an item briefly leaving the top list won't re-alert.
-        val merged = (state.seenTopUrls + top.take(20).map { it.title }).filter { it.isNotBlank() }.distinct().takeLast(60)
-        container.diskCache.write(STATE_KEY, state.copy(seenTopUrls = merged), NotifyState.serializer())
+        // Re-read the LATEST state immediately before writing and touch ONLY our field (seenTopUrls): the
+        // news fetch above is slow, and this poller shares `notify_state` with RefreshWorker. If we wrote
+        // our pre-fetch snapshot back we'd clobber whatever the worker advanced meanwhile — notably the
+        // survival-tip index/timestamp, which stuck the tip rotation on the first tip ("Rule of Threes").
+        val latest = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: state
+        val merged = (latest.seenTopUrls + top.take(20).map { it.title }).filter { it.isNotBlank() }.distinct().takeLast(60)
+        container.diskCache.write(STATE_KEY, latest.copy(seenTopUrls = merged), NotifyState.serializer())
     }
 }
