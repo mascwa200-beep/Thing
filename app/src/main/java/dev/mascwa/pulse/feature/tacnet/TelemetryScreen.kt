@@ -396,6 +396,9 @@ fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+        PipHeader("Loadout")
+        LoadoutPanel(character, c)
+        Spacer(Modifier.height(8.dp))
         PipHeader("Inventory")
         InventoryPanel(character, c, onUseItem = { vm.useItem(it) }, onSellItem = { vm.sellItem(it) })
         Spacer(Modifier.height(8.dp))
@@ -984,6 +987,61 @@ private fun ConditionsPanel(env: EnvContext, c: NightwirePalette) {
     }
 }
 
+/**
+ * The carried loadout at a glance: the passive GEAR bonuses stacking onto your checks right now, plus a
+ * pack tally (items held, split by kind, and total caps if you sold the lot). Read-only summary that sits
+ * above the interactive PACK.
+ */
+@Composable
+private fun LoadoutPanel(ch: Character, c: NightwirePalette) {
+    val gearBonuses = Special.entries.mapNotNull { s ->
+        val b = SpecialGame.gearStatBonus(ch, s)
+        if (b > 0) s to b else null
+    }
+    val carried = Items.ALL.mapNotNull { item ->
+        val qty = ch.inventory[item.id] ?: 0
+        if (qty > 0) item to qty else null
+    }
+    val totalItems = carried.sumOf { it.second }
+    val sellValue = carried.sumOf { (item, qty) -> (item.value / 2).coerceAtLeast(1) * qty }
+    val kindCounts = ItemKind.entries.mapNotNull { k ->
+        val n = carried.filter { it.first.kind == k }.sumOf { it.second }
+        if (n > 0) k to n else null
+    }
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("EQUIPPED · GEAR BONUS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 12.sp, color = c.sky, letterSpacing = 1.sp)
+            if (gearBonuses.isEmpty()) {
+                Text("No gear carried. Buy or loot GEAR for a passive edge on checks.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            } else {
+                gearBonuses.forEach { (s, b) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(s.letter.toString(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp, color = c.sky, modifier = Modifier.width(16.dp))
+                        Text(s.display, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink,
+                            modifier = Modifier.weight(1f))
+                        Text("+$b", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp, color = c.positive)
+                    }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("PACK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                    color = c.muted, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                Text("$totalItems item${if (totalItems == 1) "" else "s"} · sells for $sellValue",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink)
+            }
+            if (kindCounts.isNotEmpty()) {
+                Text(kindCounts.joinToString("   ") { (k, n) -> "${k.name} $n" },
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            }
+        }
+    }
+}
+
 /** The player's pack: AID to heal, GEAR/CHEM held, junk to sell. USE (aid) + SELL per row. */
 @Composable
 private fun InventoryPanel(ch: Character, c: NightwirePalette, onUseItem: (String) -> Unit, onSellItem: (String) -> Unit) {
@@ -1014,9 +1072,15 @@ private fun InventoryRow(item: Item, qty: Int, c: NightwirePalette, onUseItem: (
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("${item.name}${if (qty > 1) "  ×$qty" else ""}", fontFamily = ChakraPetch,
-                fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.ink)
-            Text(item.desc, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${item.name}${if (qty > 1) "  ×$qty" else ""}", fontFamily = ChakraPetch,
+                    fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.ink)
+                Spacer(Modifier.width(6.dp))
+                Text("★".repeat(item.rarity.coerceIn(1, 5)), fontFamily = JetBrainsMono,
+                    fontSize = 8.sp, color = rarityColor(item.rarity, c))
+            }
+            Text("${item.kind.name} · ${item.desc}", fontFamily = JetBrainsMono, fontSize = 8.sp,
+                color = c.muted, modifier = Modifier.padding(top = 1.dp))
         }
         if (item.kind == ItemKind.AID) {
             InvAction("USE", c.positive) { onUseItem(item.id) }
@@ -1035,6 +1099,15 @@ private fun InvAction(label: String, color: Color, onClick: () -> Unit) {
     ) {
         Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp, color = color, letterSpacing = 0.5.sp)
     }
+}
+
+/** Rarity 1..5 → a colour ramp (common → rare) for the ★ tier tag. */
+private fun rarityColor(rarity: Int, c: NightwirePalette): Color = when (rarity.coerceIn(1, 5)) {
+    1 -> c.muted
+    2 -> c.ink
+    3 -> c.positive
+    4 -> c.sky
+    else -> c.violet
 }
 
 @Composable
