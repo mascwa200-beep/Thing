@@ -1323,6 +1323,60 @@ new cadence + rotation on the Pixel once the build lands (must install the updat
 - **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; a new non-item
   game system.
 
+### LARP batch L1–L5 + depth batch + AR camera (this session, dev branch `claude/loving-edison-bd65oa`, #286–#292)
+Owner: "I am essentially making this a giant larp." Shipped the 5-part LARP batch, then a "more real-time
+tracking · different transportation · 1000+ achievements + your own deeper ideas" batch, then the AR camera —
+all CI-green slices, squash-merged to `main`, re-synced each time. Pure cores in `core:telemetry` (kotlinc +
+JUnit locally; the recipe = `/opt/gradle-8.14.3/lib` jars, compile only the depended-on files; the FULL
+game-core suite is now **192+ tests**). Android layers compile-gated by CI + adversarial subagent
+compile-reviews (no local SDK). **Everything on-device is owner-verify on the Pixel.**
+- **L1 reset-run (#286):** `SpecialGameStore.resetProgress()` wipes the run (stats/level/XP/caps/inventory/
+  perks/rep/achievements/quests/scavenge/codex) but **preserves the real-life profile** (LifeStats). Confirm-gated
+  RESET RUN control on STATS ▸ SPECIAL. The full `reset()` (also wipes profile) is untouched.
+- **L2 XP only from real places (#286):** removed the per-app-screen-visit XP grant (+ `XP_PER_VISIT`). XP comes
+  only from site-gated encounters/scavenge/talks + quest rewards. (Two app-usage milestone achievements still
+  grant a little — flagged.)
+- **L3 track/untrack sites (#287):** tapping a scanned site on the DATA ▸ WASTELAND map opens a `SiteSheet`
+  (arrival brief · threat · distance) with **TRACK ▸ SET PATH HERE** → drops a `WaypointStore` waypoint
+  (`ObjectiveKind.MAIN`, made active) so the NAV gold path routes there; idempotent (re-activates a waypoint
+  within ~20 m, no dupes). `TelemetryViewModel` gained `WaypointStore` (`trackedWaypoints`/`trackSite`/`untrackSite`).
+- **L4 real-life → S.P.E.C.I.A.L. (#288):** `LifeProfile` gained **wellRead → INT, fitness → STR/END, community
+  (where you live) → CHA/PER** (0..100 self-reports, `SELF_MID`/`SELF_HIGH` bands, defaulted → old saves neutral;
+  flow into `resolve` via `effects()`). Persisted + LIFE-panel number fields. On-device only. (Money + BMI/steps
+  already fed it.)
+- **L5 your wasteland tale / renown (#289):** `core:telemetry/Legend.kt` — a **global renown** distinct from
+  per-faction Reputation. `RenownTier` (Reviled→Revered), `Archetype` (curated seed), `DeedKind` (grow-it deeds).
+  `Legends.shopPricePct` (±20%) + `charismaBonus` (±2). `Character.legend`; `SpecialGame.legendStatBonus` folds
+  into CHA checks; `shopPrice` folds the renown modifier (stacks with faction discount + world event); `curateLegend`/
+  `recordDeed`. GROW: `resolveTalk` win → `WON_TALK`. CURATE: archetype picker. LEGEND panel on STATS ▸ SPECIAL.
+  The tale is game progress → cleared by both reset paths.
+- **Depth batch 1 — 1000+ achievements + transport core (#290):** `core:telemetry/Transport.kt` — `TransportMode`
+  STILL/WALK/RUN/CYCLE/DRIVE, `classify(speedMps, hint?)` (still overrides hint; 30 km/h+ always vehicular; hint
+  breaks run-vs-cycle), per-mode distance accrual. **`Achievements.kt` → 1,717 achievements across 27 metrics**:
+  hand-authored FEATURED + procedurally-generated tiered LADDERS (distance total/per-mode/on-foot, elevation,
+  steps, caps, wins, crits, ventures, talks, scavenges, quests, crafts, trades, places, cells, level, renown,
+  days, perks, carry, discovery) — unique ids, monotonic thresholds, scaling rewards (item every 10th rung).
+  New `AchMetric`s + `GameMetrics` fields (defaulted). `nextUp(metrics, unlocked, limit)` = a short "what's next"
+  chase list (the UI shows this, not a wall of 1717).
+- **Depth batch 2 — wire transport/elevation/exploration (#291):** `core:telemetry/GeoTracking.kt` —
+  `elevationGain` (ascent-only, 3 m noise floor) + `cellId` (~111 m grid bucket → distinct cells = exploration,
+  aggregate not a path). `DeviceLocation` gains `altitudeM`/`speedMps` (from the Android fix; one construction
+  site). `GameWorldStore.onLocation(...speed, altitude)` classifies each committed step per mode + accrues climb
+  + cells (capped `MAX_CELLS=5000`); `TravelStats`/`Stored` carry them (defaulted). `SpecialGameStore` `ext*`
+  fields + widened `setTravelMetrics` → `currentMetrics` feeds walk/run/cycle/drive/elevation/cells + **renown**.
+  UI: ACHIEVEMENTS panel → unlocked/total + NEXT UP; WASTELAND map → ON-FOOT · CYCLE · DRIVE · CLIMB · AREAS.
+- **AR wasteland camera (#292):** `feature/ar/ArScreen.kt` + `ArViewModel.kt` — a compass **"magic window"** (no
+  ARCore) over the geo-gated sites. CameraX back-camera `PreviewView` (new `camera-view` dep) + the nearby
+  `WorldSite`s projected via the merged `ArProjection` core (`screenX` from heading+bearing; sized by distance;
+  threat-tinted cards; ◉ HERE · ENGAGE within 60 m). Compass heading/cardinal readout, figure-8 calibration hint,
+  CAMERA-permission gate, SCAN button. `Routes.AR` + factory + NavHost + an ◈ AR CAMERA VIEW button on DATA ▸
+  WASTELAND. Feeds `onLocation` so travel/exploration accrues in AR too.
+- **Owner-proposed deeper ideas still queued (offered, not built):** game-action counter feeding for the
+  remaining ladders (talks/scavenges/quests/crafts/trades/days/steps-total are defined but only partly fed);
+  streaks (consecutive days), real POIs → "your settlements", route/commute recognition, seasons, vehicle-as-caravan.
+  ⚠️ The whole batch's runtime (GPS speed/altitude, per-mode classification feel, elevation, AR viewfinder +
+  marker projection, 1717-achievement unlock cascade) is **CI-unprovable — owner verifies on the Pixel**.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
