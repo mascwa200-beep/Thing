@@ -172,6 +172,7 @@ object SpecialGame {
             val statValue = character.stat(choice.stat) +
                 perkStatBonus(character, choice.stat) +
                 gearStatBonus(character, choice.stat) +
+                setStatBonus(character, choice.stat) +
                 companionStatBonus(character, choice.stat) +
                 (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
                 (life?.let { LifeStats.statBonus(it, choice.stat) } ?: 0) +
@@ -201,6 +202,9 @@ object SpecialGame {
     }
 
     // --- Inventory + items ---
+
+    /** Synergy bonus from any fully-assembled [GearSet] that boosts checks gated by [s]. */
+    fun setStatBonus(c: Character, s: Special): Int = GearSets.statBonus(c.inventory, s)
 
     /** Passive bonus from carried GEAR that boosts checks gated by [s] (each distinct piece counts once). */
     fun gearStatBonus(c: Character, s: Special): Int = c.inventory.entries.sumOf { (id, qty) ->
