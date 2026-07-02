@@ -1087,10 +1087,18 @@ Built as 3 CI-green slices; the game now reads your real self.
   Store persists nourishment (anchored-decay) + operatorName (defaulted → old saves neutral; `reset()` clears);
   VM `eat()`/`setName()`; LIFE panel gained a Name text field (new `LifeTextField`, commit-on-focus-loss), a
   Nourishment gauge, and an EAT button (needs row now DRINK · EAT · REST · WASH). ⚠️ On-device-unverified.
-- **Life-sim customization set is now comprehensive** (height/weight/age/real-money · hydration/hygiene/energy/
-  nourishment · mood · name). **Owner-steerable next (not built unprompted):** real step-count → energy (needs
-  the step-counter sensor + ACTIVITY_RECOGNITION), appearance/portrait, sleep-schedule-aware energy decay.
-  ⚠️ The whole life-sim UI (LIFE panel, meters, fields) is CI-compile-gated only — owner verifies on the Pixel.
+- **Batch 4 — world-driven need dynamics (PR #266, merged, commit `9e86046`):** needs no longer decay flat —
+  the live `EnvContext` sets the pace. `LifeStats.decayNeeds(p, elapsed, env)` overload (2-arg delegates,
+  env=null → base rates, back-compat): heat ×1.6 / scorching ×2.2 hydration; cold ×1.3 / frigid ×1.5, night
+  (22:00–06:00) ×1.5, moving ×1.4 energy (stacking); moving also ×1.2 hunger, ×1.3 hygiene; **CHARGING →
+  energy REGENERATES +8/hr** (plugged in ≈ resting). `needDrivers(env)` → UI labels. +5 tests (34 total,
+  kotlinc green). Store keeps `lastEnv` (fed each tick) + decays through it in `currentLife()`, with a
+  charging-transition **re-anchor guard** so regen/decay isn't applied retroactively to a long gap; VM feeds
+  `refreshNeeds(env)` each tick; LIFE panel shows a "REAL-WORLD DRIVERS" readout. ⚠️ On-device-unverified.
+- **Life-sim customization set** (height/weight/age/real-money · hydration/hygiene/energy/nourishment · mood ·
+  name · world-driven decay). **Owner-steerable next:** real step-count → energy (step-counter sensor +
+  ACTIVITY_RECOGNITION), appearance/portrait, sleep-schedule-aware decay.
+  ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers) is CI-compile-gated only — owner verifies on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
