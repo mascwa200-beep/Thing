@@ -15,6 +15,7 @@ import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.ItemCodex
 import dev.mascwa.pulse.core.telemetry.LifeProfile
 import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.LootTable
@@ -297,6 +298,7 @@ class SpecialGameStore(
                     if (union.size != discovered.size) {
                         discovered = union
                         _discovered.value = union
+                        runAchievementCheck() // codex-milestone achievements measure the fresh discovery count
                         scheduleFlush()
                     }
                 }
@@ -312,6 +314,7 @@ class SpecialGameStore(
             perks = c.perks.size, distinctItems = c.inventory.size, caps = c.caps,
             appVisits = extVisits, distinctFeatures = extFeatures,
             distanceM = extDistanceM, placesVisited = extPlaces,
+            itemsDiscovered = ItemCodex.found(discovered),
         )
     }
 
