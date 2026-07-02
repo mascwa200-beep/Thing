@@ -422,11 +422,14 @@ class SpecialGameStore(
         }
     }
 
-    /** Buy one of [itemId] at a [kind] shop — faction reputation discounts the price + earns standing. */
-    fun buyAt(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) {
+    /**
+     * Buy one of [itemId] at a [kind] shop — faction reputation discounts the price, the day's world event
+     * [shopPct] bends it further, and the purchase earns standing.
+     */
+    fun buyAt(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind, shopPct: Int = 0) {
         scope.launch {
             ensureLoaded()
-            _character.value = SpecialGame.buyItemAt(_character.value, itemId, kind)
+            _character.value = SpecialGame.buyItemAt(_character.value, itemId, kind, shopPct)
             runAchievementCheck()
             scheduleFlush()
         }

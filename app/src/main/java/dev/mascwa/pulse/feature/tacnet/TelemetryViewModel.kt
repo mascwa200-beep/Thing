@@ -245,8 +245,9 @@ class TelemetryViewModel(
     /** Dismiss the one-shot scavenge-haul readout. */
     fun dismissScavenge() = game.dismissScavenge()
 
-    /** Buy an item from a [kind] shop — faction reputation discounts it + earns standing. */
-    fun buy(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) = game.buyAt(itemId, kind)
+    /** Buy an item from a [kind] shop — reputation + the day's world event bend the price; earns standing. */
+    fun buy(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) =
+        game.buyAt(itemId, kind, _worldEvent.value.shopPct)
     /** Talk to a [kind] NPC — resolves the conversation with the real-world context; a win earns rep. */
     fun talk(encounter: dev.mascwa.pulse.core.telemetry.Encounter, kind: dev.mascwa.pulse.core.telemetry.LocationKind) =
         game.resolveTalk(encounter, kind, _env.value)

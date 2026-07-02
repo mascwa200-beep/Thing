@@ -14,6 +14,8 @@ data class WorldEvent(
     val favored: Set<Special> = emptySet(),
     /** +/- percent to the caps a winning encounter pays this day (0 = no change). */
     val capsWinPct: Int = 0,
+    /** +/- percent to shop prices this day (negative = a discount; 0 = no change). */
+    val shopPct: Int = 0,
 )
 
 object WorldEvents {
@@ -28,8 +30,10 @@ object WorldEvents {
         WorldEvent("the_hunt", "The Hunt", "Predators are on the move. Strength and reflexes will be tested.",
             favored = setOf(Special.STRENGTH, Special.AGILITY)),
         WorldEvent("market_fair", "Market Fair",
-            "Traders and talkers fill the roads — a silver tongue wins the day.", favored = setOf(Special.CHARISMA)),
-        WorldEvent("gloom", "Gloom", "A grey, grinding day. Caps come slow and hard.", capsWinPct = -15),
+            "Traders and talkers fill the roads — wares go cheap and a silver tongue wins the day.",
+            favored = setOf(Special.CHARISMA), shopPct = -20),
+        WorldEvent("gloom", "Gloom", "A grey, grinding day. Caps come slow and traders gouge.",
+            capsWinPct = -15, shopPct = 15),
         WorldEvent("clear_skies", "Clear Skies", "A sharp, bright day — keen eyes and clear minds prosper.",
             favored = setOf(Special.PERCEPTION, Special.INTELLIGENCE)),
     )
