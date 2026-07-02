@@ -106,6 +106,13 @@ class LifeStatsTest {
         assertEquals(-1, LifeStats.statBonus(spent, Special.INTELLIGENCE))
     }
 
+    @Test fun lowNourishmentTaxesStrengthThenEndurance() {
+        assertEquals(-1, LifeStats.statBonus(LifeProfile(nourishment = 25), Special.STRENGTH))
+        val starving = LifeProfile(nourishment = 10)
+        assertEquals(-2, LifeStats.statBonus(starving, Special.STRENGTH))
+        assertEquals(-1, LifeStats.statBonus(starving, Special.ENDURANCE))
+    }
+
     @Test fun moodOnlyBendsAtExtremes() {
         // Neutral mood (default 50) → no effect.
         assertEquals(0, LifeStats.statBonus(LifeProfile(mood = 50), Special.CHARISMA))
@@ -141,10 +148,21 @@ class LifeStatsTest {
         assertEquals(p, LifeStats.decayNeeds(p, 0L))
     }
 
-    @Test fun drinkWashRestRestore() {
+    @Test fun drinkWashRestEatRestore() {
         assertEquals(100, LifeStats.drink(LifeProfile(hydration = 5)).hydration)
         assertEquals(100, LifeStats.wash(LifeProfile(hygiene = 5)).hygiene)
         assertEquals(100, LifeStats.rest(LifeProfile(energy = 5)).energy)
+        assertEquals(100, LifeStats.eat(LifeProfile(nourishment = 5)).nourishment)
+    }
+
+    @Test fun nourishmentDecaysToo() {
+        val p = LifeStats.decayNeeds(LifeProfile(nourishment = 100), elapsedMs = 10L * 3_600_000L)
+        assertEquals(65, p.nourishment) // 10h × 3.5/h
+    }
+
+    @Test fun withNameClampsLength() {
+        assertEquals("Six", LifeStats.withName(LifeProfile(), "Six").operatorName)
+        assertEquals(LifeStats.MAX_NAME, LifeStats.withName(LifeProfile(), "x".repeat(80)).operatorName.length)
     }
 
     @Test fun energyDecaysToo() {

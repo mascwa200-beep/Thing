@@ -31,8 +31,12 @@ data class LifeProfile(
     val hygiene: Int = 100,
     /** Energy/rest need, 0..100 — decays with real time, restored by [LifeStats.rest]. */
     val energy: Int = 100,
+    /** Nourishment/food need, 0..100 — decays with real time, restored by [LifeStats.eat]. */
+    val nourishment: Int = 100,
     /** Mood, 0..100 (50 = neutral) — user-set; high spirits buff CHARISMA/LUCK, low spirits sap them. */
     val mood: Int = 50,
+    /** Cosmetic operator name/callsign shown on the LIFE panel (no game effect). */
+    val operatorName: String = "",
 )
 
 /** A single life-driven modifier to a stat check: [delta] to [stat], with a short human [reason]. */
@@ -78,7 +82,11 @@ object LifeStats {
     const val HYDRATION_DECAY_PER_HR = 4.0
     const val HYGIENE_DECAY_PER_HR = 2.0
     const val ENERGY_DECAY_PER_HR = 3.0
+    const val NOURISHMENT_DECAY_PER_HR = 3.5
     private const val MS_PER_HOUR = 3_600_000.0
+
+    /** Max length of the cosmetic operator name. */
+    const val MAX_NAME = 24
 
     // Mood band edges (0..100, 50 = neutral) — only the extremes bend checks.
     const val MOOD_HIGH = 75
@@ -198,6 +206,12 @@ object LifeStats {
         } else if (p.energy <= NEED_LOW) {
             out += LifeEffect(Special.AGILITY, -1, "Weary")
         }
+        if (p.nourishment <= NEED_CRITICAL) {
+            out += LifeEffect(Special.STRENGTH, -2, "Starving")
+            out += LifeEffect(Special.ENDURANCE, -1, "Running on empty")
+        } else if (p.nourishment <= NEED_LOW) {
+            out += LifeEffect(Special.STRENGTH, -1, "Hungry")
+        }
 
         // Mood only tips the scales at the extremes.
         if (p.mood >= MOOD_HIGH) {
@@ -231,7 +245,8 @@ object LifeStats {
         val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
         val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
         val en = (p.energy - (hrs * ENERGY_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
-        return p.copy(hydration = hyd, hygiene = hyg, energy = en)
+        val nour = (p.nourishment - (hrs * NOURISHMENT_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
+        return p.copy(hydration = hyd, hygiene = hyg, energy = en, nourishment = nour)
     }
 
     /** Top up hydration (a drink). */
@@ -243,10 +258,14 @@ object LifeStats {
     /** Rest up — restore energy. */
     fun rest(p: LifeProfile): LifeProfile = p.copy(energy = 100)
 
+    /** Eat — restore nourishment. */
+    fun eat(p: LifeProfile): LifeProfile = p.copy(nourishment = 100)
+
     // --- Clamped setters (0 / blank clears an unset field) ---
     fun withHeight(p: LifeProfile, cm: Int): LifeProfile = p.copy(heightCm = cm.coerceIn(0, MAX_HEIGHT_CM))
     fun withWeight(p: LifeProfile, kg: Int): LifeProfile = p.copy(weightKg = kg.coerceIn(0, MAX_WEIGHT_KG))
     fun withAge(p: LifeProfile, years: Int): LifeProfile = p.copy(ageYears = years.coerceIn(0, MAX_AGE))
     fun withMoney(p: LifeProfile, amount: Double): LifeProfile = p.copy(realMoney = amount.coerceAtLeast(0.0))
     fun withMood(p: LifeProfile, mood: Int): LifeProfile = p.copy(mood = mood.coerceIn(0, 100))
+    fun withName(p: LifeProfile, name: String): LifeProfile = p.copy(operatorName = name.take(MAX_NAME))
 }
