@@ -1080,8 +1080,17 @@ Built as 3 CI-green slices; the game now reads your real self.
   green). Store persists energy (anchored-decay) + mood (both defaulted → old saves neutral; `reset()` clears);
   VM `rest()`/`setMood()`; LIFE panel gained an Energy gauge, a **REST** button (row now DRINK·WASH·REST) and
   a Mood field. ⚠️ On-device-unverified (CI compile-gates only).
-- **Open / steerable (owner's "etc, etc"):** more life inputs — operator name/callsign, diet/"well-fed",
-  real-world step count → game energy, appearance — each a clean new slice.
+- **Batch 3 — NOURISHMENT + operator NAME (PR #265, merged, commit `44e1798`):** `LifeStats` grew a fourth
+  need **NOURISHMENT** (0..100, decays ~3.5/hr, restored by `eat()`; hungry saps STRENGTH, starving saps
+  STR+END) — with hydration + energy this is the **Fallout-Survival trio thirst · hunger · sleep** (+ hygiene)
+  — plus a cosmetic `operatorName` (≤24 ch, no game effect, `withName`). +3 tests (29 total, kotlinc green).
+  Store persists nourishment (anchored-decay) + operatorName (defaulted → old saves neutral; `reset()` clears);
+  VM `eat()`/`setName()`; LIFE panel gained a Name text field (new `LifeTextField`, commit-on-focus-loss), a
+  Nourishment gauge, and an EAT button (needs row now DRINK · EAT · REST · WASH). ⚠️ On-device-unverified.
+- **Life-sim customization set is now comprehensive** (height/weight/age/real-money · hydration/hygiene/energy/
+  nourishment · mood · name). **Owner-steerable next (not built unprompted):** real step-count → energy (needs
+  the step-counter sensor + ACTIVITY_RECOGNITION), appearance/portrait, sleep-schedule-aware energy decay.
+  ⚠️ The whole life-sim UI (LIFE panel, meters, fields) is CI-compile-gated only — owner verifies on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
