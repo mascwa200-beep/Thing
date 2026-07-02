@@ -110,6 +110,11 @@ class SpecialGameStore(
         val mood: Int = 50,
         val operatorName: String = "",
         val needsAnchorMs: Long = 0L,
+        // Today's real steps + the daily baseline (cumulative step-counter reading at the day's start;
+        // reboot-safe). All defaulted → old saves load with no step data.
+        val stepsToday: Int = 0,
+        val stepDay: Long = -1L,
+        val stepBaseline: Long = -1L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -149,6 +154,10 @@ class SpecialGameStore(
     // The most recent real-world context (weather/time/motion/charging) the ViewModel fed in — drives how
     // fast the needs decay (and lets charging regenerate energy). Null = plain base rates.
     private var lastEnv: EnvContext? = null
+    // Step-counter daily baseline: the cumulative reading at the start of [stepDay] (epoch-day). Today's
+    // steps = latest cumulative − baseline (reboot-safe: a lower reading re-baselines).
+    private var stepDay = -1L
+    private var stepBaseline = -1L
 
     private val _started = MutableStateFlow(0L)
     /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
@@ -236,8 +245,10 @@ class SpecialGameStore(
                     hydration = stored.hydrationBase.coerceIn(0, 100), hygiene = stored.hygieneBase.coerceIn(0, 100),
                     energy = stored.energyBase.coerceIn(0, 100), nourishment = stored.nourishmentBase.coerceIn(0, 100),
                     mood = stored.mood.coerceIn(0, 100), operatorName = stored.operatorName.take(LifeStats.MAX_NAME),
+                    stepsToday = stored.stepsToday.coerceAtLeast(0),
                 )
                 needsAnchorMs = stored.needsAnchorMs
+                stepDay = stored.stepDay; stepBaseline = stored.stepBaseline
             }
             // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
             if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
@@ -538,6 +549,7 @@ class SpecialGameStore(
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
             startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
+            stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -607,6 +619,28 @@ class SpecialGameStore(
     fun setMood(mood: Int) = mutateLife { LifeStats.withMood(it, mood) }
     fun setName(name: String) = mutateLife { LifeStats.withName(it, name) }
 
+    /**
+     * Feed the cumulative step-counter reading (steps since boot). Maintains a per-day baseline so today's
+     * steps = latest − baseline; a lower reading (device reboot) or a new local day re-baselines. Updates
+     * the profile's `stepsToday` (no need re-anchor — steps aren't a decaying need). Aggregate + on-device.
+     */
+    fun setStepCounter(raw: Long) {
+        scope.launch {
+            ensureLoaded()
+            val today = currentDay()
+            if (stepDay != today || stepBaseline < 0 || raw < stepBaseline) {
+                stepDay = today
+                stepBaseline = raw
+            }
+            val steps = (raw - stepBaseline).coerceAtLeast(0).toInt()
+            if (steps != lifeBase.stepsToday) {
+                lifeBase = lifeBase.copy(stepsToday = steps)
+                _life.value = currentLife()
+                scheduleFlush()
+            }
+        }
+    }
+
     /** Top up hydration (a drink). */
     fun drink() = mutateLife { LifeStats.drink(it) }
     /** Freshen up (a wash). */
@@ -637,6 +671,7 @@ class SpecialGameStore(
             hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene,
             energyBase = lifeBase.energy, nourishmentBase = lifeBase.nourishment,
             mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
+            stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }

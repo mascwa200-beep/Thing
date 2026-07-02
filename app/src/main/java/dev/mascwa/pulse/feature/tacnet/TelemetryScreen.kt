@@ -151,6 +151,18 @@ private fun GameSensors(vm: TelemetryViewModel) {
             runCatching { requestCamera.launch(android.Manifest.permission.CAMERA) }
         }
     }
+    // Real steps → the activity buff. ACTIVITY_RECOGNITION is a runtime permission on API 29+; once granted,
+    // vm.start() re-registers so the step counter starts feeding today's total.
+    val requestActivity = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.start()
+    }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 29 &&
+            context.checkSelfPermission("android.permission.ACTIVITY_RECOGNITION") != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            runCatching { requestActivity.launch("android.permission.ACTIVITY_RECOGNITION") }
+        }
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -483,6 +495,10 @@ private fun LifePanel(
             }
             Text(bits.joinToString("  ·  ").uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
                 fontSize = 10.sp, color = c.amber, letterSpacing = 1.sp)
+
+            // Real steps walked today (device step counter) → the activity buff. Bar targets the 10k goal.
+            FalloutGauge("Steps today", "${life.stepsToday} / ${LifeStats.STRIDE_STEPS}",
+                life.stepsToday.toFloat() / LifeStats.STRIDE_STEPS, c.positive)
 
             // Needs meters + top-up actions.
             FalloutGauge("Hydration", "${life.hydration}%", life.hydration / 100f, c.sky)
