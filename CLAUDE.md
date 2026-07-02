@@ -983,7 +983,35 @@ serializable → backward-compatible); `TelemetryViewModel.start()` now gates `s
 `cameraSampler.start()` on `settings.current().ambientSensing` (samplers stay individually no-op without
 their permissions too). Settings → **Security & network → "Ambient sensing (game)"** toggle. Takes effect on
 the next game-screen open (navigating to Settings pauses the game → stops the samplers → returning re-reads
-the setting). ⚠️ On-device-unverified (CI compile-gates only).
+the setting). ⚠️ On-device-unverified (CI compile-gates only). **(#260 merged.)**
+
+### TOOLS visual unification — sibling tabs to the STATS Pip-Boy look (PR #261)
+Owner sent a screenshot of the STATS/PIP-BOY page and asked to make the sibling TOOLS tabs match it
+**pixel-for-pixel** (via AskUserQuestion → "unify the other TOOLS tabs"). Drove it from a full design-system
+conformance audit (subagent) of all 9 TOOLS screens vs the canonical kit in `feature/common/PipUi.kt`
+(`PipFrame` flat corner-bracket box, `PipHeader` ■+rule section header, `PipDataRow`, `PipSelectRow`,
+`PipStatTile`) + the STATS reference `TelemetryScreen`. **Corrected a mis-flag:** the top-strip `LVL 888` is
+INTENTIONAL (device readout: HP=battery, AP=free-mem, **LVL=build** in `PipBoyScreen.kt`), and the
+OperatorPortrait already uses `character.level` — the screenshot's "LEVEL 888" was an older build, not a bug.
+- **New `PipUi.PipChip`** — THE canonical flat rectangular pick-one chip (solid green when selected / hairline
+  outline otherwise), replacing the cut-cornered `NeonChip` in feed rails.
+- **1/3 (feed screens):** SEARCH (engine picker → PipChip; now fully conforming), SOCIAL (tab rail + tag
+  chips → PipChip; item titles → ChakraPetch), PLACES (category rail → PipChip; name/address/source/permission
+  → Pip fonts; Material "Grant location" `TextButton` → flat Pip button).
+- **2/3 (SURVIVE sub-screens):** OfflineSurvival (Material `Surface`→`Box`; rounded `HubTile`→flat
+  `PipHubTile`; `TextButton`→Pip button), Guides (title/summary + detail body → Pip fonts; detail headings →
+  `PipHeader`+`PipFrame`), Tools + SOS + Safety (typography → Pip fonts; SOS/Safety Material buttons → Pip;
+  SOS ActionRow rounded icon-chip flattened). **SurviveHub was already conforming.**
+- **3/3 (shared states, app-wide):** `LoadingState`/`ErrorState`/`EmptyState`/`StaleBanner`
+  (`feature/common/Components.kt`) were the last pure-Material surfaces (colorScheme/typography + Material
+  `Button`/`Surface`); rewrote them to read `Pulse.colors` + ChakraPetch/JetBrainsMono + flat + a Pip retry
+  button. **Signatures unchanged → all ~13 call sites untouched** (markets/weather/news/economy/sky/home +
+  TOOLS) — they now render terminal-styled in each screen's own palette (green under TOOLS, app accent
+  elsewhere). `SectionHeader` (a general Material header, distinct from `PipHeader`) left as-is.
+- Build has **no `allWarningsAsErrors`**, so leftover unused `MaterialTheme` imports are harmless. Whole-refactor
+  subagent compile-review came back clean (10 files). ⚠️ Render-blind (CI compile-gates only) — owner is the
+  pixel-fidelity judge on the Pixel; the exact `PipChip`/`PipHubTile`/font-size values are easy to tune from a
+  screenshot. **The app-wide 3/3 shared-states change is beyond the literal "unify TOOLS" ask — owner can veto.**
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

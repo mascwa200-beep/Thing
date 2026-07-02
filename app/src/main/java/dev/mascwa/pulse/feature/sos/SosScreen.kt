@@ -86,7 +86,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
                 Text(
                     if (state.active) "Strobe + alarm active. Tap to stop."
                     else "Tap SOS to flash the light in morse and sound a loud alarm.",
-                    style = MaterialTheme.typography.bodyMedium, color = c.ink2,
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
                     textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -128,7 +128,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
                 PipFrame(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Your coordinates", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-                        Text(coords, style = MaterialTheme.typography.bodyMedium, color = c.ink)
+                        Text(coords, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
                     }
                 }
             }
@@ -140,7 +140,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
                 PipFrame(Modifier.fillMaxWidth()) {
                     if (card.isEmpty) {
                         Text("Add your medical info & contacts in Settings ▸ Safety.",
-                            style = MaterialTheme.typography.bodyMedium, color = c.muted)
+                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                     } else Column {
                         if (card.fullName.isNotBlank()) CardRow("Name", card.fullName)
                         if (card.bloodType.isNotBlank()) CardRow("Blood type", card.bloodType)
@@ -157,7 +157,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
                     val ct = state.contacts[i]
                     PipFrame(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(ct.name, style = MaterialTheme.typography.bodyLarge, color = c.ink)
+                            Text(ct.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                             Text(ct.phone, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
                         }
                     }
@@ -173,13 +173,13 @@ private fun ActionRow(title: String, subtitle: String, icon: androidx.compose.ui
     val c = Pulse.colors
     PipFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = accent) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.14f)),
+            Box(Modifier.size(40.dp).background(accent.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
             }
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = c.ink)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.muted)
+                Text(title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink)
+                Text(subtitle, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
             }
         }
     }
@@ -190,6 +190,6 @@ private fun CardRow(label: String, value: String) {
     val c = Pulse.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = c.ink, textAlign = TextAlign.End)
+        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink, textAlign = TextAlign.End)
     }
 }

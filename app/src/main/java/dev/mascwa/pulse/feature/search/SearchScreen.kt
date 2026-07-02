@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
-import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.PipChip
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -92,7 +92,7 @@ fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
             PipHeader("Engine")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SearchEngine.entries.forEach { e ->
-                    NeonChip(e.label, selected = e == engine, onClick = { vm.setEngine(e) },
+                    PipChip(e.label, selected = e == engine, onClick = { vm.setEngine(e) },
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
             }

@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
@@ -60,9 +62,9 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null) {
                     PipFrame(Modifier.fillMaxWidth().clickable { selected = g }) {
                         Column {
                             Text(g.category.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
-                            Text(g.title, style = MaterialTheme.typography.titleMedium, color = c.ink,
-                                modifier = Modifier.padding(top = 2.dp))
-                            Text(g.summary, style = MaterialTheme.typography.bodyMedium, color = c.muted,
+                            Text(g.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                                color = c.ink, modifier = Modifier.padding(top = 2.dp))
+                            Text(g.summary, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                                 modifier = Modifier.padding(top = 2.dp))
                         }
                     }
@@ -76,10 +78,10 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null) {
             ) {
                 items(sel.sections, key = { it.heading }) { section ->
                     Column {
-                        Text(section.heading, style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold, color = c.accent)
-                        Text(section.body, style = MaterialTheme.typography.bodyMedium, color = c.ink2,
-                            modifier = Modifier.padding(top = 4.dp))
+                        PipHeader(section.heading)
+                        PipFrame(Modifier.fillMaxWidth()) {
+                            Text(section.body, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                        }
                     }
                 }
             }

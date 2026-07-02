@@ -32,11 +32,12 @@ import dev.mascwa.pulse.data.social.SocialItem
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.PipChip
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PipHeader
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
@@ -59,7 +60,7 @@ fun SocialScreen(vm: SocialViewModel, onBack: (() -> Unit)? = null) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SocialTab.entries.forEach { t ->
-                    NeonChip(t.label, selected = t == tab, onClick = { vm.select(t) })
+                    PipChip(t.label, selected = t == tab, onClick = { vm.select(t) })
                 }
             }
             PullToRefreshBox(isRefreshing = false, onRefresh = { vm.refresh() }) {
@@ -114,7 +115,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
                     item {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             data.tags.forEach { tag ->
-                                NeonChip("#${tag.name}", selected = false, onClick = { openUrl(context, tag.url) },
+                                PipChip("#${tag.name}", selected = false, onClick = { openUrl(context, tag.url) },
                                     modifier = Modifier.padding(bottom = 8.dp))
                             }
                         }
@@ -132,8 +133,7 @@ private fun ItemRow(item: SocialItem, onClick: () -> Unit) {
     val c = Pulse.colors
     PipFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
         Column {
-            Text(item.title, style = MaterialTheme.typography.bodyLarge, color = c.ink,
-                fontWeight = FontWeight.Medium)
+            Text(item.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
             Text("${item.source} · ${item.meta}", fontFamily = JetBrainsMono, fontSize = 10.sp,
                 color = c.accent, modifier = Modifier.padding(top = 4.dp))
         }
