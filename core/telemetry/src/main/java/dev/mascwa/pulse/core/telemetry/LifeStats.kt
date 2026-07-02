@@ -257,6 +257,22 @@ object LifeStats {
     /** Net life modifier to a check gated by [s] (sum of matching [effects]). */
     fun statBonus(p: LifeProfile, s: Special): Int = effects(p).filter { it.stat == s }.sumOf { it.delta }
 
+    /**
+     * The attributes the current real hour-of-day leans into — used to BIAS which encounters appear (not to
+     * change check maths), so what you face tracks your actual day: mornings reward a sharp, planning head;
+     * the working midday is physical; evenings are social; the small hours belong to stealth and chance.
+     * Distinct from the darkness/energy effects elsewhere (those bend checks; this only shapes content).
+     */
+    fun circadianFavored(hourOfDay: Int): Set<Special> {
+        val h = ((hourOfDay % 24) + 24) % 24
+        return when (h) {
+            in 5..10 -> setOf(Special.PERCEPTION, Special.INTELLIGENCE) // morning — fresh, planning
+            in 11..16 -> setOf(Special.STRENGTH, Special.ENDURANCE)     // midday — the working, physical hours
+            in 17..21 -> setOf(Special.CHARISMA)                        // evening — social hours
+            else -> setOf(Special.AGILITY, Special.LUCK)                // night (22–04) — stealth & risk
+        }
+    }
+
     /** The caps-reward boost the wealth tier grants (a % applied to positive caps rewards). */
     fun capsBonusPct(p: LifeProfile): Int = moneyTier(p).capsBonusPct
 
