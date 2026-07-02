@@ -79,4 +79,17 @@ class AchievementsTest {
         assertTrue(Achievements.isUnlocked(Achievements.byId("trailblazer")!!, m))
         assertTrue(Achievements.isUnlocked(Achievements.byId("tourist")!!, m))
     }
+
+    @Test fun codexDiscoveryMilestonesProjectAndClear() {
+        assertEquals(0, GameMetrics().value(AchMetric.ITEMS_DISCOVERED))
+        assertEquals(15, GameMetrics(itemsDiscovered = 15).value(AchMetric.ITEMS_DISCOVERED))
+        val ten = Achievements.byId("codex_10")!!
+        assertFalse(Achievements.isUnlocked(ten, GameMetrics(itemsDiscovered = 9)))
+        assertTrue(Achievements.isUnlocked(ten, GameMetrics(itemsDiscovered = 10)))
+        // "Archivist" clears exactly at a full catalog and its threshold tracks the catalog size.
+        val all = Achievements.byId("codex_all")!!
+        assertEquals(Items.ALL.size, all.threshold)
+        assertFalse(Achievements.isUnlocked(all, GameMetrics(itemsDiscovered = Items.ALL.size - 1)))
+        assertTrue(Achievements.isUnlocked(all, GameMetrics(itemsDiscovered = Items.ALL.size)))
+    }
 }

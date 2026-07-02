@@ -10,6 +10,7 @@ package dev.mascwa.pulse.core.telemetry
 enum class AchMetric {
     LEVEL, WINS, CRITS, VENTURES, PERKS, DISTINCT_ITEMS, CAPS,
     APP_VISITS, DISTINCT_FEATURES, DISTANCE_M, PLACES_VISITED,
+    ITEMS_DISCOVERED,
 }
 
 /** One achievement: watch [metric], clear at [threshold], pay out XP/caps/an item. */
@@ -41,6 +42,7 @@ data class GameMetrics(
     val distinctFeatures: Int = 0,
     val distanceM: Int = 0,
     val placesVisited: Int = 0,
+    val itemsDiscovered: Int = 0,
 ) {
     fun value(m: AchMetric): Int = when (m) {
         AchMetric.LEVEL -> level
@@ -54,6 +56,7 @@ data class GameMetrics(
         AchMetric.DISTINCT_FEATURES -> distinctFeatures
         AchMetric.DISTANCE_M -> distanceM
         AchMetric.PLACES_VISITED -> placesVisited
+        AchMetric.ITEMS_DISCOVERED -> itemsDiscovered
     }
 }
 
@@ -74,6 +77,10 @@ object Achievements {
         // --- Economy / loot ---
         Achievement("collector", "Collector", "Carry 10 different item types.", AchMetric.DISTINCT_ITEMS, 10, rewardCaps = 50),
         Achievement("caps_baron", "Caps Baron", "Bank 500 caps.", AchMetric.CAPS, 500, rewardXp = 100),
+        // --- Codex / discovery (the completion loop: scavenge → discover → reward) ---
+        Achievement("codex_10", "Rag And Bone", "Discover 10 different items.", AchMetric.ITEMS_DISCOVERED, 10, rewardXp = 30),
+        Achievement("codex_20", "Curator", "Discover 20 different items.", AchMetric.ITEMS_DISCOVERED, 20, rewardCaps = 60, rewardItemId = "grit_ration"),
+        Achievement("codex_all", "Archivist", "Discover every item in the catalog.", AchMetric.ITEMS_DISCOVERED, Items.ALL.size, rewardCaps = 200, rewardItemId = "fortune_idol", rewardXp = 100),
         // --- App usage (the grind bleeds into using Pulse) ---
         Achievement("online", "Operator Online", "Open 25 screens across Pulse.", AchMetric.APP_VISITS, 25, rewardXp = 20),
         Achievement("power_user", "Power User", "Open 200 screens across Pulse.", AchMetric.APP_VISITS, 200, rewardCaps = 60, rewardItemId = "data_slate"),
