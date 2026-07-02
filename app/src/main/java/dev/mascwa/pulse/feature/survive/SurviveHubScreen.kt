@@ -36,27 +36,34 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
 fun SurviveHubScreen(onOpenRoute: (String) -> Unit, onBack: (() -> Unit)? = null) {
-    val c = Pulse.colors
     PulseScaffold(
         title = "Survive",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { PipHubTile("SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, c.magenta) { onOpenRoute(Routes.SOS) } }
-            item { PipHubTile("Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, c.accent) { onOpenRoute(Routes.PLACES) } }
-            item { PipHubTile("Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, c.amber) { onOpenRoute(Routes.SAFETY) } }
-            item { PipHubTile("Map", "Incidents & help on the live nav map", Icons.Filled.Map, c.accent) { onOpenRoute(Routes.NAV) } }
-            item { PipHubTile("Survival Guides", "First aid, water, fire, signalling · offline", Icons.AutoMirrored.Filled.MenuBook, c.positive) { onOpenRoute(Routes.SURVIVAL) } }
-            item { PipHubTile("Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, c.positive) { onOpenRoute(Routes.TOOLS) } }
-        }
+        SurviveBody(onOpenRoute, Modifier.padding(innerPadding))
+    }
+}
+
+/** The scaffold-free SURVIVE hub grid — hosted standalone in [SurviveHubScreen] and as the SURVIVE
+ *  sub-tab inside the PIP-BOY STATS page. Each tile deep-links to its survival tool. */
+@Composable
+fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { PipHubTile("SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, c.magenta) { onOpenRoute(Routes.SOS) } }
+        item { PipHubTile("Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, c.accent) { onOpenRoute(Routes.PLACES) } }
+        item { PipHubTile("Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, c.amber) { onOpenRoute(Routes.SAFETY) } }
+        item { PipHubTile("Map", "Incidents & help on the live nav map", Icons.Filled.Map, c.accent) { onOpenRoute(Routes.NAV) } }
+        item { PipHubTile("Survival Guides", "First aid, water, fire, signalling · offline", Icons.AutoMirrored.Filled.MenuBook, c.positive) { onOpenRoute(Routes.SURVIVAL) } }
+        item { PipHubTile("Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, c.positive) { onOpenRoute(Routes.TOOLS) } }
     }
 }
 

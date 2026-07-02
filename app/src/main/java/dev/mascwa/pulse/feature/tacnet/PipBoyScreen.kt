@@ -54,7 +54,8 @@ import kotlin.math.roundToInt
 /**
  * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy device, organised under the
  * three canonical Pip-Boy sections selected from the global bottom nav (STATS / ITEMS / DATA):
- *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.).
+ *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.), plus the folded-in SURVIVE hub,
+ *             SOCIAL feed and web SEARCH sub-tabs.
  *  - ITEMS  → the collected-inventory view (favourite stations, notes, tracked objectives).
  *  - DATA   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), QUESTS
  *             (objectives log), NOTES (library), RADIO and MUSIC.
@@ -65,6 +66,9 @@ private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"
 
 private enum class PipTab(val label: String, val section: PipSection) {
     STATUS("STATUS", PipSection.STATS),
+    SURVIVE("SURVIVE", PipSection.STATS),
+    SOCIAL("SOCIAL", PipSection.STATS),
+    SEARCH("SEARCH", PipSection.STATS),
     ITEMS("ITEMS", PipSection.ITEMS),
     MAP("MAP", PipSection.DATA),
     RADAR("RADAR", PipSection.DATA),
@@ -95,6 +99,9 @@ fun PipBoyScreen(
     objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel,
     navVm: dev.mascwa.pulse.feature.nav.NavViewModel,
     spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel,
+    socialVm: dev.mascwa.pulse.feature.social.SocialViewModel,
+    searchVm: dev.mascwa.pulse.feature.search.SearchViewModel,
+    onOpenRoute: (String) -> Unit = {},
     onBack: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
 ) {
@@ -113,6 +120,9 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
+                    PipTab.SURVIVE -> Unit // the survive hub is a static tile grid
+                    PipTab.SOCIAL -> socialVm.refresh()
+                    PipTab.SEARCH -> Unit // search has no feed to pull
                     PipTab.ITEMS -> objectivesVm.refresh() // refresh tracked objectives in the inventory
                     PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
@@ -139,6 +149,9 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
+                        PipTab.SURVIVE -> dev.mascwa.pulse.feature.survive.SurviveBody(onOpenRoute, Modifier.fillMaxSize())
+                        PipTab.SOCIAL -> dev.mascwa.pulse.feature.social.SocialBody(socialVm, Modifier.fillMaxSize())
+                        PipTab.SEARCH -> dev.mascwa.pulse.feature.search.SearchBody(searchVm, Modifier.fillMaxSize())
                         PipTab.ITEMS -> ItemsBody(tasksVm, notesVm, objectivesVm)
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())

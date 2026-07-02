@@ -76,6 +76,9 @@ fun PipBoyHeader(
  */
 @Composable
 fun FeedTabBar(state: FeedTabState) {
+    // With a single feed (PIP-BOY, which carries its own STATS/ITEMS/DATA nav), a one-chip tab row is
+    // redundant chrome — skip it. The header + palette machinery still runs for any feed route.
+    if (FEED_TABS.size <= 1) return
     Column(Modifier.fillMaxWidth().background(PipBg)) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),
