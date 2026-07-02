@@ -1415,6 +1415,19 @@ new cadence + rotation on the Pixel once the build lands (must install the updat
 - Optional emulator-generated baseline profile (vs the hand-authored starter).
 - Text/PDF are handled; other binary file types decline honestly.
 
+### AR wasteland + LARP batch (owner-driven, in progress)
+- **AR wasteland — slice 1 (PR #285, merged):** owner scrapped a creature-catching idea; building an AR
+  camera mode that projects the nearby `WorldSite`s through the live camera (Minecraft-Earth style, a
+  compass "magic window" — **no ARCore**, unreliable on GrapheneOS). `core:telemetry/ArProjection.kt` (+
+  `ArProjectionTest` 4 cases): `relativeBearing` (signed, wraps 359°→1°), `inView` (within FOV), `screenX`
+  (bearing→0..1 horizontal fraction, 0.5 = ahead), `sizeForDistance` (depth cue). **AR camera screen (slice
+  2) DEFERRED to after the LARP batch** — CameraX Preview (add `camera-view` dep) + `CompassController`
+  heading + GPS + sites projected via `ArProjection` + reticle/tint, `Routes.AR` + entry on the wasteland map.
+- **LARP batch accepted (owner: "I am essentially making this a giant larp"):** L1 reset-progress (keep
+  personal info) → L2 XP only from real-place actions → L3 track/untrack sites for NAV → L4 more real-life →
+  S.P.E.C.I.A.L. inputs (well-read→INT, social→CHA, fitness→STR/END) → L5 Legend/reputation-tale system
+  (curate an archetype OR emergent from deeds; affects town attitude/shops/perks/stats). Each a CI-green slice.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

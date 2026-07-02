@@ -399,13 +399,9 @@ class SpecialGameStore(
     fun setUsageMetrics(appVisits: Int, distinctFeatures: Int) {
         scope.launch {
             ensureLoaded()
-            if (lastXpVisits < 0) {
-                lastXpVisits = appVisits // baseline — don't grant XP for usage before the game was tracking it
-            } else if (appVisits > lastXpVisits) {
-                val gained = (appVisits - lastXpVisits) * XP_PER_VISIT
-                lastXpVisits = appVisits
-                if (gained > 0) _character.value = SpecialGame.gainXp(_character.value, gained)
-            }
+            // NO MORE COUCH XP — opening app screens no longer levels the operative. XP is earned ONLY by
+            // doing things at real wasteland sites (site-gated encounters/scavenge/talks + quest rewards).
+            // We still track the raw counts so the (one-time milestone) usage achievements can still clear.
             extVisits = appVisits
             extFeatures = distinctFeatures
             runAchievementCheck()
@@ -643,6 +639,30 @@ class SpecialGameStore(
         }
     }
 
+    /**
+     * Reset the GAME — stats, level, XP, caps, inventory, perks, companion, faction rep, achievements, daily
+     * objectives, scavenge state and the item codex — to a fresh operative, but KEEP the real-life profile
+     * (height/weight/age/money, hydration/hygiene/energy/nourishment, mood, name, steps) and the story clock.
+     * For restarting the wasteland run without re-entering your real self. (Contrast [reset], which also
+     * wipes the profile.)
+     */
+    fun resetProgress() {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.newCharacter()
+            _resolution.value = null
+            wins = 0; crits = 0; ventures = 0
+            unlocked = emptySet(); _unlocked.value = emptySet(); _lastUnlock.value = null
+            lastXpVisits = -1 // re-baseline app-usage XP against the fresh counters
+            dailyDay = -1L; claimed = emptySet() // re-baseline today's objectives
+            lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
+            discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
+            // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
     /** Grant a completed quest's reward — caps + XP (with any level-ups) — into the character. */
     fun awardQuest(caps: Int, xp: Int) {
         scope.launch {
@@ -772,7 +792,6 @@ class SpecialGameStore(
 
     companion object {
         const val FLUSH_DELAY_MS = 1_000L
-        const val XP_PER_VISIT = 3 // XP granted per new app-screen visit (using Pulse levels your operative)
         /** Real-time cooldown between scavenges (ms) — stops loot-farming; the UI shows the countdown. */
         const val SCAVENGE_COOLDOWN_MS = 3 * 60_000L // 3 minutes
     }

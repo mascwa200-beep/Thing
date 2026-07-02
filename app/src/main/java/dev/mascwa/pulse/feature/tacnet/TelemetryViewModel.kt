@@ -305,8 +305,10 @@ class TelemetryViewModel(
     fun dismissCompanion() = game.dismissCompanion()
     /** Get back up after being downed. */
     fun revive() = game.revive()
-    /** Start the game over with a fresh operative. */
+    /** Start the game over with a fresh operative (also wipes the real-life profile). */
     fun resetGame() { game.reset(); questStore.clear() }
+    /** Reset the wasteland RUN — stats/level/XP/caps/inventory/achievements/quests — but KEEP your profile. */
+    fun resetProgress() { game.resetProgress(); questStore.clear() }
 
     // --- Real-life profile (LifeStats): body metrics + real money + hydration/hygiene, on-device only ---
     /** The operator's real-life profile with hydration/hygiene decayed to now. */
