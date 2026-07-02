@@ -399,13 +399,9 @@ class SpecialGameStore(
     fun setUsageMetrics(appVisits: Int, distinctFeatures: Int) {
         scope.launch {
             ensureLoaded()
-            if (lastXpVisits < 0) {
-                lastXpVisits = appVisits // baseline — don't grant XP for usage before the game was tracking it
-            } else if (appVisits > lastXpVisits) {
-                val gained = (appVisits - lastXpVisits) * XP_PER_VISIT
-                lastXpVisits = appVisits
-                if (gained > 0) _character.value = SpecialGame.gainXp(_character.value, gained)
-            }
+            // NO MORE COUCH XP — opening app screens no longer levels the operative. XP is earned ONLY by
+            // doing things at real wasteland sites (site-gated encounters/scavenge/talks + quest rewards).
+            // We still track the raw counts so the (one-time milestone) usage achievements can still clear.
             extVisits = appVisits
             extFeatures = distinctFeatures
             runAchievementCheck()
@@ -796,7 +792,6 @@ class SpecialGameStore(
 
     companion object {
         const val FLUSH_DELAY_MS = 1_000L
-        const val XP_PER_VISIT = 3 // XP granted per new app-screen visit (using Pulse levels your operative)
         /** Real-time cooldown between scavenges (ms) — stops loot-farming; the UI shows the countdown. */
         const val SCAVENGE_COOLDOWN_MS = 3 * 60_000L // 3 minutes
     }
