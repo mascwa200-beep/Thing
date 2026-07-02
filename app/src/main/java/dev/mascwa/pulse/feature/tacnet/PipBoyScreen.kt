@@ -263,7 +263,7 @@ private fun StatReadout(label: String, value: String) {
 private fun PipTopNav(t: Telemetry, section: PipSection, onSection: (PipSection) -> Unit) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
     val freeMem = freeMemPercent(t)
-    Column(Modifier.fillMaxWidth().background(Pip.bg).padding(horizontal = 16.dp, top = 8.dp)) {
+    Column(Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
             StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
