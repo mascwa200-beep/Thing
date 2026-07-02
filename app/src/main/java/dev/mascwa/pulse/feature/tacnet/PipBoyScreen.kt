@@ -161,7 +161,7 @@ fun PipBoyScreen(
                         PipTab.SEARCH -> dev.mascwa.pulse.feature.search.SearchBody(searchVm, Modifier.fillMaxSize())
                         PipTab.GEAR -> ItemsGameBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.STORED -> ItemsBody(tasksVm, notesVm, objectivesVm)
-                        PipTab.WASTELAND -> WastelandDataBody(telemetryVm, Modifier.fillMaxSize())
+                        PipTab.WASTELAND -> WastelandDataBody(telemetryVm, onOpenRoute, Modifier.fillMaxSize())
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
