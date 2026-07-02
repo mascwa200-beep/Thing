@@ -225,6 +225,8 @@ class TelemetryViewModel(
         val loc = _gps.value ?: return
         gameWorld.refresh(loc.latitude, loc.longitude)
     }
+    /** Every item id ever acquired — for the ITEMS ▸ codex completion tracker. */
+    val discovered: StateFlow<Set<String>> = game.discoveredFlow
     /** The most recent scavenge haul (id → count), for a one-shot readout; null when dismissed. */
     val lastScavenge: StateFlow<Map<String, Int>?> = game.lastScavengeFlow
     private val _scavengeCooldown = MutableStateFlow(0L)

@@ -96,6 +96,7 @@ import dev.mascwa.pulse.data.game.DailyState
 import dev.mascwa.pulse.data.game.TravelStats
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.Item
+import dev.mascwa.pulse.core.telemetry.ItemCodex
 import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.LifeProfile
@@ -391,6 +392,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
 fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     GameSensors(vm)
     val character by vm.character.collectAsStateWithLifecycle()
+    val discovered by vm.discovered.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -410,6 +412,9 @@ fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         PipHeader("Reputation")
         ReputationPanel(character, c)
+        Spacer(Modifier.height(8.dp))
+        PipHeader("Codex")
+        CodexPanel(discovered, c)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -1043,6 +1048,54 @@ private fun LoadoutPanel(ch: Character, c: NightwirePalette) {
             if (kindCounts.isNotEmpty()) {
                 Text(kindCounts.joinToString("   ") { (k, n) -> "${k.name} $n" },
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            }
+        }
+    }
+}
+
+/**
+ * The item CODEX — a completionist tracker: how much of the catalog you've ever acquired (discovery is
+ * monotonic, so using/selling never un-discovers), a flavour rank, a per-kind breakdown, and a teaser list
+ * of what's still out there (masked "???" + rarity stars) to chase via scavenging/shops/crafting.
+ */
+@Composable
+private fun CodexPanel(discovered: Set<String>, c: NightwirePalette) {
+    val found = ItemCodex.found(discovered)
+    val total = ItemCodex.TOTAL
+    val pct = ItemCodex.completion(discovered).coerceIn(0f, 1f)
+    val undisc = ItemCodex.undiscovered(discovered)
+    PipFrame(Modifier.fillMaxWidth(), accent = c.violet) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("CODEX · $found / $total", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp, color = c.violet, letterSpacing = 1.sp)
+                Text(ItemCodex.rank(discovered).uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = c.violet)
+            }
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(c.line)) {
+                Box(Modifier.fillMaxWidth(pct).height(6.dp).clip(RoundedCornerShape(3.dp)).background(c.violet))
+            }
+            Text(
+                ItemCodex.byKind(discovered).entries.joinToString("   ") { (k, p) -> "${k.name} ${p.first}/${p.second}" },
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+            if (undisc.isEmpty()) {
+                Text("Every item catalogued. Archivist.", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive)
+            } else {
+                Text("STILL OUT THERE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                    color = c.muted, letterSpacing = 1.sp)
+                undisc.take(6).forEach { item ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("• ??? · ${item.kind.name}", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                            modifier = Modifier.weight(1f))
+                        Text("★".repeat(item.rarity.coerceIn(1, 5)), fontFamily = JetBrainsMono, fontSize = 8.sp,
+                            color = rarityColor(item.rarity, c))
+                    }
+                }
+                if (undisc.size > 6) {
+                    Text("+${undisc.size - 6} more to find", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                }
             }
         }
     }

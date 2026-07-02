@@ -1184,9 +1184,15 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   `weight(item, luck)` lifts ONLY the rare tiers (4/5) with LUCK, never lowering common odds; `pick(luck,
   roll, pool)` is deterministic over an injected `[0,1)` roll (on-device supplies randomness, CI pins the
   distribution); `scavenge(luck, rolls)` merges a multi-roll bundle to id→count; QUEST items excluded.
-- **Next (in progress):** wire a visible **SCAVENGE** action into DATA ▸ WASTELAND (store+VM+UI) granting
-  `LootTable.scavenge` loot scaled by LUCK — the first player-facing use of the loot core.
-  ⚠️ On-device-unverified (CI compile-gates only) for anything with a runtime surface.
+- **SCAVENGE (PR #274, merged):** the first player-facing use of the loot core. **DATA ▸ WASTELAND** gained
+  a **SCAVENGE** panel — comb the area for a rarity-weighted `LootTable` haul scaled by LUCK (1–3 picks; more
+  + rarer with higher LUCK), rate-limited by a persisted **3-min cooldown** (`SpecialGameStore.SCAVENGE_COOLDOWN_MS`)
+  so it can't be farmed. `SpecialGameStore.scavenge()`/`dismissScavenge()` + `lastScavengeFlow` (the haul) +
+  `lastScavengeMsFlow` (cooldown anchor); `lastScavengeMs` persisted in the `Stored` blob (defaulted → old
+  saves), reset-cleared; a new distinct find re-runs the achievement check. `TelemetryViewModel` exposes a
+  live `scavengeCooldown` countdown (recomputed each 1.5s tick). UI `ScavengePanel`: a SCAVENGE button that
+  dims to a "SEARCHED · 2m 45s" countdown while cooling down + a tap-to-dismiss FOUND readout. Compile-review
+  subagent clean. ⚠️ On-device-unverified (CI compile-gates only) — the scavenge loop + cooldown want the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -118,6 +119,8 @@ class SpecialGameStore(
         val stepBaseline: Long = -1L,
         // Wall-clock ms of the last SCAVENGE (0 = never); gates the scavenge cooldown. Defaulted → old saves.
         val lastScavengeMs: Long = 0L,
+        // Item codex: every item id ever acquired (monotonic — never removed). Defaulted → old saves.
+        val discoveredIds: List<String> = emptyList(),
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -171,6 +174,13 @@ class SpecialGameStore(
     private val _lastScavenge = MutableStateFlow<Map<String, Int>?>(null)
     /** The most recent scavenge haul (id → count), for a one-shot "found" readout; null when dismissed. */
     val lastScavengeFlow: StateFlow<Map<String, Int>?> = _lastScavenge.asStateFlow()
+
+    // Item codex: every item id ever acquired (monotonic). Fed by a collector on the character (below), so
+    // every acquisition path — loot, scavenge, shop, craft, encounter reward — marks discovery automatically.
+    private var discovered: Set<String> = emptySet()
+    private val _discovered = MutableStateFlow<Set<String>>(emptySet())
+    /** Ids of every item ever acquired (for the ITEMS ▸ codex progress). */
+    val discoveredFlow: StateFlow<Set<String>> = _discovered.asStateFlow()
 
     private val _started = MutableStateFlow(0L)
     /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
@@ -264,7 +274,11 @@ class SpecialGameStore(
                 stepDay = stored.stepDay; stepBaseline = stored.stepBaseline
                 lastScavengeMs = stored.lastScavengeMs.coerceAtLeast(0L)
                 _lastScavengeMs.value = lastScavengeMs
+                discovered = stored.discoveredIds.toSet()
             }
+            // Seed the codex from whatever's already in the pack (so pre-codex saves count their held items).
+            discovered = (discovered + _character.value.inventory.keys)
+            _discovered.value = discovered
             // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
             if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
             if (needsAnchorMs <= 0L) needsAnchorMs = System.currentTimeMillis()
@@ -273,7 +287,21 @@ class SpecialGameStore(
             loaded = true
             justLoaded = true
         }
-        if (justLoaded) { scheduleFlush(); publishMetrics(); refreshDaily() }
+        if (justLoaded) {
+            scheduleFlush(); publishMetrics(); refreshDaily()
+            // Track item discovery off the live character — any acquisition path (loot/scavenge/shop/craft/
+            // encounter reward) grows the pack, and the codex unions those ids (monotonic). Launched once.
+            scope.launch {
+                _character.collect { c ->
+                    val union = discovered + c.inventory.keys
+                    if (union.size != discovered.size) {
+                        discovered = union
+                        _discovered.value = union
+                        scheduleFlush()
+                    }
+                }
+            }
+        }
     }
 
     /** Build the current metric snapshot: character progress + counters + the fed-in app-usage/travel. */
@@ -596,6 +624,7 @@ class SpecialGameStore(
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
+            discovered = emptySet(); _discovered.value = emptySet() // wipe the codex for the fresh operative
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -722,6 +751,7 @@ class SpecialGameStore(
             mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
             stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
             lastScavengeMs = lastScavengeMs,
+            discoveredIds = discovered.toList(),
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
