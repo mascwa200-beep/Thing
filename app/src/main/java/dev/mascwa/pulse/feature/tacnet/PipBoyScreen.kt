@@ -66,10 +66,13 @@ private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"
 
 private enum class PipTab(val label: String, val section: PipSection) {
     STATUS("STATUS", PipSection.STATS),
+    SPECIAL("SPECIAL", PipSection.STATS),
     SURVIVE("SURVIVE", PipSection.STATS),
     SOCIAL("SOCIAL", PipSection.STATS),
     SEARCH("SEARCH", PipSection.STATS),
-    ITEMS("ITEMS", PipSection.ITEMS),
+    GEAR("GEAR", PipSection.ITEMS),
+    STORED("STORED", PipSection.ITEMS),
+    WASTELAND("WASTELAND", PipSection.DATA),
     MAP("MAP", PipSection.DATA),
     RADAR("RADAR", PipSection.DATA),
     ORBIT("ORBIT", PipSection.DATA),
@@ -120,10 +123,13 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
+                    PipTab.SPECIAL -> Unit // the game is live (self-managed via GameSensors)
                     PipTab.SURVIVE -> Unit // the survive hub is a static tile grid
                     PipTab.SOCIAL -> socialVm.refresh()
                     PipTab.SEARCH -> Unit // search has no feed to pull
-                    PipTab.ITEMS -> objectivesVm.refresh() // refresh tracked objectives in the inventory
+                    PipTab.GEAR -> Unit // the game loadout is live
+                    PipTab.STORED -> objectivesVm.refresh() // refresh tracked objectives in the inventory
+                    PipTab.WASTELAND -> Unit // the wasteland map has its own SCAN control
                     PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
                     PipTab.RADAR -> radarVm.refresh()
@@ -149,10 +155,13 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
+                        PipTab.SPECIAL -> SpecialGameBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.SURVIVE -> dev.mascwa.pulse.feature.survive.SurviveBody(onOpenRoute, Modifier.fillMaxSize())
                         PipTab.SOCIAL -> dev.mascwa.pulse.feature.social.SocialBody(socialVm, Modifier.fillMaxSize())
                         PipTab.SEARCH -> dev.mascwa.pulse.feature.search.SearchBody(searchVm, Modifier.fillMaxSize())
-                        PipTab.ITEMS -> ItemsBody(tasksVm, notesVm, objectivesVm)
+                        PipTab.GEAR -> ItemsGameBody(telemetryVm, Modifier.fillMaxSize())
+                        PipTab.STORED -> ItemsBody(tasksVm, notesVm, objectivesVm)
+                        PipTab.WASTELAND -> WastelandDataBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
