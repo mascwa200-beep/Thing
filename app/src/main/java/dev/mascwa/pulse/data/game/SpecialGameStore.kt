@@ -112,6 +112,11 @@ class SpecialGameStore(
         val nourishmentBase: Int = 100,
         val mood: Int = 50,
         val operatorName: String = "",
+        // Self-reported 0..100 life scores (0 = unset) — how well-read / in-shape / rooted you are. Defaulted
+        // → old saves load neutral. ON-DEVICE ONLY.
+        val wellRead: Int = 0,
+        val fitness: Int = 0,
+        val community: Int = 0,
         val needsAnchorMs: Long = 0L,
         // Today's real steps + the daily baseline (cumulative step-counter reading at the day's start;
         // reboot-safe). All defaulted → old saves load with no step data.
@@ -270,6 +275,8 @@ class SpecialGameStore(
                     energy = stored.energyBase.coerceIn(0, 100), nourishment = stored.nourishmentBase.coerceIn(0, 100),
                     mood = stored.mood.coerceIn(0, 100), operatorName = stored.operatorName.take(LifeStats.MAX_NAME),
                     stepsToday = stored.stepsToday.coerceAtLeast(0),
+                    wellRead = stored.wellRead.coerceIn(0, 100), fitness = stored.fitness.coerceIn(0, 100),
+                    community = stored.community.coerceIn(0, 100),
                 )
                 needsAnchorMs = stored.needsAnchorMs
                 stepDay = stored.stepDay; stepBaseline = stored.stepBaseline
@@ -728,6 +735,9 @@ class SpecialGameStore(
     fun setCurrency(code: String) = mutateLife { it.copy(currency = code.take(4).ifBlank { "USD" }) }
     fun setMood(mood: Int) = mutateLife { LifeStats.withMood(it, mood) }
     fun setName(name: String) = mutateLife { LifeStats.withName(it, name) }
+    fun setWellRead(v: Int) = mutateLife { LifeStats.withWellRead(it, v) }
+    fun setFitness(v: Int) = mutateLife { LifeStats.withFitness(it, v) }
+    fun setCommunity(v: Int) = mutateLife { LifeStats.withCommunity(it, v) }
 
     /**
      * Feed the cumulative step-counter reading (steps since boot). Maintains a per-day baseline so today's
@@ -781,6 +791,7 @@ class SpecialGameStore(
             hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene,
             energyBase = lifeBase.energy, nourishmentBase = lifeBase.nourishment,
             mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
+            wellRead = lifeBase.wellRead, fitness = lifeBase.fitness, community = lifeBase.community,
             stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
             lastScavengeMs = lastScavengeMs,
             discoveredIds = discovered.toList(),

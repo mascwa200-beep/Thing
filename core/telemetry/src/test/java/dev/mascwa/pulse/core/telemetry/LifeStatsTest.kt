@@ -221,6 +221,41 @@ class LifeStatsTest {
         assertEquals(7200, LifeStats.withSteps(LifeProfile(), 7200).stepsToday)
     }
 
+    @Test fun wellReadSharpensIntelligence() {
+        assertEquals(0, LifeStats.statBonus(LifeProfile(wellRead = 30), Special.INTELLIGENCE)) // below MID
+        assertEquals(1, LifeStats.statBonus(LifeProfile(wellRead = 50), Special.INTELLIGENCE)) // MID → +1
+        assertEquals(2, LifeStats.statBonus(LifeProfile(wellRead = 90), Special.INTELLIGENCE)) // HIGH → +2
+    }
+
+    @Test fun fitnessBuffsTheBody() {
+        assertEquals(0, LifeStats.statBonus(LifeProfile(fitness = 30), Special.ENDURANCE)) // below MID
+        // MID → END +1 only.
+        assertEquals(1, LifeStats.statBonus(LifeProfile(fitness = 50), Special.ENDURANCE))
+        assertEquals(0, LifeStats.statBonus(LifeProfile(fitness = 50), Special.STRENGTH))
+        // HIGH → STR +1, END +1.
+        val fit = LifeProfile(fitness = 90)
+        assertEquals(1, LifeStats.statBonus(fit, Special.STRENGTH))
+        assertEquals(1, LifeStats.statBonus(fit, Special.ENDURANCE))
+    }
+
+    @Test fun communityRootsBuffCharismaThenPerception() {
+        assertEquals(0, LifeStats.statBonus(LifeProfile(community = 30), Special.CHARISMA)) // below MID
+        // MID → CHA +1 only.
+        assertEquals(1, LifeStats.statBonus(LifeProfile(community = 50), Special.CHARISMA))
+        assertEquals(0, LifeStats.statBonus(LifeProfile(community = 50), Special.PERCEPTION))
+        // HIGH → CHA +1, PER +1.
+        val rooted = LifeProfile(community = 90)
+        assertEquals(1, LifeStats.statBonus(rooted, Special.CHARISMA))
+        assertEquals(1, LifeStats.statBonus(rooted, Special.PERCEPTION))
+    }
+
+    @Test fun newSelfReportSettersClamp() {
+        assertEquals(0, LifeStats.withWellRead(LifeProfile(), -5).wellRead)
+        assertEquals(100, LifeStats.withWellRead(LifeProfile(), 250).wellRead)
+        assertEquals(70, LifeStats.withFitness(LifeProfile(), 70).fitness)
+        assertEquals(100, LifeStats.withCommunity(LifeProfile(), 999).community)
+    }
+
     @Test fun circadianFavoredByHour() {
         assertEquals(setOf(Special.PERCEPTION, Special.INTELLIGENCE), LifeStats.circadianFavored(8))
         assertEquals(setOf(Special.STRENGTH, Special.ENDURANCE), LifeStats.circadianFavored(13))

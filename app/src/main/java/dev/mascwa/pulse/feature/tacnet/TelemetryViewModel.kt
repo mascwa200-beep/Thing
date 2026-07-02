@@ -354,6 +354,12 @@ class TelemetryViewModel(
     fun setCurrency(code: String) = game.setCurrency(code)
     fun setMood(mood: Int) = game.setMood(mood)
     fun setName(name: String) = game.setName(name)
+    /** How well-read you are (0..100 self-report) → INTELLIGENCE. */
+    fun setWellRead(v: Int) = game.setWellRead(v)
+    /** How in-shape you are (0..100 self-report) → STRENGTH/ENDURANCE. */
+    fun setFitness(v: Int) = game.setFitness(v)
+    /** How rooted you are where you live (0..100 self-report) → CHARISMA/PERCEPTION. */
+    fun setCommunity(v: Int) = game.setCommunity(v)
     /** Top up hydration (a drink). */
     fun drink() = game.drink()
     /** Freshen up (a wash). */
