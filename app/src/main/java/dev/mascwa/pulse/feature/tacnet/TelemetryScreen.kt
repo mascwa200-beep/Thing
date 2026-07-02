@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
+import dev.mascwa.pulse.core.telemetry.AgendaQuest
 import dev.mascwa.pulse.core.telemetry.AgeBand
 import dev.mascwa.pulse.core.telemetry.Build
 import dev.mascwa.pulse.core.telemetry.Character
@@ -161,6 +162,15 @@ private fun GameSensors(vm: TelemetryViewModel) {
             context.checkSelfPermission("android.permission.ACTIVITY_RECOGNITION") != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
             runCatching { requestActivity.launch("android.permission.ACTIVITY_RECOGNITION") }
+        }
+    }
+    // Real calendar → the wasteland agenda. On grant, pull the events in.
+    val requestCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.refreshAgenda()
+    }
+    LaunchedEffect(Unit) {
+        if (context.checkSelfPermission("android.permission.READ_CALENDAR") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            runCatching { requestCalendar.launch("android.permission.READ_CALENDAR") }
         }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -417,11 +427,17 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val daily by vm.daily.collectAsStateWithLifecycle()
     val quests by vm.quests.collectAsStateWithLifecycle()
+    val agenda by vm.agenda.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+        if (agenda.isNotEmpty()) {
+            PipHeader("Agenda")
+            AgendaPanel(agenda, c)
+            Spacer(Modifier.height(8.dp))
+        }
         if (daily.objectives.isNotEmpty()) {
             PipHeader("Daily")
             DailyPanel(daily, c) { vm.claimDaily(it) }
@@ -439,6 +455,33 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Achievements")
         AchievementsPanel(unlocked, gameMetrics, c)
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * The AGENDA panel — your real upcoming calendar events, framed as time-boxed wasteland objectives with a
+ * live countdown. On-device only (event text never leaves the phone); empty without the READ_CALENDAR grant.
+ */
+@Composable
+private fun AgendaPanel(agenda: List<AgendaQuest>, c: NightwirePalette) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.violet) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("REAL AGENDA · YOUR DAY, WASTELAND-SIDE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 11.sp, color = c.violet, letterSpacing = 1.sp)
+            agenda.forEach { q ->
+                Column {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(q.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                            color = c.ink, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        Text(q.countdown, fontFamily = JetBrainsMono, fontSize = 11.sp,
+                            color = if (q.imminent) c.amber else c.muted)
+                    }
+                    Text(q.briefing, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2,
+                        modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+        }
     }
 }
 
