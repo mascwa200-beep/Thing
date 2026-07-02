@@ -249,7 +249,8 @@ class TelemetryViewModel(
     /** Milliseconds left on the scavenge cooldown (0 = ready), recomputed each game tick. */
     val scavengeCooldown: StateFlow<Long> = _scavengeCooldown.asStateFlow()
     /** Scavenge the area for rarity-weighted loot scaled by LUCK (rate-limited by the cooldown). */
-    fun scavenge() = game.scavenge()
+    /** Scavenge for rarity-weighted loot — GEO-GATED: only while physically at a wasteland site. */
+    fun scavenge() { if (siteReach.value?.atSite == true) game.scavenge() }
     /** Dismiss the one-shot scavenge-haul readout. */
     fun dismissScavenge() = game.dismissScavenge()
 
