@@ -15,4 +15,8 @@ data class NotifyState(
     val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
     val flightAlertedIds: List<String> = emptyList(),
+    /** Last time (epoch ms) each survival need was alerted (need name → ms), so a nag is throttled. */
+    val survivalFiredMs: Map<String, Long> = emptyMap(),
+    /** Calendar event ids already reminded about while imminent, so an appointment nudges once. */
+    val agendaNotifiedIds: List<String> = emptyList(),
 )

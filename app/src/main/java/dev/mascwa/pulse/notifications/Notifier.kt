@@ -50,6 +50,17 @@ class Notifier(private val context: Context) {
     fun notifyReminder(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "REMINDER", title, body, "home", NotificationCompat.PRIORITY_HIGH)
 
+    /** Life-sim survival check-in (a decaying need ran low) — opens the game to tend it. */
+    fun notifySurvival(id: Int, title: String, body: String, urgent: Boolean) =
+        post(
+            NotificationChannels.REMINDERS, id, "SURVIVAL", title, body, "tacnet",
+            if (urgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
+        )
+
+    /** Life-sim agenda check-in (a real appointment is imminent) — opens the game's agenda. */
+    fun notifyAgenda(id: Int, title: String, body: String) =
+        post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet", NotificationCompat.PRIORITY_HIGH)
+
     /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
     fun notifyFinding(id: Int, title: String, body: String) =
         post(NotificationChannels.DIGEST, id, "J.A.R.V.I.S.", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)

@@ -1124,6 +1124,21 @@ Built as 3 CI-green slices; the game now reads your real self.
   (manifest already has BLUETOOTH perms) — held pending owner go + a physical strap to verify.
   ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers, steps) is CI-compile-gated only — owner verifies on the Pixel.
 
+### Survival check-in push notifications (PR #270, merged, commit — squash)
+Owner: "make a whole bunch of check-in push notifications necessary for your survival and whatnot." The
+background worker now nudges you when a real-decaying life-sim need runs low — which, since the needs bleed
+into reality, doubles as a drink/eat/rest/wash reminder. Pure `core:telemetry/SurvivalAlerts.kt` (+7 tests,
+kotlinc green): `SurvivalNeed`×`AlertLevel` (LOW ≤30 / CRITICAL ≤15, matching LifeStats thresholds);
+`evaluate(life, seed)` → one `SurvivalAlert` per low need, body drawn from a ~40-line themed catalog rotated
+by the injected seed (deterministic → testable). On-device: `Notifier.notifySurvival`/`notifyAgenda`
+(existing REMINDERS channel → deep-link "tacnet"/PIP-BOY); `SpecialGameStore.lifeSnapshot()` gives the worker
+the decayed-to-now profile; `RefreshWorker` survival pass (gated by master toggle + quiet hours like every
+other alert) fires each low need throttled per need in `NotifyState.survivalFiredMs` (~3h; critical ~1.5h),
+and reminds once per imminent real calendar event (reuses `CalendarQuests` + `agendaNotifiedIds` dedup). New
+opt-out `NotificationPrefs.survivalAlerts` (default on) + a "Survival check-ins (Pip-Boy)" Settings toggle. A
+never-played game stays silent (needs at 100). Subagent compile-review clean. ⚠️ On-device-unverified — the
+background worker firing/throttling + the notifications want a real run on the Pixel.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

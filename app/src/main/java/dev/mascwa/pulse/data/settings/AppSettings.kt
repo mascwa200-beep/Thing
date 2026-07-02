@@ -242,6 +242,9 @@ data class NotificationPrefs(
     val auroraAlerts: Boolean = true,     // NOAA OVATION aurora probability at your location
     val safetyAlerts: Boolean = true,
     val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
+    /** Survival check-ins for the S.P.E.C.I.A.L. life-sim: nudge you when a real-decaying need (hydration/
+     *  nourishment/energy/hygiene) runs low, or an appointment is imminent — keep the operator alive. */
+    val survivalAlerts: Boolean = true,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,
