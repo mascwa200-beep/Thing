@@ -105,6 +105,8 @@ class SpecialGameStore(
         val currency: String = "USD",
         val hydrationBase: Int = 100,
         val hygieneBase: Int = 100,
+        val energyBase: Int = 100,
+        val mood: Int = 50,
         val needsAnchorMs: Long = 0L,
     )
 
@@ -227,6 +229,7 @@ class SpecialGameStore(
                     heightCm = stored.heightCm, weightKg = stored.weightKg, ageYears = stored.ageYears,
                     realMoney = stored.realMoney, currency = stored.currency.ifBlank { "USD" },
                     hydration = stored.hydrationBase.coerceIn(0, 100), hygiene = stored.hygieneBase.coerceIn(0, 100),
+                    energy = stored.energyBase.coerceIn(0, 100), mood = stored.mood.coerceIn(0, 100),
                 )
                 needsAnchorMs = stored.needsAnchorMs
             }
@@ -581,11 +584,14 @@ class SpecialGameStore(
     fun setAge(years: Int) = mutateLife { LifeStats.withAge(it, years) }
     fun setRealMoney(amount: Double) = mutateLife { LifeStats.withMoney(it, amount) }
     fun setCurrency(code: String) = mutateLife { it.copy(currency = code.take(4).ifBlank { "USD" }) }
+    fun setMood(mood: Int) = mutateLife { LifeStats.withMood(it, mood) }
 
     /** Top up hydration (a drink). */
     fun drink() = mutateLife { LifeStats.drink(it) }
     /** Freshen up (a wash). */
     fun wash() = mutateLife { LifeStats.wash(it) }
+    /** Rest up (restore energy). */
+    fun rest() = mutateLife { LifeStats.rest(it) }
 
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
@@ -605,7 +611,8 @@ class SpecialGameStore(
             startedAtMs = startedAtMs,
             heightCm = lifeBase.heightCm, weightKg = lifeBase.weightKg, ageYears = lifeBase.ageYears,
             realMoney = lifeBase.realMoney, currency = lifeBase.currency,
-            hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene, needsAnchorMs = needsAnchorMs,
+            hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene,
+            energyBase = lifeBase.energy, mood = lifeBase.mood, needsAnchorMs = needsAnchorMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }

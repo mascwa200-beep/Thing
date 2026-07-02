@@ -29,6 +29,10 @@ data class LifeProfile(
     val hydration: Int = 100,
     /** Hygiene need, 0..100 — decays with real time, restored by [LifeStats.wash]. */
     val hygiene: Int = 100,
+    /** Energy/rest need, 0..100 — decays with real time, restored by [LifeStats.rest]. */
+    val energy: Int = 100,
+    /** Mood, 0..100 (50 = neutral) — user-set; high spirits buff CHARISMA/LUCK, low spirits sap them. */
+    val mood: Int = 50,
 )
 
 /** A single life-driven modifier to a stat check: [delta] to [stat], with a short human [reason]. */
@@ -70,10 +74,15 @@ object LifeStats {
     const val NEED_LOW = 30
     const val NEED_CRITICAL = 15
 
-    // Need decay per hour of real time (points). Thirst builds faster than grime.
+    // Need decay per hour of real time (points). Thirst builds faster than grime; energy sags between.
     const val HYDRATION_DECAY_PER_HR = 4.0
     const val HYGIENE_DECAY_PER_HR = 2.0
+    const val ENERGY_DECAY_PER_HR = 3.0
     private const val MS_PER_HOUR = 3_600_000.0
+
+    // Mood band edges (0..100, 50 = neutral) — only the extremes bend checks.
+    const val MOOD_HIGH = 75
+    const val MOOD_LOW = 25
 
     // Money-tier thresholds, in the profile's currency units (magnitude only).
     const val STEADY_MONEY = 100.0
@@ -183,6 +192,20 @@ object LifeStats {
         } else if (p.hygiene <= NEED_LOW) {
             out += LifeEffect(Special.CHARISMA, -1, "Unkempt")
         }
+        if (p.energy <= NEED_CRITICAL) {
+            out += LifeEffect(Special.AGILITY, -2, "Exhausted")
+            out += LifeEffect(Special.INTELLIGENCE, -1, "Foggy-headed")
+        } else if (p.energy <= NEED_LOW) {
+            out += LifeEffect(Special.AGILITY, -1, "Weary")
+        }
+
+        // Mood only tips the scales at the extremes.
+        if (p.mood >= MOOD_HIGH) {
+            out += LifeEffect(Special.CHARISMA, +1, "High spirits")
+            out += LifeEffect(Special.LUCK, +1, "Feeling lucky")
+        } else if (p.mood <= MOOD_LOW) {
+            out += LifeEffect(Special.CHARISMA, -1, "Low spirits")
+        }
 
         return out
     }
@@ -201,13 +224,14 @@ object LifeStats {
 
     // --- Needs upkeep ---
 
-    /** Decay hydration + hygiene for [elapsedMs] of real time (clamped to 0..100). Deterministic. */
+    /** Decay hydration + hygiene + energy for [elapsedMs] of real time (clamped to 0..100). Deterministic. */
     fun decayNeeds(p: LifeProfile, elapsedMs: Long): LifeProfile {
         if (elapsedMs <= 0) return p
         val hrs = elapsedMs / MS_PER_HOUR
         val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
         val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
-        return p.copy(hydration = hyd, hygiene = hyg)
+        val en = (p.energy - (hrs * ENERGY_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
+        return p.copy(hydration = hyd, hygiene = hyg, energy = en)
     }
 
     /** Top up hydration (a drink). */
@@ -216,9 +240,13 @@ object LifeStats {
     /** Freshen up (a wash). */
     fun wash(p: LifeProfile): LifeProfile = p.copy(hygiene = 100)
 
+    /** Rest up — restore energy. */
+    fun rest(p: LifeProfile): LifeProfile = p.copy(energy = 100)
+
     // --- Clamped setters (0 / blank clears an unset field) ---
     fun withHeight(p: LifeProfile, cm: Int): LifeProfile = p.copy(heightCm = cm.coerceIn(0, MAX_HEIGHT_CM))
     fun withWeight(p: LifeProfile, kg: Int): LifeProfile = p.copy(weightKg = kg.coerceIn(0, MAX_WEIGHT_KG))
     fun withAge(p: LifeProfile, years: Int): LifeProfile = p.copy(ageYears = years.coerceIn(0, MAX_AGE))
     fun withMoney(p: LifeProfile, amount: Double): LifeProfile = p.copy(realMoney = amount.coerceAtLeast(0.0))
+    fun withMood(p: LifeProfile, mood: Int): LifeProfile = p.copy(mood = mood.coerceIn(0, 100))
 }
