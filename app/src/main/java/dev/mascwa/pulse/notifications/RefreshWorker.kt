@@ -366,6 +366,49 @@ class RefreshWorker(
             }
         }
 
+        // --- Life-sim survival check-ins: nudge when a real-decaying need runs low (throttled per need,
+        // critical ones sooner) + remind when a real appointment is imminent (once per event). The needs
+        // bleed into reality, so this doubles as a "drink / eat / rest / wash" reminder. Keeps you alive. ---
+        if (prefs.survivalAlerts) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val life = container.specialGameStore.lifeSnapshot()
+                val throttleMs = 3L * 60 * 60 * 1000 // low needs: at most every ~3h
+                val fired = state.survivalFiredMs.toMutableMap()
+                dev.mascwa.pulse.core.telemetry.SurvivalAlerts.evaluate(life, now).forEach { alert ->
+                    val critical = alert.level == dev.mascwa.pulse.core.telemetry.AlertLevel.CRITICAL
+                    val gate = if (critical) throttleMs / 2 else throttleMs
+                    if (now - (fired[alert.need.name] ?: 0L) >= gate) {
+                        notifier.notifySurvival(
+                            id = 7700 + alert.need.ordinal,
+                            title = alert.title,
+                            body = alert.body,
+                            urgent = critical,
+                        )
+                        fired[alert.need.name] = now
+                    }
+                }
+                state = state.copy(survivalFiredMs = fired)
+
+                // Imminent real appointment → an agenda reminder, once per event while it's imminent.
+                val agenda = dev.mascwa.pulse.core.telemetry.CalendarQuests.compose(
+                    container.calendarRepository.upcoming(now), now, max = 5,
+                )
+                val notified = state.agendaNotifiedIds.toMutableSet()
+                agenda.filter { it.imminent && it.id.toString() !in notified }.take(3).forEach { q ->
+                    notifier.notifyAgenda(
+                        id = 7720 + (q.id.hashCode() and 0xFF),
+                        title = "⏰ Incoming: ${q.title.take(60)}",
+                        body = "${q.countdown} — ${q.briefing}",
+                    )
+                    notified += q.id.toString()
+                }
+                // Keep only ids still in the agenda window so the dedup set can't grow without bound.
+                val liveIds = agenda.map { it.id.toString() }.toSet()
+                state = state.copy(agendaNotifiedIds = notified.filter { it in liveIds })
+            }
+        }
+
         // --- Daily digest ---
         if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
             runCatching {

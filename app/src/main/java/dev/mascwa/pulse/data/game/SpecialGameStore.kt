@@ -575,6 +575,9 @@ class SpecialGameStore(
     private fun currentLife(): LifeProfile =
         LifeStats.decayNeeds(lifeBase, System.currentTimeMillis() - needsAnchorMs, lastEnv)
 
+    /** The decayed-to-now life profile, loading from disk first — for background reads (e.g. the notifier). */
+    suspend fun lifeSnapshot(): LifeProfile { ensureLoaded(); return currentLife() }
+
     /**
      * Recompute the decayed needs under the current real-world [env] and publish — call periodically (e.g.
      * each game tick) so the meters move in real time. Does NOT change the base/anchor (no sub-threshold
