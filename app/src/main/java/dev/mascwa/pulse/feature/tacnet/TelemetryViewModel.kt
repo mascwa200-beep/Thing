@@ -260,6 +260,19 @@ class TelemetryViewModel(
     /** Start the game over with a fresh operative. */
     fun resetGame() { game.reset(); questStore.clear() }
 
+    // --- Real-life profile (LifeStats): body metrics + real money + hydration/hygiene, on-device only ---
+    /** The operator's real-life profile with hydration/hygiene decayed to now. */
+    val life: StateFlow<dev.mascwa.pulse.core.telemetry.LifeProfile> = game.lifeFlow
+    fun setHeight(cm: Int) = game.setHeight(cm)
+    fun setWeight(kg: Int) = game.setWeight(kg)
+    fun setAge(years: Int) = game.setAge(years)
+    fun setRealMoney(amount: Double) = game.setRealMoney(amount)
+    fun setCurrency(code: String) = game.setCurrency(code)
+    /** Top up hydration (a drink). */
+    fun drink() = game.drink()
+    /** Freshen up (a wash). */
+    fun wash() = game.wash()
+
     /** Distil the live telemetry snapshot + cached weather + clock into the game's [EnvContext]. */
     private fun buildEnv(t: Telemetry): EnvContext {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -352,6 +365,7 @@ class TelemetryViewModel(
                 controller.refreshSystem()
                 _env.value = buildEnv(controller.telemetry.value)
                 updateDayBanner()
+                game.refreshNeeds() // decay hydration/hygiene forward so the meters move in real time
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)

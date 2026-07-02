@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,17 +40,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -59,6 +68,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
+import dev.mascwa.pulse.core.telemetry.AgeBand
+import dev.mascwa.pulse.core.telemetry.Build
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Companion
@@ -86,6 +97,8 @@ import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.Item
 import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
+import dev.mascwa.pulse.core.telemetry.LifeProfile
+import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
 import dev.mascwa.pulse.core.telemetry.Quest
@@ -290,12 +303,22 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
     val questDone by vm.questCompleted.collectAsStateWithLifecycle()
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
+    val life by vm.life.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
+        PipHeader("Life")
+        LifePanel(
+            life, c,
+            onSetHeight = { vm.setHeight(it) }, onSetWeight = { vm.setWeight(it) },
+            onSetAge = { vm.setAge(it) }, onSetMoney = { vm.setRealMoney(it) },
+            onDrink = { vm.drink() }, onWash = { vm.wash() },
+        )
+        Spacer(Modifier.height(8.dp))
+
         PipHeader("S.P.E.C.I.A.L.")
         if (dayBanner.isNotEmpty()) {
             Text(
@@ -401,6 +424,112 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Achievements")
         AchievementsPanel(unlocked, gameMetrics, c)
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * The LIFE panel — the operator's real self, fed into the wasteland. Editable body metrics + a
+ * self-reported real-money figure (which buffs the game), two Sims-style needs (hydration / hygiene) you
+ * keep topped up, a build / age / wealth readout, and a live list of how it all bends your checks. Every
+ * value is on-device only and never leaves the phone.
+ */
+@Composable
+private fun LifePanel(
+    life: LifeProfile,
+    c: NightwirePalette,
+    onSetHeight: (Int) -> Unit,
+    onSetWeight: (Int) -> Unit,
+    onSetAge: (Int) -> Unit,
+    onSetMoney: (Double) -> Unit,
+    onDrink: () -> Unit,
+    onWash: () -> Unit,
+) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("VITALS OF THE OPERATOR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 12.sp, color = c.sky, letterSpacing = 1.sp)
+            Text("Your real life bleeds into the wasteland. Stays on this device — never leaves.",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+
+            LifeNumberField("Height", if (life.heightCm > 0) life.heightCm.toString() else "", "cm", c) {
+                onSetHeight(it.toIntOrNull() ?: 0)
+            }
+            LifeNumberField("Weight", if (life.weightKg > 0) life.weightKg.toString() else "", "kg", c) {
+                onSetWeight(it.toIntOrNull() ?: 0)
+            }
+            LifeNumberField("Age", if (life.ageYears > 0) life.ageYears.toString() else "", "yr", c) {
+                onSetAge(it.toIntOrNull() ?: 0)
+            }
+            LifeNumberField("Real money", if (life.realMoney > 0) life.realMoney.roundToInt().toString() else "",
+                life.currency, c) {
+                onSetMoney(it.toDoubleOrNull() ?: 0.0)
+            }
+
+            // Build / age / wealth summary.
+            val bits = buildList {
+                LifeStats.build(life).takeIf { it != Build.UNSET }?.let { add(it.label) }
+                LifeStats.ageBand(life).takeIf { it != AgeBand.UNSET }?.let { add(it.label) }
+                add(LifeStats.moneyTier(life).label)
+            }
+            Text(bits.joinToString("  ·  ").uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 10.sp, color = c.amber, letterSpacing = 1.sp)
+
+            // Needs meters + top-up actions.
+            FalloutGauge("Hydration", "${life.hydration}%", life.hydration / 100f, c.sky)
+            FalloutGauge("Hygiene", "${life.hygiene}%", life.hygiene / 100f, c.positive)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
+                Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
+            }
+
+            // How the profile bends your checks right now (mirrors the CONDITIONS readout).
+            val fx = LifeStats.describe(life)
+            if (fx.isNotEmpty()) {
+                Text("HOW YOUR LIFE BENDS THE WASTELAND", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = c.ink, letterSpacing = 1.sp, modifier = Modifier.padding(top = 2.dp))
+                fx.forEach { Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2) }
+            }
+        }
+    }
+}
+
+/**
+ * One labelled numeric input for [LifePanel]. Commits on focus-loss / IME-done (not per keystroke), so the
+ * decayed-needs flow re-emitting each tick can never clobber what you're mid-typing. Digits only.
+ */
+@Composable
+private fun LifeNumberField(
+    label: String,
+    value: String,
+    unit: String,
+    c: NightwirePalette,
+    onCommit: (String) -> Unit,
+) {
+    // Re-seed only when the committed [value] changes externally (load / reset / clamp) — not while typing.
+    var text by remember(value) { mutableStateOf(value) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it.filter { ch -> ch.isDigit() }.take(7) },
+            singleLine = true,
+            textStyle = TextStyle(color = c.ink, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 14.sp, textAlign = TextAlign.End),
+            cursorBrush = SolidColor(c.sky),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onCommit(text) }),
+            modifier = Modifier.width(96.dp).background(c.void).border(1.dp, c.line)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .onFocusChanged { if (!it.isFocused) onCommit(text) },
+            decorationBox = { inner ->
+                if (text.isEmpty()) {
+                    Text("—", fontFamily = ChakraPetch, fontSize = 14.sp, color = c.muted,
+                        textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                }
+                inner()
+            },
+        )
+        Text(" $unit", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
     }
 }
 

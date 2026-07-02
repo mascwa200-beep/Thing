@@ -153,6 +153,7 @@ object SpecialGame {
         roll: Int,
         env: EnvContext? = null,
         useItemId: String? = null,
+        life: LifeProfile? = null,
     ): Resolution {
         val choice = encounter.choices.getOrNull(choiceIndex)
             ?: return Resolution(false, false, Outcome("Nothing happens."), character, roll)
@@ -173,6 +174,7 @@ object SpecialGame {
                 gearStatBonus(character, choice.stat) +
                 companionStatBonus(character, choice.stat) +
                 (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
+                (life?.let { LifeStats.statBonus(it, choice.stat) } ?: 0) +
                 (activeChem?.statBonusAmt ?: 0)
             check(statValue, choice.difficulty, character.stat(Special.LUCK), roll, critMargin)
         }
@@ -181,10 +183,11 @@ object SpecialGame {
         if (result.crit && result.success) {
             outcome = outcome.copy(xp = outcome.xp * 2, caps = outcome.caps + outcome.caps / 2)
         }
-        // Perks reward success: +% caps / +% XP, and a little healing.
+        // Perks + real-world wealth reward success: +% caps / +% XP, and a little healing.
         if (result.success) {
+            val capsPct = perkCapsPct(character) + (life?.let { LifeStats.capsBonusPct(it) } ?: 0)
             outcome = outcome.copy(
-                caps = pctScale(outcome.caps, perkCapsPct(character)),
+                caps = pctScale(outcome.caps, capsPct),
                 xp = pctScale(outcome.xp, perkXpPct(character)),
                 hp = outcome.hp + perkHealOnWin(character) + companionHealOnWin(character),
             )

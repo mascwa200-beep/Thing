@@ -15,6 +15,8 @@ import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
+import dev.mascwa.pulse.core.telemetry.LifeProfile
+import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
@@ -93,6 +95,17 @@ class SpecialGameStore(
         val streakDay: Long = -1,
         // Wall-clock ms when this operative's story began — drives the wasteland day counter (Day 1, 2, …).
         val startedAtMs: Long = 0L,
+        // The operator's real-life profile (LifeStats). Body metrics + self-reported real money → game buffs;
+        // hydration/hygiene persist as ANCHORED base values decayed forward from [needsAnchorMs]. All defaulted
+        // → old saves load with a fully-neutral (blank) profile. ON-DEVICE ONLY — never leaves the device.
+        val heightCm: Int = 0,
+        val weightKg: Int = 0,
+        val ageYears: Int = 0,
+        val realMoney: Double = 0.0,
+        val currency: String = "USD",
+        val hydrationBase: Int = 100,
+        val hygieneBase: Int = 100,
+        val needsAnchorMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -124,9 +137,19 @@ class SpecialGameStore(
     // When the operative's story began (wall-clock ms) — the anchor for the wasteland day counter.
     private var startedAtMs = 0L
 
+    // The operator's real-life profile. [lifeBase] holds the ANCHORED needs (hydration/hygiene) — the live
+    // values are decayed forward from [needsAnchorMs] on read, so continuous display refresh never loses
+    // sub-threshold decay (base + anchor only change on a top-up / edit).
+    private var lifeBase = LifeProfile()
+    private var needsAnchorMs = 0L
+
     private val _started = MutableStateFlow(0L)
     /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
     val startedFlow: StateFlow<Long> = _started.asStateFlow()
+
+    private val _life = MutableStateFlow(LifeProfile())
+    /** The operator's real-life profile with hydration/hygiene decayed to now (on-device only). */
+    val lifeFlow: StateFlow<LifeProfile> = _life.asStateFlow()
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -200,10 +223,18 @@ class SpecialGameStore(
                 claimed = stored.claimed.toSet()
                 streak = stored.streak.coerceAtLeast(0); streakDay = stored.streakDay
                 startedAtMs = stored.startedAtMs
+                lifeBase = LifeProfile(
+                    heightCm = stored.heightCm, weightKg = stored.weightKg, ageYears = stored.ageYears,
+                    realMoney = stored.realMoney, currency = stored.currency.ifBlank { "USD" },
+                    hydration = stored.hydrationBase.coerceIn(0, 100), hygiene = stored.hygieneBase.coerceIn(0, 100),
+                )
+                needsAnchorMs = stored.needsAnchorMs
             }
             // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
             if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
+            if (needsAnchorMs <= 0L) needsAnchorMs = System.currentTimeMillis()
             _started.value = startedAtMs
+            _life.value = currentLife()
             loaded = true
             justLoaded = true
         }
@@ -344,7 +375,7 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             val roll = random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env)
+            val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env, life = currentLife())
             var updated = resolution.character
             // A good conversation earns standing with that faction.
             if (resolution.success && kind != null) {
@@ -393,7 +424,7 @@ class SpecialGameStore(
             val encounter = encounterFor(c) ?: return@launch
             // The die comes from how well the player physically performed the gesture, when supplied.
             val r = roll ?: random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId)
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId, currentLife())
             _character.value = resolution.character
             _resolution.value = resolution
             if (resolution.success) wins++
@@ -497,6 +528,7 @@ class SpecialGameStore(
             lastXpVisits = -1 // re-baseline app-usage XP so the fresh operative doesn't get a dump
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
             startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
+            lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -516,6 +548,45 @@ class SpecialGameStore(
         }
     }
 
+    // --- Real-life profile (LifeStats) ---
+
+    /** The live profile: [lifeBase] with hydration/hygiene decayed forward to now. */
+    private fun currentLife(): LifeProfile =
+        LifeStats.decayNeeds(lifeBase, System.currentTimeMillis() - needsAnchorMs)
+
+    /**
+     * Recompute the decayed needs and publish — call periodically (e.g. each game tick) so the meters move
+     * in real time. Does NOT change the base/anchor, so no sub-threshold decay is ever lost.
+     */
+    fun refreshNeeds() {
+        scope.launch { ensureLoaded(); _life.value = currentLife() }
+    }
+
+    /**
+     * Apply [transform] to the CURRENT (decayed) profile, then re-anchor: the decayed needs become the new
+     * base and the clock resets to now. So editing a field or topping up a need never drops accrued decay.
+     */
+    private fun mutateLife(transform: (LifeProfile) -> LifeProfile) {
+        scope.launch {
+            ensureLoaded()
+            lifeBase = transform(currentLife())
+            needsAnchorMs = System.currentTimeMillis()
+            _life.value = lifeBase
+            scheduleFlush()
+        }
+    }
+
+    fun setHeight(cm: Int) = mutateLife { LifeStats.withHeight(it, cm) }
+    fun setWeight(kg: Int) = mutateLife { LifeStats.withWeight(it, kg) }
+    fun setAge(years: Int) = mutateLife { LifeStats.withAge(it, years) }
+    fun setRealMoney(amount: Double) = mutateLife { LifeStats.withMoney(it, amount) }
+    fun setCurrency(code: String) = mutateLife { it.copy(currency = code.take(4).ifBlank { "USD" }) }
+
+    /** Top up hydration (a drink). */
+    fun drink() = mutateLife { LifeStats.drink(it) }
+    /** Freshen up (a wash). */
+    fun wash() = mutateLife { LifeStats.wash(it) }
+
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
         flushJob = scope.launch {
@@ -532,6 +603,9 @@ class SpecialGameStore(
             baseTravelM = baseTravelM, basePlaces = basePlaces, claimed = claimed.toList(),
             streak = streak, streakDay = streakDay,
             startedAtMs = startedAtMs,
+            heightCm = lifeBase.heightCm, weightKg = lifeBase.weightKg, ageYears = lifeBase.ageYears,
+            realMoney = lifeBase.realMoney, currency = lifeBase.currency,
+            hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene, needsAnchorMs = needsAnchorMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
