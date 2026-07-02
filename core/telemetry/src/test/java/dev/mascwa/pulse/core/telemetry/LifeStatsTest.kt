@@ -170,6 +170,40 @@ class LifeStatsTest {
         assertEquals(70, p.energy) // 10h × 3/h
     }
 
+    @Test fun envNullDecayMatchesBaseRates() {
+        val p = LifeProfile(hydration = 100, hygiene = 100, energy = 100, nourishment = 100)
+        val ms = 5L * 3_600_000L
+        assertEquals(LifeStats.decayNeeds(p, ms), LifeStats.decayNeeds(p, ms, null))
+    }
+
+    @Test fun heatSpikesThirst() {
+        val p = LifeProfile(hydration = 100)
+        val hot = EnvContext(outdoorTempC = 35.0) // ≥ HOT_C (32)
+        // 5h × 4/h × 1.6 = 32 → 68.
+        assertEquals(68, LifeStats.decayNeeds(p, 5L * 3_600_000L, hot).hydration)
+    }
+
+    @Test fun chargingRecoversEnergy() {
+        val p = LifeProfile(energy = 50)
+        val charging = EnvContext(charging = true)
+        // 3h × 8/h regen = 24 → 74.
+        assertEquals(74, LifeStats.decayNeeds(p, 3L * 3_600_000L, charging).energy)
+    }
+
+    @Test fun nightDrainsEnergyFaster() {
+        val p = LifeProfile(energy = 100)
+        val night = EnvContext(hourOfDay = 23)
+        // 4h × 3/h × 1.5 = 18 → 82.
+        assertEquals(82, LifeStats.decayNeeds(p, 4L * 3_600_000L, night).energy)
+    }
+
+    @Test fun needDriversLabelActiveFactors() {
+        val drivers = LifeStats.needDrivers(EnvContext(outdoorTempC = 41.0, charging = true))
+        assertTrue(drivers.any { it.contains("Scorching") })
+        assertTrue(drivers.any { it.contains("Charging") })
+        assertTrue(LifeStats.needDrivers(null).isEmpty())
+    }
+
     @Test fun withMoodClamps() {
         assertEquals(0, LifeStats.withMood(LifeProfile(), -20).mood)
         assertEquals(100, LifeStats.withMood(LifeProfile(), 250).mood)

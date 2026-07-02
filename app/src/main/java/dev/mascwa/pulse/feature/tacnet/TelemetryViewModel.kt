@@ -371,7 +371,7 @@ class TelemetryViewModel(
                 controller.refreshSystem()
                 _env.value = buildEnv(controller.telemetry.value)
                 updateDayBanner()
-                game.refreshNeeds() // decay hydration/hygiene forward so the meters move in real time
+                game.refreshNeeds(_env.value) // real weather/time/motion/charging drive the needs decay
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)

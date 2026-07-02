@@ -146,6 +146,9 @@ class SpecialGameStore(
     // sub-threshold decay (base + anchor only change on a top-up / edit).
     private var lifeBase = LifeProfile()
     private var needsAnchorMs = 0L
+    // The most recent real-world context (weather/time/motion/charging) the ViewModel fed in — drives how
+    // fast the needs decay (and lets charging regenerate energy). Null = plain base rates.
+    private var lastEnv: EnvContext? = null
 
     private val _started = MutableStateFlow(0L)
     /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
@@ -556,16 +559,30 @@ class SpecialGameStore(
 
     // --- Real-life profile (LifeStats) ---
 
-    /** The live profile: [lifeBase] with hydration/hygiene decayed forward to now. */
+    /** The live profile: [lifeBase] with the needs decayed forward to now under the last real-world [lastEnv]. */
     private fun currentLife(): LifeProfile =
-        LifeStats.decayNeeds(lifeBase, System.currentTimeMillis() - needsAnchorMs)
+        LifeStats.decayNeeds(lifeBase, System.currentTimeMillis() - needsAnchorMs, lastEnv)
 
     /**
-     * Recompute the decayed needs and publish — call periodically (e.g. each game tick) so the meters move
-     * in real time. Does NOT change the base/anchor, so no sub-threshold decay is ever lost.
+     * Recompute the decayed needs under the current real-world [env] and publish — call periodically (e.g.
+     * each game tick) so the meters move in real time. Does NOT change the base/anchor (no sub-threshold
+     * decay is lost) EXCEPT on a charging transition, where it re-anchors so the energy regen/decay isn't
+     * applied retroactively to the whole prior gap.
      */
-    fun refreshNeeds() {
-        scope.launch { ensureLoaded(); _life.value = currentLife() }
+    fun refreshNeeds(env: EnvContext? = null) {
+        scope.launch {
+            ensureLoaded()
+            val chargingChanged = (env?.charging == true) != (lastEnv?.charging == true)
+            if (chargingChanged) {
+                lifeBase = currentLife()               // capture the decayed state under the OLD env
+                needsAnchorMs = System.currentTimeMillis()
+                lastEnv = env
+                scheduleFlush()
+            } else {
+                lastEnv = env
+            }
+            _life.value = currentLife()
+        }
     }
 
     /**
