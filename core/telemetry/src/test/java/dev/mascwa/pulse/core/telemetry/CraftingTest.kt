@@ -66,4 +66,25 @@ class CraftingTest {
         val before = char(mapOf("medkit" to 1, "circuit_board" to 1), int = 4)
         assertEquals(before, SpecialGame.craft(before, r))
     }
+
+    @Test fun tierUpRecipesUpgradePlusOneGearIntoPlusTwo() {
+        // Each tier-up consumes a +1 GEAR piece + a fusion cell and yields the matching +2 GEAR.
+        val r = Recipes.byId("craft_gauntlet")!! // grip_gloves + fusion_cell + scrap_metal x2, INT >= 6
+        val before = char(mapOf("grip_gloves" to 1, "fusion_cell" to 1, "scrap_metal" to 2), int = 6)
+        val after = SpecialGame.craft(before, r)
+        assertNull("the +1 piece is consumed", after.inventory["grip_gloves"])
+        assertNull("the power source is consumed", after.inventory["fusion_cell"])
+        assertEquals(1, after.inventory["power_gauntlet"]) // +2 STR gear produced
+        assertEquals(2, Items.byId("power_gauntlet")?.statBonusAmt)
+    }
+
+    @Test fun everyNewTierUpOutputIsRealPlusTwoGearOrHighAid() {
+        listOf("craft_gauntlet", "craft_recon", "craft_webbing", "craft_negotiator", "craft_servos", "craft_neural")
+            .forEach { id ->
+                val out = Items.byId(Recipes.byId(id)!!.outputId)!!
+                assertEquals("$id should craft GEAR", ItemKind.GEAR, out.kind)
+                assertEquals("$id should craft a +2 piece", 2, out.statBonusAmt)
+            }
+        assertEquals(ItemKind.AID, Items.byId(Recipes.byId("craft_surgeon")!!.outputId)?.kind)
+    }
 }

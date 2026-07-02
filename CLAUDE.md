@@ -1153,6 +1153,22 @@ persisted `NotifyState.survivalTipIndex`, gated by master toggle + quiet hours. 
 `NotificationPrefs.survivalTips` (default on) + a "Survival tips (frequent)" Settings toggle. ⚠️
 On-device-unverified — the firing cadence wants a real run on the Pixel.
 
+### ITEMS page — catalog 22→37 + a LOADOUT panel (PR #272, merged, commit — squash)
+Owner: "add more stuff to the items page." Grew the wasteland item economy and surfaced the carried loadout.
+- **Catalog (`core:telemetry/Items.kt`), 22 → 37:** AID gained Trauma Patch (+20 HP) + Surgeon's Kit (+60 HP)
+  filling the mid/high heal tier; CHEM gained rare **+4** one-check kicks Titan Serum (STR) / Quicksilver (AGI)
+  / Fortune Vial (LUCK); GEAR gained **Lucky Charm** (closes the LUCK gear gap — every S.P.E.C.I.A.L. attribute
+  now has passive gear) plus a full **+2 tier** (Power Gauntlet, Recon Optics, Combat Webbing, Negotiator's
+  Suit, Neural Implant, Sprint Servos, Fortune Idol); JUNK gained higher-value Fusion Cell + Gold Trinket.
+  `GameLocations.stock` sells the new items per `LocationKind`; every stock id resolves.
+- **UI (`TelemetryScreen`, ITEMS ▸ GEAR):** a new **LOADOUT panel** above PACK — the passive GEAR bonuses
+  stacking on your checks right now (via `SpecialGame.gearStatBonus`) + a pack tally (items held, split by
+  kind, total caps if sold). PACK rows now show a **rarity ★ tier tag** (colour-ramped common→rare, new
+  `rarityColor` helper) and the item kind.
+- **`ItemsTest`** (5 cases, kotlinc-validated green): catalog grew + ids unique, `byId` round-trips + rejects
+  unknown, every shop-stock id is a real item, every stat has passive gear, higher-tier items present.
+  ⚠️ On-device-unverified (CI compile-gates only): the LOADOUT panel + richer PACK rows want eyes on the Pixel.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
