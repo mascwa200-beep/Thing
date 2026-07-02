@@ -1246,8 +1246,34 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   `seenTopUrls`; `RefreshWorker.writeState` re-reads and keeps the latest `seenTopUrls`. Also protects the
   other worker-owned dedup fields (survival check-ins, agenda, safety/flight/market) from the same clobber.
   ⚠️ On-device-unverified — the tip rotation advancing wants a run on the Pixel.
-- **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; wire world-event
-  shop discounts; a new non-item game system.
+- **World-event shop prices (PR #280):** completed the daily mechanic — `WorldEvent.shopPct` (Market Fair
+  −20% "wares go cheap"; Gloom +15% "traders gouge"). `SpecialGame.shopPrice(item,c,kind,shopPct)` is the
+  single source of truth (rep discount → world modifier, floored at 1); `buyItemAt` routes through it; store
+  `buyAt` + VM `buy` thread `worldEvent.shopPct` so the CHARGE matches; `LocationSheet` shows it + a "MARKET
+  −20%" tag; the STAT banner lists the shop effect. +2 WorldEventsTest (37 core green). Compile-review clean.
+
+### GEO-GATED WASTELAND — the "go there to get/do things" overhaul (accepted, in progress)
+Owner: "Make Geo fenced wasteland encounters/cities/towns/tribes/gangs/monsters/fights/NPCs/shops/locations/
+quests/weapons/money all linked to the real world. To get things and do things, first I must go there and
+have it." Via AskUserQuestion the owner chose **FULLY GEO-GATED** — EVERYTHING (encounters, fights, loot,
+shops, quests, weapons) requires physically traveling to a real place within reach; **nothing happens at
+home** (couch-play `venture` is to be retired). Built as CI-green slices per the established pattern.
+- **Slice 1 — site-model core (PR #280, merged):** `core:telemetry/WorldSite.kt` (+ `WorldSiteTest` 7 cases,
+  kotlinc-validated) — deterministic map from a real place (coords + OSM category) to a stable wasteland
+  **site**. `SiteType` taxonomy (11): safe/trade — SETTLEMENT/TRADER/MEDIC/FIXER/BARKEEP/OUTPOST (threat 1,
+  a `shopKind`); danger — TRIBE(2)/RUINS(2)/GANG_CAMP(3)/MONSTER_DEN(4)/VAULT(5), `hostile` flag.
+  `WorldSites.typeFor(osmCategory)` classifies (widens `GameLocations.kindFor`), `nameFor(type, seed)` gives
+  deterministic seeded names that never churn ("The Rusted Fangs", "Deathclaw Gorge", "Vault 87", "New
+  Haven"), `siteFor(...)` builds the stable site, `favoredStats(type)` biases which fights appear,
+  `spawnsEncounter(type)`, per-type `intro()`.
+- **Remaining slices:** (2) wire `GameWorldStore` to classify scanned POIs into `WorldSite`s — add Overpass
+  queries for the hostile/exploration types (gang camps=industrial/works/scrapyard, monster dens=water/wood/
+  wetland, tribes=park/nature_reserve/camp_site, vaults=military/bunker, ruins=historic/abandoned) → (3) map
+  render → (4) **presence-gate encounters/fights/shop/quests** at sites + retire couch-play `venture` → (5)
+  weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core loop — owner verifies each
+  slice on the Pixel.
+- **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; a new non-item
+  game system.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
