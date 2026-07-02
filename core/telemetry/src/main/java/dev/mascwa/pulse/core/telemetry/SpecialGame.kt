@@ -70,6 +70,8 @@ data class Character(
     val inventory: Map<String, Int> = emptyMap(),
     val companion: String? = null,
     val reputation: Map<String, Int> = emptyMap(),
+    /** Your wasteland tale — global renown (curated by archetype + grown by deeds). Bends shops + CHARISMA. */
+    val legend: Legend = Legend(),
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -174,6 +176,7 @@ object SpecialGame {
                 gearStatBonus(character, choice.stat) +
                 setStatBonus(character, choice.stat) +
                 companionStatBonus(character, choice.stat) +
+                legendStatBonus(character, choice.stat) +
                 (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
                 (life?.let { LifeStats.statBonus(it, choice.stat) } ?: 0) +
                 (activeChem?.statBonusAmt ?: 0)
@@ -205,6 +208,18 @@ object SpecialGame {
 
     /** Synergy bonus from any fully-assembled [GearSet] that boosts checks gated by [s]. */
     fun setStatBonus(c: Character, s: Special): Int = GearSets.statBonus(c.inventory, s)
+
+    /** Your renown's sway in social dealings — a CHARISMA bump (or penalty) from your standing/tale. */
+    fun legendStatBonus(c: Character, s: Special): Int =
+        if (s == Special.CHARISMA) Legends.charismaBonus(c.legend.renown) else 0
+
+    // --- The wasteland tale (global renown) ---
+
+    /** Curate your tale by (re)seeding the renown from a chosen [Archetype] (null = a blank slate). */
+    fun curateLegend(c: Character, archetype: Archetype?): Character = c.copy(legend = Legends.start(archetype))
+
+    /** Let the tale grow: record a [deed] the wasteland remembers, shifting your renown (clamped). */
+    fun recordDeed(c: Character, deed: DeedKind): Character = c.copy(legend = Legends.recordDeed(c.legend, deed))
 
     /** Passive bonus from carried GEAR that boosts checks gated by [s] (each distinct piece counts once). */
     fun gearStatBonus(c: Character, s: Special): Int = c.inventory.entries.sumOf { (id, qty) ->
@@ -270,7 +285,10 @@ object SpecialGame {
      */
     fun shopPrice(item: Item, c: Character, kind: LocationKind, shopPct: Int = 0): Int {
         val base = Reputation.discountedPrice(item.value, rep(c, kind))
-        return (base + base * shopPct / 100).coerceAtLeast(1)
+        // Your global renown bends every price too (revered → cut rates, reviled → gouged), stacked with the
+        // day's world modifier. Floored at 1 so a purchase always costs something.
+        val pct = shopPct + Legends.shopPricePct(c.legend.renown)
+        return (base + base * pct / 100).coerceAtLeast(1)
     }
 
     /**
