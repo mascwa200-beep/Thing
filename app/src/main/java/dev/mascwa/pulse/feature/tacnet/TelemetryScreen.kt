@@ -26,9 +26,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -387,7 +389,44 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             encounter != null -> EncounterPanel(encounter!!, character, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
             else -> IdlePanel(resolution, siteReach, c) { vm.venture() }
         }
+        Spacer(Modifier.height(12.dp))
+        ResetRunControl(c) { vm.resetProgress() }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** A confirm-gated "reset the wasteland run" control — wipes game progress but keeps your real-life profile. */
+@Composable
+private fun ResetRunControl(c: NightwirePalette, onReset: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, c.negative.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .background(c.negative.copy(alpha = 0.06f)).clickable { confirming = true }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("RESET RUN", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+            letterSpacing = 1.5.sp, color = c.negative)
+    }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Reset the wasteland run?") },
+            text = {
+                Text(
+                    "Wipes your stats, level, XP, caps, inventory, perks, faction rep, achievements, quests " +
+                        "and codex — a fresh operative. Your real-life profile (height, weight, age, money, " +
+                        "needs, name, steps) is KEPT. This can't be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; onReset() }) {
+                    Text("RESET", color = c.negative)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("CANCEL") } },
+        )
     }
 }
 

@@ -643,6 +643,30 @@ class SpecialGameStore(
         }
     }
 
+    /**
+     * Reset the GAME — stats, level, XP, caps, inventory, perks, companion, faction rep, achievements, daily
+     * objectives, scavenge state and the item codex — to a fresh operative, but KEEP the real-life profile
+     * (height/weight/age/money, hydration/hygiene/energy/nourishment, mood, name, steps) and the story clock.
+     * For restarting the wasteland run without re-entering your real self. (Contrast [reset], which also
+     * wipes the profile.)
+     */
+    fun resetProgress() {
+        scope.launch {
+            ensureLoaded()
+            _character.value = SpecialGame.newCharacter()
+            _resolution.value = null
+            wins = 0; crits = 0; ventures = 0
+            unlocked = emptySet(); _unlocked.value = emptySet(); _lastUnlock.value = null
+            lastXpVisits = -1 // re-baseline app-usage XP against the fresh counters
+            dailyDay = -1L; claimed = emptySet() // re-baseline today's objectives
+            lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
+            discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
+            // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
     /** Grant a completed quest's reward — caps + XP (with any level-ups) — into the character. */
     fun awardQuest(caps: Int, xp: Int) {
         scope.launch {
