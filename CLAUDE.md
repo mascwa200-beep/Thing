@@ -1210,9 +1210,18 @@ follow-ups to #272 (both pure CI-tested core; 21 game-core tests green, kotlinc-
   `SpecialGameStore.currentMetrics()` feeds `ItemCodex.found(discovered)`; the discovery collector now
   `runAchievementCheck()`s after the codex grows (reward-item cascade bounded by the finite unlocked set).
   `AchievementsTest` +1 (22 game-core tests green). ⚠️ On-device-unverified (CI compile-gates only).
-- **Item-economy arc now:** 37-item catalog → LOADOUT panel → crafting tier-up → rarity-weighted loot →
-  SCAVENGE → completion codex → discovery-milestone rewards. **Open follow-ups (offered):** a STASH/storage;
-  item set bonuses; more encounter content.
+- **Gear sets (PR #277, merged):** a synergy layer on the loadout — carrying every piece of a set grants an
+  extra stat bonus *beyond* the pieces' own passive gear, rewarding the chase for the rare +2 tier. Pure
+  `core:telemetry/GearSets.kt` (+ `GearSetsTest` 5 cases): `GearSet` + `isComplete`/`active`/`ownedPieces`/
+  `statBonus`; 4 sets — Enforcer (power_gauntlet+combat_webbing → +1 STR), Infiltrator (sprint_servos+
+  recon_optics → +1 AGI), Envoy (negotiator_suit+neural_implant → +1 CHA), Fortune's Favor (fortune_idol+
+  lucky_charm → +2 LUCK); every piece resolves as GEAR. `SpecialGame.setStatBonus(c,s)` summed into the
+  resolve check beside `gearStatBonus` (stacks with perks/companions/env/life). LOADOUT panel gained a SET
+  BONUS section (active sets + a "1/2 · +n STAT" teaser for in-progress ones). Compile-review subagent clean.
+  28 game-core tests green. ⚠️ On-device-unverified (CI compile-gates only).
+- **Item-economy arc now:** 37-item catalog → LOADOUT (+ set bonuses) → crafting tier-up → rarity-weighted
+  loot → SCAVENGE → completion codex → discovery-milestone rewards → gear-set synergies. **Open follow-ups
+  (offered):** a STASH/storage; more encounter/boss content; a new non-item game system.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
