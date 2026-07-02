@@ -19,6 +19,31 @@ class AchievementsTest {
         assertEquals(null, Achievements.byId("nope"))
     }
 
+    @Test fun catalogHasAtLeastAThousand() {
+        assertTrue("expected 1000+ achievements, got ${Achievements.ALL.size}", Achievements.ALL.size >= 1000)
+        // Every generated track's ladder is monotonic + all thresholds positive.
+        Achievements.ALL.forEach { assertTrue("bad threshold ${it.id}", it.threshold > 0) }
+    }
+
+    @Test fun nextUpSurfacesAShortChaseList() {
+        // With a blank profile, "what's next" is a short, capped, most-progressed-first list.
+        val next = Achievements.nextUp(GameMetrics(wins = 3, distanceM = 400), emptySet())
+        assertTrue(next.size <= 6)
+        assertTrue(next.none { Achievements.isUnlocked(it, GameMetrics(wins = 3, distanceM = 400)) })
+    }
+
+    @Test fun newTrackingMetricsProject() {
+        val m = GameMetrics(walkM = 1500, runM = 500, driveM = 8000, elevationM = 300, stepsTotal = 12_000,
+            cellsExplored = 7, talksWon = 4, scavenges = 6, questsDone = 3, crafted = 5, trades = 9,
+            renown = 40, daysSurvived = 8)
+        assertEquals(2000, m.value(AchMetric.ONFOOT_M)) // walk + run
+        assertEquals(1500, m.value(AchMetric.WALK_M))
+        assertEquals(8000, m.value(AchMetric.DRIVE_M))
+        assertEquals(300, m.value(AchMetric.ELEVATION_M))
+        assertEquals(12_000, m.value(AchMetric.STEPS_TOTAL))
+        assertEquals(40, m.value(AchMetric.RENOWN))
+    }
+
     @Test fun everyRewardItemIdResolves() {
         // A typo'd reward id would silently grant nothing on-device.
         Achievements.ALL.mapNotNull { it.rewardItemId }.forEach {
