@@ -1104,10 +1104,15 @@ Built as 3 CI-green slices; the game now reads your real self.
   persisted per-day baseline (today = latest − baseline; a lower reading [reboot] or new day re-baselines);
   VM feeds it each tick. LIFE panel shows a "Steps N / 10000" gauge. **Aggregate + on-device only.**
   Subagent compile-review clean (incl. `android.os.Build` vs the `Build` enum). ⚠️ On-device-unverified.
+- **Batch 6 — circadian encounter bias (PR #268, merged, commit `34d60b1`):** `LifeStats.circadianFavored(hour)`
+  → the attributes the real hour-of-day leans into (morning 05–10 PER/INT, midday 11–16 STR/END, evening 17–21
+  CHA, night 22–04 AGI/LUCK). Biases WHICH encounters appear (not check maths → no double-count with the
+  darkness/energy effects): `TelemetryViewModel.venture()` unions it with the perception favoured set fed to
+  `SpecialGame.nextEncounter`. +1 test (37 total, kotlinc green). LIFE panel shows "THIS HOUR FAVOURS · …".
 - **Life-sim customization set is now very comprehensive** (height/weight/age/real-money · hydration/hygiene/
-  energy/nourishment · mood · name · world-driven decay · **real step count**). **Owner-steerable next (bigger,
-  need device/hardware):** BLE heart-rate strap → vitals (manifest already has BLUETOOTH perms), calendar-aware
-  quests (READ_CALENDAR present), a full circadian/time-of-day + sleep-debt model.
+  energy/nourishment · mood · name · world-driven decay · **real step count** · **time-of-day encounter bias**).
+  **Owner-steerable next (bigger, need device/hardware):** BLE heart-rate strap → vitals (manifest already has
+  BLUETOOTH perms), calendar-aware quests (READ_CALENDAR present).
   ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers, steps) is CI-compile-gated only — owner verifies on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
