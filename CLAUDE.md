@@ -1266,12 +1266,19 @@ home** (couch-play `venture` is to be retired). Built as CI-green slices per the
   deterministic seeded names that never churn ("The Rusted Fangs", "Deathclaw Gorge", "Vault 87", "New
   Haven"), `siteFor(...)` builds the stable site, `favoredStats(type)` biases which fights appear,
   `spawnsEncounter(type)`, per-type `intro()`.
-- **Remaining slices:** (2) wire `GameWorldStore` to classify scanned POIs into `WorldSite`s — add Overpass
-  queries for the hostile/exploration types (gang camps=industrial/works/scrapyard, monster dens=water/wood/
-  wetland, tribes=park/nature_reserve/camp_site, vaults=military/bunker, ruins=historic/abandoned) → (3) map
-  render → (4) **presence-gate encounters/fights/shop/quests** at sites + retire couch-play `venture` → (5)
-  weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core loop — owner verifies each
-  slice on the Pixel.
+- **Slice 2 — POI → WorldSite classification (PR #281, merged):** `GameWorldStore` now turns every scanned
+  real place into a `WorldSite`, not just a shop. Query model is category-driven (`SiteQuery(category,id,
+  filter)`); each POI maps through `WorldSites.typeFor`/`siteFor`. 5 trade queries (supermarket/pharmacy/
+  hardware/pub/fuel) + 5 new danger queries — tribes (`leisure=park/nature_reserve`), gang camps
+  (`landuse=industrial`), monster dens (`natural=water/wood/wetland`), vaults (`military=bunker`), ruins
+  (`historic=ruins/archaeological_site`). Overpass `node`+`way` `out center` returns area POIs as points, so
+  these classify. New `sitesFlow: StateFlow<List<WorldSite>>` (cap `MAX_SITES=32`); the trade sites still
+  drive the existing `GameLocation` shop layer (derived from `SiteType.shopKind`) so the current map/shop UI
+  is untouched. `TelemetryViewModel.sites` exposed for the render slice. Compile-review clean.
+- **Remaining slices:** (3) render the sites on the wasteland map (per-SiteType coloured markers) → (4)
+  **presence-gate encounters/fights/shop/quests** at sites + retire couch-play `venture` → (5) weapons + money
+  as things found/earned only AT real places. ⚠️ Reshapes the core loop — owner verifies each slice on the
+  Pixel. On-device-unverified so far: the Overpass fetches for the new categories + the classification.
 - **Item/game arc open follow-ups (offered):** a STASH/storage; more encounter/boss content; a new non-item
   game system.
 

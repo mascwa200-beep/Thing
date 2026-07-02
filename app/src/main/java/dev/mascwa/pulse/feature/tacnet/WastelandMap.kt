@@ -14,8 +14,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import dev.mascwa.pulse.core.telemetry.GameLocation
-import dev.mascwa.pulse.core.telemetry.LocationKind
+import dev.mascwa.pulse.core.telemetry.SiteType
+import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import org.maplibre.android.MapLibre
@@ -38,15 +38,15 @@ private const val W_LOC_SOURCE = "wl-loc"
 private const val W_LOC_LAYER = "wl-loc-dot"
 
 /**
- * The literal Pokémon-Go map: an OSM map centred on the player with the nearby real-shop game locations
- * as colour-coded dots (by [LocationKind]). Tapping a dot fires [onSelect] with the location id (the STAT
- * tab opens that location's shop/conversation). Compact + embedded, so map gestures are disabled — it
- * pans with the player, not the finger, and vertical scroll passes through to the page. Clones NAV's
- * proven MapLibre-in-Compose wiring (lifecycle-bound [MapView], GeoJSON sources, tap query).
+ * The literal Pokémon-Go map: an OSM map centred on the player with the nearby wasteland [WorldSite]s as
+ * dots colour-coded by [SiteType] and sized by threat (a gang camp / monster den / vault reads bigger and
+ * angrier than a settlement). Tapping a dot fires [onSelect] with the site id. Compact + embedded, so map
+ * gestures are disabled — it pans with the player, not the finger, and vertical scroll passes through to the
+ * page. Clones NAV's proven MapLibre-in-Compose wiring (lifecycle-bound [MapView], GeoJSON sources, tap query).
  */
 @Composable
 fun WastelandMap(
-    locations: List<GameLocation>,
+    sites: List<WorldSite>,
     gps: DeviceLocation?,
     c: NightwirePalette,
     modifier: Modifier = Modifier,
@@ -74,7 +74,7 @@ fun WastelandMap(
                 style.addLayer(
                     CircleLayer(W_LOC_LAYER, W_LOC_SOURCE).withProperties(
                         PropertyFactory.circleColor(Expression.get("color")),
-                        PropertyFactory.circleRadius(8f),
+                        PropertyFactory.circleRadius(Expression.get("radius")),
                         PropertyFactory.circleStrokeColor(c.void.toArgb()),
                         PropertyFactory.circleStrokeWidth(2f),
                     ),
@@ -117,10 +117,10 @@ fun WastelandMap(
         }
     }
 
-    // Refresh the location dots whenever the scan results change.
-    LaunchedEffect(locations, map) {
+    // Refresh the site dots whenever the scan results change.
+    LaunchedEffect(sites, map) {
         val style = map?.style ?: return@LaunchedEffect
-        style.getSourceAs<GeoJsonSource>(W_LOC_SOURCE)?.setGeoJson(wastelandGeoJson(locations))
+        style.getSourceAs<GeoJsonSource>(W_LOC_SOURCE)?.setGeoJson(wastelandGeoJson(sites))
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
@@ -158,24 +158,32 @@ private fun rememberWastelandMapView(): MapView {
     return mapView
 }
 
-private fun kindColorHex(kind: LocationKind): String = when (kind) {
-    LocationKind.TRADER -> "#FFC542"
-    LocationKind.MEDIC -> "#FF5A5A"
-    LocationKind.FIXER -> "#5AD1FF"
-    LocationKind.BARKEEP -> "#B98CFF"
-    LocationKind.OUTPOST -> "#5BFF9B"
+private fun siteColorHex(type: SiteType): String = when (type) {
+    SiteType.SETTLEMENT -> "#5BFF9B" // green — a safe town
+    SiteType.TRADER -> "#FFC542"     // gold
+    SiteType.MEDIC -> "#FF5A5A"      // red cross
+    SiteType.FIXER -> "#5AD1FF"      // cyan
+    SiteType.BARKEEP -> "#B98CFF"    // violet
+    SiteType.OUTPOST -> "#9BFFDA"    // teal
+    SiteType.TRIBE -> "#E0C068"      // tan
+    SiteType.RUINS -> "#9AA0A6"      // grey rubble
+    SiteType.GANG_CAMP -> "#FF7A3C"  // orange — danger
+    SiteType.MONSTER_DEN -> "#C43CFF" // magenta — a lair
+    SiteType.VAULT -> "#FFE000"      // bright yellow — a prize
 }
 
-private fun wastelandGeoJson(locs: List<GameLocation>): String {
+private fun wastelandGeoJson(sites: List<WorldSite>): String {
     val features = StringBuilder()
     var first = true
-    for (l in locs) {
+    for (s in sites) {
         if (!first) features.append(',')
         first = false
+        val radius = 7 + s.type.threat // 8..12 — bigger = more dangerous
         features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
-            .append(l.lon).append(',').append(l.lat)
-            .append("]},\"properties\":{\"id\":").append(wJsonString(l.id))
-            .append(",\"color\":\"").append(kindColorHex(l.kind)).append("\"}}")
+            .append(s.lon).append(',').append(s.lat)
+            .append("]},\"properties\":{\"id\":").append(wJsonString(s.id))
+            .append(",\"color\":\"").append(siteColorHex(s.type)).append("\"")
+            .append(",\"radius\":").append(radius).append("}}")
     }
     return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }

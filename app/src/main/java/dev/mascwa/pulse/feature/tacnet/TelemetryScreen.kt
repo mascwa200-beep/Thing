@@ -84,6 +84,7 @@ import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GearSets
 import dev.mascwa.pulse.core.telemetry.WorldEvent
+import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.telemetry.GestureType
 import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
@@ -435,6 +436,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
     val gameMetrics by vm.gameMetrics.collectAsStateWithLifecycle()
     val locations by vm.locations.collectAsStateWithLifecycle()
+    val sites by vm.sites.collectAsStateWithLifecycle()
     val travel by vm.travel.collectAsStateWithLifecycle()
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val daily by vm.daily.collectAsStateWithLifecycle()
@@ -464,7 +466,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
         }
         PipHeader("Wasteland")
-        WastelandPanel(locations, travel, scanning, gps, character, worldEvent.shopPct, c,
+        WastelandPanel(locations, sites, travel, scanning, gps, character, worldEvent.shopPct, c,
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
@@ -1591,6 +1593,7 @@ private fun rewardText(a: Achievement): String = buildList {
 @Composable
 private fun WastelandPanel(
     locations: List<GameLocation>,
+    sites: List<WorldSite>,
     travel: TravelStats,
     scanning: Boolean,
     gps: DeviceLocation?,
@@ -1612,15 +1615,18 @@ private fun WastelandPanel(
                 TravelStat("PLAYED", formatPlayTime(travel.playMs), c)
             }
             GameButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", c.sky, onScan)
-            if (locations.isNotEmpty()) {
-                WastelandMap(locations, gps, c, Modifier.fillMaxWidth().height(200.dp)) { id ->
+            if (sites.isNotEmpty()) {
+                // Every nearby real place as a wasteland site — settlements, tribes, gang camps, monster dens,
+                // vaults. Coloured by type + sized by threat. (Trading the shop sites is below; fighting the
+                // danger sites when you're standing on them is a later slice.)
+                WastelandMap(sites, gps, c, Modifier.fillMaxWidth().height(200.dp)) { id ->
                     selectedId = if (selectedId == id) null else id
                 }
             }
-            if (locations.isEmpty()) {
+            if (sites.isEmpty()) {
                 Text(
                     if (gps == null) "No fix yet. Grant location and give it a moment."
-                    else "Nothing scanned. Tap SCAN AREA to find real shops nearby.",
+                    else "Nothing scanned. Tap SCAN AREA to map the wasteland around you.",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 )
             } else {

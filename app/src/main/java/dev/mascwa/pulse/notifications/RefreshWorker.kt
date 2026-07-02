@@ -409,16 +409,19 @@ class RefreshWorker(
             }
         }
 
-        // --- Frequent survival tips: push the next tip from the 300+ rotating catalog (quiet, low-priority,
-        // fixed id so each silently replaces the last). Fires roughly every worker tick — the worker interval
-        // is the cadence — gated by the master toggle + quiet hours like everything else. ---
+        // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each
+        // silently replaces the last). Gated to at most one per SURVIVAL_TIP_MIN_GAP_MS. The tip index is
+        // DERIVED FROM THE CLOCK (not a persisted cursor), so the rotation can never get stuck on tip 0 even
+        // if state fails to persist, and the ×131 scramble (coprime with the ~310-tip catalog) makes it feel
+        // random while still covering everything over time. ---
         if (prefs.survivalTips) {
             runCatching {
                 val now = System.currentTimeMillis()
                 if (now - state.survivalTipLastMs >= SURVIVAL_TIP_MIN_GAP_MS) {
-                    val idx = state.survivalTipIndex
+                    val bucket = now / SURVIVAL_TIP_MIN_GAP_MS // advances once per gap, from the real clock
+                    val idx = (bucket * 131).toInt()
                     notifier.notifyTip(7760, "⛑ Survival tip", dev.mascwa.pulse.core.telemetry.SurvivalTips.tip(idx))
-                    state = state.copy(survivalTipIndex = idx + 1, survivalTipLastMs = now)
+                    state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
                 }
             }
         }
@@ -535,6 +538,6 @@ class RefreshWorker(
         const val UNIQUE_NAME = "pulse_periodic_refresh"
         // Minimum gap between survival tips — a floor so double-runs don't double-fire; the worker's own
         // period (≥15 min) is the real cadence, so tips arrive roughly every tick while awake.
-        private const val SURVIVAL_TIP_MIN_GAP_MS = 12L * 60 * 1000
+        private const val SURVIVAL_TIP_MIN_GAP_MS = 3L * 60 * 60 * 1000 // ~one tip every 3 hours, not every tick
     }
 }
