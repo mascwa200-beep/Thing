@@ -82,6 +82,7 @@ import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
 import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
+import dev.mascwa.pulse.core.telemetry.GearSets
 import dev.mascwa.pulse.core.telemetry.GestureType
 import dev.mascwa.pulse.core.telemetry.Gestures
 import dev.mascwa.pulse.core.telemetry.GameMetrics
@@ -1036,6 +1037,26 @@ private fun LoadoutPanel(ch: Character, c: NightwirePalette) {
                         Text("+$b", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
                             fontSize = 11.sp, color = c.positive)
                     }
+                }
+            }
+            // Gear sets — a full matched pair adds a synergy bonus on top; show active + any in progress.
+            val active = GearSets.active(ch.inventory)
+            val partial = GearSets.ALL.filter { it !in active && GearSets.ownedPieces(it, ch.inventory) > 0 }
+            if (active.isNotEmpty() || partial.isNotEmpty()) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
+                Text("SET BONUS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                    color = c.violet, letterSpacing = 1.sp)
+                active.forEach { set ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(set.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                            color = c.violet, modifier = Modifier.weight(1f))
+                        Text("+${set.bonusAmt} ${set.bonusStat.display}", fontFamily = ChakraPetch,
+                            fontWeight = FontWeight.Bold, fontSize = 10.sp, color = c.positive)
+                    }
+                }
+                partial.forEach { set ->
+                    Text("${set.name}  ${GearSets.ownedPieces(set, ch.inventory)}/${set.pieces.size} · +${set.bonusAmt} ${set.bonusStat.display}",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
