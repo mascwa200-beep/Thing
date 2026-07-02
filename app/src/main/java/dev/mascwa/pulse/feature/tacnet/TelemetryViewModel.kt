@@ -17,6 +17,8 @@ import dev.mascwa.pulse.core.telemetry.Quest
 import dev.mascwa.pulse.core.telemetry.QuestMetrics
 import dev.mascwa.pulse.core.telemetry.QuestView
 import dev.mascwa.pulse.core.telemetry.SceneContext
+import dev.mascwa.pulse.core.telemetry.WorldEvent
+import dev.mascwa.pulse.core.telemetry.WorldEvents
 import dev.mascwa.pulse.core.telemetry.SceneSignals
 import dev.mascwa.pulse.core.telemetry.StoryDirector
 import dev.mascwa.pulse.core.telemetry.TaskBoard
@@ -87,11 +89,17 @@ class TelemetryViewModel(
     /** The current wasteland day number — drives quest generation (a StateFlow so quests roll over daily). */
     private val _day = MutableStateFlow(1)
 
+    private val _worldEvent = MutableStateFlow(WorldEvents.eventFor(1))
+    /** The day's wasteland situation — favours some stats + modifies win caps (surfaced as a banner). */
+    val worldEvent: StateFlow<WorldEvent> = _worldEvent.asStateFlow()
+
     private fun updateDayBanner() {
         val now = System.currentTimeMillis()
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         _dayBanner.value = GameClock.banner(game.startedFlow.value, now, hour)
-        _day.value = GameClock.dayNumber(game.startedFlow.value, now)
+        val day = GameClock.dayNumber(game.startedFlow.value, now)
+        _day.value = day
+        _worldEvent.value = WorldEvents.eventFor(day)
     }
 
     /**
@@ -251,14 +259,15 @@ class TelemetryViewModel(
     /** Draw the next encounter, biased toward what the game perceives you doing/hearing right now. */
     fun venture() = game.venture(
         Perception.strategy(sceneContext.value).favored +
-            dev.mascwa.pulse.core.telemetry.LifeStats.circadianFavored(_env.value.hourOfDay),
+            dev.mascwa.pulse.core.telemetry.LifeStats.circadianFavored(_env.value.hourOfDay) +
+            _worldEvent.value.favored,
     )
     /**
      * Resolve a choice in the active encounter — with the real-world context, an optional CHEM, and an
      * optional [roll] (supplied by the gesture-performance grade; random if null).
      */
     fun choose(choiceIndex: Int, useItemId: String? = null, roll: Int? = null) =
-        game.choose(choiceIndex, _env.value, useItemId, roll)
+        game.choose(choiceIndex, _env.value, useItemId, roll, _worldEvent.value.capsWinPct)
 
     /** The live device motion (accelerometer/gyro), for grading encounter gestures. */
     val telemetryFlow: StateFlow<Telemetry> = telemetry
