@@ -372,6 +372,7 @@ class TelemetryViewModel(
                 _env.value = buildEnv(controller.telemetry.value)
                 updateDayBanner()
                 game.refreshNeeds(_env.value) // real weather/time/motion/charging drive the needs decay
+                controller.telemetry.value.stepCounterRaw?.let { game.setStepCounter(it) } // real steps → activity buff
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 pushLog()
                 delay(1500)

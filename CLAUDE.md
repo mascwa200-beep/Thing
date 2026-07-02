@@ -1095,10 +1095,20 @@ Built as 3 CI-green slices; the game now reads your real self.
   kotlinc green). Store keeps `lastEnv` (fed each tick) + decays through it in `currentLife()`, with a
   charging-transition **re-anchor guard** so regen/decay isn't applied retroactively to a long gap; VM feeds
   `refreshNeeds(env)` each tick; LIFE panel shows a "REAL-WORLD DRIVERS" readout. ⚠️ On-device-unverified.
-- **Life-sim customization set** (height/weight/age/real-money · hydration/hygiene/energy/nourishment · mood ·
-  name · world-driven decay). **Owner-steerable next:** real step-count → energy (step-counter sensor +
-  ACTIVITY_RECOGNITION), appearance/portrait, sleep-schedule-aware decay.
-  ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers) is CI-compile-gated only — owner verifies on the Pixel.
+- **Batch 5 — real STEP COUNT → the game (PR #267, merged, commit `a827479`):** the strongest real-life tie
+  yet. `LifeStats.stepsToday` → an activity buff (≥5000 END+1 "Active today"; ≥10000 END+1 AGI+1 "In stride")
+  via the effects() pipeline; +2 tests (36 total, kotlinc green). `TelemetryController` reads
+  `Sensor.TYPE_STEP_COUNTER` (cumulative-since-boot) → `Telemetry.stepCounterRaw` (defensive; no perm/sensor
+  → no events). Manifest gains **ACTIVITY_RECOGNITION** + an optional stepcounter feature; `GameSensors`
+  requests it at runtime (API 29+, re-registers on grant). `SpecialGameStore.setStepCounter(raw)` keeps a
+  persisted per-day baseline (today = latest − baseline; a lower reading [reboot] or new day re-baselines);
+  VM feeds it each tick. LIFE panel shows a "Steps N / 10000" gauge. **Aggregate + on-device only.**
+  Subagent compile-review clean (incl. `android.os.Build` vs the `Build` enum). ⚠️ On-device-unverified.
+- **Life-sim customization set is now very comprehensive** (height/weight/age/real-money · hydration/hygiene/
+  energy/nourishment · mood · name · world-driven decay · **real step count**). **Owner-steerable next (bigger,
+  need device/hardware):** BLE heart-rate strap → vitals (manifest already has BLUETOOTH perms), calendar-aware
+  quests (READ_CALENDAR present), a full circadian/time-of-day + sleep-debt model.
+  ⚠️ The whole life-sim UI (LIFE panel, meters, fields, drivers, steps) is CI-compile-gated only — owner verifies on the Pixel.
 
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).

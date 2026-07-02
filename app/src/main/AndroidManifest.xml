@@ -59,6 +59,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
+    <!-- Real-world activity for the life-sim: today's step count (TYPE_STEP_COUNTER) buffs the character.
+         Aggregate + on-device only — the raw count never leaves the device (opt-in, runtime-gated on API 29+). -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
+
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"

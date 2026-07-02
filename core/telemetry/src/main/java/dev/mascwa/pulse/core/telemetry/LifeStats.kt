@@ -35,6 +35,8 @@ data class LifeProfile(
     val nourishment: Int = 100,
     /** Mood, 0..100 (50 = neutral) — user-set; high spirits buff CHARISMA/LUCK, low spirits sap them. */
     val mood: Int = 50,
+    /** Real steps walked today (from the device step counter) — an active day buffs ENDURANCE/AGILITY. */
+    val stepsToday: Int = 0,
     /** Cosmetic operator name/callsign shown on the LIFE panel (no game effect). */
     val operatorName: String = "",
 )
@@ -107,6 +109,10 @@ object LifeStats {
     // Mood band edges (0..100, 50 = neutral) — only the extremes bend checks.
     const val MOOD_HIGH = 75
     const val MOOD_LOW = 25
+
+    // Real-world step thresholds — an active day keeps you fit (a full stride is the classic 10k goal).
+    const val ACTIVE_STEPS = 5000
+    const val STRIDE_STEPS = 10000
 
     // Money-tier thresholds, in the profile's currency units (magnitude only).
     const val STEADY_MONEY = 100.0
@@ -237,6 +243,14 @@ object LifeStats {
             out += LifeEffect(Special.CHARISMA, -1, "Low spirits")
         }
 
+        // A real active day keeps you fit — steps buff the body.
+        if (p.stepsToday >= STRIDE_STEPS) {
+            out += LifeEffect(Special.ENDURANCE, +1, "In stride (10k+ steps)")
+            out += LifeEffect(Special.AGILITY, +1, "Light on your feet")
+        } else if (p.stepsToday >= ACTIVE_STEPS) {
+            out += LifeEffect(Special.ENDURANCE, +1, "Active today (5k+ steps)")
+        }
+
         return out
     }
 
@@ -328,4 +342,5 @@ object LifeStats {
     fun withMoney(p: LifeProfile, amount: Double): LifeProfile = p.copy(realMoney = amount.coerceAtLeast(0.0))
     fun withMood(p: LifeProfile, mood: Int): LifeProfile = p.copy(mood = mood.coerceIn(0, 100))
     fun withName(p: LifeProfile, name: String): LifeProfile = p.copy(operatorName = name.take(MAX_NAME))
+    fun withSteps(p: LifeProfile, steps: Int): LifeProfile = p.copy(stepsToday = steps.coerceAtLeast(0))
 }

@@ -39,6 +39,8 @@ data class Telemetry(
     val netSignal: String = "—",
     val memUsedMb: Long = 0,
     val memTotalMb: Long = 0,
+    /** Cumulative steps since last device boot (from TYPE_STEP_COUNTER); null if unavailable/no permission. */
+    val stepCounterRaw: Long? = null,
 )
 
 class TelemetryController(private val context: Context) : SensorEventListener {
@@ -49,6 +51,8 @@ class TelemetryController(private val context: Context) : SensorEventListener {
     private val accel = sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val gyro = sm?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     private val light = sm?.getDefaultSensor(Sensor.TYPE_LIGHT)
+    // Steps walked since boot — needs ACTIVITY_RECOGNITION for events to flow (API 29+); no-op otherwise.
+    private val stepCounter = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
     private val _t = MutableStateFlow(Telemetry(hasBarometer = pressure != null))
     val telemetry: StateFlow<Telemetry> = _t.asStateFlow()
@@ -57,6 +61,9 @@ class TelemetryController(private val context: Context) : SensorEventListener {
         listOf(pressure, magnet, accel, gyro, light).forEach { s ->
             s?.let { sm?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         }
+        // The step counter changes rarely; a slow delay is plenty and saves power. Defensive — if the
+        // ACTIVITY_RECOGNITION permission isn't granted, registration is a harmless no-op (no events).
+        stepCounter?.let { runCatching { sm?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) } }
         refreshSystem()
     }
 
@@ -93,6 +100,7 @@ class TelemetryController(private val context: Context) : SensorEventListener {
                 _t.update { it.copy(gyroDps = Math.toDegrees(mag.toDouble()).toFloat()) }
             }
             Sensor.TYPE_LIGHT -> _t.update { it.copy(lightLux = e.values[0]) }
+            Sensor.TYPE_STEP_COUNTER -> _t.update { it.copy(stepCounterRaw = e.values[0].toLong()) }
         }
     }
 

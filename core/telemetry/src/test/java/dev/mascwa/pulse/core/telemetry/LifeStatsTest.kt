@@ -204,6 +204,23 @@ class LifeStatsTest {
         assertTrue(LifeStats.needDrivers(null).isEmpty())
     }
 
+    @Test fun stepsBuffTheBody() {
+        // Under 5k → no buff.
+        assertEquals(0, LifeStats.statBonus(LifeProfile(stepsToday = 3000), Special.ENDURANCE))
+        // 5k+ → END +1.
+        assertEquals(1, LifeStats.statBonus(LifeProfile(stepsToday = 6000), Special.ENDURANCE))
+        assertEquals(0, LifeStats.statBonus(LifeProfile(stepsToday = 6000), Special.AGILITY))
+        // 10k+ → END +1, AGI +1.
+        val strider = LifeProfile(stepsToday = 12000)
+        assertEquals(1, LifeStats.statBonus(strider, Special.ENDURANCE))
+        assertEquals(1, LifeStats.statBonus(strider, Special.AGILITY))
+    }
+
+    @Test fun withStepsClampsNonNegative() {
+        assertEquals(0, LifeStats.withSteps(LifeProfile(), -50).stepsToday)
+        assertEquals(7200, LifeStats.withSteps(LifeProfile(), 7200).stepsToday)
+    }
+
     @Test fun withMoodClamps() {
         assertEquals(0, LifeStats.withMood(LifeProfile(), -20).mood)
         assertEquals(100, LifeStats.withMood(LifeProfile(), 250).mood)
