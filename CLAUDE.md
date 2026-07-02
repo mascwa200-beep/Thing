@@ -1046,6 +1046,36 @@ per-section sub-tab rail, and a slim `PipUtilBar` (SET/BUG/EXIT + build) at the 
   default. There's a brief sensor stop→start on switching between game tabs (each body mounts its own
   `GameSensors`) — acceptable; lift to `PipBoyScreen` if it feels janky.
 
+### Life profile — the operator's REAL self bleeds into the S.P.E.C.I.A.L. game (PR #263, merged)
+Owner: "add more user-based input customizations for the game — height, weight, age, hydration, hygiene,
+real money (in-game caps stay, but how much REAL money you have gives buffs/boosts + other effects), etc."
+Built as 3 CI-green slices; the game now reads your real self.
+- **Slice 1 — pure core (PR #263 commit `afa6ff5`):** `core:telemetry/LifeStats.kt` (+ 22-case
+  `LifeStatsTest`, locally kotlinc-validated all-green). `LifeProfile` (heightCm/weightKg/ageYears/
+  realMoney/currency/hydration/hygiene, all 0/unset = neutral). BMI → a `Build` archetype (featherweight
+  AGI+ / athletic END+ / rugged STR+ / powerhouse STR+2, AGI−); age → an `AgeBand` (young reflexes AGI+ …
+  veteran INT+PER+, AGI−); real money → a `MoneyTier` (BROKE→LOADED) that buffs CHARISMA/LUCK/INTELLIGENCE
+  and boosts caps rewards up to **+35%**; hydration/hygiene sliding taxes END/STR (thirst) or CHA (grime).
+  `effects()` is the single source of truth; `statBonus`/`capsBonusPct`/`describe` are views;
+  `decayNeeds`/`drink`/`wash` + clamped setters evolve it. Wired into `SpecialGame.resolve(..., life = null)`
+  (backward-compatible) so life modifiers stack with env/perk/gear/companion on the check + the wealth caps
+  boost stacks with perk caps on a win.
+- **Slice 2 + 3 — on-device + UI (PR #263 commit `cad4e09`):** `SpecialGameStore` persists the profile in
+  the `Stored` blob — needs are stored as an ANCHORED base decayed forward from `needsAnchorMs`, so
+  continuous display refresh never loses sub-threshold decay (base/anchor change only on a top-up/edit);
+  `lifeFlow` publishes the live decayed profile; `setHeight/Weight/Age/RealMoney/Currency` + `drink/wash`
+  re-anchor cleanly; `choose()`/`resolveTalk()` feed the profile into `resolve`; `reset()` clears it; all
+  fields defaulted → old saves load blank/neutral. `TelemetryViewModel` exposes `life` + the setters and
+  ticks `refreshNeeds()` every 1.5 s so the meters decay live. UI: a **LIFE panel on STATS ▸ SPECIAL**
+  (`LifePanel`/`LifeNumberField`) — editable Height/Weight/Age/Real-money fields (commit on focus-loss so
+  the per-tick decay flow can't clobber typing), a build·age·wealth readout, hydration/hygiene gauges with
+  DRINK/WASH, and a live "how your life bends the wasteland" effects list. **Privacy:** the money figure +
+  body metrics are on-device only — never transmitted or logged (panel says so); cleared by the game reset.
+- Verification: pure core local kotlinc + 22 tests green; Android layers subagent compile-review clean + CI.
+  ⚠️ On-device-unverified (CI compile-gates only): the panel render, the numeric-field commit UX, and the
+  needs decay/meters on the Pixel. **Open / steerable (owner's "etc, etc"):** more life inputs — sleep/energy,
+  mood, diet/nutrition, real-world step count → game energy, appearance/name — each a clean new slice.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a
