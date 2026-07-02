@@ -1281,9 +1281,19 @@ home** (couch-play `venture` is to be retired). Built as CI-green slices per the
   `WastelandMap(sites: List<WorldSite>)` + `siteColorHex(SiteType)` + threat-driven GeoJSON radius; tap fires
   `onSelect(id)`. `WastelandPanel` gained a `sites` param (map renders from it; shop trade list still on
   `locations`). Compile-review clean.
-- **Remaining slices:** (4) **presence-gate encounters/fights/shop/quests** at sites + retire couch-play
-  `venture` → (5) weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core loop —
-  owner verifies each slice on the Pixel.
+- **Slice 4 — presence-gate the encounter loop (PR #283, merged):** couch-play `venture` retired — you can
+  only fight when physically AT a wasteland site. Core `LocationGate` gained `WorldSite` overloads
+  (`distanceTo`/`isAtSite`/`reachHint`, +2 tests, 14 core green). VM: a `SiteReach` (nearest engageable site +
+  distance + in-reach flag) via `combine(_gps, sites)` filtered to `WorldSites.spawnsEncounter`; declared
+  AFTER `_gps` so its initializer sees an initialized flow (compile-review flagged this as the key risk —
+  confirmed ordered). `venture()` no-ops unless `siteReach.atSite` and biases the draw by
+  `WorldSites.favoredStats(site.type)` (unioned with perception/circadian/world-event). UI `IdlePanel`:
+  geo-gated — AT a site shows name + intro + ENGAGE; else NEAREST site + "travel here — N m away"; none
+  scanned → prompt to SCAN AREA. **The loop: map (DATA) → travel to a gang camp/monster den/vault/tribe/ruins
+  → STATS ▸ SPECIAL "AT · <site>" → ENGAGE → fight.** ⚠️ On-device-unverified — needs a real GPS fix at a real
+  site; owner verifies on the Pixel (flag if gating feels too strict).
+- **Remaining slices:** (5) weapons + money as things found/earned only AT real places. ⚠️ Reshapes the core
+  loop — owner verifies each slice on the Pixel.
 
 ### Survival-tip notification — stuck-on-tip-0 + too-frequent (owner screenshot, PR #282)
 Owner reported (screenshot) the survival tip still showed "Rule of Threes" (tip #0) and fired far too often.
