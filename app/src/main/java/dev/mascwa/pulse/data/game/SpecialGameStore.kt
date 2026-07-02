@@ -152,6 +152,13 @@ class SpecialGameStore(
     private var extFeatures = 0
     private var extDistanceM = 0
     private var extPlaces = 0
+    // Real-time travel breakdown (from GameWorldStore): per-mode distance, vertical climb, cells explored.
+    private var extWalkM = 0
+    private var extRunM = 0
+    private var extCycleM = 0
+    private var extDriveM = 0
+    private var extElevationM = 0
+    private var extCells = 0
     // Daily-objective state.
     private var dailyDay = -1L
     private var baseWins = 0
@@ -334,6 +341,9 @@ class SpecialGameStore(
             appVisits = extVisits, distinctFeatures = extFeatures,
             distanceM = extDistanceM, placesVisited = extPlaces,
             itemsDiscovered = ItemCodex.found(discovered),
+            walkM = extWalkM, runM = extRunM, cycleM = extCycleM, driveM = extDriveM,
+            elevationM = extElevationM, cellsExplored = extCells,
+            renown = c.legend.renown,
         )
     }
 
@@ -428,11 +438,22 @@ class SpecialGameStore(
     }
 
     /** Feed real-world travel metrics (from the game-world tracker); re-checks travel achievements. */
-    fun setTravelMetrics(distanceM: Int, placesVisited: Int) {
+    fun setTravelMetrics(
+        distanceM: Int,
+        placesVisited: Int,
+        walkM: Int = extWalkM,
+        runM: Int = extRunM,
+        cycleM: Int = extCycleM,
+        driveM: Int = extDriveM,
+        elevationM: Int = extElevationM,
+        cells: Int = extCells,
+    ) {
         scope.launch {
             ensureLoaded()
             extDistanceM = distanceM
             extPlaces = placesVisited
+            extWalkM = walkM; extRunM = runM; extCycleM = cycleM; extDriveM = driveM
+            extElevationM = elevationM; extCells = cells
             runAchievementCheck()
         }
     }

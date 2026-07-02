@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.GameLocation
+import dev.mascwa.pulse.core.telemetry.GeoTracking
+import dev.mascwa.pulse.core.telemetry.Transport
+import dev.mascwa.pulse.core.telemetry.TransportMode
 import dev.mascwa.pulse.core.telemetry.TravelFilter
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.telemetry.WorldSites
@@ -29,8 +32,22 @@ import kotlinx.serialization.json.Json
 
 private val Context.gameWorldDataStore: DataStore<Preferences> by preferencesDataStore(name = "pulse_gameworld")
 
-/** The player's real-world footprint in the game: how far they've walked, where they've been, time played. */
-data class TravelStats(val distanceM: Double = 0.0, val placesVisited: Int = 0, val playMs: Long = 0L)
+/**
+ * The player's real-world footprint in the game: how far they've travelled (total + broken out by how they
+ * got around — on foot / running / cycling / driving), vertical metres climbed, distinct ~111 m areas
+ * explored, where they've been, and time played. Aggregate + on-device only.
+ */
+data class TravelStats(
+    val distanceM: Double = 0.0,
+    val placesVisited: Int = 0,
+    val playMs: Long = 0L,
+    val walkM: Long = 0L,
+    val runM: Long = 0L,
+    val cycleM: Long = 0L,
+    val driveM: Long = 0L,
+    val elevationM: Long = 0L,
+    val cellsExplored: Int = 0,
+)
 
 /**
  * The Pokémon-Go layer: turns real nearby shops (OpenStreetMap via [OverpassRepository]) into game
@@ -50,6 +67,14 @@ class GameWorldStore(
         val distanceM: Double = 0.0,
         val placesVisited: List<String> = emptyList(),
         val playMs: Long = 0L,
+        // Per-mode distance, vertical climb, and the coarse ~111 m cells explored. All defaulted → old saves
+        // load with no transport/elevation/exploration history. On-device only.
+        val walkM: Long = 0L,
+        val runM: Long = 0L,
+        val cycleM: Long = 0L,
+        val driveM: Long = 0L,
+        val elevationM: Long = 0L,
+        val cells: List<String> = emptyList(),
     )
 
     // Each query's [category] is a token WorldSites.typeFor classifies into a SiteType — so one place →
@@ -84,6 +109,12 @@ class GameWorldStore(
     // the GPS-uncertainty circle around this anchor — so standing still (jitter) never adds distance.
     private var anchorLat: Double? = null
     private var anchorLon: Double? = null
+    // Real-time tracking: distance by transport mode, vertical climb, and coarse cells explored.
+    private var modeMeters: Map<TransportMode, Long> = emptyMap()
+    private var elevationM = 0L
+    private var cells = emptySet<String>()
+    private var lastAltM: Double? = null   // previous altitude, for computing climb (not persisted)
+    private var lastFixMs = 0L             // wall clock of the last committed fix, for a speed fallback (not persisted)
 
     private val _locations = MutableStateFlow<List<GameLocation>>(emptyList())
     val locationsFlow: StateFlow<List<GameLocation>> = _locations.asStateFlow()
@@ -108,6 +139,14 @@ class GameWorldStore(
                 distanceM = stored.distanceM.coerceAtLeast(0.0)
                 placesVisited = stored.placesVisited.toSet()
                 playMs = stored.playMs.coerceAtLeast(0L)
+                modeMeters = mapOf(
+                    TransportMode.WALK to stored.walkM.coerceAtLeast(0L),
+                    TransportMode.RUN to stored.runM.coerceAtLeast(0L),
+                    TransportMode.CYCLE to stored.cycleM.coerceAtLeast(0L),
+                    TransportMode.DRIVE to stored.driveM.coerceAtLeast(0L),
+                ).filterValues { it > 0L }
+                elevationM = stored.elevationM.coerceAtLeast(0L)
+                cells = stored.cells.toSet()
             }
             loaded = true
         }
@@ -117,7 +156,15 @@ class GameWorldStore(
     private fun stableId(lat: Double, lon: Double): String = "%.5f,%.5f".format(lat, lon)
 
     private fun publishTravel() {
-        _travel.value = TravelStats(distanceM, placesVisited.size, playMs)
+        _travel.value = TravelStats(
+            distanceM = distanceM, placesVisited = placesVisited.size, playMs = playMs,
+            walkM = Transport.distance(modeMeters, TransportMode.WALK),
+            runM = Transport.distance(modeMeters, TransportMode.RUN),
+            cycleM = Transport.distance(modeMeters, TransportMode.CYCLE),
+            driveM = Transport.distance(modeMeters, TransportMode.DRIVE),
+            elevationM = elevationM,
+            cellsExplored = cells.size,
+        )
     }
 
     /** Fetch nearby real shops around [lat],[lon] and turn them into game locations (best-effort). */
@@ -155,7 +202,13 @@ class GameWorldStore(
      * walking. A fix must clear an uncertainty-sized radius from the last committed anchor before it counts,
      * so GPS wander while you sit still adds nothing; genuine walking (which leaves that radius) does.
      */
-    fun onLocation(lat: Double, lon: Double, accuracyM: Float? = null) {
+    fun onLocation(
+        lat: Double,
+        lon: Double,
+        accuracyM: Float? = null,
+        speedMps: Double? = null,
+        altitudeM: Double? = null,
+    ) {
         scope.launch {
             ensureLoaded()
             // Distance accrual is the CI-tested pure filter — jitter never counts, real walking does.
@@ -163,6 +216,29 @@ class GameWorldStore(
             distanceM += res.addedM
             anchorLat = res.anchorLat
             anchorLon = res.anchorLon
+
+            // Attribute any committed distance to a transport mode, using the fix's reported ground speed
+            // (or a distance/time fallback when the fix didn't report one). STILL never accrues.
+            val now = System.currentTimeMillis()
+            if (res.addedM > 0) {
+                val effSpeed = speedMps ?: run {
+                    val dtSec = if (lastFixMs > 0L) (now - lastFixMs) / 1000.0 else 0.0
+                    if (dtSec in 0.5..600.0) res.addedM / dtSec else null
+                }
+                // No usable speed but real movement → assume on foot (the most conservative moving mode).
+                val mode = if (effSpeed != null) Transport.classify(effSpeed) else TransportMode.WALK
+                modeMeters = Transport.accrue(modeMeters, mode, res.addedM.toLong())
+            }
+            lastFixMs = now
+
+            // Vertical climb from real altitude changes (ascent only, above a noise floor).
+            elevationM += GeoTracking.elevationGain(lastAltM, altitudeM)
+            if (altitudeM != null) lastAltM = altitudeM
+
+            // Exploration: count distinct ~111 m cells entered (capped so the on-device set stays bounded).
+            if ((accuracyM == null || accuracyM <= TravelFilter.MAX_ACCURACY_M) && cells.size < MAX_CELLS) {
+                cells = cells + GeoTracking.cellId(lat, lon)
+            }
 
             // Only trust a reasonably accurate fix to mark a location "reached".
             if (accuracyM == null || accuracyM <= TravelFilter.MAX_ACCURACY_M) {
@@ -194,6 +270,7 @@ class GameWorldStore(
         scope.launch {
             mutex.withLock {
                 distanceM = 0.0; placesVisited = emptySet(); playMs = 0L; anchorLat = null; anchorLon = null
+                modeMeters = emptyMap(); elevationM = 0L; cells = emptySet(); lastAltM = null; lastFixMs = 0L
             }
             publishTravel()
             runCatching { context.gameWorldDataStore.edit { it.remove(prefsKey) } }
@@ -209,7 +286,15 @@ class GameWorldStore(
     }
 
     private suspend fun flush() {
-        val snapshot = Stored(distanceM, placesVisited.toList(), playMs)
+        val snapshot = Stored(
+            distanceM = distanceM, placesVisited = placesVisited.toList(), playMs = playMs,
+            walkM = Transport.distance(modeMeters, TransportMode.WALK),
+            runM = Transport.distance(modeMeters, TransportMode.RUN),
+            cycleM = Transport.distance(modeMeters, TransportMode.CYCLE),
+            driveM = Transport.distance(modeMeters, TransportMode.DRIVE),
+            elevationM = elevationM,
+            cells = cells.toList(),
+        )
         runCatching {
             context.gameWorldDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
         }
@@ -226,6 +311,7 @@ class GameWorldStore(
         const val MAX_LOCATIONS = 24
         const val MAX_SITES = 32 // more types than shops → a slightly larger cap for the full site set
         const val VISIT_RADIUS_M = 60.0
+        const val MAX_CELLS = 5000 // bound the on-device exploration set (covers every CELLS_EXPLORED tier)
         const val FLUSH_DELAY_MS = 2_000L
     }
 }
