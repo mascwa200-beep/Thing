@@ -86,6 +86,7 @@ import dev.mascwa.pulse.core.telemetry.GameLocation
 import dev.mascwa.pulse.core.telemetry.GameLocations
 import dev.mascwa.pulse.core.telemetry.GearSets
 import dev.mascwa.pulse.core.telemetry.WorldEvent
+import dev.mascwa.pulse.core.telemetry.SiteType
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.telemetry.WorldSites
 import dev.mascwa.pulse.core.telemetry.GestureType
@@ -487,6 +488,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scavengeCooldown by vm.scavengeCooldown.collectAsStateWithLifecycle()
     val siteReach by vm.siteReach.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
+    val trackedWaypoints by vm.trackedWaypoints.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -508,8 +510,9 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(8.dp))
         }
         PipHeader("Wasteland")
-        WastelandPanel(locations, sites, travel, scanning, gps, character, worldEvent.shopPct, c,
-            onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
+        WastelandPanel(locations, sites, travel, scanning, gps, character, worldEvent.shopPct, trackedWaypoints, c,
+            onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) },
+            onTrack = { vm.trackSite(it) }, onUntrack = { vm.untrackSite(it) })
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
         ScavengePanel(lastScavenge, scavengeCooldown, siteReach?.atSite == true, character, c,
@@ -1641,10 +1644,13 @@ private fun WastelandPanel(
     gps: DeviceLocation?,
     ch: Character,
     shopPct: Int,
+    tracked: List<dev.mascwa.pulse.data.objectives.Waypoint>,
     c: NightwirePalette,
     onScan: () -> Unit,
     onBuy: (String, LocationKind) -> Unit,
     onTalk: (Encounter, LocationKind) -> Unit,
+    onTrack: (WorldSite) -> Unit,
+    onUntrack: (WorldSite) -> Unit,
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
@@ -1659,11 +1665,19 @@ private fun WastelandPanel(
             GameButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", c.sky, onScan)
             if (sites.isNotEmpty()) {
                 // Every nearby real place as a wasteland site — settlements, tribes, gang camps, monster dens,
-                // vaults. Coloured by type + sized by threat. (Trading the shop sites is below; fighting the
-                // danger sites when you're standing on them is a later slice.)
+                // vaults. Coloured by type + sized by threat. Tap a dot to select it → a track/travel card.
                 WastelandMap(sites, gps, c, Modifier.fillMaxWidth().height(200.dp)) { id ->
                     selectedId = if (selectedId == id) null else id
                 }
+            }
+            // A tapped site → its arrival brief + a TRACK/UNTRACK control (drops/removes a NAV waypoint so the
+            // gold path routes you there). Works for every site (danger dens too), not just the trade shops.
+            val selectedSite = sites.firstOrNull { it.id == selectedId }
+            if (selectedSite != null) {
+                val isTracked = tracked.any { Geo.distanceMeters(it.latitude, it.longitude, selectedSite.lat, selectedSite.lon) <= 20.0 }
+                val dist = gps?.let { Geo.distanceMeters(it.latitude, it.longitude, selectedSite.lat, selectedSite.lon) }
+                SiteSheet(selectedSite, isTracked, dist, c,
+                    onTrack = { onTrack(selectedSite) }, onUntrack = { onUntrack(selectedSite) })
             }
             if (sites.isEmpty()) {
                 Text(
@@ -1684,6 +1698,51 @@ private fun WastelandPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Accent colour for a site card — danger reads red, the wilds amber, safe/trade green. */
+private fun siteAccent(type: SiteType, c: NightwirePalette): Color = when {
+    type.hostile -> c.negative
+    type.threat >= 2 -> c.amber // TRIBE / RUINS — the untamed wilds
+    else -> c.positive // settlements + trade sites
+}
+
+/**
+ * A tapped wasteland site: its arrival brief + how far off + a TRACK/UNTRACK control. Tracking drops a NAV
+ * waypoint at the site's real coords so the gold path on the NAV map routes you there (untracking removes it).
+ * The one control the owner asked for — pick a place on the map and set your path to it.
+ */
+@Composable
+private fun SiteSheet(
+    site: WorldSite,
+    tracked: Boolean,
+    distanceM: Double?,
+    c: NightwirePalette,
+    onTrack: () -> Unit,
+    onUntrack: () -> Unit,
+) {
+    val accent = siteAccent(site.type, c)
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+            .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .background(accent.copy(alpha = 0.06f)).padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(site.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    color = c.ink, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Text("${site.type.label.uppercase()} · THREAT ${site.type.threat}", fontFamily = JetBrainsMono,
+                    fontSize = 8.sp, color = accent, letterSpacing = 0.5.sp)
+            }
+            Text(WorldSites.intro(site), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2)
+            distanceM?.let {
+                Text("${Geo.formatDistance(it)} away", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            if (tracked) GameButton("✓ TRACKED · UNTRACK", c.muted, onUntrack)
+            else GameButton("TRACK ▸ SET PATH HERE", accent, onTrack)
         }
     }
 }

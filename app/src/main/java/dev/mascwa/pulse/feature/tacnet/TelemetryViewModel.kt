@@ -70,6 +70,7 @@ class TelemetryViewModel(
     private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
     private val cameraSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler,
     private val calendar: dev.mascwa.pulse.data.calendar.CalendarRepository,
+    private val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -241,6 +242,39 @@ class TelemetryViewModel(
         val loc = _gps.value ?: return
         gameWorld.refresh(loc.latitude, loc.longitude)
     }
+
+    // --- Track a wasteland site → a NAV waypoint (the gold path routes you there) ---
+    /** The saved NAV waypoints — the UI reads these to tell which sites are currently tracked. */
+    val trackedWaypoints: StateFlow<List<dev.mascwa.pulse.data.objectives.Waypoint>> =
+        waypointStore.waypoints.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * Track a wasteland [site] for navigation — drops a NAV waypoint at its real coords (the gold path on the
+     * NAV map then routes you there). Idempotent: if a waypoint already sits on this spot, it's just re-activated.
+     */
+    fun trackSite(site: WorldSite) {
+        viewModelScope.launch {
+            val existing = trackedWaypoints.value.firstOrNull { atSameSpot(it.latitude, it.longitude, site.lat, site.lon) }
+            if (existing != null) waypointStore.setActive(existing.id)
+            else waypointStore.add(
+                site.name, site.lat, site.lon,
+                dev.mascwa.pulse.data.objectives.ObjectiveKind.MAIN, note = site.type.label,
+            )
+        }
+    }
+
+    /** Untrack a wasteland [site] — removes any NAV waypoint sitting on its spot. */
+    fun untrackSite(site: WorldSite) {
+        viewModelScope.launch {
+            trackedWaypoints.value
+                .filter { atSameSpot(it.latitude, it.longitude, site.lat, site.lon) }
+                .forEach { waypointStore.remove(it.id) }
+        }
+    }
+
+    /** Whether two coordinates are the same wasteland spot (~20 m — a site's exact POI coords, not a nearby one). */
+    private fun atSameSpot(aLat: Double, aLon: Double, bLat: Double, bLon: Double): Boolean =
+        dev.mascwa.pulse.core.util.Geo.distanceMeters(aLat, aLon, bLat, bLon) <= 20.0
     /** Every item id ever acquired — for the ITEMS ▸ codex completion tracker. */
     val discovered: StateFlow<Set<String>> = game.discoveredFlow
     /** The most recent scavenge haul (id → count), for a one-shot readout; null when dismissed. */
