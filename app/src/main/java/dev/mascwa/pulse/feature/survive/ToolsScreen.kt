@@ -25,10 +25,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
@@ -84,7 +86,7 @@ fun ToolsScreen(vm: ToolsViewModel, onBack: (() -> Unit)? = null) {
 
             Text(
                 "These tools run fully offline. The strobe and alarm keep running until you turn them off — mind your battery.",
-                style = MaterialTheme.typography.labelSmall, color = c.muted,
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
         }
     }
@@ -106,9 +108,9 @@ private fun ToolButton(
         accent = if (active) accent else c.line,
     ) {
         Column {
-            Text(title, style = MaterialTheme.typography.titleMedium,
+            Text(title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
                 color = if (enabled) (if (active) accent else c.ink) else c.muted)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.muted)
+            Text(subtitle, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
         }
     }
 }

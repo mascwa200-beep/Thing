@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.safety
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
@@ -69,16 +71,20 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                 needsPermission -> Column(Modifier.padding(16.dp)) {
                     PipFrame(Modifier.fillMaxWidth()) {
                         Column {
-                            Text("Location needed", style = MaterialTheme.typography.titleMedium, color = c.ink)
+                            Text("Location needed", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink)
                             Text("Grant location to see hazards and incidents near you.",
-                                style = MaterialTheme.typography.bodyMedium, color = c.muted,
+                                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                                 modifier = Modifier.padding(top = 4.dp))
-                            TextButton(onClick = {
-                                permLauncher.launch(arrayOf(
-                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                                ))
-                            }) { Text("Grant location") }
+                            Text(
+                                "▸ GRANT LOCATION",
+                                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp, color = c.accent,
+                                modifier = Modifier.padding(top = 10.dp).border(1.dp, c.accent).clickable {
+                                    permLauncher.launch(arrayOf(
+                                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    ))
+                                }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
                         }
                     }
                 }
@@ -97,7 +103,7 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                         Text(
                             "Sources: USGS earthquakes, GDACS global disasters, US NWS alerts. " +
                                 "No proprietary crime feed is publicly available; coverage is hazard-based.",
-                            style = MaterialTheme.typography.labelSmall, color = c.muted,
+                            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                             modifier = Modifier.padding(8.dp),
                         )
                     }
@@ -126,8 +132,8 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
                 Text(Formatters.relativeTime(incident.timeEpochMs), fontFamily = JetBrainsMono,
                     fontSize = 9.sp, color = c.muted)
             }
-            Text(incident.title, style = MaterialTheme.typography.titleSmall, color = c.ink,
-                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            Text(incident.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = c.ink, modifier = Modifier.padding(top = 4.dp))
             val dist = if (incident.distanceMeters > 0)
                 "${Geo.formatDistance(incident.distanceMeters)} · ${Geo.cardinal(incident.bearing)}" else "Your area"
             Text("$dist · ${incident.source}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
