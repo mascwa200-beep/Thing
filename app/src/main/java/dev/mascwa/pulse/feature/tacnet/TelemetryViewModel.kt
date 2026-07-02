@@ -225,6 +225,16 @@ class TelemetryViewModel(
         val loc = _gps.value ?: return
         gameWorld.refresh(loc.latitude, loc.longitude)
     }
+    /** The most recent scavenge haul (id → count), for a one-shot readout; null when dismissed. */
+    val lastScavenge: StateFlow<Map<String, Int>?> = game.lastScavengeFlow
+    private val _scavengeCooldown = MutableStateFlow(0L)
+    /** Milliseconds left on the scavenge cooldown (0 = ready), recomputed each game tick. */
+    val scavengeCooldown: StateFlow<Long> = _scavengeCooldown.asStateFlow()
+    /** Scavenge the area for rarity-weighted loot scaled by LUCK (rate-limited by the cooldown). */
+    fun scavenge() = game.scavenge()
+    /** Dismiss the one-shot scavenge-haul readout. */
+    fun dismissScavenge() = game.dismissScavenge()
+
     /** Buy an item from a [kind] shop — faction reputation discounts it + earns standing. */
     fun buy(itemId: String, kind: dev.mascwa.pulse.core.telemetry.LocationKind) = game.buyAt(itemId, kind)
     /** Talk to a [kind] NPC — resolves the conversation with the real-world context; a win earns rep. */
@@ -403,6 +413,8 @@ class TelemetryViewModel(
                 _agenda.value = CalendarQuests.compose(calEvents, System.currentTimeMillis()) // refresh countdowns
                 if (System.currentTimeMillis() - lastCalLoadMs > CAL_RELOAD_MS) refreshAgenda() // reload events ~5-minly
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
+                _scavengeCooldown.value = (dev.mascwa.pulse.data.game.SpecialGameStore.SCAVENGE_COOLDOWN_MS -
+                    (System.currentTimeMillis() - game.lastScavengeMsFlow.value)).coerceAtLeast(0L)
                 pushLog()
                 delay(1500)
             }

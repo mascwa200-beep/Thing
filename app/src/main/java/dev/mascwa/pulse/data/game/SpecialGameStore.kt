@@ -17,6 +17,7 @@ import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.LifeProfile
 import dev.mascwa.pulse.core.telemetry.LifeStats
+import dev.mascwa.pulse.core.telemetry.LootTable
 import dev.mascwa.pulse.core.telemetry.Recipes
 import dev.mascwa.pulse.core.telemetry.Resolution
 import dev.mascwa.pulse.core.telemetry.Special
@@ -115,6 +116,8 @@ class SpecialGameStore(
         val stepsToday: Int = 0,
         val stepDay: Long = -1L,
         val stepBaseline: Long = -1L,
+        // Wall-clock ms of the last SCAVENGE (0 = never); gates the scavenge cooldown. Defaulted → old saves.
+        val lastScavengeMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -158,6 +161,16 @@ class SpecialGameStore(
     // steps = latest cumulative − baseline (reboot-safe: a lower reading re-baselines).
     private var stepDay = -1L
     private var stepBaseline = -1L
+    // Wall-clock ms of the last scavenge — the cooldown anchor (0 = ready immediately).
+    private var lastScavengeMs = 0L
+
+    private val _lastScavengeMs = MutableStateFlow(0L)
+    /** When the player last scavenged (wall-clock ms). The UI derives the cooldown countdown from this. */
+    val lastScavengeMsFlow: StateFlow<Long> = _lastScavengeMs.asStateFlow()
+
+    private val _lastScavenge = MutableStateFlow<Map<String, Int>?>(null)
+    /** The most recent scavenge haul (id → count), for a one-shot "found" readout; null when dismissed. */
+    val lastScavengeFlow: StateFlow<Map<String, Int>?> = _lastScavenge.asStateFlow()
 
     private val _started = MutableStateFlow(0L)
     /** Wall-clock ms the character's story began (0 until loaded); feeds [GameClock] for the day counter. */
@@ -249,6 +262,8 @@ class SpecialGameStore(
                 )
                 needsAnchorMs = stored.needsAnchorMs
                 stepDay = stored.stepDay; stepBaseline = stored.stepBaseline
+                lastScavengeMs = stored.lastScavengeMs.coerceAtLeast(0L)
+                _lastScavengeMs.value = lastScavengeMs
             }
             // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
             if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
@@ -433,6 +448,36 @@ class SpecialGameStore(
     }
 
     /**
+     * Scavenge the area for salvage — a rarity-weighted [LootTable] haul scaled by LUCK (more picks, better
+     * odds on the rare tiers). Rate-limited by [SCAVENGE_COOLDOWN_MS] so it can't be farmed; no-op while on
+     * cooldown or downed. Publishes the haul to [lastScavengeFlow] for a one-shot readout.
+     */
+    fun scavenge() {
+        scope.launch {
+            ensureLoaded()
+            val now = System.currentTimeMillis()
+            if (now - lastScavengeMs < SCAVENGE_COOLDOWN_MS) return@launch // still on cooldown
+            val c = _character.value
+            if (c.down) return@launch
+            val luck = c.stat(Special.LUCK)
+            val picks = 1 + luck / 5 // luck 1–4 → 1, 5–9 → 2, 10 → 3 items
+            val rolls = List(picks) { random.nextDouble() }
+            val haul = LootTable.scavenge(luck, rolls)
+            var updated = c
+            for ((id, qty) in haul) updated = SpecialGame.addItem(updated, id, qty)
+            _character.value = updated
+            lastScavengeMs = now
+            _lastScavengeMs.value = now
+            _lastScavenge.value = haul
+            runAchievementCheck() // a new distinct item may clear a collection achievement
+            scheduleFlush()
+        }
+    }
+
+    /** Dismiss the one-shot scavenge-haul readout. */
+    fun dismissScavenge() { _lastScavenge.value = null }
+
+    /**
      * Resolve [choiceIndex] of the active encounter with a fresh die roll; publishes the [Resolution].
      * [env] is the real-world context (temperature/light/motion/… bends the check) and [useItemId] is an
      * optional CHEM consumed to buff this check — both flow in from the ViewModel.
@@ -550,6 +595,7 @@ class SpecialGameStore(
             startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
+            lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
             runAchievementCheck()
             scheduleFlush()
@@ -675,14 +721,17 @@ class SpecialGameStore(
             energyBase = lifeBase.energy, nourishmentBase = lifeBase.nourishment,
             mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
             stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
+            lastScavengeMs = lastScavengeMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
         }
     }
 
-    private companion object {
+    companion object {
         const val FLUSH_DELAY_MS = 1_000L
         const val XP_PER_VISIT = 3 // XP granted per new app-screen visit (using Pulse levels your operative)
+        /** Real-time cooldown between scavenges (ms) — stops loot-farming; the UI shows the countdown. */
+        const val SCAVENGE_COOLDOWN_MS = 3 * 60_000L // 3 minutes
     }
 }
