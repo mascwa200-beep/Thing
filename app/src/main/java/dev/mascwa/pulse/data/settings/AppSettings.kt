@@ -245,6 +245,8 @@ data class NotificationPrefs(
     /** Survival check-ins for the S.P.E.C.I.A.L. life-sim: nudge you when a real-decaying need (hydration/
      *  nourishment/energy/hygiene) runs low, or an appointment is imminent — keep the operator alive. */
     val survivalAlerts: Boolean = true,
+    /** Frequent, quiet rotating field-survival tips (a 300+ catalog). Silent (low-priority), self-replacing. */
+    val survivalTips: Boolean = true,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,

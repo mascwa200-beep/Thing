@@ -19,4 +19,7 @@ data class NotifyState(
     val survivalFiredMs: Map<String, Long> = emptyMap(),
     /** Calendar event ids already reminded about while imminent, so an appointment nudges once. */
     val agendaNotifiedIds: List<String> = emptyList(),
+    /** Rotating survival-tip cursor (walks the whole catalog before repeating) + when one last fired. */
+    val survivalTipIndex: Int = 0,
+    val survivalTipLastMs: Long = 0L,
 )

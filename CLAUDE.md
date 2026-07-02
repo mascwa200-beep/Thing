@@ -1139,6 +1139,20 @@ opt-out `NotificationPrefs.survivalAlerts` (default on) + a "Survival check-ins 
 never-played game stays silent (needs at 100). Subagent compile-review clean. ⚠️ On-device-unverified — the
 background worker firing/throttling + the notifications want a real run on the Pixel.
 
+### Survival TIPS push notifications — 310-tip rotating catalog (PR #271, merged, commit — squash)
+Owner: "make survival tips for push notifications, quite frequent, 300+ types." Pure
+`core:telemetry/SurvivalTips.kt` (+4 tests, kotlinc green): **310 distinct field-survival tips** (water /
+fire / shelter / cold / heat / first aid / food & foraging / navigation / signalling / weather / wildlife /
+knots & gear / terrain / hygiene / urban-disaster prep); `tip(index)` walks the whole catalog before
+repeating (wraps neg/large). On-device: `Notifier.notifyTip` on the LOW-priority DIGEST channel with a FIXED
+id, so each new tip arrives QUIETLY and silently REPLACES the last (frequent, but no buzz / no tray pile-up);
+tapping opens the Survival guides (added `Routes.SURVIVAL` to the deep-linkable `SHORTCUT_ROUTES`).
+`RefreshWorker` pushes the next tip roughly every tick (a 12-min floor guards double-fires; the worker's own
+≥15-min period is the cadence, so frequency scales with the notification refresh interval), advancing a
+persisted `NotifyState.survivalTipIndex`, gated by master toggle + quiet hours. New opt-out
+`NotificationPrefs.survivalTips` (default on) + a "Survival tips (frequent)" Settings toggle. ⚠️
+On-device-unverified — the firing cadence wants a real run on the Pixel.
+
 ### Shipped (prior session, dev branch `claude/nice-cori-0zkrjm`)
 - **HUD active-waypoint nav card** (relative turn arrow + distance + bearing; `core:telemetry/NavGuidance`).
 - **Markets reliability**: home ticker only showed ~3 instruments — root cause was Yahoo 429-throttling a

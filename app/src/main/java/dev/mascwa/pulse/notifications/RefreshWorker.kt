@@ -409,6 +409,20 @@ class RefreshWorker(
             }
         }
 
+        // --- Frequent survival tips: push the next tip from the 300+ rotating catalog (quiet, low-priority,
+        // fixed id so each silently replaces the last). Fires roughly every worker tick — the worker interval
+        // is the cadence — gated by the master toggle + quiet hours like everything else. ---
+        if (prefs.survivalTips) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                if (now - state.survivalTipLastMs >= SURVIVAL_TIP_MIN_GAP_MS) {
+                    val idx = state.survivalTipIndex
+                    notifier.notifyTip(7760, "⛑ Survival tip", dev.mascwa.pulse.core.telemetry.SurvivalTips.tip(idx))
+                    state = state.copy(survivalTipIndex = idx + 1, survivalTipLastMs = now)
+                }
+            }
+        }
+
         // --- Daily digest ---
         if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
             runCatching {
@@ -513,5 +527,8 @@ class RefreshWorker(
 
     companion object {
         const val UNIQUE_NAME = "pulse_periodic_refresh"
+        // Minimum gap between survival tips — a floor so double-runs don't double-fire; the worker's own
+        // period (≥15 min) is the real cadence, so tips arrive roughly every tick while awake.
+        private const val SURVIVAL_TIP_MIN_GAP_MS = 12L * 60 * 1000
     }
 }
