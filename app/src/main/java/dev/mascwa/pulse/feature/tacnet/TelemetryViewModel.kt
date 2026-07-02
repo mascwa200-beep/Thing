@@ -471,7 +471,7 @@ class TelemetryViewModel(
                 if (!location.hasPermission()) return@launch
                 val loc = location.current() ?: return@launch
                 _gps.value = loc
-                gameWorld.onLocation(loc.latitude, loc.longitude, loc.accuracyM)
+                gameWorld.onLocation(loc.latitude, loc.longitude, loc.accuracyM, loc.speedMps, loc.altitudeM)
                 // Best-effort outdoor temperature (in °C) + daylight, so the wasteland reacts to real weather.
                 runCatching {
                     val w = weather.fetch(loc.latitude, loc.longitude, loc.name, force = false).data
@@ -481,8 +481,16 @@ class TelemetryViewModel(
                     }
                 }
             }
-            // Real-world travel (distance/places) → travel achievements.
-            launch { gameWorld.travelFlow.collect { game.setTravelMetrics(it.distanceM.toInt(), it.placesVisited) } }
+            // Real-world travel (distance/places/mode/elevation/cells) → travel + transport achievements.
+            launch {
+                gameWorld.travelFlow.collect {
+                    game.setTravelMetrics(
+                        it.distanceM.toInt(), it.placesVisited,
+                        it.walkM.toInt(), it.runM.toInt(), it.cycleM.toInt(), it.driveM.toInt(),
+                        it.elevationM.toInt(), it.cellsExplored,
+                    )
+                }
+            }
             // Poll GPS periodically so walking accumulates distance + reaches nearby locations.
             launch {
                 while (true) {
@@ -490,7 +498,7 @@ class TelemetryViewModel(
                     if (location.hasPermission()) {
                         location.current()?.let {
                             _gps.value = it
-                            gameWorld.onLocation(it.latitude, it.longitude, it.accuracyM)
+                            gameWorld.onLocation(it.latitude, it.longitude, it.accuracyM, it.speedMps, it.altitudeM)
                         }
                     }
                 }

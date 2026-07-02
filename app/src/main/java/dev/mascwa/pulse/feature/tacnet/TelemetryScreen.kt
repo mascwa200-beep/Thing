@@ -1628,11 +1628,21 @@ private fun ApproachRow(choice: Choice, ch: Character, selectedChem: String?, c:
 /** The grind, made visible: what you've earned and what's next. Drives return play. */
 @Composable
 private fun AchievementsPanel(unlocked: Set<String>, metrics: GameMetrics, c: NightwirePalette) {
+    // With 1000+ milestones, showing the whole catalog is a wall — surface the count + a short "what's next"
+    // chase list (the nearest un-cleared tier per metric, most-progressed first).
+    val next = remember(metrics, unlocked) { Achievements.nextUp(metrics, unlocked, limit = 8) }
     PipFrame(Modifier.fillMaxWidth(), accent = c.positive) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("ACHIEVEMENTS · ${unlocked.size}/${Achievements.ALL.size}", fontFamily = ChakraPetch,
                 fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.positive, letterSpacing = 1.sp)
-            Achievements.ALL.forEach { a -> AchievementRow(a, a.id in unlocked, metrics, c) }
+            if (next.isEmpty()) {
+                Text("Every milestone cleared. You are the wasteland's own legend.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            } else {
+                Text("NEXT UP", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                    color = c.positive, letterSpacing = 1.sp)
+                next.forEach { a -> AchievementRow(a, done = false, metrics, c) }
+            }
         }
     }
 }
@@ -1737,6 +1747,14 @@ private fun WastelandPanel(
                 TravelStat("WALKED", Geo.formatDistance(travel.distanceM), c)
                 TravelStat("PLACES", "${travel.placesVisited}", c)
                 TravelStat("PLAYED", formatPlayTime(travel.playMs), c)
+            }
+            // Real-time transport breakdown: how you actually got around, vertical climb, and areas explored.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TravelStat("ON FOOT", Geo.formatDistance((travel.walkM + travel.runM).toDouble()), c)
+                TravelStat("CYCLE", Geo.formatDistance(travel.cycleM.toDouble()), c)
+                TravelStat("DRIVE", Geo.formatDistance(travel.driveM.toDouble()), c)
+                TravelStat("CLIMB", Geo.formatDistance(travel.elevationM.toDouble()), c)
+                TravelStat("AREAS", "${travel.cellsExplored}", c)
             }
             GameButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", c.sky, onScan)
             if (sites.isNotEmpty()) {

@@ -27,6 +27,10 @@ data class DeviceLocation(
     val name: String,
     /** Horizontal accuracy in metres (68% confidence), or null if the fix didn't report it. */
     val accuracyM: Float? = null,
+    /** Altitude in metres above the WGS84 ellipsoid, or null if the fix didn't report it (→ elevation tracking). */
+    val altitudeM: Double? = null,
+    /** Ground speed in m/s, or null if the fix didn't report it (→ transport-mode classification). */
+    val speedMps: Double? = null,
 )
 
 /** Reverse-geocoded administrative context for a coordinate (for region-scoped lookups like radio). */
@@ -60,7 +64,12 @@ class LocationProvider(private val context: Context) {
         // faster first fix, and no failed Play-Services round-trip.
         val loc = (if (isGmsAvailable()) fusedFix() else null) ?: managerFix() ?: lastKnown() ?: return null
         val name = reverseGeocode(loc.latitude, loc.longitude) ?: formatCoords(loc.latitude, loc.longitude)
-        return DeviceLocation(loc.latitude, loc.longitude, name, if (loc.hasAccuracy()) loc.accuracy else null)
+        return DeviceLocation(
+            loc.latitude, loc.longitude, name,
+            if (loc.hasAccuracy()) loc.accuracy else null,
+            altitudeM = if (loc.hasAltitude()) loc.altitude else null,
+            speedMps = if (loc.hasSpeed()) loc.speed.toDouble() else null,
+        )
     }
 
     /**
