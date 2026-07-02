@@ -446,6 +446,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val agenda by vm.agenda.collectAsStateWithLifecycle()
     val lastScavenge by vm.lastScavenge.collectAsStateWithLifecycle()
     val scavengeCooldown by vm.scavengeCooldown.collectAsStateWithLifecycle()
+    val siteReach by vm.siteReach.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val c = Pulse.colors
     Column(
@@ -472,7 +473,7 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) })
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
-        ScavengePanel(lastScavenge, scavengeCooldown, character, c,
+        ScavengePanel(lastScavenge, scavengeCooldown, siteReach?.atSite == true, character, c,
             onScavenge = { vm.scavenge() }, onDismiss = { vm.dismissScavenge() })
         Spacer(Modifier.height(8.dp))
         PipHeader("Achievements")
@@ -1656,6 +1657,7 @@ private fun WastelandPanel(
 private fun ScavengePanel(
     haul: Map<String, Int>?,
     cooldownMs: Long,
+    atSite: Boolean,
     ch: Character,
     c: NightwirePalette,
     onScavenge: () -> Unit,
@@ -1665,9 +1667,13 @@ private fun ScavengePanel(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("SCAVENGE", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
                 color = c.positive, letterSpacing = 1.sp)
-            Text("Comb the area for salvage. Your LUCK (${ch.stat(Special.LUCK)}) tilts the odds toward the rare finds.",
+            Text("Comb a wasteland site for salvage. Your LUCK (${ch.stat(Special.LUCK)}) tilts the odds toward the rare finds.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
-            if (cooldownMs > 0L) {
+            if (!atSite) {
+                // Geo-gated: you can only scavenge where you're standing — travel to a site first.
+                Text("Travel to a wasteland site to comb it — open the map above and go stand at one.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            } else if (cooldownMs > 0L) {
                 Box(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
                         .border(1.dp, c.muted.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
