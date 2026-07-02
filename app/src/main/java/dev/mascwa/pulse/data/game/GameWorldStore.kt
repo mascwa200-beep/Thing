@@ -7,9 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.GameLocation
-import dev.mascwa.pulse.core.telemetry.GameLocations
-import dev.mascwa.pulse.core.telemetry.LocationKind
 import dev.mascwa.pulse.core.telemetry.TravelFilter
+import dev.mascwa.pulse.core.telemetry.WorldSite
+import dev.mascwa.pulse.core.telemetry.WorldSites
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.places.OverpassRepository
 import kotlinx.coroutines.CoroutineScope
@@ -52,14 +52,23 @@ class GameWorldStore(
         val playMs: Long = 0L,
     )
 
-    private data class KindQuery(val kind: LocationKind, val id: String, val filter: String)
+    // Each query's [category] is a token WorldSites.typeFor classifies into a SiteType — so one place →
+    // one wasteland site (and, for trade sites, a GameLocation shop derived from the SiteType's shopKind).
+    private data class SiteQuery(val category: String, val id: String, val filter: String)
 
     private val queries = listOf(
-        KindQuery(LocationKind.TRADER, "gw_trader", """["shop"~"^(supermarket|convenience|general|mall|department_store|greengrocer|kiosk)$"]"""),
-        KindQuery(LocationKind.MEDIC, "gw_medic", """["amenity"~"^(pharmacy|hospital|clinic|doctors)$"]"""),
-        KindQuery(LocationKind.FIXER, "gw_fixer", """["shop"~"^(hardware|doityourself|electronics|trade)$"]"""),
-        KindQuery(LocationKind.BARKEEP, "gw_barkeep", """["amenity"~"^(bar|pub|cafe|restaurant|fast_food)$"]"""),
-        KindQuery(LocationKind.OUTPOST, "gw_outpost", """["amenity"="fuel"]"""),
+        // Safe / trade sites (also surface as GameLocation shops).
+        SiteQuery("supermarket", "gw_trader", """["shop"~"^(supermarket|convenience|general|mall|department_store|greengrocer|kiosk)$"]"""),
+        SiteQuery("pharmacy", "gw_medic", """["amenity"~"^(pharmacy|hospital|clinic|doctors)$"]"""),
+        SiteQuery("hardware", "gw_fixer", """["shop"~"^(hardware|doityourself|electronics|trade)$"]"""),
+        SiteQuery("pub", "gw_barkeep", """["amenity"~"^(bar|pub|cafe|restaurant|fast_food)$"]"""),
+        SiteQuery("fuel", "gw_outpost", """["amenity"="fuel"]"""),
+        // Danger / exploration sites (wasteland-only — tribes, gangs, monster dens, vaults, ruins).
+        SiteQuery("leisure=park", "gw_tribe", """["leisure"~"^(park|nature_reserve)$"]"""),
+        SiteQuery("landuse=industrial", "gw_gang", """["landuse"~"^(industrial)$"]"""),
+        SiteQuery("natural=water", "gw_monster", """["natural"~"^(water|wood|wetland)$"]"""),
+        SiteQuery("military=bunker", "gw_vault", """["military"~"^(bunker)$"]"""),
+        SiteQuery("historic=ruins", "gw_ruins", """["historic"~"^(ruins|archaeological_site)$"]"""),
     )
 
     private val prefsKey = stringPreferencesKey("gameworld_json")
@@ -78,6 +87,11 @@ class GameWorldStore(
 
     private val _locations = MutableStateFlow<List<GameLocation>>(emptyList())
     val locationsFlow: StateFlow<List<GameLocation>> = _locations.asStateFlow()
+
+    // The geo-gated wasteland: every scanned real place as a WorldSite (settlements/tribes/gang camps/monster
+    // dens/vaults/ruins/shops). The trade sites also appear in [locationsFlow] as GameLocations (shop layer).
+    private val _sites = MutableStateFlow<List<WorldSite>>(emptyList())
+    val sitesFlow: StateFlow<List<WorldSite>> = _sites.asStateFlow()
 
     private val _travel = MutableStateFlow(TravelStats())
     val travelFlow: StateFlow<TravelStats> = _travel.asStateFlow()
@@ -111,19 +125,24 @@ class GameWorldStore(
         scope.launch {
             ensureLoaded()
             _scanning.value = true
-            val found = mutableListOf<GameLocation>()
+            val sites = mutableListOf<WorldSite>()
             for (q in queries) {
+                val type = WorldSites.typeFor(q.category)
                 val places = runCatching {
-                    overpass.fetch(q.id, q.filter, RADIUS_M, q.kind.title, lat, lon, force = false).data.places
+                    overpass.fetch(q.id, q.filter, RADIUS_M, type.label, lat, lon, force = false).data.places
                 }.getOrNull().orEmpty()
                 places.take(PER_KIND).forEach { p ->
-                    found += GameLocation(stableId(p.latitude, p.longitude), p.name, q.kind, p.latitude, p.longitude)
+                    sites += WorldSites.siteFor(stableId(p.latitude, p.longitude), p.latitude, p.longitude, q.category)
                 }
             }
-            val deduped = found.distinctBy { it.id }
+            val dedupedSites = sites.distinctBy { it.id }
                 .sortedBy { Geo.distanceMeters(lat, lon, it.lat, it.lon) }
-                .take(MAX_LOCATIONS)
-            _locations.value = deduped
+                .take(MAX_SITES)
+            _sites.value = dedupedSites
+            // Trade sites also drive the existing shop layer (GameLocation) so nothing downstream breaks.
+            _locations.value = dedupedSites.mapNotNull { s ->
+                s.type.shopKind?.let { GameLocation(s.id, s.name, it, s.lat, s.lon) }
+            }.take(MAX_LOCATIONS)
             _scanning.value = false
             // A fresh scan at the current spot may already be "at" a location.
             onLocation(lat, lon)
@@ -205,6 +224,7 @@ class GameWorldStore(
         const val RADIUS_M = 2000
         const val PER_KIND = 6
         const val MAX_LOCATIONS = 24
+        const val MAX_SITES = 32 // more types than shops → a slightly larger cap for the full site set
         const val VISIT_RADIUS_M = 60.0
         const val FLUSH_DELAY_MS = 2_000L
     }
