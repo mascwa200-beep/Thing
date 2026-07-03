@@ -121,6 +121,14 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
     }
 
+    /** Runs ActivitySensing over the mic + camera labels → a persisted history of real self-care (shower /
+     *  meal / bathroom), which the habit check-in reads to catch a lie. On-device (text evidence only). */
+    val activityEvidenceStore: dev.mascwa.pulse.data.perception.ActivityEvidenceStore by lazy {
+        dev.mascwa.pulse.data.perception.ActivityEvidenceStore(
+            appContext, json, ambientPerceptionSampler.soundLabels, cameraPerceptionSampler.sceneLabels,
+        )
+    }
+
     /** Real calendar → the life-sim's agenda (upcoming events become wasteland objectives; on-device only). */
     val calendarRepository: dev.mascwa.pulse.data.calendar.CalendarRepository by lazy {
         dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)

@@ -69,6 +69,7 @@ class TelemetryViewModel(
     private val questStore: dev.mascwa.pulse.data.game.QuestStore,
     private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
     private val cameraSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler,
+    private val activityEvidence: dev.mascwa.pulse.data.perception.ActivityEvidenceStore,
     private val calendar: dev.mascwa.pulse.data.calendar.CalendarRepository,
     private val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore,
 ) : ViewModel() {
@@ -456,6 +457,7 @@ class TelemetryViewModel(
             if (runCatching { settings.current().ambientSensing }.getOrDefault(true)) {
                 sampler.start()      // on-device ambient hearing (no-op without mic)
                 cameraSampler.start() // on-device ambient seeing (no-op without the camera permission)
+                activityEvidence.start() // detect real self-care from those labels → the lie-catcher's history
             }
         }
         // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).
@@ -525,6 +527,7 @@ class TelemetryViewModel(
         controller.stop()
         sampler.stop() // release the mic when the game screen isn't visible
         cameraSampler.stop() // release the camera when the game screen isn't visible
+        activityEvidence.stop() // stop sampling the perception labels when sensing pauses
         ticker?.cancel()
     }
 
