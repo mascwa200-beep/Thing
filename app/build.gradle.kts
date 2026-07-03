@@ -190,6 +190,9 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    // Filament — 3D AR wasteland renderer (arm64 native; no ARCore/Play Services).
+    implementation(libs.filament.android)
+    implementation(libs.filament.utils.android)
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.
