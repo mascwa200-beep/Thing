@@ -210,9 +210,21 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
                     }
                 }
             }
+            // Search-as-you-type: debounce keystrokes so it feels live without hammering the API. The
+            // explicit SEARCH button still fires immediately (both share one cancellable job).
+            LaunchedEffect(query) {
+                kotlinx.coroutines.delay(350)
+                vm.search(query)
+            }
             when (searchStatus) {
                 SpotifyViewModel.SearchStatus.LOADING -> StatusLine("Searching…", c)
                 SpotifyViewModel.SearchStatus.EMPTY -> StatusLine("No tracks found.", c)
+                SpotifyViewModel.SearchStatus.FAILED ->
+                    StatusLine("Search failed — check your connection and try again.", c)
+                SpotifyViewModel.SearchStatus.AUTH_EXPIRED -> Column {
+                    StatusLine("Spotify session expired — relink your account to search again.", c)
+                    PipButton("▸ RELINK ACCOUNT", c, Modifier.padding(top = 4.dp)) { vm.connect(context) }
+                }
                 else -> results.forEach { track -> TrackRow(track, c) { vm.play(track) } }
             }
 

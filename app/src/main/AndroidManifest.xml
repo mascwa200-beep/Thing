@@ -8,6 +8,11 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- The Spotify App Remote SDK must be able to see AND bind to the installed Spotify app. On
+             Android 11+ (this device is API 37) package visibility is filtered by default, so without
+             this the in-app player's SpotifyAppRemote.connect() can never find/bind Spotify and just
+             spins on "Connecting…". Declaring the package restores that visibility. -->
+        <package android:name="com.spotify.music" />
     </queries>
 
     <!-- Networking for all the free public data sources. -->
