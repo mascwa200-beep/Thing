@@ -508,8 +508,9 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.reflection.ReflectionEngine(memoryStream, inferenceEngine, settingsRepository)
     }
 
-    /** Compass is stateful per-screen, so hand out a fresh controller each time. */
-    fun newCompassController(): CompassController = CompassController(appContext)
+    /** Compass is stateful per-screen, so hand out a fresh controller each time. [cameraUpright] = AR mode. */
+    fun newCompassController(cameraUpright: Boolean = false): CompassController =
+        CompassController(appContext, cameraUpright)
 
     /** Telemetry is stateful per-screen (sensor lifecycle), so hand out fresh. */
     fun newTelemetryController(): dev.mascwa.pulse.data.sensors.TelemetryController =

@@ -2,8 +2,12 @@ package dev.mascwa.pulse.feature.ar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.data.game.GameWorldStore
+import dev.mascwa.pulse.data.game.SpecialGameStore
+import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -27,6 +31,8 @@ class ArViewModel(
     private val location: LocationProvider,
     private val compass: CompassController,
     private val gameWorld: GameWorldStore,
+    private val game: SpecialGameStore,
+    private val waypoints: WaypointStore,
 ) : ViewModel() {
 
     /** The geo-gated wasteland sites near you (shared with the game's scan). */
@@ -34,12 +40,24 @@ class ArViewModel(
 
     val scanning: StateFlow<Boolean> = gameWorld.scanningFlow
 
+    /** The player's character (for the AR stats HUD — LVL/HP/CAPS). */
+    val character: StateFlow<Character> = game.characterFlow
+
+    /** The active tracked waypoint (projected as a gold objective marker), or null. */
+    val activeWaypoint: StateFlow<Waypoint?> =
+        waypoints.active.stateIn(viewModelScope, SharingStarted.WhileSubscribed(2_000), null)
+
     private val _gps = MutableStateFlow<DeviceLocation?>(null)
     val gps: StateFlow<DeviceLocation?> = _gps.asStateFlow()
 
     /** Live compass heading (degrees from true north). */
     val heading: StateFlow<Float> = compass.reading
         .map { it.trueAzimuth }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(2_000), 0f)
+
+    /** Live camera pitch (degrees up+/down−) — drives the vertical parallax of markers. */
+    val pitch: StateFlow<Float> = compass.reading
+        .map { it.pitch }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(2_000), 0f)
 
     /** True when the compass is uncalibrated / absent — prompt a figure-8 wave. */

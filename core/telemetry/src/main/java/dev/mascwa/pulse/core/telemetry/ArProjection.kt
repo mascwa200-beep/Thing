@@ -14,6 +14,9 @@ object ArProjection {
     /** Approximate horizontal field of view (degrees) of a typical phone camera in portrait. */
     const val DEFAULT_FOV_DEG = 60.0
 
+    /** Approximate vertical field of view (degrees) in portrait — the long screen axis, so wider than [DEFAULT_FOV_DEG]. */
+    const val DEFAULT_VFOV_DEG = 74.0
+
     /**
      * The bearing of [bearingDeg] relative to where you're facing ([headingDeg]), normalized to `(-180, 180]`.
      * Negative = to your left, positive = to your right, 0 = dead ahead. Handles the 359°→1° wrap.
@@ -36,6 +39,20 @@ object ArProjection {
      */
     fun screenX(headingDeg: Double, bearingDeg: Double, fovDeg: Double = DEFAULT_FOV_DEG): Double =
         0.5 + relativeBearing(headingDeg, bearingDeg) / fovDeg
+
+    /**
+     * Vertical screen fraction for a target at elevation [targetElevDeg] (≈ 0 for a far, ground-level site)
+     * given the camera's [pitchDeg] (0 = level, positive = tilted up): `0.5` = the horizon at centre, `0.0` =
+     * the top edge, `1.0` = the bottom edge. Tilting UP slides ground targets DOWN the frame (toward 1);
+     * tilting DOWN slides them UP (toward 0) — the parallax that makes markers feel pinned to the world.
+     * This is what fixes "tilting made things drift sideways": the heading no longer absorbs the tilt.
+     */
+    fun screenY(pitchDeg: Double, targetElevDeg: Double = 0.0, vFovDeg: Double = DEFAULT_VFOV_DEG): Double =
+        0.5 + (pitchDeg - targetElevDeg) / vFovDeg
+
+    /** Whether a target at [targetElevDeg] falls within the vertical [vFovDeg] given the camera [pitchDeg]. */
+    fun inViewVertical(pitchDeg: Double, targetElevDeg: Double = 0.0, vFovDeg: Double = DEFAULT_VFOV_DEG): Boolean =
+        abs(pitchDeg - targetElevDeg) <= vFovDeg / 2.0
 
     /**
      * A rough on-screen size fraction (0..1) for a marker by real-world [distanceM]: near things read bigger,
