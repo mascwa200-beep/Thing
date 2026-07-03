@@ -354,6 +354,11 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.ar.ArScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            // ---- 3D AR wasteland (real Filament-rendered geometry over the camera; separate mode) ----
+            composable(Routes.AR3D) {
+                dev.mascwa.pulse.feature.ar3d.WastelandArScreen(onBack = { navController.popBackStack() })
+            }
+
             // ---- Objectives / waypoint tracker ----
             composable(Routes.OBJECTIVES) {
                 val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
