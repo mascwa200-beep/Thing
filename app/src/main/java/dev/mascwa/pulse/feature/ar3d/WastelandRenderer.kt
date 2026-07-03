@@ -237,7 +237,7 @@ class WastelandRenderer {
         override fun onNativeWindowChanged(surface: Surface) {
             swapChain?.let { engine.destroySwapChain(it) }
             swapChain = engine.createSwapChain(surface, uiHelper.swapChainFlags)
-            displayHelper.attach(renderer, surfaceView?.display)
+            surfaceView?.display?.let { displayHelper.attach(renderer, it) }
         }
 
         override fun onDetachedFromSurface() {
