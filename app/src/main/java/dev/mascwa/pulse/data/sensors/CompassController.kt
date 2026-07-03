@@ -17,14 +17,20 @@ import kotlinx.coroutines.flow.asStateFlow
  * Magnetic azimuth comes from the rotation-vector sensor (fused, smooth).
  * True-north declination is computed **offline** with [GeomagneticField] (WMM)
  * once a location is provided — no network required.
+ *
+ * [cameraUpright] mode remaps the coordinate system for a phone held vertically like a viewfinder (AR): the
+ * azimuth then follows the direction the CAMERA points and stays stable as you tilt up/down (the flat-held
+ * default lets a tilt corrupt the heading — that's the "tilting drifts sideways" bug), and [Reading.pitch]
+ * becomes meaningful (how far up/down you're aiming).
  */
-class CompassController(context: Context) : SensorEventListener {
+class CompassController(context: Context, private val cameraUpright: Boolean = false) : SensorEventListener {
 
     data class Reading(
         val magneticAzimuth: Float = 0f,   // degrees 0..360
         val declination: Float = 0f,       // degrees east(+)/west(-)
         val accuracyLow: Boolean = false,  // needs figure-8 calibration
         val hasSensor: Boolean = true,
+        val pitch: Float = 0f,             // degrees up(+)/down(-); only meaningful in cameraUpright mode
     ) {
         val trueAzimuth: Float get() = ((magneticAzimuth + declination) % 360f + 360f) % 360f
     }
@@ -36,10 +42,12 @@ class CompassController(context: Context) : SensorEventListener {
     val reading: StateFlow<Reading> = _reading.asStateFlow()
 
     private val rotationMatrix = FloatArray(9)
+    private val remappedMatrix = FloatArray(9)
     private val orientation = FloatArray(3)
 
     /** Low-pass state for the heading (null until the first reading). */
     private var filteredAzimuth: Float? = null
+    private var filteredPitch: Float? = null
 
     fun setLocation(lat: Double, lon: Double, altitude: Double) {
         val geo = GeomagneticField(
@@ -61,12 +69,30 @@ class CompassController(context: Context) : SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-        SensorManager.getOrientation(rotationMatrix, orientation)
+        // AR viewfinder: remap so azimuth follows the camera direction and stays stable while tilting up/down.
+        val matrix = if (cameraUpright) {
+            SensorManager.remapCoordinateSystem(
+                rotationMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix,
+            )
+            remappedMatrix
+        } else {
+            rotationMatrix
+        }
+        SensorManager.getOrientation(matrix, orientation)
         val raw = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) % 360f + 360f) % 360f
         // Circular low-pass: averaging via sin/cos so 359°→1° doesn't smear to 180°.
         val smoothed = filteredAzimuth?.let { circularLerp(it, raw, SMOOTHING) } ?: raw
         filteredAzimuth = smoothed
-        _reading.value = _reading.value.copy(magneticAzimuth = smoothed)
+        if (cameraUpright) {
+            // In the remapped (camera-upright) frame, orientation[1] is the up/down aim. Negate so tilting the
+            // phone UP reads as positive pitch (looking up), matching ArProjection.screenY's convention.
+            val rawPitch = -Math.toDegrees(orientation[1].toDouble()).toFloat()
+            val p = filteredPitch?.let { it + PITCH_SMOOTHING * (rawPitch - it) } ?: rawPitch
+            filteredPitch = p
+            _reading.value = _reading.value.copy(magneticAzimuth = smoothed, pitch = p)
+        } else {
+            _reading.value = _reading.value.copy(magneticAzimuth = smoothed)
+        }
     }
 
     private fun circularLerp(prev: Float, curr: Float, alpha: Float): Float {
@@ -87,5 +113,7 @@ class CompassController(context: Context) : SensorEventListener {
     private companion object {
         /** Low-pass weight for new samples (higher = snappier, lower = smoother). */
         const val SMOOTHING = 0.2f
+        /** Pitch is less jittery than azimuth — a gentle low-pass keeps the vertical parallax smooth. */
+        const val PITCH_SMOOTHING = 0.25f
     }
 }

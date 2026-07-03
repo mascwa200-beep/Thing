@@ -33,6 +33,23 @@ class ArProjectionTest {
         assertEquals(0.75, ArProjection.screenX(0.0, 15.0, 60.0), 1e-9)
     }
 
+    @Test fun screenYPinsToHorizonWithPitch() {
+        // Level camera → a ground-level (0° elevation) site sits at the horizon (centre).
+        assertEquals(0.5, ArProjection.screenY(0.0, 0.0, 74.0), 1e-9)
+        // Tilt up half the vertical FOV → the ground site slides to the bottom edge.
+        assertEquals(1.0, ArProjection.screenY(37.0, 0.0, 74.0), 1e-9)
+        // Tilt down → it slides to the top edge.
+        assertEquals(0.0, ArProjection.screenY(-37.0, 0.0, 74.0), 1e-9)
+        // A raised target (positive elevation) sits higher on screen (smaller screenY) at level pitch.
+        assertTrue(ArProjection.screenY(0.0, 15.0, 74.0) < 0.5)
+    }
+
+    @Test fun inViewVerticalRespectsVFov() {
+        assertTrue(ArProjection.inViewVertical(0.0, 0.0, 74.0))
+        assertTrue(ArProjection.inViewVertical(30.0, 0.0, 74.0))   // within ±37
+        assertFalse(ArProjection.inViewVertical(50.0, 0.0, 74.0))  // beyond ±37 → looking well above it
+    }
+
     @Test fun sizeShrinksWithDistanceAndClamps() {
         assertEquals(1.0, ArProjection.sizeForDistance(10.0), 1e-9)     // very near → full
         assertEquals(0.35, ArProjection.sizeForDistance(5000.0), 1e-9)  // very far → floor
