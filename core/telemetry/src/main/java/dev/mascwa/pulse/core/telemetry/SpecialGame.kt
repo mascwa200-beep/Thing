@@ -96,6 +96,36 @@ data class Character(
 /** The maths of a single stat check. [total] = stat + roll + luck modifier. */
 data class CheckResult(val success: Boolean, val crit: Boolean, val total: Int, val roll: Int)
 
+/** Where a check modifier came from — so the UI can attribute it ("from your build", "worn gear", "renown"). */
+enum class ModSource { BASE, PERK, GEAR, GEAR_SET, COMPANION, LEGEND, ENVIRONMENT, LIFE, CHEM }
+
+/** One contributor to a stat check's value, with a human [label] and its [source]. The BASE entry carries
+ *  the raw stat; the rest are the +/- modifiers stacked on top. */
+data class CheckMod(val label: String, val amount: Int, val source: ModSource)
+
+/**
+ * The full, attributable maths of a stat check — the base stat + every applied modifier + the die + the LUCK
+ * tilt, versus the DC. This is what makes the real-life effects *believable*: the UI can show exactly why a
+ * check swung the way it did ("d10=6 + STR 8 (+2 Powerhouse, −2 Exhausted) +1 luck = 15 vs DC 12 → PASS").
+ * [stat] is null for a safe/no-check option.
+ */
+data class CheckBreakdown(
+    val stat: Special?,
+    val mods: List<CheckMod>,
+    val roll: Int,
+    val luckMod: Int,
+    val difficulty: Int,
+    val total: Int,
+    val success: Boolean,
+    val crit: Boolean,
+) {
+    /** The stat value going into the check (base + all modifiers), before the die + luck. */
+    val statValue: Int get() = mods.sumOf { it.amount }
+
+    /** Just the +/- modifiers (everything but the raw BASE stat), for a "what bent this" list. */
+    val bonuses: List<CheckMod> get() = mods.filter { it.source != ModSource.BASE }
+}
+
 /** The full result of resolving a choice: the check + the applied [outcome] + the updated [character]. */
 data class Resolution(
     val success: Boolean,
@@ -103,6 +133,8 @@ data class Resolution(
     val outcome: Outcome,
     val character: Character,
     val roll: Int,
+    /** The attributable maths behind [success] — so the UI can show what swung the check. */
+    val breakdown: CheckBreakdown = CheckBreakdown(null, emptyList(), roll, 0, 0, 0, success, crit),
 )
 
 object SpecialGame {
@@ -168,20 +200,24 @@ object SpecialGame {
         }
 
         val critMargin = if (perkLuckierCrits(character) || companionLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
+        val luck = character.stat(Special.LUCK)
+        // Build the attributable modifier stack once — it drives both the check maths and the UI breakdown.
+        val mods = statMods(character, choice, env, useItemId, life)
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
-            val statValue = character.stat(choice.stat) +
-                perkStatBonus(character, choice.stat) +
-                gearStatBonus(character, choice.stat) +
-                setStatBonus(character, choice.stat) +
-                companionStatBonus(character, choice.stat) +
-                legendStatBonus(character, choice.stat) +
-                (env?.let { Environment.statBonus(it, choice.stat) } ?: 0) +
-                (life?.let { LifeStats.statBonus(it, choice.stat) } ?: 0) +
-                (activeChem?.statBonusAmt ?: 0)
-            check(statValue, choice.difficulty, character.stat(Special.LUCK), roll, critMargin)
+            check(mods.sumOf { it.amount }, choice.difficulty, luck, roll, critMargin)
         }
+        val breakdown = CheckBreakdown(
+            stat = choice.stat,
+            mods = mods,
+            roll = roll,
+            luckMod = (luck - 5) / 2,
+            difficulty = choice.difficulty,
+            total = result.total,
+            success = result.success,
+            crit = result.crit,
+        )
 
         var outcome = if (result.success) choice.success else choice.failure
         if (result.crit && result.success) {
@@ -201,7 +237,48 @@ object SpecialGame {
         if (activeChem != null) updated = removeItem(updated, activeChem.id, 1)
         if (!encounter.repeatable) updated = updated.copy(seen = updated.seen + encounter.id)
         updated = updated.copy(currentEncounterId = null)
-        return Resolution(result.success, result.crit, outcome, updated, roll)
+        return Resolution(result.success, result.crit, outcome, updated, roll, breakdown)
+    }
+
+    /**
+     * The attributable modifier stack for [choice]'s stat check — the BASE stat plus every +/- contributor
+     * (perks, worn GEAR + set synergy, companion, renown, the real-world [env], your real [life], and a
+     * prepped CHEM via [useItemId]), each with a human label + [ModSource]. The sum equals the value fed to
+     * [check], so this both drives [resolve]'s [CheckBreakdown] and lets the encounter UI preview the stack
+     * and odds *before* you commit. Returns empty for a safe/no-check option. Pure.
+     */
+    fun statMods(
+        c: Character,
+        choice: Choice,
+        env: EnvContext? = null,
+        useItemId: String? = null,
+        life: LifeProfile? = null,
+    ): List<CheckMod> {
+        val stat = choice.stat ?: return emptyList()
+        val mods = mutableListOf<CheckMod>()
+        mods += CheckMod(stat.display, c.stat(stat), ModSource.BASE)
+        owned(c).filter { it.statBonus == stat }.forEach { mods += CheckMod(it.name, it.statBonusAmt, ModSource.PERK) }
+        c.inventory.forEach { (id, qty) ->
+            if (qty > 0) {
+                val item = Items.byId(id)
+                if (item != null && item.kind == ItemKind.GEAR && item.statBonus == stat) {
+                    mods += CheckMod(item.name, item.statBonusAmt, ModSource.GEAR)
+                }
+            }
+        }
+        GearSets.statBonus(c.inventory, stat).takeIf { it != 0 }?.let { mods += CheckMod("Gear set", it, ModSource.GEAR_SET) }
+        activeCompanion(c)?.takeIf { it.statBonus == stat }
+            ?.let { mods += CheckMod(it.name, it.statBonusAmt, ModSource.COMPANION) }
+        if (stat == Special.CHARISMA) {
+            Legends.charismaBonus(c.legend.renown).takeIf { it != 0 }
+                ?.let { mods += CheckMod("Renown", it, ModSource.LEGEND) }
+        }
+        env?.let { e -> Environment.effects(e).filter { it.stat == stat }.forEach { mods += CheckMod(it.reason, it.delta, ModSource.ENVIRONMENT) } }
+        life?.let { l -> LifeStats.effects(l).filter { it.stat == stat }.forEach { mods += CheckMod(it.reason, it.delta, ModSource.LIFE) } }
+        useItemId?.let { Items.byId(it) }
+            ?.takeIf { it.kind == ItemKind.CHEM && (c.inventory[it.id] ?: 0) > 0 && it.statBonus == stat }
+            ?.let { mods += CheckMod(it.name, it.statBonusAmt, ModSource.CHEM) }
+        return mods
     }
 
     // --- Inventory + items ---

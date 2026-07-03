@@ -74,6 +74,8 @@ import dev.mascwa.pulse.core.telemetry.AgendaQuest
 import dev.mascwa.pulse.core.telemetry.AgeBand
 import dev.mascwa.pulse.core.telemetry.Build
 import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.CheckBreakdown
+import dev.mascwa.pulse.core.telemetry.CheckMod
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Companion
 import dev.mascwa.pulse.core.telemetry.Companions
@@ -110,6 +112,7 @@ import dev.mascwa.pulse.core.telemetry.ItemCodex
 import dev.mascwa.pulse.core.telemetry.ItemKind
 import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.LifeProfile
+import dev.mascwa.pulse.core.telemetry.ModSource
 import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
@@ -395,7 +398,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         when {
             character.down -> DownedPanel(c) { vm.revive() }
-            encounter != null -> EncounterPanel(encounter!!, character, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
+            encounter != null -> EncounterPanel(encounter!!, character, env, life, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
             else -> IdlePanel(resolution, siteReach, c) { vm.venture() }
         }
         Spacer(Modifier.height(12.dp))
@@ -1454,6 +1457,8 @@ private const val PERF_FLOOR = 0.5f        // completing a gesture at all is nev
 private fun EncounterPanel(
     e: Encounter,
     ch: Character,
+    env: EnvContext?,
+    life: LifeProfile?,
     telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
     c: NightwirePalette,
     onResolve: (Int, String?, Int) -> Unit,
@@ -1540,7 +1545,7 @@ private fun EncounterPanel(
                     }
                 }
             }
-            e.choices.forEach { choice -> ApproachRow(choice, ch, selectedChem, c) }
+            e.choices.forEach { choice -> ApproachRow(choice, ch, env, life, selectedChem, c) }
             Spacer(Modifier.height(2.dp))
             SegBar(meter, if (resolved) c.positive else c.sky, c)
             when {
@@ -1589,16 +1594,21 @@ private fun ChemChip(label: String, on: Boolean, c: NightwirePalette, onClick: (
     }
 }
 
-/** A stat-gated approach, CP2077-style: `[STR 12] Heave it wide  ▸ SHAKE`, coloured by your odds. Read-only. */
+/**
+ * A stat-gated approach, CP2077-style: `[STR 12] Heave it wide  ▸ SHAKE`, coloured by your odds. Now shows
+ * the FULL live modifier stack — your real life, worn gear, perks, the environment, everything — as named
+ * chips, and the effective stat that stack produces, so the odds you see are the real ones and you can watch
+ * exactly what's bending this check *before* you commit. Read-only.
+ */
 @Composable
-private fun ApproachRow(choice: Choice, ch: Character, selectedChem: String?, c: NightwirePalette) {
+private fun ApproachRow(choice: Choice, ch: Character, env: EnvContext?, life: LifeProfile?, selectedChem: String?, c: NightwirePalette) {
     val gate = choice.stat
-    val chemBonus = if (gate != null) {
-        val chem = selectedChem?.let { Items.byId(it) }
-        if (chem != null && chem.kind == ItemKind.CHEM && chem.statBonus == gate && (ch.inventory[chem.id] ?: 0) > 0) chem.statBonusAmt else 0
-    } else 0
-    val bonus = if (gate != null) SpecialGame.perkStatBonus(ch, gate) + SpecialGame.gearStatBonus(ch, gate) + chemBonus else 0
-    val effStat = if (gate != null) ch.stat(gate) + bonus else 0
+    // Recomputed only when the inputs change, not on every sensor-driven meter frame.
+    val mods = remember(choice, ch, env, life, selectedChem) {
+        if (gate != null) SpecialGame.statMods(ch, choice, env, selectedChem, life) else emptyList()
+    }
+    val effStat = mods.sumOf { it.amount }
+    val bonuses = mods.filter { it.source != ModSource.BASE }
     val tag = if (gate == null) "SAFE" else oddsLabel(effStat, choice.difficulty, ch.stat(Special.LUCK))
     val tagColor = when (tag) {
         "SURE", "SAFE" -> c.positive
@@ -1620,13 +1630,34 @@ private fun ApproachRow(choice: Choice, ch: Character, selectedChem: String?, c:
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
             )
             Text(
-                (gesture?.let { "▸ ${it.label}" } ?: "▸ automatic") + (if (bonus != 0) "   (${if (bonus > 0) "+" else ""}$bonus)" else ""),
+                (gesture?.let { "▸ ${it.label}" } ?: "▸ automatic") +
+                    (if (gate != null) "   ·   your ${gate.display.take(3)} $effStat vs ${choice.difficulty}" else ""),
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 9.sp,
                 color = if (gesture != null) c.sky else c.muted, letterSpacing = 0.5.sp, modifier = Modifier.padding(top = 2.dp),
             )
+            if (bonuses.isNotEmpty()) {
+                FlowRow(
+                    Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) { bonuses.forEach { ModChip(it, c) } }
+            }
         }
         Text(tag, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = tagColor, letterSpacing = 1.sp)
     }
+}
+
+/** One named +/- modifier as a coloured chip — "+2 Powerhouse", "−2 Exhausted". The believability unit. */
+@Composable
+private fun ModChip(m: CheckMod, c: NightwirePalette) {
+    val pos = m.amount >= 0
+    val col = if (pos) c.positive else c.negative
+    Text(
+        "${if (pos) "+" else "−"}${abs(m.amount)} ${m.label}",
+        fontFamily = JetBrainsMono, fontSize = 8.sp, color = col,
+        modifier = Modifier.clip(RoundedCornerShape(2.dp)).background(col.copy(alpha = 0.10f))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+    )
 }
 
 /** The grind, made visible: what you've earned and what's next. Drives return play. */
@@ -2269,6 +2300,8 @@ private fun IdlePanel(resolution: Resolution?, reach: SiteReach?, c: NightwirePa
                 if (rewards.isNotBlank()) {
                     Text(rewards, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = c.amber)
                 }
+                // The maths, laid bare — what your real life + gear actually did to that roll.
+                if (resolution.breakdown.stat != null) BreakdownReadout(resolution.breakdown, c)
             }
             // GEO-GATED: you can only fight when physically at a wasteland site.
             when {
@@ -2292,6 +2325,28 @@ private fun IdlePanel(resolution: Resolution?, reach: SiteReach?, c: NightwirePa
                 }
             }
         }
+    }
+}
+
+/**
+ * The check laid bare after a fight: `d10 6  +  STR 8 +0 luck  =  14   vs   DC 12`, with the named modifier
+ * chips underneath. This is the payoff of "make the effects real" — you SEE that your Powerhouse build (or
+ * your exhaustion) is exactly what turned that roll into a win or a loss.
+ */
+@Composable
+private fun BreakdownReadout(bd: CheckBreakdown, c: NightwirePalette) {
+    val stat = bd.stat ?: return
+    val luckStr = if (bd.luckMod != 0) "  ${if (bd.luckMod > 0) "+" else "−"}${abs(bd.luckMod)} luck" else ""
+    Text(
+        "d10 ${bd.roll}  +  ${stat.display.take(3)} ${bd.statValue}$luckStr  =  ${bd.total}   vs   DC ${bd.difficulty}",
+        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp),
+    )
+    if (bd.bonuses.isNotEmpty()) {
+        FlowRow(
+            Modifier.padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) { bd.bonuses.forEach { ModChip(it, c) } }
     }
 }
 
