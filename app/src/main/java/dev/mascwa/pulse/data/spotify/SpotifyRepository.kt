@@ -39,6 +39,16 @@ data class SpotifyPlaylist(val name: String, val uri: String, val ownerName: Str
 /** Outcome of a playback-control call, so the UI can explain why nothing happened. */
 enum class PlaybackResult { OK, NO_DEVICE, NEEDS_PREMIUM, FAILED }
 
+/** Outcome of a catalogue search, so the UI can distinguish "genuinely no results" from a dead session or
+ *  a network failure — otherwise every failure silently reads as "No tracks found". */
+sealed interface SearchOutcome {
+    data class Ok(val tracks: List<SpotifyTrack>) : SearchOutcome
+    /** Not linked, or the token expired and couldn't refresh (a 401) → the user must relink. */
+    object AuthExpired : SearchOutcome
+    /** Transport error or an unexpected HTTP status. */
+    object Failed : SearchOutcome
+}
+
 /**
  * High-level Spotify Web API client. Holds the OAuth lifecycle (begin/complete/refresh/disconnect) over
  * [SettingsRepository] (tokens persist in the settings JSON; the backup export scrubs them) and exposes
@@ -149,17 +159,27 @@ class SpotifyRepository(private val settings: SettingsRepository) {
             .filter { it.id.isNotBlank() }
     }
 
-    suspend fun search(query: String, limit: Int = 20): List<SpotifyTrack> {
+    suspend fun search(query: String, limit: Int = 20): SearchOutcome {
         val q = query.trim()
-        if (q.isBlank()) return emptyList()
+        if (q.isBlank()) return SearchOutcome.Ok(emptyList())
+        // A dead session (no token / refresh failed) is the most likely reason search "returns nothing" while
+        // stale playlists still show — surface it as AuthExpired so the UI can tell the user to relink.
+        if (token() == null) return SearchOutcome.AuthExpired
         // %20 (not +) for the query — some endpoints treat a literal + as a plus sign, not a space.
         val enc = URLEncoder.encode(q, "UTF-8").replace("+", "%20")
-        val (code, body) = request("GET", "/search?type=track&limit=$limit&q=$enc") ?: return emptyList()
-        if (code !in 200..299) return emptyList()
-        val r = runCatching { json.decodeFromString(ApiSearch.serializer(), body) }.getOrNull() ?: return emptyList()
-        return r.tracks?.items.orEmpty().map {
-            SpotifyTrack(it.name, it.artists.joinToString(", ") { a -> a.name }, it.uri, it.album?.images?.firstOrNull()?.url)
-        }
+        // market=from_token filters to what's actually playable in the account's country (needs user-read-
+        // private, which is granted) — the recommended way to get relevant, playable results.
+        val (code, body) = request("GET", "/search?type=track&market=from_token&limit=$limit&q=$enc")
+            ?: return SearchOutcome.Failed
+        if (code == 401) return SearchOutcome.AuthExpired
+        if (code !in 200..299) return SearchOutcome.Failed
+        val r = runCatching { json.decodeFromString(ApiSearch.serializer(), body) }.getOrNull()
+            ?: return SearchOutcome.Failed
+        return SearchOutcome.Ok(
+            r.tracks?.items.orEmpty().map {
+                SpotifyTrack(it.name, it.artists.joinToString(", ") { a -> a.name }, it.uri, it.album?.images?.firstOrNull()?.url)
+            },
+        )
     }
 
     /** The user's own + followed playlists (newest-first as Spotify returns them). */

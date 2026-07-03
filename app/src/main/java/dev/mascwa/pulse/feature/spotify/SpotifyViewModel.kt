@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.settings.SpotifyAuthState
 import dev.mascwa.pulse.data.spotify.PlaybackResult
+import dev.mascwa.pulse.data.spotify.SearchOutcome
 import dev.mascwa.pulse.data.spotify.SpotifyAppRemoteController
 import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
@@ -30,7 +31,7 @@ import kotlinx.coroutines.launch
  */
 class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
 
-    enum class SearchStatus { IDLE, LOADING, READY, EMPTY }
+    enum class SearchStatus { IDLE, LOADING, READY, EMPTY, AUTH_EXPIRED, FAILED }
 
     val auth: StateFlow<SpotifyAuthState> = repo.authState
         .map { it.spotify }
@@ -202,9 +203,18 @@ class SpotifyViewModel(private val repo: SpotifyRepository) : ViewModel() {
         if (query.isBlank()) { _searchResults.value = emptyList(); _searchStatus.value = SearchStatus.IDLE; return }
         searchJob = viewModelScope.launch {
             _searchStatus.value = SearchStatus.LOADING
-            val results = repo.search(query)
-            _searchResults.value = results
-            _searchStatus.value = if (results.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
+            when (val outcome = repo.search(query)) {
+                is SearchOutcome.Ok -> {
+                    _searchResults.value = outcome.tracks
+                    _searchStatus.value = if (outcome.tracks.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
+                }
+                SearchOutcome.AuthExpired -> {
+                    _searchResults.value = emptyList(); _searchStatus.value = SearchStatus.AUTH_EXPIRED
+                }
+                SearchOutcome.Failed -> {
+                    _searchResults.value = emptyList(); _searchStatus.value = SearchStatus.FAILED
+                }
+            }
         }
     }
 
