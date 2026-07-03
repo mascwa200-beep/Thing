@@ -53,6 +53,8 @@ mediapipeTasksAudio = "0.10.21"
 mediapipeTasksVision = "0.10.21"
 # CameraX — the ambient camera sampler (ImageAnalysis bound to a headless lifecycle).
 camerax = "1.4.1"
+# Google Filament — real-time PBR renderer for the 3D AR wasteland (no ARCore / Play Services; arm64 native).
+filament = "1.71.5"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -125,6 +127,9 @@ androidx-camera-core = { group = "androidx.camera", name = "camera-core", versio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+# Filament 3D renderer (AR wasteland). filament-utils brings kotlin-math (Float3/Mat4/quat). No gltfio (procedural).
+filament-android = { group = "com.google.android.filament", name = "filament-android", version.ref = "filament" }
+filament-utils-android = { group = "com.google.android.filament", name = "filament-utils-android", version.ref = "filament" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
