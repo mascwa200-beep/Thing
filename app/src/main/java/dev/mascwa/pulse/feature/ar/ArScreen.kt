@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,9 +101,20 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     val character by vm.character.collectAsStateWithLifecycle()
     val activeWp by vm.activeWaypoint.collectAsStateWithLifecycle()
 
+    // WASTELAND vision: recolour the live feed to the irradiated post-war world + ash + lore.
+    var wasteland by remember { mutableStateOf(false) }
+    var loreIdx by remember { mutableStateOf(0) }
+    LaunchedEffect(wasteland) {
+        if (!wasteland) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(9000)
+            loreIdx++
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Pip.bg)) {
         if (hasCamera) {
-            CameraPreview(Modifier.fillMaxSize())
+            CameraPreview(Modifier.fillMaxSize(), wasteland)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -115,6 +128,12 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                     textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 ArButton("GRANT OPTICS", Modifier.padding(top = 16.dp)) { permLauncher.launch(Manifest.permission.CAMERA) }
             }
+        }
+
+        // WASTELAND vision overlays — over the (recoloured) camera, under the HUD chrome.
+        if (hasCamera && wasteland) {
+            RadVignette(Modifier.fillMaxSize())
+            AshOverlay(Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -168,27 +187,26 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
 
         // --- Fixed HUD chrome ---
 
-        // Heading ribbon across the top.
-        CompassRibbon(heading, Modifier.align(Alignment.TopCenter).fillMaxWidth().height(30.dp)
-            .padding(top = 2.dp))
-
         // Centre reticle — a phosphor ring + dot.
         Box(Modifier.align(Alignment.Center).size(48.dp).border(1.dp, Pip.bright.copy(alpha = 0.6f), CircleShape)) {
             Box(Modifier.align(Alignment.Center).size(4.dp).background(Pip.glow, CircleShape))
         }
 
-        // Top bar: back + heading readout + calibration.
-        Row(
-            Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 34.dp, start = 12.dp, end = 12.dp),
-            verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            ArButton("‹ EXIT") { onBack() }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${heading.toInt()}° ${cardinal(heading)}", fontFamily = ChakraPetch,
-                    fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Pip.glow, letterSpacing = 1.sp)
-                Text("PITCH ${pitch.toInt()}°", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
-                if (unreliable) {
-                    Text("compass off — wave a figure-8", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.alert)
+        // Top chrome — heading ribbon + EXIT/heading, held BELOW the system status bar (clock/battery).
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding()) {
+            CompassRibbon(heading, Modifier.fillMaxWidth().height(30.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp, start = 12.dp, end = 12.dp),
+                verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                ArButton("‹ EXIT") { onBack() }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${heading.toInt()}° ${cardinal(heading)}", fontFamily = ChakraPetch,
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Pip.glow, letterSpacing = 1.sp)
+                    Text("PITCH ${pitch.toInt()}°", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
+                    if (unreliable) {
+                        Text("compass off — wave a figure-8", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.alert)
+                    }
                 }
             }
         }
@@ -203,11 +221,19 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 Modifier.align(Alignment.BottomEnd).padding(12.dp).size(104.dp))
         }
 
-        // Bottom-centre: nearest-site readout + scan.
+        // Bottom-centre: (wasteland lore) · nearest-site readout · WASTELAND toggle + scan.
         Column(
-            Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 12.dp),
+            Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (wasteland) {
+                Text(
+                    "☢ ${dev.mascwa.pulse.core.telemetry.WastelandLore.render(loreIdx)}",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.mid, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clip(RoundedCornerShape(3.dp))
+                        .background(Pip.bg.copy(alpha = 0.66f)).padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
             if (g == null) {
                 ReadoutLine("ACQUIRING SATELLITE FIX…")
             } else if (sites.isEmpty()) {
@@ -216,7 +242,10 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 val d = Geo.distanceMeters(g.latitude, g.longitude, nearest.lat, nearest.lon)
                 ReadoutLine("NEAREST · ${nearest.name.uppercase()} · ${Geo.formatDistance(d)}")
             }
-            ArButton(if (scanning) "SCANNING…" else "SCAN AREA ▸", Modifier.padding(top = 6.dp)) { vm.scan() }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ArButton(if (wasteland) "☢ WASTELAND ✓" else "☢ WASTELAND") { wasteland = !wasteland }
+                ArButton(if (scanning) "SCANNING…" else "SCAN ▸") { vm.scan() }
+            }
         }
 
         // CRT scanline tube over everything (decorative; passes touches through).
@@ -224,9 +253,13 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     }
 }
 
-/** Live back-camera preview via CameraX, bound to the composition's lifecycle. */
+/**
+ * Live back-camera preview via CameraX, bound to the composition's lifecycle. When [wasteland] is on, a
+ * RenderEffect colour-grade recolours the real feed into the irradiated post-war world (API 31+; a no-op
+ * below that — the ash/vignette/lore overlays still convey the mood).
+ */
 @Composable
-private fun CameraPreview(modifier: Modifier) {
+private fun CameraPreview(modifier: Modifier, wasteland: Boolean) {
     val lifecycleOwner = LocalLifecycleOwner.current
     AndroidView(
         modifier = modifier,
@@ -250,6 +283,68 @@ private fun CameraPreview(modifier: Modifier) {
             }, ContextCompat.getMainExecutor(ctx))
             previewView
         },
+        update = { previewView ->
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                runCatching { previewView.setRenderEffect(if (wasteland) wastelandRenderEffect() else null) }
+            }
+        },
+    )
+}
+
+/** A desaturated, amber-green "irradiated" colour grade for the live feed. */
+@androidx.annotation.RequiresApi(31)
+private fun wastelandRenderEffect(): android.graphics.RenderEffect {
+    val grade = android.graphics.ColorMatrix().apply { setSaturation(0.35f) }
+    // Warm the reds, hold green (the rad tint), cut blue — a sun-baked, sickly cast.
+    grade.postConcat(
+        android.graphics.ColorMatrix(
+            floatArrayOf(
+                1.15f, 0.10f, 0.00f, 0f, 4f,
+                0.00f, 1.05f, 0.00f, 0f, 8f,
+                0.00f, 0.10f, 0.65f, 0f, -6f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        ),
+    )
+    return android.graphics.RenderEffect.createColorFilterEffect(android.graphics.ColorMatrixColorFilter(grade))
+}
+
+/** Drifting irradiated ash — analytic positions from an animation phase (no per-frame allocation). */
+@Composable
+private fun AshOverlay(modifier: Modifier) {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ash")
+    val phase by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(11_000, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "phase",
+    )
+    Canvas(modifier) {
+        val n = 130
+        for (i in 0 until n) {
+            val col = (i * 73 % 100) / 100f
+            val speed = 0.5f + (i % 5) * 0.16f
+            val y = (((phase * speed) + (i * 37 % 100) / 100f) % 1f) * size.height
+            val drift = sin(phase * 6.2832f + i) * 14f
+            val x = col * size.width + drift
+            val r = 1f + (i % 3)
+            drawCircle(Color(0xFFC7B47A).copy(alpha = 0.22f), r, Offset(x, y))
+        }
+    }
+}
+
+/** A radiation vignette — darkening + green cast toward the edges. */
+@Composable
+private fun RadVignette(modifier: Modifier) {
+    Box(
+        modifier.background(
+            androidx.compose.ui.graphics.Brush.radialGradient(
+                0.55f to Color.Transparent,
+                0.85f to Color(0x33143C1E),
+                1.0f to Color(0x99041308),
+            ),
+        ),
     )
 }
 
