@@ -76,7 +76,9 @@ import dev.mascwa.pulse.core.telemetry.Build
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.CheckBreakdown
 import dev.mascwa.pulse.core.telemetry.CheckMod
+import dev.mascwa.pulse.core.telemetry.CheckinOutcome
 import dev.mascwa.pulse.core.telemetry.Choice
+import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.Companion
 import dev.mascwa.pulse.core.telemetry.Companions
 import dev.mascwa.pulse.core.telemetry.DailyObjective
@@ -344,6 +346,8 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val siteReach by vm.siteReach.collectAsStateWithLifecycle()
     val legend by vm.legend.collectAsStateWithLifecycle()
+    val dueCheckin by vm.dueCheckin.collectAsStateWithLifecycle()
+    val checkinResult by vm.checkinResult.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -362,6 +366,17 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
         )
         Spacer(Modifier.height(8.dp))
+
+        // Self-care check-in: asks, then catches a lie against the sensed evidence, then tops up the need.
+        val result = checkinResult
+        val due = dueCheckin
+        if (result != null) {
+            CheckinResultBanner(result, c) { vm.dismissCheckinResult() }
+            Spacer(Modifier.height(8.dp))
+        } else if (due != null) {
+            CheckinCard(due, c, onYes = { vm.answerHabit(due, true) }, onNo = { vm.answerHabit(due, false) })
+            Spacer(Modifier.height(8.dp))
+        }
 
         PipHeader("S.P.E.C.I.A.L.")
         if (dayBanner.isNotEmpty()) {
@@ -2347,6 +2362,48 @@ private fun BreakdownReadout(bd: CheckBreakdown, c: NightwirePalette) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) { bd.bonuses.forEach { ModChip(it, c) } }
+    }
+}
+
+/** The self-care check-in — the app asks; the answer is then cross-referenced with the sensed evidence. */
+@Composable
+private fun CheckinCard(habit: Habit, c: NightwirePalette, onYes: () -> Unit, onNo: () -> Unit) {
+    PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("SELF-CARE CHECK-IN", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.sky, letterSpacing = 2.sp)
+            Text(habit.question, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CheckinButton("YES ▸", c.positive, Modifier.weight(1f), onYes)
+                CheckinButton("NOT YET", c.muted, Modifier.weight(1f), onNo)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckinButton(label: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp, color = color)
+    }
+}
+
+/** The verdict after a check-in — the lie-catcher's reply, tap to dismiss. */
+@Composable
+private fun CheckinResultBanner(outcome: CheckinOutcome, c: NightwirePalette, onDismiss: () -> Unit) {
+    val (msg, col) = when (outcome) {
+        CheckinOutcome.CONFIRMED -> "✓ Sensors agree — logged, need topped up." to c.positive
+        CheckinOutcome.UNVERIFIED -> "~ Couldn't fully confirm, but I'll take your word — credited." to c.amber
+        CheckinOutcome.CAUGHT_LIE -> "✗ I never sensed that happen — no credit. Go do it for real." to c.negative
+        CheckinOutcome.HONEST_NO -> "Alright — go do it, then check back." to c.sky
+    }
+    PipFrame(Modifier.fillMaxWidth().clickable { onDismiss() }, accent = col) {
+        Text(msg, fontFamily = JetBrainsMono, fontSize = 11.sp, color = col)
     }
 }
 

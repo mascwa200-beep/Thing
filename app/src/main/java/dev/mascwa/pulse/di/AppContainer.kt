@@ -129,6 +129,12 @@ class AppContainer(private val appContext: Context) {
         )
     }
 
+    /** The habit check-in loop: asks "showered/ate/drank yet?", verifies the claim against the evidence
+     *  history, and tops up the matching real-life need on a truthful yes (no lockout). */
+    val habitStore: dev.mascwa.pulse.data.game.HabitStore by lazy {
+        dev.mascwa.pulse.data.game.HabitStore(appContext, json, activityEvidenceStore, specialGameStore)
+    }
+
     /** Real calendar → the life-sim's agenda (upcoming events become wasteland objectives; on-device only). */
     val calendarRepository: dev.mascwa.pulse.data.calendar.CalendarRepository by lazy {
         dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)
