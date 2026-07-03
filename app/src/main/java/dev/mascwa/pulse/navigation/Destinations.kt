@@ -63,6 +63,9 @@ object Routes {
     // AR wasteland camera — projects nearby geo-gated sites through the live camera (compass "magic window")
     const val AR = "ar"
 
+    // 3D AR wasteland — real Filament-rendered geometry over the camera (separate mode; being built up slice by slice)
+    const val AR3D = "ar3d"
+
     // Objectives / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
 

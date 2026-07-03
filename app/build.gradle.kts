@@ -193,6 +193,7 @@ dependencies {
     // Filament — 3D AR wasteland renderer (arm64 native; no ARCore/Play Services).
     implementation(libs.filament.android)
     implementation(libs.filament.utils.android)
+    implementation(libs.filamat.android)
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

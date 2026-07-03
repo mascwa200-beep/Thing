@@ -130,6 +130,9 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 # Filament 3D renderer (AR wasteland). filament-utils brings kotlin-math (Float3/Mat4/quat). No gltfio (procedural).
 filament-android = { group = "com.google.android.filament", name = "filament-android", version.ref = "filament" }
 filament-utils-android = { group = "com.google.android.filament", name = "filament-utils-android", version.ref = "filament" }
+# Runtime material compiler (builds the unlit shader on-device — avoids shipping matc-compiled .filamat blobs;
+# arm64 slice only, ~3-4 MB via the abiFilter).
+filamat-android = { group = "com.google.android.filament", name = "filamat-android", version.ref = "filament" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
