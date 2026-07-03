@@ -2,12 +2,13 @@ package dev.mascwa.pulse.feature.ar
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.PixelFormat
+import android.view.SurfaceView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,7 +55,7 @@ import dev.mascwa.pulse.core.telemetry.ArProjection
 import dev.mascwa.pulse.core.telemetry.SiteType
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.util.Geo
-import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.feature.ar3d.WastelandRenderer
 import dev.mascwa.pulse.feature.tacnet.Pip
 import dev.mascwa.pulse.feature.tacnet.crtScanlines
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -75,6 +76,10 @@ private const val RADAR_RANGE_M = 800.0
  * vertical position from the camera **pitch** (tilt up → markers slide down toward the horizon), so tilting
  * no longer smears things sideways. Extra HUD: a heading ribbon, a top-down radar, an operator STAT strip,
  * and the tracked objective. Phosphor-green CRT chrome. No ARCore.
+ *
+ * The **◉ 3D** toggle swaps the flat projected markers for a real Filament-rendered 3D wasteland of the
+ * immediate vicinity ([WastelandRenderer] — a transparent GL surface composited over the live camera). It's
+ * built up slice by slice; right now it draws the proof geometry. The HUD instruments stay in both modes.
  */
 @Composable
 fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
@@ -101,20 +106,12 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     val character by vm.character.collectAsStateWithLifecycle()
     val activeWp by vm.activeWaypoint.collectAsStateWithLifecycle()
 
-    // WASTELAND vision: recolour the live feed to the irradiated post-war world + ash + lore.
-    var wasteland by remember { mutableStateOf(false) }
-    var loreIdx by remember { mutableStateOf(0) }
-    LaunchedEffect(wasteland) {
-        if (!wasteland) return@LaunchedEffect
-        while (true) {
-            kotlinx.coroutines.delay(9000)
-            loreIdx++
-        }
-    }
+    // 3D mode: swap the flat projected markers for the Filament-rendered wasteland of the immediate vicinity.
+    var mode3d by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Pip.bg)) {
         if (hasCamera) {
-            CameraPreview(Modifier.fillMaxSize(), wasteland)
+            CameraPreview(Modifier.fillMaxSize())
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -130,10 +127,10 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
             }
         }
 
-        // WASTELAND vision overlays — over the (recoloured) camera, under the HUD chrome.
-        if (hasCamera && wasteland) {
-            RadVignette(Modifier.fillMaxSize())
-            AshOverlay(Modifier.fillMaxSize())
+        // 3D wasteland — a transparent Filament GL surface composited over the live camera (immediate vicinity).
+        // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
+        if (hasCamera && mode3d) {
+            FilamentLayer(Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -142,8 +139,8 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
             sites.minByOrNull { Geo.distanceMeters(g.latitude, g.longitude, it.lat, it.lon) }
         } else null
 
-        // --- Projected markers (need camera + a fix) ---
-        if (hasCamera && g != null) {
+        // --- Flat projected markers (default mode; hidden while 3D is on) ---
+        if (hasCamera && !mode3d && g != null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val wDp = maxWidth
                 val hDp = maxHeight
@@ -221,19 +218,11 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 Modifier.align(Alignment.BottomEnd).padding(12.dp).size(104.dp))
         }
 
-        // Bottom-centre: (wasteland lore) · nearest-site readout · WASTELAND toggle + scan.
+        // Bottom-centre: nearest-site readout · 3D toggle + scan.
         Column(
             Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (wasteland) {
-                Text(
-                    "☢ ${dev.mascwa.pulse.core.telemetry.WastelandLore.render(loreIdx)}",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.mid, textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp).clip(RoundedCornerShape(3.dp))
-                        .background(Pip.bg.copy(alpha = 0.66f)).padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
             if (g == null) {
                 ReadoutLine("ACQUIRING SATELLITE FIX…")
             } else if (sites.isEmpty()) {
@@ -243,7 +232,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 ReadoutLine("NEAREST · ${nearest.name.uppercase()} · ${Geo.formatDistance(d)}")
             }
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ArButton(if (wasteland) "☢ WASTELAND ✓" else "☢ WASTELAND") { wasteland = !wasteland }
+                ArButton(if (mode3d) "◉ 3D ✓" else "◉ 3D") { mode3d = !mode3d }
                 ArButton(if (scanning) "SCANNING…" else "SCAN ▸") { vm.scan() }
             }
         }
@@ -253,13 +242,9 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     }
 }
 
-/**
- * Live back-camera preview via CameraX, bound to the composition's lifecycle. When [wasteland] is on, a
- * RenderEffect colour-grade recolours the real feed into the irradiated post-war world (API 31+; a no-op
- * below that — the ash/vignette/lore overlays still convey the mood).
- */
+/** Live back-camera preview via CameraX, bound to the composition's lifecycle. */
 @Composable
-private fun CameraPreview(modifier: Modifier, wasteland: Boolean) {
+private fun CameraPreview(modifier: Modifier) {
     val lifecycleOwner = LocalLifecycleOwner.current
     AndroidView(
         modifier = modifier,
@@ -283,68 +268,27 @@ private fun CameraPreview(modifier: Modifier, wasteland: Boolean) {
             }, ContextCompat.getMainExecutor(ctx))
             previewView
         },
-        update = { previewView ->
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                runCatching { previewView.setRenderEffect(if (wasteland) wastelandRenderEffect() else null) }
+    )
+}
+
+/**
+ * The 3D wasteland layer — a **transparent** Filament SurfaceView floating over the live camera. `setZOrderOnTop`
+ * + a `TRANSLUCENT` holder composite it above the camera TextureView while its clear pixels reveal the camera
+ * (and the Compose HUD drawn behind it). The [WastelandRenderer]'s native engine is freed when 3D toggles off.
+ */
+@Composable
+private fun FilamentLayer(modifier: Modifier) {
+    val renderer = remember { WastelandRenderer() }
+    DisposableEffect(Unit) { onDispose { renderer.detach() } } // frees native memory when 3D turns off / on leave
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            SurfaceView(ctx).apply {
+                setZOrderOnTop(true)                      // composite above the camera TextureView
+                holder.setFormat(PixelFormat.TRANSLUCENT) // give the surface an alpha channel
+                renderer.attach(this)
             }
         },
-    )
-}
-
-/** A desaturated, amber-green "irradiated" colour grade for the live feed. */
-@androidx.annotation.RequiresApi(31)
-private fun wastelandRenderEffect(): android.graphics.RenderEffect {
-    val grade = android.graphics.ColorMatrix().apply { setSaturation(0.35f) }
-    // Warm the reds, hold green (the rad tint), cut blue — a sun-baked, sickly cast.
-    grade.postConcat(
-        android.graphics.ColorMatrix(
-            floatArrayOf(
-                1.15f, 0.10f, 0.00f, 0f, 4f,
-                0.00f, 1.05f, 0.00f, 0f, 8f,
-                0.00f, 0.10f, 0.65f, 0f, -6f,
-                0f, 0f, 0f, 1f, 0f,
-            ),
-        ),
-    )
-    return android.graphics.RenderEffect.createColorFilterEffect(android.graphics.ColorMatrixColorFilter(grade))
-}
-
-/** Drifting irradiated ash — analytic positions from an animation phase (no per-frame allocation). */
-@Composable
-private fun AshOverlay(modifier: Modifier) {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ash")
-    val phase by transition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(11_000, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "phase",
-    )
-    Canvas(modifier) {
-        val n = 130
-        for (i in 0 until n) {
-            val col = (i * 73 % 100) / 100f
-            val speed = 0.5f + (i % 5) * 0.16f
-            val y = (((phase * speed) + (i * 37 % 100) / 100f) % 1f) * size.height
-            val drift = sin(phase * 6.2832f + i) * 14f
-            val x = col * size.width + drift
-            val r = 1f + (i % 3)
-            drawCircle(Color(0xFFC7B47A).copy(alpha = 0.22f), r, Offset(x, y))
-        }
-    }
-}
-
-/** A radiation vignette — darkening + green cast toward the edges. */
-@Composable
-private fun RadVignette(modifier: Modifier) {
-    Box(
-        modifier.background(
-            androidx.compose.ui.graphics.Brush.radialGradient(
-                0.55f to Color.Transparent,
-                0.85f to Color(0x33143C1E),
-                1.0f to Color(0x99041308),
-            ),
-        ),
     )
 }
 

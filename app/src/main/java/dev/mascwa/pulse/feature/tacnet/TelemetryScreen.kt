@@ -577,11 +577,9 @@ fun WastelandDataBody(vm: TelemetryViewModel, onOpenRoute: (String) -> Unit = {}
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) },
             onTrack = { vm.trackSite(it) }, onUntrack = { vm.untrackSite(it) })
         Spacer(Modifier.height(6.dp))
-        // Project the nearby sites through the live camera (compass magic-window AR).
+        // Project the nearby sites through the live camera (compass magic-window AR; ◉ 3D toggle inside
+        // swaps the flat markers for a Filament-rendered 3D wasteland of the immediate vicinity).
         GameButton("◈ AR CAMERA VIEW ▸", c.violet) { onOpenRoute(dev.mascwa.pulse.navigation.Routes.AR) }
-        Spacer(Modifier.height(6.dp))
-        // Real 3D-rendered wasteland over the camera (Filament; being built up slice by slice).
-        GameButton("◈ 3D WASTELAND · BETA ▸", c.positive) { onOpenRoute(dev.mascwa.pulse.navigation.Routes.AR3D) }
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
         ScavengePanel(lastScavenge, scavengeCooldown, siteReach?.atSite == true, character, c,
