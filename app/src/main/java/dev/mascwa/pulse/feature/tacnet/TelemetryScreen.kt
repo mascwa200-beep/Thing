@@ -534,7 +534,7 @@ fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
  * wasteland map (scan / shop / talk) and achievements. Scaffold-free.
  */
 @Composable
-fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
+fun WastelandDataBody(vm: TelemetryViewModel, onOpenRoute: (String) -> Unit = {}, modifier: Modifier = Modifier) {
     GameSensors(vm)
     val character by vm.character.collectAsStateWithLifecycle()
     val gps by vm.gps.collectAsStateWithLifecycle()
@@ -576,6 +576,9 @@ fun WastelandDataBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         WastelandPanel(locations, sites, travel, scanning, gps, character, worldEvent.shopPct, trackedWaypoints, c,
             onScan = { vm.scanArea() }, onBuy = { id, kind -> vm.buy(id, kind) }, onTalk = { enc, kind -> vm.talk(enc, kind) },
             onTrack = { vm.trackSite(it) }, onUntrack = { vm.untrackSite(it) })
+        Spacer(Modifier.height(6.dp))
+        // Project the nearby sites through the live camera (compass magic-window AR).
+        GameButton("◈ AR CAMERA VIEW ▸", c.violet) { onOpenRoute(dev.mascwa.pulse.navigation.Routes.AR) }
         Spacer(Modifier.height(8.dp))
         PipHeader("Scavenge")
         ScavengePanel(lastScavenge, scavengeCooldown, siteReach?.atSite == true, character, c,

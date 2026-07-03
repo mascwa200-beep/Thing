@@ -61,6 +61,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.tacnet.RadarViewModel(c.radarRepository, c.locationProvider, c.spaceWeatherRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.TelemetryViewModel::class.java) ->
                 dev.mascwa.pulse.feature.tacnet.TelemetryViewModel(c.newTelemetryController(), c.locationProvider, c.settingsRepository, c.specialGameStore, c.weatherRepository, c.usageRepository, c.gameWorldStore, c.profileStore, c.taskStore, c.questStore, c.ambientPerceptionSampler, c.cameraPerceptionSampler, c.calendarRepository, c.waypointStore)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.ar.ArViewModel::class.java) ->
+                dev.mascwa.pulse.feature.ar.ArViewModel(c.locationProvider, c.newCompassController(), c.gameWorldStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tacnet.RadioViewModel::class.java) ->
                 dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository, c.settingsRepository, c.tuneInRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.notes.NotesViewModel::class.java) ->
