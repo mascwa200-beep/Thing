@@ -365,6 +365,21 @@ class SpecialGameStore(
         refreshDaily()
     }
 
+    /**
+     * After a RESET, mark whatever already qualifies (mostly your KEPT real-life metrics — steps, distance,
+     * places) as earned **without paying out its rewards**, so a fresh operative can't be instantly re-levelled
+     * by achievements you preserved. Without this, [runAchievementCheck] on a just-reset character re-grants
+     * all those XP/caps/item rewards and hands out perk picks — the "reset didn't reset" bug. Game-progress
+     * achievements (wins/crits/ventures/…) don't re-qualify because their counters were just zeroed.
+     */
+    private fun seedAchievementsNoReward() {
+        unlocked = Achievements.evaluate(currentMetrics(), emptySet()).map { it.id }.toSet()
+        _unlocked.value = unlocked
+        _lastUnlock.value = null
+        publishMetrics()
+        refreshDaily()
+    }
+
     // --- Daily objectives ---
     private fun currentDay(): Long = java.time.LocalDate.now().toEpochDay()
 
@@ -688,8 +703,8 @@ class SpecialGameStore(
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex for the fresh operative
-            // Usage/travel achievements re-earn from the (persisted) real metrics on the next check.
-            runAchievementCheck()
+            // Seed (no reward) so kept real-life achievements can't instantly re-level the fresh operative.
+            seedAchievementsNoReward()
             scheduleFlush()
         }
     }
@@ -713,7 +728,9 @@ class SpecialGameStore(
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
             // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
-            runAchievementCheck()
+            // Seed (no reward) so kept real-life achievements can't instantly re-level the fresh operative
+            // (the "reset didn't reset — I still have perks/level/caps" bug).
+            seedAchievementsNoReward()
             scheduleFlush()
         }
     }
