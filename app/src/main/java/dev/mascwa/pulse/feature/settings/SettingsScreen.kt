@@ -219,6 +219,21 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             }
                         },
                     )
+                    var sensors by remember { mutableStateOf<String?>(null) }
+                    PrefClickable(
+                        "Sensors",
+                        value = if (sensors == null) "tap to probe" else "see below",
+                        subtitle = sensors
+                            ?: "Probe which sensors this device actually exposes. The activity-sensing " +
+                            "(shower / eating detection) is built on what's really here — Pixels have a " +
+                            "barometer but usually no humidity or ambient-temperature sensor, so the honest " +
+                            "signal is sound (running water) + scene, not a humidity spike.",
+                        onClick = {
+                            if (sensors == null) {
+                                sensors = dev.mascwa.pulse.core.device.SensorCapabilities(context).summary()
+                            }
+                        },
+                    )
                     PrefClickable(
                         "GrapheneOS per-app controls",
                         subtitle = "Network, Sensors & Storage Scopes for Pulse (GrapheneOS-exclusive) live in App info.",
