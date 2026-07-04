@@ -316,7 +316,7 @@
         <service
             android:name=".data.perception.AmbientSensingService"
             android:exported="false"
-            android:foregroundServiceType="camera|microphone" />
+            android:foregroundServiceType="camera|microphone|dataSync" />
 
         <!-- J.A.R.V.I.S. arc-reactor live wallpaper. Reads only on-device cached Pulse data; drawn
              procedurally (no bitmaps). Set it from Settings → Appearance → J.A.R.V.I.S. live wallpaper. -->
