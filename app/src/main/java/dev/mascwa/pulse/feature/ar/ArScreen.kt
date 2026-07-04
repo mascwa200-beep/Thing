@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import dev.mascwa.pulse.core.telemetry.ArProjection
+import dev.mascwa.pulse.core.telemetry.LocalFootprint
 import dev.mascwa.pulse.core.telemetry.Setting
 import dev.mascwa.pulse.core.telemetry.SiteType
 import dev.mascwa.pulse.core.telemetry.WorldSite
@@ -114,6 +115,8 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     // Solid wasteland ground only when we're confident we're OUTSIDE (or in transit). Indoors / not-yet-known →
     // the non-blocking wireframe ground ghost, so a solid floor never obscures the room.
     val indoor = setting != Setting.OUTDOOR && setting != Setting.VEHICLE
+    // Real OSM building footprints, projected to the local frame around the current fix (empty → procedural).
+    val localBuildings by vm.localBuildings.collectAsStateWithLifecycle()
 
     // The AR overlay is ONE thing: the Filament wasteland + the site labels together (no mode toggle). It
     // "models" for a beat on entry — a Fallout loading screen while the scene builds.
@@ -144,7 +147,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         // ground is solid outdoors / a wireframe ghost indoors ([indoor], from the camera classifier).
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
         if (hasCamera) {
-            FilamentLayer(heading, pitch, indoor, Modifier.fillMaxSize())
+            FilamentLayer(heading, pitch, indoor, localBuildings, Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -216,6 +219,11 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                         fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Pip.glow, letterSpacing = 1.sp)
                     Text("PITCH ${pitch.toInt()}°", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
                     Text(settingLabel(setting), fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
+                    Text(
+                        if (localBuildings.isEmpty()) "STRUCTURES · SCANNED"
+                        else "STRUCTURES · ${localBuildings.size} MAPPED",
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim,
+                    )
                     if (unreliable) {
                         Text("compass off — wave a figure-8", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.alert)
                     }
@@ -332,13 +340,21 @@ private fun CameraPreview(analyzer: (ImageProxy) -> Unit, modifier: Modifier) {
  * leaves. [indoor] picks the ground mode: solid wasteland outdoors, wireframe ground ghost indoors.
  */
 @Composable
-private fun FilamentLayer(heading: Float, pitch: Float, indoor: Boolean, modifier: Modifier) {
+private fun FilamentLayer(
+    heading: Float,
+    pitch: Float,
+    indoor: Boolean,
+    buildings: List<LocalFootprint>,
+    modifier: Modifier,
+) {
     val renderer = remember { WastelandRenderer() }
     DisposableEffect(Unit) { onDispose { renderer.detach() } } // frees native memory on leave
     // Aim the wasteland camera by the live compass + tilt (main thread — same as the renderer).
     LaunchedEffect(heading, pitch) { renderer.setOrientation(heading, pitch) }
     // Swap solid ground ↔ wireframe ghost as the camera classifier decides indoors/outdoors.
     LaunchedEffect(indoor) { renderer.setIndoor(indoor) }
+    // Feed the real geo-anchored OSM footprints (re-projected as you move); empty keeps the procedural skyline.
+    LaunchedEffect(buildings) { renderer.setBuildings(buildings) }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
