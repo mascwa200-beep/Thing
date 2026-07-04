@@ -3,11 +3,13 @@ package dev.mascwa.pulse.feature.ar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.Setting
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.data.game.GameWorldStore
 import dev.mascwa.pulse.data.game.SpecialGameStore
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.objectives.WaypointStore
+import dev.mascwa.pulse.data.perception.IndoorOutdoorDetector
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -33,10 +35,14 @@ class ArViewModel(
     private val gameWorld: GameWorldStore,
     private val game: SpecialGameStore,
     private val waypoints: WaypointStore,
+    val indoorDetector: IndoorOutdoorDetector,
 ) : ViewModel() {
 
     /** The geo-gated wasteland sites near you (shared with the game's scan). */
     val sites: StateFlow<List<WorldSite>> = gameWorld.sitesFlow
+
+    /** INDOOR/OUTDOOR/VEHICLE read of the AR camera → drives the wasteland ground render mode. */
+    val setting: StateFlow<Setting> = indoorDetector.setting
 
     val scanning: StateFlow<Boolean> = gameWorld.scanningFlow
 
@@ -70,6 +76,8 @@ class ArViewModel(
     /** Begin the compass + GPS polling (tie to the screen's lifecycle). */
     fun start() {
         compass.start()
+        // Prime the on-device indoor/outdoor classifier (model fetch + open, off the main thread).
+        viewModelScope.launch { indoorDetector.prepare() }
         if (pollJob?.isActive == true) return
         pollJob = viewModelScope.launch {
             while (true) {
@@ -88,6 +96,7 @@ class ArViewModel(
 
     fun stop() {
         compass.stop()
+        indoorDetector.close()
         pollJob?.cancel()
         pollJob = null
     }
