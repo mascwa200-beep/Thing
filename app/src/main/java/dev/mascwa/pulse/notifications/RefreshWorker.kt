@@ -43,6 +43,18 @@ class RefreshWorker(
 
         val notifier = container.notifier
 
+        // --- Aggressive self-care check-in (opt-in): a full-screen alert over the lock screen when a habit
+        //     is overdue. markAsked stamps it so it won't re-fire until the ask-gap (no spamming). ---
+        if (prefs.aggressiveCheckin) {
+            runCatching {
+                val habit = container.habitStore.nextDue()
+                if (habit != null) {
+                    notifier.notifyCheckin(habit)
+                    container.habitStore.markAsked(habit)
+                }
+            }
+        }
+
         // --- App update available? (in-app updater; dedup by build number) ---
         if (prefs.updateChecks) {
             runCatching {

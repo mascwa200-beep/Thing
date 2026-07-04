@@ -96,6 +96,20 @@ class HabitStore(
         return outcome
     }
 
+    /** The single most-overdue habit right now (for the background worker to fire an aggressive check-in). */
+    suspend fun nextDue(): Habit? = HabitCheckin.due(habits, ensureLoaded(), clock()).firstOrNull()
+
+    /** Stamp a habit as ASKED (without answering) so a fired check-in doesn't re-fire until the ask-gap. */
+    suspend fun markAsked(habit: Habit) {
+        ensureLoaded()
+        mutex.withLock {
+            val map = states ?: mutableMapOf<String, HabitState>().also { states = it }
+            val prev = map[habit.activity.name] ?: HabitState()
+            map[habit.activity.name] = prev.copy(lastAskedMs = clock())
+        }
+        scheduleFlush()
+    }
+
     private fun topUp(need: CareNeed) {
         when (need) {
             CareNeed.HYGIENE -> game.wash()

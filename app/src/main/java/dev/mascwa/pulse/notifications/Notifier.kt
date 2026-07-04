@@ -61,6 +61,37 @@ class Notifier(private val context: Context) {
     fun notifyAgenda(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet", NotificationCompat.PRIORITY_HIGH)
 
+    /**
+     * The AGGRESSIVE self-care check-in: a full-screen alert (over the lock screen) that can't be dismissed
+     * until answered. Fires a full-screen intent to [CheckinActivity] on the high-importance REMINDERS
+     * channel; ongoing so it persists until the activity clears it on answer.
+     */
+    fun notifyCheckin(habit: dev.mascwa.pulse.core.telemetry.Habit) {
+        if (!canPost()) return
+        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.CheckinActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(dev.mascwa.pulse.feature.checkin.CheckinActivity.EXTRA_ACTIVITY, habit.activity.name)
+        }
+        val pi = PendingIntent.getActivity(
+            context, dev.mascwa.pulse.feature.checkin.CheckinActivity.NOTIF_ID, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
+            .setSubText("// CHECK-IN")
+            .setContentTitle("Check-in required")
+            .setContentText(habit.question)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setFullScreenIntent(pi, true)
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .build()
+        safeNotify(dev.mascwa.pulse.feature.checkin.CheckinActivity.NOTIF_ID, notification)
+    }
+
     /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
      *  new tip silently replaces the last); opens the Survival guides. */
     fun notifyTip(id: Int, title: String, body: String) =

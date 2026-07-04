@@ -27,6 +27,8 @@
 
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Full-screen self-care check-in that shows over the lock screen (opt-in, default off). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- On-device security auditor (read-only, local-only): enumerate installed apps + their permissions
          (QUERY_ALL_PACKAGES) and read per-app data usage (PACKAGE_USAGE_STATS, granted by the user via
@@ -139,6 +141,28 @@
                 <data android:scheme="dev.mascwa.pulse" android:host="spotify-callback" />
             </intent-filter>
         </activity>
+
+        <!-- The aggressive full-screen self-care check-in — shows over the lock screen and can't be
+             dismissed until answered (opt-in). Launched via a full-screen intent from the worker. -->
+        <activity
+            android:name=".feature.checkin.CheckinActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- The self-care lockout — pins the phone (device-owner kiosk) after a dodged check-in until the
+             task is sensed done. Safe: hard auto-release, emergency dialer stays reachable, hold-to-override. -->
+        <activity
+            android:name=".feature.checkin.LockoutActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
 
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <receiver

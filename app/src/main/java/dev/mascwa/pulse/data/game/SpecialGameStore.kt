@@ -834,6 +834,8 @@ class SpecialGameStore(
     fun rest() = mutateLife { LifeStats.rest(it) }
     /** Eat (restore nourishment). */
     fun eat() = mutateLife { LifeStats.eat(it) }
+    /** Brush your teeth (a partial hygiene lift). */
+    fun brushTeeth() = mutateLife { LifeStats.brush(it) }
 
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
