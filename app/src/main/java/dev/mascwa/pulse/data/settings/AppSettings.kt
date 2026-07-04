@@ -251,6 +251,9 @@ data class NotificationPrefs(
     val survivalAlerts: Boolean = true,
     /** Frequent, quiet rotating field-survival tips (a 300+ catalog). Silent (low-priority), self-replacing. */
     val survivalTips: Boolean = true,
+    /** "Don't break your streak" nudge: when a meaningful self-care streak is in its grace day (done
+     *  yesterday, not yet today) remind you once to check in and keep it alive. Default ON. */
+    val streakReminders: Boolean = true,
     /** Master switch for the self-care habit check-in system (the due-habit card + the aggressive path). Off
      *  = J.A.R.V.I.S. never asks whether you've showered/brushed/eaten/hydrated. Default ON. */
     val selfCareCheckins: Boolean = true,

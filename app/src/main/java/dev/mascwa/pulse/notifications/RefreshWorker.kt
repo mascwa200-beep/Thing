@@ -455,6 +455,29 @@ class RefreshWorker(
             }
         }
 
+        // --- "Don't break your streak": if a meaningful self-care streak is in its grace day (done
+        // yesterday, not yet today) nudge once to keep it alive. Uses the SAME local-epoch-day the streaks
+        // were stamped with, so "yesterday" lines up. One reminder per day (streakReminderDay dedup). ---
+        if (prefs.selfCareCheckins && prefs.streakReminders) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val todayDay = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
+                if (state.streakReminderDay != todayDay) {
+                    val streaks = container.habitStore.streaks().values
+                    val atRisk = dev.mascwa.pulse.core.telemetry.SelfCareStreak.bestAtRisk(streaks, todayDay)
+                    if (atRisk > 0) {
+                        notifier.notifySurvival(
+                            id = 7740,
+                            title = "🔥 Keep your $atRisk-day streak alive",
+                            body = "Check in on your self-care today so your $atRisk-day streak doesn't break.",
+                            urgent = false,
+                        )
+                        state = state.copy(streakReminderDay = todayDay)
+                    }
+                }
+            }
+        }
+
         // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each
         // silently replaces the last). Gated to at most one per SURVIVAL_TIP_MIN_GAP_MS. The tip index is
         // DERIVED FROM THE CLOCK (not a persisted cursor), so the rotation can never get stuck on tip 0 even

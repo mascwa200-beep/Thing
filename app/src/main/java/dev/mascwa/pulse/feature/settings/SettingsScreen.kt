@@ -593,6 +593,13 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("Survival tips (frequent)", checked = s.notifications.survivalTips, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalTips = v)) } })
                     PrefSwitch(
+                        "Don't-break-your-streak nudge",
+                        "When a self-care streak is in its grace day (done yesterday, not yet today), remind you " +
+                            "once to keep it alive.",
+                        checked = s.notifications.streakReminders, enabled = on && s.notifications.selfCareCheckins,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(streakReminders = v)) } },
+                    )
+                    PrefSwitch(
                         "Self-care check-ins",
                         "Let J.A.R.V.I.S. ask whether you've showered, brushed, eaten and hydrated — and top up " +
                             "the matching need when the sensors back you up. Turn individual habits off below.",

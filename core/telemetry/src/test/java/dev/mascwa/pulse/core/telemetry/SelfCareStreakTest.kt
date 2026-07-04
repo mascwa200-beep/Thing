@@ -91,4 +91,18 @@ class SelfCareStreakTest {
         assertEquals("4-day self-care streak · best 6", SelfCareStreak.describe(listOf(Streak(4, 6, 10)), today))
         assertEquals("streak lapsed · best 6", SelfCareStreak.describe(listOf(Streak(4, 6, 2)), today))
     }
+
+    @Test fun bestAtRiskOnlyFlagsGraceDayStreaks() {
+        val today = 10
+        // Confirmed yesterday, meaningful → at risk today.
+        assertEquals(5, SelfCareStreak.bestAtRisk(listOf(Streak(5, 5, 9)), today))
+        // Already confirmed today → safe, not at risk.
+        assertEquals(0, SelfCareStreak.bestAtRisk(listOf(Streak(5, 5, 10)), today))
+        // Already lapsed (2+ days stale) → not "at risk", it's gone.
+        assertEquals(0, SelfCareStreak.bestAtRisk(listOf(Streak(5, 5, 7)), today))
+        // Below the min-streak floor → not worth a reminder.
+        assertEquals(0, SelfCareStreak.bestAtRisk(listOf(Streak(2, 2, 9)), today))
+        // Picks the biggest at-risk streak across habits (a safe one is ignored).
+        assertEquals(8, SelfCareStreak.bestAtRisk(listOf(Streak(3, 3, 9), Streak(8, 8, 9), Streak(9, 9, 10)), today))
+    }
 }

@@ -62,6 +62,15 @@ object SelfCareStreak {
         }
     }
 
+    /**
+     * The longest streak in its **grace day** as of [today] — confirmed yesterday but not yet today, so it
+     * stays alive only if the habit is done again today — and worth protecting (≥ [minStreak]). Returns its
+     * length, or 0 if none is at risk. Drives the "don't break your streak" reminder.
+     */
+    fun bestAtRisk(streaks: Collection<Streak>, today: Int, minStreak: Int = 3): Int =
+        streaks.filter { it.lastDay == today - 1 && it.current >= minStreak }
+            .maxOfOrNull { it.current } ?: 0
+
     /** A one-line readout of the best live streak, for the UI/tool ("3-day streak · best 9"). Empty if none. */
     fun describe(streaks: Collection<Streak>, today: Int): String {
         val live = streaks.map { currentAsOf(it, today) }.maxOrNull() ?: 0
