@@ -251,6 +251,12 @@ data class NotificationPrefs(
     val survivalAlerts: Boolean = true,
     /** Frequent, quiet rotating field-survival tips (a 300+ catalog). Silent (low-priority), self-replacing. */
     val survivalTips: Boolean = true,
+    /** Master switch for the self-care habit check-in system (the due-habit card + the aggressive path). Off
+     *  = J.A.R.V.I.S. never asks whether you've showered/brushed/eaten/hydrated. Default ON. */
+    val selfCareCheckins: Boolean = true,
+    /** Habits (by [RealActivity] name) the owner has switched OFF individually — never checked in on. Default
+     *  empty = all of [HabitCheckin.DEFAULTS] active. */
+    val disabledHabits: List<String> = emptyList(),
     /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
      *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
     val aggressiveCheckin: Boolean = false,
@@ -406,6 +412,10 @@ data class AppSettings(
      *  text labels are produced — no image/audio is ever stored or sent. Off = the game uses a neutral scene
      *  and the camera/mic are never touched. Default ON; the camera indicator shows while it samples. */
     val ambientSensing: Boolean = true,
+    /** Per-sense sub-switches under [ambientSensing]: sample the microphone / camera respectively. Both ON by
+     *  default; turning one off leaves the other running (e.g. hearing on, camera off — no camera indicator). */
+    val ambientMic: Boolean = true,
+    val ambientCamera: Boolean = true,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,

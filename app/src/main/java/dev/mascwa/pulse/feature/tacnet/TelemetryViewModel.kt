@@ -472,10 +472,13 @@ class TelemetryViewModel(
         // Ambient camera/mic sensing runs only when the owner has it enabled (privacy/battery control); the
         // samplers are still individually no-ops without their permissions.
         viewModelScope.launch {
-            if (runCatching { settings.current().ambientSensing }.getOrDefault(true)) {
-                sampler.start()      // on-device ambient hearing (no-op without mic)
-                cameraSampler.start() // on-device ambient seeing (no-op without the camera permission)
-                activityEvidence.start() // detect real self-care from those labels → the lie-catcher's history
+            val cfg = runCatching { settings.current() }.getOrNull()
+            if (cfg == null || cfg.ambientSensing) {
+                val mic = cfg?.ambientMic ?: true
+                val cam = cfg?.ambientCamera ?: true
+                if (mic) sampler.start()       // on-device ambient hearing (no-op without mic)
+                if (cam) cameraSampler.start()  // on-device ambient seeing (no-op without the camera permission)
+                if (mic || cam) activityEvidence.start() // detect real self-care → the lie-catcher's history
             }
         }
         // Feed real app-usage into the achievement engine (drives "Operator Online"/"Explorer"/… + rewards).

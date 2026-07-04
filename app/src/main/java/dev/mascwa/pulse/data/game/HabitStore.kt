@@ -42,6 +42,7 @@ class HabitStore(
     private val json: Json,
     private val evidence: ActivityEvidenceStore,
     private val game: SpecialGameStore,
+    private val settings: dev.mascwa.pulse.data.settings.SettingsRepository,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
@@ -62,11 +63,24 @@ class HabitStore(
     /** The single most-overdue habit to surface a check-in for right now, or null. */
     val due: StateFlow<Habit?> = _due.asStateFlow()
 
+    /**
+     * The habits actually in play right now, honouring the owner's granular switches: an empty list if the
+     * self-care check-in system is switched off entirely, else [HabitCheckin.DEFAULTS] minus any the owner
+     * turned off individually ([NotificationPrefs.disabledHabits]). Read fresh so toggles apply at once.
+     */
+    private suspend fun activeHabits(): List<Habit> {
+        val prefs = runCatching { settings.current().notifications }.getOrNull() ?: return habits
+        if (!prefs.selfCareCheckins) return emptyList()
+        if (prefs.disabledHabits.isEmpty()) return habits
+        val off = prefs.disabledHabits.toSet()
+        return habits.filter { it.activity.name !in off }
+    }
+
     /** Recompute which habit is due (call on the game screen opening + after an answer). */
     fun refresh() {
         scope.launch {
             val s = ensureLoaded()
-            _due.value = HabitCheckin.due(habits, s, clock()).firstOrNull()
+            _due.value = HabitCheckin.due(activeHabits(), s, clock()).firstOrNull()
         }
     }
 
@@ -91,13 +105,13 @@ class HabitStore(
             )
         }
         if (HabitCheckin.topsUpNeed(outcome)) topUp(habit.activity.satisfies)
-        _due.value = HabitCheckin.due(habits, states ?: emptyMap(), now).firstOrNull()
+        _due.value = HabitCheckin.due(activeHabits(), states ?: emptyMap(), now).firstOrNull()
         scheduleFlush()
         return outcome
     }
 
     /** The single most-overdue habit right now (for the background worker to fire an aggressive check-in). */
-    suspend fun nextDue(): Habit? = HabitCheckin.due(habits, ensureLoaded(), clock()).firstOrNull()
+    suspend fun nextDue(): Habit? = HabitCheckin.due(activeHabits(), ensureLoaded(), clock()).firstOrNull()
 
     /** Stamp a habit as ASKED (without answering) so a fired check-in doesn't re-fire until the ask-gap. */
     suspend fun markAsked(habit: Habit) {
