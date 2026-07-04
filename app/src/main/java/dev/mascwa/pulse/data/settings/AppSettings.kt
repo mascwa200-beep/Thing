@@ -424,6 +424,11 @@ data class AppSettings(
      *  default; turning one off leaves the other running (e.g. hearing on, camera off — no camera indicator). */
     val ambientMic: Boolean = true,
     val ambientCamera: Boolean = true,
+    /** ALWAYS-ON ambient sensing: run the camera/mic samplers in a foreground service (over the lock screen
+     *  too), not just while the game screen is open, so the activity-attestation lie-catcher has a continuous
+     *  history. Default OFF — it's a persistent-notification, battery + privacy commitment; opt in knowingly.
+     *  Still bound by [ambientSensing] + [ambientMic]/[ambientCamera] and the runtime permissions. */
+    val ambientSensingAlways: Boolean = false,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,

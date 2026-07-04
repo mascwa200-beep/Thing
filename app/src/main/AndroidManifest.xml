@@ -52,8 +52,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word is enabled. -->
+    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word or always-on ambient sensing is enabled. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Only used while the opt-in always-on ambient sensing (life-sim attestation) is enabled. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <!-- PIP-BOY radio: keep streaming while the app is backgrounded. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
@@ -307,6 +309,14 @@
             android:name=".feature.tacnet.RadioService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Opt-in always-on ambient sensing (life-sim attestation) — keeps the on-device camera/mic
+             samplers running in the background so the lie-catcher has a continuous evidence history.
+             Default OFF; labels only, nothing stored or sent. -->
+        <service
+            android:name=".data.perception.AmbientSensingService"
+            android:exported="false"
+            android:foregroundServiceType="camera|microphone|dataSync" />
 
         <!-- J.A.R.V.I.S. arc-reactor live wallpaper. Reads only on-device cached Pulse data; drawn
              procedurally (no bitmaps). Set it from Settings → Appearance → J.A.R.V.I.S. live wallpaper. -->

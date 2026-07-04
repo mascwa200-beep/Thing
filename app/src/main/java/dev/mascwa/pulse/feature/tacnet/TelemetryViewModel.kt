@@ -245,7 +245,18 @@ class TelemetryViewModel(
         viewModelScope.launch {
             questDriver.collect { (composed, metrics) -> questStore.sync(composed, metrics) }
         }
+        // Track whether the always-on ambient-sensing service owns the samplers. When it does, closing the
+        // game screen must NOT stop them (that would kill the background sensing), so stop() defers below.
+        viewModelScope.launch {
+            settings.settings
+                .map { it.ambientSensingAlways && it.ambientSensing }
+                .distinctUntilChanged()
+                .collect { alwaysOnSensing = it }
+        }
     }
+
+    /** Cached: the always-on sensing service is running the shared samplers, so the screen shouldn't stop them. */
+    @Volatile private var alwaysOnSensing = false
 
     // --- Achievements (the grind: app usage + game progress → rewards) ---
     val unlockedAchievements: StateFlow<Set<String>> = game.unlockedFlow
@@ -569,9 +580,13 @@ class TelemetryViewModel(
 
     fun stop() {
         controller.stop()
-        sampler.stop() // release the mic when the game screen isn't visible
-        cameraSampler.stop() // release the camera when the game screen isn't visible
-        activityEvidence.stop() // stop sampling the perception labels when sensing pauses
+        // Release the mic/camera when the game screen isn't visible — UNLESS the always-on sensing service
+        // owns them, in which case leave them running so background attestation keeps its history.
+        if (!alwaysOnSensing) {
+            sampler.stop()
+            cameraSampler.stop()
+            activityEvidence.stop()
+        }
         ticker?.cancel()
     }
 
