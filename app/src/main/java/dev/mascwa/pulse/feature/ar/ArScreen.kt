@@ -106,8 +106,10 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     val character by vm.character.collectAsStateWithLifecycle()
     val activeWp by vm.activeWaypoint.collectAsStateWithLifecycle()
 
-    // 3D mode: swap the flat projected markers for the Filament-rendered wasteland of the immediate vicinity.
-    var mode3d by remember { mutableStateOf(false) }
+    // The AR overlay is ONE thing: the Filament wasteland + the site labels together (no mode toggle). It
+    // "models" for a beat on entry — a Fallout loading screen while the scene builds.
+    var modeling by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2400); modeling = false }
 
     Box(Modifier.fillMaxSize().background(Pip.bg)) {
         if (hasCamera) {
@@ -128,8 +130,9 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         }
 
         // 3D wasteland — a transparent Filament GL surface composited over the live camera (immediate vicinity).
+        // Always on now: the wasteland IS the AR view, with the site labels drawn on top of it below.
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
-        if (hasCamera && mode3d) {
+        if (hasCamera) {
             FilamentLayer(heading, pitch, Modifier.fillMaxSize())
         }
 
@@ -139,8 +142,8 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
             sites.minByOrNull { Geo.distanceMeters(g.latitude, g.longitude, it.lat, it.lon) }
         } else null
 
-        // --- Flat projected markers (default mode; hidden while 3D is on) ---
-        if (hasCamera && !mode3d && g != null) {
+        // --- Site labels — projected over the wasteland (always shown; they ARE the combined AR view) ---
+        if (hasCamera && g != null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val wDp = maxWidth
                 val hDp = maxHeight
@@ -232,13 +235,40 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 ReadoutLine("NEAREST · ${nearest.name.uppercase()} · ${Geo.formatDistance(d)}")
             }
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ArButton(if (mode3d) "◉ 3D ✓" else "◉ 3D") { mode3d = !mode3d }
                 ArButton(if (scanning) "SCANNING…" else "SCAN ▸") { vm.scan() }
             }
         }
 
+        // Fallout loading beat — covers the raw pop-in while the wasteland models on entry.
+        if (modeling) {
+            WastelandLoading(Modifier.fillMaxSize())
+        }
+
         // CRT scanline tube over everything (decorative; passes touches through).
         Canvas(Modifier.fillMaxSize()) { crtScanlines(Color.Black.copy(alpha = 0.10f), gap = 3f) }
+    }
+}
+
+/** The "modelling the wasteland" loading screen — a Fallout terminal boot beat over the camera on entry. */
+@Composable
+private fun WastelandLoading(modifier: Modifier) {
+    Box(modifier.background(Color(0xFF05070A)), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "◈ WASTELAND OVERLAY", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                fontSize = 18.sp, color = Pip.glow, letterSpacing = 3.sp,
+            )
+            Text(
+                "MODELLING YOUR VICINITY", fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = Pip.dim, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 8.dp),
+            )
+            listOf("MAPPING TERRAIN", "RESOLVING STRUCTURES", "CALIBRATING OPTICS").forEach {
+                Text("▸ $it", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.bright, letterSpacing = 1.sp)
+            }
+        }
     }
 }
 
