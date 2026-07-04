@@ -222,6 +222,10 @@ data class JarvisSettings(
      *  background (cloud-gated; spends provider credits) and bring you findings with a notification.
      *  Off by default — opt in, since it acts on its own and uses your cloud key. */
     val autonomousCuriosity: Boolean = false,
+    /** Free-text directive the owner types for J.A.R.V.I.S. to interpret when tending the self-care/life-sim
+     *  system — how strict to be, when to nudge vs. leave you alone, which habits matter, etc. Injected into
+     *  the assistant's context every turn; it uses the `selfcare` tool to read/act on the game accordingly. */
+    val selfCareDirective: String = "",
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */
@@ -247,6 +251,12 @@ data class NotificationPrefs(
     val survivalAlerts: Boolean = true,
     /** Frequent, quiet rotating field-survival tips (a 300+ catalog). Silent (low-priority), self-replacing. */
     val survivalTips: Boolean = true,
+    /** Master switch for the self-care habit check-in system (the due-habit card + the aggressive path). Off
+     *  = J.A.R.V.I.S. never asks whether you've showered/brushed/eaten/hydrated. Default ON. */
+    val selfCareCheckins: Boolean = true,
+    /** Habits (by [RealActivity] name) the owner has switched OFF individually — never checked in on. Default
+     *  empty = all of [HabitCheckin.DEFAULTS] active. */
+    val disabledHabits: List<String> = emptyList(),
     /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
      *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
     val aggressiveCheckin: Boolean = false,
@@ -254,6 +264,11 @@ data class NotificationPrefs(
      *  the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no matter what,
      *  the emergency dialer stays reachable, and a 5-second hold overrides it. */
     val lockoutEnabled: Boolean = false,
+    /** J.A.R.V.I.S.-DRIVEN timing: instead of a fixed clock, let the assistant decide WHEN to check in — it
+     *  reads your directive + current needs + what the sensors actually saw and nudges only when it judges the
+     *  moment right. Needs cloud chat on (spends credits). Off by default; when on it supersedes the fixed
+     *  schedule and fires an aggressive/soft check-in per your other switches. */
+    val jarvisDrivenCheckins: Boolean = false,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,
@@ -402,12 +417,18 @@ data class AppSettings(
      *  text labels are produced — no image/audio is ever stored or sent. Off = the game uses a neutral scene
      *  and the camera/mic are never touched. Default ON; the camera indicator shows while it samples. */
     val ambientSensing: Boolean = true,
+    /** Per-sense sub-switches under [ambientSensing]: sample the microphone / camera respectively. Both ON by
+     *  default; turning one off leaves the other running (e.g. hearing on, camera off — no camera indicator). */
+    val ambientMic: Boolean = true,
+    val ambientCamera: Boolean = true,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,
     val curiosityIndex: Int = 0,
     /** When the Mnemosyne reflection pass last ran (throttle). */
     val lastReflectionMs: Long = 0,
+    /** When the J.A.R.V.I.S.-driven self-care timing pass last ran (throttle — it's a cloud call). */
+    val lastSelfCareCheckMs: Long = 0,
     /** Periodically anchor the blackbox audit ledger head to a public RFC-3161 TSA (opt-in; sends only a
      *  hash). [lastLedgerAnchorMs] throttles it (~daily). The manual "Anchor now" button is always available. */
     val autoAnchorLedger: Boolean = false,

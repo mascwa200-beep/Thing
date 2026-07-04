@@ -43,9 +43,11 @@ class RefreshWorker(
 
         val notifier = container.notifier
 
-        // --- Aggressive self-care check-in (opt-in): a full-screen alert over the lock screen when a habit
-        //     is overdue. markAsked stamps it so it won't re-fire until the ask-gap (no spamming). ---
-        if (prefs.aggressiveCheckin) {
+        // --- Fixed-schedule aggressive self-care check-in (opt-in): a full-screen alert over the lock screen
+        //     when a habit is overdue. markAsked stamps it so it won't re-fire until the ask-gap. Steps aside
+        //     when J.A.R.V.I.S. is driving the timing himself (the pass below owns the "when" then). ---
+        val jarvisDrivenCheckins = prefs.jarvisDrivenCheckins && settings.jarvis.cloudActive
+        if (prefs.aggressiveCheckin && !jarvisDrivenCheckins) {
             runCatching {
                 val habit = container.habitStore.nextDue()
                 if (habit != null) {
@@ -121,6 +123,38 @@ class RefreshWorker(
                     container.settingsRepository.update {
                         it.copy(lastCuriosityMs = now, curiosityIndex = it.curiosityIndex + 1)
                     }
+                }
+            }
+        }
+
+        // --- J.A.R.V.I.S.-driven self-care timing (opt-in, cloud-gated, throttled): rather than a fixed
+        //     clock, let the assistant decide WHEN to nudge — it reads the owner's directive + current needs +
+        //     what the sensors actually saw and asks (via `selfcare ask`) only when it judges the moment right.
+        //     Only consult the model when something is genuinely overdue (saves credits). ---
+        if (prefs.selfCareCheckins && jarvisDrivenCheckins) {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val selfCareIntervalMs = 90L * 60 * 1000 // at most every ~90 min (it's a cloud call)
+                if (now - settings.lastSelfCareCheckMs >= selfCareIntervalMs &&
+                    container.habitStore.nextDue() != null
+                ) {
+                    val directive = settings.jarvis.selfCareDirective
+                    val sys = dev.mascwa.pulse.jarvis.JarvisPersona.SYSTEM_PROMPT +
+                        if (directive.isNotBlank()) {
+                            "\n\nThe owner's self-care directive (interpret it): ${directive.trim()}"
+                        } else {
+                            ""
+                        }
+                    val query =
+                        "Quietly review the owner's self-care right now. Use `selfcare due` to see what habit is " +
+                            "overdue, `selfcare needs` for their need levels, and `selfcare evidence` for what " +
+                            "the sensors actually saw recently. Then — ONLY if their directive and the evidence " +
+                            "make this a genuinely good moment to nudge them about ONE specific unmet need — " +
+                            "fire a single check-in with `selfcare ask <shower|teeth|meal|water>`. If it's a " +
+                            "poor time (they clearly just did it, nothing's due, or the directive says leave " +
+                            "them be), do nothing. Be sparing — at most one nudge. Reply with a one-line note."
+                    container.agentOrchestrator.run(query, sys).collect { /* drive to completion */ }
+                    container.settingsRepository.update { it.copy(lastSelfCareCheckMs = now) }
                 }
             }
         }

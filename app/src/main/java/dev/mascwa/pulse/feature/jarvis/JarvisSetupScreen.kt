@@ -97,6 +97,7 @@ fun JarvisSetupScreen(
     val maxTokens by vm.maxTokens.collectAsState()
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
+    val selfCareDirective by vm.selfCareDirective.collectAsState()
     val feedTopic by vm.feedTopic.collectAsState()
     val autonomousCuriosity by vm.autonomousCuriosity.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
@@ -289,6 +290,23 @@ fun JarvisSetupScreen(
             Text(
                 "Saved on-device. A built-in safety rule is always appended in code and can't be " +
                     "overridden by the charter.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("SELF-CARE DIRECTIVE  ·  how J.A.R.V.I.S. minds your real-life needs")
+            MonoFieldArea(
+                selfCareDirective, vm::onDirectiveChange,
+                "In your own words: how strict to be, when to nudge vs. leave you alone, which habits " +
+                    "matter, hours to never disturb… e.g. \"Keep me hydrated and fed; nag hard about brushing " +
+                    "at night; never lock me out during work hours; be gentle before 9am.\"",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NeonButton(text = "SAVE DIRECTIVE", enabled = true, color = c.accent, onClick = vm::saveDirective)
+            }
+            Text(
+                "J.A.R.V.I.S. reads this every turn and uses the `selfcare` tool to check the game state, tend " +
+                    "your needs, and decide when to ask — so the check-ins follow your rules, not a fixed clock. " +
+                    "On-device only.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 

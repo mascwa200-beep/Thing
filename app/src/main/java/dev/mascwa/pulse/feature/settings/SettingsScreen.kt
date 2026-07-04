@@ -593,10 +593,33 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("Survival tips (frequent)", checked = s.notifications.survivalTips, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalTips = v)) } })
                     PrefSwitch(
+                        "Self-care check-ins",
+                        "Let J.A.R.V.I.S. ask whether you've showered, brushed, eaten and hydrated — and top up " +
+                            "the matching need when the sensors back you up. Turn individual habits off below.",
+                        checked = s.notifications.selfCareCheckins, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(selfCareCheckins = v)) } },
+                    )
+                    if (s.notifications.selfCareCheckins) {
+                        dev.mascwa.pulse.core.telemetry.HabitCheckin.DEFAULTS.forEach { habit ->
+                            val key = habit.activity.name
+                            PrefSwitch(
+                                "     · ${habit.label}",
+                                checked = key !in s.notifications.disabledHabits, enabled = on,
+                                onChange = { v ->
+                                    vm.update {
+                                        val cur = it.notifications.disabledHabits
+                                        val next = if (v) cur - key else (cur + key).distinct()
+                                        it.copy(notifications = it.notifications.copy(disabledHabits = next))
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    PrefSwitch(
                         "Full-screen check-ins (aggressive)",
                         "When a self-care habit is overdue, take over the whole screen (even the lock screen) " +
                             "with a check-in you can't dismiss until you answer YES/NO. Off by default.",
-                        checked = s.notifications.aggressiveCheckin, enabled = on,
+                        checked = s.notifications.aggressiveCheckin, enabled = on && s.notifications.selfCareCheckins,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
                     )
                     PrefSwitch(
@@ -606,6 +629,16 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             "matter what, the emergency dialer stays reachable, and a 5-second hold overrides it. Off by default.",
                         checked = s.notifications.lockoutEnabled, enabled = on && s.notifications.aggressiveCheckin,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(lockoutEnabled = v)) } },
+                    )
+                    PrefSwitch(
+                        "Let J.A.R.V.I.S. decide when to ask",
+                        "Instead of a fixed clock, J.A.R.V.I.S. reads your self-care directive (set in " +
+                            "J.A.R.V.I.S. Setup) + your current needs + what the sensors actually saw, and " +
+                            "checks in only when he judges the moment right. Needs cloud chat on — it spends " +
+                            "provider credits. Off by default.",
+                        checked = s.notifications.jarvisDrivenCheckins,
+                        enabled = on && s.notifications.selfCareCheckins,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(jarvisDrivenCheckins = v)) } },
                     )
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
@@ -655,6 +688,18 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         checked = s.ambientSensing,
                         onChange = { v -> vm.update { it.copy(ambientSensing = v) } },
                     )
+                    if (s.ambientSensing) {
+                        PrefSwitch(
+                            "     · Microphone (hearing)",
+                            checked = s.ambientMic,
+                            onChange = { v -> vm.update { it.copy(ambientMic = v) } },
+                        )
+                        PrefSwitch(
+                            "     · Camera (seeing)",
+                            checked = s.ambientCamera,
+                            onChange = { v -> vm.update { it.copy(ambientCamera = v) } },
+                        )
+                    }
                     PrefClickable(
                         "Security auditor",
                         subtitle = "Read-only, local-only audit: app permissions, trust store, encryption & " +

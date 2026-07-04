@@ -132,7 +132,7 @@ class AppContainer(private val appContext: Context) {
     /** The habit check-in loop: asks "showered/ate/drank yet?", verifies the claim against the evidence
      *  history, and tops up the matching real-life need on a truthful yes (no lockout). */
     val habitStore: dev.mascwa.pulse.data.game.HabitStore by lazy {
-        dev.mascwa.pulse.data.game.HabitStore(appContext, json, activityEvidenceStore, specialGameStore)
+        dev.mascwa.pulse.data.game.HabitStore(appContext, json, activityEvidenceStore, specialGameStore, settingsRepository)
     }
 
     /** Real calendar → the life-sim's agenda (upcoming events become wasteland objectives; on-device only). */
@@ -378,6 +378,15 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
+            dev.mascwa.pulse.jarvis.agent.SelfCareTool(specialGameStore, habitStore, activityEvidenceStore) { habit ->
+                // Fire the check-in per the owner's switches: aggressive full-screen if enabled, else a soft
+                // reminder. Master switch gates it (no self-care check-ins at all when off).
+                val prefs = runCatching { settingsRepository.current().notifications }.getOrNull()
+                if (prefs == null || prefs.selfCareCheckins) {
+                    if (prefs?.aggressiveCheckin == true) notifier.notifyCheckin(habit)
+                    else notifier.notifySurvival(91838, "Check-in · ${habit.label}", habit.question, urgent = false)
+                }
+            },
             dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
             dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
             dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),
