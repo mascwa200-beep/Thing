@@ -81,7 +81,13 @@ object StoryDirector {
         } else {
             val goalDay = life.day + 3
             quests += Quest(
-                id = "q_survive_$goalDay",
+                // STABLE id (not day-derived): the survival MAIN is a one-and-done arc like every other
+                // non-daily quest, so it lands in QuestLog.completedIds once and is never re-issued. A
+                // day-derived id here composed a NEW survive quest every wasteland day while old ones
+                // completed — an unbounded caps/XP farm for merely existing (only DAILY quests, which need
+                // real wins, are meant to refresh by day). Task-less players get this intro arc once, then
+                // the empty MAIN slot nudges them to record a real task (the whole point of the director).
+                id = "q_survive",
                 title = "Endure",
                 brief = "No orders today — just the wasteland, and the will to see day $goalDay.",
                 goal = QuestGoal.SURVIVE_DAYS, target = goalDay, kind = QuestKind.MAIN,
