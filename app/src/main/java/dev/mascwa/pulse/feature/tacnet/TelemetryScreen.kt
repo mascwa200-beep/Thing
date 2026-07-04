@@ -348,6 +348,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val legend by vm.legend.collectAsStateWithLifecycle()
     val dueCheckin by vm.dueCheckin.collectAsStateWithLifecycle()
     val checkinResult by vm.checkinResult.collectAsStateWithLifecycle()
+    val selfCareStreak by vm.selfCareStreak.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -377,6 +378,14 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         } else if (due != null) {
             CheckinCard(due, c, onYes = { vm.answerHabit(due, true) }, onNo = { vm.answerHabit(due, false) })
             Spacer(Modifier.height(8.dp))
+        }
+        if (selfCareStreak.isNotBlank()) {
+            Text(
+                "🔥 ${selfCareStreak.uppercase()}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.amber, letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
         }
 
         PipHeader("S.P.E.C.I.A.L.")

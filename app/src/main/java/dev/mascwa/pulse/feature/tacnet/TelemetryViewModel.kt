@@ -94,6 +94,18 @@ class TelemetryViewModel(
     // --- Habit check-in (self-care attestation) ---
     /** The habit due for a check-in ("Have you showered today?"), or null when nothing's due. */
     val dueCheckin: StateFlow<dev.mascwa.pulse.core.telemetry.Habit?> = habitStore.due
+    /** A one-line readout of a LIVE self-care streak ("4-day self-care streak · best 9"), or "" when none is
+     *  currently running (a lapsed streak reads as "" here; the `selfcare` tool still reports the lapse). */
+    val selfCareStreak: StateFlow<String> = habitStore.streaksFlow
+        .map { streaks ->
+            val now = System.currentTimeMillis()
+            val today = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
+            val liveBest = streaks.values.maxOfOrNull {
+                dev.mascwa.pulse.core.telemetry.SelfCareStreak.currentAsOf(it, today)
+            } ?: 0
+            if (liveBest > 0) dev.mascwa.pulse.core.telemetry.SelfCareStreak.describe(streaks.values, today) else ""
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     private val _checkinResult = MutableStateFlow<dev.mascwa.pulse.core.telemetry.CheckinOutcome?>(null)
     /** The last answered check-in's verdict (confirmed / caught lie / …), for a transient banner. */
     val checkinResult: StateFlow<dev.mascwa.pulse.core.telemetry.CheckinOutcome?> = _checkinResult.asStateFlow()
