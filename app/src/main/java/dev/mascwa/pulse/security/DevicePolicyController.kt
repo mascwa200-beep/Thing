@@ -50,6 +50,19 @@ class DevicePolicyController(context: Context) {
         true
     }.getOrDefault(false)
 
+    // --- Lock task (kiosk) allow-list — for the self-care lockout ---------------------------------
+
+    /**
+     * Whitelist [packages] so they may enter device-owner lock task (kiosk pin) without a user prompt. Used
+     * by the self-care lockout to pin itself (and keep the dialer reachable for emergencies). DO-only; true
+     * if applied. Passing an empty list clears the allow-list.
+     */
+    fun setLockTaskPackages(packages: List<String>): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.setLockTaskPackages(admin, packages.toTypedArray())
+        true
+    }.getOrDefault(false)
+
     // --- Wipe after N failed unlocks (anti-theft / anti-coercion) --------------------------------
 
     /** The failed-unlock count that triggers a factory wipe; 0 = disabled. */

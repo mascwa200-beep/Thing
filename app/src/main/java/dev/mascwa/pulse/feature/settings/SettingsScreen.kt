@@ -599,6 +599,14 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         checked = s.notifications.aggressiveCheckin, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
                     )
+                    PrefSwitch(
+                        "Lock phone until done (device-owner)",
+                        "If you dodge a full-screen check-in (\"not yet\", or a claim the sensors catch as false), " +
+                            "pin the phone until they sense you did the task. Safe: auto-unlocks after 10 min no " +
+                            "matter what, the emergency dialer stays reachable, and a 5-second hold overrides it. Off by default.",
+                        checked = s.notifications.lockoutEnabled, enabled = on && s.notifications.aggressiveCheckin,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(lockoutEnabled = v)) } },
+                    )
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.checkin
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.lifecycleScope
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.CheckinOutcome
 import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.HabitCheckin
 import kotlinx.coroutines.launch
@@ -61,11 +63,29 @@ class CheckinActivity : ComponentActivity() {
         setContent {
             CheckinFullScreen(habit) { claimedDone ->
                 lifecycleScope.launch {
-                    runCatching { habitStore.answer(habit, claimedDone) }
+                    val outcome = runCatching { habitStore.answer(habit, claimedDone) }.getOrNull()
                     runCatching { NotificationManagerCompat.from(this@CheckinActivity).cancel(NOTIF_ID) }
+                    maybeLockout(habit, outcome)
                     finish()
                 }
             }
+        }
+    }
+
+    /** If the lockout is armed and you dodged it (said "not yet", or got caught lying), pin the phone until
+     *  the task is sensed done. Off (no-op) unless the owner enabled it; the lockout itself is safe-by-design. */
+    private suspend fun maybeLockout(habit: Habit, outcome: CheckinOutcome?) {
+        if (outcome != CheckinOutcome.HONEST_NO && outcome != CheckinOutcome.CAUGHT_LIE) return
+        val container = (application as PulseApplication).container
+        val armed = runCatching { container.settingsRepository.current().notifications.lockoutEnabled }.getOrDefault(false)
+        if (!armed) return
+        runCatching {
+            startActivity(
+                Intent(this, LockoutActivity::class.java).apply {
+                    putExtra(LockoutActivity.EXTRA_ACTIVITY, habit.activity.name)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
         }
     }
 

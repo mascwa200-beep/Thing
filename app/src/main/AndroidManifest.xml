@@ -153,6 +153,17 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- The self-care lockout — pins the phone (device-owner kiosk) after a dodged check-in until the
+             task is sensed done. Safe: hard auto-release, emergency dialer stays reachable, hold-to-override. -->
+        <activity
+            android:name=".feature.checkin.LockoutActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <receiver
             android:name=".notifications.BootReceiver"

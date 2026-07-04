@@ -250,6 +250,10 @@ data class NotificationPrefs(
     /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
      *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
     val aggressiveCheckin: Boolean = false,
+    /** LOCKOUT: after you dodge a check-in ("not yet" / caught lie), pin the phone (device-owner kiosk) until
+     *  the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no matter what,
+     *  the emergency dialer stays reachable, and a 5-second hold overrides it. */
+    val lockoutEnabled: Boolean = false,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,
