@@ -579,6 +579,23 @@ class RefreshWorker(
             val sw = runCatching { container.spaceWeatherRepository.fetch(false, lat, lon).data }.getOrNull()
             dev.mascwa.pulse.data.orbital.SkyDigest.lines(orb, sw, lat, lon).take(2).forEach { lines += it }
         }
+        // Self-care streak: a glanceable nudge (grace-day) or a "going strong" line — only when the check-in
+        // system is on and a streak actually exists, so it never clutters the digest for non-players.
+        if (settings.notifications.selfCareCheckins) {
+            runCatching {
+                val streaks = container.habitStore.streaks().values
+                val now = System.currentTimeMillis()
+                val today = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
+                val atRisk = dev.mascwa.pulse.core.telemetry.SelfCareStreak.bestAtRisk(streaks, today)
+                val liveBest = streaks.maxOfOrNull {
+                    dev.mascwa.pulse.core.telemetry.SelfCareStreak.currentAsOf(it, today)
+                } ?: 0
+                when {
+                    atRisk > 0 -> lines += "🔥 Keep your $atRisk-day self-care streak alive today"
+                    liveBest > 0 -> lines += "🔥 $liveBest-day self-care streak going strong"
+                }
+            }
+        }
         return lines
     }
 
