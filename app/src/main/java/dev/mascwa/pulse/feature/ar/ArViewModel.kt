@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.BuildingFootprint
 import dev.mascwa.pulse.core.telemetry.BuildingFootprints
 import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.ElevationField
 import dev.mascwa.pulse.core.telemetry.LocalFootprint
 import dev.mascwa.pulse.core.telemetry.Setting
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.ar.BuildingRepository
+import dev.mascwa.pulse.data.ar.ElevationRepository
 import dev.mascwa.pulse.data.game.GameWorldStore
 import dev.mascwa.pulse.data.game.SpecialGameStore
 import dev.mascwa.pulse.data.objectives.Waypoint
@@ -43,6 +45,7 @@ class ArViewModel(
     private val waypoints: WaypointStore,
     val indoorDetector: IndoorOutdoorDetector,
     private val buildings: BuildingRepository,
+    private val elevationRepo: ElevationRepository,
 ) : ViewModel() {
 
     /** The geo-gated wasteland sites near you (shared with the game's scan). */
@@ -77,6 +80,10 @@ class ArViewModel(
             else BuildingFootprints.project(g.latitude, g.longitude, fps)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(2_000), emptyList())
 
+    private val _elevation = MutableStateFlow<ElevationField?>(null)
+    /** Real DEM elevation around the fix (the invisible ground anchor); null → flat-anchored procedural. */
+    val elevation: StateFlow<ElevationField?> = _elevation.asStateFlow()
+
     /** Live compass heading (degrees from true north). */
     val heading: StateFlow<Float> = compass.reading
         .map { it.trueAzimuth }
@@ -108,8 +115,8 @@ class ArViewModel(
                         compass.setLocation(loc.latitude, loc.longitude, loc.altitudeM ?: 0.0)
                         // Keep the game's travel/exploration accruing while the AR view is open.
                         gameWorld.onLocation(loc.latitude, loc.longitude, loc.accuracyM, loc.speedMps, loc.altitudeM)
-                        // Pull the real OSM buildings around you (first fix + whenever you've moved far enough).
-                        maybeFetchBuildings(loc.latitude, loc.longitude)
+                        // Pull the real OSM buildings + DEM elevation around you (first fix + on a big move).
+                        maybeFetchGeo(loc.latitude, loc.longitude)
                     }
                 }
                 delay(GPS_POLL_MS)
@@ -130,22 +137,24 @@ class ArViewModel(
         gameWorld.refresh(loc.latitude, loc.longitude)
     }
 
-    // Fetch the OSM building footprints once, then again only after you've walked far enough that the set
-    // would meaningfully change — so it's not hammering Overpass every 5 s poll. Guarded against overlap.
+    // Fetch the OSM buildings + DEM elevation once, then again only after you've walked far enough that the
+    // set would meaningfully change — so it's not hammering the APIs every 5 s poll. Guarded against overlap.
     private var lastFetchLat = Double.NaN
     private var lastFetchLon = Double.NaN
-    private var fetchingBuildings = false
+    private var fetchingGeo = false
 
-    private fun maybeFetchBuildings(lat: Double, lon: Double) {
+    private fun maybeFetchGeo(lat: Double, lon: Double) {
         val moved = lastFetchLat.isNaN() ||
             Geo.distanceMeters(lastFetchLat, lastFetchLon, lat, lon) > REFETCH_M
-        if (!moved || fetchingBuildings) return
-        fetchingBuildings = true
+        if (!moved || fetchingGeo) return
+        fetchingGeo = true
         lastFetchLat = lat; lastFetchLon = lon
         viewModelScope.launch {
             val fps = buildings.near(lat, lon)
             if (fps.isNotEmpty()) _footprints.value = fps
-            fetchingBuildings = false
+            val field = elevationRepo.near(lat, lon)
+            if (field != null) _elevation.value = field
+            fetchingGeo = false
         }
     }
 

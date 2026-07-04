@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import dev.mascwa.pulse.core.telemetry.ArProjection
+import dev.mascwa.pulse.core.telemetry.ElevationField
 import dev.mascwa.pulse.core.telemetry.LocalFootprint
 import dev.mascwa.pulse.core.telemetry.Setting
 import dev.mascwa.pulse.core.telemetry.SiteType
@@ -117,6 +118,8 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     val indoor = setting != Setting.OUTDOOR && setting != Setting.VEHICLE
     // Real OSM building footprints, projected to the local frame around the current fix (empty → procedural).
     val localBuildings by vm.localBuildings.collectAsStateWithLifecycle()
+    // Real DEM elevation field (the invisible ground anchor); null → flat-anchored procedural terrain.
+    val elevation by vm.elevation.collectAsStateWithLifecycle()
 
     // The AR overlay is ONE thing: the Filament wasteland + the site labels together (no mode toggle). It
     // "models" for a beat on entry — a Fallout loading screen while the scene builds.
@@ -147,7 +150,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         // ground is solid outdoors / a wireframe ghost indoors ([indoor], from the camera classifier).
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
         if (hasCamera) {
-            FilamentLayer(heading, pitch, indoor, localBuildings, Modifier.fillMaxSize())
+            FilamentLayer(heading, pitch, indoor, localBuildings, elevation, Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -345,6 +348,7 @@ private fun FilamentLayer(
     pitch: Float,
     indoor: Boolean,
     buildings: List<LocalFootprint>,
+    elevation: ElevationField?,
     modifier: Modifier,
 ) {
     val renderer = remember { WastelandRenderer() }
@@ -355,6 +359,8 @@ private fun FilamentLayer(
     LaunchedEffect(indoor) { renderer.setIndoor(indoor) }
     // Feed the real geo-anchored OSM footprints (re-projected as you move); empty keeps the procedural skyline.
     LaunchedEffect(buildings) { renderer.setBuildings(buildings) }
+    // Anchor the wasteland floor to the real DEM topography (null → flat-anchored procedural).
+    LaunchedEffect(elevation) { renderer.setElevation(elevation) }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->

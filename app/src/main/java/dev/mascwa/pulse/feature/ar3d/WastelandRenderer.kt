@@ -24,6 +24,7 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.android.DisplayHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.filamat.MaterialBuilder
+import dev.mascwa.pulse.core.telemetry.ElevationField
 import dev.mascwa.pulse.core.telemetry.LocalFootprint
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -49,9 +50,10 @@ import java.util.Random
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
  * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as do [setOrientation] and
  * [setIndoor]. The structures come from **real OSM building footprints** ([setBuildings]) geo-anchored to the
- * GPS fix (falling back to a procedural skyline until they load). The Filament API here is verified against
- * v1.71.5 (hello-triangle + transparent-view samples + the filamat runtime MaterialBuilder). Next: real
- * terrain elevation as the invisible ground anchor.
+ * GPS fix (falling back to a procedural skyline until they load), and the ground follows the **real DEM
+ * topography** ([setElevation], the invisible anchor) so the wasteland floor sits on the real ground. The
+ * Filament API here is verified against v1.71.5 (hello-triangle + transparent-view samples + the filamat
+ * runtime MaterialBuilder).
  */
 class WastelandRenderer {
 
@@ -126,8 +128,13 @@ class WastelandRenderer {
     private var pendingIndoor: Boolean? = null
 
     // Real OSM building footprints (geo-anchored, projected to the local frame) replace the procedural ruins
-    // once they load; [pendingBuildings] holds a set that arrived before [attach].
+    // once they load; [pendingBuildings] holds a set that arrived before [attach], [currentFootprints] the last
+    // applied set (so an elevation rebuild can reseat the buildings on the new ground).
     private var pendingBuildings: List<LocalFootprint>? = null
+    private var currentFootprints: List<LocalFootprint> = emptyList()
+
+    // Real DEM elevation around the player (the invisible ground anchor); null = flat-anchored procedural.
+    private var elevationField: ElevationField? = null
 
     private val choreographer = Choreographer.getInstance()
     private val frameScheduler = FrameCallback()
@@ -204,9 +211,12 @@ class WastelandRenderer {
 
     private fun setupWorld() {
         loadMaterialAtRuntime()
-        createTerrain()
-        createGroundGrid()
-        createBuildings()
+        val t = buildTerrainBuffers()
+        terrainVb = t.first; terrainIb = t.second; terrainIndexCount = t.third
+        val g = buildGroundGridBuffers()
+        groundGridVb = g.first; groundGridIb = g.second; groundGridIndexCount = g.third
+        val b = buildProceduralBuildingBuffers()
+        buildingVb = b.first; buildingIb = b.second; buildingIndexCount = b.third
 
         // Honour an indoor/outdoor read that arrived before the surface was ready.
         pendingIndoor?.let { indoor = it; pendingIndoor = null }
@@ -273,6 +283,7 @@ class WastelandRenderer {
         if (!started) { pendingBuildings = footprints; return }
         if (footprints.isEmpty()) return
         val built = buildFootprintBuffers(footprints) ?: return
+        currentFootprints = footprints // remembered so an elevation rebuild can reseat them
         // Swap fields, rebuild the renderable to point at the new buffers, THEN free the old ones (never free a
         // buffer a live renderable still references).
         val oldVb = buildingVb
@@ -283,6 +294,42 @@ class WastelandRenderer {
         rebuildRenderable()
         engine.destroyVertexBuffer(oldVb)
         engine.destroyIndexBuffer(oldIb)
+    }
+
+    /**
+     * Set the **real DEM elevation** field (the invisible ground anchor). The wasteland floor is rebuilt to
+     * follow the real topography (and the buildings reseated onto it); a null field flat-anchors to the
+     * procedural dunes. Main-thread only; before [attach] it's just stored and [setupWorld] builds with it.
+     */
+    fun setElevation(field: ElevationField?) {
+        elevationField = field
+        if (started) rebuildWorldGeometry()
+    }
+
+    /**
+     * Rebuild the terrain + ground ghost + structures from the current [groundHeight] (i.e. after the elevation
+     * field changed) and swap them in safely — build all the new buffers first, repoint the renderable, THEN
+     * free the old buffers (never free a buffer a live renderable still references).
+     */
+    private fun rebuildWorldGeometry() {
+        val t = buildTerrainBuffers()
+        val g = buildGroundGridBuffers()
+        val b = (if (currentFootprints.isNotEmpty()) buildFootprintBuffers(currentFootprints) else null)
+            ?: buildProceduralBuildingBuffers()
+
+        val oldTerrainVb = terrainVb; val oldTerrainIb = terrainIb
+        val oldGroundVb = groundGridVb; val oldGroundIb = groundGridIb
+        val oldBuildingVb = buildingVb; val oldBuildingIb = buildingIb
+
+        terrainVb = t.first; terrainIb = t.second; terrainIndexCount = t.third
+        groundGridVb = g.first; groundGridIb = g.second; groundGridIndexCount = g.third
+        buildingVb = b.first; buildingIb = b.second; buildingIndexCount = b.third
+
+        rebuildRenderable()
+
+        engine.destroyVertexBuffer(oldTerrainVb); engine.destroyIndexBuffer(oldTerrainIb)
+        engine.destroyVertexBuffer(oldGroundVb); engine.destroyIndexBuffer(oldGroundIb)
+        engine.destroyVertexBuffer(oldBuildingVb); engine.destroyIndexBuffer(oldBuildingIb)
     }
 
     /**
@@ -319,7 +366,7 @@ class WastelandRenderer {
             var cx = 0f; var cz = 0f
             for (p in pts) { cx += p.x; cz += p.z }
             cx /= n; cz /= n
-            val ground = heightAt(cx, cz) - 1.0f
+            val ground = groundHeight(cx, cz) - 1.0f
             val top = ground + fp.heightM
             val col = shadeAndFog(STRUCT, 1.0f, cx, cz)
             for (i in 0 until n) {
@@ -384,14 +431,27 @@ class WastelandRenderer {
 
     // ---- Baked wasteland: heightmap terrain + wireframe structures, shading + fog folded into vertex colours ----
 
-    /** Rolling-dune height at (x,z) — a smooth deterministic sum of sines (no external noise lib), ~±4 m. */
-    private fun heightAt(x: Float, z: Float): Float {
+    /** Rolling-dune detail at (x,z) — a smooth deterministic sum of sines (no external noise lib), ~±4 m. */
+    private fun rawDune(x: Float, z: Float): Float {
         val xd = x.toDouble()
         val zd = z.toDouble()
         return (2.4 * Math.sin(xd * 0.055) * Math.cos(zd * 0.048) +
             1.5 * Math.sin(xd * 0.12 + zd * 0.07) +
             0.8 * Math.cos(xd * 0.20 - zd * 0.16)).toFloat()
     }
+
+    /** The dune value at the origin, subtracted so the wasteland floor sits at y≈0 under the player. */
+    private val dune0: Float = rawDune(0f, 0f)
+
+    /**
+     * The wasteland ground height at (x,z): the **real terrain elevation** (relative to the player, from the
+     * DEM when loaded) plus the anchored dune detail. With no elevation it's just the dunes, anchored so the
+     * ground under the player is y≈0 and the eye-height camera sits the right height above it. When the DEM is
+     * loaded the floor follows the real topography — the "height map used to know where the real ground is",
+     * never drawn itself.
+     */
+    private fun groundHeight(x: Float, z: Float): Float =
+        (elevationField?.heightAt(x, z) ?: 0f) + (rawDune(x, z) - dune0)
 
     /**
      * Pack an RGB triple into the UBYTE4 COLOR attribute. It's read as RGBA in the shader, but a little-endian
@@ -421,8 +481,8 @@ class WastelandRenderer {
     /** Slope-shaded terrain colour: base tone lerps low→high by height, times the sun term, then hazed. */
     private fun terrainColor(x: Float, z: Float, h: Float): Int {
         val e = 1.0f
-        val dhx = heightAt(x + e, z) - heightAt(x - e, z)
-        val dhz = heightAt(x, z + e) - heightAt(x, z - e)
+        val dhx = groundHeight(x + e, z) - groundHeight(x - e, z)
+        val dhz = groundHeight(x, z + e) - groundHeight(x, z - e)
         val nx = -dhx; val ny = 2f * e; val nz = -dhz
         val nlen = Math.sqrt((nx * nx + ny * ny + nz * nz).toDouble()).toFloat().coerceAtLeast(1e-3f)
         val ndotl = ((nx * SUN_X + ny * SUN_Y + nz * SUN_Z) / nlen).coerceAtLeast(0f)
@@ -457,20 +517,20 @@ class WastelandRenderer {
         return ib
     }
 
-    /** Solid heightmap ground: a shared-vertex grid, two triangles per cell. */
-    private fun createTerrain() {
+    /** Solid heightmap ground: a shared-vertex grid, two triangles per cell. Returns (vb, ib, indexCount). */
+    private fun buildTerrainBuffers(): Triple<VertexBuffer, IndexBuffer, Int> {
         val n = TERRAIN_RES
         val step = WORLD_HALF * 2f / n
         val vertexCount = (n + 1) * (n + 1)
-        terrainIndexCount = n * n * 6
+        val indexCount = n * n * 6
 
         val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
-        val indexData = ByteBuffer.allocate(terrainIndexCount * 2).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(indexCount * 2).order(ByteOrder.nativeOrder())
         for (iz in 0..n) {
             for (ix in 0..n) {
                 val x = -WORLD_HALF + ix * step
                 val z = -WORLD_HALF + iz * step
-                val h = heightAt(x, z)
+                val h = groundHeight(x, z)
                 vertexData.putFloat(x).putFloat(h).putFloat(z).putInt(terrainColor(x, z, h))
             }
         }
@@ -485,8 +545,7 @@ class WastelandRenderer {
             }
         }
         vertexData.flip(); indexData.flip()
-        terrainVb = buildVertexBuffer(vertexData, vertexCount)
-        terrainIb = buildIndexBuffer(indexData, terrainIndexCount)
+        return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, indexCount), indexCount)
     }
 
     /**
@@ -494,19 +553,19 @@ class WastelandRenderer {
      * terrain height) instead of a solid floor, dim + hazed — so indoors you can see where the outside ground
      * level sits without a solid surface blocking the room.
      */
-    private fun createGroundGrid() {
+    private fun buildGroundGridBuffers(): Triple<VertexBuffer, IndexBuffer, Int> {
         val g = GHOST_RES
         val step = WORLD_HALF * 2f / g
         // g+1 lines each direction, each a polyline of g segments → segments = 2 * (g+1) * g, verts = ×2.
         val segments = 2 * (g + 1) * g
         val vertexCount = segments * 2
-        groundGridIndexCount = vertexCount
+        val indexCount = vertexCount
 
         val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
-        val indexData = ByteBuffer.allocate(groundGridIndexCount * 2).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(indexCount * 2).order(ByteOrder.nativeOrder())
         var k = 0
         fun node(x: Float, z: Float) {
-            val h = heightAt(x, z)
+            val h = groundHeight(x, z)
             vertexData.putFloat(x).putFloat(h).putFloat(z).putInt(shadeAndFog(GHOST, 0.9f, x, z))
             indexData.putShort(k.toShort()); k++
         }
@@ -525,17 +584,16 @@ class WastelandRenderer {
             }
         }
         vertexData.flip(); indexData.flip()
-        groundGridVb = buildVertexBuffer(vertexData, vertexCount)
-        groundGridIb = buildIndexBuffer(indexData, groundGridIndexCount)
+        return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, indexCount), indexCount)
     }
 
-    /** Wireframe structures: box outlines (12 edges each) standing on the terrain, amber + hazed. */
-    private fun createBuildings() {
+    /** Procedural wireframe ruins (the fallback skyline before real footprints load). Returns (vb, ib, count). */
+    private fun buildProceduralBuildingBuffers(): Triple<VertexBuffer, IndexBuffer, Int> {
         val vertexCount = RUINS * 24 // 12 edges × 2 verts
-        buildingIndexCount = vertexCount
+        val indexCount = vertexCount
 
         val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
-        val indexData = ByteBuffer.allocate(buildingIndexCount * 2).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(indexCount * 2).order(ByteOrder.nativeOrder())
         var k = 0
         fun vert(x: Float, y: Float, z: Float, color: Int) {
             vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
@@ -554,7 +612,7 @@ class WastelandRenderer {
             val hw = (3f + rnd.nextFloat() * 7f) / 2f
             val hd = (3f + rnd.nextFloat() * 7f) / 2f
             val height = 5f + rnd.nextFloat() * 14f
-            val ground = heightAt(cx, cz) - 1.2f
+            val ground = groundHeight(cx, cz) - 1.2f
             val x0 = cx - hw; val x1 = cx + hw
             val z0 = cz - hd; val z1 = cz + hd
             val y0 = ground; val y1 = ground + height
@@ -570,8 +628,7 @@ class WastelandRenderer {
             edge(x1, y0, z1, x1, y1, z1, col); edge(x0, y0, z1, x0, y1, z1, col)
         }
         vertexData.flip(); indexData.flip()
-        buildingVb = buildVertexBuffer(vertexData, vertexCount)
-        buildingIb = buildIndexBuffer(indexData, buildingIndexCount)
+        return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, indexCount), indexCount)
     }
 
     private inner class FrameCallback : Choreographer.FrameCallback {

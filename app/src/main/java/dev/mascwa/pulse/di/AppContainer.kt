@@ -201,6 +201,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.ar.BuildingRepository(http)
     }
 
+    /** Real DEM elevation for the AR wasteland floor (the invisible ground anchor). */
+    val elevationRepository: dev.mascwa.pulse.data.ar.ElevationRepository by lazy {
+        dev.mascwa.pulse.data.ar.ElevationRepository(http)
+    }
+
     /** Road-snapped routing (free, keyless OSRM) for the NAV navigation path. */
     val routingRepository: dev.mascwa.pulse.data.places.RoutingRepository by lazy {
         dev.mascwa.pulse.data.places.RoutingRepository(http)
