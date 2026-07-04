@@ -32,7 +32,19 @@ private class FeedFactory(private val context: Context) : RemoteViewsService.Rem
     @Volatile private var rows: List<FeedRow> = emptyList()
 
     override fun onCreate() {}
-    override fun onDataSetChanged() { rows = loadRows() }
+
+    /**
+     * Rebuild the rows. The load blocks on cached-data reads via [runBlocking]; if the framework interrupts
+     * this binder thread mid-refresh (host teardown, a superseded update) that surfaces as an
+     * [InterruptedException] straight out of [runBlocking] — which the per-source `runCatching` blocks inside
+     * it can't catch. Guard the whole call so a cancelled refresh never crashes the widget, and keep the
+     * last-known rows rather than blanking the feed. We deliberately don't re-assert the interrupt: we've
+     * handled the cancellation, and re-interrupting this pooled framework thread could fail an unrelated task.
+     */
+    override fun onDataSetChanged() {
+        rows = runCatching { loadRows() }.getOrElse { rows }
+    }
+
     override fun onDestroy() { rows = emptyList() }
 
     override fun getCount(): Int = rows.size
