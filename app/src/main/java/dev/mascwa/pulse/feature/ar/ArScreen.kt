@@ -130,7 +130,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         // 3D wasteland — a transparent Filament GL surface composited over the live camera (immediate vicinity).
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
         if (hasCamera && mode3d) {
-            FilamentLayer(Modifier.fillMaxSize())
+            FilamentLayer(heading, pitch, Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -277,9 +277,11 @@ private fun CameraPreview(modifier: Modifier) {
  * (and the Compose HUD drawn behind it). The [WastelandRenderer]'s native engine is freed when 3D toggles off.
  */
 @Composable
-private fun FilamentLayer(modifier: Modifier) {
+private fun FilamentLayer(heading: Float, pitch: Float, modifier: Modifier) {
     val renderer = remember { WastelandRenderer() }
     DisposableEffect(Unit) { onDispose { renderer.detach() } } // frees native memory when 3D turns off / on leave
+    // Aim the ground-grid camera by the live compass + tilt (main thread — same as the renderer).
+    LaunchedEffect(heading, pitch) { renderer.setOrientation(heading, pitch) }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->

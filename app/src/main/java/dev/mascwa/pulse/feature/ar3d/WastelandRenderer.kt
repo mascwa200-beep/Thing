@@ -28,14 +28,16 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * 3D-AR slice 1: renders one flat-shaded (vertex-coloured) triangle into a **transparent** Filament
- * SurfaceView, so a live camera behind it shows through everywhere except the triangle — the proof that the
- * whole Filament-over-CameraX composite works on the (de-Googled) Pixel. No ARCore.
+ * 3D-AR slice 2: renders a **phosphor wireframe ground grid** on the y=0 plane into a **transparent** Filament
+ * SurfaceView, composited over the live camera — the AR "magic window": a Fallout/Tron ground plane receding
+ * to the horizon over the real world. An eye-height (1.6 m) perspective camera is driven by the phone's
+ * compass + pitch ([setOrientation]) so panning/tilting the phone looks around the wasteland. No ARCore.
  *
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
- * the main/UI thread (Choreographer + UiHelper callbacks are main-thread). The API here is verified against
- * Google Filament v1.71.5 (hello-triangle + transparent-view + multi-view samples, and the filamat runtime
- * MaterialBuilder). Later slices add the compass-driven camera, procedural terrain/ruins, and geo-anchoring.
+ * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as does [setOrientation] (it touches
+ * the camera on the render thread). The API here is verified against Google Filament v1.71.5 (hello-triangle +
+ * transparent-view samples + the filamat runtime MaterialBuilder). Later slices add sky/fog, procedural ruins,
+ * and geo-anchoring.
  */
 class WastelandRenderer {
 
@@ -44,6 +46,14 @@ class WastelandRenderer {
             // Loads the native libraries. Safe once at class load (mirrors the samples' companion init).
             Filament.init()
         }
+
+        /** Ground-grid geometry. */
+        private const val GRID_HALF = 60f            // metres from centre to edge (±60 m → 120 m across)
+        private const val GRID_LINES = 25            // lines per axis (spacing = 120/24 = 5 m)
+        // Phosphor green (0xAARRGGBB, matches the samples). A plain val, not const — `.toInt()` on the Long
+        // literal isn't a compile-time constant.
+        private val GRID_COLOR = 0xff3cff8c.toInt()
+        private const val EYE_HEIGHT = 1.6           // camera height above the ground plane, metres
     }
 
     private lateinit var engine: Engine
@@ -61,6 +71,7 @@ class WastelandRenderer {
     private var surfaceView: SurfaceView? = null
     private var swapChain: SwapChain? = null
     private var renderable = 0
+    private var lineIndexCount = 0
     private var started = false
 
     private val choreographer = Choreographer.getInstance()
@@ -76,7 +87,7 @@ class WastelandRenderer {
         // finds a live renderer/scene.
         setupFilament()
         setupTransparentView()
-        setupTriangle()
+        setupGround()
 
         uiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
         uiHelper.isOpaque = false // → getSwapChainFlags() returns CONFIG_TRANSPARENT
@@ -132,21 +143,38 @@ class WastelandRenderer {
         renderer.clearOptions = renderer.clearOptions.apply { clear = true }
     }
 
-    private fun setupTriangle() {
+    private fun setupGround() {
         loadMaterialAtRuntime()
         createMesh()
 
         renderable = EntityManager.get().create()
         RenderableManager.Builder(1)
-            .boundingBox(Box(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.01f))
-            .geometry(0, PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, 3)
+            // Centred at origin, spanning ±GRID_HALF in X/Z, paper-thin in Y.
+            .boundingBox(Box(0.0f, 0.0f, 0.0f, GRID_HALF, 0.1f, GRID_HALF))
+            .geometry(0, PrimitiveType.LINES, vertexBuffer, indexBuffer, 0, lineIndexCount)
             .material(0, materialInstance)
             .culling(false)
             .build(engine, renderable)
         scene.addEntity(renderable)
 
-        // Static camera looking down -Z at the triangle in the z=0 plane.
-        camera.lookAt(0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+        // Eye-height camera looking level toward -Z (north) until the compass feeds a heading.
+        setOrientation(0f, 0f)
+    }
+
+    /**
+     * Aim the eye-height camera by the phone's [headingDeg] (compass, clockwise from north) and [pitchDeg]
+     * (nose-up positive). North (heading 0) looks toward -Z; tilting the phone down (negative pitch) reveals
+     * more of the ground grid — the "magic window". Main-thread only; no-op until [attach] has built the camera.
+     */
+    fun setOrientation(headingDeg: Float, pitchDeg: Float) {
+        if (!started) return
+        val h = Math.toRadians(headingDeg.toDouble())
+        val p = Math.toRadians(pitchDeg.coerceIn(-89f, 89f).toDouble())
+        val cosP = Math.cos(p)
+        val fx = cosP * Math.sin(h)
+        val fy = Math.sin(p)
+        val fz = -cosP * Math.cos(h)
+        camera.lookAt(0.0, EYE_HEIGHT, 0.0, fx, EYE_HEIGHT + fy, fz, 0.0, 1.0, 0.0)
     }
 
     /**
@@ -182,22 +210,33 @@ class WastelandRenderer {
     }
 
     /**
-     * Vertex/index buffers reproduced from hello-triangle's createMesh — the exact UBYTE4-normalized packing
-     * (putInt of 0xAARRGGBB in nativeOrder) is verified-correct there.
+     * A wireframe ground grid on the y=0 plane: [GRID_LINES] evenly-spaced lines each in X and Z over
+     * ±[GRID_HALF] m, drawn as `LINES` in a single phosphor colour. Same verified UBYTE4-normalised colour
+     * packing (putInt of 0xAARRGGBB in nativeOrder) + FLOAT3 position as hello-triangle's createMesh.
      */
     private fun createMesh() {
         val floatSize = 4
         val intSize = 4
         val shortSize = 2
         val vertexSize = 3 * floatSize + intSize // FLOAT3 position + UBYTE4 colour
-        val vertexCount = 3
+        val vertexCount = GRID_LINES * 4          // 2 verts per line, one set along Z + one along X
+        lineIndexCount = vertexCount
 
-        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize)
-            .order(ByteOrder.nativeOrder())
-            .putFloat(1.0f).putFloat(0.0f).putFloat(0.0f).putInt(0xffff0000.toInt())     // red
-            .putFloat(-0.5f).putFloat(0.866f).putFloat(0.0f).putInt(0xff00ff00.toInt())  // green
-            .putFloat(-0.5f).putFloat(-0.866f).putFloat(0.0f).putInt(0xff0000ff.toInt()) // blue
-            .flip()
+        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        val span = GRID_HALF * 2f
+        for (i in 0 until GRID_LINES) {
+            val t = -GRID_HALF + span * i / (GRID_LINES - 1)
+            // Line parallel to Z at x=t.
+            vertexData.putFloat(t).putFloat(0f).putFloat(-GRID_HALF).putInt(GRID_COLOR)
+            vertexData.putFloat(t).putFloat(0f).putFloat(GRID_HALF).putInt(GRID_COLOR)
+        }
+        for (j in 0 until GRID_LINES) {
+            val t = -GRID_HALF + span * j / (GRID_LINES - 1)
+            // Line parallel to X at z=t.
+            vertexData.putFloat(-GRID_HALF).putFloat(0f).putFloat(t).putInt(GRID_COLOR)
+            vertexData.putFloat(GRID_HALF).putFloat(0f).putFloat(t).putInt(GRID_COLOR)
+        }
+        vertexData.flip()
 
         vertexBuffer = VertexBuffer.Builder()
             .bufferCount(1)
@@ -208,13 +247,13 @@ class WastelandRenderer {
             .build(engine)
         vertexBuffer.setBufferAt(engine, 0, vertexData)
 
-        val indexData = ByteBuffer.allocate(vertexCount * shortSize)
-            .order(ByteOrder.nativeOrder())
-            .putShort(0).putShort(1).putShort(2)
-            .flip()
+        // LINES primitive: consecutive index pairs (0,1)(2,3)… are segments, so indices are just 0..n-1.
+        val indexData = ByteBuffer.allocate(vertexCount * shortSize).order(ByteOrder.nativeOrder())
+        for (k in 0 until vertexCount) indexData.putShort(k.toShort())
+        indexData.flip()
 
         indexBuffer = IndexBuffer.Builder()
-            .indexCount(3)
+            .indexCount(vertexCount)
             .bufferType(IndexBuffer.Builder.IndexType.USHORT)
             .build(engine)
         indexBuffer.setBuffer(engine, indexData)
