@@ -264,6 +264,11 @@ data class NotificationPrefs(
      *  the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no matter what,
      *  the emergency dialer stays reachable, and a 5-second hold overrides it. */
     val lockoutEnabled: Boolean = false,
+    /** J.A.R.V.I.S.-DRIVEN timing: instead of a fixed clock, let the assistant decide WHEN to check in — it
+     *  reads your directive + current needs + what the sensors actually saw and nudges only when it judges the
+     *  moment right. Needs cloud chat on (spends credits). Off by default; when on it supersedes the fixed
+     *  schedule and fires an aggressive/soft check-in per your other switches. */
+    val jarvisDrivenCheckins: Boolean = false,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,
@@ -422,6 +427,8 @@ data class AppSettings(
     val curiosityIndex: Int = 0,
     /** When the Mnemosyne reflection pass last ran (throttle). */
     val lastReflectionMs: Long = 0,
+    /** When the J.A.R.V.I.S.-driven self-care timing pass last ran (throttle — it's a cloud call). */
+    val lastSelfCareCheckMs: Long = 0,
     /** Periodically anchor the blackbox audit ledger head to a public RFC-3161 TSA (opt-in; sends only a
      *  hash). [lastLedgerAnchorMs] throttles it (~daily). The manual "Anchor now" button is always available. */
     val autoAnchorLedger: Boolean = false,

@@ -378,7 +378,15 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
-            dev.mascwa.pulse.jarvis.agent.SelfCareTool(specialGameStore, habitStore, activityEvidenceStore),
+            dev.mascwa.pulse.jarvis.agent.SelfCareTool(specialGameStore, habitStore, activityEvidenceStore) { habit ->
+                // Fire the check-in per the owner's switches: aggressive full-screen if enabled, else a soft
+                // reminder. Master switch gates it (no self-care check-ins at all when off).
+                val prefs = runCatching { settingsRepository.current().notifications }.getOrNull()
+                if (prefs == null || prefs.selfCareCheckins) {
+                    if (prefs?.aggressiveCheckin == true) notifier.notifyCheckin(habit)
+                    else notifier.notifySurvival(91838, "Check-in · ${habit.label}", habit.question, urgent = false)
+                }
+            },
             dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
             dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
             dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),

@@ -630,6 +630,16 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         checked = s.notifications.lockoutEnabled, enabled = on && s.notifications.aggressiveCheckin,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(lockoutEnabled = v)) } },
                     )
+                    PrefSwitch(
+                        "Let J.A.R.V.I.S. decide when to ask",
+                        "Instead of a fixed clock, J.A.R.V.I.S. reads your self-care directive (set in " +
+                            "J.A.R.V.I.S. Setup) + your current needs + what the sensors actually saw, and " +
+                            "checks in only when he judges the moment right. Needs cloud chat on — it spends " +
+                            "provider credits. Off by default.",
+                        checked = s.notifications.jarvisDrivenCheckins,
+                        enabled = on && s.notifications.selfCareCheckins,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(jarvisDrivenCheckins = v)) } },
+                    )
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,

@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.jarvis.agent
 
+import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.HabitCheckin
 import dev.mascwa.pulse.core.telemetry.Special
 import dev.mascwa.pulse.data.game.HabitStore
@@ -18,12 +19,16 @@ class SelfCareTool(
     private val game: SpecialGameStore,
     private val habits: HabitStore,
     private val evidence: ActivityEvidenceStore,
+    /** Fire an actual check-in for a habit (aggressive full-screen or soft reminder, per the owner's switches).
+     *  Wired by AppContainer; this is how J.A.R.V.I.S. proactively decides to ASK rather than a fixed clock. */
+    private val fireCheckin: suspend (Habit) -> Unit,
 ) : JarvisTool {
     override val name = "selfcare"
     override val usage =
         "selfcare [status] | selfcare needs | selfcare drink|eat|rest|wash|brush | selfcare due | " +
-            "selfcare evidence | selfcare confirm <shower|teeth|meal|water> — read + tend the operator's " +
-            "real-life needs, the S.P.E.C.I.A.L. character, sensed self-care, and habit check-ins"
+            "selfcare evidence | selfcare confirm <shower|teeth|meal|water> | selfcare ask [shower|teeth|meal|" +
+            "water] — read + tend the operator's real-life needs, the S.P.E.C.I.A.L. character, sensed " +
+            "self-care, and habit check-ins; `ask` fires a check-in NOW when you judge the moment right"
 
     override suspend fun run(arg: String): String = runCatching {
         val a = arg.trim()
@@ -40,9 +45,26 @@ class SelfCareTool(
             "due" -> habits.nextDue()?.let { "Check-in due: ${it.label} — \"${it.question}\"" } ?: "No check-in is due."
             "evidence" -> evidenceLine()
             "confirm", "answer", "done" -> confirm(rest.ifBlank { verb })
+            "ask", "checkin", "nudge", "prompt" -> ask(rest)
             else -> status()
         }
     }.getOrElse { "selfcare failed: ${it.message}" }
+
+    /** Proactively fire a check-in for the named habit (or the most-overdue one). */
+    private suspend fun ask(rest: String): String {
+        val key = rest.lowercase()
+        val habit = HabitCheckin.DEFAULTS.firstOrNull { h ->
+            key.isNotBlank() && (
+                h.label.lowercase().contains(key) ||
+                    h.activity.name.lowercase().contains(key) ||
+                    h.activity.label.lowercase().contains(key)
+                )
+        } ?: habits.nextDue()
+            ?: return "Nothing is due to ask about, so I held off."
+        fireCheckin(habit)
+        habits.markAsked(habit)
+        return "Asked the operator: \"${habit.question}\""
+    }
 
     private suspend fun status(): String {
         val c = game.characterFlow.value
