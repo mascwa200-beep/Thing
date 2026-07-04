@@ -378,6 +378,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
+            dev.mascwa.pulse.jarvis.agent.SelfCareTool(specialGameStore, habitStore, activityEvidenceStore),
             dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
             dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
             dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),
