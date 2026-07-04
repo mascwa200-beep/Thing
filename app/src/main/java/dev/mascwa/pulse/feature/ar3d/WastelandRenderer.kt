@@ -28,10 +28,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * 3D-AR slice 2: renders a **phosphor wireframe ground grid** on the y=0 plane into a **transparent** Filament
- * SurfaceView, composited over the live camera — the AR "magic window": a Fallout/Tron ground plane receding
- * to the horizon over the real world. An eye-height (1.6 m) perspective camera is driven by the phone's
- * compass + pitch ([setOrientation]) so panning/tilting the phone looks around the wasteland. No ARCore.
+ * 3D-AR wasteland: renders a **phosphor wireframe ground grid** on the y=0 plane plus procedural **ruins**
+ * (wireframe box outlines rising from it) into a **transparent** Filament SurfaceView, composited over the
+ * live camera — the AR "magic window": a Fallout/Tron ground plane + skyline receding to the horizon over the
+ * real world. An eye-height (1.6 m) perspective camera is driven by the phone's compass + pitch
+ * ([setOrientation]) so panning/tilting the phone looks around the wasteland. No ARCore.
  *
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
  * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as does [setOrientation] (it touches
@@ -54,6 +55,13 @@ class WastelandRenderer {
         // literal isn't a compile-time constant.
         private val GRID_COLOR = 0xff3cff8c.toInt()
         private const val EYE_HEIGHT = 1.6           // camera height above the ground plane, metres
+
+        /** Procedural ruins: wireframe box outlines rising from the grid, placed deterministically. */
+        private const val RUINS = 10                 // how many structures
+        private const val RUIN_SEED = 0x5EED5CA7L     // fixed seed → stable layout every run
+        private val RUIN_COLOR = 0xffbfffdf.toInt()  // pale phosphor — reads as structure vs the ground grid
+        private const val EDGES_PER_BOX = 12
+        private const val VERTS_PER_BOX = EDGES_PER_BOX * 2
     }
 
     private lateinit var engine: Engine
@@ -149,8 +157,8 @@ class WastelandRenderer {
 
         renderable = EntityManager.get().create()
         RenderableManager.Builder(1)
-            // Centred at origin, spanning ±GRID_HALF in X/Z, paper-thin in Y.
-            .boundingBox(Box(0.0f, 0.0f, 0.0f, GRID_HALF, 0.1f, GRID_HALF))
+            // Centred over the grid in X/Z; tall enough in Y to enclose the ruins (culling is off anyway).
+            .boundingBox(Box(0.0f, 10.0f, 0.0f, GRID_HALF, 20.0f, GRID_HALF))
             .geometry(0, PrimitiveType.LINES, vertexBuffer, indexBuffer, 0, lineIndexCount)
             .material(0, materialInstance)
             .culling(false)
@@ -210,31 +218,65 @@ class WastelandRenderer {
     }
 
     /**
-     * A wireframe ground grid on the y=0 plane: [GRID_LINES] evenly-spaced lines each in X and Z over
-     * ±[GRID_HALF] m, drawn as `LINES` in a single phosphor colour. Same verified UBYTE4-normalised colour
-     * packing (putInt of 0xAARRGGBB in nativeOrder) + FLOAT3 position as hello-triangle's createMesh.
+     * The wasteland geometry, all as one `LINES` mesh: a wireframe ground grid on the y=0 plane
+     * ([GRID_LINES] lines each in X and Z over ±[GRID_HALF] m, phosphor green) plus [RUINS] wireframe box
+     * outlines rising from it (pale phosphor, deterministic seeded layout so they never churn). Same verified
+     * UBYTE4-normalised colour packing (putInt of 0xAARRGGBB in nativeOrder) + FLOAT3 position as hello-triangle.
      */
     private fun createMesh() {
         val floatSize = 4
         val intSize = 4
         val shortSize = 2
         val vertexSize = 3 * floatSize + intSize // FLOAT3 position + UBYTE4 colour
-        val vertexCount = GRID_LINES * 4          // 2 verts per line, one set along Z + one along X
+        val vertexCount = GRID_LINES * 4 + RUINS * VERTS_PER_BOX
         lineIndexCount = vertexCount
 
         val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        fun vert(x: Float, y: Float, z: Float, color: Int) {
+            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
+        }
+        fun edge(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, color: Int) {
+            vert(ax, ay, az, color); vert(bx, by, bz, color)
+        }
+
+        // Ground grid.
         val span = GRID_HALF * 2f
         for (i in 0 until GRID_LINES) {
             val t = -GRID_HALF + span * i / (GRID_LINES - 1)
-            // Line parallel to Z at x=t.
-            vertexData.putFloat(t).putFloat(0f).putFloat(-GRID_HALF).putInt(GRID_COLOR)
-            vertexData.putFloat(t).putFloat(0f).putFloat(GRID_HALF).putInt(GRID_COLOR)
+            edge(t, 0f, -GRID_HALF, t, 0f, GRID_HALF, GRID_COLOR) // parallel to Z at x=t
         }
         for (j in 0 until GRID_LINES) {
             val t = -GRID_HALF + span * j / (GRID_LINES - 1)
-            // Line parallel to X at z=t.
-            vertexData.putFloat(-GRID_HALF).putFloat(0f).putFloat(t).putInt(GRID_COLOR)
-            vertexData.putFloat(GRID_HALF).putFloat(0f).putFloat(t).putInt(GRID_COLOR)
+            edge(-GRID_HALF, 0f, t, GRID_HALF, 0f, t, GRID_COLOR) // parallel to X at z=t
+        }
+
+        // Procedural ruins: wireframe boxes rising from the grid, seeded so the skyline is stable each run.
+        val rnd = java.util.Random(RUIN_SEED)
+        repeat(RUINS) {
+            val ang = rnd.nextDouble() * 2.0 * Math.PI
+            val dist = 14f + rnd.nextFloat() * 42f          // 14..56 m out (clear of the player at origin)
+            val cx = (Math.cos(ang) * dist).toFloat()
+            val cz = (Math.sin(ang) * dist).toFloat()
+            val hw = (2f + rnd.nextFloat() * 6f) / 2f       // half-width  1..4 m
+            val hd = (2f + rnd.nextFloat() * 6f) / 2f       // half-depth  1..4 m
+            val h = 2f + rnd.nextFloat() * 10f              // height     2..12 m
+            val x0 = cx - hw; val x1 = cx + hw
+            val z0 = cz - hd; val z1 = cz + hd
+            // bottom rectangle
+            edge(x0, 0f, z0, x1, 0f, z0, RUIN_COLOR)
+            edge(x1, 0f, z0, x1, 0f, z1, RUIN_COLOR)
+            edge(x1, 0f, z1, x0, 0f, z1, RUIN_COLOR)
+            edge(x0, 0f, z1, x0, 0f, z0, RUIN_COLOR)
+            // top rectangle
+            edge(x0, h, z0, x1, h, z0, RUIN_COLOR)
+            edge(x1, h, z0, x1, h, z1, RUIN_COLOR)
+            edge(x1, h, z1, x0, h, z1, RUIN_COLOR)
+            edge(x0, h, z1, x0, h, z0, RUIN_COLOR)
+            // vertical edges
+            edge(x0, 0f, z0, x0, h, z0, RUIN_COLOR)
+            edge(x1, 0f, z0, x1, h, z0, RUIN_COLOR)
+            edge(x1, 0f, z1, x1, h, z1, RUIN_COLOR)
+            edge(x0, 0f, z1, x0, h, z1, RUIN_COLOR)
         }
         vertexData.flip()
 
