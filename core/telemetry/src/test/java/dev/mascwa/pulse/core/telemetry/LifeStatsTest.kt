@@ -319,4 +319,10 @@ class LifeStatsTest {
         assertEquals(noLife.success, blank.success)
         assertEquals(noLife.character.caps, blank.character.caps)
     }
+
+    @Test fun brushIsAPartialHygieneLiftAndClamps() {
+        assertEquals(60, LifeStats.brush(LifeProfile(hygiene = 25)).hygiene) // +35 partial, not a full reset
+        assertEquals(100, LifeStats.brush(LifeProfile(hygiene = 90)).hygiene) // clamps at 100
+        assertEquals(100, LifeStats.wash(LifeProfile(hygiene = 10)).hygiene)  // a wash is still the full reset
+    }
 }

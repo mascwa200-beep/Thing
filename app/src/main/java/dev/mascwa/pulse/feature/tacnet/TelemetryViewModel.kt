@@ -384,6 +384,8 @@ class TelemetryViewModel(
     fun rest() = game.rest()
     /** Eat (restore nourishment). */
     fun eat() = game.eat()
+    /** Brush your teeth (a partial hygiene lift). */
+    fun brushTeeth() = game.brushTeeth()
 
     // --- Your wasteland tale (global renown) — curate it, or let it grow from your deeds ---
     /** Your current tale: renown + the curated archetype. Bends shops + CHARISMA. */

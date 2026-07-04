@@ -364,6 +364,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onSetWellRead = { vm.setWellRead(it) }, onSetFitness = { vm.setFitness(it) },
             onSetCommunity = { vm.setCommunity(it) },
             onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
+            onBrush = { vm.brushTeeth() },
         )
         Spacer(Modifier.height(8.dp))
 
@@ -660,6 +661,7 @@ private fun LifePanel(
     onWash: () -> Unit,
     onRest: () -> Unit,
     onEat: () -> Unit,
+    onBrush: () -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -716,7 +718,10 @@ private fun LifePanel(
                 Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
                 Box(Modifier.weight(1f)) { GameButton("EAT", c.magenta, onEat) }
                 Box(Modifier.weight(1f)) { GameButton("REST", c.amber, onRest) }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
+                Box(Modifier.weight(1f)) { GameButton("BRUSH", c.violet, onBrush) }
             }
 
             // What the real world is doing to your needs right now (heat, night, motion, charging).

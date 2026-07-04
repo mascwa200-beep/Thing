@@ -89,6 +89,8 @@ object LifeStats {
     // Need decay per hour of real time (points). Thirst builds faster than grime; energy sags between.
     const val HYDRATION_DECAY_PER_HR = 4.0
     const val HYGIENE_DECAY_PER_HR = 2.0
+    /** Hygiene restored by brushing your teeth — a partial lift, not the full reset a wash gives. */
+    const val BRUSH_HYGIENE = 35
     const val ENERGY_DECAY_PER_HR = 3.0
     const val NOURISHMENT_DECAY_PER_HR = 3.5
     /** Energy recovered per hour while the phone is charging — plugged in ≈ resting up. */
@@ -374,6 +376,9 @@ object LifeStats {
 
     /** Freshen up (a wash). */
     fun wash(p: LifeProfile): LifeProfile = p.copy(hygiene = 100)
+
+    /** Brush your teeth — a partial hygiene lift (part of staying clean, not a full wash). */
+    fun brush(p: LifeProfile): LifeProfile = p.copy(hygiene = (p.hygiene + BRUSH_HYGIENE).coerceIn(0, 100))
 
     /** Rest up — restore energy. */
     fun rest(p: LifeProfile): LifeProfile = p.copy(energy = 100)
