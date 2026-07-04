@@ -196,6 +196,11 @@ class AppContainer(private val appContext: Context) {
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
 
+    /** Real OSM building footprints for the AR wasteland (geo-anchored wireframe buildings). */
+    val buildingRepository: dev.mascwa.pulse.data.ar.BuildingRepository by lazy {
+        dev.mascwa.pulse.data.ar.BuildingRepository(http)
+    }
+
     /** Road-snapped routing (free, keyless OSRM) for the NAV navigation path. */
     val routingRepository: dev.mascwa.pulse.data.places.RoutingRepository by lazy {
         dev.mascwa.pulse.data.places.RoutingRepository(http)

@@ -24,6 +24,7 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.android.DisplayHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.filamat.MaterialBuilder
+import dev.mascwa.pulse.core.telemetry.LocalFootprint
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Random
@@ -47,9 +48,10 @@ import java.util.Random
  *
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
  * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as do [setOrientation] and
- * [setIndoor]. The Filament API here is verified against v1.71.5 (hello-triangle + transparent-view samples +
- * the filamat runtime MaterialBuilder). Next: real OSM building footprints + terrain elevation geo-anchored to
- * the GPS fix.
+ * [setIndoor]. The structures come from **real OSM building footprints** ([setBuildings]) geo-anchored to the
+ * GPS fix (falling back to a procedural skyline until they load). The Filament API here is verified against
+ * v1.71.5 (hello-triangle + transparent-view samples + the filamat runtime MaterialBuilder). Next: real
+ * terrain elevation as the invisible ground anchor.
  */
 class WastelandRenderer {
 
@@ -70,6 +72,9 @@ class WastelandRenderer {
 
         /** Indoor "ground ghost" — a wireframe of the outside ground level, drawn instead of the solid floor. */
         private const val GHOST_RES = 24             // grid lines per axis for the indoor ground ghost
+
+        /** Real-footprint building cap so the wireframe index buffer stays within USHORT range. */
+        private const val MAX_BUILDING_VERTS = 60_000
 
         /** Baked shading: a fixed "sun" direction (roughly upper-left) + how dark the shadow side gets. */
         private const val SUN_X = -0.42f
@@ -119,6 +124,10 @@ class WastelandRenderer {
     // camera classifier flips it via [setIndoor]; [pendingIndoor] holds a value that arrived before [attach].
     private var indoor = false
     private var pendingIndoor: Boolean? = null
+
+    // Real OSM building footprints (geo-anchored, projected to the local frame) replace the procedural ruins
+    // once they load; [pendingBuildings] holds a set that arrived before [attach].
+    private var pendingBuildings: List<LocalFootprint>? = null
 
     private val choreographer = Choreographer.getInstance()
     private val frameScheduler = FrameCallback()
@@ -203,6 +212,9 @@ class WastelandRenderer {
         pendingIndoor?.let { indoor = it; pendingIndoor = null }
         rebuildRenderable()
 
+        // Honour real footprints that arrived before the surface was ready (replaces the procedural ruins).
+        pendingBuildings?.let { setBuildings(it); pendingBuildings = null }
+
         // Eye-height camera looking level toward -Z (north) until the compass feeds a heading.
         setOrientation(0f, 0f)
     }
@@ -247,6 +259,79 @@ class WastelandRenderer {
         if (on == indoor) return
         indoor = on
         rebuildRenderable()
+    }
+
+    /**
+     * Replace the procedural ruins with **real OSM building footprints** (already projected to the local frame
+     * by [dev.mascwa.pulse.core.telemetry.BuildingFootprints.project], so the renderer just extrudes them).
+     * Each footprint becomes a wireframe box outline — base ring + top ring + a vertical at each vertex —
+     * standing on the wasteland terrain at its true position/shape/scale. An **empty** list is a no-op so the
+     * procedural skyline stays as the fallback (rural areas / an Overpass miss). Main-thread only; if called
+     * before [attach], it's remembered and applied in [setupWorld].
+     */
+    fun setBuildings(footprints: List<LocalFootprint>) {
+        if (!started) { pendingBuildings = footprints; return }
+        if (footprints.isEmpty()) return
+        val built = buildFootprintBuffers(footprints) ?: return
+        // Swap fields, rebuild the renderable to point at the new buffers, THEN free the old ones (never free a
+        // buffer a live renderable still references).
+        val oldVb = buildingVb
+        val oldIb = buildingIb
+        buildingVb = built.first
+        buildingIb = built.second
+        buildingIndexCount = built.third
+        rebuildRenderable()
+        engine.destroyVertexBuffer(oldVb)
+        engine.destroyIndexBuffer(oldIb)
+    }
+
+    /**
+     * Build fresh wireframe vertex/index buffers for the given projected footprints (amber + hazed, standing on
+     * the terrain). Returns (VertexBuffer, IndexBuffer, indexCount), or null if nothing drawable. Footprints
+     * are added until [MAX_BUILDING_VERTS] would be exceeded, keeping the index buffer within USHORT range.
+     */
+    private fun buildFootprintBuffers(footprints: List<LocalFootprint>): Triple<VertexBuffer, IndexBuffer, Int>? {
+        val rings = ArrayList<LocalFootprint>()
+        var verts = 0
+        for (fp in footprints) {
+            val n = fp.points.size
+            if (n < 2) continue
+            val add = 6 * n // base ring (n) + top ring (n) + verticals (n), each an edge = 2 verts
+            if (verts + add > MAX_BUILDING_VERTS) break
+            rings.add(fp); verts += add
+        }
+        if (rings.isEmpty()) return null
+
+        val vertexData = ByteBuffer.allocate(verts * vertexSize).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(verts * 2).order(ByteOrder.nativeOrder())
+        var k = 0
+        fun vert(x: Float, y: Float, z: Float, color: Int) {
+            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
+            indexData.putShort(k.toShort()); k++
+        }
+        fun edge(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, color: Int) {
+            vert(ax, ay, az, color); vert(bx, by, bz, color)
+        }
+        for (fp in rings) {
+            val pts = fp.points
+            val n = pts.size
+            // One flat base per building at its centroid's terrain height (a footprint should sit level).
+            var cx = 0f; var cz = 0f
+            for (p in pts) { cx += p.x; cz += p.z }
+            cx /= n; cz /= n
+            val ground = heightAt(cx, cz) - 1.0f
+            val top = ground + fp.heightM
+            val col = shadeAndFog(STRUCT, 1.0f, cx, cz)
+            for (i in 0 until n) {
+                val a = pts[i]
+                val b = pts[(i + 1) % n]
+                edge(a.x, ground, a.z, b.x, ground, b.z, col)   // base ring edge
+                edge(a.x, top, a.z, b.x, top, b.z, col)         // top ring edge
+                edge(a.x, ground, a.z, a.x, top, a.z, col)      // vertical at this vertex
+            }
+        }
+        vertexData.flip(); indexData.flip()
+        return Triple(buildVertexBuffer(vertexData, verts), buildIndexBuffer(indexData, verts), verts)
     }
 
     /**
