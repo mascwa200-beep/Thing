@@ -70,6 +70,7 @@ class TelemetryViewModel(
     private val sampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler,
     private val cameraSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler,
     private val activityEvidence: dev.mascwa.pulse.data.perception.ActivityEvidenceStore,
+    private val habitStore: dev.mascwa.pulse.data.game.HabitStore,
     private val calendar: dev.mascwa.pulse.data.calendar.CalendarRepository,
     private val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore,
 ) : ViewModel() {
@@ -89,6 +90,20 @@ class TelemetryViewModel(
     /** The real world the operative is standing in — bends stat checks. Rebuilt each telemetry tick. */
     private val _env = MutableStateFlow(EnvContext())
     val env: StateFlow<EnvContext> = _env.asStateFlow()
+
+    // --- Habit check-in (self-care attestation) ---
+    /** The habit due for a check-in ("Have you showered today?"), or null when nothing's due. */
+    val dueCheckin: StateFlow<dev.mascwa.pulse.core.telemetry.Habit?> = habitStore.due
+    private val _checkinResult = MutableStateFlow<dev.mascwa.pulse.core.telemetry.CheckinOutcome?>(null)
+    /** The last answered check-in's verdict (confirmed / caught lie / …), for a transient banner. */
+    val checkinResult: StateFlow<dev.mascwa.pulse.core.telemetry.CheckinOutcome?> = _checkinResult.asStateFlow()
+
+    /** Answer the due check-in: cross-references the sensor evidence, tops up the need on a truthful yes. */
+    fun answerHabit(habit: dev.mascwa.pulse.core.telemetry.Habit, claimedDone: Boolean) {
+        viewModelScope.launch { _checkinResult.value = habitStore.answer(habit, claimedDone) }
+    }
+
+    fun dismissCheckinResult() { _checkinResult.value = null }
 
     /** The wasteland day banner ("DAY 3 · DUSK") — advances with your real life. Rebuilt each tick. */
     private val _dayBanner = MutableStateFlow("")
@@ -451,6 +466,7 @@ class TelemetryViewModel(
         controller.start()
         _env.value = buildEnv(controller.telemetry.value)
         refreshAgenda() // pull the real calendar into the wasteland agenda (no-op without READ_CALENDAR)
+        habitStore.refresh() // surface any due self-care check-in ("showered today?")
         // Ambient camera/mic sensing runs only when the owner has it enabled (privacy/battery control); the
         // samplers are still individually no-ops without their permissions.
         viewModelScope.launch {
