@@ -29,18 +29,20 @@ import java.nio.ByteOrder
 import java.util.Random
 
 /**
- * 3D-AR **solid wasteland**: a real environment rendered over the live camera — undulating heightmap terrain
- * (rolling dunes, sun-shaded from the slope), solid ruined **buildings** sitting on it, and atmospheric
- * **haze** that fades distant geometry toward a hazy horizon so the ground dissolves into the distance and the
- * real world shows above it (the sky). No ARCore, no lighting/IBL, no blend-mode tricks — every surface is the
- * same proven **opaque unlit vertex-colour** material, with all shading + fog baked into the vertex colours,
- * so it composites cleanly over the camera. An eye-height (1.6 m) perspective camera is driven by the phone's
- * compass + pitch ([setOrientation]) so panning/tilting the phone looks around the wasteland.
+ * 3D-AR **wasteland**, Fallout-styled: a **solid** heightmap ground (rolling dunes, sun-shaded from the slope,
+ * weathered sepia/khaki palette) with **wireframe** structures standing on it — holographic amber outlines, not
+ * solid blocks, so they read as *scanned* buildings hovering over the real world — plus atmospheric haze that
+ * fades the distance. Composited over the live camera (the real world shows above the horizon as the sky). The
+ * ground is one opaque TRIANGLES primitive; the structures are a second LINES primitive, both on one renderable
+ * using the same proven opaque-unlit vertex-colour material. No ARCore, no lighting/IBL, no blend-mode tricks.
+ *
+ * An eye-height (1.6 m) perspective camera is driven by the phone's compass + pitch ([setOrientation]) so
+ * panning/tilting the phone looks around the wasteland.
  *
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
  * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as does [setOrientation]. The
  * Filament API here is verified against v1.71.5 (hello-triangle + transparent-view samples + the filamat
- * runtime MaterialBuilder). Next: geo-anchoring the structures to real GPS.
+ * runtime MaterialBuilder). Next: real OSM building footprints + terrain elevation geo-anchored to the GPS fix.
  */
 class WastelandRenderer {
 
@@ -55,7 +57,7 @@ class WastelandRenderer {
         private const val TERRAIN_RES = 50           // grid cells per axis (heightmap resolution)
         private const val EYE_HEIGHT = 1.6           // camera height above the ground plane, metres
 
-        /** Ruined structures. */
+        /** Wireframe structures. */
         private const val RUINS = 16
         private const val RUIN_SEED = 0x5EED5CA7L    // fixed seed → stable skyline every run
 
@@ -63,17 +65,19 @@ class WastelandRenderer {
         private const val SUN_X = -0.42f
         private const val SUN_Y = 0.82f
         private const val SUN_Z = -0.40f
-        private const val AMBIENT = 0.42f            // 0 = pitch-black shadows, 1 = flat/unshaded
+        private const val AMBIENT = 0.46f            // 0 = pitch-black shadows, 1 = flat/unshaded
 
         /** Atmospheric haze: distant geometry lerps toward [FOG] between these radii (metres). */
-        private const val FOG_START = 26f
+        private const val FOG_START = 24f
         private const val FOG_END = 58f
 
-        // Wasteland palette (RGB triples; alpha is ALWAYS 0xFF so geometry stays opaque over the camera).
-        private val SAND_LOW = intArrayOf(0x53, 0x48, 0x34)   // hollows / low ground
-        private val SAND_HIGH = intArrayOf(0xb4, 0xa1, 0x74)  // sun-catching ridges
-        private val CONCRETE = intArrayOf(0x8c, 0x86, 0x79)   // ruined structures
-        private val FOG = intArrayOf(0xc6, 0xc0, 0xb2)        // hazy horizon tone
+        // Fallout-weathered palette. Colours are packed ABGR (0xAABBGGRR) so the little-endian putInt into the
+        // UBYTE4 COLOR attribute reads back as correct RGBA — the [packColor] helper handles the swap; these are
+        // plain RGB triples. Alpha is ALWAYS 0xFF so geometry stays opaque over the camera.
+        private val DUST_LOW = intArrayOf(0x3e, 0x39, 0x2a)    // hollows / low ground (dark olive-brown)
+        private val DUST_HIGH = intArrayOf(0x9c, 0x8c, 0x5c)   // sun-catching ridges (faded khaki)
+        private val STRUCT = intArrayOf(0xE8, 0xA8, 0x3C)      // structure wireframe (Pip-Boy amber)
+        private val FOG = intArrayOf(0xb6, 0xac, 0x8e)         // hazy horizon tone (dusty tan)
     }
 
     private lateinit var engine: Engine
@@ -83,15 +87,18 @@ class WastelandRenderer {
     private lateinit var camera: Camera
     private lateinit var material: Material
     private lateinit var materialInstance: MaterialInstance
-    private lateinit var vertexBuffer: VertexBuffer
-    private lateinit var indexBuffer: IndexBuffer
+    private lateinit var terrainVb: VertexBuffer
+    private lateinit var terrainIb: IndexBuffer
+    private lateinit var buildingVb: VertexBuffer
+    private lateinit var buildingIb: IndexBuffer
     private lateinit var uiHelper: UiHelper
     private lateinit var displayHelper: DisplayHelper
 
     private var surfaceView: SurfaceView? = null
     private var swapChain: SwapChain? = null
     private var renderable = 0
-    private var indexCount = 0
+    private var terrainIndexCount = 0
+    private var buildingIndexCount = 0
     private var started = false
 
     private val choreographer = Choreographer.getInstance()
@@ -128,8 +135,10 @@ class WastelandRenderer {
         // view/scene → camera component, then EntityManager.destroy, then the engine LAST.
         engine.destroyEntity(renderable)
         engine.destroyMaterialInstance(materialInstance)
-        engine.destroyVertexBuffer(vertexBuffer)
-        engine.destroyIndexBuffer(indexBuffer)
+        engine.destroyVertexBuffer(terrainVb)
+        engine.destroyIndexBuffer(terrainIb)
+        engine.destroyVertexBuffer(buildingVb)
+        engine.destroyIndexBuffer(buildingIb)
         engine.destroyMaterial(material)
         engine.destroyRenderer(renderer)
         engine.destroyView(view)
@@ -165,14 +174,17 @@ class WastelandRenderer {
 
     private fun setupWorld() {
         loadMaterialAtRuntime()
-        createMesh()
+        createTerrain()
+        createBuildings()
 
         renderable = EntityManager.get().create()
-        RenderableManager.Builder(1)
-            // Centred over the terrain in X/Z; tall enough in Y to enclose the ruins (culling is off anyway).
-            .boundingBox(Box(0.0f, 8.0f, 0.0f, WORLD_HALF, 24.0f, WORLD_HALF))
-            .geometry(0, PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, indexCount)
+        RenderableManager.Builder(2)
+            // Centred over the terrain in X/Z; tall enough in Y to enclose the structures (culling is off).
+            .boundingBox(Box(0.0f, 12.0f, 0.0f, WORLD_HALF, 30.0f, WORLD_HALF))
+            .geometry(0, PrimitiveType.TRIANGLES, terrainVb, terrainIb, 0, terrainIndexCount)
+            .geometry(1, PrimitiveType.LINES, buildingVb, buildingIb, 0, buildingIndexCount)
             .material(0, materialInstance)
+            .material(1, materialInstance)
             .culling(false) // no back-face culling → winding order never hides a face (safe for baked geometry)
             .build(engine, renderable)
         scene.addEntity(renderable)
@@ -229,7 +241,7 @@ class WastelandRenderer {
         materialInstance = material.createInstance()
     }
 
-    // ---- Baked wasteland: heightmap terrain + solid ruins, all shading + fog folded into vertex colours ----
+    // ---- Baked wasteland: heightmap terrain + wireframe structures, shading + fog folded into vertex colours ----
 
     /** Rolling-dune height at (x,z) — a smooth deterministic sum of sines (no external noise lib), ~±4 m. */
     private fun heightAt(x: Float, z: Float): Float {
@@ -241,12 +253,10 @@ class WastelandRenderer {
     }
 
     /**
-     * A 0xFF-alpha opaque colour for the UBYTE4-normalised COLOR attribute. Packed **ABGR** (0xAABBGGRR): the
-     * mesh writes it with `putInt` in native (little-endian) byte order, so the bytes land LSB-first as
-     * [R,G,B,A] and the attribute reads them back as RGBA. (If colours look R/B-swapped on device — e.g. sand
-     * turns blue — swap the `r`/`b` positions here.)
+     * Pack an RGB triple into the UBYTE4 COLOR attribute. It's read as RGBA in the shader, but a little-endian
+     * `putInt` writes bytes low→high, so byte 0 (= shader R) must hold our R. We therefore build 0xAABBGGRR.
      */
-    private fun packOpaque(r: Int, g: Int, b: Int): Int =
+    private fun packColor(r: Int, g: Int, b: Int): Int =
         (0xFF shl 24) or (b.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or r.coerceIn(0, 255)
 
     private fun mix(a: Int, b: Int, t: Float): Int = (a + (b - a) * t).toInt()
@@ -264,12 +274,11 @@ class WastelandRenderer {
         var b = (base[2] * shade).toInt()
         val f = fogAmount(x, z)
         r = mix(r, FOG[0], f); g = mix(g, FOG[1], f); b = mix(b, FOG[2], f)
-        return packOpaque(r, g, b)
+        return packColor(r, g, b)
     }
 
     /** Slope-shaded terrain colour: base tone lerps low→high by height, times the sun term, then hazed. */
     private fun terrainColor(x: Float, z: Float, h: Float): Int {
-        // Approximate surface normal from the height gradient (finite differences), then a Lambert-ish term.
         val e = 1.0f
         val dhx = heightAt(x + e, z) - heightAt(x - e, z)
         val dhz = heightAt(x, z + e) - heightAt(x, z - e)
@@ -278,42 +287,50 @@ class WastelandRenderer {
         val ndotl = ((nx * SUN_X + ny * SUN_Y + nz * SUN_Z) / nlen).coerceAtLeast(0f)
         val shade = AMBIENT + (1f - AMBIENT) * ndotl
         val ht = ((h + 4f) / 8f).coerceIn(0f, 1f)
-        val baseR = mix(SAND_LOW[0], SAND_HIGH[0], ht)
-        val baseG = mix(SAND_LOW[1], SAND_HIGH[1], ht)
-        val baseB = mix(SAND_LOW[2], SAND_HIGH[2], ht)
+        val baseR = mix(DUST_LOW[0], DUST_HIGH[0], ht)
+        val baseG = mix(DUST_LOW[1], DUST_HIGH[1], ht)
+        val baseB = mix(DUST_LOW[2], DUST_HIGH[2], ht)
         return shadeAndFog(intArrayOf(baseR, baseG, baseB), shade, x, z)
     }
 
-    private fun createMesh() {
-        val floatSize = 4
-        val intSize = 4
-        val shortSize = 2
-        val vertexSize = 3 * floatSize + intSize // FLOAT3 position + UBYTE4 colour
+    private val vertexSize = 3 * 4 + 4 // FLOAT3 position + UBYTE4 colour
+
+    private fun buildVertexBuffer(data: ByteBuffer, vertexCount: Int): VertexBuffer {
+        val vb = VertexBuffer.Builder()
+            .bufferCount(1)
+            .vertexCount(vertexCount)
+            .attribute(VertexAttribute.POSITION, 0, AttributeType.FLOAT3, 0, vertexSize)
+            .attribute(VertexAttribute.COLOR, 0, AttributeType.UBYTE4, 3 * 4, vertexSize)
+            .normalized(VertexAttribute.COLOR)
+            .build(engine)
+        vb.setBufferAt(engine, 0, data)
+        return vb
+    }
+
+    private fun buildIndexBuffer(data: ByteBuffer, indexCount: Int): IndexBuffer {
+        val ib = IndexBuffer.Builder()
+            .indexCount(indexCount)
+            .bufferType(IndexBuffer.Builder.IndexType.USHORT)
+            .build(engine)
+        ib.setBuffer(engine, data)
+        return ib
+    }
+
+    /** Solid heightmap ground: a shared-vertex grid, two triangles per cell. */
+    private fun createTerrain() {
         val n = TERRAIN_RES
         val step = WORLD_HALF * 2f / n
-
-        val terrainVerts = (n + 1) * (n + 1)
-        val terrainIndices = n * n * 6
-        val ruinVerts = RUINS * 24 // 6 faces × 4 corners
-        val ruinIndices = RUINS * 36 // 6 faces × 2 triangles × 3
-        val vertexCount = terrainVerts + ruinVerts
-        val idxCount = terrainIndices + ruinIndices
-        indexCount = idxCount
+        val vertexCount = (n + 1) * (n + 1)
+        terrainIndexCount = n * n * 6
 
         val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
-        val indexData = ByteBuffer.allocate(idxCount * shortSize).order(ByteOrder.nativeOrder())
-        fun vert(x: Float, y: Float, z: Float, color: Int) {
-            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
-        }
-        fun idx(i: Int) { indexData.putShort(i.toShort()) }
-
-        // --- Terrain: a shared-vertex heightmap grid, two triangles per cell. ---
+        val indexData = ByteBuffer.allocate(terrainIndexCount * 2).order(ByteOrder.nativeOrder())
         for (iz in 0..n) {
             for (ix in 0..n) {
                 val x = -WORLD_HALF + ix * step
                 val z = -WORLD_HALF + iz * step
                 val h = heightAt(x, z)
-                vert(x, h, z, terrainColor(x, z, h))
+                vertexData.putFloat(x).putFloat(h).putFloat(z).putInt(terrainColor(x, z, h))
             }
         }
         for (iz in 0 until n) {
@@ -322,20 +339,29 @@ class WastelandRenderer {
                 val b = a + 1
                 val c = a + (n + 1)
                 val d = c + 1
-                idx(a); idx(c); idx(b) // culling is off, so winding order is irrelevant
-                idx(b); idx(c); idx(d)
+                indexData.putShort(a.toShort()); indexData.putShort(c.toShort()); indexData.putShort(b.toShort())
+                indexData.putShort(b.toShort()); indexData.putShort(c.toShort()); indexData.putShort(d.toShort())
             }
         }
+        vertexData.flip(); indexData.flip()
+        terrainVb = buildVertexBuffer(vertexData, vertexCount)
+        terrainIb = buildIndexBuffer(indexData, terrainIndexCount)
+    }
 
-        // --- Ruins: solid boxes sitting on the terrain, per-face shaded so they read as 3-D blocks. ---
-        var vi = terrainVerts
-        fun quad(
-            ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float,
-            cx: Float, cy: Float, cz: Float, dx: Float, dy: Float, dz: Float, color: Int,
-        ) {
-            vert(ax, ay, az, color); vert(bx, by, bz, color); vert(cx, cy, cz, color); vert(dx, dy, dz, color)
-            idx(vi); idx(vi + 1); idx(vi + 2); idx(vi); idx(vi + 2); idx(vi + 3)
-            vi += 4
+    /** Wireframe structures: box outlines (12 edges each) standing on the terrain, amber + hazed. */
+    private fun createBuildings() {
+        val vertexCount = RUINS * 24 // 12 edges × 2 verts
+        buildingIndexCount = vertexCount
+
+        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(buildingIndexCount * 2).order(ByteOrder.nativeOrder())
+        var k = 0
+        fun vert(x: Float, y: Float, z: Float, color: Int) {
+            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
+            indexData.putShort(k.toShort()); k++
+        }
+        fun edge(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, color: Int) {
+            vert(ax, ay, az, color); vert(bx, by, bz, color)
         }
 
         val rnd = Random(RUIN_SEED)
@@ -346,38 +372,25 @@ class WastelandRenderer {
             val cz = (Math.sin(ang) * dist).toFloat()
             val hw = (3f + rnd.nextFloat() * 7f) / 2f
             val hd = (3f + rnd.nextFloat() * 7f) / 2f
-            val height = 4f + rnd.nextFloat() * 12f
-            val ground = heightAt(cx, cz) - 1.2f // sink slightly so it stays grounded on the slope
+            val height = 5f + rnd.nextFloat() * 14f
+            val ground = heightAt(cx, cz) - 1.2f
             val x0 = cx - hw; val x1 = cx + hw
             val z0 = cz - hd; val z1 = cz + hd
             val y0 = ground; val y1 = ground + height
-            // Per-face shade + haze (keyed on the box centre so a whole ruin hazes together).
-            fun face(shade: Float) = shadeAndFog(CONCRETE, shade, cx, cz)
-            quad(x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, face(1.0f))   // top (sun)
-            quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, face(0.30f))  // bottom
-            quad(x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, face(0.74f))  // +X
-            quad(x0, y0, z0, x0, y1, z0, x0, y1, z1, x0, y0, z1, face(0.58f))  // -X
-            quad(x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, face(0.66f))  // +Z
-            quad(x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, face(0.48f))  // -Z
+            val col = shadeAndFog(STRUCT, 1.0f, cx, cz)
+            // bottom
+            edge(x0, y0, z0, x1, y0, z0, col); edge(x1, y0, z0, x1, y0, z1, col)
+            edge(x1, y0, z1, x0, y0, z1, col); edge(x0, y0, z1, x0, y0, z0, col)
+            // top
+            edge(x0, y1, z0, x1, y1, z0, col); edge(x1, y1, z0, x1, y1, z1, col)
+            edge(x1, y1, z1, x0, y1, z1, col); edge(x0, y1, z1, x0, y1, z0, col)
+            // verticals
+            edge(x0, y0, z0, x0, y1, z0, col); edge(x1, y0, z0, x1, y1, z0, col)
+            edge(x1, y0, z1, x1, y1, z1, col); edge(x0, y0, z1, x0, y1, z1, col)
         }
-
-        vertexData.flip()
-        indexData.flip()
-
-        vertexBuffer = VertexBuffer.Builder()
-            .bufferCount(1)
-            .vertexCount(vertexCount)
-            .attribute(VertexAttribute.POSITION, 0, AttributeType.FLOAT3, 0, vertexSize)
-            .attribute(VertexAttribute.COLOR, 0, AttributeType.UBYTE4, 3 * floatSize, vertexSize)
-            .normalized(VertexAttribute.COLOR)
-            .build(engine)
-        vertexBuffer.setBufferAt(engine, 0, vertexData)
-
-        indexBuffer = IndexBuffer.Builder()
-            .indexCount(idxCount)
-            .bufferType(IndexBuffer.Builder.IndexType.USHORT)
-            .build(engine)
-        indexBuffer.setBuffer(engine, indexData)
+        vertexData.flip(); indexData.flip()
+        buildingVb = buildVertexBuffer(vertexData, vertexCount)
+        buildingIb = buildIndexBuffer(indexData, buildingIndexCount)
     }
 
     private inner class FrameCallback : Choreographer.FrameCallback {
