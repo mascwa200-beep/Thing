@@ -84,6 +84,26 @@ class QuestLogTest {
         assertTrue(r2.newlyCompleted.isEmpty())
     }
 
+    @Test fun surviveMainDoesNotFarmAcrossDays() {
+        // Regression: a task-less player's survival MAIN must be one-and-done — issued once, rewarded once —
+        // not re-composed and re-paid every wasteland day. (The old day-derived id stacked a fresh survive
+        // quest daily, each completing on its own day = an unbounded caps/XP farm for merely existing.)
+        var state = QuestLogState()
+        var surviveCompletions = 0
+        for (day in 1..12) {
+            val composed = StoryDirector.compose(LifeContext(day = day), seed = day.toLong()) // no tasks/interests
+            val r = QuestLog.sync(state, composed, QuestMetrics(day = day)) // wins=0 → dailies never complete
+            state = r.state
+            surviveCompletions += r.newlyCompleted.count { it.goal == QuestGoal.SURVIVE_DAYS }
+            // Never stack more than one survive quest at a time.
+            assertTrue(
+                "survive quests must not stack",
+                state.active.count { it.quest.goal == QuestGoal.SURVIVE_DAYS } <= 1,
+            )
+        }
+        assertEquals("survive MAIN must pay out at most once, not daily", 1, surviveCompletions)
+    }
+
     @Test fun viewReportsProgressAndCompletion() {
         val a = ActiveQuest(quest("q", QuestGoal.VENTURE, 3), baseVentures = 1)
         val views = QuestLog.view(QuestLogState(active = listOf(a)), QuestMetrics(ventures = 4))
