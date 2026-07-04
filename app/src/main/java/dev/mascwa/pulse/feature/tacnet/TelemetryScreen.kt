@@ -349,6 +349,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val dueCheckin by vm.dueCheckin.collectAsStateWithLifecycle()
     val checkinResult by vm.checkinResult.collectAsStateWithLifecycle()
     val selfCareStreak by vm.selfCareStreak.collectAsStateWithLifecycle()
+    val wellKept by vm.wellKept.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -423,7 +424,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         when {
             character.down -> DownedPanel(c) { vm.revive() }
-            encounter != null -> EncounterPanel(encounter!!, character, env, life, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
+            encounter != null -> EncounterPanel(encounter!!, character, env, life, wellKept, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
             else -> IdlePanel(resolution, siteReach, c) { vm.venture() }
         }
         Spacer(Modifier.height(12.dp))
@@ -1488,6 +1489,7 @@ private fun EncounterPanel(
     ch: Character,
     env: EnvContext?,
     life: LifeProfile?,
+    wellKept: Int,
     telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
     c: NightwirePalette,
     onResolve: (Int, String?, Int) -> Unit,
@@ -1574,7 +1576,7 @@ private fun EncounterPanel(
                     }
                 }
             }
-            e.choices.forEach { choice -> ApproachRow(choice, ch, env, life, selectedChem, c) }
+            e.choices.forEach { choice -> ApproachRow(choice, ch, env, life, wellKept, selectedChem, c) }
             Spacer(Modifier.height(2.dp))
             SegBar(meter, if (resolved) c.positive else c.sky, c)
             when {
@@ -1630,11 +1632,11 @@ private fun ChemChip(label: String, on: Boolean, c: NightwirePalette, onClick: (
  * exactly what's bending this check *before* you commit. Read-only.
  */
 @Composable
-private fun ApproachRow(choice: Choice, ch: Character, env: EnvContext?, life: LifeProfile?, selectedChem: String?, c: NightwirePalette) {
+private fun ApproachRow(choice: Choice, ch: Character, env: EnvContext?, life: LifeProfile?, wellKept: Int, selectedChem: String?, c: NightwirePalette) {
     val gate = choice.stat
     // Recomputed only when the inputs change, not on every sensor-driven meter frame.
-    val mods = remember(choice, ch, env, life, selectedChem) {
-        if (gate != null) SpecialGame.statMods(ch, choice, env, selectedChem, life) else emptyList()
+    val mods = remember(choice, ch, env, life, wellKept, selectedChem) {
+        if (gate != null) SpecialGame.statMods(ch, choice, env, selectedChem, life, wellKept) else emptyList()
     }
     val effStat = mods.sumOf { it.amount }
     val bonuses = mods.filter { it.source != ModSource.BASE }

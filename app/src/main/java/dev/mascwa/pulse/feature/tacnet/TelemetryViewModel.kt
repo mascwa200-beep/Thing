@@ -347,7 +347,18 @@ class TelemetryViewModel(
      * optional [roll] (supplied by the gesture-performance grade; random if null).
      */
     fun choose(choiceIndex: Int, useItemId: String? = null, roll: Int? = null) =
-        game.choose(choiceIndex, _env.value, useItemId, roll, _worldEvent.value.capsWinPct)
+        game.choose(choiceIndex, _env.value, useItemId, roll, _worldEvent.value.capsWinPct, wellKept.value)
+
+    /** The current self-care "well-kept" edge — a small flat bonus on EVERY stat check from live habit
+     *  streaks. Drives both the encounter preview odds and the actual resolve, so what you see is what you
+     *  roll. */
+    val wellKept: StateFlow<Int> = habitStore.streaksFlow
+        .map { streaks ->
+            val now = System.currentTimeMillis()
+            val today = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
+            dev.mascwa.pulse.core.telemetry.SelfCareStreak.wellKeptBonus(streaks.values, today)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** The live device motion (accelerometer/gyro), for grading encounter gestures. */
     val telemetryFlow: StateFlow<Telemetry> = telemetry

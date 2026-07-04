@@ -570,14 +570,14 @@ class SpecialGameStore(
      * [env] is the real-world context (temperature/light/motion/… bends the check) and [useItemId] is an
      * optional CHEM consumed to buff this check — both flow in from the ViewModel.
      */
-    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null, roll: Int? = null, worldCapsPct: Int = 0) {
+    fun choose(choiceIndex: Int, env: EnvContext? = null, useItemId: String? = null, roll: Int? = null, worldCapsPct: Int = 0, wellKept: Int = 0) {
         scope.launch {
             ensureLoaded()
             val c = _character.value
             val encounter = encounterFor(c) ?: return@launch
             // The die comes from how well the player physically performed the gesture, when supplied.
             val r = roll ?: random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId, currentLife())
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId, currentLife(), wellKept)
             var updatedChar = resolution.character
             // The day's world event tweaks the caps a win pays (a fraction of the base reward, +/-).
             if (resolution.success && worldCapsPct != 0) {

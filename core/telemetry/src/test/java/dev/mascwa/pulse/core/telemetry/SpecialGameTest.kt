@@ -114,6 +114,21 @@ class SpecialGameTest {
     }
 
     @Test
+    fun wellKeptStreakAddsAFlatCheckMod() {
+        val c = SpecialGame.newCharacter()
+        val base = SpecialGame.statMods(c, enc.choices[0])
+        val buffed = SpecialGame.statMods(c, enc.choices[0], wellKept = 2)
+        val streakMod = buffed.firstOrNull { it.label == "Self-care streak" }
+        assertNotNull(streakMod)
+        assertEquals(2, streakMod!!.amount)
+        assertEquals(ModSource.LIFE, streakMod.source)
+        assertEquals(base.sumOf { it.amount } + 2, buffed.sumOf { it.amount })
+        // Zero streak adds nothing; a safe (no-stat) choice never gets the mod.
+        assertNull(SpecialGame.statMods(c, enc.choices[0], wellKept = 0).firstOrNull { it.label == "Self-care streak" })
+        assertTrue(SpecialGame.statMods(c, enc.choices[1], wellKept = 2).isEmpty())
+    }
+
+    @Test
     fun repeatableEncounterIsNotRetired() {
         val rep = enc.copy(id = "rep", repeatable = true)
         val c = SpecialGame.newCharacter()
