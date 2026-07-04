@@ -11,6 +11,8 @@ import dev.mascwa.pulse.core.telemetry.CheckinOutcome
 import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.HabitCheckin
 import dev.mascwa.pulse.core.telemetry.HabitState
+import dev.mascwa.pulse.core.telemetry.SelfCareStreak
+import dev.mascwa.pulse.core.telemetry.Streak
 import dev.mascwa.pulse.data.perception.ActivityEvidenceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,10 @@ private val Context.habitDataStore: DataStore<Preferences> by preferencesDataSto
  * water. A truthful/provisional completion tops up the matching real-life need (via [SpecialGameStore]) and
  * stamps the habit done; a caught lie tops up nothing. Persists like ProfileStore (Mutex + debounced flush).
  * No device lockout — sense + check-in only.
+ *
+ * It also keeps a per-habit **[Streak]** — confirming a habit on consecutive real days builds it, a missed day
+ * breaks it ([SelfCareStreak]) — and pays out a small caps reward each time a streak crosses a milestone, so
+ * keeping your real routine is rewarded in the game.
  */
 class HabitStore(
     private val context: Context,
@@ -50,11 +56,18 @@ class HabitStore(
     private data class StoredState(val activity: String, val lastConfirmedMs: Long, val lastAskedMs: Long)
 
     @Serializable
-    private data class Stored(val states: List<StoredState> = emptyList())
+    private data class StoredStreak(val activity: String, val current: Int, val longest: Int, val lastDay: Int)
+
+    @Serializable
+    private data class Stored(
+        val states: List<StoredState> = emptyList(),
+        val streaks: List<StoredStreak> = emptyList(),
+    )
 
     private val prefsKey = stringPreferencesKey("habits_json")
     private val mutex = Mutex()
     private var states: MutableMap<String, HabitState>? = null
+    private var streaks: MutableMap<String, Streak>? = null
     private var flushJob: Job? = null
 
     val habits: List<Habit> = HabitCheckin.DEFAULTS
@@ -62,6 +75,10 @@ class HabitStore(
     private val _due = MutableStateFlow<Habit?>(null)
     /** The single most-overdue habit to surface a check-in for right now, or null. */
     val due: StateFlow<Habit?> = _due.asStateFlow()
+
+    private val _streaks = MutableStateFlow<Map<String, Streak>>(emptyMap())
+    /** Per-habit consecutive-day streaks (keyed by [RealActivity] name) for the UI + the `selfcare` tool. */
+    val streaksFlow: StateFlow<Map<String, Streak>> = _streaks.asStateFlow()
 
     /**
      * The habits actually in play right now, honouring the owner's granular switches: an empty list if the
@@ -96,6 +113,7 @@ class HabitStore(
         val sinceMs = now - habit.everyMs
         val ev = evidence.recent(sinceMs)
         val outcome = HabitCheckin.resolve(habit, claimedDone, ev, sinceMs)
+        var milestone = 0
         mutex.withLock {
             val map = states ?: mutableMapOf<String, HabitState>().also { states = it }
             val prev = map[habit.activity.name] ?: HabitState()
@@ -103,8 +121,19 @@ class HabitStore(
                 lastAskedMs = now,
                 lastConfirmedMs = if (HabitCheckin.confirms(outcome)) now else prev.lastConfirmedMs,
             )
+            // A genuine completion also advances the consecutive-day streak (caught lies don't).
+            if (HabitCheckin.confirms(outcome)) {
+                val sMap = streaks ?: mutableMapOf<String, Streak>().also { streaks = it }
+                val before = sMap[habit.activity.name] ?: Streak()
+                val after = SelfCareStreak.record(before, localDay(now))
+                sMap[habit.activity.name] = after
+                _streaks.value = sMap.toMap()
+                if (after.current > before.current && after.current in STREAK_MILESTONES) milestone = after.current
+            }
         }
         if (HabitCheckin.topsUpNeed(outcome)) topUp(habit.activity.satisfies)
+        // Pay out for reaching a streak milestone — keeping the real routine earns caps + a little XP.
+        if (milestone > 0) game.awardQuest(caps = milestone * 3, xp = milestone)
         _due.value = HabitCheckin.due(activeHabits(), states ?: emptyMap(), now).firstOrNull()
         scheduleFlush()
         return outcome
@@ -124,6 +153,13 @@ class HabitStore(
         scheduleFlush()
     }
 
+    /** A snapshot of the current streaks (loads if needed) — for the `selfcare` tool. */
+    suspend fun streaks(): Map<String, Streak> { ensureLoaded(); return streaks?.toMap() ?: emptyMap() }
+
+    /** A one-line readout of the best live streak ("4-day self-care streak · best 9"), or "" if none. */
+    suspend fun describeStreak(): String =
+        SelfCareStreak.describe(streaks().values, localDay(clock()))
+
     private fun topUp(need: CareNeed) {
         when (need) {
             CareNeed.HYGIENE -> game.wash()
@@ -136,8 +172,9 @@ class HabitStore(
 
     suspend fun clear() {
         flushJob?.cancel()
-        mutex.withLock { states = mutableMapOf() }
+        mutex.withLock { states = mutableMapOf(); streaks = mutableMapOf() }
         _due.value = null
+        _streaks.value = emptyMap()
         runCatching { context.habitDataStore.edit { it.remove(prefsKey) } }
     }
 
@@ -146,11 +183,15 @@ class HabitStore(
     private suspend fun ensureLoaded(): Map<String, HabitState> = mutex.withLock {
         states ?: run {
             val raw = context.habitDataStore.data.first()[prefsKey]
-            val loaded = raw
-                ?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
-                ?.states.orEmpty()
+            val stored = raw?.let { runCatching { json.decodeFromString(Stored.serializer(), it) }.getOrNull() }
+            val loaded = stored?.states.orEmpty()
                 .associate { it.activity to HabitState(it.lastConfirmedMs, it.lastAskedMs) }
                 .toMutableMap()
+            val loadedStreaks = stored?.streaks.orEmpty()
+                .associate { it.activity to Streak(it.current, it.longest, it.lastDay) }
+                .toMutableMap()
+            streaks = loadedStreaks
+            _streaks.value = loadedStreaks.toMap()
             loaded.also { states = it }
         }
     }
@@ -162,14 +203,26 @@ class HabitStore(
 
     private suspend fun flush() {
         val snapshot = mutex.withLock {
-            states?.let { m -> Stored(m.map { (k, v) -> StoredState(k, v.lastConfirmedMs, v.lastAskedMs) }) }
+            val s = states ?: return@withLock null
+            Stored(
+                states = s.map { (k, v) -> StoredState(k, v.lastConfirmedMs, v.lastAskedMs) },
+                streaks = (streaks ?: emptyMap()).map { (k, v) -> StoredStreak(k, v.current, v.longest, v.lastDay) },
+            )
         } ?: return
         runCatching {
             context.habitDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
         }
     }
 
+    /** Local epoch-day (calendar day in the device's timezone) for the consecutive-day streak logic. */
+    private fun localDay(nowMs: Long): Int {
+        val offset = java.util.TimeZone.getDefault().getOffset(nowMs)
+        return ((nowMs + offset) / 86_400_000L).toInt()
+    }
+
     private companion object {
         const val FLUSH_DELAY_MS = 2_000L
+        /** Streak lengths that pay out a caps + XP reward on the day they're reached. */
+        val STREAK_MILESTONES = setOf(3, 7, 14, 30, 60, 100)
     }
 }

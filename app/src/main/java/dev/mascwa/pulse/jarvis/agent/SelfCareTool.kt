@@ -26,9 +26,10 @@ class SelfCareTool(
     override val name = "selfcare"
     override val usage =
         "selfcare [status] | selfcare needs | selfcare drink|eat|rest|wash|brush | selfcare due | " +
-            "selfcare evidence | selfcare confirm <shower|teeth|meal|water> | selfcare ask [shower|teeth|meal|" +
-            "water] — read + tend the operator's real-life needs, the S.P.E.C.I.A.L. character, sensed " +
-            "self-care, and habit check-ins; `ask` fires a check-in NOW when you judge the moment right"
+            "selfcare evidence | selfcare streak | selfcare confirm <shower|teeth|meal|water> | selfcare ask " +
+            "[shower|teeth|meal|water] — read + tend the operator's real-life needs, the S.P.E.C.I.A.L. " +
+            "character, sensed self-care, streaks, and habit check-ins; `ask` fires a check-in NOW when you " +
+            "judge the moment right"
 
     override suspend fun run(arg: String): String = runCatching {
         val a = arg.trim()
@@ -43,6 +44,9 @@ class SelfCareTool(
             "wash" -> { game.wash(); "Hygiene restored (a wash)." }
             "brush" -> { game.brushTeeth(); "Teeth brushed (a partial hygiene lift)." }
             "due" -> habits.nextDue()?.let { "Check-in due: ${it.label} — \"${it.question}\"" } ?: "No check-in is due."
+            "streak", "streaks" -> habits.describeStreak().ifBlank {
+                "No self-care streak yet — confirm a habit two days running to start one."
+            }
             "evidence" -> evidenceLine()
             "confirm", "answer", "done" -> confirm(rest.ifBlank { verb })
             "ask", "checkin", "nudge", "prompt" -> ask(rest)
@@ -69,10 +73,12 @@ class SelfCareTool(
     private suspend fun status(): String {
         val c = game.characterFlow.value
         val stats = Special.entries.joinToString(" ") { "${it.letter}${c.stat(it)}" }
+        val streak = habits.describeStreak()
         return buildString {
             append("OPERATOR · LVL ${c.level} · ${c.caps} caps · HP ${c.hp}/${c.maxHp}\n")
             append("S.P.E.C.I.A.L. $stats\n")
             append(needsLine()).append('\n')
+            if (streak.isNotBlank()) append(streak).append('\n')
             append(habits.nextDue()?.let { "Check-in due: ${it.label}." } ?: "No check-in due.")
         }
     }
