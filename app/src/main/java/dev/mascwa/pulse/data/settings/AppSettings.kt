@@ -222,6 +222,10 @@ data class JarvisSettings(
      *  background (cloud-gated; spends provider credits) and bring you findings with a notification.
      *  Off by default — opt in, since it acts on its own and uses your cloud key. */
     val autonomousCuriosity: Boolean = false,
+    /** Free-text directive the owner types for J.A.R.V.I.S. to interpret when tending the self-care/life-sim
+     *  system — how strict to be, when to nudge vs. leave you alone, which habits matter, etc. Injected into
+     *  the assistant's context every turn; it uses the `selfcare` tool to read/act on the game accordingly. */
+    val selfCareDirective: String = "",
 ) {
     val hasModelUrl get() = modelUrl.isNotBlank()
     /** Cloud chat is active when enabled and a key is present. */
