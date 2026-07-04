@@ -1482,6 +1482,46 @@ compile-reviews (no local SDK). **Everything on-device is owner-verify on the Pi
   S.P.E.C.I.A.L. inputs (well-read→INT, social→CHA, fitness→STR/END) → L5 Legend/reputation-tale system
   (curate an archetype OR emergent from deeds; affects town attitude/shops/perks/stats). Each a CI-green slice.
 
+### AR wasteland 3D rework — the "real, indoor/outdoor, geo-anchored" arc (this session, #315–#318 all merged)
+Owner rejected the earlier wireframe-grid / solid-grey-box wasteland via screenshots + a refined spec (the
+Lucky-38 New-Vegas poster as the "dial Bethesda Fallout to 11" reference): ONE combined AR mode (labels +
+wasteland together, not a toggle) with a loading screen; camera-detected indoor/outdoor; real OSM building
+footprints as wireframes at their true shape/scale; ground following the real topographical height map as an
+invisible anchor. Built as 4 CI-green slices in `feature/ar3d/WastelandRenderer.kt` (Filament 1.71.5, verified
+blind by compile-review subagents each PR; pure cores locally kotlinc-run):
+- **#315 — one combined mode + wireframe structures + loading screen:** dropped the ◉3D toggle (the Filament
+  wasteland is always on with site labels over it); solid heightmap ground (TRIANGLES) + amber wireframe
+  structures (LINES) on one 2-primitive renderable; "MODELLING YOUR VICINITY" Fallout loading beat on entry.
+- **#316 — indoor/outdoor camera detection drives the ground:** `data/perception/IndoorOutdoorDetector.kt`
+  binds a MediaPipe `ImageAnalysis` pass to the AR camera's OWN session (a 2nd camera session's `unbindAll`
+  would fight the preview), classifies via the same pure `Perception.distill` → INDOOR/OUTDOOR (2-frame
+  debounce). `WastelandRenderer.setIndoor`: **outdoors** = solid wasteland floor (replaces real ground);
+  **indoors** = only a wireframe ground ghost (a solid floor blocked the room — the owner's core complaint).
+  Defaults to the non-blocking ghost until confidently OUTSIDE. HUD readout `INSIDE·GROUND GHOST` /
+  `OUTSIDE·SOLID GROUND` for verification.
+- **#317 — real OSM building footprints, geo-anchored wireframes:** pure `core:telemetry/BuildingFootprints.kt`
+  (+6 tests) — `project()` equirectangular-maps each ring to the renderer frame (x=east, z=−north, matching the
+  compass camera), trims OSM's repeated closing vertex; `estimateHeight()` (height / levels×3 m / default,
+  clamped 2..120 m). `data/ar/BuildingRepository.kt` (Overpass `way["building"]` + `out geom`). Renderer
+  `setBuildings()` extrudes each footprint to a wireframe box (base+top ring + verticals), safe buffer swap;
+  empty = procedural fallback. VM fetches on first fix + >150 m move; re-projects each GPS tick so buildings
+  stay anchored as you walk. `STRUCTURES · N MAPPED` HUD readout.
+- **#318 — real DEM elevation as the invisible ground anchor:** pure `core:telemetry/ElevationField.kt`
+  (+6 tests) — bilinear (res+1)² DEM grid, origin-relative so the ground under the player is ~0 (camera then
+  sits eye-height above it). `data/ar/ElevationRepository.kt` (keyless **Open-Meteo** batch, 9×9). Renderer:
+  `heightAt`→`rawDune`; `groundHeight()` = real DEM elevation + anchored dune detail (subtracts the origin dune
+  so the floor is y≈0 under the player even with no DEM). `setElevation()` rebuilds terrain+ghost+buildings via
+  the safe build-new→repoint→free swap; `create*()`→`build*Buffers()` returning Triples. Null field =
+  flat-anchored procedural (fallback).
+- **Result: the AR wasteland is now ONE combined mode, indoor/outdoor-aware, drawn from real OSM building
+  footprints, on the real terrain elevation.** ⚠️ **ENTIRELY on-device-unverified — Filament can't render in
+  CI, and the camera classifier / Overpass / Open-Meteo / GPS geo-anchoring are all CI-unprovable. PAUSED for
+  owner Pixel verification before piling more on top.** Owner checklist: indoors shows the wireframe ground
+  ghost (room stays visible), outdoors the solid floor; buildings stand where the real ones are (bearing/shape)
+  and grow as you approach; the floor sits right under you. **Open / steerable next:** the Fallout aesthetic
+  "to 11" polish (weathered sepia-green, atmosphere — a screenshot-driven visual judgment call), and only after
+  the geo-anchoring is confirmed to feel right.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
