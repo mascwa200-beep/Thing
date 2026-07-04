@@ -7,6 +7,8 @@ import android.view.SurfaceView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
@@ -52,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import dev.mascwa.pulse.core.telemetry.ArProjection
+import dev.mascwa.pulse.core.telemetry.Setting
 import dev.mascwa.pulse.core.telemetry.SiteType
 import dev.mascwa.pulse.core.telemetry.WorldSite
 import dev.mascwa.pulse.core.util.Geo
@@ -60,6 +63,7 @@ import dev.mascwa.pulse.feature.tacnet.Pip
 import dev.mascwa.pulse.feature.tacnet.crtScanlines
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import java.util.concurrent.Executors
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -77,9 +81,10 @@ private const val RADAR_RANGE_M = 800.0
  * no longer smears things sideways. Extra HUD: a heading ribbon, a top-down radar, an operator STAT strip,
  * and the tracked objective. Phosphor-green CRT chrome. No ARCore.
  *
- * The **◉ 3D** toggle swaps the flat projected markers for a real Filament-rendered 3D wasteland of the
- * immediate vicinity ([WastelandRenderer] — a transparent GL surface composited over the live camera). It's
- * built up slice by slice; right now it draws the proof geometry. The HUD instruments stay in both modes.
+ * There's ONE combined AR view: a real Filament-rendered 3D wasteland ([WastelandRenderer] — a transparent GL
+ * surface composited over the live camera) with the site labels projected on top of it. The camera also runs
+ * an on-device indoor/outdoor classifier ([IndoorOutdoorDetector]): **outdoors** the solid wasteland ground
+ * replaces the real floor; **indoors** only a wireframe ground ghost is drawn so it never blocks the room.
  */
 @Composable
 fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
@@ -105,6 +110,10 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val character by vm.character.collectAsStateWithLifecycle()
     val activeWp by vm.activeWaypoint.collectAsStateWithLifecycle()
+    val setting by vm.setting.collectAsStateWithLifecycle()
+    // Solid wasteland ground only when we're confident we're OUTSIDE (or in transit). Indoors / not-yet-known →
+    // the non-blocking wireframe ground ghost, so a solid floor never obscures the room.
+    val indoor = setting != Setting.OUTDOOR && setting != Setting.VEHICLE
 
     // The AR overlay is ONE thing: the Filament wasteland + the site labels together (no mode toggle). It
     // "models" for a beat on entry — a Fallout loading screen while the scene builds.
@@ -113,7 +122,8 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(Pip.bg)) {
         if (hasCamera) {
-            CameraPreview(Modifier.fillMaxSize())
+            // Live camera + an on-device indoor/outdoor analysis pass (feeds the renderer's ground mode).
+            CameraPreview(vm.indoorDetector::analyze, Modifier.fillMaxSize())
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -130,10 +140,11 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         }
 
         // 3D wasteland — a transparent Filament GL surface composited over the live camera (immediate vicinity).
-        // Always on now: the wasteland IS the AR view, with the site labels drawn on top of it below.
+        // Always on now: the wasteland IS the AR view, with the site labels drawn on top of it below. The
+        // ground is solid outdoors / a wireframe ghost indoors ([indoor], from the camera classifier).
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
         if (hasCamera) {
-            FilamentLayer(heading, pitch, Modifier.fillMaxSize())
+            FilamentLayer(heading, pitch, indoor, Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -204,6 +215,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                     Text("${heading.toInt()}° ${cardinal(heading)}", fontFamily = ChakraPetch,
                         fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Pip.glow, letterSpacing = 1.sp)
                     Text("PITCH ${pitch.toInt()}°", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
+                    Text(settingLabel(setting), fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim)
                     if (unreliable) {
                         Text("compass off — wave a figure-8", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.alert)
                     }
@@ -221,7 +233,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                 Modifier.align(Alignment.BottomEnd).padding(12.dp).size(104.dp))
         }
 
-        // Bottom-centre: nearest-site readout · 3D toggle + scan.
+        // Bottom-centre: nearest-site readout + scan.
         Column(
             Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -272,10 +284,16 @@ private fun WastelandLoading(modifier: Modifier) {
     }
 }
 
-/** Live back-camera preview via CameraX, bound to the composition's lifecycle. */
+/**
+ * Live back-camera preview via CameraX, bound to the composition's lifecycle. Also binds an [ImageAnalysis]
+ * that hands each frame to [analyzer] (the on-device indoor/outdoor classifier) — one camera session drives
+ * both the preview and the classification, so nothing fights over the camera.
+ */
 @Composable
-private fun CameraPreview(modifier: Modifier) {
+private fun CameraPreview(analyzer: (ImageProxy) -> Unit, modifier: Modifier) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) { onDispose { runCatching { analysisExecutor.shutdown() } } }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -290,9 +308,15 @@ private fun CameraPreview(modifier: Modifier) {
                     val preview = androidx.camera.core.Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { it.setAnalyzer(analysisExecutor, analyzer) }
                     runCatching {
                         provider.unbindAll()
-                        provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                        provider.bindToLifecycle(
+                            lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis,
+                        )
                     }
                 }
             }, ContextCompat.getMainExecutor(ctx))
@@ -304,14 +328,17 @@ private fun CameraPreview(modifier: Modifier) {
 /**
  * The 3D wasteland layer — a **transparent** Filament SurfaceView floating over the live camera. `setZOrderOnTop`
  * + a `TRANSLUCENT` holder composite it above the camera TextureView while its clear pixels reveal the camera
- * (and the Compose HUD drawn behind it). The [WastelandRenderer]'s native engine is freed when 3D toggles off.
+ * (and the Compose HUD drawn behind it). The [WastelandRenderer]'s native engine is freed when the AR view
+ * leaves. [indoor] picks the ground mode: solid wasteland outdoors, wireframe ground ghost indoors.
  */
 @Composable
-private fun FilamentLayer(heading: Float, pitch: Float, modifier: Modifier) {
+private fun FilamentLayer(heading: Float, pitch: Float, indoor: Boolean, modifier: Modifier) {
     val renderer = remember { WastelandRenderer() }
-    DisposableEffect(Unit) { onDispose { renderer.detach() } } // frees native memory when 3D turns off / on leave
-    // Aim the ground-grid camera by the live compass + tilt (main thread — same as the renderer).
+    DisposableEffect(Unit) { onDispose { renderer.detach() } } // frees native memory on leave
+    // Aim the wasteland camera by the live compass + tilt (main thread — same as the renderer).
     LaunchedEffect(heading, pitch) { renderer.setOrientation(heading, pitch) }
+    // Swap solid ground ↔ wireframe ghost as the camera classifier decides indoors/outdoors.
+    LaunchedEffect(indoor) { renderer.setIndoor(indoor) }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -460,6 +487,14 @@ private fun arColor(type: SiteType): Color = when {
     type.hostile -> Color(0xFFE6FF66) // in-palette alert (a gang camp / den / vault reads hot)
     type.threat >= 2 -> Pip.mid
     else -> Pip.bright
+}
+
+/** The sensed indoor/outdoor read, surfaced so the ground mode is verifiable on-device. */
+private fun settingLabel(s: Setting): String = when (s) {
+    Setting.OUTDOOR -> "OUTSIDE · SOLID GROUND"
+    Setting.VEHICLE -> "IN TRANSIT · SOLID GROUND"
+    Setting.INDOOR -> "INSIDE · GROUND GHOST"
+    Setting.UNKNOWN -> "SENSING SURROUNDINGS…"
 }
 
 /** Cardinal label for a heading in degrees. */

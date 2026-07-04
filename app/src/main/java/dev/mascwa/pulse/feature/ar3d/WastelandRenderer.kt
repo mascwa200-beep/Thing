@@ -29,20 +29,27 @@ import java.nio.ByteOrder
 import java.util.Random
 
 /**
- * 3D-AR **wasteland**, Fallout-styled: a **solid** heightmap ground (rolling dunes, sun-shaded from the slope,
- * weathered sepia/khaki palette) with **wireframe** structures standing on it — holographic amber outlines, not
- * solid blocks, so they read as *scanned* buildings hovering over the real world — plus atmospheric haze that
- * fades the distance. Composited over the live camera (the real world shows above the horizon as the sky). The
- * ground is one opaque TRIANGLES primitive; the structures are a second LINES primitive, both on one renderable
- * using the same proven opaque-unlit vertex-colour material. No ARCore, no lighting/IBL, no blend-mode tricks.
+ * 3D-AR **wasteland**, Fallout-styled, composited over the live camera (the real world shows above the horizon
+ * as the sky). **Wireframe** structures — holographic amber outlines, not solid blocks — stand on the ground so
+ * they read as *scanned* buildings hovering over the real world, plus atmospheric haze that fades the distance.
+ *
+ * The **ground adapts to whether you're indoors or outdoors** ([setIndoor], fed by the camera classifier):
+ *  - **OUTDOORS** — a **solid** heightmap floor (rolling dunes, slope-sun-shaded, weathered sepia/khaki) that
+ *    *replaces* the real ground (TRIANGLES primitive).
+ *  - **INDOORS** — a solid floor would block the room, so only a **wireframe ground ghost** of that same
+ *    heightmap is drawn (LINES primitive) — you see where the outside ground level sits without it obscuring the
+ *    space around you.
+ * Either way the structures are a second LINES primitive; both primitives share one renderable + the same
+ * proven opaque-unlit vertex-colour material. No ARCore, no lighting/IBL, no blend-mode tricks.
  *
  * An eye-height (1.6 m) perspective camera is driven by the phone's compass + pitch ([setOrientation]) so
  * panning/tilting the phone looks around the wasteland.
  *
  * A plain lifecycle-free owner (not a ViewModel): [attach]/[detach] are the only entry points and MUST run on
- * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as does [setOrientation]. The
- * Filament API here is verified against v1.71.5 (hello-triangle + transparent-view samples + the filamat
- * runtime MaterialBuilder). Next: real OSM building footprints + terrain elevation geo-anchored to the GPS fix.
+ * the main/UI thread (Choreographer + UiHelper callbacks are main-thread), as do [setOrientation] and
+ * [setIndoor]. The Filament API here is verified against v1.71.5 (hello-triangle + transparent-view samples +
+ * the filamat runtime MaterialBuilder). Next: real OSM building footprints + terrain elevation geo-anchored to
+ * the GPS fix.
  */
 class WastelandRenderer {
 
@@ -61,6 +68,9 @@ class WastelandRenderer {
         private const val RUINS = 16
         private const val RUIN_SEED = 0x5EED5CA7L    // fixed seed → stable skyline every run
 
+        /** Indoor "ground ghost" — a wireframe of the outside ground level, drawn instead of the solid floor. */
+        private const val GHOST_RES = 24             // grid lines per axis for the indoor ground ghost
+
         /** Baked shading: a fixed "sun" direction (roughly upper-left) + how dark the shadow side gets. */
         private const val SUN_X = -0.42f
         private const val SUN_Y = 0.82f
@@ -77,6 +87,7 @@ class WastelandRenderer {
         private val DUST_LOW = intArrayOf(0x3e, 0x39, 0x2a)    // hollows / low ground (dark olive-brown)
         private val DUST_HIGH = intArrayOf(0x9c, 0x8c, 0x5c)   // sun-catching ridges (faded khaki)
         private val STRUCT = intArrayOf(0xE8, 0xA8, 0x3C)      // structure wireframe (Pip-Boy amber)
+        private val GHOST = intArrayOf(0x63, 0x74, 0x4c)       // indoor ground-ghost wire (dim mossy phosphor)
         private val FOG = intArrayOf(0xb6, 0xac, 0x8e)         // hazy horizon tone (dusty tan)
     }
 
@@ -89,6 +100,8 @@ class WastelandRenderer {
     private lateinit var materialInstance: MaterialInstance
     private lateinit var terrainVb: VertexBuffer
     private lateinit var terrainIb: IndexBuffer
+    private lateinit var groundGridVb: VertexBuffer
+    private lateinit var groundGridIb: IndexBuffer
     private lateinit var buildingVb: VertexBuffer
     private lateinit var buildingIb: IndexBuffer
     private lateinit var uiHelper: UiHelper
@@ -98,8 +111,14 @@ class WastelandRenderer {
     private var swapChain: SwapChain? = null
     private var renderable = 0
     private var terrainIndexCount = 0
+    private var groundGridIndexCount = 0
     private var buildingIndexCount = 0
     private var started = false
+
+    // Ground mode: false = outdoors (solid terrain floor), true = indoors (wireframe ground ghost only). The
+    // camera classifier flips it via [setIndoor]; [pendingIndoor] holds a value that arrived before [attach].
+    private var indoor = false
+    private var pendingIndoor: Boolean? = null
 
     private val choreographer = Choreographer.getInstance()
     private val frameScheduler = FrameCallback()
@@ -137,6 +156,8 @@ class WastelandRenderer {
         engine.destroyMaterialInstance(materialInstance)
         engine.destroyVertexBuffer(terrainVb)
         engine.destroyIndexBuffer(terrainIb)
+        engine.destroyVertexBuffer(groundGridVb)
+        engine.destroyIndexBuffer(groundGridIb)
         engine.destroyVertexBuffer(buildingVb)
         engine.destroyIndexBuffer(buildingIb)
         engine.destroyMaterial(material)
@@ -175,22 +196,57 @@ class WastelandRenderer {
     private fun setupWorld() {
         loadMaterialAtRuntime()
         createTerrain()
+        createGroundGrid()
         createBuildings()
 
-        renderable = EntityManager.get().create()
-        RenderableManager.Builder(2)
-            // Centred over the terrain in X/Z; tall enough in Y to enclose the structures (culling is off).
-            .boundingBox(Box(0.0f, 12.0f, 0.0f, WORLD_HALF, 30.0f, WORLD_HALF))
-            .geometry(0, PrimitiveType.TRIANGLES, terrainVb, terrainIb, 0, terrainIndexCount)
-            .geometry(1, PrimitiveType.LINES, buildingVb, buildingIb, 0, buildingIndexCount)
-            .material(0, materialInstance)
-            .material(1, materialInstance)
-            .culling(false) // no back-face culling → winding order never hides a face (safe for baked geometry)
-            .build(engine, renderable)
-        scene.addEntity(renderable)
+        // Honour an indoor/outdoor read that arrived before the surface was ready.
+        pendingIndoor?.let { indoor = it; pendingIndoor = null }
+        rebuildRenderable()
 
         // Eye-height camera looking level toward -Z (north) until the compass feeds a heading.
         setOrientation(0f, 0f)
+    }
+
+    /**
+     * (Re)build the single renderable's two primitives from the current [indoor] flag: primitive 0 is the
+     * ground — a solid TRIANGLES floor outdoors, a wireframe LINES ghost indoors — and primitive 1 is always
+     * the wireframe structures. All buffers are pre-built in [setupWorld]; switching modes only swaps which
+     * ground buffer primitive 0 points at, so it's cheap. Main-thread only.
+     */
+    private fun rebuildRenderable() {
+        if (renderable != 0) {
+            scene.removeEntity(renderable)
+            engine.destroyEntity(renderable)
+            EntityManager.get().destroy(renderable)
+        }
+        renderable = EntityManager.get().create()
+        val builder = RenderableManager.Builder(2)
+            // Centred over the terrain in X/Z; tall enough in Y to enclose the structures (culling is off).
+            .boundingBox(Box(0.0f, 12.0f, 0.0f, WORLD_HALF, 30.0f, WORLD_HALF))
+            .material(0, materialInstance)
+            .material(1, materialInstance)
+            .culling(false) // no back-face culling → winding order never hides a face (safe for baked geometry)
+        if (indoor) {
+            builder.geometry(0, PrimitiveType.LINES, groundGridVb, groundGridIb, 0, groundGridIndexCount)
+        } else {
+            builder.geometry(0, PrimitiveType.TRIANGLES, terrainVb, terrainIb, 0, terrainIndexCount)
+        }
+        builder.geometry(1, PrimitiveType.LINES, buildingVb, buildingIb, 0, buildingIndexCount)
+        builder.build(engine, renderable)
+        scene.addEntity(renderable)
+    }
+
+    /**
+     * Set the ground mode from the camera's indoor/outdoor read. Outdoors ([on] = false) the solid wasteland
+     * floor replaces the real ground; indoors ([on] = true) only the wireframe ground ghost is drawn so it
+     * never blocks the room. A no-op if unchanged. Main-thread only; if called before [attach] built the
+     * scene, it's remembered and applied in [setupWorld].
+     */
+    fun setIndoor(on: Boolean) {
+        if (!started) { pendingIndoor = on; return }
+        if (on == indoor) return
+        indoor = on
+        rebuildRenderable()
     }
 
     /**
@@ -346,6 +402,46 @@ class WastelandRenderer {
         vertexData.flip(); indexData.flip()
         terrainVb = buildVertexBuffer(vertexData, vertexCount)
         terrainIb = buildIndexBuffer(indexData, terrainIndexCount)
+    }
+
+    /**
+     * Indoor **ground ghost**: the same heightmap drawn as a coarse wireframe grid (LINES following the
+     * terrain height) instead of a solid floor, dim + hazed — so indoors you can see where the outside ground
+     * level sits without a solid surface blocking the room.
+     */
+    private fun createGroundGrid() {
+        val g = GHOST_RES
+        val step = WORLD_HALF * 2f / g
+        // g+1 lines each direction, each a polyline of g segments → segments = 2 * (g+1) * g, verts = ×2.
+        val segments = 2 * (g + 1) * g
+        val vertexCount = segments * 2
+        groundGridIndexCount = vertexCount
+
+        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(groundGridIndexCount * 2).order(ByteOrder.nativeOrder())
+        var k = 0
+        fun node(x: Float, z: Float) {
+            val h = heightAt(x, z)
+            vertexData.putFloat(x).putFloat(h).putFloat(z).putInt(shadeAndFog(GHOST, 0.9f, x, z))
+            indexData.putShort(k.toShort()); k++
+        }
+        // Lines running along X (one per Z row).
+        for (iz in 0..g) {
+            val z = -WORLD_HALF + iz * step
+            for (ix in 0 until g) {
+                node(-WORLD_HALF + ix * step, z); node(-WORLD_HALF + (ix + 1) * step, z)
+            }
+        }
+        // Lines running along Z (one per X column).
+        for (ix in 0..g) {
+            val x = -WORLD_HALF + ix * step
+            for (iz in 0 until g) {
+                node(x, -WORLD_HALF + iz * step); node(x, -WORLD_HALF + (iz + 1) * step)
+            }
+        }
+        vertexData.flip(); indexData.flip()
+        groundGridVb = buildVertexBuffer(vertexData, vertexCount)
+        groundGridIb = buildIndexBuffer(indexData, groundGridIndexCount)
     }
 
     /** Wireframe structures: box outlines (12 edges each) standing on the terrain, amber + hazed. */
