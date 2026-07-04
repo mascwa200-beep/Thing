@@ -22,4 +22,6 @@ data class NotifyState(
     /** Rotating survival-tip cursor (walks the whole catalog before repeating) + when one last fired. */
     val survivalTipIndex: Int = 0,
     val survivalTipLastMs: Long = 0L,
+    /** Local epoch-day we last fired a "don't break your streak" reminder, so it nudges at most once a day. */
+    val streakReminderDay: Int = -1,
 )
