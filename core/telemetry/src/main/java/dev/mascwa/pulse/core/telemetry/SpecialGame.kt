@@ -188,6 +188,7 @@ object SpecialGame {
         env: EnvContext? = null,
         useItemId: String? = null,
         life: LifeProfile? = null,
+        wellKept: Int = 0,
     ): Resolution {
         val choice = encounter.choices.getOrNull(choiceIndex)
             ?: return Resolution(false, false, Outcome("Nothing happens."), character, roll)
@@ -202,7 +203,7 @@ object SpecialGame {
         val critMargin = if (perkLuckierCrits(character) || companionLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
         val luck = character.stat(Special.LUCK)
         // Build the attributable modifier stack once — it drives both the check maths and the UI breakdown.
-        val mods = statMods(character, choice, env, useItemId, life)
+        val mods = statMods(character, choice, env, useItemId, life, wellKept)
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
@@ -253,6 +254,7 @@ object SpecialGame {
         env: EnvContext? = null,
         useItemId: String? = null,
         life: LifeProfile? = null,
+        wellKept: Int = 0,
     ): List<CheckMod> {
         val stat = choice.stat ?: return emptyList()
         val mods = mutableListOf<CheckMod>()
@@ -278,6 +280,8 @@ object SpecialGame {
         useItemId?.let { Items.byId(it) }
             ?.takeIf { it.kind == ItemKind.CHEM && (c.inventory[it.id] ?: 0) > 0 && it.statBonus == stat }
             ?.let { mods += CheckMod(it.name, it.statBonusAmt, ModSource.CHEM) }
+        // A well-kept real-life routine (self-care streaks) gives a small flat edge on any check.
+        if (wellKept != 0) mods += CheckMod("Self-care streak", wellKept, ModSource.LIFE)
         return mods
     }
 
