@@ -247,6 +247,9 @@ data class NotificationPrefs(
     val survivalAlerts: Boolean = true,
     /** Frequent, quiet rotating field-survival tips (a 300+ catalog). Silent (low-priority), self-replacing. */
     val survivalTips: Boolean = true,
+    /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
+     *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
+    val aggressiveCheckin: Boolean = false,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */
     val updateChecks: Boolean = true,
