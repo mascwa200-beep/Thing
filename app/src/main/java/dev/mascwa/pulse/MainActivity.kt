@@ -131,6 +131,21 @@ class MainActivity : ComponentActivity() {
             val bz by hudVm.bz.collectAsStateWithLifecycle()
             val stormLevel by hudVm.stormLevel.collectAsStateWithLifecycle()
 
+            // Always-on ambient sensing (opt-in): keep the foreground sensing service in step with the
+            // settings — starts/stops immediately on a toggle change and on cold launch. Defensive inside.
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            androidx.compose.runtime.LaunchedEffect(
+                settings.ambientSensingAlways, settings.ambientSensing, settings.ambientMic, settings.ambientCamera,
+            ) {
+                if (settings.ambientSensingAlways && settings.ambientSensing) {
+                    dev.mascwa.pulse.data.perception.AmbientSensingService.start(
+                        ctx, mic = settings.ambientMic, cam = settings.ambientCamera,
+                    )
+                } else {
+                    dev.mascwa.pulse.data.perception.AmbientSensingService.stop(ctx)
+                }
+            }
+
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
                 // Hardware attestation runs once, async, and STRENGTHENS the gate: a genuine result is

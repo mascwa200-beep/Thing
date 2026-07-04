@@ -706,6 +706,14 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             checked = s.ambientCamera,
                             onChange = { v -> vm.update { it.copy(ambientCamera = v) } },
                         )
+                        PrefSwitch(
+                            "     · Always on (background + lock screen)",
+                            "Keep sensing in a foreground service even when the game screen is closed, so the " +
+                                "self-care lie-catcher has a continuous history. Shows a persistent notification " +
+                                "(and the camera/mic indicators); uses more battery. Off by default.",
+                            checked = s.ambientSensingAlways,
+                            onChange = { v -> vm.update { it.copy(ambientSensingAlways = v) } },
+                        )
                     }
                     PrefClickable(
                         "Security auditor",
