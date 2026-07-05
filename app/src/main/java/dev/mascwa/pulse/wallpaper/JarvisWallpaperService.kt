@@ -66,6 +66,17 @@ class JarvisWallpaperService : WallpaperService() {
 
         @Volatile private var snapshot = Snapshot()
 
+        // Cached date/time formatters — rebuilt on the ≤1/min data tick (refreshData) instead of
+        // reconstructed every frame (~30 fps). Constructing SimpleDateFormat/DateFormat is expensive
+        // (pattern parse + locale symbols); this was the biggest per-frame cost. Touched only on the main
+        // looper thread (render + refreshData both run there), so no thread-safety concern. Rebuilding
+        // ≤1/min keeps a system 12-/24-hour or locale change reflected within a minute.
+        private var timeFmt: java.text.DateFormat =
+            android.text.format.DateFormat.getTimeFormat(this@JarvisWallpaperService)
+        private var dateFmt: java.text.DateFormat =
+            android.text.format.DateFormat.getMediumDateFormat(this@JarvisWallpaperService)
+        private var dayFmt = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault())
+
         private val frame = Runnable { drawFrame() }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -102,6 +113,10 @@ class JarvisWallpaperService : WallpaperService() {
 
         private fun refreshData() {
             lastDataMs = SystemClock.uptimeMillis()
+            // Refresh cached formatters (main thread, ≤1/min) so a 12-/24-hour or locale change is picked up.
+            timeFmt = android.text.format.DateFormat.getTimeFormat(this@JarvisWallpaperService)
+            dateFmt = android.text.format.DateFormat.getMediumDateFormat(this@JarvisWallpaperService)
+            dayFmt = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault())
             scope.launch {
                 val app = applicationContext as? PulseApplication ?: return@launch
                 val c = app.container
@@ -204,9 +219,9 @@ class JarvisWallpaperService : WallpaperService() {
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             val snap = snapshot
             val now = java.util.Date()
-            val timeStr = android.text.format.DateFormat.getTimeFormat(this@JarvisWallpaperService).format(now)
-            val dayStr = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(now).uppercase()
-            val dateStr = android.text.format.DateFormat.getMediumDateFormat(this@JarvisWallpaperService).format(now).uppercase()
+            val timeStr = timeFmt.format(now)
+            val dayStr = dayFmt.format(now).uppercase()
+            val dateStr = dateFmt.format(now).uppercase()
 // ===== Frame & edge telemetry =====
 drawCornerFrame(canvas, p, w, h, t)
 drawTelemetryTicks(canvas, p, cx, h * 0.045f, w * 0.9f, t)
@@ -461,35 +476,38 @@ private fun drawTelemetryTicks(c: Canvas, p: Paint, cx: Float, y: Float, span: F
     p.clearShadowLayer()
 }
 
-// ===== drawWorldRadar =====
-private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, markers: List<FloatArray>) {
-    val r = 0.78f * rad
-
-    val nAmerica = arrayOf(
+// Continent outlines (normalized 0..1 coords) for the world radar — hoisted to a single shared
+// allocation instead of rebuilding ~37 FloatArrays every wallpaper frame (~30 fps, always-on).
+private val WORLD_CONTINENTS: Array<Array<FloatArray>> = arrayOf(
+    arrayOf( // N. America
         floatArrayOf(0.13f, 0.16f), floatArrayOf(0.27f, 0.16f), floatArrayOf(0.30f, 0.30f),
         floatArrayOf(0.22f, 0.42f), floatArrayOf(0.16f, 0.34f), floatArrayOf(0.12f, 0.24f)
-    )
-    val sAmerica = arrayOf(
+    ),
+    arrayOf( // S. America
         floatArrayOf(0.28f, 0.50f), floatArrayOf(0.34f, 0.50f), floatArrayOf(0.37f, 0.62f),
         floatArrayOf(0.32f, 0.82f), floatArrayOf(0.28f, 0.70f), floatArrayOf(0.27f, 0.58f)
-    )
-    val europe = arrayOf(
+    ),
+    arrayOf( // Europe
         floatArrayOf(0.45f, 0.18f), floatArrayOf(0.55f, 0.18f),
         floatArrayOf(0.54f, 0.30f), floatArrayOf(0.46f, 0.30f)
-    )
-    val africa = arrayOf(
+    ),
+    arrayOf( // Africa
         floatArrayOf(0.46f, 0.32f), floatArrayOf(0.60f, 0.34f), floatArrayOf(0.60f, 0.52f),
         floatArrayOf(0.52f, 0.70f), floatArrayOf(0.47f, 0.52f), floatArrayOf(0.45f, 0.40f)
-    )
-    val asia = arrayOf(
+    ),
+    arrayOf( // Asia
         floatArrayOf(0.55f, 0.14f), floatArrayOf(0.86f, 0.16f), floatArrayOf(0.84f, 0.40f),
         floatArrayOf(0.66f, 0.44f), floatArrayOf(0.58f, 0.32f), floatArrayOf(0.55f, 0.22f)
-    )
-    val australia = arrayOf(
+    ),
+    arrayOf( // Australia
         floatArrayOf(0.78f, 0.62f), floatArrayOf(0.90f, 0.62f),
         floatArrayOf(0.90f, 0.74f), floatArrayOf(0.80f, 0.74f)
     )
-    val continents = arrayOf(nAmerica, sAmerica, europe, africa, asia, australia)
+)
+
+// ===== drawWorldRadar =====
+private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, markers: List<FloatArray>) {
+    val r = 0.78f * rad
 
     fun mapX(nx: Float): Float = cx - r + nx * 2f * r
     fun mapY(ny: Float): Float = cy - r + ny * 2f * r
@@ -551,7 +569,7 @@ private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float
     }
 
     // ---- 4) Continents ----
-    for (poly in continents) {
+    for (poly in WORLD_CONTINENTS) {
         val polyPath = Path()
         polyPath.moveTo(mapX(poly[0][0]), mapY(poly[0][1]))
         var i = 1
