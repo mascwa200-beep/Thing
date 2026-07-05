@@ -112,6 +112,7 @@ class WastelandRenderer {
             val struct = intArrayOf(0x3e, 0x9c, 0x6e)     // scanned-building wireframe (phosphor green)
             val rad = intArrayOf(0x86, 0xff, 0x8e)        // toxic-green (faint hollow pools — used in a later slice)
             val rock = intArrayOf(0x2e, 0x26, 0x1e)       // dark umber rock on steep crag/mesa faces (Ref A)
+            val window = intArrayOf(0xff, 0xd6, 0x8a)     // warm amber lit windows on the silhouette skyline (Ref A/B)
         }
 
         // Render palette repointed onto the mood — all existing colour maths (terrainColor/shadeAndFog/…) key off these.
@@ -751,26 +752,32 @@ class WastelandRenderer {
 
     /**
      * The hero horizon vista (outdoors only): the focal anatomy of the reference paintings — a glowing pale-green
-     * BEACON orb low toward [HERO_AZ_DEG], a graded phosphor HAZE glow around/behind it, and a near-black
-     * SILHOUETTE skyline of ruined buildings + a broadcast TOWER standing in FRONT of the beacon. One baked
-     * TRIANGLES buffer at the far distance (all < the 200 m plane), depth-ordered skyline(176) < beacon(186) <
-     * haze(192) so the dark ruins read against the glow. Static — built once, independent of terrain/footprints.
+     * BEACON orb low toward [HERO_AZ_DEG], a graded phosphor HAZE glow around/behind it, a near-black SILHOUETTE
+     * skyline of ruined buildings (jagged/broken rooflines, scattered warm LIT WINDOWS, occasional antenna spires)
+     * + a broadcast TOWER, and a few foreground POWER POLES (Ref B) standing in FRONT of the beacon. One baked
+     * TRIANGLES buffer at the far distance (all < the 200 m plane), depth-ordered poles(74) < skyline(176) <
+     * beacon(186) < haze(192) so the dark ruins read against the glow. Static — built once, independent of
+     * terrain/footprints. Triangles are collected into lists then emitted exactly, so the variable-count detail
+     * can never desync a hand-counted vertexCount.
      */
     private fun buildHorizonVistaBuffers(): Triple<VertexBuffer, IndexBuffer, Int> {
         val az = Math.toRadians(HERO_AZ_DEG.toDouble())
         val sx = Math.sin(az).toFloat(); val sz = (-Math.cos(az)).toFloat() // beacon horizontal dir (−Z = north)
         val rx = sz; val ry = -sx                                           // horizontal "right", perpendicular
 
-        val vertexCount = BEACON_SEGS * 3 + HAZE_STEPS * 6 + SKY_BLDGS * 6 + 12
-        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
-        val indexData = ByteBuffer.allocate(vertexCount * 2).order(ByteOrder.nativeOrder())
-        var k = 0
-        fun vert(x: Float, y: Float, z: Float, color: Int) {
-            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
-            indexData.putShort(k.toShort()); k++
-        }
+        // Collect the vista's triangles into growing lists, then emit an exactly-sized buffer at the end — so the
+        // variable-count detail (lit windows, jagged rooflines, antennas, power poles) can never desync a
+        // hand-counted vertexCount. Build-time only (called once in setupWorld); the lists cost nothing per frame.
+        val pos = ArrayList<Float>()   // x,y,z per vertex, interleaved
+        val col = ArrayList<Int>()     // one packed colour per vertex
+        fun vert(x: Float, y: Float, z: Float, color: Int) { pos.add(x); pos.add(y); pos.add(z); col.add(color) }
         fun tri(ax: Float, ay: Float, az2: Float, ca: Int, bx: Float, by: Float, bz: Float, cb: Int, cx: Float, cy: Float, cz: Float, cc: Int) {
             vert(ax, ay, az2, ca); vert(bx, by, bz, cb); vert(cx, cy, cz, cc)
+        }
+        // A camera-facing vertical quad: the arc segment (x0,z0)→(x1,z1) extruded from y0 up to y1 (two tris).
+        fun quad(x0: Float, z0: Float, x1: Float, z1: Float, y0: Float, y1: Float, cBase: Int, cTop: Int) {
+            tri(x0, y0, z0, cBase, x1, y0, z1, cBase, x1, y1, z1, cTop)
+            tri(x0, y0, z0, cBase, x1, y1, z1, cTop, x0, y1, z0, cTop)
         }
         fun blend(base: IntArray, toward: IntArray, t: Float): Int =
             packColor(mix(base[0], toward[0], t), mix(base[1], toward[1], t), mix(base[2], toward[2], t))
@@ -818,18 +825,47 @@ class WastelandRenderer {
         val rnd = Random(VISTA_SEED)
         val slot = 2 * skyHalf / SKY_BLDGS
         val darkC = solid(Mood.shadow)
+        val winC = solid(Mood.window)
         for (b in 0 until SKY_BLDGS) {
             val centerA = az - skyHalf + slot * (b + 0.5)
             val wid = slot * (0.55 + rnd.nextDouble() * 0.3) // width < slot → gaps between buildings
-            val h = 5f + rnd.nextFloat() * 15f + (if (rnd.nextFloat() < 0.18f) 12f else 0f)
-            val lit = rnd.nextFloat() < 0.33f
+            val baseH = 5f + rnd.nextFloat() * 15f + (if (rnd.nextFloat() < 0.18f) 12f else 0f)
+            // Jagged/ruined roofline: the two top corners sit at different heights → broken, uneven tops.
+            val hL = baseH * (0.80f + rnd.nextFloat() * 0.20f)
+            val hR = baseH * (0.80f + rnd.nextFloat() * 0.20f)
+            val lit = rnd.nextFloat() < 0.42f
             val baseC = if (lit) blend(Mood.shadow, Mood.struct, 0.22f) else darkC
             val roofC = blend(Mood.shadow, Mood.beacon, if (lit) 0.5f else 0.32f)
             val d0 = dirAt(centerA - wid / 2); val d1 = dirAt(centerA + wid / 2)
             val x0 = d0[0] * R_SKY; val z0 = d0[1] * R_SKY
             val x1 = d1[0] * R_SKY; val z1 = d1[1] * R_SKY
-            tri(x0, SKY_BASE, z0, baseC, x1, SKY_BASE, z1, baseC, x1, h, z1, roofC)
-            tri(x0, SKY_BASE, z0, baseC, x1, h, z1, roofC, x0, h, z0, roofC)
+            tri(x0, SKY_BASE, z0, baseC, x1, SKY_BASE, z1, baseC, x1, hR, z1, roofC)
+            tri(x0, SKY_BASE, z0, baseC, x1, hR, z1, roofC, x0, hL, z0, roofC)
+            // Scattered lit windows — small warm quads a touch in FRONT of the silhouette (depth-test on top).
+            val cols = 3 + rnd.nextInt(3)                        // 3..5 columns
+            val topWin = minOf(hL, hR) - 1.5f
+            val rows = (topWin / 4f).toInt().coerceIn(1, 6)      // ~one row per 4 m
+            val rWin = R_SKY - 1.0f
+            for (ci in 0 until cols) {
+                for (ri in 0 until rows) {
+                    if (rnd.nextFloat() > (if (lit) 0.5f else 0.22f)) continue // most dark → scattered lights
+                    val u = (ci + 0.5) / cols
+                    val v = (ri + 0.5f) / rows
+                    val wa = (centerA - wid / 2) + wid * u
+                    val wHalf = wid * 0.16
+                    val e0 = dirAt(wa - wHalf); val e1 = dirAt(wa + wHalf)
+                    val wy0 = SKY_BASE + (topWin - SKY_BASE) * v
+                    quad(e0[0] * rWin, e0[1] * rWin, e1[0] * rWin, e1[1] * rWin, wy0, wy0 + 1.5f, winC, winC)
+                }
+            }
+            // Occasional antenna/spire on the taller ruins — a thin dark spike, tip catching the beacon glow.
+            if (maxOf(hL, hR) > 15f && rnd.nextFloat() < 0.5f) {
+                val aHalf = wid * 0.05
+                val g0 = dirAt(centerA - aHalf); val g1 = dirAt(centerA + aHalf)
+                val roofH = maxOf(hL, hR)
+                quad(g0[0] * R_SKY, g0[1] * R_SKY, g1[0] * R_SKY, g1[1] * R_SKY,
+                    roofH, roofH + 4f + rnd.nextFloat() * 5f, darkC, blend(Mood.shadow, Mood.beacon, 0.55f))
+            }
         }
         run {
             val tw = Math.toRadians(1.4)
@@ -850,6 +886,36 @@ class WastelandRenderer {
             tri(ex0, towerH, ez0, tipC, ex1, towerH + 7f, ez1, tipC, ex0, towerH + 7f, ez0, tipC)
         }
 
+        // (e) POWER POLES — a few foreground silhouetted utility poles + crossarms (Ref B), standing nearer than
+        //     the skyline so they read as immediate foreground under the beacon. Dark, camera-facing thin quads.
+        run {
+            val poleR = R_SKY * 0.42f            // ~74 m — clearly in front of the skyline (still < 200 m plane)
+            val poles = 4
+            val spread = Math.toRadians(46.0)
+            for (i in 0 until poles) {
+                val pa = az - spread / 2 + spread * i / (poles - 1) + (rnd.nextDouble() - 0.5) * 0.05
+                val pHalf = 0.006                // very thin pole
+                val p0 = dirAt(pa - pHalf); val p1 = dirAt(pa + pHalf)
+                val poleH = 11f + rnd.nextFloat() * 4f
+                quad(p0[0] * poleR, p0[1] * poleR, p1[0] * poleR, p1[1] * poleR, SKY_BASE, poleH, darkC, darkC)
+                // Two horizontal crossarms near the top (a wider, thin band).
+                val aHalf = 0.03
+                val c0 = dirAt(pa - aHalf); val c1 = dirAt(pa + aHalf)
+                val ax0 = c0[0] * poleR; val az0b = c0[1] * poleR
+                val ax1 = c1[0] * poleR; val az1b = c1[1] * poleR
+                quad(ax0, az0b, ax1, az1b, poleH - 1.4f, poleH - 0.9f, darkC, darkC)
+                quad(ax0, az0b, ax1, az1b, poleH - 3.2f, poleH - 2.7f, darkC, darkC)
+            }
+        }
+
+        // Emit exactly what was collected (index == vertex order; USHORT-safe — the vista is a few thousand verts).
+        val vertexCount = col.size
+        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(vertexCount * 2).order(ByteOrder.nativeOrder())
+        for (i in 0 until vertexCount) {
+            vertexData.putFloat(pos[i * 3]).putFloat(pos[i * 3 + 1]).putFloat(pos[i * 3 + 2]).putInt(col[i])
+            indexData.putShort(i.toShort())
+        }
         vertexData.flip(); indexData.flip()
         return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, vertexCount), vertexCount)
     }
