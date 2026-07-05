@@ -15,11 +15,16 @@ private const val MAX_OBS = 1500
 private fun String.clip(n: Int = MAX_OBS): String =
     if (length <= n) this else take(n) + "…[truncated]"
 
+// Compiled once — stripHtml runs on every page the agent fetches.
+private val HTML_SCRIPT_STYLE = Regex("(?is)<(script|style)[^>]*>.*?</\\1>")
+private val HTML_TAG = Regex("<[^>]+>")
+private val HTML_WHITESPACE = Regex("\\s+")
+
 /** Strip HTML to rough plain text. */
 private fun stripHtml(html: String): String =
-    html.replace(Regex("(?is)<(script|style)[^>]*>.*?</\\1>"), " ")
-        .replace(Regex("<[^>]+>"), " ")
-        .replace(Regex("\\s+"), " ")
+    html.replace(HTML_SCRIPT_STYLE, " ")
+        .replace(HTML_TAG, " ")
+        .replace(HTML_WHITESPACE, " ")
         .trim()
 
 /** Keyless web search via DuckDuckGo's Instant-Answer API (limited but no key/account). */

@@ -89,14 +89,14 @@ class TextToSpeechEngine(context: Context) {
      *  Keeps the words; drops emphasis/code/heading/quote/bullet markers and turns links into their text. */
     private fun forSpeech(raw: String): String {
         var t = raw
-        t = t.replace(Regex("```[a-zA-Z0-9]*"), " ")            // code-fence markers
-        t = t.replace("`", "")                                   // inline code ticks
-        t = t.replace(Regex("\\[([^\\]]+)\\]\\([^)]*\\)"), "$1") // [text](url) -> text
-        t = t.replace("*", "")                                   // ** bold ** and * italic *
-        t = t.replace(Regex("(?m)^\\s{0,3}#{1,6}\\s*"), "")      // # headings
-        t = t.replace(Regex("(?m)^\\s{0,3}>\\s?"), "")           // > block quotes
-        t = t.replace(Regex("(?m)^\\s{0,3}[-•]\\s+"), "")        // - / • bullet markers
-        t = t.replace(Regex("[ \\t]{2,}"), " ")                  // collapse runs of spaces
+        t = t.replace(RE_CODE_FENCE, " ")   // code-fence markers
+        t = t.replace("`", "")              // inline code ticks
+        t = t.replace(RE_LINK, "$1")        // [text](url) -> text
+        t = t.replace("*", "")              // ** bold ** and * italic *
+        t = t.replace(RE_HEADING, "")       // # headings
+        t = t.replace(RE_QUOTE, "")         // > block quotes
+        t = t.replace(RE_BULLET, "")        // - / • bullet markers
+        t = t.replace(RE_SPACES, " ")       // collapse runs of spaces
         return t.trim()
     }
 
@@ -124,5 +124,13 @@ class TextToSpeechEngine(context: Context) {
         const val JARVIS_RATE = 0.95f
         // Engine-specific name fragments that tend to denote a male en-GB voice.
         val MALE_HINTS = listOf("gbb", "gbd", "male", "#male")
+
+        // Compiled once — forSpeech runs on every spoken utterance. Regex is immutable/thread-safe.
+        val RE_CODE_FENCE = Regex("```[a-zA-Z0-9]*")
+        val RE_LINK = Regex("\\[([^\\]]+)\\]\\([^)]*\\)")
+        val RE_HEADING = Regex("(?m)^\\s{0,3}#{1,6}\\s*")
+        val RE_QUOTE = Regex("(?m)^\\s{0,3}>\\s?")
+        val RE_BULLET = Regex("(?m)^\\s{0,3}[-•]\\s+")
+        val RE_SPACES = Regex("[ \\t]{2,}")
     }
 }

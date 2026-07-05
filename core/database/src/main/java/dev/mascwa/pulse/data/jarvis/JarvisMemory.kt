@@ -51,13 +51,16 @@ class JarvisMemory(db: JarvisDatabase) {
     suspend fun remember(text: String, source: String = NoteSource.USER): Long =
         notes.insert(AgentNoteEntity(timestamp = System.currentTimeMillis(), noteText = text.trim(), source = source))
 
+    // Compiled once — recall runs on every knowledge query. Regex is immutable/thread-safe.
+    private val TOKEN = Regex("[^a-z0-9]+")
+
     /**
      * Lexically retrieve the notes most relevant to [query]. The query is sanitized into safe FTS
      * MATCH syntax (alphanumeric terms OR-ed together) so arbitrary user text can never break it.
      */
     suspend fun recall(query: String, limit: Int = 5): List<AgentNoteEntity> {
         val match = query.lowercase()
-            .split(Regex("[^a-z0-9]+"))
+            .split(TOKEN)
             .filter { it.length > 2 }
             .distinct()
             .take(8)

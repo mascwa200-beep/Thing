@@ -49,10 +49,13 @@ object ProcedureLibrary {
         "what", "how", "get", "let", "please", "jarvis", "from", "into", "about", "have", "use", "using",
     )
 
+    // Compiled once — keywords runs per procedure recall/observe; Regex is immutable/thread-safe.
+    private val TOKEN = Regex("[^a-z0-9]+")
+
     /** The significant keywords of a request — lowercased, de-stopworded, deduped, capped. Order-independent
      *  so two phrasings of the same goal share a cue. */
     fun keywords(text: String): List<String> =
-        text.lowercase().split(Regex("[^a-z0-9]+"))
+        text.lowercase().split(TOKEN)
             .filter { it.length > 2 && it !in STOPWORDS }
             .distinct()
             .take(MAX_CUE_KEYWORDS)

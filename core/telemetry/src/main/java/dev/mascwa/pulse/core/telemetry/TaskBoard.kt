@@ -43,9 +43,15 @@ object TaskBoard {
     /** Predicates that read as a question/mental-state rather than an actionable task ("i need to know …"). */
     private val DETECT_STOP_VERBS = setOf("know", "understand", "see", "hear", "think")
 
+    // Compiled once — normalize runs inside add/setStatus/remove's O(N) title-match loops, and detect
+    // runs on every user message. Regex is immutable/thread-safe, so object-level sharing is safe.
+    private val WHITESPACE = Regex("\\s+")
+    private val LEADING_FILLER = Regex("(?i)^(ok(ay)?|so|well|right|alright|also|and|um+|uh+)[\\s,]+")
+    private val SENTENCE_SPLIT = Regex("[.!?\\n]")
+
     /** Normalized key for dedupe/matching: lowercase, collapsed whitespace, no surrounding punctuation. */
     fun normalize(text: String): String =
-        text.lowercase().trim().trim('.', '!', ',', ';', ':', '"', '\'').replace(Regex("\\s+"), " ")
+        text.lowercase().trim().trim('.', '!', ',', ';', ':', '"', '\'').replace(WHITESPACE, " ")
 
     /**
      * Add a task, or reaffirm an existing one with the same title (re-adding a completed task reopens
@@ -204,13 +210,11 @@ object TaskBoard {
         val t = text.trim()
         if (t.isEmpty() || t.endsWith("?")) return null
         // Strip a short leading filler so "ok, i need to …" still matches.
-        val stripped = t.replaceFirst(
-            Regex("(?i)^(ok(ay)?|so|well|right|alright|also|and|um+|uh+)[\\s,]+"), "",
-        ).trim()
+        val stripped = t.replaceFirst(LEADING_FILLER, "").trim()
         val lower = stripped.lowercase()
         val cue = DETECT_CUES.firstOrNull { lower.startsWith(it) } ?: return null
         var rest = stripped.substring(cue.length).trim()
-        rest = rest.split(Regex("[.!?\\n]"), limit = 2).first().trim().trimEnd(',', ';', ':')
+        rest = rest.split(SENTENCE_SPLIT, limit = 2).first().trim().trimEnd(',', ';', ':')
         if (rest.length < 3) return null
         val firstWord = rest.substringBefore(' ').lowercase()
         if (firstWord in DETECT_STOP_VERBS) return null

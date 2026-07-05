@@ -147,6 +147,7 @@ class SocialRepository(
     }
 
     private val tagRegex = Regex("<[^>]*>")
+    private val wsRegex = Regex("\\s+")
     private fun stripHtml(s: String) = s.replace(tagRegex, " ").replace("&amp;", "&")
-        .replace("&#39;", "'").replace("&quot;", "\"").replace(Regex("\\s+"), " ").trim()
+        .replace("&#39;", "'").replace("&quot;", "\"").replace(wsRegex, " ").trim()
 }

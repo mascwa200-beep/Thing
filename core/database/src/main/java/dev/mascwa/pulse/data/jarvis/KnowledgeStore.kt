@@ -28,13 +28,16 @@ class KnowledgeStore(db: JarvisDatabase) {
         return chunks.size
     }
 
+    // Compiled once — search runs on every knowledge query. Regex is immutable/thread-safe.
+    private val TOKEN = Regex("[^a-z0-9]+")
+
     /**
      * Lexically retrieve the chunks most relevant to [query]. The query is sanitized into safe FTS
      * MATCH syntax (quoted alphanumeric terms OR-ed together) so arbitrary text can't break it.
      */
     suspend fun search(query: String, limit: Int = 5): List<KnowledgeDocEntity> {
         val match = query.lowercase()
-            .split(Regex("[^a-z0-9]+"))
+            .split(TOKEN)
             .filter { it.length > 2 }
             .distinct()
             .take(8)
