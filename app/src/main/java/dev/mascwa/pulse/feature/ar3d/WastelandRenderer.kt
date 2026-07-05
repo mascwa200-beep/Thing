@@ -78,11 +78,16 @@ class WastelandRenderer {
         /** Real-footprint building cap so the wireframe index buffer stays within USHORT range. */
         private const val MAX_BUILDING_VERTS = 60_000
 
-        /** Baked shading: a fixed "sun" direction (roughly upper-left) + how dark the shadow side gets. */
-        private const val SUN_X = -0.42f
-        private const val SUN_Y = 0.82f
-        private const val SUN_Z = -0.40f
-        private const val AMBIENT = 0.46f            // 0 = pitch-black shadows, 1 = flat/unshaded
+        // Baked shading: a LOW "sun" aimed toward the beacon (grazing backlight) → crests facing the horizon
+        // catch the glow, everything else crushes to near-black, for the references' backlit chiaroscuro. All
+        // tunable — if the ground reads too dark on the Pixel, lift AMBIENT / drop SHADE_GAMMA.
+        private const val SUN_X = -0.40f             // ≈ the beacon's horizontal direction (HERO_AZ)
+        private const val SUN_Y = 0.33f              // low → grazing backlight, flat ground sits in shadow
+        private const val SUN_Z = -0.855f
+        private const val AMBIENT = 0.24f            // 0 = pitch-black shadows, 1 = flat/unshaded
+        private const val SHADE_GAMMA = 1.35f        // punchier light→dark falloff (chiaroscuro)
+        private const val RIM_STRENGTH = 0.85f       // how strongly FAR beacon-facing crests catch the glow
+        private const val HOLLOW_SINK = 0.45f        // how far local dips sink toward near-black
 
         /** Atmospheric haze: distant geometry lerps toward [FOG] between these radii (metres). */
         private const val FOG_START = 24f
@@ -510,17 +515,35 @@ class WastelandRenderer {
         return ((d - FOG_START) / (FOG_END - FOG_START)).coerceIn(0f, 1f)
     }
 
-    /** Fold [shade] (0..1) and the (x,z) haze into a base RGB triple → a packed opaque colour. */
-    private fun shadeAndFog(base: IntArray, shade: Float, x: Float, z: Float): Int {
-        var r = (base[0] * shade).toInt()
-        var g = (base[1] * shade).toInt()
-        var b = (base[2] * shade).toInt()
-        val f = fogAmount(x, z)
-        r = mix(r, FOG[0], f); g = mix(g, FOG[1], f); b = mix(b, FOG[2], f)
-        return packColor(r, g, b)
+    /**
+     * The haze colour at (x,z): plain [FOG] away from the beacon, brightening toward [Mood.beacon] as the
+     * point's bearing nears [HERO_AZ_DEG] — so the hazy horizon GLOWS toward the beacon, matching the vista.
+     */
+    private fun fogTarget(x: Float, z: Float): IntArray {
+        val azp = Math.toDegrees(Math.atan2(x.toDouble(), (-z).toDouble()))
+        var d = Math.abs(azp - HERO_AZ_DEG) % 360.0
+        if (d > 180.0) d = 360.0 - d
+        val t = (1.0 - d / 90.0).coerceIn(0.0, 1.0).toFloat().let { it * it * 0.5f }
+        return intArrayOf(mix(FOG[0], Mood.beacon[0], t), mix(FOG[1], Mood.beacon[1], t), mix(FOG[2], Mood.beacon[2], t))
     }
 
-    /** Slope-shaded terrain colour: base tone lerps low→high by height, times the sun term, then hazed. */
+    /** Fold [shade] (0..1) into a base RGB triple, then haze toward the beacon-biased fog target. */
+    private fun shadeAndFog(base: IntArray, shade: Float, x: Float, z: Float): Int {
+        val f = fogAmount(x, z)
+        val ft = fogTarget(x, z)
+        return packColor(
+            mix((base[0] * shade).toInt(), ft[0], f),
+            mix((base[1] * shade).toInt(), ft[1], f),
+            mix((base[2] * shade).toInt(), ft[2], f),
+        )
+    }
+
+    /**
+     * Backlit terrain colour: base tone lerps low→high by height (local hollows sunk toward near-black), times
+     * a grazing-sun term (gamma-punched → deep shadow), with FAR beacon-facing crests catching a [Mood.beacon]
+     * rim (fog-weighted so distant ridges glow most = the silhouetted-mesa-against-orb read), then hazed toward
+     * the beacon-biased fog. The chiaroscuro that turns the flat khaki dunes into the reference paintings.
+     */
     private fun terrainColor(x: Float, z: Float, h: Float): Int {
         val e = 1.0f
         val dhx = groundHeight(x + e, z) - groundHeight(x - e, z)
@@ -528,12 +551,24 @@ class WastelandRenderer {
         val nx = -dhx; val ny = 2f * e; val nz = -dhz
         val nlen = Math.sqrt((nx * nx + ny * ny + nz * nz).toDouble()).toFloat().coerceAtLeast(1e-3f)
         val ndotl = ((nx * SUN_X + ny * SUN_Y + nz * SUN_Z) / nlen).coerceAtLeast(0f)
-        val shade = AMBIENT + (1f - AMBIENT) * ndotl
+        val ndotlG = Math.pow(ndotl.toDouble(), SHADE_GAMMA.toDouble()).toFloat()
+        val shade = AMBIENT + (1f - AMBIENT) * ndotlG
+        // Base tone low→high by height, then sink local dips (anchored dune relief, NOT DEM height) toward shadow.
         val ht = ((h + 4f) / 8f).coerceIn(0f, 1f)
-        val baseR = mix(DUST_LOW[0], DUST_HIGH[0], ht)
-        val baseG = mix(DUST_LOW[1], DUST_HIGH[1], ht)
-        val baseB = mix(DUST_LOW[2], DUST_HIGH[2], ht)
-        return shadeAndFog(intArrayOf(baseR, baseG, baseB), shade, x, z)
+        val dip = ((dune0 - rawDune(x, z)) / 3f).coerceIn(0f, 1f) * HOLLOW_SINK
+        val baseR = mix(mix(DUST_LOW[0], DUST_HIGH[0], ht), Mood.shadow[0], dip)
+        val baseG = mix(mix(DUST_LOW[1], DUST_HIGH[1], ht), Mood.shadow[1], dip)
+        val baseB = mix(mix(DUST_LOW[2], DUST_HIGH[2], ht), Mood.shadow[2], dip)
+        // Shade, then add the backlit beacon rim on far, beacon-facing slopes.
+        val fog = fogAmount(x, z)
+        val rim = (ndotlG * fog * RIM_STRENGTH).coerceIn(0f, 0.7f)
+        var r = mix((baseR * shade).toInt(), Mood.beacon[0], rim)
+        var g = mix((baseG * shade).toInt(), Mood.beacon[1], rim)
+        var b = mix((baseB * shade).toInt(), Mood.beacon[2], rim)
+        // Haze toward the beacon-biased fog target.
+        val ft = fogTarget(x, z)
+        r = mix(r, ft[0], fog); g = mix(g, ft[1], fog); b = mix(b, ft[2], fog)
+        return packColor(r, g, b)
     }
 
     private val vertexSize = 3 * 4 + 4 // FLOAT3 position + UBYTE4 colour
