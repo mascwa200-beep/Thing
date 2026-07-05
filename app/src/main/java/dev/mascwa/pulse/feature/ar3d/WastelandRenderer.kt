@@ -88,14 +88,42 @@ class WastelandRenderer {
         private const val FOG_START = 24f
         private const val FOG_END = 58f
 
-        // Fallout-weathered palette. Colours are packed ABGR (0xAABBGGRR) so the little-endian putInt into the
-        // UBYTE4 COLOR attribute reads back as correct RGBA — the [packColor] helper handles the swap; these are
-        // plain RGB triples. Alpha is ALWAYS 0xFF so geometry stays opaque over the camera.
-        private val DUST_LOW = intArrayOf(0x3e, 0x39, 0x2a)    // hollows / low ground (dark olive-brown)
-        private val DUST_HIGH = intArrayOf(0x9c, 0x8c, 0x5c)   // sun-catching ridges (faded khaki)
-        private val STRUCT = intArrayOf(0xE8, 0xA8, 0x3C)      // structure wireframe (Pip-Boy amber)
-        private val GHOST = intArrayOf(0x63, 0x74, 0x4c)       // indoor ground-ghost wire (dim mossy phosphor)
-        private val FOG = intArrayOf(0xb6, 0xac, 0x8e)         // hazy horizon tone (dusty tan)
+        // --- Fallout mood palette (GREEN_NIGHT primary — the Ref-A "green night" wasteland) ---
+        // Colours are plain RGB triples; [packColor] swaps them into the UBYTE4 ABGR attribute (alpha always
+        // 0xFF → opaque over the camera). To ship the Ref-B "amber dusk" look later, swap these SEVEN values
+        // (no other code changes) or gate a second set behind a flag — every colour path keys off [Mood].
+        private object Mood {
+            val shadow = intArrayOf(0x06, 0x10, 0x0c)     // near-black teal — deep shadow / silhouettes
+            val lowGround = intArrayOf(0x12, 0x24, 0x1b)  // dark green-teal hollows
+            val highGround = intArrayOf(0x46, 0x74, 0x54) // muted phosphor-green sun-catching ridges
+            val haze = intArrayOf(0x2c, 0x5e, 0x54)       // phosphor-teal horizon haze
+            val beacon = intArrayOf(0xcf, 0xf2, 0xd6)     // bright pale green-white beacon / rim light
+            val struct = intArrayOf(0x3e, 0x9c, 0x6e)     // scanned-building wireframe (phosphor green)
+            val rad = intArrayOf(0x86, 0xff, 0x8e)        // toxic-green (faint hollow pools — used in a later slice)
+        }
+
+        // Render palette repointed onto the mood — all existing colour maths (terrainColor/shadeAndFog/…) key off these.
+        private val DUST_LOW = Mood.lowGround   // hollows / low ground
+        private val DUST_HIGH = Mood.highGround // sun-catching ridges
+        private val STRUCT = Mood.struct        // structure wireframe
+        private val GHOST = intArrayOf(0x2a, 0x4c, 0x3a) // indoor ground-ghost wire (dim green-teal)
+        private val FOG = Mood.haze             // hazy horizon tone
+
+        // --- Hero horizon vista: a glowing beacon + silhouetted ruin skyline low toward [HERO_AZ_DEG] ---
+        /** Compass bearing the beacon sits at (PUBLIC — the ArScreen Compose bloom aligns to it). */
+        const val HERO_AZ_DEG = 335f
+        /** The beacon's elevation above the horizon in degrees (for the Compose bloom placement). */
+        const val HERO_ELEV_DEG = 9f
+        private const val R_BEACON = 186f       // beacon orb distance (all < the 200 m far plane)
+        private const val R_SKY = 176f          // skyline sits IN FRONT of the beacon (depth-ordered)
+        private const val R_HAZE = 192f         // haze glow behind the beacon
+        private const val BEACON_Y = 30f        // beacon centre height → ~9° above the horizon at R_BEACON
+        private const val ORB_R = 46f           // beacon orb radius (world units at R_BEACON)
+        private const val SKY_BASE = -3f        // vista base a touch below the horizon (no seam)
+        private const val BEACON_SEGS = 48
+        private const val HAZE_STEPS = 36
+        private const val SKY_BLDGS = 20
+        private const val VISTA_SEED = 0x5A17L
     }
 
     private lateinit var engine: Engine
@@ -111,6 +139,8 @@ class WastelandRenderer {
     private lateinit var groundGridIb: IndexBuffer
     private lateinit var buildingVb: VertexBuffer
     private lateinit var buildingIb: IndexBuffer
+    private lateinit var heroVb: VertexBuffer      // hero horizon vista (beacon + skyline), built once, static
+    private lateinit var heroIb: IndexBuffer
     private lateinit var uiHelper: UiHelper
     private lateinit var displayHelper: DisplayHelper
 
@@ -120,6 +150,7 @@ class WastelandRenderer {
     private var terrainIndexCount = 0
     private var groundGridIndexCount = 0
     private var buildingIndexCount = 0
+    private var heroIndexCount = 0
     private var started = false
 
     // Ground mode: false = outdoors (solid terrain floor), true = indoors (wireframe ground ghost only). The
@@ -176,6 +207,8 @@ class WastelandRenderer {
         engine.destroyIndexBuffer(groundGridIb)
         engine.destroyVertexBuffer(buildingVb)
         engine.destroyIndexBuffer(buildingIb)
+        engine.destroyVertexBuffer(heroVb)
+        engine.destroyIndexBuffer(heroIb)
         engine.destroyMaterial(material)
         engine.destroyRenderer(renderer)
         engine.destroyView(view)
@@ -217,6 +250,10 @@ class WastelandRenderer {
         groundGridVb = g.first; groundGridIb = g.second; groundGridIndexCount = g.third
         val b = buildProceduralBuildingBuffers()
         buildingVb = b.first; buildingIb = b.second; buildingIndexCount = b.third
+        // The hero horizon vista is a static far backdrop — built ONCE, re-referenced (never rebuilt) across
+        // setIndoor/setBuildings/setElevation, freed in detach().
+        val h = buildHorizonVistaBuffers()
+        heroVb = h.first; heroIb = h.second; heroIndexCount = h.third
 
         // Honour an indoor/outdoor read that arrived before the surface was ready.
         pendingIndoor?.let { indoor = it; pendingIndoor = null }
@@ -230,10 +267,10 @@ class WastelandRenderer {
     }
 
     /**
-     * (Re)build the single renderable's two primitives from the current [indoor] flag: primitive 0 is the
-     * ground — a solid TRIANGLES floor outdoors, a wireframe LINES ghost indoors — and primitive 1 is always
-     * the wireframe structures. All buffers are pre-built in [setupWorld]; switching modes only swaps which
-     * ground buffer primitive 0 points at, so it's cheap. Main-thread only.
+     * (Re)build the renderable from the current [indoor] flag: primitive 0 is the ground (solid TRIANGLES floor
+     * outdoors, wireframe LINES ghost indoors), primitive 1 the wireframe structures, and — OUTDOORS ONLY —
+     * primitive 2 the hero horizon vista (beacon + skyline). All buffers are pre-built in [setupWorld]; this
+     * only re-references them, so mode switches are cheap. Main-thread only.
      */
     private fun rebuildRenderable() {
         if (renderable != 0) {
@@ -242,9 +279,10 @@ class WastelandRenderer {
             EntityManager.get().destroy(renderable)
         }
         renderable = EntityManager.get().create()
-        val builder = RenderableManager.Builder(2)
-            // Centred over the terrain in X/Z; tall enough in Y to enclose the structures (culling is off).
-            .boundingBox(Box(0.0f, 12.0f, 0.0f, WORLD_HALF, 30.0f, WORLD_HALF))
+        val primCount = if (indoor) 2 else 3 // outdoors adds the hero vista as primitive 2
+        val builder = RenderableManager.Builder(primCount)
+            // Wide enough in X/Z + Y to enclose the far horizon vista (~192 m) so it's never frustum-culled.
+            .boundingBox(Box(0.0f, 40.0f, 0.0f, 200.0f, 90.0f, 200.0f))
             .material(0, materialInstance)
             .material(1, materialInstance)
             .culling(false) // no back-face culling → winding order never hides a face (safe for baked geometry)
@@ -254,6 +292,10 @@ class WastelandRenderer {
             builder.geometry(0, PrimitiveType.TRIANGLES, terrainVb, terrainIb, 0, terrainIndexCount)
         }
         builder.geometry(1, PrimitiveType.LINES, buildingVb, buildingIb, 0, buildingIndexCount)
+        if (!indoor) {
+            builder.material(2, materialInstance)
+            builder.geometry(2, PrimitiveType.TRIANGLES, heroVb, heroIb, 0, heroIndexCount)
+        }
         builder.build(engine, renderable)
         scene.addEntity(renderable)
     }
@@ -629,6 +671,111 @@ class WastelandRenderer {
         }
         vertexData.flip(); indexData.flip()
         return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, indexCount), indexCount)
+    }
+
+    /**
+     * The hero horizon vista (outdoors only): the focal anatomy of the reference paintings — a glowing pale-green
+     * BEACON orb low toward [HERO_AZ_DEG], a graded phosphor HAZE glow around/behind it, and a near-black
+     * SILHOUETTE skyline of ruined buildings + a broadcast TOWER standing in FRONT of the beacon. One baked
+     * TRIANGLES buffer at the far distance (all < the 200 m plane), depth-ordered skyline(176) < beacon(186) <
+     * haze(192) so the dark ruins read against the glow. Static — built once, independent of terrain/footprints.
+     */
+    private fun buildHorizonVistaBuffers(): Triple<VertexBuffer, IndexBuffer, Int> {
+        val az = Math.toRadians(HERO_AZ_DEG.toDouble())
+        val sx = Math.sin(az).toFloat(); val sz = (-Math.cos(az)).toFloat() // beacon horizontal dir (−Z = north)
+        val rx = sz; val ry = -sx                                           // horizontal "right", perpendicular
+
+        val vertexCount = BEACON_SEGS * 3 + HAZE_STEPS * 6 + SKY_BLDGS * 6 + 12
+        val vertexData = ByteBuffer.allocate(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        val indexData = ByteBuffer.allocate(vertexCount * 2).order(ByteOrder.nativeOrder())
+        var k = 0
+        fun vert(x: Float, y: Float, z: Float, color: Int) {
+            vertexData.putFloat(x).putFloat(y).putFloat(z).putInt(color)
+            indexData.putShort(k.toShort()); k++
+        }
+        fun tri(ax: Float, ay: Float, az2: Float, ca: Int, bx: Float, by: Float, bz: Float, cb: Int, cx: Float, cy: Float, cz: Float, cc: Int) {
+            vert(ax, ay, az2, ca); vert(bx, by, bz, cb); vert(cx, cy, cz, cc)
+        }
+        fun blend(base: IntArray, toward: IntArray, t: Float): Int =
+            packColor(mix(base[0], toward[0], t), mix(base[1], toward[1], t), mix(base[2], toward[2], t))
+        fun solid(c: IntArray): Int = packColor(c[0], c[1], c[2])
+        fun dirAt(a: Double): FloatArray = floatArrayOf(Math.sin(a).toFloat(), (-Math.cos(a)).toFloat())
+
+        // (a) HAZE band behind the beacon (±60°, horizon→up) — glows toward the beacon at the bottom-centre,
+        //     fading to plain haze at the edges and near-black up top. Drawn first (farthest); z-test layers it.
+        val hazeHalf = Math.toRadians(60.0)
+        val hazeTop = 82f
+        val topC = solid(Mood.shadow)
+        for (j in 0 until HAZE_STEPS) {
+            val a0 = az - hazeHalf + 2 * hazeHalf * j / HAZE_STEPS
+            val a1 = az - hazeHalf + 2 * hazeHalf * (j + 1) / HAZE_STEPS
+            val d0 = dirAt(a0); val d1 = dirAt(a1)
+            val g0 = (1f - Math.abs(a0 - az).toFloat() / hazeHalf.toFloat()).coerceIn(0f, 1f)
+            val g1 = (1f - Math.abs(a1 - az).toFloat() / hazeHalf.toFloat()).coerceIn(0f, 1f)
+            val b0 = blend(Mood.haze, Mood.beacon, g0 * g0 * 0.7f)
+            val b1 = blend(Mood.haze, Mood.beacon, g1 * g1 * 0.7f)
+            val x0 = d0[0] * R_HAZE; val z0 = d0[1] * R_HAZE
+            val x1 = d1[0] * R_HAZE; val z1 = d1[1] * R_HAZE
+            tri(x0, SKY_BASE, z0, b0, x1, SKY_BASE, z1, b1, x1, hazeTop, z1, topC)
+            tri(x0, SKY_BASE, z0, b0, x1, hazeTop, z1, topC, x0, hazeTop, z0, topC)
+        }
+
+        // (b) BEACON orb — a billboarded bright-core → haze-rim fan facing the camera at R_BEACON.
+        val bcx = sx * R_BEACON; val bcz = sz * R_BEACON
+        val coreC = solid(Mood.beacon)
+        val rimC = blend(Mood.beacon, Mood.haze, 0.72f)
+        for (i in 0 until BEACON_SEGS) {
+            val a0 = 2.0 * Math.PI * i / BEACON_SEGS
+            val a1 = 2.0 * Math.PI * (i + 1) / BEACON_SEGS
+            val c0 = (Math.cos(a0) * ORB_R).toFloat(); val s0 = (Math.sin(a0) * ORB_R).toFloat()
+            val c1 = (Math.cos(a1) * ORB_R).toFloat(); val s1 = (Math.sin(a1) * ORB_R).toFloat()
+            tri(
+                bcx, BEACON_Y, bcz, coreC,
+                bcx + rx * c0, BEACON_Y + s0, bcz + ry * c0, rimC,
+                bcx + rx * c1, BEACON_Y + s1, bcz + ry * c1, rimC,
+            )
+        }
+
+        // (c) SILHOUETTE skyline — near-black ruined buildings IN FRONT of the beacon, roofline rim-lit by the
+        //     glow; a seeded third read as dimly "lit". Then a tall broadcast TOWER at HERO_AZ with a bright tip.
+        val skyHalf = Math.toRadians(55.0)
+        val rnd = Random(VISTA_SEED)
+        val slot = 2 * skyHalf / SKY_BLDGS
+        val darkC = solid(Mood.shadow)
+        for (b in 0 until SKY_BLDGS) {
+            val centerA = az - skyHalf + slot * (b + 0.5)
+            val wid = slot * (0.55 + rnd.nextDouble() * 0.3) // width < slot → gaps between buildings
+            val h = 5f + rnd.nextFloat() * 15f + (if (rnd.nextFloat() < 0.18f) 12f else 0f)
+            val lit = rnd.nextFloat() < 0.33f
+            val baseC = if (lit) blend(Mood.shadow, Mood.struct, 0.22f) else darkC
+            val roofC = blend(Mood.shadow, Mood.beacon, if (lit) 0.5f else 0.32f)
+            val d0 = dirAt(centerA - wid / 2); val d1 = dirAt(centerA + wid / 2)
+            val x0 = d0[0] * R_SKY; val z0 = d0[1] * R_SKY
+            val x1 = d1[0] * R_SKY; val z1 = d1[1] * R_SKY
+            tri(x0, SKY_BASE, z0, baseC, x1, SKY_BASE, z1, baseC, x1, h, z1, roofC)
+            tri(x0, SKY_BASE, z0, baseC, x1, h, z1, roofC, x0, h, z0, roofC)
+        }
+        run {
+            val tw = Math.toRadians(1.4)
+            val d0 = dirAt(az - tw); val d1 = dirAt(az + tw)
+            val x0 = d0[0] * R_SKY; val z0 = d0[1] * R_SKY
+            val x1 = d1[0] * R_SKY; val z1 = d1[1] * R_SKY
+            val towerH = 54f
+            val tipRim = blend(Mood.shadow, Mood.beacon, 0.6f)
+            tri(x0, SKY_BASE, z0, darkC, x1, SKY_BASE, z1, darkC, x1, towerH, z1, tipRim)
+            tri(x0, SKY_BASE, z0, darkC, x1, towerH, z1, tipRim, x0, towerH, z0, tipRim)
+            // bright tip glint (the broadcast beacon / "38" light)
+            val cw = tw * 2.4
+            val e0 = dirAt(az - cw); val e1 = dirAt(az + cw)
+            val ex0 = e0[0] * R_SKY; val ez0 = e0[1] * R_SKY
+            val ex1 = e1[0] * R_SKY; val ez1 = e1[1] * R_SKY
+            val tipC = coreC
+            tri(ex0, towerH, ez0, tipC, ex1, towerH, ez1, tipC, ex1, towerH + 7f, ez1, tipC)
+            tri(ex0, towerH, ez0, tipC, ex1, towerH + 7f, ez1, tipC, ex0, towerH + 7f, ez0, tipC)
+        }
+
+        vertexData.flip(); indexData.flip()
+        return Triple(buildVertexBuffer(vertexData, vertexCount), buildIndexBuffer(indexData, vertexCount), vertexCount)
     }
 
     private inner class FrameCallback : Choreographer.FrameCallback {
