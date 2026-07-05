@@ -69,6 +69,9 @@ data class GameMetrics(
     val elevationM: Int = 0,
     val stepsTotal: Int = 0,
     val cellsExplored: Int = 0,
+    // LocationKind.names of place-kinds physically reached (for VISIT_KIND quest completion; no achievement
+    // keys off it — carried here only so the one QuestMetrics snapshot reads from the one GameMetrics bag).
+    val visitedKinds: Set<String> = emptySet(),
 ) {
     fun value(m: AchMetric): Int = when (m) {
         AchMetric.LEVEL -> level

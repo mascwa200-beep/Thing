@@ -20,6 +20,7 @@ data class QuestMetrics(
     val places: Int = 0,                  // distinct real places reached
     val day: Int = 1,                     // wasteland day (absolute)
     val pendingTasks: Set<String> = emptySet(), // titles of tasks still open
+    val visitedKinds: Set<String> = emptySet(), // LocationKind.names of place-kinds physically reached
 )
 
 /** An issued quest, frozen with the metric baseline captured when it appeared. */
@@ -52,7 +53,14 @@ object QuestLog {
         QuestGoal.WALK_DISTANCE -> (m.distanceM - a.baseDistanceM).coerceAtLeast(0)
         QuestGoal.WIN_ENCOUNTERS -> (m.wins - a.baseWins).coerceAtLeast(0)
         QuestGoal.VENTURE -> (m.ventures - a.baseVentures).coerceAtLeast(0)
-        QuestGoal.VISIT_KIND -> (m.places - a.basePlaces).coerceAtLeast(0)
+        QuestGoal.VISIT_KIND -> {
+            // Complete only when the quest's SPECIFIC kind of place has been physically reached — not any
+            // place. A legacy quest with no targetKey (persisted before this field) keeps the old any-place
+            // delta so it can still finish. Per-kind ids mean each kind can only ever pay out once.
+            val key = a.quest.targetKey
+            if (key == null) (m.places - a.basePlaces).coerceAtLeast(0)
+            else if (key in m.visitedKinds) 1 else 0
+        }
         QuestGoal.SURVIVE_DAYS -> m.day
         QuestGoal.COMPLETE_TASK -> {
             val title = a.quest.source.removePrefix(TASK_PREFIX)

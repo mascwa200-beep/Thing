@@ -35,6 +35,10 @@ data class Quest(
     val source: String,
     val rewardCaps: Int,
     val rewardXp: Int,
+    // For VISIT_KIND quests only: the LocationKind.name the player must physically reach. Null on every
+    // other goal (and on legacy VISIT_KIND quests persisted before this field existed → they fall back to
+    // the old any-place completion). This is what makes "visit a TRADER" complete on a TRADER, not any place.
+    val targetKey: String? = null,
 )
 
 /** Everything the director knows about you + your world right now. */
@@ -124,6 +128,7 @@ object StoryDirector {
                 brief = "A ${kind.title.lowercase()} (${kind.role}) is within reach. Get there in person and deal.",
                 goal = QuestGoal.VISIT_KIND, target = 1, kind = QuestKind.SIDE,
                 source = "Nearby: ${kind.title}", rewardCaps = 20, rewardXp = 25,
+                targetKey = kind.name, // complete only when THIS kind of place is physically reached
             )
         }
 
