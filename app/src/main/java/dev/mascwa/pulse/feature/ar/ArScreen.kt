@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -66,6 +68,7 @@ import dev.mascwa.pulse.feature.tacnet.crtScanlines
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import java.util.concurrent.Executors
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -151,6 +154,13 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
         // Placed early so the Compose HUD chrome (drawn after) stays tappable through the surface's clear pixels.
         if (hasCamera) {
             FilamentLayer(heading, pitch, indoor, localBuildings, elevation, Modifier.fillMaxSize())
+        }
+
+        // Fallout hero beacon glow — a soft additive halo over the Filament beacon so the opaque orb reads as
+        // emitting light. Outdoors only (the beacon is drawn only outdoors); under the site labels + HUD so
+        // those stay crisp. Fades out as you turn away from the beacon's bearing.
+        if (hasCamera && !indoor) {
+            HeroBeaconBloom(heading, pitch, Modifier.fillMaxSize())
         }
 
         // Nearest engage-able site (for the readout + radar highlight).
@@ -371,6 +381,38 @@ private fun FilamentLayer(
             }
         },
     )
+}
+
+/**
+ * A soft additive glow over the Filament hero beacon so the opaque orb reads as *emitting* light (the material
+ * can't truly bloom). Aligns to [WastelandRenderer.HERO_AZ_DEG] / [WastelandRenderer.HERO_ELEV_DEG] via the
+ * same magic-window projection as the site markers, and fades out as the beacon leaves the view.
+ */
+@Composable
+private fun HeroBeaconBloom(heading: Float, pitch: Float, modifier: Modifier) {
+    val az = WastelandRenderer.HERO_AZ_DEG.toDouble()
+    val rel = abs(ArProjection.relativeBearing(heading.toDouble(), az))
+    if (rel > 46.0) return // beacon well out of view → no glow
+    val fade = (1f - (rel / 46.0).toFloat()).coerceIn(0f, 1f)
+    val xFrac = ArProjection.screenX(heading.toDouble(), az).toFloat().coerceIn(-0.3f, 1.3f)
+    val yFrac = ArProjection.screenY(pitch.toDouble(), WastelandRenderer.HERO_ELEV_DEG.toDouble())
+        .toFloat().coerceIn(0f, 1f)
+    val glow = Color(0xFF9CF0C0) // pale phosphor green (matches the baked beacon)
+    Canvas(modifier) {
+        val c = Offset(xFrac * size.width, yFrac * size.height)
+        val r = size.minDimension * 0.6f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0f to glow.copy(alpha = 0.38f * fade),
+                    0.45f to glow.copy(alpha = 0.14f * fade),
+                    1f to Color.Transparent,
+                ),
+                center = c, radius = r,
+            ),
+            radius = r, center = c, blendMode = BlendMode.Plus,
+        )
+    }
 }
 
 /** A floating site card in Pip-Boy chrome, tinted by threat, sized by distance. */
