@@ -6,6 +6,8 @@ import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.contentOrNull
@@ -35,7 +37,8 @@ class SocialRepository(
         val key = "social_lemmy_$instance"
         return cachedJson(key, force, SocialFeed.serializer()) {
             val url = "https://$instance/api/v3/post/list?sort=Active&type_=All&limit=30"
-            val posts = http.json.parseToJsonElement(http.getString(url))
+            val text = http.getString(url)
+            val posts = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }
                 .jsonObject["posts"]?.jsonArray ?: return@cachedJson SocialFeed(emptyList())
             SocialFeed(posts.mapNotNull { el ->
                 val o = el.jsonObject
@@ -63,9 +66,8 @@ class SocialRepository(
         val key = "social_mastodon_$instance"
         return cachedJson(key, force, MastodonTrends.serializer()) {
             val tags = runCatching {
-                val arr = http.json.parseToJsonElement(
-                    http.getString("https://$instance/api/v1/trends/tags?limit=20"),
-                ).jsonArray
+                val text = http.getString("https://$instance/api/v1/trends/tags?limit=20")
+                val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
                 arr.mapNotNull { el ->
                     val o = el.jsonObject
                     val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -76,9 +78,8 @@ class SocialRepository(
             }.getOrDefault(emptyList())
 
             val statuses = runCatching {
-                val arr = http.json.parseToJsonElement(
-                    http.getString("https://$instance/api/v1/trends/statuses?limit=20"),
-                ).jsonArray
+                val text = http.getString("https://$instance/api/v1/trends/statuses?limit=20")
+                val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
                 arr.mapNotNull { el ->
                     val o = el.jsonObject
                     val link = o["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -110,9 +111,8 @@ class SocialRepository(
                 ids.map { id ->
                     async {
                         runCatching {
-                            val o = http.json.parseToJsonElement(
-                                http.getString("https://hacker-news.firebaseio.com/v0/item/$id.json"),
-                            ).jsonObject
+                            val text = http.getString("https://hacker-news.firebaseio.com/v0/item/$id.json")
+                            val o = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
                             val title = o["title"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
                             val link = o["url"]?.jsonPrimitive?.contentOrNull ?: "https://news.ycombinator.com/item?id=$id"
                             val score = o["score"]?.jsonPrimitive?.intOrNull ?: 0

@@ -3,6 +3,8 @@ package dev.mascwa.pulse.data.ar
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.BuildingFootprints
 import dev.mascwa.pulse.core.telemetry.ElevationField
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -44,7 +46,7 @@ class ElevationRepository(
             "&longitude=" + URLEncoder.encode(lons.toString(), "UTF-8")
         return runCatching {
             val text = http.getString(url)
-            val arr = http.json.parseToJsonElement(text).jsonObject["elevation"]?.jsonArray
+            val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["elevation"]?.jsonArray
                 ?: return@runCatching null
             if (arr.size != n * n) return@runCatching null
             val elev = FloatArray(n * n)

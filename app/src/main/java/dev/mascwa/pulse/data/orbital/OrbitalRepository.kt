@@ -6,6 +6,8 @@ import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -71,7 +73,7 @@ class OrbitalRepository(
 
     private suspend fun loadIss(): IssPosition {
         val text = http.getString("https://api.wheretheiss.at/v1/satellites/25544")
-        val obj = http.json.parseToJsonElement(text).jsonObject
+        val obj = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
         fun d(k: String) = obj[k]?.jsonPrimitive?.doubleOrNull
         return IssPosition(
             latitude = d("latitude") ?: 0.0,
@@ -83,7 +85,8 @@ class OrbitalRepository(
 
     private suspend fun loadSun(lat: Double, lon: Double): SunTimes {
         val url = "https://api.sunrise-sunset.org/json?lat=$lat&lng=$lon&formatted=0"
-        val obj = http.json.parseToJsonElement(http.getString(url)).jsonObject
+        val text = http.getString(url)
+        val obj = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
         val results = obj["results"]?.jsonObject ?: return SunTimes(null, null, null)
         fun iso(k: String) = results[k]?.jsonPrimitive?.contentOrNull?.let(::parseIso)
         val dayLen = results["day_length"]?.jsonPrimitive?.let {
@@ -97,7 +100,8 @@ class OrbitalRepository(
             timeZone = TimeZone.getTimeZone("UTC")
         }.format(System.currentTimeMillis())
         val url = "https://api.nasa.gov/neo/rest/v1/feed?start_date=$today&end_date=$today&api_key=$apiKey"
-        val root = http.json.parseToJsonElement(http.getString(url)).jsonObject
+        val text = http.getString(url)
+        val root = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
         val byDate = root["near_earth_objects"]?.jsonObject ?: return emptyList()
         val list = byDate[today]?.jsonArray ?: byDate.values.firstOrNull()?.jsonArray ?: return emptyList()
         return list.mapNotNull { el ->

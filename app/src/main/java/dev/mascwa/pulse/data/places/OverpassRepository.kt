@@ -4,6 +4,8 @@ import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.Geo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -80,7 +82,7 @@ class OverpassRepository(
         """.trimIndent()
         val url = "https://overpass-api.de/api/interpreter?data=" + URLEncoder.encode(ql, "UTF-8")
         val text = http.getString(url)
-        val elements = http.json.parseToJsonElement(text).jsonObject["elements"]?.jsonArray ?: return PlacesResult(id, lat, lon, emptyList())
+        val elements = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["elements"]?.jsonArray ?: return PlacesResult(id, lat, lon, emptyList())
 
         val places = elements.mapNotNull { el ->
             val o = el.jsonObject
