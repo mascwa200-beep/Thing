@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.cos
 import kotlin.math.sin
 
+// Cardinal node angles (deg) — hoisted so the per-frame reactor draw doesn't allocate a boxed list each frame.
+private val CARDINALS = intArrayOf(0, 90, 180, 270)
+
 /**
  * Stark-style arc-reactor HUD ring — the signature J.A.R.V.I.S. "system
  * diagnostics" look: concentric counter-rotating arc rings, a fine tick ring
@@ -95,7 +98,7 @@ fun HudReactor(
         arcRing(center, rMax * 0.46f, color.copy(alpha = 0.55f), 2f, spin * 1.6f, segments = 4, fill = 0.5f)
 
         // Cardinal bright nodes on the outer ring.
-        listOf(0, 90, 180, 270).forEach { d ->
+        CARDINALS.forEach { d ->
             val a = Math.toRadians(d.toDouble())
             drawCircle(
                 accent, 2.4f,

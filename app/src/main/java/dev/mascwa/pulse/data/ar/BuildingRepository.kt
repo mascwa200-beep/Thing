@@ -4,6 +4,8 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.BuildingFootprint
 import dev.mascwa.pulse.core.telemetry.BuildingFootprints
 import dev.mascwa.pulse.core.telemetry.GeoPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -33,7 +35,7 @@ class BuildingRepository(
         val url = "https://overpass-api.de/api/interpreter?data=" + URLEncoder.encode(ql, "UTF-8")
         return runCatching {
             val text = http.getString(url)
-            val elements = http.json.parseToJsonElement(text).jsonObject["elements"]?.jsonArray
+            val elements = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["elements"]?.jsonArray
                 ?: return emptyList()
             elements.mapNotNull { el ->
                 val o = el.jsonObject

@@ -48,9 +48,13 @@ class HttpClient(
         url: String,
         deserializer: DeserializationStrategy<T>,
         headers: Map<String, String> = emptyMap(),
-    ): T {
+    ): T = withContext(Dispatchers.IO) {
+        // Parse on IO, not the caller's dispatcher: AsyncLoader/ViewModels invoke fetch() directly in
+        // viewModelScope (Main.immediate), so without this the deserialize (large weather/news/markets
+        // arrays) would run on the main thread and drop frames. getString already runs on IO; the nested
+        // withContext is a no-op there.
         val text = getString(url, headers)
-        return json.decodeFromString(deserializer, text)
+        json.decodeFromString(deserializer, text)
     }
 
     /** Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?). */

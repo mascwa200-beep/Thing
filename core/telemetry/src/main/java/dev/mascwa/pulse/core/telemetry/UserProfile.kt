@@ -42,6 +42,17 @@ object UserProfile {
         "im learning", "learning",
     )
 
+    // Compiled once — these run on the per-message capture path (detect/normalize are called for every
+    // stored entry inside merge/forget's O(N) scans). Regex is immutable/thread-safe, so sharing is safe.
+    private val WHITESPACE = Regex("\\s+")
+    private val FIRST_PERSON = Regex("(?i)\\b(i|i'm|im|i've|ive|my|me)\\b")
+    private val CATEGORY_LABELS = listOf(
+        ProfileCategory.PREFERENCE to "Preferences",
+        ProfileCategory.INTEREST to "Interests",
+        ProfileCategory.PROJECT to "Projects",
+        ProfileCategory.FACT to "Other",
+    )
+
     /** Best-guess category for a free-text statement. Order: project, then preference, then interest. */
     fun classify(text: String): ProfileCategory {
         val t = text.lowercase()
@@ -60,7 +71,7 @@ object UserProfile {
     fun detect(text: String): ProfileCategory? {
         val t = text.trim()
         if (t.isEmpty() || t.endsWith("?")) return null
-        val firstPerson = Regex("(?i)\\b(i|i'm|im|i've|ive|my|me)\\b").containsMatchIn(t)
+        val firstPerson = FIRST_PERSON.containsMatchIn(t)
         if (!firstPerson) return null
         val cat = classify(t)
         return if (cat == ProfileCategory.FACT) null else cat
@@ -68,7 +79,7 @@ object UserProfile {
 
     /** Normalized key for dedupe: lowercase, collapsed whitespace, no surrounding punctuation. */
     fun normalize(text: String): String =
-        text.lowercase().trim().trim('.', '!', ',', ';', ':', '"', '\'').replace(Regex("\\s+"), " ")
+        text.lowercase().trim().trim('.', '!', ',', ';', ':', '"', '\'').replace(WHITESPACE, " ")
 
     /**
      * Fold a statement into the profile: reaffirm (bump weight + recency) if already known, else add it.
@@ -137,13 +148,7 @@ object UserProfile {
         maxChars: Int = DEFAULT_MAX_CHARS,
     ): String {
         if (entries.isEmpty()) return ""
-        val labels = listOf(
-            ProfileCategory.PREFERENCE to "Preferences",
-            ProfileCategory.INTEREST to "Interests",
-            ProfileCategory.PROJECT to "Projects",
-            ProfileCategory.FACT to "Other",
-        )
-        val lines = labels.mapNotNull { (cat, label) ->
+        val lines = CATEGORY_LABELS.mapNotNull { (cat, label) ->
             val items = inCategory(entries, cat).take(perCategory)
             if (items.isEmpty()) null else "$label: " + items.joinToString("; ") { it.text }
         }

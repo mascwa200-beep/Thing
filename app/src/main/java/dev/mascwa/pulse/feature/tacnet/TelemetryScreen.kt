@@ -1494,7 +1494,9 @@ private fun EncounterPanel(
     c: NightwirePalette,
     onResolve: (Int, String?, Int) -> Unit,
 ) {
-    val chems = Items.ALL.filter { it.kind == ItemKind.CHEM && (ch.inventory[it.id] ?: 0) > 0 }
+    // Remembered so the live gesture meter's ~20fps recomposition doesn't re-filter the 37-item catalog
+    // each frame; only re-derives when the encounter or the held inventory changes.
+    val chems = remember(e.id, ch.inventory) { Items.ALL.filter { it.kind == ItemKind.CHEM && (ch.inventory[it.id] ?: 0) > 0 } }
     var selectedChem by remember(e.id) { mutableStateOf<String?>(null) }
     var resolved by remember(e.id) { mutableStateOf(false) }
     var meter by remember(e.id) { mutableStateOf(0f) }

@@ -6,6 +6,8 @@ import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.Geo
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -74,7 +76,7 @@ class RadarRepository(
         } catch (_: Exception) {
             http.getString("https://opendata.adsb.fi/api/v2/lat/$lat/lon/$lon/dist/$fetchNm") to "adsb.fi"
         }
-        val arr = http.json.parseToJsonElement(text).jsonObject["ac"]?.jsonArray
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["ac"]?.jsonArray
             ?: return emptyList<Contact>() to src
         val list = arr.mapNotNull { el ->
             val o = el.jsonObject
@@ -112,9 +114,8 @@ class RadarRepository(
 
     // --- Live ISS position (keyless) ---
     private suspend fun iss(): Contact? {
-        val o = http.json.parseToJsonElement(
-            http.getString("https://api.wheretheiss.at/v1/satellites/25544"),
-        ).jsonObject
+        val text = http.getString("https://api.wheretheiss.at/v1/satellites/25544")
+        val o = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
         fun d(k: String) = o[k]?.jsonPrimitive?.doubleOrNull
         val clat = d("latitude") ?: return null
         val clon = d("longitude") ?: return null
@@ -134,7 +135,7 @@ class RadarRepository(
         val text = http.getString(
             "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson",
         )
-        val features = http.json.parseToJsonElement(text).jsonObject["features"]?.jsonArray
+        val features = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["features"]?.jsonArray
             ?: return emptyList()
         return features.mapNotNull { f ->
             val o = f.jsonObject

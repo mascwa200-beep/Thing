@@ -152,6 +152,9 @@ object MemoryStream {
     )
     private val SELF_CUES = listOf("i ", "i'm", "im ", "i've", "ive ", "my ", "me ", "mine")
 
+    // Compiled once — estimateImportance runs on every captured observation (per user message).
+    private val WHITESPACE = Regex("\\s+")
+
     /**
      * A cheap, deterministic on-device estimate of a memory's importance (1–10) for when no cloud
      * brain is available to rate poignancy. The app may override this with an LLM rating when cloud
@@ -164,7 +167,7 @@ object MemoryStream {
         var score = 2.0
         score += IMPORTANCE_CUES.count { lower.contains(it) } * 1.5
         if (SELF_CUES.any { lower.startsWith(it) || lower.contains(" $it") }) score += 1.0
-        val words = lower.split(Regex("\\s+")).size
+        val words = lower.split(WHITESPACE).size
         if (words >= 12) score += 1.0
         if (words >= 30) score += 1.0
         if (lower.endsWith("?")) score -= 1.0

@@ -6,6 +6,8 @@ import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.Geo
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -70,7 +72,7 @@ class SafetyRepository(
     // --- USGS earthquakes (GeoJSON, global, keyless) ---
     private suspend fun usgs(lat: Double, lon: Double): List<Incident> {
         val text = http.getString("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson")
-        val features = http.json.parseToJsonElement(text).jsonObject["features"]?.jsonArray ?: return emptyList()
+        val features = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["features"]?.jsonArray ?: return emptyList()
         return features.mapNotNull { f ->
             val o = f.jsonObject
             val props = o["properties"]?.jsonObject ?: return@mapNotNull null
@@ -105,7 +107,7 @@ class SafetyRepository(
     // --- GDACS global disasters (GeoJSON, keyless) ---
     private suspend fun gdacs(lat: Double, lon: Double): List<Incident> {
         val text = http.getString("https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP")
-        val features = http.json.parseToJsonElement(text).jsonObject["features"]?.jsonArray ?: return emptyList()
+        val features = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["features"]?.jsonArray ?: return emptyList()
         return features.mapNotNull { f ->
             runCatching {
                 val o = f.jsonObject
@@ -141,7 +143,7 @@ class SafetyRepository(
     // --- US National Weather Service active alerts (keyless; empty outside US) ---
     private suspend fun nws(lat: Double, lon: Double): List<Incident> {
         val text = http.getString("https://api.weather.gov/alerts/active?point=$lat,$lon")
-        val features = http.json.parseToJsonElement(text).jsonObject["features"]?.jsonArray ?: return emptyList()
+        val features = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["features"]?.jsonArray ?: return emptyList()
         return features.mapNotNull { f ->
             val props = f.jsonObject["properties"]?.jsonObject ?: return@mapNotNull null
             val event = props["event"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -168,7 +170,7 @@ class SafetyRepository(
     // --- UK street-level crime (data.police.uk, keyless; England/Wales/NI only) ---
     private suspend fun ukCrime(lat: Double, lon: Double): List<Incident> {
         val text = http.getString("https://data.police.uk/api/crimes-street/all-crime?lat=$lat&lng=$lon")
-        val arr = http.json.parseToJsonElement(text).jsonArray
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
         return arr.mapNotNull { el ->
             runCatching {
                 val o = el.jsonObject

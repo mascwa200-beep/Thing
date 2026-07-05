@@ -10,6 +10,8 @@ import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -87,7 +89,7 @@ class FuelRepository(
             "&facets[product][]=EPMR&facets[product][]=EPD2D" +
             "&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=10"
         val text = http.getString(url)
-        val data = http.json.parseToJsonElement(text)
+        val data = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }
             .jsonObject["response"]?.jsonObject?.get("data")?.jsonArray ?: return emptyList()
 
         // Take the most recent point per product.

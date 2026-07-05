@@ -266,12 +266,18 @@ private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
     val c = Pulse.colors
     val items = quotes.orEmpty().filter { it.changePercent != null }
     if (items.isEmpty()) return
-    val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
-    val tickerItems = buildList {
-        mood?.let { add(TickerItem("", it.headline, c.accent)) }
-        items.forEach { q ->
-            val pct = q.changePercent ?: return@forEach
-            add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), trendColor(pct >= 0)))
+    // trendColor is @Composable (reads the theme), so resolve both trend colours here in composable
+    // scope, then build the item list once per change inside a pure remember (no @Composable calls).
+    val upColor = trendColor(true)
+    val downColor = trendColor(false)
+    val tickerItems = remember(quotes, c, upColor, downColor) {
+        val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
+        buildList {
+            mood?.let { add(TickerItem("", it.headline, c.accent)) }
+            items.forEach { q ->
+                val pct = q.changePercent ?: return@forEach
+                add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), if (pct >= 0) upColor else downColor))
+            }
         }
     }
     Ticker(tickerItems, speedFactor = LocalTickerSpeed.current, onClick = onClick)

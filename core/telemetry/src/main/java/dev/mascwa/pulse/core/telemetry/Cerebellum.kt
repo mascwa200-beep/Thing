@@ -139,6 +139,9 @@ object Cerebellum {
         "tell", "give", "get", "set", "with", "this", "that", "it", "jarvis",
     )
 
+    // Compiled once — signature runs per request; Regex is immutable/thread-safe.
+    private val TOKEN = Regex("[^a-z0-9]+")
+
     /**
      * Normalize a free-text request into a stable, low-sensitivity cue: lowercase, letters only, drop
      * stopwords, keep the first few salient tokens. Deterministic so the same kind of request maps to
@@ -146,7 +149,7 @@ object Cerebellum {
      */
     fun signature(text: String, maxTokens: Int = 3): String {
         val tokens = text.lowercase()
-            .split(Regex("[^a-z0-9]+"))
+            .split(TOKEN)
             .filter { it.length > 2 && it !in STOPWORDS }
         return tokens.take(maxTokens).joinToString(" ")
     }

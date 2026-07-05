@@ -5,6 +5,8 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -69,7 +71,7 @@ class SpaceWeatherRepository(
      *  The feed is a full integer-degree grid of (lon 0..359, lat -90..90, prob) triples. */
     private suspend fun loadAurora(lat: Double, lon: Double): Int? {
         val text = http.getString("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json")
-        val coords = http.json.parseToJsonElement(text).jsonObject["coordinates"]?.jsonArray ?: return null
+        val coords = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["coordinates"]?.jsonArray ?: return null
         val lonR = (((lon % 360) + 360) % 360).roundToInt() % 360
         val latR = lat.roundToInt().coerceIn(-90, 90)
         // Fast path: lon-major ordering, lat ascending from -90.
@@ -102,7 +104,7 @@ class SpaceWeatherRepository(
      *  header row) or array-of-objects — handle both. */
     private suspend fun loadKp(): List<Double> {
         val text = http.getString("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json")
-        val arr = http.json.parseToJsonElement(text).jsonArray
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
         return arr.mapNotNull { row ->
             when (row) {
                 is JsonArray -> row.getOrNull(1)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
@@ -127,7 +129,8 @@ class SpaceWeatherRepository(
     /** From a NOAA array-of-arrays product (row 0 is a header), the newest row whose [column]
      *  parses as a finite Double — recent rows are occasionally blank/null. */
     private suspend fun lastNumericInColumn(url: String, column: Int): Double? {
-        val arr = http.json.parseToJsonElement(http.getString(url)).jsonArray
+        val text = http.getString(url)
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
         for (i in arr.indices.reversed()) {
             if (i == 0) break // header row
             val v = arr[i].jsonArray.getOrNull(column)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
@@ -138,7 +141,7 @@ class SpaceWeatherRepository(
 
     private suspend fun loadAlerts(): List<SpaceAlert> {
         val text = http.getString("https://services.swpc.noaa.gov/products/alerts.json")
-        val arr = http.json.parseToJsonElement(text).jsonArray
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
         return arr.take(12).mapNotNull { el ->
             val obj = el.jsonObject
             val message = obj["message"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
