@@ -1522,6 +1522,49 @@ blind by compile-review subagents each PR; pure cores locally kotlinc-run):
   "to 11" polish (weathered sepia-green, atmosphere — a screenshot-driven visual judgment call), and only after
   the geo-anchoring is confirmed to feel right.
 
+### AR wasteland Fallout AESTHETIC arc — Slices 1–4 + a quest fix (this session, #322–#328 all merged)
+Owner gave two reference paintings ((A) a green-night wasteland — pale-green glowing orb low on the horizon, a
+silhouetted settlement + broadcast tower, dark craggy rock mesas framing a valley, amber HUD corner brackets;
+(B) the Fallout-New-Vegas Lucky-38 key art — gold-glowing spire, silhouetted city skyline with lit windows,
+cracked desert + power poles) and: *"the final product for the Wasteland AR map should come out looking like
+either of the two images."* Also: motion consistency (know when stationary vs moving). Shipped as CI-green
+slices; each renderer slice verified blind by adversarial compile-reviews (Kotlin types + Filament buffer
+safety + geometry/determinism). All in `feature/ar3d/WastelandRenderer.kt` + `feature/ar/ArScreen.kt`.
+- **Slice 1 (#322) — hero horizon vista:** a static far backdrop toward `HERO_AZ_DEG` (335°) — a glowing pale-green
+  BEACON orb + a graded phosphor HAZE glow + a near-black SILHOUETTE skyline + broadcast TOWER. A Compose
+  additive `HeroBeaconBloom` fakes the orb's glow (opaque material can't bloom).
+- **Slice 2a/2b (#323/#324) — backlit shading + screen grade:** a low grazing "sun" toward the beacon
+  (gamma-punched `terrainColor` chiaroscuro + far beacon-facing rim + fog biased toward the beacon); Compose
+  `ArGradeOverlay` (duotone wash + vignette + tube-curve edges + horizon-haze band) + `ArCornerBrackets` (amber
+  L-frame, Ref A). `ArMood` enum committed to GREEN_NIGHT (AMBER_DUSK is a ready 7-value swap for Ref B).
+- **Slice 3 (#326) — craggy rock mesas:** `ridged()` sharp crests + `mesaWall()` directional valley walls that
+  open toward the beacon corridor (so the vista stays visible), `Mood.rock` umber on steep faces; TERRAIN_RES 50→110.
+- **Slice 4 (#327) — lit-window skyline + RobCo boot:** the signature Fallout read — scattered warm LIT WINDOWS
+  (small quads a metre in front of each silhouette building, seeded on/off), jagged/broken ROOFLINES (differing
+  top-corner heights) + antenna spires, and foreground POWER POLES (Ref B). Refactored `buildHorizonVistaBuffers`
+  to a collect-then-emit triangle list (kills the fragile hand-counted vertexCount; worst-case ~4.3k verts,
+  USHORT-safe). `ArScreen.WastelandLoading` → a cinematic RobCo terminal boot (a decrypting diagnostic roll via
+  `DecryptText` + a clearance bar) over the ~2.7 s the wasteland models.
+- **Motion anchoring (#325):** the AR view/buildings now ride a motion-gated STABLE anchor (reuses the CI-tested
+  `TravelFilter`) — jitter-free when stationary, snaps forward when you actually walk; a "◈ IN MOTION / ◉
+  STATIONARY" readout. `ArViewModel.anchor`/`moving`; `localBuildings` re-projects off the anchor, not raw GPS.
+- **⚠️ The whole aesthetic arc is ENTIRELY CI-unverifiable (Filament can't render in CI) — PAUSED for owner Pixel
+  verification before layering more.** Pixel checklist: face ~NW (335°) — pale-green orb low on the horizon with
+  a dark settlement in front (broken rooflines, warm lit windows, tower, power poles); dark craggy mesas frame
+  the valley with the beacon visible down the corridor; entering AR plays the decrypting RobCo boot. Screenshot
+  → easy const tuning (window density, mesa steepness `MESA_RISE`/`RIDGE_AMT`, beacon `HERO_AZ_DEG`, palette).
+  The Ref-B "amber dusk" look is a flip of `AR_MOOD` + the renderer `Mood` palette (no structural change).
+- **Quest VISIT_KIND bug fix (#328) — the last deferred correctness item:** a "visit a TRADER" side quest
+  completed on reaching ANY place (it scored off the distinct-place count). Now `Quest.targetKey` (LocationKind
+  name, set by `StoryDirector`) + `QuestMetrics/GameMetrics.visitedKinds` gate completion on the SPECIFIC kind
+  physically reached; `GameWorldStore` records `loc.kind.name` at each ≤60 m reach and threads it alongside
+  `placesVisited`; `QuestStore` persists `targetKey`. Legacy null-targetKey quests fall back to the old any-place
+  delta (never un-completable). Per-kind ids → each kind pays out once (no farm). Core kotlinc-validated,
+  `QuestLogTest` 15/15 (+3). ⚠️ Android wiring CI-compile-gated; on-device-unverified.
+- **Open / steerable next (owner's call):** (a) verify the AR aesthetic + motion on the Pixel, tune from a
+  screenshot, or flip to the Ref-B amber-dusk mood; (b) resume the geo-gated core loop verification (still
+  paused, CLAUDE.md above); (c) more Fallout atmosphere (dust motes, weathered grade) once the base is confirmed.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
