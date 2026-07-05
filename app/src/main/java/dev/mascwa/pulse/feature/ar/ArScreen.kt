@@ -109,7 +109,10 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     }
 
     val sites by vm.sites.collectAsStateWithLifecycle()
-    val gps by vm.gps.collectAsStateWithLifecycle()
+    // The AR view rides the STABLE motion-gated anchor (not the raw jittery fix) — so the projected wasteland
+    // sits still when you're stationary and only tracks when you actually move.
+    val gps by vm.anchor.collectAsStateWithLifecycle()
+    val moving by vm.moving.collectAsStateWithLifecycle()
     val heading by vm.heading.collectAsStateWithLifecycle()
     val pitch by vm.pitch.collectAsStateWithLifecycle()
     val unreliable by vm.compassUnreliable.collectAsStateWithLifecycle()
@@ -245,6 +248,11 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                         if (localBuildings.isEmpty()) "STRUCTURES · SCANNED"
                         else "STRUCTURES · ${localBuildings.size} MAPPED",
                         fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.dim,
+                    )
+                    Text(
+                        if (moving) "◈ IN MOTION · TRACKING" else "◉ STATIONARY · LOCKED",
+                        fontFamily = JetBrainsMono, fontSize = 8.sp,
+                        color = if (moving) Pip.glow else Pip.dim,
                     )
                     if (unreliable) {
                         Text("compass off — wave a figure-8", fontFamily = JetBrainsMono, fontSize = 8.sp, color = Pip.alert)
