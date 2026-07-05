@@ -109,15 +109,16 @@ fun GlitchText(
         animationSpec = infiniteRepeatable(tween(5200, easing = LinearEasing), RepeatMode.Restart),
         label = "burst",
     )
-    val off = 1.1f + 0.9f * wob + if (burst > 0.94f) 3.4f else 0f
+    // Compute the offset inside each graphicsLayer lambda so wob/burst are read in the layer phase, not
+    // composition — otherwise this recomposes every animation frame (it's in the always-visible wordmark).
     Box {
         Text(
             text, style = style.copy(fontWeight = FontWeight.Bold), color = magenta.copy(alpha = 0.55f),
-            modifier = Modifier.graphicsLayer { translationX = off },
+            modifier = Modifier.graphicsLayer { translationX = 1.1f + 0.9f * wob + if (burst > 0.94f) 3.4f else 0f },
         )
         Text(
             text, style = style.copy(fontWeight = FontWeight.Bold), color = accent.copy(alpha = 0.55f),
-            modifier = Modifier.graphicsLayer { translationX = -off },
+            modifier = Modifier.graphicsLayer { translationX = -(1.1f + 0.9f * wob + if (burst > 0.94f) 3.4f else 0f) },
         )
         Text(text, style = style, color = baseColor)
     }

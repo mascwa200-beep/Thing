@@ -38,7 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -153,7 +155,9 @@ fun HudStrip(modifier: Modifier = Modifier) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text("◢NW//SYS", fontFamily = ChakraPetch, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = accent)
-                Text("◉", fontSize = 8.sp, color = healthColor.copy(alpha = dotAlpha))
+                // Alpha read in the layer phase (not composition) so the pulse doesn't recompose the
+                // whole always-visible strip every animation frame. Same output: one opaque glyph faded.
+                Text("◉", fontSize = 8.sp, color = healthColor, modifier = Modifier.graphicsLayer { alpha = dotAlpha })
                 Text(clock, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2)
                 DecryptText(
                     text = healthWord(health),
@@ -168,11 +172,12 @@ fun HudStrip(modifier: Modifier = Modifier) {
                 KpCell(hud.kp, hud.stormLevel, c)
             }
         }
-        // Breathing accent scan-line under the strip.
-        Box(Modifier.fillMaxWidth().height(1.5.dp).background(accent.copy(alpha = lineAlpha)))
+        // Breathing accent scan-line under the strip. Alpha read in the draw phase (drawBehind), not
+        // composition, so the breathing doesn't recompose the strip each frame.
+        Box(Modifier.fillMaxWidth().height(1.5.dp).drawBehind { drawRect(accent, alpha = lineAlpha) })
 
         if (hud.dataStream) {
-            val items = dataStreamItems(hud, tempC, memUsed, memTotal, c)
+            val items = remember(hud, tempC, memUsed, memTotal, c) { dataStreamItems(hud, tempC, memUsed, memTotal, c) }
             if (items.isNotEmpty()) Ticker(items)
         }
     }

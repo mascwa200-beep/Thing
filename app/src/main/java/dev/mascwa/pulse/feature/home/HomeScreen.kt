@@ -266,12 +266,15 @@ private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
     val c = Pulse.colors
     val items = quotes.orEmpty().filter { it.changePercent != null }
     if (items.isEmpty()) return
-    val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
-    val tickerItems = buildList {
-        mood?.let { add(TickerItem("", it.headline, c.accent)) }
-        items.forEach { q ->
-            val pct = q.changePercent ?: return@forEach
-            add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), trendColor(pct >= 0)))
+    // Derive the ticker items once per quotes/palette change, not on every HomeScreen recomposition.
+    val tickerItems = remember(quotes, c) {
+        val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
+        buildList {
+            mood?.let { add(TickerItem("", it.headline, c.accent)) }
+            items.forEach { q ->
+                val pct = q.changePercent ?: return@forEach
+                add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), trendColor(pct >= 0)))
+            }
         }
     }
     Ticker(tickerItems, speedFactor = LocalTickerSpeed.current, onClick = onClick)
