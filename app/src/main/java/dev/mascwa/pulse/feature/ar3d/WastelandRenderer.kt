@@ -65,8 +65,14 @@ class WastelandRenderer {
 
         /** Terrain extent + resolution. */
         private const val WORLD_HALF = 60f           // metres from centre to edge (±60 m → 120 m across)
-        private const val TERRAIN_RES = 50           // grid cells per axis (heightmap resolution)
+        private const val TERRAIN_RES = 110          // grid cells per axis (111² = 12321 verts, USHORT-safe) — fine crags
         private const val EYE_HEIGHT = 1.6           // camera height above the ground plane, metres
+
+        /** Craggy mesas (Ref A): sharp ridged crests + directional valley walls that open toward the beacon. */
+        private const val RIDGE_AMT = 1.0f           // strength of the sharp ridged crests
+        private const val CRAG_FADE_M = 30f          // crags fade in over this distance (flatter right under you)
+        private const val MESA_CORRIDOR_M = 18f      // half-width of the open valley toward the beacon
+        private const val MESA_RISE = 0.55f          // how fast the side walls climb past the corridor
 
         /** Wireframe structures. */
         private const val RUINS = 16
@@ -105,6 +111,7 @@ class WastelandRenderer {
             val beacon = intArrayOf(0xcf, 0xf2, 0xd6)     // bright pale green-white beacon / rim light
             val struct = intArrayOf(0x3e, 0x9c, 0x6e)     // scanned-building wireframe (phosphor green)
             val rad = intArrayOf(0x86, 0xff, 0x8e)        // toxic-green (faint hollow pools — used in a later slice)
+            val rock = intArrayOf(0x2e, 0x26, 0x1e)       // dark umber rock on steep crag/mesa faces (Ref A)
         }
 
         // Render palette repointed onto the mood — all existing colour maths (terrainColor/shadeAndFog/…) key off these.
@@ -487,18 +494,50 @@ class WastelandRenderer {
             0.8 * Math.cos(xd * 0.20 - zd * 0.16)).toFloat()
     }
 
-    /** The dune value at the origin, subtracted so the wasteland floor sits at y≈0 under the player. */
-    private val dune0: Float = rawDune(0f, 0f)
+    /** Sharp ridged crests via folded (absolute) sines squared — the craggy rock relief (always ≥ 0, ~0..7.5 m). */
+    private fun ridged(x: Float, z: Float): Float {
+        val xd = x.toDouble(); val zd = z.toDouble()
+        val a = 1.0 - Math.abs(Math.sin(xd * 0.05) * Math.cos(zd * 0.045))
+        val b = 1.0 - Math.abs(Math.sin(xd * 0.11 - zd * 0.09))
+        return (a * a * 5.0 + b * b * 2.5).toFloat()
+    }
+
+    /**
+     * Directional mesa walls: the ground climbs on the sides (perpendicular to the beacon) beyond a corridor,
+     * higher farther out — framing a valley whose OPENING points at [HERO_AZ_DEG], so the beacon/skyline stay
+     * visible down the corridor (not walled off by a 360° crater). 0 at the origin.
+     */
+    private fun mesaWall(x: Float, z: Float): Float {
+        val az = Math.toRadians(HERO_AZ_DEG.toDouble())
+        val bx = Math.sin(az).toFloat(); val bz = (-Math.cos(az)).toFloat()
+        val across = x * bz - z * bx // signed perpendicular offset from the beacon corridor
+        val past = (Math.abs(across) - MESA_CORRIDOR_M).coerceAtLeast(0f)
+        val far = (Math.sqrt((x * x + z * z).toDouble()).toFloat() / WORLD_HALF).coerceIn(0f, 1f)
+        return past * MESA_RISE * far
+    }
+
+    /**
+     * The full baked ground relief: rolling dunes + sharp ridged crags (faded in past [CRAG_FADE_M] so the
+     * ground right under you stays walkable-flat) + the directional mesa walls. All three are 0 at the origin,
+     * so the floor anchor [dune0] stays exact.
+     */
+    private fun rawDetail(x: Float, z: Float): Float {
+        val dist = Math.sqrt((x * x + z * z).toDouble()).toFloat()
+        val cragW = (dist / CRAG_FADE_M).coerceIn(0f, 1f)
+        return rawDune(x, z) + ridged(x, z) * cragW * RIDGE_AMT + mesaWall(x, z)
+    }
+
+    /** The relief value at the origin (= rawDune(0,0), since crags/mesas are 0 there), subtracted so the floor sits y≈0. */
+    private val dune0: Float = rawDetail(0f, 0f)
 
     /**
      * The wasteland ground height at (x,z): the **real terrain elevation** (relative to the player, from the
-     * DEM when loaded) plus the anchored dune detail. With no elevation it's just the dunes, anchored so the
-     * ground under the player is y≈0 and the eye-height camera sits the right height above it. When the DEM is
-     * loaded the floor follows the real topography — the "height map used to know where the real ground is",
-     * never drawn itself.
+     * DEM when loaded) plus the anchored baked relief (dunes + crags + mesa walls). Anchored so the ground
+     * under the player is y≈0 and the eye-height camera sits the right height above it; a loaded DEM then makes
+     * the whole thing follow the real topography — the "height map used to know where the real ground is".
      */
     private fun groundHeight(x: Float, z: Float): Float =
-        (elevationField?.heightAt(x, z) ?: 0f) + (rawDune(x, z) - dune0)
+        (elevationField?.heightAt(x, z) ?: 0f) + (rawDetail(x, z) - dune0)
 
     /**
      * Pack an RGB triple into the UBYTE4 COLOR attribute. It's read as RGBA in the shader, but a little-endian
@@ -556,9 +595,11 @@ class WastelandRenderer {
         // Base tone low→high by height, then sink local dips (anchored dune relief, NOT DEM height) toward shadow.
         val ht = ((h + 4f) / 8f).coerceIn(0f, 1f)
         val dip = ((dune0 - rawDune(x, z)) / 3f).coerceIn(0f, 1f) * HOLLOW_SINK
-        val baseR = mix(mix(DUST_LOW[0], DUST_HIGH[0], ht), Mood.shadow[0], dip)
-        val baseG = mix(mix(DUST_LOW[1], DUST_HIGH[1], ht), Mood.shadow[1], dip)
-        val baseB = mix(mix(DUST_LOW[2], DUST_HIGH[2], ht), Mood.shadow[2], dip)
+        // Steep crag/mesa faces turn to dark umber rock (Ref A); flats keep the green dune tone.
+        val steep = (Math.sqrt((dhx * dhx + dhz * dhz).toDouble()).toFloat() / 6f).coerceIn(0f, 1f)
+        val baseR = mix(mix(mix(DUST_LOW[0], DUST_HIGH[0], ht), Mood.shadow[0], dip), Mood.rock[0], steep)
+        val baseG = mix(mix(mix(DUST_LOW[1], DUST_HIGH[1], ht), Mood.shadow[1], dip), Mood.rock[1], steep)
+        val baseB = mix(mix(mix(DUST_LOW[2], DUST_HIGH[2], ht), Mood.shadow[2], dip), Mood.rock[2], steep)
         // Shade, then add the backlit beacon rim on far, beacon-facing slopes.
         val fog = fogAmount(x, z)
         val rim = (ndotlG * fog * RIM_STRENGTH).coerceIn(0f, 0.7f)
