@@ -200,7 +200,7 @@ class TelemetryViewModel(
         LifeInputs(
             interests = interests, pending = pending, kinds = locs.map { it.kind }.toSet(),
             level = gm.level, day = day,
-            metrics = QuestMetrics(gm.distanceM, gm.wins, gm.ventures, gm.placesVisited, day, pending.toSet()),
+            metrics = QuestMetrics(gm.distanceM, gm.wins, gm.ventures, gm.placesVisited, day, pending.toSet(), gm.visitedKinds),
         )
     }
 
@@ -544,7 +544,7 @@ class TelemetryViewModel(
                     game.setTravelMetrics(
                         it.distanceM.toInt(), it.placesVisited,
                         it.walkM.toInt(), it.runM.toInt(), it.cycleM.toInt(), it.driveM.toInt(),
-                        it.elevationM.toInt(), it.cellsExplored,
+                        it.elevationM.toInt(), it.cellsExplored, it.visitedKinds,
                     )
                 }
             }

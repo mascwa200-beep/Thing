@@ -51,6 +51,8 @@ class QuestStore(
         val kind: String, val source: String, val rewardCaps: Int, val rewardXp: Int,
         val baseDistanceM: Int = 0, val baseWins: Int = 0, val baseVentures: Int = 0,
         val basePlaces: Int = 0, val issuedDay: Int = 1,
+        // The VISIT_KIND target kind — defaulted → old saves reload as legacy (any-place) VISIT_KIND quests.
+        val targetKey: String? = null,
     )
 
     @Serializable
@@ -75,14 +77,14 @@ class QuestStore(
         id = quest.id, title = quest.title, brief = quest.brief, goal = quest.goal.name, target = quest.target,
         kind = quest.kind.name, source = quest.source, rewardCaps = quest.rewardCaps, rewardXp = quest.rewardXp,
         baseDistanceM = baseDistanceM, baseWins = baseWins, baseVentures = baseVentures,
-        basePlaces = basePlaces, issuedDay = issuedDay,
+        basePlaces = basePlaces, issuedDay = issuedDay, targetKey = quest.targetKey,
     )
 
     private fun StoredQuest.domain(): ActiveQuest? {
         val goalE = runCatching { QuestGoal.valueOf(goal) }.getOrNull() ?: return null
         val kindE = runCatching { QuestKind.valueOf(kind) }.getOrNull() ?: QuestKind.SIDE
         return ActiveQuest(
-            quest = Quest(id, title, brief, goalE, target, kindE, source, rewardCaps, rewardXp),
+            quest = Quest(id, title, brief, goalE, target, kindE, source, rewardCaps, rewardXp, targetKey),
             baseDistanceM = baseDistanceM, baseWins = baseWins, baseVentures = baseVentures,
             basePlaces = basePlaces, issuedDay = issuedDay,
         )

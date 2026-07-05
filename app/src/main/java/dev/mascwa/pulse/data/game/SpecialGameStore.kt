@@ -152,6 +152,7 @@ class SpecialGameStore(
     private var extFeatures = 0
     private var extDistanceM = 0
     private var extPlaces = 0
+    private var extVisitedKinds = emptySet<String>() // place-kinds reached (LocationKind.names) → VISIT_KIND quests
     // Real-time travel breakdown (from GameWorldStore): per-mode distance, vertical climb, cells explored.
     private var extWalkM = 0
     private var extRunM = 0
@@ -344,6 +345,7 @@ class SpecialGameStore(
             walkM = extWalkM, runM = extRunM, cycleM = extCycleM, driveM = extDriveM,
             elevationM = extElevationM, cellsExplored = extCells,
             renown = c.legend.renown,
+            visitedKinds = extVisitedKinds,
         )
     }
 
@@ -462,11 +464,13 @@ class SpecialGameStore(
         driveM: Int = extDriveM,
         elevationM: Int = extElevationM,
         cells: Int = extCells,
+        visitedKinds: Set<String> = extVisitedKinds,
     ) {
         scope.launch {
             ensureLoaded()
             extDistanceM = distanceM
             extPlaces = placesVisited
+            extVisitedKinds = visitedKinds
             extWalkM = walkM; extRunM = runM; extCycleM = cycleM; extDriveM = driveM
             extElevationM = elevationM; extCells = cells
             runAchievementCheck()

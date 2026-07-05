@@ -36,6 +36,38 @@ class QuestLogTest {
         assertTrue(QuestLog.isComplete(a, QuestMetrics(pendingTasks = emptySet())))
     }
 
+    @Test fun visitKindCompletesOnlyForItsSpecificKind() {
+        // The bug this fixes: a "visit a TRADER" quest used to complete on ANY place reached (it scored off
+        // the distinct-place count). Now it needs the TRADER kind specifically.
+        val a = ActiveQuest(
+            Quest("q_visit_trader", "T", "b", QuestGoal.VISIT_KIND, 1, QuestKind.SIDE, "Nearby: Trader", 20, 25,
+                targetKey = "TRADER"),
+        )
+        // Reaching a DIFFERENT kind (and racking up the place count) does NOT complete it.
+        assertEquals(0, QuestLog.progress(a, QuestMetrics(places = 5, visitedKinds = setOf("MEDIC"))))
+        assertFalse(QuestLog.isComplete(a, QuestMetrics(places = 5, visitedKinds = setOf("MEDIC"))))
+        // Physically reaching the TRADER completes it.
+        assertTrue(QuestLog.isComplete(a, QuestMetrics(visitedKinds = setOf("MEDIC", "TRADER"))))
+    }
+
+    @Test fun visitKindLegacyQuestFallsBackToPlacesDelta() {
+        // A VISIT_KIND quest persisted before targetKey existed (null) keeps the old any-place completion, so
+        // it can still finish rather than becoming permanently un-completable after the upgrade.
+        val a = ActiveQuest(
+            Quest("q_visit_legacy", "T", "b", QuestGoal.VISIT_KIND, 1, QuestKind.SIDE, "Nearby", 20, 25,
+                targetKey = null),
+            basePlaces = 2,
+        )
+        assertEquals(0, QuestLog.progress(a, QuestMetrics(places = 2)))
+        assertTrue(QuestLog.isComplete(a, QuestMetrics(places = 3)))
+    }
+
+    @Test fun composedVisitQuestCarriesItsTargetKind() {
+        val q = StoryDirector.compose(LifeContext(nearbyKinds = setOf(LocationKind.TRADER)), seed = 1L)
+            .firstOrNull { it.goal == QuestGoal.VISIT_KIND }
+        assertEquals(LocationKind.TRADER.name, q?.targetKey)
+    }
+
     @Test fun syncRetiresCompletedAndReturnsReward() {
         val a = ActiveQuest(quest("q_walk", QuestGoal.WALK_DISTANCE, 1000), baseDistanceM = 0)
         val r = QuestLog.sync(QuestLogState(active = listOf(a)), emptyList(), QuestMetrics(distanceM = 1200))

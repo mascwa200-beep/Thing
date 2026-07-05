@@ -47,6 +47,8 @@ data class TravelStats(
     val driveM: Long = 0L,
     val elevationM: Long = 0L,
     val cellsExplored: Int = 0,
+    // LocationKind.names of the place-kinds physically reached (feeds VISIT_KIND quest completion).
+    val visitedKinds: Set<String> = emptySet(),
 )
 
 /**
@@ -75,6 +77,8 @@ class GameWorldStore(
         val driveM: Long = 0L,
         val elevationM: Long = 0L,
         val cells: List<String> = emptyList(),
+        // LocationKind.names of place-kinds reached — defaulted → old saves load with none. On-device only.
+        val visitedKinds: List<String> = emptyList(),
     )
 
     // Each query's [category] is a token WorldSites.typeFor classifies into a SiteType — so one place →
@@ -104,6 +108,7 @@ class GameWorldStore(
     // Travel state (authoritative in-memory).
     private var distanceM = 0.0
     private var placesVisited = emptySet<String>()
+    private var visitedKinds = emptySet<String>() // LocationKind.names of place-kinds reached (for VISIT_KIND quests)
     private var playMs = 0L
     // The last position we *committed* distance from. Distance only accrues once the player moves clear of
     // the GPS-uncertainty circle around this anchor — so standing still (jitter) never adds distance.
@@ -147,6 +152,7 @@ class GameWorldStore(
                 ).filterValues { it > 0L }
                 elevationM = stored.elevationM.coerceAtLeast(0L)
                 cells = stored.cells.toSet()
+                visitedKinds = stored.visitedKinds.toSet()
             }
             loaded = true
         }
@@ -164,6 +170,7 @@ class GameWorldStore(
             driveM = Transport.distance(modeMeters, TransportMode.DRIVE),
             elevationM = elevationM,
             cellsExplored = cells.size,
+            visitedKinds = visitedKinds,
         )
     }
 
@@ -245,6 +252,9 @@ class GameWorldStore(
                 _locations.value.forEach { loc ->
                     if (loc.id !in placesVisited && Geo.distanceMeters(lat, lon, loc.lat, loc.lon) <= VISIT_RADIUS_M) {
                         placesVisited = placesVisited + loc.id
+                        // Record the KIND reached too, so a "visit a TRADER" quest completes on a TRADER (not
+                        // any place). Kept as the LocationKind.name to match StoryDirector's VISIT_KIND targetKey.
+                        visitedKinds = visitedKinds + loc.kind.name
                     }
                 }
             }
@@ -271,6 +281,7 @@ class GameWorldStore(
             mutex.withLock {
                 distanceM = 0.0; placesVisited = emptySet(); playMs = 0L; anchorLat = null; anchorLon = null
                 modeMeters = emptyMap(); elevationM = 0L; cells = emptySet(); lastAltM = null; lastFixMs = 0L
+                visitedKinds = emptySet()
             }
             publishTravel()
             runCatching { context.gameWorldDataStore.edit { it.remove(prefsKey) } }
@@ -294,6 +305,7 @@ class GameWorldStore(
             driveM = Transport.distance(modeMeters, TransportMode.DRIVE),
             elevationM = elevationM,
             cells = cells.toList(),
+            visitedKinds = visitedKinds.toList(),
         )
         runCatching {
             context.gameWorldDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
