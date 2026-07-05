@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -210,6 +211,14 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+        }
+
+        // Fallout grade + frame over the whole AR view — a duotone wash, vignette, tube-curve edges, a horizon
+        // haze band, and the amber corner brackets (Ref A). Drawn BELOW the HUD chrome so the stats/radar stay
+        // legible; touch passes straight through (no pointerInput).
+        if (hasCamera) {
+            ArGradeOverlay(pitch, Modifier.fillMaxSize())
+            ArCornerBrackets(Modifier.fillMaxSize())
         }
 
         // --- Fixed HUD chrome ---
@@ -412,6 +421,85 @@ private fun HeroBeaconBloom(heading: Float, pitch: Float, modifier: Modifier) {
             ),
             radius = r, center = c, blendMode = BlendMode.Plus,
         )
+    }
+}
+
+/** The two reference moods (GREEN_NIGHT committed; AMBER_DUSK ready to select later). */
+private enum class ArMood { GREEN_NIGHT, AMBER_DUSK }
+
+/** Screen-space grade + frame colours for a mood: corner brackets, the duotone wash, the vignette, the horizon haze. */
+private data class ArChrome(val bracket: Color, val grade: Color, val shadow: Color, val haze: Color)
+
+private fun chromeFor(mood: ArMood): ArChrome = when (mood) {
+    ArMood.GREEN_NIGHT -> ArChrome(
+        bracket = Color(0xFFE8A83C), // amber instrument frame (Ref A)
+        grade = Color(0xFF16362A),   // phosphor-teal wash unifying camera + wasteland
+        shadow = Color(0xFF04080A),  // near-black vignette
+        haze = Color(0xFF2C5E54),    // teal horizon glow
+    )
+    ArMood.AMBER_DUSK -> ArChrome(
+        bracket = Color(0xFFE8A83C),
+        grade = Color(0xFF3A1E10),   // warm amber wash
+        shadow = Color(0xFF0A0402),
+        haze = Color(0xFFC8702A),    // burnt-orange horizon glow
+    )
+}
+
+/** The committed AR mood — flip to [ArMood.AMBER_DUSK] (with the renderer [Mood]) for the Ref-B look. */
+private val AR_MOOD = ArMood.GREEN_NIGHT
+
+/**
+ * The Fallout screen grade over the whole AR view (camera + wasteland): a faint duotone wash, a radial
+ * vignette, tube-curve edge darkening, and a soft horizon haze band anchored to the camera pitch. Pure
+ * Compose Canvas (SrcOver — additive/multiply are no-ops over the camera SurfaceView); drawn below the HUD.
+ */
+@Composable
+private fun ArGradeOverlay(pitch: Float, modifier: Modifier) {
+    val c = chromeFor(AR_MOOD)
+    Canvas(modifier) {
+        val w = size.width; val h = size.height
+        // (1) duotone wash — a faint tint unifying the real camera with the baked wasteland.
+        drawRect(color = c.grade.copy(alpha = 0.10f))
+        // (2) radial vignette — clear centre → shadow at the edges.
+        drawRect(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(0.55f to Color.Transparent, 1f to c.shadow.copy(alpha = 0.5f)),
+                center = Offset(w / 2f, h / 2f), radius = maxOf(w, h) * 0.72f,
+            ),
+        )
+        // (3) tube-curve edge darken — thin gradient bands on each side.
+        val edge = c.shadow.copy(alpha = 0.35f)
+        val bh = h * 0.14f; val bw = w * 0.10f
+        drawRect(Brush.verticalGradient(listOf(edge, Color.Transparent), 0f, bh), size = Size(w, bh))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, edge), h - bh, h), Offset(0f, h - bh), Size(w, bh))
+        drawRect(Brush.horizontalGradient(listOf(edge, Color.Transparent), 0f, bw), size = Size(bw, h))
+        drawRect(Brush.horizontalGradient(listOf(Color.Transparent, edge), w - bw, w), Offset(w - bw, 0f), Size(bw, h))
+        // (4) horizon haze band — glows along the horizon line (from the camera pitch).
+        val horizonY = (ArProjection.screenY(pitch.toDouble(), 0.0).toFloat().coerceIn(0.15f, 0.95f)) * h
+        val bandH = h * 0.30f
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(Color.Transparent, c.haze.copy(alpha = 0.20f), Color.Transparent),
+                horizonY - bandH / 2f, horizonY + bandH / 2f,
+            ),
+            topLeft = Offset(0f, horizonY - bandH / 2f), size = Size(w, bandH),
+        )
+    }
+}
+
+/** The amber corner-bracket L-frame (Ref A) — a heavier bottom pair. Drawn crisp, below the HUD so it never washes. */
+@Composable
+private fun ArCornerBrackets(modifier: Modifier) {
+    val col = chromeFor(AR_MOOD).bracket
+    Canvas(modifier) {
+        val w = size.width; val h = size.height
+        val len = size.minDimension * 0.06f
+        val m = size.minDimension * 0.035f
+        val top = 2.dp.toPx(); val bot = 3.dp.toPx() // heavier bottom pair
+        drawLine(col, Offset(m, m), Offset(m + len, m), top); drawLine(col, Offset(m, m), Offset(m, m + len), top)
+        drawLine(col, Offset(w - m, m), Offset(w - m - len, m), top); drawLine(col, Offset(w - m, m), Offset(w - m, m + len), top)
+        drawLine(col, Offset(m, h - m), Offset(m + len, h - m), bot); drawLine(col, Offset(m, h - m), Offset(m, h - m - len), bot)
+        drawLine(col, Offset(w - m, h - m), Offset(w - m - len, h - m), bot); drawLine(col, Offset(w - m, h - m), Offset(w - m, h - m - len), bot)
     }
 }
 
