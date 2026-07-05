@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +67,8 @@ import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.feature.ar3d.WastelandRenderer
 import dev.mascwa.pulse.feature.tacnet.Pip
 import dev.mascwa.pulse.feature.tacnet.crtScanlines
+import dev.mascwa.pulse.ui.effects.DecryptText
+import dev.mascwa.pulse.ui.effects.LocalGlitchEnabled
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import java.util.concurrent.Executors
@@ -131,7 +134,7 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     // The AR overlay is ONE thing: the Filament wasteland + the site labels together (no mode toggle). It
     // "models" for a beat on entry — a Fallout loading screen while the scene builds.
     var modeling by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2400); modeling = false }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2700); modeling = false }
 
     Box(Modifier.fillMaxSize().background(Pip.bg)) {
         if (hasCamera) {
@@ -299,25 +302,77 @@ fun ArScreen(vm: ArViewModel, onBack: () -> Unit) {
     }
 }
 
-/** The "modelling the wasteland" loading screen — a Fallout terminal boot beat over the camera on entry. */
+/** The diagnostic roll the "modelling the wasteland" boot decrypts in — a RobCo-terminal power-on beat. */
+private fun wastelandBootLog(): List<String> = listOf(
+    "> INITIALISING VICINITY MODEL",
+    "mapping terrain mesh ............ OK",
+    "resolving OSM structures ........ OK",
+    "sampling DEM elevation grid ..... OK",
+    "calibrating optical compass ..... OK",
+    "rendering wasteland overlay ..... READY",
+)
+
+/**
+ * The "modelling the wasteland" loading screen — a cinematic RobCo terminal boot beat over the camera on
+ * entry (BootScreen idiom): a phosphor header, a diagnostic roll that DECRYPTS in line-by-line, and a
+ * clearance bar filling to 100%. Plays for the ~2.7 s the wasteland models, then the AR view fades in.
+ */
 @Composable
 private fun WastelandLoading(modifier: Modifier) {
+    val lines = remember { wastelandBootLog() }
+    var shown by remember { mutableStateOf(0) }
+    var progress by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val step = 2200L / lines.size
+        for (i in lines.indices) {
+            kotlinx.coroutines.delay(step)
+            shown = i + 1
+            progress = (i + 1f) / lines.size
+        }
+    }
     Box(modifier.background(Color(0xFF05070A)), contentAlignment = Alignment.Center) {
         Column(
+            Modifier.fillMaxWidth().padding(horizontal = 30.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "◈ WASTELAND OVERLAY", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
                 fontSize = 18.sp, color = Pip.glow, letterSpacing = 3.sp,
             )
             Text(
-                "MODELLING YOUR VICINITY", fontFamily = JetBrainsMono, fontSize = 10.sp,
-                color = Pip.dim, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 8.dp),
+                "RobCo(TM) TERRAIN MODELLER", fontFamily = JetBrainsMono, fontSize = 9.sp,
+                color = Pip.dim, letterSpacing = 2.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),
             )
-            listOf("MAPPING TERRAIN", "RESOLVING STRUCTURES", "CALIBRATING OPTICS").forEach {
-                Text("▸ $it", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.bright, letterSpacing = 1.sp)
+            // Decrypting diagnostic roll — forced on (a deliberate one-time cinematic, like the app cold-open).
+            CompositionLocalProvider(LocalGlitchEnabled provides true) {
+                Column(Modifier.fillMaxWidth().height(150.dp), verticalArrangement = Arrangement.Top) {
+                    lines.take(shown).forEachIndexed { i, ln ->
+                        val col = when (i) {
+                            0 -> Pip.glow
+                            lines.lastIndex -> Pip.bright
+                            else -> Pip.mid
+                        }
+                        DecryptText(
+                            ln, JetBrainsMono, 11.sp, col,
+                            Modifier.fillMaxWidth().padding(vertical = 2.dp), durationMs = 420,
+                        )
+                    }
+                }
             }
+            // Clearance / progress bar.
+            Box(
+                Modifier.padding(top = 14.dp).fillMaxWidth().height(6.dp)
+                    .clip(RoundedCornerShape(2.dp)).background(Pip.bg.copy(alpha = 0.8f))
+                    .border(1.dp, Pip.grid, RoundedCornerShape(2.dp)),
+            ) {
+                Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(6.dp).background(Pip.glow))
+            }
+            Text(
+                "◉ MODELLING THE WASTELAND · ${(progress * 100).toInt()}%",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.bright, letterSpacing = 1.sp,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }
