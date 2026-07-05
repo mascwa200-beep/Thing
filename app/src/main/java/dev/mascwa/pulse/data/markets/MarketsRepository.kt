@@ -6,10 +6,12 @@ import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.builtins.ListSerializer
@@ -150,7 +152,11 @@ class MarketsRepository(
         val sym = URLEncoder.encode(yahooSymbol(item), "UTF-8")
         val url = "https://query1.finance.yahoo.com/v8/finance/chart/$sym?interval=1d&range=1mo"
         val text = yahooGate.withPermit { http.getString(url, mapOf("User-Agent" to YAHOO_UA)) }
-        val result = http.json.parseToJsonElement(text).jsonObject["chart"]?.jsonObject
+        // Parse off the caller's dispatcher: quotesFor fans out ~24 of these in async{} inside a
+        // viewModelScope coroutineScope (Main), so decoding each month-long chart on Main dropped frames
+        // on the home tape. The subsequent jsonObject navigation is cheap map access.
+        val parsed = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }
+        val result = parsed.jsonObject["chart"]?.jsonObject
             ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject ?: error("No data for ${item.id}")
         val meta = result["meta"]?.jsonObject ?: error("No meta for ${item.id}")
         fun metaD(k: String) = meta[k]?.jsonPrimitive?.doubleOrNull
