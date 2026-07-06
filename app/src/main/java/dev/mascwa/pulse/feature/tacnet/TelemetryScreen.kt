@@ -363,6 +363,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val life by vm.life.collectAsStateWithLifecycle()
     val afflictions by vm.afflictions.collectAsStateWithLifecycle()
+    val restUntil by vm.restUntil.collectAsStateWithLifecycle()
     val exertion by vm.lastExertion.collectAsStateWithLifecycle()
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
@@ -387,8 +388,9 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onSetMood = { vm.setMood(it) },
             onSetWellRead = { vm.setWellRead(it) }, onSetFitness = { vm.setFitness(it) },
             onSetCommunity = { vm.setCommunity(it) },
+            restUntil = restUntil,
             onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
-            onBrush = { vm.brushTeeth() },
+            onBrush = { vm.brushTeeth() }, onFloss = { vm.floss() },
         )
         AfflictionsBanner(afflictions, c)
         Spacer(Modifier.height(8.dp))
@@ -697,11 +699,13 @@ private fun LifePanel(
     onSetWellRead: (Int) -> Unit,
     onSetFitness: (Int) -> Unit,
     onSetCommunity: (Int) -> Unit,
+    restUntil: Long,
     onDrink: () -> Unit,
     onWash: () -> Unit,
     onRest: () -> Unit,
     onEat: () -> Unit,
     onBrush: () -> Unit,
+    onFloss: () -> Unit,
 ) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.sky) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -766,11 +770,23 @@ private fun LifePanel(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
                 Box(Modifier.weight(1f)) { GameButton("EAT", c.magenta, onEat) }
-                Box(Modifier.weight(1f)) { GameButton("REST", c.amber, onRest) }
+                // REST opens a timed ~8h window rather than an instant top-up: while it's running, energy
+                // recovers and doesn't drain. Show the remaining time in place of the button.
+                Box(Modifier.weight(1f)) {
+                    val remaining = restUntil - System.currentTimeMillis()
+                    if (remaining > 0) {
+                        val h = remaining / 3_600_000L
+                        val m = (remaining % 3_600_000L) / 60_000L
+                        RestingChip("RESTING ${h}h ${m}m", c)
+                    } else {
+                        GameButton("REST", c.amber, onRest)
+                    }
+                }
             }
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("WASH", c.positive, onWash) }
                 Box(Modifier.weight(1f)) { GameButton("BRUSH", c.violet, onBrush) }
+                Box(Modifier.weight(1f)) { GameButton("FLOSS", c.sky, onFloss) }
             }
 
             // What the real world is doing to your needs right now (heat, night, motion, charging).
@@ -2548,6 +2564,20 @@ private fun GameButton(label: String, color: Color, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp, color = color)
+    }
+}
+
+/** A dim, non-interactive stand-in for the REST button while a rest window is running (shows the countdown). */
+@Composable
+private fun RestingChip(label: String, c: NightwirePalette) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.06f))
+            .border(1.dp, c.amber.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("☾ $label", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+            letterSpacing = 1.sp, color = c.amber.copy(alpha = 0.8f))
     }
 }
 

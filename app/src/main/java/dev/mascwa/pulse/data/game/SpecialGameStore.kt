@@ -131,6 +131,10 @@ class SpecialGameStore(
         val hygieneBase: Int = 100,
         val energyBase: Int = 100,
         val nourishmentBase: Int = 100,
+        val brushingBase: Int = 100,
+        val flossingBase: Int = 100,
+        /** Wall-clock ms an active REST window runs until (0 = not resting). Defaulted → old saves. */
+        val restUntilMs: Long = 0L,
         val mood: Int = 50,
         val operatorName: String = "",
         // Self-reported 0..100 life scores (0 = unset) — how well-read / in-shape / rooted you are. Defaulted
@@ -214,6 +218,10 @@ class SpecialGameStore(
     // FIRST post-load sync only re-baselines the cumulative counters (a load-time delta can't crater needs).
     private var travelCarry = ExertCarry()
     private var travelPrimed = false
+
+    // Active REST window: wall-clock ms it runs until (0 = not resting). While within it, energy regenerates
+    // and doesn't drain (see LifeStats.decayNeeds restingMs). Persisted so a rest survives the app closing.
+    private var restUntilMs = 0L
     // Step-counter daily baseline: the cumulative reading at the start of [stepDay] (epoch-day). Today's
     // steps = latest cumulative − baseline (reboot-safe: a lower reading re-baselines).
     private var stepDay = -1L
@@ -247,6 +255,10 @@ class SpecialGameStore(
     private val _afflictions = MutableStateFlow(AfflictionState())
     /** Lingering survival afflictions (contracted from long-neglected needs) — advanced on the decay tick. */
     val afflictionsFlow: StateFlow<AfflictionState> = _afflictions.asStateFlow()
+
+    private val _restUntil = MutableStateFlow(0L)
+    /** Wall-clock ms an active REST window runs until (0 = not resting) — for a "RESTING · Xh left" readout. */
+    val restUntilFlow: StateFlow<Long> = _restUntil.asStateFlow()
 
     // Non-blocking one-shot stream of "that action drained your needs" reports (fight/venture/scavenge/travel).
     private val _exertReport = MutableSharedFlow<ExertReport>(extraBufferCapacity = 4)
@@ -334,12 +346,14 @@ class SpecialGameStore(
                     realMoney = stored.realMoney, currency = stored.currency.ifBlank { "USD" },
                     hydration = stored.hydrationBase.coerceIn(0, 100), hygiene = stored.hygieneBase.coerceIn(0, 100),
                     energy = stored.energyBase.coerceIn(0, 100), nourishment = stored.nourishmentBase.coerceIn(0, 100),
+                    brushing = stored.brushingBase.coerceIn(0, 100), flossing = stored.flossingBase.coerceIn(0, 100),
                     mood = stored.mood.coerceIn(0, 100), operatorName = stored.operatorName.take(LifeStats.MAX_NAME),
                     stepsToday = stored.stepsToday.coerceAtLeast(0),
                     wellRead = stored.wellRead.coerceIn(0, 100), fitness = stored.fitness.coerceIn(0, 100),
                     community = stored.community.coerceIn(0, 100),
                 )
                 needsAnchorMs = stored.needsAnchorMs
+                restUntilMs = stored.restUntilMs.coerceAtLeast(0L)
                 stepDay = stored.stepDay; stepBaseline = stored.stepBaseline
                 lastScavengeMs = stored.lastScavengeMs.coerceAtLeast(0L)
                 _lastScavengeMs.value = lastScavengeMs
@@ -363,6 +377,7 @@ class SpecialGameStore(
             _started.value = startedAtMs
             _life.value = currentLife()
             _afflictions.value = afflictions
+            _restUntil.value = restUntilMs
             loaded = true
             justLoaded = true
         }
@@ -789,6 +804,7 @@ class SpecialGameStore(
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
             afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // shake any sickness
             travelCarry = ExertCarry() // drop any accrued travel-exertion remainder
+            restUntilMs = 0L; _restUntil.value = 0L // no rest window on a fresh operative
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex for the fresh operative
@@ -818,6 +834,7 @@ class SpecialGameStore(
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
             afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // fresh run starts healthy
             travelCarry = ExertCarry() // drop any accrued travel-exertion remainder
+            restUntilMs = 0L; _restUntil.value = 0L // clear any rest window
             // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
             // Seed (no reward) so kept real-life achievements can't instantly re-level the fresh operative
             // (the "reset didn't reset — I still have perks/level/caps" bug).
@@ -841,9 +858,17 @@ class SpecialGameStore(
 
     // --- Real-life profile (LifeStats) ---
 
-    /** The live profile: [lifeBase] with the needs decayed forward to now under the last real-world [lastEnv]. */
-    private fun currentLife(): LifeProfile =
-        LifeStats.decayNeeds(lifeBase, System.currentTimeMillis() - needsAnchorMs, lastEnv)
+    /**
+     * The live profile: [lifeBase] with the needs decayed forward to now under the last real-world [lastEnv].
+     * If a REST window is active, the portion of the elapsed time inside it (from the anchor up to
+     * [restUntilMs]) is passed as restingMs so energy regenerates over it instead of draining.
+     */
+    private fun currentLife(): LifeProfile {
+        val now = System.currentTimeMillis()
+        val elapsed = now - needsAnchorMs
+        val restingMs = (minOf(now, restUntilMs) - needsAnchorMs).coerceIn(0L, elapsed.coerceAtLeast(0L))
+        return LifeStats.decayNeeds(lifeBase, elapsed, lastEnv, restingMs)
+    }
 
     /** The decayed-to-now life profile, loading from disk first — for background reads (e.g. the notifier). */
     suspend fun lifeSnapshot(): LifeProfile { ensureLoaded(); return currentLife() }
@@ -915,8 +940,9 @@ class SpecialGameStore(
      */
     private fun exert(kind: ExertKind, cost: ExertCost) {
         if (cost.isEmpty) return
-        lifeBase = Exertion.apply(currentLife(), cost)
+        lifeBase = Exertion.apply(currentLife(), cost) // captures any rest-regen up to now, then applies cost
         needsAnchorMs = System.currentTimeMillis()
+        if (restUntilMs != 0L) { restUntilMs = 0L; _restUntil.value = 0L } // you got up to act — rest is broken
         _life.value = lifeBase
         _exertReport.tryEmit(ExertReport(kind, cost))
         scheduleFlush()
@@ -959,12 +985,29 @@ class SpecialGameStore(
     fun drink() = mutateLife { LifeStats.drink(it) }
     /** Freshen up (a wash). */
     fun wash() = mutateLife { LifeStats.wash(it) }
-    /** Rest up (restore energy). */
-    fun rest() = mutateLife { LifeStats.rest(it) }
     /** Eat (restore nourishment). */
     fun eat() = mutateLife { LifeStats.eat(it) }
-    /** Brush your teeth (a partial hygiene lift). */
+    /** Brush your teeth (restore the brushing bar). */
     fun brushTeeth() = mutateLife { LifeStats.brush(it) }
+    /** Floss (restore the flossing bar). */
+    fun floss() = mutateLife { LifeStats.floss(it) }
+
+    /**
+     * Begin (or restart) a REST window: energy no longer maxes instantly — instead it regenerates over the
+     * next ~[REST_WINDOW_MS] and stops draining, so it won't run down overnight. Re-anchors first (banking the
+     * decay so far), then opens the window. Any exertion (a fight / venture / scavenge / travel) breaks it.
+     */
+    fun rest() {
+        scope.launch {
+            ensureLoaded()
+            lifeBase = currentLife()               // bank the decay-to-now (incl. any prior rest regen)
+            needsAnchorMs = System.currentTimeMillis()
+            restUntilMs = needsAnchorMs + REST_WINDOW_MS
+            _restUntil.value = restUntilMs
+            _life.value = lifeBase
+            scheduleFlush()
+        }
+    }
 
     private fun scheduleFlush() {
         if (flushJob?.isActive == true) return
@@ -986,6 +1029,7 @@ class SpecialGameStore(
             realMoney = lifeBase.realMoney, currency = lifeBase.currency,
             hydrationBase = lifeBase.hydration, hygieneBase = lifeBase.hygiene,
             energyBase = lifeBase.energy, nourishmentBase = lifeBase.nourishment,
+            brushingBase = lifeBase.brushing, flossingBase = lifeBase.flossing, restUntilMs = restUntilMs,
             mood = lifeBase.mood, operatorName = lifeBase.operatorName, needsAnchorMs = needsAnchorMs,
             wellRead = lifeBase.wellRead, fitness = lifeBase.fitness, community = lifeBase.community,
             stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
@@ -1005,6 +1049,8 @@ class SpecialGameStore(
         const val FLUSH_DELAY_MS = 1_000L
         /** Real-time cooldown between scavenges (ms) — stops loot-farming; the UI shows the countdown. */
         const val SCAVENGE_COOLDOWN_MS = 3 * 60_000L // 3 minutes
+        /** How long a REST window runs — energy regenerates (and doesn't drain) over it. ~8 hours. */
+        const val REST_WINDOW_MS = 8L * 60 * 60 * 1000
         /** Max survival-need drain a single travel sync can apply per need — a defensive cap on a big delta. */
         const val TRAVEL_CAP_PER_SYNC = 8
     }
