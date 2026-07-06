@@ -5,6 +5,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.AlertLevel
+import dev.mascwa.pulse.core.telemetry.SurvivalAlerts
+import dev.mascwa.pulse.core.telemetry.SurvivalNeed
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -412,29 +415,58 @@ class RefreshWorker(
             }
         }
 
-        // --- Life-sim survival check-ins: nudge when a real-decaying need runs low (throttled per need,
-        // critical ones sooner) + remind when a real appointment is imminent (once per event). The needs
-        // bleed into reality, so this doubles as a "drink / eat / rest / wash" reminder. Keeps you alive. ---
+        // --- Life-sim survival check-ins: nudge when a real-decaying need runs low, escalating through four
+        // bands (NOTICE → LOW → URGENT → CRITICAL) each throttled on its own NEED|BAND key (worse = sooner),
+        // with the live stat toll + advice in the body, and a one-shot recovery confirmation when a need is
+        // brought back up; + remind when a real appointment is imminent (once per event). The needs bleed into
+        // reality, so this doubles as a "drink / eat / rest / wash" reminder. Keeps you alive. ---
         if (prefs.survivalAlerts) {
             runCatching {
                 val now = System.currentTimeMillis()
                 val life = container.specialGameStore.lifeSnapshot()
-                val throttleMs = 3L * 60 * 60 * 1000 // low needs: at most every ~3h
                 val fired = state.survivalFiredMs.toMutableMap()
-                dev.mascwa.pulse.core.telemetry.SurvivalAlerts.evaluate(life, now).forEach { alert ->
-                    val critical = alert.level == dev.mascwa.pulse.core.telemetry.AlertLevel.CRITICAL
-                    val gate = if (critical) throttleMs / 2 else throttleMs
-                    if (now - (fired[alert.need.name] ?: 0L) >= gate) {
-                        notifier.notifySurvival(
-                            id = 7700 + alert.need.ordinal,
-                            title = alert.title,
-                            body = alert.body,
-                            urgent = critical,
-                        )
-                        fired[alert.need.name] = now
+                val active = state.survivalNeedActive.toMutableSet()
+                SurvivalNeed.entries.forEach { need ->
+                    val value = need.kind.value(life)
+                    val band = SurvivalAlerts.bandFor(value)
+                    if (band != null) {
+                        val alert = SurvivalAlerts.alertFor(need, value, now) ?: return@forEach
+                        // Per-band throttle: gentler bands nag less; an escalation to a worse band fires
+                        // promptly because it's a fresh NEED|BAND key, not gated by the prior band's stamp.
+                        val gate = when (band) {
+                            AlertLevel.CRITICAL -> 90L * 60 * 1000      // ~1.5h
+                            AlertLevel.URGENT -> 2L * 60 * 60 * 1000    // ~2h
+                            AlertLevel.LOW -> 3L * 60 * 60 * 1000       // ~3h
+                            AlertLevel.NOTICE -> 6L * 60 * 60 * 1000    // ~6h — a soft heads-up
+                        }
+                        val key = "${need.name}|${band.name}"
+                        if (now - (fired[key] ?: 0L) >= gate) {
+                            // Richer body: the themed line + the live stat stakes (when it's biting) + advice.
+                            val body = buildString {
+                                append(alert.body)
+                                if (alert.stakes.isNotBlank()) append("\nToll right now: ${alert.stakes}")
+                                append("\n${alert.advice}")
+                            }
+                            notifier.notifySurvival(
+                                id = 7700 + need.ordinal,
+                                title = alert.title,
+                                body = body,
+                                urgent = band.isPressing,
+                            )
+                            fired[key] = now
+                        }
+                        // Track LOW-or-worse so a recovery can be confirmed; a mere NOTICE isn't worth one.
+                        if (band != AlertLevel.NOTICE) active += need.name
+                    } else if (need.name in active) {
+                        // Climbed back to healthy after being a real concern → confirm the recovery once,
+                        // then clear its throttle keys so a later decline nags fresh (not gated by an old stamp).
+                        val rec = SurvivalAlerts.recovery(need, now)
+                        notifier.notifySurvival(id = 7700 + need.ordinal, title = rec.title, body = rec.body, urgent = false)
+                        active -= need.name
+                        fired.keys.removeAll { it.startsWith("${need.name}|") }
                     }
                 }
-                state = state.copy(survivalFiredMs = fired)
+                state = state.copy(survivalFiredMs = fired, survivalNeedActive = active.toList())
 
                 // Imminent real appointment → an agenda reminder, once per event while it's imminent.
                 val agenda = dev.mascwa.pulse.core.telemetry.CalendarQuests.compose(
