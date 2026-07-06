@@ -51,14 +51,11 @@ import dev.mascwa.pulse.data.weather.WeatherCode
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import dev.mascwa.pulse.feature.common.LocalTickerSpeed
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.mascwa.pulse.feature.common.SectionBar
-import dev.mascwa.pulse.feature.common.Ticker
-import dev.mascwa.pulse.feature.common.TickerItem
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -154,8 +151,6 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         c.muted,
                     )
                 }
-                // static, reliable markets strip — mood + each instrument's move; tap to open Markets
-                MarketsStrip(state.markets.data, nav.openMarkets)
             }
         },
     ) { innerPadding ->
@@ -254,33 +249,6 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
             }
         }
     }
-}
-
-/**
- * The home markets ticker — an auto-scrolling NIGHTWIRE marquee: a plain-English mood read + every
- * loaded instrument's move, looping seamlessly. Scroll rate is the user's adjustable [LocalTickerSpeed]
- * (Settings slider). Taps through to the full Markets screen. Built on the robust [Ticker] (no fill bug).
- */
-@Composable
-private fun MarketsStrip(quotes: List<Quote>?, onClick: () -> Unit) {
-    val c = Pulse.colors
-    val items = quotes.orEmpty().filter { it.changePercent != null }
-    if (items.isEmpty()) return
-    // trendColor is @Composable (reads the theme), so resolve both trend colours here in composable
-    // scope, then build the item list once per change inside a pure remember (no @Composable calls).
-    val upColor = trendColor(true)
-    val downColor = trendColor(false)
-    val tickerItems = remember(quotes, c, upColor, downColor) {
-        val mood = MarketMood.summarize(items.mapNotNull { it.changePercent })
-        buildList {
-            mood?.let { add(TickerItem("", it.headline, c.accent)) }
-            items.forEach { q ->
-                val pct = q.changePercent ?: return@forEach
-                add(TickerItem(q.label.uppercase().take(12), Formatters.signedPercent(pct), if (pct >= 0) upColor else downColor))
-            }
-        }
-    }
-    Ticker(tickerItems, speedFactor = LocalTickerSpeed.current, onClick = onClick)
 }
 
 @Composable
