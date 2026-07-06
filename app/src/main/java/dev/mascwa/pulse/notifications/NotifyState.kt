@@ -23,6 +23,9 @@ data class NotifyState(
     /** Needs currently in a real concern band (LOW or worse) that we've alerted — so we can fire a single
      *  recovery confirmation when one is brought back up to healthy. Need names. */
     val survivalNeedActive: List<String> = emptyList(),
+    /** Afflictions we've already announced as active — so a disease pushes once when it takes hold and once
+     *  when it clears. Affliction names. */
+    val afflictedNotified: List<String> = emptyList(),
     /** Calendar event ids already reminded about while imminent, so an appointment nudges once. */
     val agendaNotifiedIds: List<String> = emptyList(),
     /** Rotating survival-tip cursor (walks the whole catalog before repeating) + when one last fired. */
