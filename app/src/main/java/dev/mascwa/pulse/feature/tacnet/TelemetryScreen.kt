@@ -70,6 +70,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
+import dev.mascwa.pulse.core.telemetry.Affliction
+import dev.mascwa.pulse.core.telemetry.AfflictionState
+import dev.mascwa.pulse.core.telemetry.Afflictions
 import dev.mascwa.pulse.core.telemetry.AgendaQuest
 import dev.mascwa.pulse.core.telemetry.AgeBand
 import dev.mascwa.pulse.core.telemetry.Build
@@ -359,6 +362,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val questDone by vm.questCompleted.collectAsStateWithLifecycle()
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val life by vm.life.collectAsStateWithLifecycle()
+    val afflictions by vm.afflictions.collectAsStateWithLifecycle()
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val siteReach by vm.siteReach.collectAsStateWithLifecycle()
@@ -385,6 +389,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onDrink = { vm.drink() }, onWash = { vm.wash() }, onRest = { vm.rest() }, onEat = { vm.eat() },
             onBrush = { vm.brushTeeth() },
         )
+        AfflictionsBanner(afflictions, c)
         Spacer(Modifier.height(8.dp))
 
         // Self-care check-in: asks, then catches a lie against the sensed evidence, then tops up the need.
@@ -441,7 +446,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         when {
             character.down -> DownedPanel(c) { vm.revive() }
-            encounter != null -> EncounterPanel(encounter!!, character, env, life, wellKept, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
+            encounter != null -> EncounterPanel(encounter!!, character, env, life, afflictions, wellKept, vm.telemetryFlow, c) { i, chem, roll -> vm.choose(i, chem, roll) }
             else -> IdlePanel(resolution, siteReach, c) { vm.venture() }
         }
         Spacer(Modifier.height(12.dp))
@@ -988,6 +993,37 @@ private fun NeedGauge(st: NeedState, c: NightwirePalette) {
         color = if (st.tier.isConcern) col else c.muted,
         modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
     )
+}
+
+/**
+ * The lingering-affliction readout beneath the needs: any disease that's taken hold (with the stat toll it's
+ * carrying and how far along the cure is) and any that's incubating from a still-critical need. Renders
+ * nothing when you're well.
+ */
+@Composable
+private fun AfflictionsBanner(state: AfflictionState, c: NightwirePalette) {
+    val active = state.active.toList()
+    val incubating = Afflictions.incubating(state)
+    if (active.isEmpty() && incubating.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        if (active.isNotEmpty()) {
+            Text("⚕ AFFLICTED", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.negative, letterSpacing = 1.sp)
+            active.forEach { a ->
+                val toll = a.effects.joinToString("  ") { e ->
+                    "${e.stat.display.take(3)} ${if (e.delta < 0) "−" else "+"}${abs(e.delta)}"
+                }
+                val cure = (Afflictions.cureProgress(state, a) * 100).roundToInt()
+                Text("● ${a.label} · $toll", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.negative)
+                Text("   ${a.desc}  ${a.cure} (recovery $cure%)", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.ink2)
+            }
+        }
+        incubating.forEach { a ->
+            val pct = (Afflictions.incubation(state, a) * 100).roundToInt()
+            Text("△ Coming down with ${a.label.lowercase()} ($pct%) — tend ${a.need.label.lowercase()}",
+                fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.amber)
+        }
+    }
 }
 
 /** Tier → colour ramp: healthy green, fading amber, low amber-orange, strained/critical red. */
@@ -1543,6 +1579,7 @@ private fun EncounterPanel(
     ch: Character,
     env: EnvContext?,
     life: LifeProfile?,
+    afflictions: AfflictionState?,
     wellKept: Int,
     telemetry: StateFlow<dev.mascwa.pulse.data.sensors.Telemetry>,
     c: NightwirePalette,
@@ -1632,7 +1669,7 @@ private fun EncounterPanel(
                     }
                 }
             }
-            e.choices.forEach { choice -> ApproachRow(choice, ch, env, life, wellKept, selectedChem, c) }
+            e.choices.forEach { choice -> ApproachRow(choice, ch, env, life, afflictions, wellKept, selectedChem, c) }
             Spacer(Modifier.height(2.dp))
             SegBar(meter, if (resolved) c.positive else c.sky, c)
             when {
@@ -1688,11 +1725,11 @@ private fun ChemChip(label: String, on: Boolean, c: NightwirePalette, onClick: (
  * exactly what's bending this check *before* you commit. Read-only.
  */
 @Composable
-private fun ApproachRow(choice: Choice, ch: Character, env: EnvContext?, life: LifeProfile?, wellKept: Int, selectedChem: String?, c: NightwirePalette) {
+private fun ApproachRow(choice: Choice, ch: Character, env: EnvContext?, life: LifeProfile?, afflictions: AfflictionState?, wellKept: Int, selectedChem: String?, c: NightwirePalette) {
     val gate = choice.stat
     // Recomputed only when the inputs change, not on every sensor-driven meter frame.
-    val mods = remember(choice, ch, env, life, wellKept, selectedChem) {
-        if (gate != null) SpecialGame.statMods(ch, choice, env, selectedChem, life, wellKept) else emptyList()
+    val mods = remember(choice, ch, env, life, afflictions, wellKept, selectedChem) {
+        if (gate != null) SpecialGame.statMods(ch, choice, env, selectedChem, life, wellKept, afflictions) else emptyList()
     }
     val effStat = mods.sumOf { it.amount }
     val bonuses = mods.filter { it.source != ModSource.BASE }
