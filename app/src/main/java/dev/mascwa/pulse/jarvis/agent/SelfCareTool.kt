@@ -40,9 +40,10 @@ class SelfCareTool(
             "needs" -> needsLine()
             "drink" -> { game.drink(); "Hydration topped up." }
             "eat" -> { game.eat(); "Nourishment topped up." }
-            "rest" -> { game.rest(); "Energy restored." }
+            "rest" -> { game.rest(); "Rest window started — energy recovers over the next ~8h (and won't drain)." }
             "wash" -> { game.wash(); "Hygiene restored (a wash)." }
-            "brush" -> { game.brushTeeth(); "Teeth brushed (a partial hygiene lift)." }
+            "brush" -> { game.brushTeeth(); "Teeth brushed — brushing bar restored." }
+            "floss" -> { game.floss(); "Flossed — flossing bar restored." }
             "due" -> habits.nextDue()?.let { "Check-in due: ${it.label} — \"${it.question}\"" } ?: "No check-in is due."
             "streak", "streaks" -> habits.describeStreak().ifBlank {
                 "No self-care streak yet — confirm a habit two days running to start one."

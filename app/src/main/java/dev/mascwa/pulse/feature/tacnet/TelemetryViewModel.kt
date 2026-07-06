@@ -413,6 +413,10 @@ class TelemetryViewModel(
     val life: StateFlow<dev.mascwa.pulse.core.telemetry.LifeProfile> = game.lifeFlow
     /** Lingering afflictions contracted from long-neglected needs (advanced on the needs tick). */
     val afflictions: StateFlow<dev.mascwa.pulse.core.telemetry.AfflictionState> = game.afflictionsFlow
+    /** Wall-clock ms an active REST window runs until (0 = not resting) — drives the "RESTING · Xh left" readout. */
+    val restUntil: StateFlow<Long> = game.restUntilFlow
+    /** Floss — restore the flossing oral-hygiene bar. */
+    fun floss() = game.floss()
     fun setHeight(cm: Int) = game.setHeight(cm)
     fun setWeight(kg: Int) = game.setWeight(kg)
     fun setAge(years: Int) = game.setAge(years)
