@@ -123,13 +123,6 @@ class MainActivity : ComponentActivity() {
             val settings by app.container.settingsRepository.settings
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
             val online by app.container.connectivityObserver.isOnline.collectAsStateWithLifecycle()
-            val hudVm: dev.mascwa.pulse.feature.common.HudViewModel =
-                androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
-            val kp by hudVm.kp.collectAsStateWithLifecycle()
-            val auroraPct by hudVm.auroraPct.collectAsStateWithLifecycle()
-            val solarWind by hudVm.solarWindKmS.collectAsStateWithLifecycle()
-            val bz by hudVm.bz.collectAsStateWithLifecycle()
-            val stormLevel by hudVm.stormLevel.collectAsStateWithLifecycle()
 
             // Always-on ambient sensing (opt-in): keep the foreground sensing service in step with the
             // settings — starts/stops immediately on a toggle change and on cold launch. Defensive inside.
@@ -190,19 +183,8 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
                     dev.mascwa.pulse.ui.effects.LocalHaptics provides settings.haptics,
-                    dev.mascwa.pulse.feature.common.LocalTickerSpeed provides settings.tickerSpeed,
                     dev.mascwa.pulse.feature.home.LocalJarvisFeedTopic provides settings.jarvisFeedTopic,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
-                    dev.mascwa.pulse.feature.common.LocalHud provides dev.mascwa.pulse.feature.common.HudState(
-                        kp = kp,
-                        hasLocation = app.container.locationProvider.hasPermission(),
-                        enabled = settings.hudStrip,
-                        auroraPct = auroraPct,
-                        solarWindKmS = solarWind,
-                        bz = bz,
-                        stormLevel = stormLevel,
-                        dataStream = settings.hudDataStream,
-                    ),
                 ) {
                 Box(Modifier.fillMaxSize()) {
                     if (gated) {

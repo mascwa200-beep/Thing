@@ -483,25 +483,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
                         vm.update { it.copy(amoledBlack = v) }
                     }
-                    PrefSwitch("HUD strip", "Live clock · GPS · link · battery · Kp", s.hudStrip) { v ->
-                        vm.update { it.copy(hudStrip = v) }
-                    }
-                    PrefSwitch("HUD data-stream", "Second-row live telemetry marquee + tap-to-scan", s.hudDataStream) { v ->
-                        vm.update { it.copy(hudDataStream = v) }
-                    }
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
                     }
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
                     }
-                    PrefSlider(
-                        "Ticker speed",
-                        value = s.tickerSpeed,
-                        valueRange = 0.25f..3f,
-                        subtitle = "Auto-scroll rate of the home markets ticker",
-                        valueLabel = { "%.2f×".format(it) },
-                    ) { v -> vm.update { it.copy(tickerSpeed = v) } }
                 }
             }
             item { HorizontalDivider() }

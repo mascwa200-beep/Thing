@@ -49,8 +49,6 @@ fun PulseScaffold(
                 }
                 // Fallout Pip-Boy feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
                 feedTabs?.let { FeedTabBar(it) }
-                // Always-on cockpit telemetry strip (no-op when disabled in Settings).
-                HudStrip()
             }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
