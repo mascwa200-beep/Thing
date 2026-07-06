@@ -20,6 +20,8 @@ enum class SurvivalNeed(val label: String, val verb: String, val kind: NeedKind)
     NOURISHMENT("NOURISHMENT", "EAT", NeedKind.NOURISHMENT),
     ENERGY("ENERGY", "REST", NeedKind.ENERGY),
     HYGIENE("HYGIENE", "WASH", NeedKind.HYGIENE),
+    BRUSHING("BRUSHING", "BRUSH", NeedKind.BRUSHING),
+    FLOSSING("FLOSSING", "FLOSS", NeedKind.FLOSSING),
 }
 
 /** How dire the need is — four escalating bands (a soft heads-up through a life-or-death alarm). */
@@ -289,6 +291,90 @@ object SurvivalAlerts {
                 "Hygiene's bottomed out, operator. Get clean now.",
             )
         }
+        SurvivalNeed.BRUSHING -> when (level) {
+            AlertLevel.NOTICE -> listOf(
+                "Teeth feeling a little filmy. Brush when you get a sec.",
+                "Plaque's starting to settle in. A brush keeps it honest.",
+                "Your mouth wants a brush before long, operator.",
+                "Nothing dire — but don't let the brushing slide.",
+                "That morning-mouth feeling's creeping back. Brush soon.",
+                "Skip brushing long enough and it compounds. Stay on it.",
+                "A quick brush now saves a rotten tooth later.",
+                "Teeth could use a once-over sometime today.",
+            )
+            AlertLevel.LOW -> listOf(
+                "You skipped brushing and it shows. Handle it.",
+                "Plaque's building on your teeth — brush before it hardens.",
+                "Your breath's turning. Brush, operator — people notice.",
+                "Neglecting your teeth. Brush now, not tomorrow.",
+                "Fuzzy teeth and a sour mouth. Time to BRUSH.",
+                "Charisma's slipping with your smile. Brush up.",
+                "Days without a brush add up fast. Do it now.",
+                "Your mouth's a mess. Sort it before a deal goes bad.",
+            )
+            AlertLevel.URGENT -> listOf(
+                "Your breath could drop a brahmin. BRUSH, now.",
+                "Plaque's turning to tartar — brush before a tooth goes.",
+                "You're one skipped brush from real damage. Handle it.",
+                "Nobody wants to talk to that mouth. Brush immediately.",
+                "This is neglect, plain and simple. Brush your damn teeth.",
+                "Your smile's a liability now. Brush before it costs you.",
+                "Fuzzy, sour, and getting worse. BRUSH.",
+                "Stop putting it off — your teeth are paying for it.",
+            )
+            AlertLevel.CRITICAL -> listOf(
+                "Your teeth are ROTTING in your head. Brush. NOW.",
+                "Critical neglect — that's decay you can taste. BRUSH.",
+                "You've let it go too far. Brush before you lose a tooth.",
+                "Your mouth is a wasteland of its own. Brush this instant.",
+                "This is what not-brushing looks like: rot. Fix it NOW.",
+                "Toothache, stench, decay — all self-inflicted. BRUSH.",
+                "You reek from ten paces and it's your teeth. Brush now.",
+                "Bottomed out. Brush or start counting the teeth you'll lose.",
+            )
+        }
+        SurvivalNeed.FLOSSING -> when (level) {
+            AlertLevel.NOTICE -> listOf(
+                "Been a bit since you flossed. Slip it in when you can.",
+                "Bits are lodging between your teeth. Floss soon.",
+                "Your gums will thank you for a floss before long.",
+                "Nothing urgent — just don't forget to floss.",
+                "Flossing's easy to skip and easy to regret. Stay on it.",
+                "A quick floss now keeps your gums off the ropes.",
+                "Gums are fine, but keep the flossing up, operator.",
+                "You're due a floss sometime today.",
+            )
+            AlertLevel.LOW -> listOf(
+                "You've been skipping the floss. Your gums are noticing.",
+                "Gunk's building between your teeth. Floss before it festers.",
+                "Gums feeling tender? That's the skipped flossing. Floss.",
+                "Neglecting your gums, operator. Floss now.",
+                "Flossing's overdue and your mouth knows it. Handle it.",
+                "Let this slide and it turns to bleeding gums. Floss up.",
+                "Your gums are getting sore. Floss before it worsens.",
+                "Days without floss and it adds up. Do it now.",
+            )
+            AlertLevel.URGENT -> listOf(
+                "Your gums are bleeding — that's neglect. FLOSS now.",
+                "Skip flossing much longer and it's gum disease. Handle it.",
+                "Sore, swollen, bleeding gums. Floss immediately.",
+                "This is on you, operator. Floss before your gums give out.",
+                "Your mouth's turning against you. FLOSS.",
+                "Real damage is close now. Get the floss out.",
+                "Bleeding when you eat? Floss. This is fixable — barely.",
+                "Stop neglecting it — your gums are on the edge.",
+            )
+            AlertLevel.CRITICAL -> listOf(
+                "GUM DISEASE has set in. Floss before you lose teeth.",
+                "Critical neglect — your gums are rotting. FLOSS NOW.",
+                "Bleeding, receding, failing gums. All because you didn't floss.",
+                "You let it get this bad. Floss immediately or it's the dentist.",
+                "This is what skipping floss does: disease. Fix it NOW.",
+                "Your gums are giving out, operator. FLOSS.",
+                "Rot has reached the roots. Floss now, and hope it's not too late.",
+                "Bottomed out — floss or start saying goodbye to teeth.",
+            )
+        }
     }
 
     /** The positive-confirmation catalog for a need brought back up. */
@@ -324,6 +410,22 @@ object SurvivalAlerts {
             "Washed and sharp. Presence back where it should be.",
             "Clean again, operator. That's the difference between a deal and a door.",
             "Dust off, charm on. Well done.",
+        )
+        SurvivalNeed.BRUSHING -> listOf(
+            "Teeth brushed, breath fresh. Smile's back in business.",
+            "Plaque gone. Your charisma thanks you, operator.",
+            "Clean teeth, clean start. Well done.",
+            "Mouth sorted. No more turning heads the wrong way.",
+            "Brushed and bright. Keep it up and no rot sets in.",
+            "That's the difference between a grin and a grimace. Nice.",
+        )
+        SurvivalNeed.FLOSSING -> listOf(
+            "Flossed and healthy. Your gums are grateful.",
+            "Gunk cleared, gums calm. Good work.",
+            "No more bleeding gums. You caught it in time.",
+            "Flossed clean — gum disease stays a rumour.",
+            "Gums back in the green. Keep the habit, operator.",
+            "That's roots saved. Well flossed.",
         )
     }
 }

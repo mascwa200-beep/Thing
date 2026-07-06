@@ -97,10 +97,14 @@ class AfflictionsTest {
     }
 
     @Test fun forNeedMapsEveryNeed() {
+        // Every NeedKind must map to exactly one affliction (forNeed throws otherwise).
+        NeedKind.entries.forEach { Affliction.forNeed(it) }
         assertEquals(Affliction.DEHYDRATION, Affliction.forNeed(NeedKind.HYDRATION))
         assertEquals(Affliction.MALNUTRITION, Affliction.forNeed(NeedKind.NOURISHMENT))
         assertEquals(Affliction.EXHAUSTION, Affliction.forNeed(NeedKind.ENERGY))
         assertEquals(Affliction.INFECTION, Affliction.forNeed(NeedKind.HYGIENE))
+        assertEquals(Affliction.TOOTH_DECAY, Affliction.forNeed(NeedKind.BRUSHING))
+        assertEquals(Affliction.GUM_DISEASE, Affliction.forNeed(NeedKind.FLOSSING))
     }
 
     @Test fun zeroElapsedIsNoOp() {
