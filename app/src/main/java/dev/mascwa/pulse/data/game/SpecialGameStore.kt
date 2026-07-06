@@ -20,6 +20,9 @@ import dev.mascwa.pulse.core.telemetry.DailyObjective
 import dev.mascwa.pulse.core.telemetry.DailyObjectives
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.ExertCost
+import dev.mascwa.pulse.core.telemetry.ExertKind
+import dev.mascwa.pulse.core.telemetry.Exertion
 import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.ItemCodex
@@ -36,8 +39,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
@@ -57,6 +63,9 @@ data class DailyState(
     val claimed: Set<String> = emptySet(),
     val streak: Int = 0,
 )
+
+/** A one-shot "that action cost you needs" event for a transient UI flourish. */
+data class ExertReport(val kind: ExertKind, val cost: ExertCost)
 
 /**
  * On-device persistence + play surface for the [SpecialGame] — the STAT-tab wasteland RPG. In-memory
@@ -227,6 +236,10 @@ class SpecialGameStore(
     private val _afflictions = MutableStateFlow(AfflictionState())
     /** Lingering survival afflictions (contracted from long-neglected needs) — advanced on the decay tick. */
     val afflictionsFlow: StateFlow<AfflictionState> = _afflictions.asStateFlow()
+
+    // Non-blocking one-shot stream of "that action drained your needs" reports (fight/venture/scavenge/travel).
+    private val _exertReport = MutableSharedFlow<ExertReport>(extraBufferCapacity = 4)
+    val exertReportFlow: SharedFlow<ExertReport> = _exertReport.asSharedFlow()
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -561,6 +574,7 @@ class SpecialGameStore(
             _resolution.value = null
             _character.value = c.copy(currentEncounterId = next.id)
             ventures++
+            exert(ExertKind.VENTURE, Exertion.ventureCost()) // heading out costs a little energy
             runAchievementCheck()
             scheduleFlush()
         }
@@ -588,6 +602,7 @@ class SpecialGameStore(
             lastScavengeMs = now
             _lastScavengeMs.value = now
             _lastScavenge.value = haul
+            exert(ExertKind.SCAVENGE, Exertion.scavengeCost()) // combing a site is thirsty, tiring legwork
             runAchievementCheck() // a new distinct item may clear a collection achievement
             scheduleFlush()
         }
@@ -620,6 +635,13 @@ class SpecialGameStore(
             _resolution.value = resolution
             if (resolution.success) wins++
             if (resolution.crit) crits++
+            // The fight was resolved at pre-exertion needs (resolve read currentLife above); now the physical
+            // effort of the gesture is the aftermath. Only stat-gated approaches (a real gesture) cost needs —
+            // a SAFE option is passive. Harder checks + a flat-out gesture cost more.
+            val chosen = encounter.choices.getOrNull(choiceIndex)
+            if (chosen?.stat != null) {
+                exert(ExertKind.ENGAGE, Exertion.engageCost(chosen.difficulty, r.toFloat() / SpecialGame.DIE))
+            }
             runAchievementCheck()
             scheduleFlush()
         }
@@ -848,6 +870,21 @@ class SpecialGameStore(
             _life.value = lifeBase
             scheduleFlush()
         }
+    }
+
+    /**
+     * Spend survival needs on a physical action ([kind]). Applies [cost] to the CURRENT decayed needs and
+     * re-anchors — the SAME capture-decayed-then-re-anchor discipline as [mutateLife], so the accrued
+     * time-decay is never double-counted. Emits a one-shot [ExertReport] for the UI. Only touches the needs
+     * (never HP, never a [LifeEffect]). Call from inside an already-loaded [scope] coroutine.
+     */
+    private fun exert(kind: ExertKind, cost: ExertCost) {
+        if (cost.isEmpty) return
+        lifeBase = Exertion.apply(currentLife(), cost)
+        needsAnchorMs = System.currentTimeMillis()
+        _life.value = lifeBase
+        _exertReport.tryEmit(ExertReport(kind, cost))
+        scheduleFlush()
     }
 
     fun setHeight(cm: Int) = mutateLife { LifeStats.withHeight(it, cm) }

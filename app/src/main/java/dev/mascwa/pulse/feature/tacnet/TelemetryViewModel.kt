@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -233,7 +234,20 @@ class TelemetryViewModel(
     val questCompleted: StateFlow<Quest?> = _questDone.asStateFlow()
     fun dismissQuestComplete() { _questDone.value = null }
 
+    private val _lastExertion = MutableStateFlow<dev.mascwa.pulse.data.game.ExertReport?>(null)
+    /** The most-recent "that action cost you needs" report, shown as a transient STAT-panel flourish. */
+    val lastExertion: StateFlow<dev.mascwa.pulse.data.game.ExertReport?> = _lastExertion.asStateFlow()
+
     init {
+        // Surface each exertion report for ~3s, then clear (collectLatest cancels the pending clear when a
+        // fresh action drains needs again, so a burst keeps showing the latest cost).
+        viewModelScope.launch {
+            game.exertReportFlow.collectLatest { r ->
+                _lastExertion.value = r
+                kotlinx.coroutines.delay(3000)
+                _lastExertion.value = null
+            }
+        }
         // Subscribe to completions FIRST (so a first-tick completion isn't missed), then drive the log on
         // every life/metric change; grant rewards + a one-shot banner as quests complete.
         viewModelScope.launch {
