@@ -118,6 +118,8 @@ import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.LifeProfile
 import dev.mascwa.pulse.core.telemetry.ModSource
 import dev.mascwa.pulse.core.telemetry.LifeStats
+import dev.mascwa.pulse.core.telemetry.NeedState
+import dev.mascwa.pulse.core.telemetry.NeedTier
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
 import dev.mascwa.pulse.core.telemetry.Quest
@@ -734,11 +736,20 @@ private fun LifePanel(
             FalloutGauge("Steps today", "${life.stepsToday} / ${LifeStats.STRIDE_STEPS}",
                 life.stepsToday.toFloat() / LifeStats.STRIDE_STEPS, c.positive)
 
-            // Needs meters + top-up actions.
-            FalloutGauge("Hydration", "${life.hydration}%", life.hydration / 100f, c.sky)
-            FalloutGauge("Nourishment", "${life.nourishment}%", life.nourishment / 100f, c.magenta)
-            FalloutGauge("Energy", "${life.energy}%", life.energy / 100f, c.amber)
-            FalloutGauge("Hygiene", "${life.hygiene}%", life.hygiene / 100f, c.positive)
+            // Needs meters + top-up actions — each bar tints by its severity tier and shows the named
+            // condition + the exact stat toll it's taking right now. An overall CONDITION rolls them up.
+            val overall = LifeStats.overallCondition(life)
+            val urgent = LifeStats.mostUrgentNeed(life)
+            Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("NEEDS · CONDITION $overall%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp, color = needTierColor(LifeStats.needTier(overall), c), letterSpacing = 1.sp,
+                    modifier = Modifier.weight(1f))
+                if (urgent != null) {
+                    Text("▲ ${urgent.kind.label.uppercase()} ${urgent.condition}", fontFamily = JetBrainsMono,
+                        fontSize = 8.sp, color = needTierColor(urgent.tier, c))
+                }
+            }
+            LifeStats.needStates(life).forEach { NeedGauge(it, c) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.weight(1f)) { GameButton("DRINK", c.sky, onDrink) }
                 Box(Modifier.weight(1f)) { GameButton("EAT", c.magenta, onEat) }
@@ -957,6 +968,34 @@ private fun ConditionFigure(modifier: Modifier, head: Color, torso: Color, limbs
         drawLine(legs, Offset(cx - half * 0.55f, tBot), Offset(cx - half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
         drawLine(legs, Offset(cx + half * 0.55f, tBot), Offset(cx + half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
     }
+}
+
+/**
+ * A survival-need meter: the [FalloutGauge] tinted by the need's severity tier, with the named condition
+ * and the exact stat toll it's taking right now beneath it (dim when the need is comfortable, tier-coloured
+ * once it's a concern).
+ */
+@Composable
+private fun NeedGauge(st: NeedState, c: NightwirePalette) {
+    val col = needTierColor(st.tier, c)
+    FalloutGauge(st.kind.label.uppercase(), "${st.value}%  ${st.tier.label}", st.value / 100f, col)
+    val stakes = st.effects.joinToString("  ") { e ->
+        "${e.stat.display.take(3)} ${if (e.delta < 0) "−" else "+"}${abs(e.delta)}"
+    }
+    val sub = if (stakes.isBlank()) st.condition else "${st.condition} · $stakes"
+    Text(
+        sub, fontFamily = JetBrainsMono, fontSize = 8.sp,
+        color = if (st.tier.isConcern) col else c.muted,
+        modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
+    )
+}
+
+/** Tier → colour ramp: healthy green, fading amber, low amber-orange, strained/critical red. */
+private fun needTierColor(tier: NeedTier, c: NightwirePalette): Color = when (tier) {
+    NeedTier.PEAK, NeedTier.HEALTHY -> c.positive
+    NeedTier.FADING -> c.amber
+    NeedTier.LOW -> Color(0xFFFF9F45)
+    NeedTier.STRAINED, NeedTier.CRITICAL -> c.negative
 }
 
 /** A VITALS gauge in the Fallout HP/AP idiom: a green-banded label/value header over a notched,

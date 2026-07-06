@@ -15,8 +15,14 @@ data class NotifyState(
     val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
     val flightAlertedIds: List<String> = emptyList(),
-    /** Last time (epoch ms) each survival need was alerted (need name → ms), so a nag is throttled. */
+    /**
+     * Last time (epoch ms) each survival need+band was alerted (key `NEED|BAND` → ms), so a nag is
+     * throttled per severity and an escalation (LOW → URGENT → CRITICAL) fires promptly on its own key.
+     */
     val survivalFiredMs: Map<String, Long> = emptyMap(),
+    /** Needs currently in a real concern band (LOW or worse) that we've alerted — so we can fire a single
+     *  recovery confirmation when one is brought back up to healthy. Need names. */
+    val survivalNeedActive: List<String> = emptyList(),
     /** Calendar event ids already reminded about while imminent, so an appointment nudges once. */
     val agendaNotifiedIds: List<String> = emptyList(),
     /** Rotating survival-tip cursor (walks the whole catalog before repeating) + when one last fired. */
