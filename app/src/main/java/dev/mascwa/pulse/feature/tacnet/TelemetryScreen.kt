@@ -77,6 +77,8 @@ import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.CheckBreakdown
 import dev.mascwa.pulse.core.telemetry.CheckMod
 import dev.mascwa.pulse.core.telemetry.CheckinOutcome
+import dev.mascwa.pulse.ui.effects.HapticCue
+import dev.mascwa.pulse.ui.effects.rememberHapticCue
 import dev.mascwa.pulse.core.telemetry.Choice
 import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.Companion
@@ -336,6 +338,19 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val character by vm.character.collectAsStateWithLifecycle()
     val encounter by vm.currentEncounter.collectAsStateWithLifecycle()
     val resolution by vm.gameResolution.collectAsStateWithLifecycle()
+    // DualSense-style haptic on each encounter resolution: crit → escalating flourish, win → a swell into
+    // a click, loss → a double thud. Gated by the Settings haptics toggle inside rememberHapticCue.
+    val encounterHaptic = rememberHapticCue()
+    LaunchedEffect(resolution) {
+        val r = resolution ?: return@LaunchedEffect
+        encounterHaptic(
+            when {
+                r.crit -> HapticCue.CRIT
+                r.success -> HapticCue.SUCCESS_RISE
+                else -> HapticCue.ERROR_REJECT
+            }
+        )
+    }
     val env by vm.env.collectAsStateWithLifecycle()
     val lastUnlock by vm.lastUnlock.collectAsStateWithLifecycle()
     val dayBanner by vm.dayBanner.collectAsStateWithLifecycle()
