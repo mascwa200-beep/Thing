@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.Affliction
 import dev.mascwa.pulse.core.telemetry.AlertLevel
 import dev.mascwa.pulse.core.telemetry.SurvivalAlerts
 import dev.mascwa.pulse.core.telemetry.SurvivalNeed
@@ -467,6 +468,22 @@ class RefreshWorker(
                     }
                 }
                 state = state.copy(survivalFiredMs = fired, survivalNeedActive = active.toList())
+
+                // Lingering afflictions: fire once when a disease takes hold (a neglected need went sick),
+                // once when it clears. Deduped via afflictedNotified. Shares the survival-alerts toggle.
+                val aff = container.specialGameStore.afflictionSnapshot()
+                val activeAfflictions = aff.active.map { it.name }
+                val knownAfflictions = state.afflictedNotified
+                aff.active.filter { it.name !in knownAfflictions }.forEach { a ->
+                    notifier.notifySurvival(7780 + a.ordinal, "⚕ AFFLICTED · ${a.label}", "${a.desc} ${a.cure}", urgent = true)
+                }
+                Affliction.entries.filter { it.name in knownAfflictions && it.name !in activeAfflictions }.forEach { a ->
+                    notifier.notifySurvival(
+                        7780 + a.ordinal, "✓ RECOVERED · ${a.label}",
+                        "You've shaken off ${a.label.lowercase()}. Back to fighting form.", urgent = false,
+                    )
+                }
+                state = state.copy(afflictedNotified = activeAfflictions)
 
                 // Imminent real appointment → an agenda reminder, once per event while it's imminent.
                 val agenda = dev.mascwa.pulse.core.telemetry.CalendarQuests.compose(
