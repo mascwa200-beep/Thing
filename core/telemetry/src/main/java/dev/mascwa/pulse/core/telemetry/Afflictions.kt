@@ -52,6 +52,18 @@ enum class Affliction(
         "Filth set into a wound — you've caught an infection.",
         "Stay clean to fight it off.",
     ),
+    TOOTH_DECAY(
+        "Tooth Decay", NeedKind.BRUSHING,
+        listOf(LifeEffect(Special.CHARISMA, -2, "Rotting teeth"), LifeEffect(Special.PERCEPTION, -1, "Throbbing toothache")),
+        "Plaque left too long has rotted a tooth — it aches and it shows when you smile.",
+        "Keep brushing to heal it.",
+    ),
+    GUM_DISEASE(
+        "Gum Disease", NeedKind.FLOSSING,
+        listOf(LifeEffect(Special.ENDURANCE, -2, "Gum disease"), LifeEffect(Special.CHARISMA, -1, "Bleeding gums")),
+        "Neglected gums have turned — they bleed, they ache, and the rot saps your health.",
+        "Floss daily to beat it back.",
+    ),
     ;
 
     companion object {

@@ -89,28 +89,29 @@ class LifeStatsTest {
     }
 
     @Test fun criticalHydrationTaxesEnduranceAndStrength() {
+        // CRITICAL now bites hard: primary −3, secondary −2.
         val p = LifeProfile(hydration = 10)
-        assertEquals(-2, LifeStats.statBonus(p, Special.ENDURANCE))
-        assertEquals(-1, LifeStats.statBonus(p, Special.STRENGTH))
+        assertEquals(-3, LifeStats.statBonus(p, Special.ENDURANCE))
+        assertEquals(-2, LifeStats.statBonus(p, Special.STRENGTH))
     }
 
     @Test fun poorHygieneTaxesCharisma() {
-        assertEquals(-1, LifeStats.statBonus(LifeProfile(hygiene = 25), Special.CHARISMA))
-        assertEquals(-2, LifeStats.statBonus(LifeProfile(hygiene = 10), Special.CHARISMA))
+        assertEquals(-1, LifeStats.statBonus(LifeProfile(hygiene = 25), Special.CHARISMA)) // LOW → primary −1
+        assertEquals(-3, LifeStats.statBonus(LifeProfile(hygiene = 10), Special.CHARISMA)) // CRITICAL → primary −3
     }
 
     @Test fun lowEnergyTaxesAgilityThenIntelligence() {
         assertEquals(-1, LifeStats.statBonus(LifeProfile(energy = 25), Special.AGILITY))
-        val spent = LifeProfile(energy = 10)
-        assertEquals(-2, LifeStats.statBonus(spent, Special.AGILITY))
-        assertEquals(-1, LifeStats.statBonus(spent, Special.INTELLIGENCE))
+        val spent = LifeProfile(energy = 10) // CRITICAL → AGI −3, INT −2
+        assertEquals(-3, LifeStats.statBonus(spent, Special.AGILITY))
+        assertEquals(-2, LifeStats.statBonus(spent, Special.INTELLIGENCE))
     }
 
     @Test fun lowNourishmentTaxesStrengthThenEndurance() {
         assertEquals(-1, LifeStats.statBonus(LifeProfile(nourishment = 25), Special.STRENGTH))
-        val starving = LifeProfile(nourishment = 10)
-        assertEquals(-2, LifeStats.statBonus(starving, Special.STRENGTH))
-        assertEquals(-1, LifeStats.statBonus(starving, Special.ENDURANCE))
+        val starving = LifeProfile(nourishment = 10) // CRITICAL → STR −3, END −2
+        assertEquals(-3, LifeStats.statBonus(starving, Special.STRENGTH))
+        assertEquals(-2, LifeStats.statBonus(starving, Special.ENDURANCE))
     }
 
     @Test fun moodOnlyBendsAtExtremes() {
@@ -316,9 +317,9 @@ class LifeStatsTest {
     }
 
     @Test fun poorBandAddsASecondPenalty() {
-        // 20 is in the POOR band (16–24): primary AND secondary take a hit.
+        // 20 is in the POOR band (16–24): primary −2, secondary −1.
         val p = LifeProfile(hydration = 20)
-        assertEquals(-1, LifeStats.statBonus(p, Special.ENDURANCE)) // primary
+        assertEquals(-2, LifeStats.statBonus(p, Special.ENDURANCE)) // primary
         assertEquals(-1, LifeStats.statBonus(p, Special.STRENGTH))  // secondary
     }
 
@@ -387,9 +388,46 @@ class LifeStatsTest {
         assertEquals(noLife.character.caps, blank.character.caps)
     }
 
-    @Test fun brushIsAPartialHygieneLiftAndClamps() {
-        assertEquals(60, LifeStats.brush(LifeProfile(hygiene = 25)).hygiene) // +35 partial, not a full reset
-        assertEquals(100, LifeStats.brush(LifeProfile(hygiene = 90)).hygiene) // clamps at 100
-        assertEquals(100, LifeStats.wash(LifeProfile(hygiene = 10)).hygiene)  // a wash is still the full reset
+    @Test fun oralHygieneRestoreAndDecay() {
+        // Brush restores the brushing bar (not general hygiene); floss restores flossing.
+        assertEquals(100, LifeStats.brush(LifeProfile(brushing = 25)).brushing)
+        assertEquals(25, LifeStats.brush(LifeProfile(brushing = 25, hygiene = 25)).hygiene) // hygiene untouched now
+        assertEquals(100, LifeStats.floss(LifeProfile(flossing = 5)).flossing)
+        // Both oral needs decay on their own slow clocks.
+        val p = LifeStats.decayNeeds(LifeProfile(brushing = 100, flossing = 100), elapsedMs = 10L * 3_600_000L)
+        assertEquals(50, p.brushing) // 10h × 5/h
+        assertEquals(70, p.flossing) // 10h × 3/h
+    }
+
+    @Test fun oralNeglectTaxesCharismaAndHealth() {
+        // Neglected brushing → CHA sags (bad breath); neglected flossing → END (gum disease).
+        assertEquals(-1, LifeStats.statBonus(LifeProfile(brushing = 28), Special.CHARISMA)) // LOW → primary −1
+        assertEquals(-3, LifeStats.statBonus(LifeProfile(brushing = 8), Special.CHARISMA))  // CRITICAL → −3
+        assertEquals(-3, LifeStats.statBonus(LifeProfile(flossing = 8), Special.ENDURANCE)) // CRITICAL → −3
+    }
+
+    @Test fun sixNeedsNeglectedComesApart() {
+        // All six needs low → the deep cross-need penalties fire (>=4 and >=5 tiers).
+        val wreck = LifeProfile(hydration = 20, nourishment = 20, energy = 20, hygiene = 20, brushing = 20, flossing = 20)
+        val fx = LifeStats.effects(wreck)
+        assertTrue(fx.any { it.reason == "A wreck of a body" })       // >=4
+        assertTrue(fx.any { it.reason == "Falling apart" })            // >=5
+        assertTrue(fx.any { it.reason == "Running yourself ragged" })  // >=2 still there
+    }
+
+    @Test fun restWindowRegeneratesEnergyAndDoesNotDrain() {
+        // Whole elapsed inside the rest window → energy REGENERATES (no drain), even at night.
+        val night = EnvContext(hourOfDay = 23)
+        val ms = 4L * 3_600_000L
+        // 4h resting × 12.5/h regen = +50 → 40 becomes 90.
+        assertEquals(90, LifeStats.decayNeeds(LifeProfile(energy = 40), ms, night, restingMs = ms).energy)
+        // Half resting, half awake at night: +25 regen, then 2h × 3 × 1.5 = 9 drain → 40 + 25 − 9 = 56.
+        val half = LifeStats.decayNeeds(LifeProfile(energy = 40), ms, night, restingMs = ms / 2).energy
+        assertEquals(56, half)
+        // restingMs = 0 reproduces the plain decay exactly (back-compat).
+        assertEquals(
+            LifeStats.decayNeeds(LifeProfile(energy = 100), ms, night).energy,
+            LifeStats.decayNeeds(LifeProfile(energy = 100), ms, night, restingMs = 0L).energy,
+        )
     }
 }

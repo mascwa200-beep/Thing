@@ -33,6 +33,10 @@ data class LifeProfile(
     val energy: Int = 100,
     /** Nourishment/food need, 0..100 — decays with real time, restored by [LifeStats.eat]. */
     val nourishment: Int = 100,
+    /** Teeth-brushing need, 0..100 — oral hygiene; decays with real time, restored by [LifeStats.brush]. */
+    val brushing: Int = 100,
+    /** Flossing need, 0..100 — oral hygiene; decays with real time, restored by [LifeStats.floss]. */
+    val flossing: Int = 100,
     /** Mood, 0..100 (50 = neutral) — user-set; high spirits buff CHARISMA/LUCK, low spirits sap them. */
     val mood: Int = 50,
     /** Real steps walked today (from the device step counter) — an active day buffs ENDURANCE/AGILITY. */
@@ -82,7 +86,9 @@ enum class NeedKind(val label: String, val verb: String, val restoreLabel: Strin
     HYDRATION("Hydration", "DRINK", "hydrated"),
     NOURISHMENT("Nourishment", "EAT", "fed"),
     ENERGY("Energy", "REST", "rested"),
-    HYGIENE("Hygiene", "WASH", "clean");
+    HYGIENE("Hygiene", "WASH", "clean"),
+    BRUSHING("Brushing", "BRUSH", "brushed"),
+    FLOSSING("Flossing", "FLOSS", "flossed");
 
     /** The need's current 0..100 value on [p]. */
     fun value(p: LifeProfile): Int = when (this) {
@@ -90,6 +96,8 @@ enum class NeedKind(val label: String, val verb: String, val restoreLabel: Strin
         NOURISHMENT -> p.nourishment
         ENERGY -> p.energy
         HYGIENE -> p.hygiene
+        BRUSHING -> p.brushing
+        FLOSSING -> p.flossing
     }
 }
 
@@ -135,12 +143,15 @@ object LifeStats {
     // Need decay per hour of real time (points). Thirst builds faster than grime; energy sags between.
     const val HYDRATION_DECAY_PER_HR = 4.0
     const val HYGIENE_DECAY_PER_HR = 2.0
-    /** Hygiene restored by brushing your teeth — a partial lift, not the full reset a wash gives. */
-    const val BRUSH_HYGIENE = 35
     const val ENERGY_DECAY_PER_HR = 3.0
     const val NOURISHMENT_DECAY_PER_HR = 3.5
+    /** Teeth need brushing ~twice a day; flossing ~once — so oral hygiene decays slowly but relentlessly. */
+    const val BRUSHING_DECAY_PER_HR = 5.0
+    const val FLOSSING_DECAY_PER_HR = 3.0
     /** Energy recovered per hour while the phone is charging — plugged in ≈ resting up. */
     const val ENERGY_REGEN_PER_HR = 8.0
+    /** Energy recovered per hour DURING an active rest window (a full ~8h sleep restores you fully). */
+    const val REST_ENERGY_REGEN_PER_HR = 12.5
     private const val MS_PER_HOUR = 3_600_000.0
 
     // Real-world decay multipliers (the world drives how fast needs drain).
@@ -270,10 +281,18 @@ object LifeStats {
 
         // Needs let slide tax the body + presence until you top them up (three escalating bands per need).
         out += needEffects(p)
-        // Neglecting several needs at once compounds: a body pushed on every front wears down and gets unlucky.
+        // Neglecting several needs at once COMPOUNDS brutally — a body pushed on every front comes apart.
         val downCount = NeedKind.entries.count { it.value(p) <= NEED_LOW }
         if (downCount >= 2) out += LifeEffect(Special.ENDURANCE, -1, "Running yourself ragged")
         if (downCount >= 3) out += LifeEffect(Special.LUCK, -1, "Everything's a struggle")
+        if (downCount >= 4) {
+            out += LifeEffect(Special.PERCEPTION, -1, "Neglect fogs the senses")
+            out += LifeEffect(Special.STRENGTH, -1, "A wreck of a body")
+        }
+        if (downCount >= 5) {
+            out += LifeEffect(Special.AGILITY, -1, "Falling apart")
+            out += LifeEffect(Special.INTELLIGENCE, -1, "Can't think straight")
+        }
 
         // Mood only tips the scales at the extremes.
         if (p.mood >= MOOD_HIGH) {
@@ -358,18 +377,25 @@ object LifeStats {
         NeedKind.NOURISHMENT to NeedCfg(Special.STRENGTH, Special.ENDURANCE, "Hungry", "Famished", "Starving"),
         NeedKind.ENERGY to NeedCfg(Special.AGILITY, Special.INTELLIGENCE, "Weary", "Drained", "Exhausted"),
         NeedKind.HYGIENE to NeedCfg(Special.CHARISMA, Special.LUCK, "Unkempt", "Grimy", "Reeking"),
+        // Oral hygiene: bad teeth wreck your presence (CHA) and a nagging ache dulls focus (PER); untended
+        // gums rot your health (END). Neglect these and it shows on your face and in your gut.
+        NeedKind.BRUSHING to NeedCfg(Special.CHARISMA, Special.PERCEPTION, "Plaque building", "Bad breath", "Teeth rotting"),
+        NeedKind.FLOSSING to NeedCfg(Special.ENDURANCE, Special.CHARISMA, "Gums tender", "Gums bleeding", "Gum disease"),
     )
 
-    /** The check modifiers one need is applying at value [v] — empty above NEED_LOW; escalates in three bands. */
+    /**
+     * The check modifiers one need is applying at value [v] — empty above NEED_LOW; three escalating bands
+     * that bite HARD when neglected: a warning at LOW, a real toll at POOR, and a crippling one at CRITICAL.
+     */
     private fun needEffectsFor(k: NeedKind, v: Int): List<LifeEffect> {
         val cfg = NEED_CFG.getValue(k)
         return when {
             v <= NEED_CRITICAL -> listOf(
-                LifeEffect(cfg.primary, -2, cfg.critical),
-                LifeEffect(cfg.secondary, -1, cfg.critical),
+                LifeEffect(cfg.primary, -3, cfg.critical),
+                LifeEffect(cfg.secondary, -2, cfg.critical),
             )
             v <= NEED_POOR -> listOf(
-                LifeEffect(cfg.primary, -1, cfg.poor),
+                LifeEffect(cfg.primary, -2, cfg.poor),
                 LifeEffect(cfg.secondary, -1, cfg.poor),
             )
             v <= NEED_LOW -> listOf(LifeEffect(cfg.primary, -1, cfg.low))
@@ -403,6 +429,8 @@ object LifeStats {
                 NeedKind.NOURISHMENT -> "Well-fed"
                 NeedKind.ENERGY -> "Rested & sharp"
                 NeedKind.HYGIENE -> "Fresh & clean"
+                NeedKind.BRUSHING -> "Pearly whites"
+                NeedKind.FLOSSING -> "Healthy gums"
             }
             NeedTier.HEALTHY -> "Holding steady"
             NeedTier.FADING -> when (k) {
@@ -410,6 +438,8 @@ object LifeStats {
                 NeedKind.NOURISHMENT -> "Peckish"
                 NeedKind.ENERGY -> "Flagging"
                 NeedKind.HYGIENE -> "Getting scruffy"
+                NeedKind.BRUSHING -> "Teeth filming over"
+                NeedKind.FLOSSING -> "Gums want a floss"
             }
             NeedTier.LOW -> cfg.low
             NeedTier.STRAINED -> cfg.poor
@@ -425,18 +455,24 @@ object LifeStats {
             NeedKind.NOURISHMENT -> "A snack soon would help."
             NeedKind.ENERGY -> "Take a breather when you can."
             NeedKind.HYGIENE -> "Freshen up when you get a chance."
+            NeedKind.BRUSHING -> "Brush soon — plaque's setting in."
+            NeedKind.FLOSSING -> "Floss soon — your gums need it."
         }
         NeedTier.LOW, NeedTier.STRAINED -> when (k) {
             NeedKind.HYDRATION -> "Drink now — your endurance is slipping."
             NeedKind.NOURISHMENT -> "Eat something — your strength is going."
             NeedKind.ENERGY -> "Rest up — you're getting clumsy."
             NeedKind.HYGIENE -> "Clean up — people are noticing."
+            NeedKind.BRUSHING -> "Brush now — your breath is turning heads, wrong way."
+            NeedKind.FLOSSING -> "Floss now — your gums are starting to bleed."
         }
         NeedTier.CRITICAL -> when (k) {
             NeedKind.HYDRATION -> "Dangerously dehydrated. Drink immediately."
             NeedKind.NOURISHMENT -> "You're starving. Eat now."
             NeedKind.ENERGY -> "Running on fumes. Sleep now."
             NeedKind.HYGIENE -> "Filthy and reeking. Wash immediately."
+            NeedKind.BRUSHING -> "Your teeth are rotting in your head. Brush. NOW."
+            NeedKind.FLOSSING -> "Gum disease has set in. Floss before you lose teeth."
         }
     }
 
@@ -463,10 +499,12 @@ object LifeStats {
     /**
      * Decay the needs for [elapsedMs] of real time, with the real world ([env]) driving the rates: heat
      * spikes thirst, cold / night / motion drain energy faster, motion also burns food + fouls hygiene —
-     * and while the phone is CHARGING, energy RECOVERS (plugged in ≈ resting). Clamped 0..100; deterministic.
-     * [env] = null → the plain base rates (back-compatible).
+     * and while the phone is CHARGING, energy RECOVERS (plugged in ≈ resting). Oral hygiene (brushing/
+     * flossing) decays at a slow base rate. [restingMs] is how much of [elapsedMs] fell inside an active
+     * REST window — over that portion energy REGENERATES and does NOT drain (so it can't run down overnight);
+     * the remainder decays/charges as usual. Clamped 0..100; deterministic. [env] = null → plain base rates.
      */
-    fun decayNeeds(p: LifeProfile, elapsedMs: Long, env: EnvContext?): LifeProfile {
+    fun decayNeeds(p: LifeProfile, elapsedMs: Long, env: EnvContext?, restingMs: Long = 0L): LifeProfile {
         if (elapsedMs <= 0) return p
         val hrs = elapsedMs / MS_PER_HOUR
         val tmp = env?.outdoorTempC
@@ -493,9 +531,17 @@ object LifeStats {
         val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR * hydMult).roundToInt()).coerceIn(0, 100)
         val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR * hygMult).roundToInt()).coerceIn(0, 100)
         val nour = (p.nourishment - (hrs * NOURISHMENT_DECAY_PER_HR * nourMult).roundToInt()).coerceIn(0, 100)
-        val en = if (charging) (p.energy + (hrs * ENERGY_REGEN_PER_HR).roundToInt()).coerceIn(0, 100)
-            else (p.energy - (hrs * ENERGY_DECAY_PER_HR * enMult).roundToInt()).coerceIn(0, 100)
-        return p.copy(hydration = hyd, hygiene = hyg, energy = en, nourishment = nour)
+        val brush = (p.brushing - (hrs * BRUSHING_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
+        val floss = (p.flossing - (hrs * FLOSSING_DECAY_PER_HR).roundToInt()).coerceIn(0, 100)
+        // Energy: over any REST-window portion of the elapsed time it regenerates (doesn't drain); the rest
+        // decays or, while charging, recovers. restGain is a separate rounded term so restingMs=0 reproduces
+        // the original behaviour exactly.
+        val restHrs = restingMs.coerceIn(0L, elapsedMs) / MS_PER_HOUR
+        val activeHrs = hrs - restHrs
+        val restGain = (restHrs * REST_ENERGY_REGEN_PER_HR).roundToInt()
+        val en = if (charging) (p.energy + restGain + (activeHrs * ENERGY_REGEN_PER_HR).roundToInt()).coerceIn(0, 100)
+            else (p.energy + restGain - (activeHrs * ENERGY_DECAY_PER_HR * enMult).roundToInt()).coerceIn(0, 100)
+        return p.copy(hydration = hyd, hygiene = hyg, energy = en, nourishment = nour, brushing = brush, flossing = floss)
     }
 
     /** Human labels for the real-world factors currently driving need decay — for a live UI readout. */
@@ -523,10 +569,13 @@ object LifeStats {
     /** Freshen up (a wash). */
     fun wash(p: LifeProfile): LifeProfile = p.copy(hygiene = 100)
 
-    /** Brush your teeth — a partial hygiene lift (part of staying clean, not a full wash). */
-    fun brush(p: LifeProfile): LifeProfile = p.copy(hygiene = (p.hygiene + BRUSH_HYGIENE).coerceIn(0, 100))
+    /** Brush your teeth — restore the brushing (oral-hygiene) bar. */
+    fun brush(p: LifeProfile): LifeProfile = p.copy(brushing = 100)
 
-    /** Rest up — restore energy. */
+    /** Floss — restore the flossing (oral-hygiene) bar. */
+    fun floss(p: LifeProfile): LifeProfile = p.copy(flossing = 100)
+
+    /** Fully rest — restore energy to 100. (The on-device REST action instead opens a timed rest window.) */
     fun rest(p: LifeProfile): LifeProfile = p.copy(energy = 100)
 
     /** Eat — restore nourishment. */
