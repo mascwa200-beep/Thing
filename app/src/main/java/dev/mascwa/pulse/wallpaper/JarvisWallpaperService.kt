@@ -17,7 +17,6 @@ import dev.mascwa.pulse.core.telemetry.MarketMood
 import dev.mascwa.pulse.core.telemetry.SpaceWeatherExplainers
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
-import dev.mascwa.pulse.data.weather.WeatherCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,30 +27,51 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The J.A.R.V.I.S. live wallpaper - a dense Iron-Man-OS HUD drawn to a raw [Canvas]: a central world-map radar
- * with a sweep, ringed by dials, gauges, a waveform graph, a loading bar, a molecule schematic, chevron framing
- * and telemetry tick-bars, in cyan/amber/white. Reads only on-device cached Pulse data.
+ * The J.A.R.V.I.S. live wallpaper — a dense, glanceable "Iron-Man-OS" command deck drawn to a raw [Canvas],
+ * modelled element-for-element on the JARVIS dashboard reference: a header (wordmark · system status · live
+ * clock · bell/gear), two live market sparkline charts, a topographical terrain strip, a SYS.OP.LINK GPS
+ * panel, a WARFARE/COMM-RELAY column (spectrum · radar scope · subsystems · orbital · hex telemetry), a
+ * Threats-by-Country map, a breaking-news card, and a // LIVE FEED ticker — all cyan/amber/green/red on near-black.
  *
- * Frugal + defensive: draws only while visible, refreshes data <= once a minute on a background coroutine,
- * holds no bitmaps, and swallows any surface/IO error.
+ * Real on-device Pulse data drives the useful panels (clock, sparklines, GPS lat/lon, subsystems from device
+ * health, news headline, live feed); the cockpit theater (spectrum/radar/globe/hex/topo/threats) is drawn
+ * procedurally and deterministically. Frugal + defensive: draws only while visible, refreshes data ≤ once a
+ * minute on a background coroutine, holds no bitmaps, and swallows any surface/IO error.
  */
 class JarvisWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine = ReactorEngine()
 
     private data class Snapshot(
-        val lines: List<Pair<String, Int>> = emptyList(),
         val battery: Int = -1,
-        val spark: List<Float> = emptyList(),     // normalized 0..1 series for the graph (real market sparkline)
-        val sparkLabel: String = "RTLM-57",
         val memPct: Int = -1,                     // device RAM used %
+        val tempC: Float = Float.NaN,             // battery temperature °C (thermal subsystem)
         val kp: Double = -1.0,                    // geomagnetic K-index 0..9
-        val markers: List<FloatArray> = emptyList(), // radar points: [nx, ny, kind] (0 you, 1 quake, 2 waypoint)
-        val solarWind: Double = -1.0,             // solar wind speed km/s (drives the turbine spin)
-        val breadthUp: Int = 0,                   // watchlist instruments up on the day
-        val breadthDown: Int = 0,                 // watchlist instruments down on the day
-        val breadthNet: Double = 0.0,             // equal-weighted average % change across the watchlist
-        val breadthMood: String = "",             // plain-English breadth headline (MarketMood)
+        val solarWind: Double = -1.0,             // solar wind speed km/s
+        // Two live market sparklines (top-2 movers by |Δ%|) for the header charts.
+        val spark: List<Float> = emptyList(),
+        val sparkLabel: String = "MARKET-01",
+        val sparkPct: Double = 0.0,
+        val spark2: List<Float> = emptyList(),
+        val sparkLabel2: String = "MARKET-02",
+        val sparkPct2: Double = 0.0,
+        // Market breadth (up/down + net avg) for the live-feed / status.
+        val breadthUp: Int = 0,
+        val breadthDown: Int = 0,
+        val breadthNet: Double = 0.0,
+        // GPS readout (saved location — no GPS wake).
+        val lat: Double = Double.NaN,
+        val lon: Double = Double.NaN,
+        val place: String = "",
+        val hasFix: Boolean = false,
+        // Radar contacts: [nx, ny] normalized in the scope, kind (0 you, 1 incident, 2 waypoint).
+        val markers: List<FloatArray> = emptyList(),
+        // Breaking news card.
+        val newsTitle: String = "",
+        val newsSource: String = "",
+        val newsAgeMs: Long = 0L,
+        // // LIVE FEED lines: (text, colour).
+        val lines: List<Pair<String, Int>> = emptyList(),
     )
 
     private inner class ReactorEngine : WallpaperService.Engine() {
@@ -66,18 +86,13 @@ class JarvisWallpaperService : WallpaperService() {
 
         @Volatile private var snapshot = Snapshot()
 
-        // Cached date/time formatters — rebuilt on the ≤1/min data tick (refreshData) instead of
-        // reconstructed every frame (~30 fps). Constructing SimpleDateFormat/DateFormat is expensive
-        // (pattern parse + locale symbols); this was the biggest per-frame cost. Touched only on the main
-        // looper thread (render + refreshData both run there), so no thread-safety concern. Rebuilding
-        // ≤1/min keeps a system 12-/24-hour or locale change reflected within a minute.
-        private var timeFmt: java.text.DateFormat =
-            android.text.format.DateFormat.getTimeFormat(this@JarvisWallpaperService)
-        private var dateFmt: java.text.DateFormat =
-            android.text.format.DateFormat.getMediumDateFormat(this@JarvisWallpaperService)
-        private var dayFmt = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault())
+        // Cached time formatter — rebuilt on the ≤1/min data tick (not per frame). The reference shows a
+        // seconds-resolution 24h clock, so we format HH:mm:ss ourselves; rebuilt ≤1/min picks up a locale change.
+        private var clockFmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
 
         private val frame = Runnable { drawFrame() }
+        // Reused across a frame; the wallpaper is single-threaded on the main looper.
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
@@ -113,371 +128,634 @@ class JarvisWallpaperService : WallpaperService() {
 
         private fun refreshData() {
             lastDataMs = SystemClock.uptimeMillis()
-            // Refresh cached formatters (main thread, ≤1/min) so a 12-/24-hour or locale change is picked up.
-            timeFmt = android.text.format.DateFormat.getTimeFormat(this@JarvisWallpaperService)
-            dateFmt = android.text.format.DateFormat.getMediumDateFormat(this@JarvisWallpaperService)
-            dayFmt = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault())
+            clockFmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
             scope.launch {
                 val app = applicationContext as? PulseApplication ?: return@launch
                 val c = app.container
                 val s = runCatching { c.settingsRepository.current() }.getOrNull()
                 val out = mutableListOf<Pair<String, Int>>()
-                var spark: List<Float> = emptyList()
-                var sparkLabel = "RTLM-57"
-                var kp = -1.0
-                var solarWind = -1.0
-                var breadthUp = 0
-                var breadthDown = 0
-                var breadthNet = 0.0
-                var breadthMood = ""
+                var spark: List<Float> = emptyList(); var sparkLabel = "MARKET-01"; var sparkPct = 0.0
+                var spark2: List<Float> = emptyList(); var sparkLabel2 = "MARKET-02"; var sparkPct2 = 0.0
+                var breadthUp = 0; var breadthDown = 0; var breadthNet = 0.0
+                var kp = -1.0; var solarWind = -1.0
+                var lat = Double.NaN; var lon = Double.NaN; var place = ""; var hasFix = false
+                var newsTitle = ""; var newsSource = ""; var newsAgeMs = 0L
                 val markers = mutableListOf<FloatArray>()
 
-                runCatching {
-                    s?.let { st -> st.waypoints.firstOrNull { it.id == st.activeWaypointId }?.label }
-                        ?.let { out.add("OBJ  ${it.take(30)}" to INK) }
-                }
-                runCatching {
-                    val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
-                    saved?.let { loc -> c.weatherRepository.fetch(loc.latitude, loc.longitude, loc.name, force = false).data }
-                        ?.current?.let { cur ->
-                            out.add("WX   ${Formatters.number(cur.temperature, 0)}° · ${WeatherCode.describe(cur.weatherCode)}" to INK)
-                        }
-                }
-                // Markets: movers for the feed + the top mover's real intraday sparkline for the graph.
+                val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
+                if (saved != null) { lat = saved.latitude; lon = saved.longitude; place = saved.name; hasFix = true }
+
+                // Markets: two sparklines (top-2 movers) + breadth + two feed lines.
                 runCatching {
                     val quotes = c.marketsRepository.fetchWatchlist(force = false).data.orEmpty()
                         .filter { it.changePercent != null }
-                    // Breadth (up/down counts + net average) comes from the CI-tested core so the HUD
-                    // and the Markets screen agree on the definition.
                     MarketMood.summarize(quotes.mapNotNull { it.changePercent })?.let { mood ->
-                        breadthUp = mood.up
-                        breadthDown = mood.down
-                        breadthNet = mood.netChangePct
-                        breadthMood = mood.headline
+                        breadthUp = mood.up; breadthDown = mood.down; breadthNet = mood.netChangePct
                     }
-                    val sorted = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
-                    sorted.take(2).forEach { q ->
+                    val movers = quotes.sortedByDescending { abs(it.changePercent ?: 0.0) }
+                    movers.take(2).forEach { q ->
                         val pct = q.changePercent ?: 0.0
-                        out.add("MKT  ${q.label.take(12)}  ${if (pct >= 0) "+" else ""}${"%.2f".format(pct)}%" to if (pct >= 0) POSITIVE else NEGATIVE)
+                        out.add("MKT  ${q.label.take(12)}  ${signed(pct)}%" to if (pct >= 0) POSITIVE else NEGATIVE)
                     }
-                    val top = sorted.firstOrNull { it.sparkline.size >= 2 }
-                    if (top != null) {
-                        val sl = top.sparkline
-                        val mn = sl.minOrNull() ?: 0.0
-                        val mx = sl.maxOrNull() ?: 1.0
-                        val rng = (mx - mn).let { if (it == 0.0) 1.0 else it }
-                        spark = sl.map { ((it - mn) / rng).toFloat() }
-                        sparkLabel = top.label.take(10).uppercase()
-                    }
+                    val withSpark = movers.filter { it.sparkline.size >= 2 }
+                    withSpark.getOrNull(0)?.let { spark = norm(it.sparkline); sparkLabel = it.label.take(14).uppercase(); sparkPct = it.changePercent ?: 0.0 }
+                    withSpark.getOrNull(1)?.let { spark2 = norm(it.sparkline); sparkLabel2 = it.label.take(14).uppercase(); sparkPct2 = it.changePercent ?: 0.0 }
                 }
+                // News: breaking headline card + a feed line.
                 runCatching {
-                    c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.title
-                        ?.let { out.add("NEWS ${it.take(38)}" to CYAN) }
+                    c.newsRepository.fetchCategory(NewsCategory.TOP, force = false).data?.firstOrNull()?.let { a ->
+                        newsTitle = a.title; newsSource = a.source; newsAgeMs = a.publishedEpochMs
+                        out.add("NEWS ${a.title.take(40)}" to CYAN)
+                    }
                 }
+                // Space weather: Kp + solar wind + a feed line.
                 runCatching {
                     val sw = c.spaceWeatherRepository.fetch(force = false).data
-                    kp = sw?.kp ?: -1.0
-                    solarWind = sw?.solarWindSpeed ?: -1.0
-                    // Plain-English geomagnetic line (reuses the CI-tested explainer); amber when storming.
+                    kp = sw?.kp ?: -1.0; solarWind = sw?.solarWindSpeed ?: -1.0
                     if (kp >= 0.0) out.add("SPC  ${SpaceWeatherExplainers.kp(kp).headline}" to if (kp >= 5.0) AMBER else CYAN)
                 }
-                // Radar markers: your saved location + recent earthquakes/incidents + the active waypoint, by lat/lon.
+                // Radar contacts: your location (centre) + nearby incidents + active waypoint, mapped to the scope.
                 runCatching {
-                    val saved = s?.let { it.savedLocations.getOrNull(it.selectedLocationIndex) ?: it.savedLocations.firstOrNull() }
                     if (saved != null) {
-                        markers.add(floatArrayOf(((saved.longitude + 180.0) / 360.0).toFloat(), ((90.0 - saved.latitude) / 180.0).toFloat(), 0f))
-                        c.safetyRepository.fetch(saved.latitude, saved.longitude, force = false).data?.incidents.orEmpty().take(8).forEach { ev ->
-                            markers.add(floatArrayOf(((ev.longitude + 180.0) / 360.0).toFloat(), ((90.0 - ev.latitude) / 180.0).toFloat(), 1f))
+                        markers.add(floatArrayOf(0f, 0f, 0f))
+                        c.safetyRepository.fetch(saved.latitude, saved.longitude, force = false).data?.incidents.orEmpty().take(7).forEach { ev ->
+                            val dx = ((ev.longitude - saved.longitude) * 6.0).toFloat().coerceIn(-1f, 1f)
+                            val dy = ((saved.latitude - ev.latitude) * 6.0).toFloat().coerceIn(-1f, 1f)
+                            markers.add(floatArrayOf(dx, dy, 1f))
                         }
                     }
                     s?.let { st -> st.waypoints.firstOrNull { it.id == st.activeWaypointId } }?.let { wp ->
-                        markers.add(floatArrayOf(((wp.longitude + 180.0) / 360.0).toFloat(), ((90.0 - wp.latitude) / 180.0).toFloat(), 2f))
+                        if (saved != null) {
+                            val dx = ((wp.longitude - saved.longitude) * 6.0).toFloat().coerceIn(-1f, 1f)
+                            val dy = ((saved.latitude - wp.latitude) * 6.0).toFloat().coerceIn(-1f, 1f)
+                            markers.add(floatArrayOf(dx, dy, 2f))
+                        }
                     }
                 }
                 val memPct = runCatching {
                     val am = applicationContext.getSystemService(android.app.ActivityManager::class.java)
-                    val mi = android.app.ActivityManager.MemoryInfo()
-                    am?.getMemoryInfo(mi)
+                    val mi = android.app.ActivityManager.MemoryInfo(); am?.getMemoryInfo(mi)
                     if (mi.totalMem > 0L) (((mi.totalMem - mi.availMem) * 100.0) / mi.totalMem).toInt() else -1
                 }.getOrDefault(-1)
                 val battery = runCatching {
                     applicationContext.getSystemService(BatteryManager::class.java)
                         ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
                 }.getOrDefault(-1)
-                snapshot = Snapshot(out, battery, spark, sparkLabel, memPct, kp, markers, solarWind, breadthUp, breadthDown, breadthNet, breadthMood)
+                val tempC = runCatching {
+                    val bm = applicationContext.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                    val t = bm?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+                    if (t > 0) t / 10f else Float.NaN
+                }.getOrDefault(Float.NaN)
+
+                snapshot = Snapshot(
+                    battery, memPct, tempC, kp, solarWind,
+                    spark, sparkLabel, sparkPct, spark2, sparkLabel2, sparkPct2,
+                    breadthUp, breadthDown, breadthNet,
+                    lat, lon, place, hasFix, markers,
+                    newsTitle, newsSource, newsAgeMs, out,
+                )
             }
         }
 
+        // ============================ RENDER ============================
         private fun render(canvas: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
+            val w = width.toFloat(); val h = height.toFloat()
             if (w <= 0f || h <= 0f) return
             canvas.drawColor(VOID)
-            val unit = minOf(w, h)
-            val cx = w / 2f
+            val u = minOf(w, h)                 // scale unit
             val t = SystemClock.uptimeMillis() - startMs
-            val p = Paint(Paint.ANTI_ALIAS_FLAG)
             val snap = snapshot
-            val now = java.util.Date()
-            val timeStr = timeFmt.format(now)
-            val dayStr = dayFmt.format(now).uppercase()
-            val dateStr = dateFmt.format(now).uppercase()
-// ===== Frame & edge telemetry =====
-drawCornerFrame(canvas, p, w, h, t)
-drawTelemetryTicks(canvas, p, cx, h * 0.045f, w * 0.9f, t)
-drawTelemetryTicks(canvas, p, cx, h * 0.965f, w * 0.9f, t)
+            val timeStr = runCatching { clockFmt.format(java.util.Date()) }.getOrDefault("--:--:--")
 
-// ===== Top corner dials =====
-drawFineDial(canvas, p, w * 0.17f, h * 0.135f, unit * 0.085f, t, snap.kp)
-drawTurbineDial(canvas, p, w * 0.83f, h * 0.135f, unit * 0.085f, t, snap.solarWind)
+            val mL = w * 0.030f; val mR = w * 0.970f      // page margins
+            val status = systemStatus(snap)
 
-// ===== Inline clock block (centred) =====
-run {
-    val clock = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        textAlign = Paint.Align.CENTER
-    }
-    // Big glowing time
-    clock.color = withFullAlpha(WHITE)
-    clock.textSize = unit * 0.085f
-    clock.setShadowLayer(unit * 0.04f, 0f, 0f, withAlpha(CYAN, 0.85f))
-    canvas.drawText(timeStr, cx, h * 0.115f, clock)
-    clock.clearShadowLayer()
-    // Day small cyan
-    clock.typeface = Typeface.MONOSPACE
-    clock.color = withFullAlpha(CYAN)
-    clock.textSize = unit * 0.032f
-    clock.letterSpacing = 0.18f
-    canvas.drawText(dayStr.uppercase(), cx, h * 0.115f + unit * 0.055f, clock)
-    // Date tiny muted
-    clock.color = withAlpha(MUTED, 0.85f)
-    clock.textSize = unit * 0.024f
-    clock.letterSpacing = 0.10f
-    canvas.drawText(dateStr.uppercase(), cx, h * 0.115f + unit * 0.092f, clock)
-}
+            // 1) HEADER
+            drawHeader(canvas, w, h, u, timeStr, status.first, status.second)
 
-// ===== Wave graph + sync loading bar =====
-drawWaveGraph(canvas, p, w * 0.07f, h * 0.20f, w * 0.62f, h * 0.265f, t, snap.spark, snap.sparkLabel)
-drawLoadingBar(canvas, p, w * 0.07f, h * 0.285f, w * 0.93f, h * 0.315f, t, if (snap.memPct in 0..100) snap.memPct else ((t / 120L) % 100L).toInt(), "MEM")
+            // 2) TWO MARKET SPARKLINE CHARTS
+            drawSparkChart(canvas, mL, h * 0.070f, mR, h * 0.150f, u, t, snap.sparkLabel, snap.spark, snap.sparkPct)
+            drawSparkChart(canvas, mL, h * 0.160f, mR, h * 0.240f, u, t, snap.sparkLabel2, snap.spark2, snap.sparkPct2)
 
-// ===== Central world radar =====
-drawWorldRadar(canvas, p, cx, h * 0.49f, unit * 0.33f, t, snap.markers)
+            // 3) TOPOGRAPHICAL MAPPING STRIP
+            drawTopoStrip(canvas, mL, h * 0.252f, mR, h * 0.330f, u, t)
 
-// ===== Lower instruments =====
-drawBreadth(canvas, p, w * 0.20f, h * 0.685f, unit * 0.16f, t, snap.breadthUp, snap.breadthDown, snap.breadthNet, snap.breadthMood)
-drawPercentGauge(canvas, p, w * 0.74f, h * 0.685f, unit * 0.135f, t, snap.battery.coerceIn(0, 100), "PWR")
+            // 4) TWO-COLUMN MID REGION
+            val midL0 = mL; val midL1 = w * 0.492f
+            val midR0 = w * 0.508f; val midR1 = mR
+            // Left-top: SYS.OP.LINK GPS panel
+            drawSysOpLink(canvas, midL0, h * 0.344f, midL1, h * 0.560f, u, t, snap)
+            // Left-bottom: Threats by Country
+            drawThreats(canvas, midL0, h * 0.572f, midL1, h * 0.780f, u, t)
+            // Right column: WARFARE / COMM RELAY (spans the whole mid region)
+            drawCommRelay(canvas, midR0, h * 0.344f, midR1, h * 0.780f, u, t, snap)
 
-// ===== Live data panel =====
-drawDataPanel(canvas, p, w * 0.07f, h * 0.80f, w * 0.93f, h * 0.905f, snap.lines)
+            // 5) BREAKING NEWS CARD
+            drawNewsCard(canvas, mL, h * 0.792f, mR, h * 0.884f, u, snap)
 
-// ===== Tiny mono flavour labels =====
-run {
-    val flv = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        textAlign = Paint.Align.LEFT
-        letterSpacing = 0.12f
-    }
-    // top-left under the frame
-    flv.color = withAlpha(CYAN, 0.70f)
-    flv.textSize = unit * 0.022f
-    canvas.drawText("ARGUS DYNAMICS // NIGHTWIRE OS", w * 0.07f, h * 0.075f, flv)
-    // bottom flavour line
-    flv.color = withAlpha(AMBER, 0.70f)
-    flv.textSize = unit * 0.020f
-    val blink = if (((t / 600L) % 2L) == 0L) "" else " *"
-    canvas.drawText("TRANSCEIVING MAIN DATA" + blink, w * 0.07f, h * 0.935f, flv)
-}
+            // 6) // LIVE FEED
+            drawLiveFeed(canvas, mL, h * 0.896f, mR, h * 0.990f, u, snap)
         }
-
-// ===== drawCornerFrame =====
-private fun drawCornerFrame(c: Canvas, p: Paint, w: Float, h: Float, t: Long) {
-    val stroke = w * 0.0035f
-    val arm = w * 0.10f
-    val chamfer = w * 0.035f
-    val inset = w * 0.04f
-    val accent = w * 0.018f
-    val edgeInset = h * 0.05f
-
-    val savedColor = p.color
-    val savedStrokeWidth = p.strokeWidth
-    val savedStyle = p.style
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = stroke
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-
-    val path = Path()
-
-    // TOP-LEFT
-    p.color = withFullAlpha(CYAN)
-    path.reset()
-    path.moveTo(inset, inset + chamfer)
-    path.lineTo(inset + chamfer, inset)
-    path.lineTo(inset + chamfer + arm, inset)
-    path.moveTo(inset, inset + chamfer)
-    path.lineTo(inset, inset + chamfer + arm)
-    c.drawPath(path, p)
-
-    // TOP-RIGHT
-    path.reset()
-    path.moveTo(w - inset, inset + chamfer)
-    path.lineTo(w - (inset + chamfer), inset)
-    path.lineTo(w - (inset + chamfer + arm), inset)
-    path.moveTo(w - inset, inset + chamfer)
-    path.lineTo(w - inset, inset + chamfer + arm)
-    c.drawPath(path, p)
-
-    // BOTTOM-LEFT
-    path.reset()
-    path.moveTo(inset, h - (inset + chamfer))
-    path.lineTo(inset + chamfer, h - inset)
-    path.lineTo(inset + chamfer + arm, h - inset)
-    path.moveTo(inset, h - (inset + chamfer))
-    path.lineTo(inset, h - (inset + chamfer + arm))
-    c.drawPath(path, p)
-
-    // BOTTOM-RIGHT
-    path.reset()
-    path.moveTo(w - inset, h - (inset + chamfer))
-    path.lineTo(w - (inset + chamfer), h - inset)
-    path.lineTo(w - (inset + chamfer + arm), h - inset)
-    path.moveTo(w - inset, h - (inset + chamfer))
-    path.lineTo(w - inset, h - (inset + chamfer + arm))
-    c.drawPath(path, p)
-
-    // ---- Small filled CYAN square accent inside each corner ----
-    p.style = Paint.Style.FILL
-    val pulse = (0.55f + 0.45f * (sin(t.toDouble() * 0.004).toFloat() * 0.5f + 0.5f)).coerceIn(0f, 1f)
-    p.color = withAlpha(CYAN, pulse)
-    val sq = accent
-    val sqOff = inset + chamfer + arm * 0.18f
-    c.drawRect(sqOff, sqOff, sqOff + sq, sqOff + sq, p)
-    c.drawRect(w - sqOff - sq, sqOff, w - sqOff, sqOff + sq, p)
-    c.drawRect(sqOff, h - sqOff - sq, sqOff + sq, h - sqOff, p)
-    c.drawRect(w - sqOff - sq, h - sqOff - sq, w - sqOff, h - sqOff, p)
-
-    // ---- Thin inset rule along TOP and BOTTOM edges ----
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = stroke
-    p.color = withAlpha(WHITE, 0.85f)
-
-    val ruleStartX = inset + chamfer + arm
-    val ruleEndX = w - (inset + chamfer + arm)
-    val midX = (ruleStartX + ruleEndX) * 0.5f
-    val gap = w * 0.045f
-    val chevD = w * 0.022f
-
-    c.drawLine(ruleStartX, edgeInset, midX - gap, edgeInset, p)
-    c.drawLine(midX + gap, edgeInset, ruleEndX, edgeInset, p)
-    p.color = withFullAlpha(CYAN)
-    path.reset()
-    path.moveTo(midX - gap * 0.5f, edgeInset + chevD * 0.5f)
-    path.lineTo(midX, edgeInset - chevD * 0.5f)
-    path.lineTo(midX + gap * 0.5f, edgeInset + chevD * 0.5f)
-    c.drawPath(path, p)
-
-    val edgeInsetB = h - edgeInset
-    p.color = withAlpha(WHITE, 0.85f)
-    c.drawLine(ruleStartX, edgeInsetB, midX - gap, edgeInsetB, p)
-    c.drawLine(midX + gap, edgeInsetB, ruleEndX, edgeInsetB, p)
-    p.color = withFullAlpha(CYAN)
-    path.reset()
-    path.moveTo(midX - gap * 0.5f, edgeInsetB - chevD * 0.5f)
-    path.lineTo(midX, edgeInsetB + chevD * 0.5f)
-    path.lineTo(midX + gap * 0.5f, edgeInsetB - chevD * 0.5f)
-    c.drawPath(path, p)
-
-    // ---- Row of 4 forward chevrons near top-left ----
-    val chW = w * 0.018f
-    val chH = w * 0.022f
-    val chSpacing = w * 0.028f
-    val rowY = inset + chamfer + arm + h * 0.018f
-    var cx = ruleStartX + w * 0.01f
-    val march = ((t / 240L) % 4L).toInt()
-    for (i in 0 until 4) {
-        val baseFade = 1.0f - i * 0.22f
-        val twinkle = if (i == march) 1.0f else 0.7f
-        p.color = withAlpha(CYAN, (baseFade * twinkle).coerceIn(0.15f, 1.0f))
-        path.reset()
-        path.moveTo(cx, rowY - chH * 0.5f)
-        path.lineTo(cx + chW, rowY)
-        path.lineTo(cx, rowY + chH * 0.5f)
-        c.drawPath(path, p)
-        cx += chSpacing
     }
 
-    // ---- Row of 4 back chevrons near bottom-right ----
-    val rowYb = h - (inset + chamfer + arm) - h * 0.018f
-    var cxb = ruleEndX - w * 0.01f
-    val marchB = ((t / 240L) % 4L).toInt()
-    for (i in 0 until 4) {
-        val baseFade = 1.0f - i * 0.22f
-        val twinkle = if (i == marchB) 1.0f else 0.7f
-        p.color = withAlpha(CYAN, (baseFade * twinkle).coerceIn(0.15f, 1.0f))
-        path.reset()
-        path.moveTo(cxb, rowYb - chH * 0.5f)
-        path.lineTo(cxb - chW, rowYb)
-        path.lineTo(cxb, rowYb + chH * 0.5f)
-        c.drawPath(path, p)
-        cxb -= chSpacing
+    // ============================ HELPERS ============================
+
+    /** Draw monospace text. Returns the advance width so callers can lay out inline runs. */
+    private fun txt(
+        c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int,
+        bold: Boolean = false, align: Paint.Align = Paint.Align.LEFT, spacing: Float = 0f, glow: Float = 0f,
+    ): Float {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.typeface = if (bold) MONO_BOLD else MONO
+        p.textSize = size; p.color = withFullAlpha(color); p.textAlign = align; p.letterSpacing = spacing
+        if (glow > 0f) p.setShadowLayer(glow, 0f, 0f, withAlpha(color, 0.8f))
+        c.drawText(s, x, y, p)
+        return p.measureText(s)
     }
 
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-    p.color = savedColor
-    p.strokeWidth = savedStrokeWidth
-    p.style = savedStyle
-}
+    /** Faint panel fill + a corner-bracket frame in [accent]. */
+    private fun panel(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, accent: Int, u: Float, fillA: Float = 0.30f) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        // fill
+        p.style = Paint.Style.FILL; p.color = withAlpha(PANEL, fillA)
+        c.drawRect(x0, y0, x1, y1, p)
+        // faint full border
+        p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.0016f; p.color = withAlpha(accent, 0.22f)
+        c.drawRect(x0, y0, x1, y1, p)
+        // bright corner brackets
+        p.strokeWidth = u * 0.0035f; p.color = withAlpha(accent, 0.9f)
+        val a = u * 0.020f
+        // TL
+        c.drawLine(x0, y0, x0 + a, y0, p); c.drawLine(x0, y0, x0, y0 + a, p)
+        // TR
+        c.drawLine(x1, y0, x1 - a, y0, p); c.drawLine(x1, y0, x1, y0 + a, p)
+        // BL
+        c.drawLine(x0, y1, x0 + a, y1, p); c.drawLine(x0, y1, x0, y1 - a, p)
+        // BR
+        c.drawLine(x1, y1, x1 - a, y1, p); c.drawLine(x1, y1, x1, y1 - a, p)
+    }
 
-// ===== drawTelemetryTicks =====
-private fun drawTelemetryTicks(c: Canvas, p: Paint, cx: Float, y: Float, span: Float, t: Long) {
-    val count = 60
-    val phase = (t / 120f).toDouble()
-    val gap = span / count
-    val left = cx - span / 2f
-    val maxH = span * 0.02f
+    /** A titled section rule: ■ + TITLE + hairline to the right edge. Returns the baseline used. */
+    private fun sectionHead(c: Canvas, s: String, x0: Float, x1: Float, y: Float, u: Float, accent: Int): Float {
+        val sz = u * 0.020f
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.color = withFullAlpha(accent)
+        c.drawRect(x0, y - sz * 0.8f, x0 + sz * 0.7f, y - sz * 0.1f, p)
+        val adv = txt(c, s, x0 + sz * 1.1f, y, sz, accent, bold = true, spacing = 0.10f)
+        p.strokeWidth = u * 0.0016f; p.color = withAlpha(accent, 0.4f)
+        c.drawLine(x0 + sz * 1.3f + adv, y - sz * 0.35f, x1, y - sz * 0.35f, p)
+        return y
+    }
 
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = (gap * 0.32f).coerceAtLeast(1f)
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
+    // ---------- 1) HEADER ----------
+    private fun drawHeader(c: Canvas, w: Float, h: Float, u: Float, timeStr: String, statusText: String, statusColor: Int) {
+        val y = h * 0.028f
+        // Wordmark + subtitle (left)
+        txt(c, "JARVIS", w * 0.030f, y, u * 0.036f, WHITE, bold = true, spacing = 0.14f, glow = u * 0.02f)
+        txt(c, "JUST A RATHER VERY INTELLIGENT SYSTEM", w * 0.030f, y + u * 0.024f, u * 0.0135f, CYAN, spacing = 0.08f)
+        // SYSTEM STATUS
+        txt(c, "SYSTEM STATUS", w * 0.400f, y - u * 0.010f, u * 0.0125f, MUTED, spacing = 0.10f)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.color = withFullAlpha(statusColor)
+        c.drawCircle(w * 0.400f + u * 0.010f, y + u * 0.014f, u * 0.007f, p)
+        txt(c, statusText, w * 0.400f + u * 0.024f, y + u * 0.020f, u * 0.019f, statusColor, bold = true, spacing = 0.06f)
+        // LOCAL TIME
+        txt(c, "LOCAL TIME", w * 0.560f, y - u * 0.010f, u * 0.0125f, MUTED, spacing = 0.10f)
+        txt(c, timeStr, w * 0.560f, y + u * 0.020f, u * 0.022f, CYAN, bold = true, spacing = 0.06f, glow = u * 0.012f)
+        // Bell + gear glyphs (decorative — a wallpaper isn't touchable)
+        glyphBell(c, w * 0.905f, y + u * 0.006f, u * 0.017f)
+        glyphGear(c, w * 0.955f, y + u * 0.006f, u * 0.017f)
+        // header underline
+        p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.0016f; p.color = withAlpha(CYAN, 0.25f)
+        c.drawLine(w * 0.030f, h * 0.058f, w * 0.970f, h * 0.058f, p)
+    }
 
-    for (i in 0 until count) {
-        val seed = i.toDouble() * 12.9898 + phase
-        val norm = abs(sin(seed)).toFloat()
-        val h = maxH * (0.15f + 0.85f * norm)
-        val x = left + gap * (i + 0.5f)
-        val isAmber = (i % 10 == 0)
+    private fun glyphBell(c: Canvas, cx: Float, cy: Float, r: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.style = Paint.Style.STROKE
+        p.strokeWidth = r * 0.14f; p.color = withAlpha(CYAN, 0.85f)
+        val path = Path()
+        path.moveTo(cx - r * 0.7f, cy + r * 0.5f)
+        path.quadTo(cx - r * 0.7f, cy - r * 0.7f, cx, cy - r * 0.8f)
+        path.quadTo(cx + r * 0.7f, cy - r * 0.7f, cx + r * 0.7f, cy + r * 0.5f)
+        c.drawPath(path, p)
+        c.drawLine(cx - r * 0.85f, cy + r * 0.5f, cx + r * 0.85f, cy + r * 0.5f, p)
+        p.style = Paint.Style.FILL
+        c.drawCircle(cx, cy + r * 0.8f, r * 0.16f, p)
+    }
 
-        if (isAmber) {
-            val ah = h * 1.65f
-            p.color = withFullAlpha(AMBER)
-            p.strokeWidth = (gap * 0.42f).coerceAtLeast(1f)
-            p.setShadowLayer(gap * 1.4f, 0f, 0f, withAlpha(AMBER, 0.6f))
-            c.drawLine(x, y, x, y - ah, p)
-            p.clearShadowLayer()
-            p.strokeWidth = (gap * 0.32f).coerceAtLeast(1f)
+    private fun glyphGear(c: Canvas, cx: Float, cy: Float, r: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.style = Paint.Style.STROKE
+        p.strokeWidth = r * 0.14f; p.color = withAlpha(CYAN, 0.85f)
+        c.drawCircle(cx, cy, r * 0.5f, p)
+        for (i in 0 until 8) {
+            val a = Math.toRadians(i * 45.0)
+            val sx = cx + (r * 0.6f * cos(a)).toFloat(); val sy = cy + (r * 0.6f * sin(a)).toFloat()
+            val ex = cx + (r * 0.9f * cos(a)).toFloat(); val ey = cy + (r * 0.9f * sin(a)).toFloat()
+            c.drawLine(sx, sy, ex, ey, p)
+        }
+    }
+
+    // ---------- 2) SPARKLINE CHART ----------
+    private fun drawSparkChart(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long, label: String, series: List<Float>, pct: Double) {
+        panel(c, x0, y0, x1, y1, CYAN, u, fillA = 0.22f)
+        val pad = u * 0.012f
+        txt(c, label, x0 + pad, y0 + u * 0.022f, u * 0.0135f, CYAN, spacing = 0.10f)
+        if (series.isEmpty()) {
+            txt(c, "AWAITING FEED…", x0 + pad, (y0 + y1) / 2f, u * 0.014f, MUTED)
+            return
+        }
+        val plotT = y0 + u * 0.030f; val plotB = y1 - pad
+        val plotL = x0 + pad; val plotR = x1 - pad
+        // faint baseline grid
+        val g = Paint(Paint.ANTI_ALIAS_FLAG); g.style = Paint.Style.STROKE; g.strokeWidth = u * 0.0010f
+        g.color = withAlpha(CYAN, 0.10f)
+        for (i in 0..3) { val gy = plotT + (plotB - plotT) * i / 3f; c.drawLine(plotL, gy, plotR, gy, g) }
+        // line
+        val up = pct >= 0.0
+        val lineCol = CYAN
+        val path = Path(); val n = series.size
+        for (i in series.indices) {
+            val px = plotL + (plotR - plotL) * i / (n - 1).coerceAtLeast(1)
+            val py = plotB - (plotB - plotT) * series[i]
+            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        val lp = Paint(Paint.ANTI_ALIAS_FLAG); lp.style = Paint.Style.STROKE
+        lp.strokeWidth = u * 0.0026f; lp.color = withFullAlpha(lineCol)
+        lp.setShadowLayer(u * 0.012f, 0f, 0f, withAlpha(lineCol, 0.6f))
+        c.drawPath(path, lp)
+        lp.clearShadowLayer()
+        // moving endpoint dot
+        val lastX = plotR; val lastY = plotB - (plotB - plotT) * series.last()
+        val dp = Paint(Paint.ANTI_ALIAS_FLAG); dp.color = withFullAlpha(lineCol)
+        val pulse = 0.6f + 0.4f * abs(sin(t / 500.0)).toFloat()
+        c.drawCircle(lastX, lastY, u * 0.004f * pulse + u * 0.002f, dp)
+        // % readout (right)
+        txt(c, "${signed(pct)}%", x1 - pad, y0 + u * 0.022f, u * 0.0145f, if (up) POSITIVE else NEGATIVE, bold = true, align = Paint.Align.RIGHT)
+    }
+
+    // ---------- 3) TOPOGRAPHICAL STRIP ----------
+    private fun drawTopoStrip(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long) {
+        panel(c, x0, y0, x1, y1, CYAN, u, fillA = 0.20f)
+        val pad = u * 0.012f
+        txt(c, "TOPOGRAPHICAL MAPPING: SECTOR 4", x0 + pad, y0 + u * 0.022f, u * 0.015f, CYAN, bold = true, spacing = 0.06f)
+        txt(c, "CONTOUR INTERVAL: 10M  |  GROUND DENSITY: NOMINAL  |  SUB-SURFACE: DENSE  |  PEAK: 84M",
+            x0 + pad, y0 + u * 0.040f, u * 0.0115f, MUTED, spacing = 0.02f)
+        // terrain silhouette on the right ~60%
+        val tL = x0 + (x1 - x0) * 0.42f; val tR = x1 - pad
+        val base = y1 - pad; val topY = y0 + u * 0.048f
+        val path = Path(); path.moveTo(tL, base)
+        val steps = 26
+        for (i in 0..steps) {
+            val fx = i / steps.toFloat()
+            val px = tL + (tR - tL) * fx
+            // deterministic ridged silhouette (a couple of stacked sines) — stable, not animated
+            val n = (sin(fx * 9.0) * 0.5 + sin(fx * 21.0 + 1.3) * 0.28 + sin(fx * 4.0 + 0.6) * 0.5).toFloat()
+            val hgt = ((n * 0.5f + 0.5f).coerceIn(0f, 1f)) * (base - topY)
+            path.lineTo(px, base - hgt)
+        }
+        path.lineTo(tR, base); path.close()
+        val fp = Paint(Paint.ANTI_ALIAS_FLAG); fp.style = Paint.Style.FILL; fp.color = withAlpha(CYAN, 0.10f)
+        c.drawPath(path, fp)
+        fp.style = Paint.Style.STROKE; fp.strokeWidth = u * 0.0018f; fp.color = withAlpha(CYAN, 0.7f)
+        c.drawPath(path, fp)
+        // peak marker: dashed vertical + dot (slowly drifting)
+        val drift = (0.35f + 0.30f * abs(sin(t / 4000.0)).toFloat())
+        val markX = tL + (tR - tL) * drift
+        // find silhouette height at markX
+        val fx = ((markX - tL) / (tR - tL)).coerceIn(0f, 1f)
+        val nn = (sin(fx * 9.0) * 0.5 + sin(fx * 21.0 + 1.3) * 0.28 + sin(fx * 4.0 + 0.6) * 0.5).toFloat()
+        val peakY = base - ((nn * 0.5f + 0.5f).coerceIn(0f, 1f)) * (base - topY)
+        val dp = Paint(Paint.ANTI_ALIAS_FLAG); dp.style = Paint.Style.STROKE; dp.strokeWidth = u * 0.0014f
+        dp.color = withAlpha(NEGATIVE, 0.7f); dp.pathEffect = DashPathEffect(floatArrayOf(u * 0.006f, u * 0.006f), 0f)
+        c.drawLine(markX, topY, markX, base, dp); dp.pathEffect = null
+        dp.style = Paint.Style.FILL; dp.color = withFullAlpha(NEGATIVE)
+        c.drawCircle(markX, peakY, u * 0.004f, dp)
+        txt(c, "PEAK: 84M", markX + u * 0.006f, topY + u * 0.014f, u * 0.011f, NEGATIVE)
+    }
+
+    // ---------- 4a) SYS.OP.LINK GPS PANEL ----------
+    private fun drawSysOpLink(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long, s: Snapshot) {
+        panel(c, x0, y0, x1, y1, CYAN, u, fillA = 0.28f)
+        val pad = u * 0.014f; var yy = y0 + u * 0.028f
+        txt(c, "[SYS.OP.LINK.ACTV]", x0 + pad, yy, u * 0.018f, CYAN, bold = true, spacing = 0.04f, glow = u * 0.008f)
+        // hairline under title
+        val hp = Paint(Paint.ANTI_ALIAS_FLAG); hp.style = Paint.Style.STROKE; hp.strokeWidth = u * 0.0014f
+        hp.color = withAlpha(CYAN, 0.3f); c.drawLine(x0 + pad, yy + u * 0.010f, x1 - pad, yy + u * 0.010f, hp)
+        yy += u * 0.040f
+        val val0 = if (s.hasFix) POSITIVE else MUTED
+        val lat = if (s.lat.isNaN()) "----" else "%.3f° %s".format(abs(s.lat), if (s.lat >= 0) "N" else "S")
+        val lon = if (s.lon.isNaN()) "----" else "%.3f° %s".format(abs(s.lon), if (s.lon >= 0) "E" else "W")
+        txt(c, "LAT: $lat", x0 + pad, yy, u * 0.016f, val0); yy += u * 0.024f
+        txt(c, "LON: $lon", x0 + pad, yy, u * 0.016f, val0); yy += u * 0.024f
+        txt(c, "ALT: ${if (s.hasFix) "—— MSL" else "----"}", x0 + pad, yy, u * 0.016f, MUTED); yy += u * 0.030f
+        txt(c, "SAT-LOCK: ${if (s.hasFix) "ACQUIRED" else "SEARCHING"}", x0 + pad, yy, u * 0.015f, if (s.hasFix) POSITIVE else AMBER); yy += u * 0.022f
+        txt(c, "UPLINK: SECURE E2E", x0 + pad, yy, u * 0.015f, POSITIVE); yy += u * 0.034f
+        // TX / RX / S-N bars — TX=battery, RX=link (100-mem), S-N=derived
+        val barW = (x1 - pad) - (x0 + pad + u * 0.075f)
+        drawLabeledBar(c, "TX PWR", x0 + pad, yy, u * 0.075f, barW, u, s.battery.coerceIn(0, 100) / 100f, POSITIVE); yy += u * 0.026f
+        val rx = if (s.memPct in 0..100) (100 - s.memPct) / 100f else 0.6f
+        drawLabeledBar(c, "RX GAIN", x0 + pad, yy, u * 0.075f, barW, u, rx, CYAN); yy += u * 0.026f
+        val sn = (0.45f + 0.2f * abs(sin(t / 1700.0)).toFloat())
+        drawLabeledBar(c, "S/N RAT", x0 + pad, yy, u * 0.075f, barW, u, sn, AMBER); yy += u * 0.040f
+        txt(c, "NODE CLUSTER ONL", (x0 + x1) / 2f, yy, u * 0.013f, CYAN, align = Paint.Align.CENTER, spacing = 0.06f); yy += u * 0.020f
+        txt(c, "ROUTING: OPTIMAL", (x0 + x1) / 2f, yy, u * 0.013f, CYAN, align = Paint.Align.CENTER, spacing = 0.06f)
+    }
+
+    private fun drawLabeledBar(c: Canvas, label: String, x: Float, y: Float, labelW: Float, barW: Float, u: Float, frac: Float, color: Int) {
+        txt(c, label, x, y + u * 0.004f, u * 0.013f, INK)
+        val bx = x + labelW; val bh = u * 0.010f
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.color = withAlpha(CYAN, 0.14f); c.drawRect(bx, y - bh, bx + barW, y, p)
+        p.color = withFullAlpha(color); c.drawRect(bx, y - bh, bx + barW * frac.coerceIn(0f, 1f), y, p)
+    }
+
+    // ---------- 4b) THREATS BY COUNTRY ----------
+    private fun drawThreats(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long) {
+        panel(c, x0, y0, x1, y1, NEGATIVE, u, fillA = 0.26f)
+        val pad = u * 0.014f
+        txt(c, "Threats by Country", x0 + pad, y0 + u * 0.024f, u * 0.016f, INK, bold = true)
+        // world map (upper ~45%)
+        val mapT = y0 + u * 0.034f; val mapB = y0 + (y1 - y0) * 0.42f
+        val mp = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (poly in WORLD_CONTINENTS) {
+            val path = Path()
+            for ((i, pt) in poly.withIndex()) {
+                val px = x0 + pad + (x1 - pad - x0 - pad) * pt[0]
+                val py = mapT + (mapB - mapT) * pt[1]
+                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+            }
+            path.close()
+            mp.style = Paint.Style.FILL; mp.color = withAlpha(NEGATIVE, 0.12f); c.drawPath(path, mp)
+            mp.style = Paint.Style.STROKE; mp.strokeWidth = u * 0.0012f; mp.color = withAlpha(NEGATIVE, 0.4f); c.drawPath(path, mp)
+        }
+        // hot-zone blips (deterministic positions) with a soft pulse
+        val pulse = 0.5f + 0.5f * abs(sin(t / 900.0)).toFloat()
+        mp.style = Paint.Style.FILL
+        for (z in THREAT_ZONES) {
+            val px = x0 + pad + (x1 - pad - x0 - pad) * z[0]
+            val py = mapT + (mapB - mapT) * z[1]
+            mp.color = withAlpha(NEGATIVE, 0.18f * pulse); c.drawCircle(px, py, u * 0.012f * pulse, mp)
+            mp.color = withFullAlpha(NEGATIVE); c.drawCircle(px, py, u * 0.004f, mp)
+        }
+        // ranked list (lower ~55%)
+        var ly = mapB + u * 0.030f
+        val rowH = ((y1 - u * 0.012f) - ly) / THREATS.size
+        for ((name, n) in THREATS) {
+            mp.color = withFullAlpha(NEGATIVE); c.drawCircle(x0 + pad + u * 0.006f, ly - u * 0.005f, u * 0.005f, mp)
+            txt(c, name, x0 + pad + u * 0.020f, ly, u * 0.014f, INK)
+            txt(c, n.toString(), x1 - pad, ly, u * 0.015f, CYAN, bold = true, align = Paint.Align.RIGHT)
+            ly += rowH
+        }
+    }
+
+    // ---------- 4c) WARFARE / COMM RELAY ----------
+    private fun drawCommRelay(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long, s: Snapshot) {
+        panel(c, x0, y0, x1, y1, CYAN, u, fillA = 0.24f)
+        val pad = u * 0.014f
+        var yy = y0 + u * 0.026f
+        sectionHead(c, "WARFARE / COMM RELAY", x0 + pad, x1 - pad, yy, u, CYAN); yy += u * 0.026f
+        // FREQ SPECTRUM SCAN
+        txt(c, "FREQ SPECTRUM SCAN [SHF]", x0 + pad, yy, u * 0.012f, MUTED, spacing = 0.04f); yy += u * 0.012f
+        val specT = yy; val specB = yy + u * 0.055f
+        drawSpectrum(c, x0 + pad, specT, x1 - pad, specB, u, t)
+        yy = specB + u * 0.024f
+        // RADAR SCOPE
+        val scopeR = (x1 - x0) * 0.30f
+        val scopeCx = (x0 + x1) / 2f; val scopeCy = yy + scopeR
+        drawRadarScope(c, scopeCx, scopeCy, scopeR, u, t, s.markers)
+        yy = scopeCy + scopeR + u * 0.030f
+        // SUBSYSTEMS
+        txt(c, "[SUBSYSTEMS]", x0 + pad, yy, u * 0.013f, CYAN, bold = true, spacing = 0.04f); yy += u * 0.020f
+        val thermalOk = s.tempC.isNaN() || s.tempC < 40f
+        val subs = listOf(
+            Triple("SECURE ENCRYPTION", POSITIVE, "OK"),
+            Triple("GYRO STABILIZATION", POSITIVE, "OK"),
+            Triple("SATELLITE UPLINK", if (s.hasFix) POSITIVE else AMBER, if (s.hasFix) "OK" else "SRCH"),
+            Triple("THERMAL LOAD (${if (thermalOk) "NOM" else "HI"})", if (thermalOk) AMBER else NEGATIVE, ""),
+            Triple("POWER DISTRIBUTION", if (s.battery in 0..20) NEGATIVE else POSITIVE, if (s.battery >= 0) "${s.battery}%" else "OK"),
+        )
+        val sp = Paint(Paint.ANTI_ALIAS_FLAG)
+        for ((name, col, tag) in subs) {
+            sp.color = withFullAlpha(col); c.drawRect(x0 + pad, yy - u * 0.011f, x0 + pad + u * 0.011f, yy, sp)
+            txt(c, name, x0 + pad + u * 0.018f, yy, u * 0.0125f, INK)
+            if (tag.isNotEmpty()) txt(c, tag, x1 - pad, yy, u * 0.0115f, col, align = Paint.Align.RIGHT)
+            yy += u * 0.019f
+        }
+        yy += u * 0.010f
+        // ORBITAL GLOBE
+        val globeR = (x1 - x0) * 0.24f
+        val globeCx = (x0 + x1) / 2f; val globeCy = yy + globeR
+        drawOrbital(c, globeCx, globeCy, globeR, u, t)
+        yy = globeCy + globeR + u * 0.026f
+        // ENCRYPTED TELEMETRY STREAM (hex)
+        txt(c, "ENCRYPTED TELEMETRY STREAM", x0 + pad, yy, u * 0.012f, CYAN, bold = true, spacing = 0.02f); yy += u * 0.016f
+        drawHexStream(c, x0 + pad, yy, x1 - pad, y1 - pad, u, t)
+    }
+
+    private fun drawSpectrum(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long) {
+        val bars = 26; val gap = (x1 - x0) / bars
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.style = Paint.Style.FILL
+        // baseline
+        p.strokeWidth = u * 0.0012f; p.style = Paint.Style.STROKE; p.color = withAlpha(CYAN, 0.2f)
+        c.drawLine(x0, y1, x1, y1, p); p.style = Paint.Style.FILL
+        for (i in 0 until bars) {
+            val phase = i * 0.7 + t / 260.0
+            val hFrac = (0.25 + 0.75 * (0.5 + 0.5 * sin(phase)) * (0.5 + 0.5 * sin(i * 2.3 + t / 900.0))).toFloat().coerceIn(0.08f, 1f)
+            val bx = x0 + gap * i + gap * 0.18f
+            val bw = gap * 0.64f
+            val by = y1 - (y1 - y0) * hFrac
+            // colour by band: mostly green, a few amber/red peaks
+            p.color = withFullAlpha(when {
+                hFrac > 0.85f && i % 7 == 0 -> NEGATIVE
+                hFrac > 0.7f && i % 3 == 0 -> AMBER
+                else -> POSITIVE
+            })
+            c.drawRect(bx, by, bx + bw, y1, p)
+        }
+    }
+
+    private fun drawRadarScope(c: Canvas, cx: Float, cy: Float, r: Float, u: Float, t: Long, markers: List<FloatArray>) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        // rings
+        p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.0012f
+        for (i in 1..3) { p.color = withAlpha(POSITIVE, 0.18f); c.drawCircle(cx, cy, r * i / 3f, p) }
+        // crosshair
+        p.color = withAlpha(POSITIVE, 0.14f)
+        c.drawLine(cx - r, cy, cx + r, cy, p); c.drawLine(cx, cy - r, cx, cy + r, p)
+        // sweep wedge
+        val sweep = (t / 22.0) % 360.0
+        val wedge = Path(); wedge.moveTo(cx, cy)
+        val steps = 22; val span = 55.0
+        for (i in 0..steps) {
+            val a = Math.toRadians(sweep - span * i / steps)
+            wedge.lineTo(cx + (r * sin(a)).toFloat(), cy - (r * cos(a)).toFloat())
+        }
+        wedge.close()
+        p.style = Paint.Style.FILL; p.shader = android.graphics.RadialGradient(
+            cx, cy, r, withAlpha(POSITIVE, 0.35f), withAlpha(POSITIVE, 0.0f), android.graphics.Shader.TileMode.CLAMP)
+        c.drawPath(wedge, p); p.shader = null
+        // leading edge
+        p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.0018f; p.color = withFullAlpha(POSITIVE)
+        val sa = Math.toRadians(sweep)
+        c.drawLine(cx, cy, cx + (r * sin(sa)).toFloat(), cy - (r * cos(sa)).toFloat(), p)
+        // contacts (real incident markers + your position)
+        p.style = Paint.Style.FILL
+        if (markers.isEmpty()) {
+            // decorative blips if no real data
+            for (b in DECOR_BLIPS) {
+                p.color = withAlpha(POSITIVE, 0.8f)
+                c.drawCircle(cx + r * 0.7f * b[0], cy + r * 0.7f * b[1], u * 0.003f, p)
+            }
         } else {
-            p.color = withAlpha(CYAN, 0.40f + 0.55f * norm)
-            c.drawLine(x, y, x, y - h, p)
+            for (m in markers) {
+                val col = when (m[2].toInt()) { 0 -> CYAN; 2 -> AMBER; else -> NEGATIVE }
+                p.color = withFullAlpha(col)
+                c.drawCircle(cx + r * 0.85f * m[0].coerceIn(-1f, 1f), cy + r * 0.85f * m[1].coerceIn(-1f, 1f), u * 0.0035f, p)
+            }
+        }
+        // centre
+        p.color = withFullAlpha(POSITIVE); c.drawCircle(cx, cy, u * 0.003f, p)
+    }
+
+    private fun drawOrbital(c: Canvas, cx: Float, cy: Float, r: Float, u: Float, t: Long) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.style = Paint.Style.STROKE; p.strokeWidth = u * 0.0012f
+        // globe
+        p.color = withAlpha(CYAN, 0.35f); c.drawCircle(cx, cy, r, p)
+        // graticule
+        p.color = withAlpha(CYAN, 0.18f)
+        for (i in 1..2) { val rx = r * i / 3f; c.drawOval(RectF(cx - r, cy - rx, cx + r, cy + rx), p) }
+        c.drawLine(cx, cy - r, cx, cy + r, p)
+        val ov = RectF(cx - r * 0.45f, cy - r, cx + r * 0.45f, cy + r); c.drawOval(ov, p)
+        // dashed orbit ellipse (tilted) + moving satellites
+        p.color = withAlpha(CYAN, 0.55f); p.pathEffect = DashPathEffect(floatArrayOf(u * 0.006f, u * 0.005f), 0f)
+        val orbit = RectF(cx - r * 1.15f, cy - r * 0.5f, cx + r * 1.15f, cy + r * 0.5f)
+        c.drawOval(orbit, p); p.pathEffect = null
+        p.style = Paint.Style.FILL
+        val a1 = t / 1400.0
+        val s1x = cx + (r * 1.15f * cos(a1)).toFloat(); val s1y = cy + (r * 0.5f * sin(a1)).toFloat()
+        p.color = withFullAlpha(NEGATIVE); c.drawCircle(s1x, s1y, u * 0.004f, p)
+        txt(c, "AO-ZETA", s1x + u * 0.006f, s1y, u * 0.010f, NEGATIVE)
+        val a2 = a1 + Math.PI
+        val s2x = cx + (r * 1.15f * cos(a2)).toFloat(); val s2y = cy + (r * 0.5f * sin(a2)).toFloat()
+        p.color = withFullAlpha(POSITIVE); c.drawCircle(s2x, s2y, u * 0.004f, p)
+        txt(c, "MIL-SAT", s2x - u * 0.05f, s2y, u * 0.010f, POSITIVE)
+    }
+
+    private fun drawHexStream(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, t: Long) {
+        val rows = 5; val rowH = (y1 - y0) / rows
+        val size = u * 0.0105f
+        var yy = y0 + size
+        val roll = (t / 700L).toInt()
+        for (r in 0 until rows) {
+            val addr = "0x0F%02X:".format((r * 0x10 + roll * 0x0E) and 0xFF)
+            val sb = StringBuilder()
+            for (b in 0 until 10) {
+                val v = ((r * 37 + b * 53 + roll * 17) and 0xFF)
+                sb.append("%02X ".format(v))
+            }
+            txt(c, addr, x0, yy, size, MUTED, spacing = 0.02f)
+            // highlight a couple of "hot" bytes in red for effect (deterministic)
+            txt(c, sb.toString().trim(), x0 + u * 0.055f, yy, size, if ((r + roll) % 3 == 0) NEGATIVE else INK, spacing = 0.04f)
+            yy += rowH
         }
     }
 
-    p.color = withAlpha(CYAN, 0.35f)
-    p.strokeWidth = (span * 0.0035f).coerceAtLeast(1f)
-    c.drawLine(left, y + maxH * 0.18f, left + span, y + maxH * 0.18f, p)
+    // ---------- 5) BREAKING NEWS CARD ----------
+    private fun drawNewsCard(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, s: Snapshot) {
+        panel(c, x0, y0, x1, y1, NEGATIVE, u, fillA = 0.30f)
+        val pad = u * 0.020f
+        val title = s.newsTitle.orIfBlank("AWAITING BREAKING NEWS FEED…")
+        // headline (white, wrapped to 2 lines, proportional-ish via mono)
+        val hSize = u * 0.026f
+        val maxChars = ((x1 - x0 - pad * 2) / (hSize * 0.60f)).toInt().coerceAtLeast(8)
+        val (l1, l2) = wrap2(title, maxChars)
+        txt(c, l1, x0 + pad, y0 + u * 0.036f, hSize, WHITE, bold = true)
+        if (l2.isNotEmpty()) txt(c, l2, x0 + pad, y0 + u * 0.036f + hSize * 1.15f, hSize, WHITE, bold = true)
+        // source line (red)
+        val age = if (s.newsAgeMs > 0L) Formatters.relativeTime(s.newsAgeMs).uppercase() else ""
+        val src = if (s.newsSource.isNotBlank()) "${s.newsSource.uppercase()} · $age" else "PULSE WIRE · LIVE"
+        txt(c, src, x0 + pad, y1 - u * 0.016f, u * 0.014f, NEGATIVE, spacing = 0.04f)
+    }
 
-    p.style = Paint.Style.FILL
-    p.pathEffect = null
-    p.clearShadowLayer()
+    // ---------- 6) LIVE FEED ----------
+    private fun drawLiveFeed(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, u: Float, s: Snapshot) {
+        panel(c, x0, y0, x1, y1, CYAN, u, fillA = 0.24f)
+        val pad = u * 0.020f
+        txt(c, "// LIVE FEED", x0 + pad, y0 + u * 0.032f, u * 0.020f, CYAN, bold = true, spacing = 0.06f, glow = u * 0.008f)
+        val rows = s.lines.take(4)
+        if (rows.isEmpty()) { txt(c, "• SYNCING SUBSYSTEMS…", x0 + pad, y0 + u * 0.070f, u * 0.016f, MUTED); return }
+        var yy = y0 + u * 0.070f
+        val rowH = ((y1 - u * 0.014f) - yy) / rows.size.coerceAtLeast(1)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        for ((text, col) in rows) {
+            p.color = withFullAlpha(col); c.drawCircle(x0 + pad + u * 0.004f, yy - u * 0.006f, u * 0.004f, p)
+            txt(c, text, x0 + pad + u * 0.018f, yy, u * 0.016f, col, spacing = 0.02f)
+            yy += rowH
+        }
+    }
+
+    // ---------- small utils ----------
+    private fun systemStatus(s: Snapshot): Pair<String, Int> = when {
+        s.battery in 0..12 -> "CRITICAL" to NEGATIVE
+        (!s.tempC.isNaN() && s.tempC >= 44f) -> "CAUTION" to AMBER
+        s.memPct in 90..100 -> "CAUTION" to AMBER
+        else -> "OPTIMAL" to CYAN
+    }
+
+    private fun signed(v: Double): String = (if (v >= 0) "+" else "") + "%.2f".format(v)
+    private fun norm(sl: List<Double>): List<Float> {
+        val mn = sl.minOrNull() ?: 0.0; val mx = sl.maxOrNull() ?: 1.0
+        val rng = (mx - mn).let { if (it == 0.0) 1.0 else it }
+        return sl.map { ((it - mn) / rng).toFloat() }
+    }
+    private fun String.orIfBlank(d: String) = if (this.isBlank()) d else this
+    private fun wrap2(s: String, maxChars: Int): Pair<String, String> {
+        if (s.length <= maxChars) return s to ""
+        var cut = s.lastIndexOf(' ', maxChars).let { if (it <= 0) maxChars else it }
+        val first = s.substring(0, cut).trim()
+        var rest = s.substring(cut).trim()
+        if (rest.length > maxChars) rest = rest.substring(0, (maxChars - 1).coerceAtLeast(1)).trim() + "…"
+        return first to rest
+    }
+
+    private companion object {
+        val VOID = 0xFF02060A.toInt()
+        val PANEL = 0xFF0A1420.toInt()
+        val CYAN = 0xFF57D1FF.toInt()
+        val AMBER = 0xFFFFB43A.toInt()
+        val WHITE = 0xFFF2F8FF.toInt()
+        val INK = 0xFFCFE0F2.toInt()
+        val MUTED = 0xFF5A7488.toInt()
+        val POSITIVE = 0xFF4DF0A0.toInt()
+        val NEGATIVE = 0xFFFF5A72.toInt()
+
+        val MONO: Typeface = Typeface.MONOSPACE
+        val MONO_BOLD: Typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+
+        const val FRAME_MS = 33L
+        const val DATA_INTERVAL_MS = 60_000L
+
+        // Decorative "global threat monitor" list (no real per-country feed exists — theatrical, like the
+        // reference). Stable so the panel doesn't flicker.
+        val THREATS = listOf(
+            "India" to 455, "United States" to 320, "Indonesia" to 275,
+            "China" to 260, "Brazil" to 175, "Spain" to 135, "Italy" to 127,
+        )
+        // Hot-zone blip positions on the world map (normalized 0..1).
+        val THREAT_ZONES = arrayOf(
+            floatArrayOf(0.70f, 0.42f), floatArrayOf(0.78f, 0.34f), floatArrayOf(0.20f, 0.34f),
+            floatArrayOf(0.32f, 0.66f), floatArrayOf(0.50f, 0.30f), floatArrayOf(0.82f, 0.62f),
+        )
+        val DECOR_BLIPS = arrayOf(
+            floatArrayOf(0.4f, -0.3f), floatArrayOf(-0.5f, 0.2f), floatArrayOf(0.1f, 0.6f), floatArrayOf(-0.2f, -0.55f),
+        )
+
+        fun withAlpha(base: Int, a: Float): Int =
+            (base and 0x00FFFFFF) or (((a.coerceIn(0f, 1f) * 255f).toInt()) shl 24)
+
+        fun withFullAlpha(base: Int): Int = base or 0xFF000000.toInt()
+    }
 }
 
-// Continent outlines (normalized 0..1 coords) for the world radar — hoisted to a single shared
-// allocation instead of rebuilding ~37 FloatArrays every wallpaper frame (~30 fps, always-on).
+// Continent outlines (normalized 0..1 coords) for the Threats-by-Country world map — one shared allocation.
 private val WORLD_CONTINENTS: Array<Array<FloatArray>> = arrayOf(
     arrayOf( // N. America
         floatArrayOf(0.13f, 0.16f), floatArrayOf(0.27f, 0.16f), floatArrayOf(0.30f, 0.30f),
@@ -504,954 +782,3 @@ private val WORLD_CONTINENTS: Array<Array<FloatArray>> = arrayOf(
         floatArrayOf(0.90f, 0.74f), floatArrayOf(0.80f, 0.74f)
     )
 )
-
-// ===== drawWorldRadar =====
-private fun drawWorldRadar(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, markers: List<FloatArray>) {
-    val r = 0.78f * rad
-
-    fun mapX(nx: Float): Float = cx - r + nx * 2f * r
-    fun mapY(ny: Float): Float = cy - r + ny * 2f * r
-
-    p.clearShadowLayer()
-    p.shader = null
-
-    // ---- 1) Outer graduation tick ring ----
-    p.style = Paint.Style.STROKE
-    var deg = 0
-    while (deg < 360) {
-        val major = (deg % 30) == 0
-        val a = Math.toRadians(deg.toDouble())
-        val ca = cos(a).toFloat()
-        val sa = sin(a).toFloat()
-        val inner = if (major) rad * 0.93f else rad * 0.965f
-        p.color = withAlpha(CYAN, if (major) 0.55f else 0.25f)
-        p.strokeWidth = if (major) rad * 0.012f else rad * 0.006f
-        c.drawLine(cx + ca * inner, cy + sa * inner, cx + ca * rad, cy + sa * rad, p)
-        deg += 4
-    }
-
-    // ---- 2) Dashed concentric orbit rings ----
-    val phase = (t / 18f) % (rad * 0.2f)
-    p.color = withAlpha(CYAN, 0.45f)
-    p.strokeWidth = rad * 0.008f
-    p.pathEffect = DashPathEffect(floatArrayOf(rad * 0.06f, rad * 0.04f), phase)
-    c.drawCircle(cx, cy, rad * 0.94f, p)
-    p.color = withAlpha(AMBER, 0.45f)
-    p.strokeWidth = rad * 0.007f
-    p.pathEffect = DashPathEffect(floatArrayOf(rad * 0.04f, rad * 0.05f), -phase)
-    c.drawCircle(cx, cy, rad * 0.80f, p)
-    p.color = withAlpha(CYAN, 0.35f)
-    p.strokeWidth = rad * 0.006f
-    p.pathEffect = DashPathEffect(floatArrayOf(rad * 0.03f, rad * 0.03f), phase)
-    c.drawCircle(cx, cy, rad * 0.64f, p)
-    p.pathEffect = null
-
-    // ---- Clip path for the globe interior ----
-    val circlePath = Path()
-    circlePath.addCircle(cx, cy, r, Path.Direction.CW)
-
-    c.save()
-    c.clipPath(circlePath)
-
-    // ---- 3) Equirectangular graticule ----
-    p.style = Paint.Style.STROKE
-    p.color = withAlpha(CYAN, 0.12f)
-    p.strokeWidth = rad * 0.004f
-    var gi = 1
-    while (gi < 8) {
-        val ny = gi / 8f
-        val gy = mapY(ny)
-        c.drawLine(cx - r, gy, cx + r, gy, p)
-        val nx = gi / 8f
-        val gx = mapX(nx)
-        c.drawLine(gx, cy - r, gx, cy + r, p)
-        gi++
-    }
-
-    // ---- 4) Continents ----
-    for (poly in WORLD_CONTINENTS) {
-        val polyPath = Path()
-        polyPath.moveTo(mapX(poly[0][0]), mapY(poly[0][1]))
-        var i = 1
-        while (i < poly.size) {
-            polyPath.lineTo(mapX(poly[i][0]), mapY(poly[i][1]))
-            i++
-        }
-        polyPath.close()
-        p.style = Paint.Style.FILL
-        p.color = withAlpha(CYAN, 0.18f)
-        c.drawPath(polyPath, p)
-        p.style = Paint.Style.STROKE
-        p.color = withAlpha(CYAN, 0.40f)
-        p.strokeWidth = rad * 0.004f
-        c.drawPath(polyPath, p)
-    }
-
-    // ---- 5) Rotating sweep (inside clip) ----
-    val sweepDeg = ((t / 30.0) % 360.0)
-    val sweepRad = Math.toRadians(sweepDeg)
-    val sca = cos(sweepRad).toFloat()
-    val ssa = sin(sweepRad).toFloat()
-
-    val wedge = Path()
-    wedge.moveTo(cx, cy)
-    val wedgeRect = RectF(cx - r, cy - r, cx + r, cy + r)
-    wedge.arcTo(wedgeRect, (sweepDeg - 40.0).toFloat(), 40f, false)
-    wedge.close()
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(CYAN, 0.10f)
-    c.drawPath(wedge, p)
-
-    p.style = Paint.Style.STROKE
-    p.color = withAlpha(CYAN, 0.85f)
-    p.strokeWidth = rad * 0.010f
-    c.drawLine(cx, cy, cx + sca * r, cy + ssa * r, p)
-
-    c.restore()
-
-    // ---- 6) Real geo markers: your location (cyan), recent quakes/incidents (amber), waypoint (white) ----
-    val pts = if (markers.isNotEmpty()) markers else listOf(
-        floatArrayOf(0.22f, 0.30f, 1f), floatArrayOf(0.55f, 0.40f, 1f), floatArrayOf(0.78f, 0.66f, 1f)
-    )
-    var mi = 0
-    while (mi < pts.size) {
-        val m = pts[mi]
-        val mx = mapX(m[0].coerceIn(0f, 1f))
-        val my = mapY(m[1].coerceIn(0f, 1f))
-        val dx = mx - cx
-        val dy = my - cy
-        if (dx * dx + dy * dy <= r * r) {
-            val kind = if (m.size > 2) m[2].toInt() else 1
-            val col = when (kind) { 0 -> CYAN; 2 -> WHITE; else -> AMBER }
-            val mpulse = 0.5f + 0.5f * sin((t / 320.0) + mi * 1.3).toFloat()
-            val msz = rad * 0.022f
-            val dia = Path()
-            dia.moveTo(mx, my - msz)
-            dia.lineTo(mx + msz, my)
-            dia.lineTo(mx, my + msz)
-            dia.lineTo(mx - msz, my)
-            dia.close()
-            p.style = Paint.Style.FILL
-            p.color = withAlpha(col, 0.25f + 0.55f * mpulse)
-            c.drawPath(dia, p)
-            p.style = Paint.Style.STROKE
-            p.color = withAlpha(col, 0.50f + 0.40f * mpulse)
-            p.strokeWidth = rad * 0.005f
-            c.drawPath(dia, p)
-            c.drawLine(mx, my - msz, mx, my - msz * 2.0f, p)
-        }
-        mi++
-    }
-
-    // ---- 7) Centre crosshair ----
-    p.style = Paint.Style.STROKE
-    p.color = withAlpha(WHITE, 0.65f)
-    p.strokeWidth = rad * 0.005f
-    val ch = rad * 0.05f
-    c.drawLine(cx - ch, cy, cx + ch, cy, p)
-    c.drawLine(cx, cy - ch, cx, cy + ch, p)
-    p.color = withAlpha(CYAN, 0.70f)
-    p.strokeWidth = rad * 0.006f
-    c.drawCircle(cx, cy, rad * 0.025f, p)
-
-    p.style = Paint.Style.FILL
-    p.pathEffect = null
-    p.clearShadowLayer()
-}
-
-// ===== drawPercentGauge =====
-private fun drawPercentGauge(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, pct: Int, label: String) {
-    val v = if (pct < 0) 0 else if (pct > 100) 100 else pct
-    val frac = v.toFloat() / 100f
-
-    val segCount = 24
-    val segGap = 4f
-    val segArc = (360f / segCount) - segGap
-    val ringR = rad * 0.92f
-    val ringRect = RectF(cx - ringR, cy - ringR, cx + ringR, cy + ringR)
-    val litSegs = (frac * segCount).toInt()
-
-    p.style = Paint.Style.STROKE
-    p.strokeCap = Paint.Cap.BUTT
-    p.strokeWidth = rad * 0.10f
-    p.pathEffect = null
-    p.shader = null
-    for (i in 0 until segCount) {
-        val start = (-90f) + i * (360f / segCount) + (segGap / 2f)
-        if (i < litSegs) {
-            p.color = withFullAlpha(CYAN)
-            p.setShadowLayer(rad * 0.05f, 0f, 0f, withAlpha(CYAN, 0.6f))
-        } else {
-            p.color = withAlpha(CYAN, 0.18f)
-            p.clearShadowLayer()
-        }
-        c.drawArc(ringRect, start, segArc, false, p)
-    }
-    p.clearShadowLayer()
-
-    val progR = rad * 0.78f
-    val progRect = RectF(cx - progR, cy - progR, cx + progR, cy + progR)
-    val sweep = frac * 360f
-    p.style = Paint.Style.STROKE
-    p.strokeCap = Paint.Cap.ROUND
-    p.strokeWidth = rad * 0.035f
-    p.color = withFullAlpha(AMBER)
-    p.setShadowLayer(rad * 0.06f, 0f, 0f, withAlpha(AMBER, 0.7f))
-    if (sweep > 0f) c.drawArc(progRect, -90f, sweep, false, p)
-    p.clearShadowLayer()
-
-    val tipAngle = Math.toRadians((-90f + sweep).toDouble())
-    val tipX = (cx + progR * cos(tipAngle)).toFloat()
-    val tipY = (cy + progR * sin(tipAngle)).toFloat()
-    val pulse = (0.5 + 0.5 * sin(t.toDouble() / 260.0)).toFloat()
-    p.style = Paint.Style.FILL
-    p.color = withFullAlpha(AMBER)
-    p.setShadowLayer(rad * (0.05f + 0.04f * pulse), 0f, 0f, withFullAlpha(AMBER))
-    c.drawCircle(tipX, tipY, rad * 0.045f, p)
-    p.clearShadowLayer()
-    p.color = withFullAlpha(WHITE)
-    c.drawCircle(tipX, tipY, rad * 0.018f, p)
-
-    val innerR = rad * 0.62f
-    val innerRect = RectF(cx - innerR, cy - innerR, cx + innerR, cy + innerR)
-    p.style = Paint.Style.STROKE
-    p.strokeCap = Paint.Cap.BUTT
-    p.strokeWidth = rad * 0.012f
-    p.color = withAlpha(WHITE, 0.55f)
-    c.drawArc(innerRect, 0f, 360f, false, p)
-
-    p.style = Paint.Style.FILL
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-
-    val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        textAlign = Paint.Align.CENTER
-    }
-
-    txt.color = withAlpha(MUTED, 0.85f)
-    txt.textSize = rad * 0.13f
-    val lbl = if (label.length > 16) label.substring(0, 16) else label
-    c.drawText(lbl.uppercase(), cx, cy - rad * 0.18f, txt)
-
-    txt.color = withFullAlpha(CYAN)
-    txt.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-    txt.textSize = rad * 0.42f
-    txt.setShadowLayer(rad * 0.05f, 0f, 0f, withAlpha(CYAN, 0.6f))
-    c.drawText("$v%", cx, cy + rad * 0.10f, txt)
-    txt.clearShadowLayer()
-
-    txt.typeface = Typeface.MONOSPACE
-    txt.color = withAlpha(CYAN, 0.7f)
-    txt.textSize = rad * 0.09f
-    val hex = (0x100 + (v * 0x55 / 100)).toString(16).uppercase().substring(1)
-    c.drawText("LVL.0x$hex", cx, cy + rad * 0.30f, txt)
-
-    txt.color = withAlpha(MUTED, 0.8f)
-    txt.textSize = rad * 0.10f
-    txt.textAlign = Paint.Align.LEFT
-    c.drawText("0", cx - rad * 0.86f, cy + rad * 0.035f, txt)
-    txt.textAlign = Paint.Align.RIGHT
-    c.drawText("100", cx + rad * 0.86f, cy + rad * 0.035f, txt)
-
-    p.style = Paint.Style.FILL
-    p.strokeCap = Paint.Cap.BUTT
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-}
-
-// ===== drawTurbineDial =====
-private fun drawTurbineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, solarWind: Double) {
-    p.style = Paint.Style.STROKE
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-
-    p.strokeWidth = rad * 0.012f
-    p.color = withAlpha(CYAN, 0.85f)
-    c.drawCircle(cx, cy, rad * 0.72f, p)
-
-    p.strokeWidth = rad * 0.018f
-    p.color = withAlpha(CYAN, 0.40f)
-    c.drawCircle(cx, cy, rad * 0.62f, p)
-
-    p.strokeWidth = rad * 0.008f
-    p.color = withAlpha(CYAN, 0.22f)
-    c.drawCircle(cx, cy, rad * 0.50f, p)
-
-    val bladeCount = 48
-    // Spin rate tracks the real solar-wind speed (km/s): ~400 = nominal, faster wind = faster turbine.
-    val sf = if (solarWind > 0.0) (solarWind / 400.0).coerceIn(0.4, 3.0) else 1.0
-    val spin = (t.toDouble() / 40.0) * sf
-    val inner = rad * 0.35f
-    val outer = rad * 0.70f
-    p.strokeWidth = rad * 0.020f
-    val step = 360.0 / bladeCount
-    for (i in 0 until bladeCount) {
-        val ang = spin + i * step
-        val r = Math.toRadians(ang)
-        val ca = cos(r)
-        val sa = sin(r)
-        val x0 = (cx + inner * ca).toFloat()
-        val y0 = (cy + inner * sa).toFloat()
-        val x1 = (cx + outer * ca).toFloat()
-        val y1 = (cy + outer * sa).toFloat()
-        p.color = if (i % 2 == 0) withAlpha(CYAN, 0.90f) else withAlpha(CYAN, 0.30f)
-        c.drawLine(x0, y0, x1, y1, p)
-    }
-
-    p.strokeWidth = rad * 0.030f
-    p.color = withFullAlpha(AMBER)
-    p.setShadowLayer(rad * 0.06f, 0f, 0f, withAlpha(AMBER, 0.7f))
-    val tickIn = rad * 0.74f
-    val tickOut = rad * 0.86f
-    for (k in 0 until 4) {
-        val ang = k * 90.0 - 90.0
-        val r = Math.toRadians(ang)
-        val ca = cos(r)
-        val sa = sin(r)
-        val tx0 = (cx + tickIn * ca).toFloat()
-        val ty0 = (cy + tickIn * sa).toFloat()
-        val tx1 = (cx + tickOut * ca).toFloat()
-        val ty1 = (cy + tickOut * sa).toFloat()
-        c.drawLine(tx0, ty0, tx1, ty1, p)
-    }
-    p.clearShadowLayer()
-
-    p.strokeWidth = rad * 0.010f
-    p.color = withAlpha(CYAN, 0.55f)
-    val dashOn = rad * 0.10f
-    val dashOff = rad * 0.06f
-    val phase = (t.toDouble() / 60.0).toFloat()
-    p.pathEffect = DashPathEffect(floatArrayOf(dashOn, dashOff), phase)
-    c.drawCircle(cx, cy, rad * 0.92f, p)
-    p.pathEffect = null
-
-    val hubR = rad * 0.30f
-    p.style = Paint.Style.FILL
-    p.color = withFullAlpha(INK)
-    c.drawCircle(cx, cy, hubR, p)
-
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(VOID, 0.85f)
-    c.drawCircle(cx, cy, hubR * 0.78f, p)
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = rad * 0.022f
-    p.color = withFullAlpha(CYAN)
-    p.setShadowLayer(rad * 0.05f, 0f, 0f, withAlpha(CYAN, 0.8f))
-    c.drawCircle(cx, cy, hubR, p)
-    p.clearShadowLayer()
-
-    val pulse = (0.5 + 0.5 * sin(t.toDouble() / 320.0)).toFloat()
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(WHITE, 0.18f + 0.30f * pulse)
-    c.drawCircle(cx, cy, hubR * 0.28f, p)
-    p.color = withAlpha(CYAN, 0.55f + 0.40f * pulse)
-    c.drawCircle(cx, cy, hubR * 0.12f, p)
-
-    run {
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER; textSize = rad * 0.22f
-            color = withAlpha(CYAN, 0.9f)
-        }
-        c.drawText(if (solarWind > 0.0) "SOL ${solarWind.toInt()}" else "SOL --", cx, cy + rad * 1.42f, lab)
-    }
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = rad * 0.012f
-    p.color = withFullAlpha(CYAN)
-    p.pathEffect = null
-    p.clearShadowLayer()
-}
-
-// ===== drawFineDial =====
-private fun drawFineDial(c: Canvas, p: Paint, cx: Float, cy: Float, rad: Float, t: Long, kp: Double) {
-    p.style = Paint.Style.STROKE
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-    p.strokeWidth = rad * 0.02f
-    p.color = withAlpha(CYAN, 0.55f)
-    c.drawCircle(cx, cy, rad, p)
-
-    val innerR = rad * 0.62f
-    p.strokeWidth = rad * 0.015f
-    p.color = withAlpha(CYAN, 0.35f)
-    c.drawCircle(cx, cy, innerR, p)
-
-    val tickOuter = rad
-    var deg = 0
-    while (deg < 360) {
-        val a = Math.toRadians(deg.toDouble() - 90.0)
-        val ca = cos(a)
-        val sa = sin(a)
-        val major = (deg % 45) == 0
-        val tickLen = if (major) rad * 0.14f else rad * 0.07f
-        val tickInner = tickOuter - tickLen
-        if (major) {
-            p.strokeWidth = rad * 0.022f
-            p.color = withAlpha(WHITE, 0.85f)
-        } else {
-            p.strokeWidth = rad * 0.012f
-            p.color = withAlpha(CYAN, 0.45f)
-        }
-        val x0 = (cx + ca * tickInner).toFloat()
-        val y0 = (cy + sa * tickInner).toFloat()
-        val x1 = (cx + ca * tickOuter).toFloat()
-        val y1 = (cy + sa * tickOuter).toFloat()
-        c.drawLine(x0, y0, x1, y1, p)
-        deg += 5
-    }
-
-    val arcRect = RectF(cx - rad * 0.88f, cy - rad * 0.88f, cx + rad * 0.88f, cy + rad * 0.88f)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = rad * 0.05f
-    p.color = withAlpha(AMBER, 0.9f)
-    p.setShadowLayer(rad * 0.12f, 0f, 0f, withAlpha(AMBER, 0.6f))
-    c.drawArc(arcRect, -60f, 34f, false, p)
-    p.clearShadowLayer()
-
-    // Needle points to the real geomagnetic K-index (0..9 -> 0..270 deg from top); sweeps if unknown.
-    val sweep = if (kp in 0.0..9.0) (kp / 9.0) * 270.0 else ((t.toDouble() / 60.0) % 360.0)
-    val ang = Math.toRadians(sweep - 90.0)
-    val ca = cos(ang)
-    val sa = sin(ang)
-    val pa = Math.toRadians(sweep)
-    val pca = cos(pa)
-    val psa = sin(pa)
-
-    val tipR = rad * 0.92f
-    val baseR = rad * 0.66f
-    val halfW = rad * 0.11f
-
-    val tipX = (cx + ca * tipR).toFloat()
-    val tipY = (cy + sa * tipR).toFloat()
-    val bcx = cx + ca * baseR
-    val bcy = cy + sa * baseR
-    val bLx = (bcx + pca * halfW).toFloat()
-    val bLy = (bcy + psa * halfW).toFloat()
-    val bRx = (bcx - pca * halfW).toFloat()
-    val bRy = (bcy - psa * halfW).toFloat()
-
-    val tri = Path()
-    tri.moveTo(tipX, tipY)
-    tri.lineTo(bLx, bLy)
-    tri.lineTo(bRx, bRy)
-    tri.close()
-
-    p.style = Paint.Style.FILL
-    p.color = withFullAlpha(CYAN)
-    p.setShadowLayer(rad * 0.16f, 0f, 0f, withAlpha(CYAN, 0.8f))
-    c.drawPath(tri, p)
-    p.clearShadowLayer()
-
-    p.color = withAlpha(WHITE, 0.9f)
-    c.drawCircle(tipX, tipY, rad * 0.035f, p)
-
-    val nubR = innerR - rad * 0.04f
-    var cardinal = 0
-    while (cardinal < 4) {
-        val na = Math.toRadians(cardinal * 90.0 - 90.0)
-        val nx = (cx + cos(na) * nubR).toFloat()
-        val ny = (cy + sin(na) * nubR).toFloat()
-        p.style = Paint.Style.FILL
-        p.color = if (cardinal == 0) withFullAlpha(AMBER) else withAlpha(CYAN, 0.85f)
-        c.drawCircle(nx, ny, rad * 0.05f, p)
-        cardinal++
-    }
-
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(INK, 0.9f)
-    c.drawCircle(cx, cy, rad * 0.11f, p)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = rad * 0.02f
-    p.color = withFullAlpha(CYAN)
-    c.drawCircle(cx, cy, rad * 0.11f, p)
-    p.style = Paint.Style.FILL
-    p.color = withFullAlpha(WHITE)
-    c.drawCircle(cx, cy, rad * 0.04f, p)
-
-    run {
-        val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER; textSize = rad * 0.22f
-            color = withAlpha(CYAN, 0.9f)
-        }
-        c.drawText(if (kp in 0.0..9.0) "Kp ${"%.1f".format(kp)}" else "Kp --", cx, cy + rad * 1.42f, lab)
-    }
-
-    p.style = Paint.Style.FILL
-    p.strokeWidth = 0f
-    p.pathEffect = null
-    p.clearShadowLayer()
-    p.color = withFullAlpha(CYAN)
-}
-
-// ===== drawWaveGraph =====
-private fun drawWaveGraph(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b: Float, t: Long, series: List<Float>, seriesLabel: String) {
-    val w = r - l
-    val h = b - top
-    val unit = if (w < h) w else h
-    val pad = unit * 0.04f
-
-    p.clearShadowLayer()
-    p.shader = null
-    p.pathEffect = null
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = unit * 0.012f
-    p.color = withAlpha(CYAN, 0.35f)
-    val frame = RectF(l, top, r, b)
-    c.drawRoundRect(frame, unit * 0.03f, unit * 0.03f, p)
-
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(PANEL, 0.18f)
-    c.drawRoundRect(frame, unit * 0.03f, unit * 0.03f, p)
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = unit * 0.02f
-    p.color = withAlpha(CYAN, 0.85f)
-    val bl = unit * 0.12f
-    c.drawLine(l, top, l + bl, top, p)
-    c.drawLine(l, top, l, top + bl, p)
-    c.drawLine(r, top, r - bl, top, p)
-    c.drawLine(r, top, r, top + bl, p)
-    c.drawLine(l, b, l + bl, b, p)
-    c.drawLine(l, b, l, b - bl, p)
-    c.drawLine(r, b, r - bl, b, p)
-    c.drawLine(r, b, r, b - bl, p)
-
-    val px0 = l + pad
-    val px1 = r - pad
-    val py0 = top + pad + unit * 0.10f
-    val py1 = b - pad - unit * 0.06f
-    val pw = px1 - px0
-    val ph = py1 - py0
-    val mid = py0 + ph * 0.5f
-    val amp = ph * 0.32f
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = unit * 0.005f
-    p.color = withAlpha(CYAN, 0.12f)
-    val rows = 4
-    var gi = 0
-    while (gi <= rows) {
-        val gy = py0 + ph * (gi.toFloat() / rows.toFloat())
-        c.drawLine(px0, gy, px1, gy, p)
-        gi++
-    }
-    val cols = 6
-    var ci = 0
-    while (ci <= cols) {
-        val gx = px0 + pw * (ci.toFloat() / cols.toFloat())
-        c.drawLine(gx, py0, gx, py1, p)
-        ci++
-    }
-
-    p.strokeWidth = unit * 0.006f
-    p.color = withAlpha(CYAN, 0.30f)
-    p.pathEffect = DashPathEffect(floatArrayOf(unit * 0.04f, unit * 0.03f), (t % 1000L).toFloat() * 0.02f)
-    c.drawLine(px0, mid, px1, mid, p)
-    p.pathEffect = null
-
-    val path = Path()
-    var endX = px1
-    var endY = mid
-    if (series.size >= 2) {
-        // Real series (normalized 0..1) -> the panel.
-        val n = series.size
-        var i = 0
-        while (i < n) {
-            val frac = i.toFloat() / (n - 1).toFloat()
-            val x = px0 + pw * frac
-            val y = py1 - series[i].coerceIn(0f, 1f) * ph
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            endX = x; endY = y
-            i++
-        }
-    } else {
-        // Fallback animated trace until the real sparkline is cached.
-        val samples = 40
-        var i = 0
-        while (i <= samples) {
-            val frac = i.toFloat() / samples.toFloat()
-            val x = px0 + pw * frac
-            val s1 = sin(i * 0.5 + t / 300.0).toFloat() * 0.6f
-            val s2 = sin(i * 1.7 + t / 170.0).toFloat() * 0.4f
-            val y = mid + amp * (s1 + s2)
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            endX = x; endY = y
-            i++
-        }
-    }
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = unit * 0.016f
-    p.color = withFullAlpha(CYAN)
-    p.setShadowLayer(unit * 0.05f, 0f, 0f, withAlpha(CYAN, 0.8f))
-    c.drawPath(path, p)
-    p.clearShadowLayer()
-
-    p.style = Paint.Style.FILL
-    p.color = withFullAlpha(WHITE)
-    p.setShadowLayer(unit * 0.04f, 0f, 0f, withFullAlpha(CYAN))
-    c.drawCircle(endX, endY, unit * 0.018f, p)
-    p.clearShadowLayer()
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = unit * 0.008f
-    p.color = withAlpha(AMBER, 0.7f)
-    val ticks = 12
-    var ti = 0
-    while (ti <= ticks) {
-        val tx = px0 + pw * (ti.toFloat() / ticks.toFloat())
-        val major = ti % 3 == 0
-        val tl = if (major) unit * 0.045f else unit * 0.025f
-        c.drawLine(tx, py1, tx, py1 + tl, p)
-        ti++
-    }
-
-    val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        textAlign = Paint.Align.LEFT
-        textSize = unit * 0.07f
-        color = withAlpha(CYAN, 0.9f)
-    }
-    c.drawText(seriesLabel.ifBlank { "RTLM-57" }, px0 + unit * 0.01f, top + pad + unit * 0.085f, label)
-
-    p.style = Paint.Style.FILL
-    p.pathEffect = null
-    p.clearShadowLayer()
-}
-
-// ===== drawLoadingBar =====
-private fun drawLoadingBar(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b: Float, t: Long, pct: Int, label: String) {
-    val clamped = if (pct < 0) 0 else if (pct > 100) 100 else pct
-    val frac = clamped.toFloat() / 100f
-    val w = r - l
-    val h = b - top
-    val unit = if (h < (w * 0.06f)) h else (w * 0.06f)
-    val stroke = (unit * 0.16f).coerceAtLeast(1f)
-
-    p.clearShadowLayer()
-    p.pathEffect = null
-    p.shader = null
-
-    val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE
-        textSize = unit * 1.05f
-        textAlign = Paint.Align.LEFT
-    }
-    val capY = top - (unit * 0.55f)
-    txt.color = withFullAlpha(CYAN)
-    c.drawText("$label $clamped%", l, capY, txt)
-    txt.textAlign = Paint.Align.RIGHT
-    txt.color = withAlpha(AMBER, 0.85f)
-    val dots = ((t / 350L) % 4L).toInt()
-    val tail = when (dots) { 0 -> "" ; 1 -> "." ; 2 -> ".." ; else -> "..." }
-    c.drawText("LOADING$tail", r, capY, txt)
-
-    val trackRect = RectF(l, top, r, b)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = stroke
-    p.color = withAlpha(CYAN, 0.55f)
-    val rad = h * 0.22f
-    c.drawRoundRect(trackRect, rad, rad, p)
-
-    val capLen = h * 0.55f
-    val capInset = unit * 0.6f
-    p.strokeWidth = stroke * 1.4f
-    p.color = withFullAlpha(CYAN)
-    c.drawLine(l + capInset, top + (h - capLen) * 0.5f, l + capInset, top + (h + capLen) * 0.5f, p)
-    c.drawLine(l + capInset, top + (h - capLen) * 0.5f, l + capInset + unit * 0.45f, top + (h - capLen) * 0.5f, p)
-    c.drawLine(l + capInset, top + (h + capLen) * 0.5f, l + capInset + unit * 0.45f, top + (h + capLen) * 0.5f, p)
-    c.drawLine(r - capInset, top + (h - capLen) * 0.5f, r - capInset, top + (h + capLen) * 0.5f, p)
-    c.drawLine(r - capInset, top + (h - capLen) * 0.5f, r - capInset - unit * 0.45f, top + (h - capLen) * 0.5f, p)
-    c.drawLine(r - capInset, top + (h + capLen) * 0.5f, r - capInset - unit * 0.45f, top + (h + capLen) * 0.5f, p)
-
-    val pad = stroke * 1.4f
-    val fillL = l + capInset + unit * 0.7f
-    val fillR = r - capInset - unit * 0.7f
-    val fillTop = top + pad
-    val fillBot = b - pad
-    val fillSpan = fillR - fillL
-    val fillH = fillBot - fillTop
-
-    if (fillSpan > 0f) {
-        val fillW = fillSpan * frac
-        val edgeX = fillL + fillW
-
-        p.style = Paint.Style.FILL
-        if (fillW > 0f) {
-            val fr = RectF(fillL, fillTop, edgeX, fillBot)
-            p.color = withAlpha(CYAN, 0.85f)
-            p.setShadowLayer(unit * 0.9f, 0f, 0f, withAlpha(CYAN, 0.6f))
-            c.drawRoundRect(fr, rad * 0.5f, rad * 0.5f, p)
-            p.clearShadowLayer()
-        }
-
-        val segCount = 24
-        val segW = fillSpan / segCount
-        p.style = Paint.Style.STROKE
-        p.strokeWidth = (stroke * 0.6f).coerceAtLeast(1f)
-        p.color = withAlpha(INK, 0.7f)
-        var i = 1
-        while (i < segCount) {
-            val sx = fillL + segW * i
-            if (sx < edgeX - segW * 0.2f) {
-                c.drawLine(sx, fillTop + fillH * 0.18f, sx, fillBot - fillH * 0.18f, p)
-            }
-            i++
-        }
-
-        if (frac > 0f && frac < 1f) {
-            val pulse = (0.55f + 0.45f * sin(t.toDouble() * 0.006).toFloat())
-            p.style = Paint.Style.FILL
-            val edgeW = unit * 0.6f
-            val er = RectF(edgeX - edgeW, fillTop, edgeX, fillBot)
-            p.color = withAlpha(AMBER, 0.55f + 0.4f * pulse)
-            c.drawRect(er, p)
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = stroke * 1.2f
-            p.color = withFullAlpha(AMBER)
-            p.setShadowLayer(unit * 1.2f, 0f, 0f, withAlpha(AMBER, 0.7f * pulse))
-            c.drawLine(edgeX, fillTop - pad * 0.4f, edgeX, fillBot + pad * 0.4f, p)
-            p.clearShadowLayer()
-        } else if (frac >= 1f) {
-            p.style = Paint.Style.STROKE
-            p.strokeWidth = stroke * 1.3f
-            p.color = withAlpha(WHITE, 0.9f)
-            c.drawLine(fillR, fillTop, fillR, fillBot, p)
-        }
-    }
-
-    p.pathEffect = null
-    p.clearShadowLayer()
-    p.style = Paint.Style.FILL
-    p.strokeWidth = 0f
-    p.color = withFullAlpha(WHITE)
-}
-
-// ===== drawBreadth (market breadth: watchlist up vs down) =====
-private fun drawBreadth(c: Canvas, p: Paint, cx: Float, cy: Float, size: Float, t: Long, up: Int, down: Int, net: Double, mood: String) {
-    p.clearShadowLayer()
-    p.shader = null
-    p.pathEffect = null
-
-    val total = up + down
-    val upFrac = if (total > 0) up.toFloat() / total.toFloat() else 0.5f
-    val upPct = (upFrac * 100f).toInt()
-    val bullish = upFrac >= 0.5f
-    val breath = (0.5 + 0.5 * sin(t.toDouble() / 1400.0)).toFloat()
-
-    // Dashed frame (matches the panel idiom).
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = size * 0.006f
-    p.color = withAlpha(CYAN, 0.20f + 0.12f * breath)
-    p.pathEffect = DashPathEffect(floatArrayOf(size * 0.03f, size * 0.025f), (t % 4000L).toFloat() * 0.04f)
-    val frame = RectF(cx - size * 0.46f, cy - size * 0.42f, cx + size * 0.46f, cy + size * 0.42f)
-    c.drawRoundRect(frame, size * 0.04f, size * 0.04f, p)
-    p.pathEffect = null
-
-    val lab = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE; textAlign = Paint.Align.LEFT
-    }
-    lab.textSize = size * 0.05f
-    lab.color = withAlpha(CYAN, 0.6f + 0.3f * breath)
-    c.drawText("MKT BREADTH", cx - size * 0.42f, cy - size * 0.30f, lab)
-
-    // Plain-English mood headline (auto-sized to fit the panel), tri-state coloured to match the
-    // direction (POSITIVE leaning up / NEGATIVE leaning down / AMBER mixed, on MarketMood's boundaries).
-    if (mood.isNotEmpty()) {
-        val moodText = mood.uppercase()
-        val moodColor = when {
-            upFrac >= 0.55f -> POSITIVE
-            upFrac <= 0.45f -> NEGATIVE
-            else -> AMBER
-        }
-        val moodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
-        }
-        val baseMoodSize = size * 0.052f
-        moodPaint.textSize = baseMoodSize
-        val avail = size * 0.84f
-        val measured = moodPaint.measureText(moodText)
-        if (measured > avail && measured > 0f) moodPaint.textSize = baseMoodSize * (avail / measured)
-        moodPaint.color = withFullAlpha(moodColor)
-        c.drawText(moodText, cx, cy - size * 0.215f, moodPaint)
-    }
-
-    // Big up-share percent (breadth headline).
-    val pct = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
-    }
-    pct.textSize = size * 0.15f
-    pct.color = withFullAlpha(if (bullish) POSITIVE else NEGATIVE)
-    pct.setShadowLayer(size * 0.04f, 0f, 0f, withAlpha(if (bullish) POSITIVE else NEGATIVE, 0.6f))
-    c.drawText("$upPct%", cx, cy - size * 0.04f, pct)
-    pct.clearShadowLayer()
-
-    // Net average % change across the basket (signed).
-    val netUp = net >= 0.0
-    val netStr = "NET ${if (netUp) "+" else ""}${"%.2f".format(net)}%"
-    val netPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD); textAlign = Paint.Align.CENTER
-    }
-    netPaint.textSize = size * 0.06f
-    netPaint.color = withFullAlpha(if (netUp) POSITIVE else NEGATIVE)
-    netPaint.setShadowLayer(size * 0.02f, 0f, 0f, withAlpha(if (netUp) POSITIVE else NEGATIVE, 0.5f))
-    c.drawText(netStr, cx, cy + size * 0.06f, netPaint)
-    netPaint.clearShadowLayer()
-
-    // Split bar: green (up) | red (down).
-    val barL = cx - size * 0.40f
-    val barR = cx + size * 0.40f
-    val barW = barR - barL
-    val barTop = cy + size * 0.12f
-    val barBot = cy + size * 0.22f
-    val splitX = barL + barW * upFrac
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(PANEL, 0.6f)
-    c.drawRoundRect(RectF(barL, barTop, barR, barBot), size * 0.03f, size * 0.03f, p)
-    if (upFrac > 0f) {
-        p.color = withAlpha(POSITIVE, 0.85f)
-        c.drawRoundRect(RectF(barL, barTop, splitX, barBot), size * 0.03f, size * 0.03f, p)
-    }
-    if (upFrac < 1f) {
-        p.color = withAlpha(NEGATIVE, 0.85f)
-        c.drawRoundRect(RectF(splitX, barTop, barR, barBot), size * 0.03f, size * 0.03f, p)
-    }
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = size * 0.012f
-    p.color = withFullAlpha(WHITE)
-    c.drawLine(splitX, barTop - size * 0.02f, splitX, barBot + size * 0.02f, p)
-
-    // Up / down counts.
-    val cnt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER
-    }
-    cnt.textSize = size * 0.05f
-    cnt.color = withFullAlpha(POSITIVE)
-    c.drawText("UP $up", cx - size * 0.20f, cy + size * 0.36f, cnt)
-    cnt.color = withFullAlpha(NEGATIVE)
-    c.drawText("DN $down", cx + size * 0.20f, cy + size * 0.36f, cnt)
-
-    p.style = Paint.Style.FILL
-    p.strokeWidth = 0f
-    p.pathEffect = null
-    p.clearShadowLayer()
-    p.color = withFullAlpha(CYAN)
-}
-
-// ===== drawDataPanel =====
-private fun drawDataPanel(c: Canvas, p: Paint, l: Float, top: Float, r: Float, b: Float, lines: List<Pair<String, Int>>) {
-    val w = r - l
-    val h = b - top
-    if (w <= 0f || h <= 0f) return
-
-    val rect = RectF(l, top, r, b)
-    val rad = (h * 0.04f).coerceIn(4f, 14f)
-
-    p.clearShadowLayer()
-    p.style = Paint.Style.FILL
-    p.color = withAlpha(PANEL, 0.55f)
-    p.pathEffect = null
-    p.shader = null
-    c.drawRoundRect(rect, rad, rad, p)
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = (h * 0.006f).coerceAtLeast(1f)
-    p.color = withAlpha(CYAN, 0.55f)
-    c.drawRoundRect(rect, rad, rad, p)
-
-    val br = (w * 0.07f).coerceIn(8f, 28f)
-    val bw = (h * 0.010f).coerceAtLeast(1.5f)
-    p.strokeWidth = bw
-    p.color = withFullAlpha(CYAN)
-    c.drawLine(l, top, l + br, top, p)
-    c.drawLine(l, top, l, top + br, p)
-    c.drawLine(r, top, r - br, top, p)
-    c.drawLine(r, top, r, top + br, p)
-    c.drawLine(l, b, l + br, b, p)
-    c.drawLine(l, b, l, b - br, p)
-    c.drawLine(r, b, r - br, b, p)
-    c.drawLine(r, b, r, b - br, p)
-
-    val pad = (w * 0.05f).coerceIn(6f, 22f)
-
-    val headSize = (h * 0.085f).coerceIn(8f, 22f)
-    val head = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        textAlign = Paint.Align.LEFT
-        textSize = headSize
-        color = withFullAlpha(CYAN)
-        letterSpacing = 0.12f
-    }
-    val headY = top + pad + headSize
-    c.drawText("// LIVE FEED", l + pad, headY, head)
-
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = (h * 0.004f).coerceAtLeast(1f)
-    p.color = withAlpha(CYAN, 0.30f)
-    val divY = headY + headSize * 0.45f
-    c.drawLine(l + pad, divY, r - pad, divY, p)
-
-    val n = lines.size
-    if (n > 0) {
-        val rowsTop = divY + (h * 0.04f)
-        val rowsBottom = b - pad
-        val avail = rowsBottom - rowsTop
-        val slot = avail / n
-        val rowSize = (slot * 0.62f).coerceIn(7f, headSize)
-
-        val rowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.MONOSPACE
-            textAlign = Paint.Align.LEFT
-            textSize = rowSize
-            letterSpacing = 0.04f
-        }
-
-        for (i in 0 until n) {
-            val pair = lines[i]
-            val baseY = rowsTop + slot * (i.toFloat() + 0.5f) + rowSize * 0.36f
-            rowPaint.color = withFullAlpha(pair.second)
-            p.style = Paint.Style.FILL
-            p.color = withAlpha(pair.second, 0.85f)
-            val markY = baseY - rowSize * 0.30f
-            c.drawCircle(l + pad + rowSize * 0.20f, markY, rowSize * 0.16f, p)
-            c.drawText(pair.first, l + pad + rowSize * 0.70f, baseY, rowPaint)
-        }
-    }
-
-    p.style = Paint.Style.FILL
-    p.strokeWidth = 0f
-    p.pathEffect = null
-    p.shader = null
-    p.clearShadowLayer()
-    p.color = withFullAlpha(WHITE)
-}
-    }
-
-    private companion object {
-        val VOID = 0xFF02060A.toInt()
-        val BLACK = 0xFF000000.toInt()
-        val PANEL = 0xFF081018.toInt()
-        val CYAN = 0xFF45C8F5.toInt()
-        val AMBER = 0xFFFFA23A.toInt()
-        val WHITE = 0xFFE9F4FF.toInt()
-        val INK = 0xFFE6EFFA.toInt()
-        val MUTED = 0xFF4A6076.toInt()
-        val POSITIVE = 0xFF46F9A0.toInt()
-        val NEGATIVE = 0xFFFF4D6D.toInt()
-
-        const val FRAME_MS = 33L
-        const val DATA_INTERVAL_MS = 60_000L
-
-        fun withAlpha(base: Int, a: Float): Int =
-            (base and 0x00FFFFFF) or (((a.coerceIn(0f, 1f) * 255f).toInt()) shl 24)
-
-        fun withFullAlpha(base: Int): Int = base or 0xFF000000.toInt()
-    }
-}
