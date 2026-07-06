@@ -280,6 +280,73 @@ class LifeStatsTest {
         assertEquals(0.0, LifeStats.withMoney(LifeProfile(), -100.0).realMoney, 0.0001)
     }
 
+    // --- Needs depth: tiers, conditions, cross-need coupling ---
+
+    @Test fun needTierBands() {
+        assertEquals(NeedTier.PEAK, LifeStats.needTier(100))
+        assertEquals(NeedTier.PEAK, LifeStats.needTier(85))
+        assertEquals(NeedTier.HEALTHY, LifeStats.needTier(84))
+        assertEquals(NeedTier.HEALTHY, LifeStats.needTier(60))
+        assertEquals(NeedTier.FADING, LifeStats.needTier(59))
+        assertEquals(NeedTier.FADING, LifeStats.needTier(45))
+        assertEquals(NeedTier.LOW, LifeStats.needTier(44))
+        assertEquals(NeedTier.LOW, LifeStats.needTier(25))
+        assertEquals(NeedTier.STRAINED, LifeStats.needTier(24))
+        assertEquals(NeedTier.STRAINED, LifeStats.needTier(16))
+        assertEquals(NeedTier.CRITICAL, LifeStats.needTier(15))
+        assertEquals(NeedTier.CRITICAL, LifeStats.needTier(0))
+    }
+
+    @Test fun blankProfileNeedsAllPeak() {
+        val states = LifeStats.needStates(LifeProfile())
+        assertEquals(NeedKind.entries.size, states.size)
+        assertTrue(states.all { it.tier == NeedTier.PEAK })
+        assertTrue(states.all { it.effects.isEmpty() })
+        assertNull(LifeStats.mostUrgentNeed(LifeProfile()))
+        assertEquals(100, LifeStats.overallCondition(LifeProfile()))
+    }
+
+    @Test fun needStateCarriesConditionAndAdvice() {
+        val parched = LifeStats.needStates(LifeProfile(hydration = 20))
+            .first { it.kind == NeedKind.HYDRATION }
+        assertEquals(NeedTier.STRAINED, parched.tier)
+        assertEquals("Parched", parched.condition)
+        assertTrue(parched.advice.isNotBlank())
+        assertTrue(parched.effects.isNotEmpty())
+    }
+
+    @Test fun poorBandAddsASecondPenalty() {
+        // 20 is in the POOR band (16–24): primary AND secondary take a hit.
+        val p = LifeProfile(hydration = 20)
+        assertEquals(-1, LifeStats.statBonus(p, Special.ENDURANCE)) // primary
+        assertEquals(-1, LifeStats.statBonus(p, Special.STRENGTH))  // secondary
+    }
+
+    @Test fun neglectingTwoNeedsRunsYouRagged() {
+        val p = LifeProfile(hydration = 25, energy = 25) // two needs ≤ LOW
+        assertTrue(LifeStats.effects(p).any { it.reason == "Running yourself ragged" })
+        // No third → no extra luck penalty yet.
+        assertFalse(LifeStats.effects(p).any { it.reason == "Everything's a struggle" })
+    }
+
+    @Test fun neglectingThreeNeedsSapsLuck() {
+        val p = LifeProfile(hydration = 25, energy = 25, nourishment = 25)
+        assertTrue(LifeStats.effects(p).any { it.reason == "Everything's a struggle" })
+        assertEquals(-1, LifeStats.statBonus(p, Special.LUCK))
+    }
+
+    @Test fun lowEnergySpeedsOtherNeedsDecay() {
+        // energy ≤ LOW → hydration drains 1.15× (23 instead of 20 over 5h).
+        val p = LifeStats.decayNeeds(LifeProfile(hydration = 100, energy = 20), 5L * 3_600_000L)
+        assertEquals(77, p.hydration)
+    }
+
+    @Test fun starvingSpeedsEnergyDecay() {
+        // nourishment ≤ LOW → energy drains 1.2× (18 instead of 15 over 5h).
+        val p = LifeStats.decayNeeds(LifeProfile(energy = 100, nourishment = 20), 5L * 3_600_000L)
+        assertEquals(82, p.energy)
+    }
+
     // --- Integration with SpecialGame.resolve ---
 
     @Test fun lifeStatBonusCanFlipACheck() {

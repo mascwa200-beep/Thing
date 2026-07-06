@@ -77,14 +77,60 @@ enum class MoneyTier(val label: String, val capsBonusPct: Int) {
     LOADED("Loaded", 35),
 }
 
+/** One of the operator's real-decaying survival needs. Unifies the four so logic isn't hardcoded per-need. */
+enum class NeedKind(val label: String, val verb: String, val restoreLabel: String) {
+    HYDRATION("Hydration", "DRINK", "hydrated"),
+    NOURISHMENT("Nourishment", "EAT", "fed"),
+    ENERGY("Energy", "REST", "rested"),
+    HYGIENE("Hygiene", "WASH", "clean");
+
+    /** The need's current 0..100 value on [p]. */
+    fun value(p: LifeProfile): Int = when (this) {
+        HYDRATION -> p.hydration
+        NOURISHMENT -> p.nourishment
+        ENERGY -> p.energy
+        HYGIENE -> p.hygiene
+    }
+}
+
+/** How a need is doing, from full to failing — six display bands (finer than the effect thresholds). */
+enum class NeedTier(val label: String) {
+    PEAK("Peak"), HEALTHY("Healthy"), FADING("Fading"), LOW("Low"), STRAINED("Strained"), CRITICAL("Critical");
+
+    /** Whether this tier is dragging the body down (used to colour a gauge / gate a warning). */
+    val isConcern: Boolean get() = this == LOW || this == STRAINED || this == CRITICAL
+    val isDire: Boolean get() = this == STRAINED || this == CRITICAL
+}
+
+/** A rich per-need readout for the UI + notifications: value, tier, a named condition, advice, live effects. */
+data class NeedState(
+    val kind: NeedKind,
+    val value: Int,
+    val tier: NeedTier,
+    /** e.g. "Parched" / "Peak condition". */
+    val condition: String,
+    /** e.g. "Find water and drink." — one actionable line. */
+    val advice: String,
+    /** The check modifiers this need is currently applying (empty when it's fine). */
+    val effects: List<LifeEffect>,
+)
+
 /**
  * Pure logic mapping a [LifeProfile] to its game effects. [effects] is the single source of truth;
  * [statBonus] / [capsBonusPct] / [describe] are views over it, and the needs helpers evolve the profile.
  */
 object LifeStats {
-    // Needs thresholds (0..100).
-    const val NEED_LOW = 30
-    const val NEED_CRITICAL = 15
+    // Needs thresholds (0..100) — three escalating danger bands per need drive the check penalties.
+    const val NEED_LOW = 30       // ≤ LOW: the primary attribute starts to sag
+    const val NEED_POOR = 24      // ≤ POOR: a second attribute joins the toll
+    const val NEED_CRITICAL = 15  // ≤ CRITICAL: the body is failing
+    // Finer display/notification tiers surface a condition well before penalties bite.
+    const val NEED_PEAK = 85
+    const val NEED_HEALTHY = 60
+    const val NEED_FADING = 45
+    // Cross-need decay: a spent body / empty stomach drains everything else faster.
+    private const val RUNDOWN_DECAY_X = 1.15   // low energy → other needs drain faster
+    private const val STARVING_ENERGY_X = 1.2  // low nourishment → energy drains faster
 
     // Need decay per hour of real time (points). Thirst builds faster than grime; energy sags between.
     const val HYDRATION_DECAY_PER_HR = 4.0
@@ -222,30 +268,12 @@ object LifeStats {
             }
         }
 
-        // Needs let slide tax the body + presence until you top them up.
-        if (p.hydration <= NEED_CRITICAL) {
-            out += LifeEffect(Special.ENDURANCE, -2, "Severely dehydrated")
-            out += LifeEffect(Special.STRENGTH, -1, "Wrung out")
-        } else if (p.hydration <= NEED_LOW) {
-            out += LifeEffect(Special.ENDURANCE, -1, "Thirsty")
-        }
-        if (p.hygiene <= NEED_CRITICAL) {
-            out += LifeEffect(Special.CHARISMA, -2, "Filthy")
-        } else if (p.hygiene <= NEED_LOW) {
-            out += LifeEffect(Special.CHARISMA, -1, "Unkempt")
-        }
-        if (p.energy <= NEED_CRITICAL) {
-            out += LifeEffect(Special.AGILITY, -2, "Exhausted")
-            out += LifeEffect(Special.INTELLIGENCE, -1, "Foggy-headed")
-        } else if (p.energy <= NEED_LOW) {
-            out += LifeEffect(Special.AGILITY, -1, "Weary")
-        }
-        if (p.nourishment <= NEED_CRITICAL) {
-            out += LifeEffect(Special.STRENGTH, -2, "Starving")
-            out += LifeEffect(Special.ENDURANCE, -1, "Running on empty")
-        } else if (p.nourishment <= NEED_LOW) {
-            out += LifeEffect(Special.STRENGTH, -1, "Hungry")
-        }
+        // Needs let slide tax the body + presence until you top them up (three escalating bands per need).
+        out += needEffects(p)
+        // Neglecting several needs at once compounds: a body pushed on every front wears down and gets unlucky.
+        val downCount = NeedKind.entries.count { it.value(p) <= NEED_LOW }
+        if (downCount >= 2) out += LifeEffect(Special.ENDURANCE, -1, "Running yourself ragged")
+        if (downCount >= 3) out += LifeEffect(Special.LUCK, -1, "Everything's a struggle")
 
         // Mood only tips the scales at the extremes.
         if (p.mood >= MOOD_HIGH) {
@@ -314,6 +342,119 @@ object LifeStats {
         "${e.stat.display.take(3)} $sign${abs(e.delta)} · ${e.reason}"
     }
 
+    // --- Needs depth: unified per-need effects, tiers, conditions & advice ---
+
+    /** Which attributes a need drags down, and the named condition per severity. */
+    private data class NeedCfg(
+        val primary: Special,
+        val secondary: Special,
+        val low: String,     // ≤ NEED_LOW  — the first bite
+        val poor: String,    // ≤ NEED_POOR — worse
+        val critical: String, // ≤ NEED_CRITICAL — failing
+    )
+
+    private val NEED_CFG: Map<NeedKind, NeedCfg> = mapOf(
+        NeedKind.HYDRATION to NeedCfg(Special.ENDURANCE, Special.STRENGTH, "Thirsty", "Parched", "Dehydrated"),
+        NeedKind.NOURISHMENT to NeedCfg(Special.STRENGTH, Special.ENDURANCE, "Hungry", "Famished", "Starving"),
+        NeedKind.ENERGY to NeedCfg(Special.AGILITY, Special.INTELLIGENCE, "Weary", "Drained", "Exhausted"),
+        NeedKind.HYGIENE to NeedCfg(Special.CHARISMA, Special.LUCK, "Unkempt", "Grimy", "Reeking"),
+    )
+
+    /** The check modifiers one need is applying at value [v] — empty above NEED_LOW; escalates in three bands. */
+    private fun needEffectsFor(k: NeedKind, v: Int): List<LifeEffect> {
+        val cfg = NEED_CFG.getValue(k)
+        return when {
+            v <= NEED_CRITICAL -> listOf(
+                LifeEffect(cfg.primary, -2, cfg.critical),
+                LifeEffect(cfg.secondary, -1, cfg.critical),
+            )
+            v <= NEED_POOR -> listOf(
+                LifeEffect(cfg.primary, -1, cfg.poor),
+                LifeEffect(cfg.secondary, -1, cfg.poor),
+            )
+            v <= NEED_LOW -> listOf(LifeEffect(cfg.primary, -1, cfg.low))
+            else -> emptyList()
+        }
+    }
+
+    /** Every need's current check modifiers, stacked. */
+    private fun needEffects(p: LifeProfile): List<LifeEffect> =
+        NeedKind.entries.flatMap { needEffectsFor(it, it.value(p)) }
+
+    /** The check modifiers a single [need] applies at [value] (empty above NEED_LOW). Public for alerts/UI. */
+    fun effectsForNeed(need: NeedKind, value: Int): List<LifeEffect> = needEffectsFor(need, value)
+
+    /** The six-band display tier for a raw need [value] (finer than the effect thresholds). */
+    fun needTier(value: Int): NeedTier = when {
+        value >= NEED_PEAK -> NeedTier.PEAK
+        value >= NEED_HEALTHY -> NeedTier.HEALTHY
+        value >= NEED_FADING -> NeedTier.FADING
+        value > NEED_POOR -> NeedTier.LOW
+        value > NEED_CRITICAL -> NeedTier.STRAINED
+        else -> NeedTier.CRITICAL
+    }
+
+    /** The named body condition for a need at a given tier (e.g. "Parched", "Peak condition"). */
+    fun needCondition(k: NeedKind, tier: NeedTier): String {
+        val cfg = NEED_CFG.getValue(k)
+        return when (tier) {
+            NeedTier.PEAK -> when (k) {
+                NeedKind.HYDRATION -> "Well-watered"
+                NeedKind.NOURISHMENT -> "Well-fed"
+                NeedKind.ENERGY -> "Rested & sharp"
+                NeedKind.HYGIENE -> "Fresh & clean"
+            }
+            NeedTier.HEALTHY -> "Holding steady"
+            NeedTier.FADING -> when (k) {
+                NeedKind.HYDRATION -> "Could use a drink"
+                NeedKind.NOURISHMENT -> "Peckish"
+                NeedKind.ENERGY -> "Flagging"
+                NeedKind.HYGIENE -> "Getting scruffy"
+            }
+            NeedTier.LOW -> cfg.low
+            NeedTier.STRAINED -> cfg.poor
+            NeedTier.CRITICAL -> cfg.critical
+        }
+    }
+
+    /** One actionable line of advice for a need at a given tier. */
+    fun needAdvice(k: NeedKind, tier: NeedTier): String = when (tier) {
+        NeedTier.PEAK, NeedTier.HEALTHY -> "You're good — keep it up."
+        NeedTier.FADING -> when (k) {
+            NeedKind.HYDRATION -> "Grab some water before it bites."
+            NeedKind.NOURISHMENT -> "A snack soon would help."
+            NeedKind.ENERGY -> "Take a breather when you can."
+            NeedKind.HYGIENE -> "Freshen up when you get a chance."
+        }
+        NeedTier.LOW, NeedTier.STRAINED -> when (k) {
+            NeedKind.HYDRATION -> "Drink now — your endurance is slipping."
+            NeedKind.NOURISHMENT -> "Eat something — your strength is going."
+            NeedKind.ENERGY -> "Rest up — you're getting clumsy."
+            NeedKind.HYGIENE -> "Clean up — people are noticing."
+        }
+        NeedTier.CRITICAL -> when (k) {
+            NeedKind.HYDRATION -> "Dangerously dehydrated. Drink immediately."
+            NeedKind.NOURISHMENT -> "You're starving. Eat now."
+            NeedKind.ENERGY -> "Running on fumes. Sleep now."
+            NeedKind.HYGIENE -> "Filthy and reeking. Wash immediately."
+        }
+    }
+
+    /** A rich per-need readout (value, tier, condition, advice, live effects) for every need. */
+    fun needStates(p: LifeProfile): List<NeedState> = NeedKind.entries.map { k ->
+        val v = k.value(p)
+        val tier = needTier(v)
+        NeedState(k, v, tier, needCondition(k, tier), needAdvice(k, tier), needEffectsFor(k, v))
+    }
+
+    /** The single lowest need (most-urgent first). Null when everything is comfortable. */
+    fun mostUrgentNeed(p: LifeProfile): NeedState? =
+        needStates(p).filter { it.tier.isConcern }.minByOrNull { it.value }
+
+    /** Overall condition score 0..100 = the mean of the four needs (a single "how am I doing" number). */
+    fun overallCondition(p: LifeProfile): Int =
+        (NeedKind.entries.sumOf { it.value(p) } / NeedKind.entries.size)
+
     // --- Needs upkeep ---
 
     /** Decay the needs for [elapsedMs] of real time at the base rates (no real-world context). */
@@ -337,12 +478,17 @@ object LifeStats {
         val moving = (env?.movement ?: 0f) >= Environment.MOVING_INTENSITY
         val charging = env?.charging == true
 
+        // Cross-need coupling (read from the starting values): a spent body neglects its upkeep, and an
+        // empty stomach burns through what little energy is left — so low needs drag the others down faster.
+        val rundown = if (p.energy <= NEED_LOW) RUNDOWN_DECAY_X else 1.0
+        val starving = if (p.nourishment <= NEED_LOW) STARVING_ENERGY_X else 1.0
+
         val hydMult = (if (scorching) SCORCHING_HYDRATION_X else if (hot) HOT_HYDRATION_X else 1.0) *
-            (if (moving) MOVING_HYDRATION_X else 1.0)
+            (if (moving) MOVING_HYDRATION_X else 1.0) * rundown
         val enMult = (if (frigid) FRIGID_ENERGY_X else if (cold) COLD_ENERGY_X else 1.0) *
-            (if (night) NIGHT_ENERGY_X else 1.0) * (if (moving) MOVING_ENERGY_X else 1.0)
-        val nourMult = if (moving) MOVING_NOURISHMENT_X else 1.0
-        val hygMult = if (moving) MOVING_HYGIENE_X else 1.0
+            (if (night) NIGHT_ENERGY_X else 1.0) * (if (moving) MOVING_ENERGY_X else 1.0) * starving
+        val nourMult = (if (moving) MOVING_NOURISHMENT_X else 1.0) * rundown
+        val hygMult = (if (moving) MOVING_HYGIENE_X else 1.0) * rundown
 
         val hyd = (p.hydration - (hrs * HYDRATION_DECAY_PER_HR * hydMult).roundToInt()).coerceIn(0, 100)
         val hyg = (p.hygiene - (hrs * HYGIENE_DECAY_PER_HR * hygMult).roundToInt()).coerceIn(0, 100)
