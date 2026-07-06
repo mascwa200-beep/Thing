@@ -20,9 +20,11 @@ import dev.mascwa.pulse.core.telemetry.DailyObjective
 import dev.mascwa.pulse.core.telemetry.DailyObjectives
 import dev.mascwa.pulse.core.telemetry.Encounter
 import dev.mascwa.pulse.core.telemetry.EnvContext
+import dev.mascwa.pulse.core.telemetry.ExertCarry
 import dev.mascwa.pulse.core.telemetry.ExertCost
 import dev.mascwa.pulse.core.telemetry.ExertKind
 import dev.mascwa.pulse.core.telemetry.Exertion
+import dev.mascwa.pulse.core.telemetry.TransportMode
 import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.ItemCodex
@@ -151,6 +153,10 @@ class SpecialGameStore(
         val afflictionMeter: Map<String, Long> = emptyMap(),
         val afflicted: List<String> = emptyList(),
         val afflictionAnchorMs: Long = 0L,
+        // Travel-exertion sub-point carry (points, <1 each). Defaulted → old saves start at zero.
+        val travelCarryHyd: Double = 0.0,
+        val travelCarryEn: Double = 0.0,
+        val travelCarryNour: Double = 0.0,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -203,6 +209,11 @@ class SpecialGameStore(
     // need is left critical / recovers while it's healthy). Persisted so it survives across sessions.
     private var afflictions = AfflictionState()
     private var afflictionAnchorMs = 0L
+
+    // Travel exertion: the sub-point remainder carried between GPS syncs (persisted), and a prime flag so the
+    // FIRST post-load sync only re-baselines the cumulative counters (a load-time delta can't crater needs).
+    private var travelCarry = ExertCarry()
+    private var travelPrimed = false
     // Step-counter daily baseline: the cumulative reading at the start of [stepDay] (epoch-day). Today's
     // steps = latest cumulative − baseline (reboot-safe: a lower reading re-baselines).
     private var stepDay = -1L
@@ -340,6 +351,7 @@ class SpecialGameStore(
                     active = stored.afflicted.mapNotNull { runCatching { Affliction.valueOf(it) }.getOrNull() }.toSet(),
                 )
                 afflictionAnchorMs = stored.afflictionAnchorMs
+                travelCarry = ExertCarry(stored.travelCarryHyd, stored.travelCarryEn, stored.travelCarryNour)
             }
             // Seed the codex from whatever's already in the pack (so pre-codex saves count their held items).
             discovered = (discovered + _character.value.inventory.keys)
@@ -507,6 +519,27 @@ class SpecialGameStore(
     ) {
         scope.launch {
             ensureLoaded()
+            // Travel exertion: charge the walked/ran/cycled DELTA since the last sync (driving/standing free),
+            // carrying the sub-point remainder. SKIP the first post-load sync (baseline only) so a large
+            // cumulative-vs-persisted delta can't crater the needs; cap per sync as defence in depth.
+            if (travelPrimed) {
+                val dW = (walkM - extWalkM).coerceAtLeast(0)
+                val dR = (runM - extRunM).coerceAtLeast(0)
+                val dC = (cycleM - extCycleM).coerceAtLeast(0)
+                var cost = ExertCost()
+                var carry = travelCarry
+                Exertion.travelCost(TransportMode.WALK, dW.toDouble(), carry).let { (c1, k1) -> cost += c1; carry = k1 }
+                Exertion.travelCost(TransportMode.RUN, dR.toDouble(), carry).let { (c1, k1) -> cost += c1; carry = k1 }
+                Exertion.travelCost(TransportMode.CYCLE, dC.toDouble(), carry).let { (c1, k1) -> cost += c1; carry = k1 }
+                travelCarry = carry
+                exert(ExertKind.TRAVEL, ExertCost(
+                    cost.hydration.coerceAtMost(TRAVEL_CAP_PER_SYNC),
+                    cost.energy.coerceAtMost(TRAVEL_CAP_PER_SYNC),
+                    cost.nourishment.coerceAtMost(TRAVEL_CAP_PER_SYNC),
+                ))
+            } else {
+                travelPrimed = true
+            }
             extDistanceM = distanceM
             extPlaces = placesVisited
             extVisitedKinds = visitedKinds
@@ -755,6 +788,7 @@ class SpecialGameStore(
             startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
             afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // shake any sickness
+            travelCarry = ExertCarry() // drop any accrued travel-exertion remainder
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex for the fresh operative
@@ -783,6 +817,7 @@ class SpecialGameStore(
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
             afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // fresh run starts healthy
+            travelCarry = ExertCarry() // drop any accrued travel-exertion remainder
             // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
             // Seed (no reward) so kept real-life achievements can't instantly re-level the fresh operative
             // (the "reset didn't reset — I still have perks/level/caps" bug).
@@ -959,6 +994,7 @@ class SpecialGameStore(
             afflictionMeter = afflictions.meterMs.mapKeys { it.key.name },
             afflicted = afflictions.active.map { it.name },
             afflictionAnchorMs = afflictionAnchorMs,
+            travelCarryHyd = travelCarry.hyd, travelCarryEn = travelCarry.en, travelCarryNour = travelCarry.nour,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
@@ -969,5 +1005,7 @@ class SpecialGameStore(
         const val FLUSH_DELAY_MS = 1_000L
         /** Real-time cooldown between scavenges (ms) — stops loot-farming; the UI shows the countdown. */
         const val SCAVENGE_COOLDOWN_MS = 3 * 60_000L // 3 minutes
+        /** Max survival-need drain a single travel sync can apply per need — a defensive cap on a big delta. */
+        const val TRAVEL_CAP_PER_SYNC = 8
     }
 }
