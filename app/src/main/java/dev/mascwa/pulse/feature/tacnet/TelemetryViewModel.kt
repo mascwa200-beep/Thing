@@ -397,6 +397,8 @@ class TelemetryViewModel(
     // --- Real-life profile (LifeStats): body metrics + real money + hydration/hygiene, on-device only ---
     /** The operator's real-life profile with hydration/hygiene decayed to now. */
     val life: StateFlow<dev.mascwa.pulse.core.telemetry.LifeProfile> = game.lifeFlow
+    /** Lingering afflictions contracted from long-neglected needs (advanced on the needs tick). */
+    val afflictions: StateFlow<dev.mascwa.pulse.core.telemetry.AfflictionState> = game.afflictionsFlow
     fun setHeight(cm: Int) = game.setHeight(cm)
     fun setWeight(kg: Int) = game.setWeight(kg)
     fun setAge(years: Int) = game.setAge(years)

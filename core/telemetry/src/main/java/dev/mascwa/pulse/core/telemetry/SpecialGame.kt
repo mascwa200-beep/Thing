@@ -97,7 +97,7 @@ data class Character(
 data class CheckResult(val success: Boolean, val crit: Boolean, val total: Int, val roll: Int)
 
 /** Where a check modifier came from — so the UI can attribute it ("from your build", "worn gear", "renown"). */
-enum class ModSource { BASE, PERK, GEAR, GEAR_SET, COMPANION, LEGEND, ENVIRONMENT, LIFE, CHEM }
+enum class ModSource { BASE, PERK, GEAR, GEAR_SET, COMPANION, LEGEND, ENVIRONMENT, LIFE, CHEM, AFFLICTION }
 
 /** One contributor to a stat check's value, with a human [label] and its [source]. The BASE entry carries
  *  the raw stat; the rest are the +/- modifiers stacked on top. */
@@ -189,6 +189,7 @@ object SpecialGame {
         useItemId: String? = null,
         life: LifeProfile? = null,
         wellKept: Int = 0,
+        afflictions: AfflictionState? = null,
     ): Resolution {
         val choice = encounter.choices.getOrNull(choiceIndex)
             ?: return Resolution(false, false, Outcome("Nothing happens."), character, roll)
@@ -203,7 +204,7 @@ object SpecialGame {
         val critMargin = if (perkLuckierCrits(character) || companionLuckierCrits(character)) LUCKY_CRIT_MARGIN else CRIT_MARGIN
         val luck = character.stat(Special.LUCK)
         // Build the attributable modifier stack once — it drives both the check maths and the UI breakdown.
-        val mods = statMods(character, choice, env, useItemId, life, wellKept)
+        val mods = statMods(character, choice, env, useItemId, life, wellKept, afflictions)
         val result = if (choice.stat == null) {
             CheckResult(success = true, crit = false, total = 0, roll = roll)
         } else {
@@ -255,6 +256,7 @@ object SpecialGame {
         useItemId: String? = null,
         life: LifeProfile? = null,
         wellKept: Int = 0,
+        afflictions: AfflictionState? = null,
     ): List<CheckMod> {
         val stat = choice.stat ?: return emptyList()
         val mods = mutableListOf<CheckMod>()
@@ -277,6 +279,8 @@ object SpecialGame {
         }
         env?.let { e -> Environment.effects(e).filter { it.stat == stat }.forEach { mods += CheckMod(it.reason, it.delta, ModSource.ENVIRONMENT) } }
         life?.let { l -> LifeStats.effects(l).filter { it.stat == stat }.forEach { mods += CheckMod(it.reason, it.delta, ModSource.LIFE) } }
+        // Lingering afflictions (from long-neglected needs) tax the check HARDER than the raw need did.
+        afflictions?.let { a -> Afflictions.effects(a).filter { it.stat == stat }.forEach { mods += CheckMod(it.reason, it.delta, ModSource.AFFLICTION) } }
         useItemId?.let { Items.byId(it) }
             ?.takeIf { it.kind == ItemKind.CHEM && (c.inventory[it.id] ?: 0) > 0 && it.statBonus == stat }
             ?.let { mods += CheckMod(it.name, it.statBonusAmt, ModSource.CHEM) }

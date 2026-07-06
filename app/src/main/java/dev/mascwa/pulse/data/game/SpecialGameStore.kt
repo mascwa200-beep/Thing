@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Achievement
 import dev.mascwa.pulse.core.telemetry.Achievements
+import dev.mascwa.pulse.core.telemetry.Affliction
+import dev.mascwa.pulse.core.telemetry.AfflictionState
+import dev.mascwa.pulse.core.telemetry.Afflictions
 import dev.mascwa.pulse.core.telemetry.Archetype
 import dev.mascwa.pulse.core.telemetry.Character
 import dev.mascwa.pulse.core.telemetry.DeedKind
@@ -134,6 +137,11 @@ class SpecialGameStore(
         val lastScavengeMs: Long = 0L,
         // Item codex: every item id ever acquired (monotonic — never removed). Defaulted → old saves.
         val discoveredIds: List<String> = emptyList(),
+        // Lingering afflictions: the per-affliction sickness meter (ms), the set that's taken hold, and the
+        // advance anchor. Serialized by Affliction.name. All defaulted → old saves load healthy.
+        val afflictionMeter: Map<String, Long> = emptyMap(),
+        val afflicted: List<String> = emptyList(),
+        val afflictionAnchorMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("special_json")
@@ -181,6 +189,11 @@ class SpecialGameStore(
     // The most recent real-world context (weather/time/motion/charging) the ViewModel fed in — drives how
     // fast the needs decay (and lets charging regenerate energy). Null = plain base rates.
     private var lastEnv: EnvContext? = null
+
+    // Lingering afflictions: the sickness state + its own advance anchor (the meter accrues over real time a
+    // need is left critical / recovers while it's healthy). Persisted so it survives across sessions.
+    private var afflictions = AfflictionState()
+    private var afflictionAnchorMs = 0L
     // Step-counter daily baseline: the cumulative reading at the start of [stepDay] (epoch-day). Today's
     // steps = latest cumulative − baseline (reboot-safe: a lower reading re-baselines).
     private var stepDay = -1L
@@ -210,6 +223,10 @@ class SpecialGameStore(
     private val _life = MutableStateFlow(LifeProfile())
     /** The operator's real-life profile with hydration/hygiene decayed to now (on-device only). */
     val lifeFlow: StateFlow<LifeProfile> = _life.asStateFlow()
+
+    private val _afflictions = MutableStateFlow(AfflictionState())
+    /** Lingering survival afflictions (contracted from long-neglected needs) — advanced on the decay tick. */
+    val afflictionsFlow: StateFlow<AfflictionState> = _afflictions.asStateFlow()
 
     private val _character = MutableStateFlow(SpecialGame.newCharacter())
     /** The live character sheet — stats, level, XP, caps, HP, unspent points. */
@@ -303,6 +320,13 @@ class SpecialGameStore(
                 lastScavengeMs = stored.lastScavengeMs.coerceAtLeast(0L)
                 _lastScavengeMs.value = lastScavengeMs
                 discovered = stored.discoveredIds.toSet()
+                afflictions = AfflictionState(
+                    meterMs = stored.afflictionMeter.mapNotNull { (k, v) ->
+                        runCatching { Affliction.valueOf(k) }.getOrNull()?.let { it to v.coerceIn(0L, Afflictions.ONSET_MS) }
+                    }.toMap(),
+                    active = stored.afflicted.mapNotNull { runCatching { Affliction.valueOf(it) }.getOrNull() }.toSet(),
+                )
+                afflictionAnchorMs = stored.afflictionAnchorMs
             }
             // Seed the codex from whatever's already in the pack (so pre-codex saves count their held items).
             discovered = (discovered + _character.value.inventory.keys)
@@ -310,8 +334,10 @@ class SpecialGameStore(
             // Fresh operative, or an old save from before day-tracking → stamp the story's start now.
             if (startedAtMs <= 0L) startedAtMs = System.currentTimeMillis()
             if (needsAnchorMs <= 0L) needsAnchorMs = System.currentTimeMillis()
+            if (afflictionAnchorMs <= 0L) afflictionAnchorMs = System.currentTimeMillis()
             _started.value = startedAtMs
             _life.value = currentLife()
+            _afflictions.value = afflictions
             loaded = true
             justLoaded = true
         }
@@ -499,7 +525,8 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             val roll = random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env, life = currentLife())
+            tickAfflictions()
+            val resolution = SpecialGame.resolve(_character.value, encounter, 0, roll, env, life = currentLife(), afflictions = afflictions)
             var updated = resolution.character
             // A good conversation earns standing with that faction — and grows your wasteland tale.
             if (resolution.success) {
@@ -581,7 +608,8 @@ class SpecialGameStore(
             val encounter = encounterFor(c) ?: return@launch
             // The die comes from how well the player physically performed the gesture, when supplied.
             val r = roll ?: random.nextInt(1, SpecialGame.DIE + 1)
-            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId, currentLife(), wellKept)
+            tickAfflictions()
+            val resolution = SpecialGame.resolve(c, encounter, choiceIndex, r, env, useItemId, currentLife(), wellKept, afflictions)
             var updatedChar = resolution.character
             // The day's world event tweaks the caps a win pays (a fraction of the base reward, +/-).
             if (resolution.success && worldCapsPct != 0) {
@@ -704,6 +732,7 @@ class SpecialGameStore(
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objective progress against the fresh counters
             startedAtMs = System.currentTimeMillis(); _started.value = startedAtMs // Day 1 begins again
             lifeBase = LifeProfile(); needsAnchorMs = System.currentTimeMillis(); _life.value = lifeBase // clear the real-life profile
+            afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // shake any sickness
             stepDay = -1L; stepBaseline = -1L // re-baseline today's steps for the fresh operative
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex for the fresh operative
@@ -731,6 +760,7 @@ class SpecialGameStore(
             dailyDay = -1L; claimed = emptySet() // re-baseline today's objectives
             lastScavengeMs = 0L; _lastScavengeMs.value = 0L; _lastScavenge.value = null // scavenge ready again
             discovered = emptySet(); _discovered.value = emptySet() // wipe the codex
+            afflictions = AfflictionState(); afflictionAnchorMs = System.currentTimeMillis(); _afflictions.value = afflictions // fresh run starts healthy
             // PRESERVED: lifeBase (+ needsAnchorMs), startedAtMs, stepDay/stepBaseline — your real self + clocks.
             // Seed (no reward) so kept real-life achievements can't instantly re-level the fresh operative
             // (the "reset didn't reset — I still have perks/level/caps" bug).
@@ -762,6 +792,28 @@ class SpecialGameStore(
     suspend fun lifeSnapshot(): LifeProfile { ensureLoaded(); return currentLife() }
 
     /**
+     * Advance the sickness state to now over the current decayed needs and publish it. Fills the meter while
+     * a need is critical, drains it while it's healthy (see [Afflictions.advance]); persists only on a change.
+     * Always moves the anchor so elapsed time can't double-count. Cheap; safe to call every tick.
+     */
+    private fun tickAfflictions() {
+        val now = System.currentTimeMillis()
+        if (afflictionAnchorMs <= 0L) { afflictionAnchorMs = now; return }
+        val elapsed = now - afflictionAnchorMs
+        afflictionAnchorMs = now
+        if (elapsed <= 0L) return
+        val next = Afflictions.advance(afflictions, currentLife(), elapsed)
+        if (next != afflictions) {
+            afflictions = next
+            _afflictions.value = next
+            scheduleFlush()
+        }
+    }
+
+    /** The sickness state, advanced to now, loading from disk first — for background reads (the notifier). */
+    suspend fun afflictionSnapshot(): AfflictionState { ensureLoaded(); tickAfflictions(); return afflictions }
+
+    /**
      * Recompute the decayed needs under the current real-world [env] and publish — call periodically (e.g.
      * each game tick) so the meters move in real time. Does NOT change the base/anchor (no sub-threshold
      * decay is lost) EXCEPT on a charging transition, where it re-anchors so the energy regen/decay isn't
@@ -780,6 +832,7 @@ class SpecialGameStore(
                 lastEnv = env
             }
             _life.value = currentLife()
+            tickAfflictions()
         }
     }
 
@@ -866,6 +919,9 @@ class SpecialGameStore(
             stepsToday = lifeBase.stepsToday, stepDay = stepDay, stepBaseline = stepBaseline,
             lastScavengeMs = lastScavengeMs,
             discoveredIds = discovered.toList(),
+            afflictionMeter = afflictions.meterMs.mapKeys { it.key.name },
+            afflicted = afflictions.active.map { it.name },
+            afflictionAnchorMs = afflictionAnchorMs,
         )
         runCatching {
             context.specialDataStore.edit { it[prefsKey] = json.encodeToString(Stored.serializer(), snapshot) }
