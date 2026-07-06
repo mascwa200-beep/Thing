@@ -363,6 +363,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val scene by vm.sceneContext.collectAsStateWithLifecycle()
     val life by vm.life.collectAsStateWithLifecycle()
     val afflictions by vm.afflictions.collectAsStateWithLifecycle()
+    val exertion by vm.lastExertion.collectAsStateWithLifecycle()
     val lifeEnv by vm.env.collectAsStateWithLifecycle()
     val worldEvent by vm.worldEvent.collectAsStateWithLifecycle()
     val siteReach by vm.siteReach.collectAsStateWithLifecycle()
@@ -442,6 +443,13 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         if (character.perkPicks > 0) {
             Spacer(Modifier.height(8.dp))
             PerkChoicePanel(character, c) { vm.choosePerk(it) }
+        }
+        exertion?.let { e ->
+            Text(
+                "EXERTION · ${e.kind.label.uppercase()} ${e.cost.describe()}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+                color = c.amber, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 4.dp),
+            )
         }
         Spacer(Modifier.height(8.dp))
         when {
