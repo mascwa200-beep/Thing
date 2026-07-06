@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -54,8 +55,62 @@ class SurvivalAlertsTest {
     }
 
     @Test fun thresholdsMatchLifeStats() {
-        // Exactly at NEED_LOW is still an alert; just above is not.
-        assertEquals(1, SurvivalAlerts.evaluate(LifeProfile(hygiene = LifeStats.NEED_LOW), 0).size)
-        assertTrue(SurvivalAlerts.evaluate(LifeProfile(hygiene = LifeStats.NEED_LOW + 1), 0).isEmpty())
+        // A need at or below the FADING cutoff now warrants a (gentle → dire) check-in; above it, silence.
+        assertEquals(1, SurvivalAlerts.evaluate(LifeProfile(hygiene = LifeStats.NEED_FADING), 0).size)
+        assertTrue(SurvivalAlerts.evaluate(LifeProfile(hygiene = LifeStats.NEED_FADING + 1), 0).isEmpty())
+        // Exactly at NEED_LOW is at least a LOW alert (past the gentle NOTICE band).
+        assertEquals(AlertLevel.LOW, SurvivalAlerts.evaluate(LifeProfile(hygiene = LifeStats.NEED_LOW), 0)[0].level)
+    }
+
+    @Test fun fourEscalatingBands() {
+        assertEquals(AlertLevel.NOTICE, SurvivalAlerts.bandFor(40))
+        assertEquals(AlertLevel.NOTICE, SurvivalAlerts.bandFor(45))
+        assertEquals(AlertLevel.LOW, SurvivalAlerts.bandFor(30))
+        assertEquals(AlertLevel.LOW, SurvivalAlerts.bandFor(25))
+        assertEquals(AlertLevel.URGENT, SurvivalAlerts.bandFor(24))
+        assertEquals(AlertLevel.URGENT, SurvivalAlerts.bandFor(16))
+        assertEquals(AlertLevel.CRITICAL, SurvivalAlerts.bandFor(15))
+        assertEquals(AlertLevel.CRITICAL, SurvivalAlerts.bandFor(0))
+        assertNull(SurvivalAlerts.bandFor(46))
+        assertNull(SurvivalAlerts.bandFor(100))
+    }
+
+    @Test fun noticeBandFiresGentlyWithNoStakesYet() {
+        val a = SurvivalAlerts.evaluate(LifeProfile(hydration = 40), seed = 0)
+        assertEquals(1, a.size)
+        assertEquals(AlertLevel.NOTICE, a[0].level)
+        assertTrue(a[0].body.isNotBlank())
+        // At NOTICE the need isn't taxing any stat yet, so there are no stakes to show.
+        assertTrue(a[0].stakes.isBlank())
+        assertTrue(a[0].advice.isNotBlank())
+    }
+
+    @Test fun pressingBandsCarryStatStakes() {
+        // URGENT hydration (20) taxes END and STR → the stakes string names both.
+        val a = SurvivalAlerts.alertFor(SurvivalNeed.HYDRATION, 20, seed = 0)!!
+        assertEquals(AlertLevel.URGENT, a.level)
+        assertTrue(a.stakes.contains("END"))
+        assertTrue(a.stakes.contains("STR"))
+    }
+
+    @Test fun everyBandHasAWideCatalog() {
+        // Each (need, band) rotates through many distinct messages across the seed space.
+        SurvivalNeed.entries.forEach { need ->
+            listOf(45, 28, 20, 8).forEach { value ->
+                val bodies = (0L until 30L).map { SurvivalAlerts.alertFor(need, value, it)!!.body }.toSet()
+                assertTrue("${need} @ $value should rotate", bodies.size >= 5)
+            }
+        }
+    }
+
+    @Test fun recoveryIsDeterministicAndThemed() {
+        val r = SurvivalAlerts.recovery(SurvivalNeed.HYDRATION, seed = 2)
+        assertTrue(r.title.contains("HYDRATION"))
+        assertTrue(r.title.contains("RESTORED"))
+        assertTrue(r.body.isNotBlank())
+        assertEquals(r.body, SurvivalAlerts.recovery(SurvivalNeed.HYDRATION, 2).body)
+        // Different needs give different confirmations.
+        val e = SurvivalAlerts.recovery(SurvivalNeed.ENERGY, seed = 2)
+        assertTrue(e.title.contains("ENERGY"))
     }
 }
