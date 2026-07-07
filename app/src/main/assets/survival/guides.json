@@ -58,7 +58,7 @@
         { "heading": "SOS", "body": "The universal distress signal is · · · — — — · · · (three short, three long, three short) with no gap between letters. Send it with light, whistle, or sound. Three of anything (3 fires, 3 whistle blasts, 3 flashes) means distress." },
         { "heading": "Use the app", "body": "Open Tools for an automatic SOS strobe (camera flash) and a loud alarm. These run offline. Conserve battery between attempts." },
         { "heading": "Signal mirror", "body": "Reflect sunlight toward aircraft/vehicles; flash repeatedly. Aim by holding two fingers up at the target and flashing across them." },
-        { "heading": "Ground-to-air", "body": "Make large symbols (≥3 m) with high contrast: V = need assistance, X = need medical help, → = going this direction. Stamp into snow or lay out branches/rocks." }
+        { "heading": "Ground-to-air", "body": "Make large symbols (≥3 m) with high contrast: V = need assistance, X = need medical help, → = going this direction. Stamp into snow or lay out branches/rocks. The full ground-to-air visual code used by search parties:", "image": "ground-to-air.png" }
       ]
     },
     {
@@ -105,7 +105,7 @@
       "category": "Reference",
       "summary": "Full alphabet, numbers and SOS.",
       "sections": [
-        { "heading": "Letters", "body": "A ·—  B —···  C —·—·  D —··  E ·  F ··—·  G ——·  H ····  I ··  J ·———  K —·—  L ·—··  M ——  N —·  O ———  P ·——·  Q ——·—  R ·—·  S ···  T —  U ··—  V ···—  W ·——  X —··—  Y —·——  Z ——··" },
+        { "heading": "Letters", "body": "A ·—  B —···  C —·—·  D —··  E ·  F ··—·  G ——·  H ····  I ··  J ·———  K —·—  L ·—··  M ——  N —·  O ———  P ·——·  Q ——·—  R ·—·  S ···  T —  U ··—  V ···—  W ·——  X —··—  Y —·——  Z ——··", "image": "morse-code.png" },
         { "heading": "Numbers", "body": "1 ·————  2 ··———  3 ···——  4 ····—  5 ·····  6 —····  7 ——···  8 ———··  9 ————·  0 —————" },
         { "heading": "Timing & SOS", "body": "A dash is 3x a dot. Gap between symbols = 1 dot; between letters = 3 dots; between words = 7 dots. SOS = · · · — — — · · · sent as one group." }
       ]
