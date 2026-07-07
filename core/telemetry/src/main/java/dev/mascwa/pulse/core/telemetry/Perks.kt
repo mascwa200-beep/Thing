@@ -20,6 +20,8 @@ data class Perk(
     val luckierCrits: Boolean = false,
     /** HP recovered on any successful encounter. */
     val healOnWin: Int = 0,
+    /** Reduces the survival-need cost of exertion (fighting / venturing / scavenging / travel) by this %. */
+    val exertReductionPct: Int = 0,
 )
 
 object Perks {
@@ -35,6 +37,9 @@ object Perks {
         Perk("fast_learner", "Fast Learner", "+25% XP from every win.", xpBonusPct = 25),
         Perk("field_medic", "Field Medic", "Recover 4 HP on any successful encounter.", healOnWin = 4),
         Perk("born_lucky", "Born Lucky", "Critical successes come easier.", luckierCrits = true),
+        // --- Survival resilience: the fight/trek costs your body less (folds into the exertion drain) ---
+        Perk("conditioned", "Conditioned", "Trained for the long haul — exertion costs 34% fewer needs.", exertReductionPct = 34),
+        Perk("second_wind", "Second Wind", "You pace yourself — exertion costs 20% fewer needs, and a win shrugs off 3 HP.", exertReductionPct = 20, healOnWin = 3),
     )
 
     fun byId(id: String): Perk? = ALL.firstOrNull { it.id == id }
