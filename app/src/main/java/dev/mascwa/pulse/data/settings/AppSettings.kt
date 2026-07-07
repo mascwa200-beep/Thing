@@ -320,7 +320,6 @@ data class AppSettings(
     val highContrast: Boolean = false,
     val accentColor: AccentColor = AccentColor.CYAN,
     val amoledBlack: Boolean = false,                 // true-black surfaces
-    val liveWallpaperReadout: Boolean = true,         // J.A.R.V.I.S. live wallpaper: show the data readout under the reactor
     val reactorDialSlots: List<String> = emptyList(), // Reactor Dial: package name pinned to each rotary slot ("" = empty); index = position
     val scanlines: Boolean = false,                   // CRT scanline overlay (off: clean 2077-HUD look, lighter)
     val glitch: Boolean = false,                      // chromatic glitch FX (off by default: no jank, less GPU/RAM)

@@ -49,10 +49,6 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlin.math.roundToInt
 
 /** The nearest engageable wasteland [WorldSite], how far it is, and whether you're within reach to fight it. */
 data class SiteReach(val site: WorldSite, val distanceM: Double, val atSite: Boolean)
@@ -537,11 +533,7 @@ class TelemetryViewModel(
             ?.let { (s, d) -> SiteReach(s, d, d <= LocationGate.REACH_RADIUS_M) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val _log = MutableStateFlow<List<String>>(emptyList())
-    val log: StateFlow<List<String>> = _log.asStateFlow()
-
     private var ticker: Job? = null
-    private val fmt = SimpleDateFormat("HH:mm:ss", Locale.US)
 
     fun start() {
         controller.start()
@@ -617,7 +609,6 @@ class TelemetryViewModel(
                 gameWorld.addPlayTime(1500) // time spent on the STAT tab = time played
                 _scavengeCooldown.value = (dev.mascwa.pulse.data.game.SpecialGameStore.SCAVENGE_COOLDOWN_MS -
                     (System.currentTimeMillis() - game.lastScavengeMsFlow.value)).coerceAtLeast(0L)
-                pushLog()
                 delay(1500)
             }
         }
@@ -633,17 +624,6 @@ class TelemetryViewModel(
             activityEvidence.stop()
         }
         ticker?.cancel()
-    }
-
-    private fun pushLog() {
-        val t = controller.telemetry.value
-        val ts = fmt.format(Date())
-        val baro = t.pressureHpa?.let { "%.1f".format(it) } ?: "--"
-        val mag = t.magneticUt?.roundToInt()?.toString() ?: "--"
-        val g = t.accelG?.let { "%.2f".format(it) } ?: "--"
-        val lux = t.lightLux?.roundToInt()?.toString() ?: "--"
-        val line = "[$ts] baro=${baro}hPa mag=${mag}uT g=$g lux=$lux net=${t.netType}"
-        _log.update { (listOf(line) + it).take(40) }
     }
 
     private companion object {
