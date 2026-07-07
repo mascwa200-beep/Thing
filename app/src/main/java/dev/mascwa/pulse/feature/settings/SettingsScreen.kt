@@ -326,9 +326,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     // it (the game bleeds into the phone). Opt-in; turning it off releases everything at once.
                     PrefSwitch(
                         "Phone penalties (needs lock the phone)",
-                        "Let a survival need you've let go critical revoke a phone capability (pause distraction " +
-                            "apps, block installs, lock quick-settings, disable the camera, lock volume, block " +
-                            "screenshots — and pin Pulse while critical) until you tend it. Reversible; off releases all.",
+                        "Let a survival need you've let go critical revoke a phone capability — LOCK ALL YOUR " +
+                            "APPS, block installs, lock quick-settings, disable the camera, lock volume, block " +
+                            "screenshots, and pin the phone over the lock screen until you tend it. Emergency " +
+                            "calls always work. Reversible; turning this off releases everything.",
                         checked = s.phonePenalties,
                         enabled = isOwner,
                     ) { on ->

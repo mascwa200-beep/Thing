@@ -146,8 +146,10 @@ class PenaltyGateActivity : ComponentActivity() {
         const val EXTRA_NEEDS = "penalty_gate_needs"
         /** Fixed id so a new gate replaces the last and the activity can clear it on release. */
         const val NOTIF_ID = 91_842
-        /** The hard auto-release net — the gate NEVER holds longer than this, whatever happens. */
-        private const val MAX_LOCK_MS = 15 * 60_000L
+        /** The hard auto-release net — the gate NEVER holds longer than this, whatever happens. The real
+         *  release is tending the need (the "I DID IT" button, always available); this is only an anti-brick
+         *  backstop for a broken state. Long enough that you can't just wait it out instead of taking care of it. */
+        private const val MAX_LOCK_MS = 60 * 60_000L
         /** How long the override must be held — deliberate friction so it isn't a one-tap bail-out. */
         const val OVERRIDE_HOLD_MS = 5_000L
     }

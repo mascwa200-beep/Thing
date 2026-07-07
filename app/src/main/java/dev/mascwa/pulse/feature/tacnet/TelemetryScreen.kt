@@ -218,7 +218,9 @@ private fun GameSensors(vm: TelemetryViewModel) {
     LaunchedEffect(Unit) {
         val container = (context.applicationContext as? dev.mascwa.pulse.PulseApplication)?.container ?: return@LaunchedEffect
         while (true) {
-            runCatching { container.phonePenaltyController.reconcile(container.specialGameStore.lifeSnapshot()) }
+            // fireGate=true: a need crossing critical while you're in the game locks you into the gate within
+            // seconds (the ~2h cooldown stops it re-popping). This is the aggressive, no-hedge behaviour.
+            runCatching { container.phonePenaltyController.reconcile(container.specialGameStore.lifeSnapshot(), fireGate = true) }
             kotlinx.coroutines.delay(8_000)
         }
     }
