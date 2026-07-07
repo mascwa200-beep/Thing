@@ -16,12 +16,17 @@ package dev.mascwa.pulse.core.telemetry
  * Names are original homage (no trademarked product names), leaning survivalist to match the "the game
  * bleeds into the real world" direction — rations, water, medkits, field gear.
  */
-enum class ItemKind { AID, CHEM, GEAR, JUNK, QUEST }
+enum class ItemKind { AID, CHEM, GEAR, JUNK, QUEST, PROVISION }
 
 /**
  * One item type. [value] is the caps price at a shop (sells for roughly half). [statBonus]/[statBonusAmt]
- * apply for CHEM (on a chosen check) and GEAR (passive). [healAmt] is the HP an AID restores. [rarity]
- * (1 common … 5 rare) drives loot weighting for shops/drops later.
+ * apply for CHEM (on a chosen check) and GEAR (passive). [healAmt] is the HP an AID (or provision) restores.
+ * [rarity] (1 common … 5 rare) drives loot weighting for shops/drops.
+ *
+ * PROVISION items are consumed to tend the operator's survival needs / afflictions (see `SpecialGame.useProvision`
+ * + the store): [restoreNeed]/[restoreAmt] top up a survival need by that many points; [cureMs] > 0 knocks that
+ * much time off an affliction's cure meter — [cureNeed] targets one affliction's need, or null = all of them
+ * (a broad medicine). A provision may also carry [healAmt] (food that heals a little).
  */
 data class Item(
     val id: String,
@@ -33,6 +38,10 @@ data class Item(
     val healAmt: Int = 0,
     val value: Int = 0,
     val rarity: Int = 1,
+    val restoreNeed: NeedKind? = null,
+    val restoreAmt: Int = 0,
+    val cureNeed: NeedKind? = null,
+    val cureMs: Long = 0L,
 )
 
 object Items {
@@ -83,6 +92,20 @@ object Items {
     val ALLOY = Item("rare_alloy", "Rare Alloy", "Pre-collapse metallurgy. Fetches a premium.", ItemKind.JUNK, value = 34, rarity = 3)
     val GOLD_TRINKET = Item("gold_trinket", "Gold Trinket", "Untarnished old-world gold. A trader's delight.", ItemKind.JUNK, value = 50, rarity = 4)
 
+    // --- PROVISION: tend the operator's survival needs / cure afflictions (consumed) ---
+    val WATER_RATION = Item("water_ration", "Water Ration", "A sealed pouch of clean water. Restores 45 hydration.", ItemKind.PROVISION, value = 14, rarity = 1, restoreNeed = NeedKind.HYDRATION, restoreAmt = 45)
+    val TRAIL_JERKY = Item("trail_jerky", "Trail Jerky", "Salted and dried. Restores 40 nourishment.", ItemKind.PROVISION, value = 16, rarity = 1, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 40)
+    val HEARTY_STEW = Item("hearty_stew", "Hearty Stew", "A hot meal. Restores 55 nourishment and 6 HP.", ItemKind.PROVISION, healAmt = 6, value = 28, rarity = 2, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 55)
+    val STIM_COFFEE = Item("stim_coffee", "Stim Coffee", "Bitter but bracing. Restores 35 energy.", ItemKind.PROVISION, value = 18, rarity = 2, restoreNeed = NeedKind.ENERGY, restoreAmt = 35)
+    val SOAP_BAR = Item("soap_bar", "Soap Bar", "Lye soap. Restores 50 hygiene.", ItemKind.PROVISION, value = 12, rarity = 1, restoreNeed = NeedKind.HYGIENE, restoreAmt = 50)
+    val TOOTHPASTE = Item("toothpaste", "Toothpaste", "Mint, mostly. Fully restores brushing.", ItemKind.PROVISION, value = 12, rarity = 1, restoreNeed = NeedKind.BRUSHING, restoreAmt = 100)
+    val FLOSS_PACK = Item("floss_pack", "Floss Pack", "Waxed thread. Fully restores flossing.", ItemKind.PROVISION, value = 10, rarity = 1, restoreNeed = NeedKind.FLOSSING, restoreAmt = 100)
+    // Medicine — knocks time off an affliction's cure (or clears it outright).
+    val ANTIBIOTICS = Item("antibiotics", "Antibiotics", "Pre-collapse pills. Clears an infection.", ItemKind.PROVISION, value = 45, rarity = 3, cureNeed = NeedKind.HYGIENE, cureMs = Afflictions.ONSET_MS)
+    val DENTAL_KIT = Item("dental_kit", "Dental Kit", "Brush, floss and a filling. Clears tooth decay.", ItemKind.PROVISION, value = 42, rarity = 3, cureNeed = NeedKind.BRUSHING, cureMs = Afflictions.ONSET_MS)
+    val PAINKILLERS = Item("painkillers", "Painkillers", "Takes the edge off every ailment.", ItemKind.PROVISION, healAmt = 5, value = 40, rarity = 4, cureMs = 3L * 60 * 60 * 1000)
+    val FIELD_MEDICINE = Item("field_medicine", "Field Medicine", "A full kit. Clears every affliction.", ItemKind.PROVISION, healAmt = 10, value = 110, rarity = 5, cureMs = Afflictions.ONSET_MS)
+
     /** Every item, in a stable order. */
     val ALL: List<Item> = listOf(
         WATER, BANDAGE, RATION, MEDKIT, TRAUMA_PATCH, INJECTOR, SURGEON_KIT,
@@ -90,6 +113,8 @@ object Items {
         GRIP_GLOVES, OPTICS_VISOR, LEATHER_RIG, COMMS_BADGE, DATA_SLATE, RUNNER_BOOTS, LUCKY_CHARM,
         POWER_GAUNTLET, RECON_OPTICS, COMBAT_WEBBING, NEGOTIATOR_SUIT, NEURAL_IMPLANT, SPRINT_SERVOS, FORTUNE_IDOL,
         SCRAP, WIRE, CIRCUIT, FUSION_CELL, ALLOY, GOLD_TRINKET,
+        WATER_RATION, TRAIL_JERKY, HEARTY_STEW, STIM_COFFEE, SOAP_BAR, TOOTHPASTE, FLOSS_PACK,
+        ANTIBIOTICS, DENTAL_KIT, PAINKILLERS, FIELD_MEDICINE,
     )
 
     private val byId: Map<String, Item> = ALL.associateBy { it.id }

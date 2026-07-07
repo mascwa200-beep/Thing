@@ -337,6 +337,24 @@ object SpecialGame {
         return removeItem(healed, id, 1)
     }
 
+    /** Whether [id] is a PROVISION the character is holding (can be consumed via [useProvision]). */
+    fun canUseProvision(c: Character, id: String): Boolean {
+        val item = Items.byId(id) ?: return false
+        return item.kind == ItemKind.PROVISION && (c.inventory[id] ?: 0) > 0
+    }
+
+    /**
+     * Consume a PROVISION: removes one from the pack and applies its HP [Item.healAmt]. The need-restore and
+     * affliction-cure it carries live OUTSIDE the [Character] (in the on-device store), so this only handles
+     * the character-side (pack + HP); the store orchestrates the rest. No-op if it isn't a held provision.
+     */
+    fun useProvision(c: Character, id: String): Character {
+        val item = Items.byId(id) ?: return c
+        if (item.kind != ItemKind.PROVISION || (c.inventory[id] ?: 0) <= 0) return c
+        val healed = if (item.healAmt > 0) c.copy(hp = (c.hp + item.healAmt).coerceIn(0, c.maxHp)) else c
+        return removeItem(healed, id, 1)
+    }
+
     /** Sell one of item [id] for half its [Item.value] in caps (min 1). No-op if none held. */
     fun sellItem(c: Character, id: String): Character {
         val item = Items.byId(id) ?: return c

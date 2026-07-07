@@ -581,6 +581,19 @@ object LifeStats {
     /** Eat — restore nourishment. */
     fun eat(p: LifeProfile): LifeProfile = p.copy(nourishment = 100)
 
+    /** Restore [amount] points of [need] (clamped 0..100) — a PROVISION's partial top-up. */
+    fun restoreNeed(p: LifeProfile, need: NeedKind, amount: Int): LifeProfile {
+        fun up(v: Int) = (v + amount).coerceIn(0, 100)
+        return when (need) {
+            NeedKind.HYDRATION -> p.copy(hydration = up(p.hydration))
+            NeedKind.NOURISHMENT -> p.copy(nourishment = up(p.nourishment))
+            NeedKind.ENERGY -> p.copy(energy = up(p.energy))
+            NeedKind.HYGIENE -> p.copy(hygiene = up(p.hygiene))
+            NeedKind.BRUSHING -> p.copy(brushing = up(p.brushing))
+            NeedKind.FLOSSING -> p.copy(flossing = up(p.flossing))
+        }
+    }
+
     // --- Clamped setters (0 / blank clears an unset field) ---
     fun withHeight(p: LifeProfile, cm: Int): LifeProfile = p.copy(heightCm = cm.coerceIn(0, MAX_HEIGHT_CM))
     fun withWeight(p: LifeProfile, kg: Int): LifeProfile = p.copy(weightKg = kg.coerceIn(0, MAX_WEIGHT_KG))
