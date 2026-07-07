@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -241,9 +242,15 @@ fun PulseApp(
                 val vm: PlacesViewModel = viewModel(factory = factory)
                 PipGreen { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
             }
-            composable(Routes.SURVIVAL) {
+            // Optional ?guide= arg lets a notification (e.g. a survival tip about knots) open straight to a
+            // specific guide; a plain "survival" navigation matches with guide=null and shows the list.
+            composable(
+                "${Routes.SURVIVAL}?guide={guide}",
+                arguments = listOf(navArgument("guide") { nullable = true; defaultValue = null }),
+            ) { backStackEntry ->
                 val vm: GuidesViewModel = viewModel(factory = factory)
-                PipGreen { GuidesScreen(vm, onBack = { navController.popBackStack() }) }
+                val guideId = backStackEntry.arguments?.getString("guide")
+                PipGreen { GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId) }
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
@@ -398,8 +405,9 @@ fun PulseApp(
             if (startRoute != Routes.HOME) {
                 when {
                     TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
-                    // Launcher shortcuts can target non-top routes (e.g. NAV, SOS, QUESTS).
-                    startRoute in SHORTCUT_ROUTES ->
+                    // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
+                    // QUESTS, or an argumented one like "survival?guide=fire" — match on the base route).
+                    startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
                         runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
                 }
             }

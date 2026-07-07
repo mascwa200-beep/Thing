@@ -562,7 +562,9 @@ class RefreshWorker(
                 if (now - state.survivalTipLastMs >= SURVIVAL_TIP_MIN_GAP_MS) {
                     val bucket = now / SURVIVAL_TIP_MIN_GAP_MS // advances once per gap, from the real clock
                     val idx = (bucket * 131).toInt()
-                    notifier.notifyTip(7760, "⛑ Survival tip", dev.mascwa.pulse.core.telemetry.SurvivalTips.tip(idx))
+                    val tips = dev.mascwa.pulse.core.telemetry.SurvivalTips
+                    // Deep-link the tip to the specific guide that teaches its skill (knot tip → knots guide).
+                    notifier.notifyTip(7760, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
                     state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
                 }
             }

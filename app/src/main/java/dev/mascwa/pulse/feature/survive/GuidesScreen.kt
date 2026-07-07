@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,9 +34,18 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null) {
+fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuideId: String? = null) {
     val guides by vm.guides.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<Guide?>(null) }
+    // Open straight to a specific guide when a notification deep-links one (e.g. a knot tip → the knots guide).
+    // Applied once when the catalog loads; backing out to the list won't re-trigger it.
+    var openedInitial by remember { mutableStateOf(false) }
+    LaunchedEffect(guides, initialGuideId) {
+        if (!openedInitial && !initialGuideId.isNullOrBlank() && guides.isNotEmpty()) {
+            guides.firstOrNull { it.id == initialGuideId }?.let { selected = it }
+            openedInitial = true
+        }
+    }
     val c = Pulse.colors
 
     PulseScaffold(
