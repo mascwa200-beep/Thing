@@ -57,6 +57,20 @@ object Recipes {
             mapOf("data_slate" to 1, "circuit_board" to 2, "fusion_cell" to 1), "neural_implant", stat = Special.INTELLIGENCE, minStat = 8, xp = 18),
         Recipe("craft_idol", "Fortune Idol", "Cast salvaged gold and alloy into a lucky idol.",
             mapOf("gold_trinket" to 2, "rare_alloy" to 1), "fortune_idol", stat = Special.LUCK, minStat = 6, xp = 16),
+        // --- PROVISIONS: cook food from basic supplies (no gate — anyone can run a camp stove) ---
+        Recipe("craft_canteen", "Fill a Canteen", "Rig scrap into a canteen and seal a water ration.",
+            mapOf("clean_water" to 1, "scrap_metal" to 1), "water_ration", xp = 4),
+        Recipe("craft_stew", "Cook a Stew", "Simmer rations and water into a hot, filling meal.",
+            mapOf("ration_pack" to 1, "clean_water" to 1), "hearty_stew", xp = 6),
+        Recipe("craft_jerky", "Cure Jerky", "Salt and dry a couple of ration packs into trail jerky.",
+            mapOf("ration_pack" to 2), "trail_jerky", xp = 5),
+        // --- MEDICINE: brew cures for the afflictions (INT-gated — it's chemistry) ---
+        Recipe("craft_antibiotics", "Distill Antibiotics", "Culture a medkit's agents into infection-clearing pills.",
+            mapOf("medkit" to 1, "clean_water" to 1), "antibiotics", stat = Special.INTELLIGENCE, minStat = 5, xp = 10),
+        Recipe("craft_dentalkit", "Field Dental Kit", "Fashion a brush, floss and a filling from a dressing and wire.",
+            mapOf("bandage" to 1, "wire_spool" to 1), "dental_kit", stat = Special.INTELLIGENCE, minStat = 5, xp = 8),
+        Recipe("craft_painkillers", "Mix Painkillers", "Refine a medkit and alloy traces into a broad analgesic.",
+            mapOf("medkit" to 1, "rare_alloy" to 1), "painkillers", stat = Special.INTELLIGENCE, minStat = 6, xp = 10),
     )
 
     private val byId: Map<String, Recipe> = ALL.associateBy { it.id }

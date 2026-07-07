@@ -87,4 +87,42 @@ class CraftingTest {
             }
         assertEquals(ItemKind.AID, Items.byId(Recipes.byId("craft_surgeon")!!.outputId)?.kind)
     }
+
+    @Test fun cookingRecipesYieldProvisionsWithNoStatGate() {
+        // Food is basic camp cooking — anyone can do it, and each yields a real need-restoring PROVISION.
+        listOf("craft_canteen", "craft_stew", "craft_jerky").forEach { id ->
+            val r = Recipes.byId(id)!!
+            val out = Items.byId(r.outputId)!!
+            assertEquals("$id should cook a PROVISION", ItemKind.PROVISION, out.kind)
+            assertTrue("$id output should restore a need", out.restoreNeed != null && out.restoreAmt > 0)
+            assertNull("$id should have no stat gate", r.stat)
+        }
+    }
+
+    @Test fun medicineRecipesBrewCuresAndAreIntGated() {
+        // Medicine is chemistry — INT-gated — and each output cures affliction(s).
+        listOf("craft_antibiotics", "craft_dentalkit", "craft_painkillers").forEach { id ->
+            val r = Recipes.byId(id)!!
+            val out = Items.byId(r.outputId)!!
+            assertEquals("$id should brew a PROVISION", ItemKind.PROVISION, out.kind)
+            assertTrue("$id output should cure afflictions", out.cureMs > 0L)
+            assertEquals("$id should be INT-gated", Special.INTELLIGENCE, r.stat)
+        }
+    }
+
+    @Test fun cookAStewConsumesSuppliesAndAddsTheMeal() {
+        val r = Recipes.byId("craft_stew")!! // ration_pack x1 + clean_water x1 → hearty_stew
+        val before = char(mapOf("ration_pack" to 1, "clean_water" to 2))
+        val after = SpecialGame.craft(before, r)
+        assertNull("the ration is eaten into the pot", after.inventory["ration_pack"])
+        assertEquals("one water used, one left", 1, after.inventory["clean_water"])
+        assertEquals("a hot meal comes out", 1, after.inventory["hearty_stew"])
+    }
+
+    @Test fun brewingMedicineRespectsTheIntGate() {
+        val r = Recipes.byId("craft_antibiotics")!! // INT >= 5
+        val inv = mapOf("medkit" to 1, "clean_water" to 1)
+        assertEquals("too dim to brew → no-op", char(inv, int = 4), SpecialGame.craft(char(inv, int = 4), r))
+        assertEquals("skilled enough → pills produced", 1, SpecialGame.craft(char(inv, int = 5), r).inventory["antibiotics"])
+    }
 }
