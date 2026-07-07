@@ -1610,6 +1610,65 @@ Every runtime behaviour is **owner-verify on the Pixel** (CI can't run the store
   buff subsystem), more provision/recipe/encounter content, affliction-resistance perks (touch the delicate
   decay/tick path — thread carefully).
 
+### Item-economy + well-fed buff follow-ups (this session, #344–#348 all merged)
+- **Consumables wiring (#344):** the PROVISION USE button in the pack + shops stock provisions/medicine.
+- **Craft food & medicine (#345):** 6 workbench recipes cook (canteen/stew/jerky) + brew (antibiotics/dental-
+  kit/painkillers, INT-gated) from basic JUNK/AID — pure `Recipes`, zero Android change (USE button + codex
+  already exist). Closes the loop: you can MAKE provisions, not only buy them at geo-gated shops.
+- **Resilience perks (#346):** `Perk.exertReductionPct` + **Conditioned** (−34% exertion cost) / **Second
+  Wind** (−20% + heal-on-win 3) — the exertion loop's first counterplay. `Exertion.scale(cost,pct)` capped 60%;
+  applied at the store `exert()` chokepoint. Perks auto-appear in the picker → zero UI change.
+- **Well-fed buff (#348):** a hearty meal (hearty_stew=4 fights, trail_jerky=2) leaves you WELL-FED — +1 to
+  STR/END checks for N encounters, ticking down. `Character.wellFedFor` + `Item.wellFedTurns` +
+  `ModSource.WELL_FED` (auto-shows in the immersion check breakdown). A **deterministic counter** (not need-
+  value-derived) so it dodges the neutrality trap; the positive counterpart to exertion draining you.
+
+### PHONE PENALTIES — "neglect bites the phone" (owner ask, #349–#353 all merged, OPT-IN default OFF)
+Owner: "make the penalties more invasive to the phone — each tailored to revoke access to a thing until the
+need is taken care of," then chose **Harsher (kiosk)** intensity, then "seriously make it lock the apps / do
+whatever it wants." A neglected survival need now **revokes real Device-Owner capabilities** until you tend it.
+All CI-green slices; **the two safety floors kept (non-negotiable): emergency calls always work + a guaranteed
+eventual release so a bug can't permanently brick the phone.** Uses the Device-Owner powers (Pulse is DO).
+- **Core (#349):** `core:telemetry/PhonePenalties.kt` (+ `PhonePenaltiesTest`) — `PhoneLock` (pause apps /
+  block installs / lock quick-settings / disable camera / lock volume / block screenshots), `DEFAULT_MAPPING`
+  one distinct lock per need, `penalisedNeeds(life, prev)` **hysteresis** (engage ≤15 / release ≥60), `locksFor`,
+  `kioskEngaged`, `restoreHint`. Pure/inert.
+- **Enforcement (#350):** `DevicePolicyController` gained reversible levers (setUserRestriction/setStatusBarDisabled/
+  setScreenCaptureDisabled/setPackagesSuspended); `security/PhonePenaltyController.reconcile(life, fireGate)`
+  engages/lifts locks **transition-only** (never stomps a manual toggle); master toggle + **RELEASE ALL** in
+  Settings → Device-owner controls (default OFF; off = release everything); driven on app-foreground + the worker.
+- **Banner (#351):** STATS ▸ SPECIAL "🔒 PHONE LOCKED" readout (lock + how to lift each) + an ~8s in-game
+  reconcile so tending a need lifts its lock promptly. `TelemetryViewModel.phonePenalties`.
+- **Kiosk gate (#352):** `feature/checkin/PenaltyGateActivity` (mirrors `LockoutActivity`) — pins the phone
+  **over the lock screen** with the critical need(s) + a "{VERB} · I DID IT" button each (runs the store care
+  action); releases when every need is tended/recovered. Fired via `Notifier.notifyPenaltyGate` full-screen
+  intent from the worker. Safety nets: 15→**60 min** auto-release backstop, emergency-dialer button, 5s-hold
+  override, degrades to a nag without DO, ~2h re-pop cooldown. `AppSettings.phonePenaltyKiosk`/`lastPenaltyGateMs`.
+- **Real teeth (#353):** PAUSE_DISTRACTIONS now suspends **EVERY launchable app** (QUERY_ALL_PACKAGES) minus a
+  hard safe-list (Pulse/launcher/dialer/Settings/**active keyboard**) — not an empty list; the kiosk gate fires
+  from **foreground reconciles too** (onStart + the 8s loop), so it bites within seconds; 60-min hold.
+- ⚠️ **ALL on-device-unverified** (CI can't run Device-Owner policies) — owner verifies on the Pixel: toggle on,
+  let a need go critical → apps lock + gate over the lock screen → tend the need to get back in. Both compile-
+  reviewed clean by subagents. **Open:** per-need mapping picker + distraction-app picker (defaults work now).
+
+### CAMERA/MIC DETECT THE NEEDS — auto-care (owner ask, #354–#356 all merged)
+Owner: "camera + mic that detect the needs." The phone now **auto-restores a need when it catches you tending
+it in real life** — no button press — building on the existing `ActivitySensing` (scene/sound labels →
+`RealActivity` evidence: drinking/eating/washing/brushing) + the perception samplers.
+- **Core (#354):** `core:telemetry/NeedSensing.kt` (+5 tests) — `needFor(RealActivity)`→NeedKind (toothbrush →
+  the distinct BRUSHING need; shower/handwash → HYGIENE; eating → NOURISHMENT; drinking → HYDRATION),
+  `sensedNeeds(evidence, minConf)` deduped ≥0.6-confidence, `CREDITABLE`.
+- **Auto-care engine (#355):** `data/perception/NeedAutoCare.kt` observes `activityEvidenceStore.evidenceFlow`;
+  when it confidently senses care in the last 5 min it calls the store care action (drink/eat/wash/brushTeeth),
+  per-need 30-min cooldown, gated by the ambient-sensing toggle. Started from `PulseApplication` app scope.
+  `Notifier.notifySensedCare` quiet DIGEST flourish. **Closes the penalty loop:** the gate releases when a need
+  recovers, so the phone SEEING you drink auto-unlocks it.
+- **Flourish + vocab (#356):** a live "👁 AUTO-CARE · caught you taking care — <Need> restored" banner on STATS
+  (`TelemetryViewModel.sensedCare`); expanded `ActivitySensing` keyword vocab (water/tooth/eat/drink/scenes).
+- ⚠️ On-device-unverified (mic/camera + MediaPipe classifiers + the auto-restore only run on the Pixel).
+  **Open:** sleep/rest → ENERGY detection deliberately NOT built ("dark+quiet+night" misfires — would falsely
+  credit rest whenever you sit quietly at night); a conservative version is possible if the owner wants it.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
