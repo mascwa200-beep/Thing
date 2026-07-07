@@ -77,6 +77,7 @@ class TelemetryViewModel(
     private val habitStore: dev.mascwa.pulse.data.game.HabitStore,
     private val calendar: dev.mascwa.pulse.data.calendar.CalendarRepository,
     private val waypointStore: dev.mascwa.pulse.data.objectives.WaypointStore,
+    private val needAutoCare: dev.mascwa.pulse.data.perception.NeedAutoCare,
 ) : ViewModel() {
 
     val telemetry: StateFlow<Telemetry> = controller.telemetry
@@ -415,6 +416,11 @@ class TelemetryViewModel(
     // --- Real-life profile (LifeStats): body metrics + real money + hydration/hygiene, on-device only ---
     /** The operator's real-life profile with hydration/hygiene decayed to now. */
     val life: StateFlow<dev.mascwa.pulse.core.telemetry.LifeProfile> = game.lifeFlow
+
+    /** The last need the camera/mic caught you tending in real life and auto-restored — drives a live
+     *  "👁 AUTO-CARE" readout on the LIFE panel. Null until the auto-care engine senses a care action. */
+    val sensedCare: StateFlow<dev.mascwa.pulse.core.telemetry.NeedKind?> =
+        needAutoCare.sensed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The active "neglect bites the phone" locks — a capability revoked per critically-neglected need, with
      *  the care action that lifts it. Empty unless the opt-in penalty toggle is on. Drives the STATS banner. */

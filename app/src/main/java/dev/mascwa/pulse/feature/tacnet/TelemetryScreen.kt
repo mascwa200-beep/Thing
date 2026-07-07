@@ -122,6 +122,7 @@ import dev.mascwa.pulse.core.telemetry.LifeProfile
 import dev.mascwa.pulse.core.telemetry.ModSource
 import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.NeedState
+import dev.mascwa.pulse.core.telemetry.NeedKind
 import dev.mascwa.pulse.core.telemetry.NeedTier
 import dev.mascwa.pulse.core.telemetry.Perk
 import dev.mascwa.pulse.core.telemetry.Perks
@@ -386,6 +387,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val selfCareStreak by vm.selfCareStreak.collectAsStateWithLifecycle()
     val wellKept by vm.wellKept.collectAsStateWithLifecycle()
     val phonePenalties by vm.phonePenalties.collectAsStateWithLifecycle()
+    val sensedCare by vm.sensedCare.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -408,6 +410,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         AfflictionsBanner(afflictions, c)
         WellFedBanner(character, c)
         PhonePenaltyBanner(phonePenalties, c)
+        SensedCareBanner(sensedCare, c)
         Spacer(Modifier.height(8.dp))
 
         // Self-care check-in: asks, then catches a lie against the sensed evidence, then tops up the need.
@@ -1077,6 +1080,18 @@ private fun PhonePenaltyBanner(penalties: List<PhonePenaltyView>, c: NightwirePa
             Text("● ${p.lock} locked · ${p.hint}", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.negative)
         }
     }
+}
+
+/** The camera/mic auto-care flourish: when the phone catches you tending a need in real life and restores it
+ *  automatically, show what it saw. Renders nothing until the auto-care engine fires. */
+@Composable
+private fun SensedCareBanner(need: NeedKind?, c: NightwirePalette) {
+    if (need == null) return
+    Text(
+        "👁 AUTO-CARE · caught you taking care — ${need.label} restored",
+        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.sky,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    )
 }
 
 /** A hearty meal's "well-fed" buff, while it lasts: a small STR/END edge that ticks down each fight. */
