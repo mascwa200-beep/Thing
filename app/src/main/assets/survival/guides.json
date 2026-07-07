@@ -130,6 +130,117 @@
         { "heading": "Consumer radios", "body": "FRS/GMRS Channel 1 and Channel 9 are common informal calling/emergency channels in North America. PMR446 Channel 1 in Europe. Monitor and call on these if you carry walkie-talkies." },
         { "heading": "Amateur (ham) calling", "body": "2 m: 146.520 MHz FM simplex calling (US). 70 cm: 446.000 MHz. HF voice calling examples: 7.200, 14.300 MHz. A licence is normally required, but any frequency may be used in a genuine life-threatening emergency." }
       ]
+    },
+    {
+      "id": "mindset",
+      "title": "Survival Mindset",
+      "category": "Foundations",
+      "summary": "Priorities, staying calm, and the rule of threes.",
+      "sections": [
+        { "heading": "Rule of threes", "body": "You can last roughly 3 minutes without air, 3 hours without shelter in harsh weather, 3 days without water, and 3 weeks without food. Fix problems in that order — air, then warmth/shelter, then water, then food." },
+        { "heading": "STOP", "body": "The moment things go wrong: Stop, Think, Observe, Plan. Panic burns energy and gets people killed. Sit down, breathe, and take stock before you act." },
+        { "heading": "Stay or go", "body": "If you are lost and someone knows your route and return time, STAY PUT — a stationary person is far easier to find. Only move if no one will look for you, and then leave clear markers as you go." },
+        { "heading": "Ask before you act", "body": "Before any task ask: does this make me warmer, drier, safer, or found? If not, skip it and conserve energy. Do the hard work early while you still have daylight and strength." },
+        { "heading": "Keep morale up", "body": "Small finishable goals — build a fire, boil water, improve the shelter — keep focus and hope alive. The mind quits long before the body has to; keep a useful thought going and take the next small step." }
+      ]
+    },
+    {
+      "id": "knots",
+      "title": "Knots & Cordage",
+      "category": "Skills",
+      "summary": "The few knots to know cold, and using cordage.",
+      "sections": [
+        { "heading": "Learn these four", "body": "Master a small set you can tie without thinking: the BOWLINE (a fixed loop), the TAUT-LINE HITCH (an adjustable, sliding loop), the CLOVE HITCH (fast to tie onto a post), and the SQUARE (reef) KNOT (joining two lines of equal thickness)." },
+        { "heading": "Bowline", "body": "Makes a loop that will not slip or jam under load — good for rescue, hauling, and rigging. 'The rabbit comes out of the hole, round the tree, and back down the hole.' Form a small loop, pass the working end up through it, around the standing line, and back down through the loop." },
+        { "heading": "Taut-line hitch", "body": "A loop that grips under tension but slides by hand to tension it — perfect for tent and tarp guy-lines. Wrap the working end twice inside the loop then once outside, above the coils, and dress it snug." },
+        { "heading": "Clove hitch", "body": "Two half-hitches around a post or pole; quick to start a lashing or hang a line. It can slip under a changing load, so back it up with a couple of half-hitches for anything that matters." },
+        { "heading": "Cordage tips", "body": "Paracord's inner strands pull out to make fishing line, snares, or sewing thread — one cord is many tools. Melt or tape cut rope ends so they do not fray. Keep a few metres on your body, not just in the pack." }
+      ]
+    },
+    {
+      "id": "food",
+      "title": "Food & Foraging",
+      "category": "Sustenance",
+      "summary": "Safe foraging, fishing, trapping, and cooking.",
+      "sections": [
+        { "heading": "Food comes last", "body": "You can go weeks without food — do not risk poisoning yourself foraging unknown plants to fill your belly early. Water and warmth matter far more. Do not eat if water is scarce; digestion, especially of protein, costs your body water." },
+        { "heading": "Never eat what you can't identify", "body": "Never eat a wild plant, mushroom, or berry you cannot identify with total certainty. Avoid plants with milky sap, thorns, a bitter or soapy taste, or a three-leaf pattern. There is no reliable rule of thumb for mushrooms — when unsure, do not eat it." },
+        { "heading": "Reliable wild foods", "body": "In many regions: cattail (roots, shoots, and pollen, cooked), dandelion and plantain greens, freshwater fish, most grubs, and the inner bark (cambium) of pines. Acorns are edible only after leaching out the bitter tannins with repeated changes of water." },
+        { "heading": "Fishing & trapping", "body": "Trapping and fishing beat hunting for calories spent — set multiple snares and lines and let them work while you rest. A fish trap or funnel of stones in a stream inlet catches passing fish. Check snares and lines at dawn and dusk when animals move most." },
+        { "heading": "Cook it", "body": "Cook all wild meat, fish, eggs, and insects thoroughly to kill parasites and bacteria. For insects, avoid brightly coloured, hairy, or foul-smelling ones, remove legs and wings, and cook them. Salt, smoke, or dry surplus meat in thin strips to preserve it." }
+      ]
+    },
+    {
+      "id": "wildlife",
+      "title": "Wildlife & Insects",
+      "category": "Hazards",
+      "summary": "Avoiding and reacting to animals, ticks and bites.",
+      "sections": [
+        { "heading": "Avoid the encounter", "body": "Most animals want nothing to do with you — make noise on the trail so you never surprise one. Never get between a mother and her young, or corner any wild animal. Store food away from your shelter, hang it high in bear country, and keep a clean camp." },
+        { "heading": "Bears & big predators", "body": "Back away slowly from a large predator — do not run, as running triggers a chase. For bears, know your species: generally make yourself big and loud for a black bear, but play dead for a defensive grizzly. Carry and know how to use bear spray where relevant." },
+        { "heading": "Snakes & scorpions", "body": "Give snakes space and a clear path to leave; most bites happen when people try to handle or kill them. In snake or scorpion country, shake out boots, clothing, and bedding before putting them on, and watch where you place hands and feet." },
+        { "heading": "Ticks & mosquitoes", "body": "Check yourself for ticks daily in tick country, especially warm hidden areas; remove one by pulling straight out with tweezers close to the skin, without twisting or burning. Cover up and use nets at dawn and dusk to prevent mosquito bites and the diseases they carry." }
+      ]
+    },
+    {
+      "id": "cold",
+      "title": "Cold & Hypothermia",
+      "category": "Climate",
+      "summary": "Layering, frostbite, hypothermia and staying warm.",
+      "sections": [
+        { "heading": "Spot hypothermia", "body": "Watch for the 'umbles' — stumbles, mumbles, fumbles, grumbles — plus shivering and confusion. Treat mild cases with dry insulation, shelter from wind, warm sweet drinks, and gentle movement — not a hot bath. Warm the core first; handle the person gently." },
+        { "heading": "Frostbite", "body": "Do not rub frostbitten skin, and do not thaw it if it might refreeze — refreezing causes far worse damage. Rewarm in water at body temperature (about 37–39 °C / 99–102 °F), never over direct heat. Warm nipped fingers or toes against your own belly or armpits." },
+        { "heading": "Layer for cold", "body": "Wear a wicking base, an insulating mid, and a wind/waterproof shell, and adjust to avoid sweating — wet layers freeze you. Cotton kills in the cold: once wet it stops insulating, so choose wool or synthetics. Cover your head and neck." },
+        { "heading": "Stay warm", "body": "Windchill is the real killer — get out of the wind. Eat and drink often; your body burns fuel fast to make heat. Vent before you sweat, keep spare batteries and lighters warm in an inner pocket, and change into dry socks before sleeping." }
+      ]
+    },
+    {
+      "id": "heat",
+      "title": "Heat & Desert",
+      "category": "Climate",
+      "summary": "Beating heat exhaustion, sun and desert travel.",
+      "sections": [
+        { "heading": "Travel cool, rest hot", "body": "In the desert, travel at dawn, dusk, or night and rest in shade during the peak heat — a still body needs far less water. Sand is coldest and firmest to walk on at night." },
+        { "heading": "Cover up", "body": "Stay covered in loose, light clothing; it shades you and slows sweat loss. Keep your mouth shut and breathe through your nose to cut moisture loss. Wet a cloth and drape it on your neck and wrists to cool the blood near the surface." },
+        { "heading": "Heat illness", "body": "Heat exhaustion — heavy sweat, weakness, nausea — means stop, get in shade, and sip water now. Heat stroke (hot red skin, confusion, and no sweat) is a life-threatening emergency: cool the body fast by any means and get help." },
+        { "heading": "Water & salt", "body": "Ration sweat, not water: work in the cool hours and drink when thirsty. Replace salt with food or a pinch in water, or cramps and worse follow. Do not lie directly on hot sand or rock — put insulation between you and the ground." }
+      ]
+    },
+    {
+      "id": "terrain",
+      "title": "Terrain & Travel",
+      "category": "Movement",
+      "summary": "River crossings, slopes, scree, ice and snow.",
+      "sections": [
+        { "heading": "River crossings", "body": "Cross a swift river at a wide, shallow, calmer stretch — never a narrow, fast, deep one. Unbuckle your pack's hip belt first so you can shed it if you fall. Face upstream and side-step across, using a sturdy stick as a third leg for balance." },
+        { "heading": "Slopes & scree", "body": "Descend switchbacks rather than straight down — it is easier on the knees and far safer. Keep your weight over your feet on descents; leaning back sends them sliding. On loose scree, plant your feet flat and take small steps." },
+        { "heading": "Ice & snow", "body": "Test each step on ice, a log, or scree, keeping three points of contact. Kick steps and use the edges of your boots on steep snow. Test a snow bridge or ice edge with a pole before trusting your weight to it, and avoid avalanche terrain after heavy snow or rapid warming." },
+        { "heading": "Pace yourself", "body": "Rest the moment you feel a hot spot on your foot — stopping now saves a crippling blister later. In soft snow, break trail in short shifts and rotate; postholing exhausts you fast." }
+      ]
+    },
+    {
+      "id": "hygiene",
+      "title": "Health & Hygiene",
+      "category": "Medical",
+      "summary": "Staying clean, healthy and rested in the field.",
+      "sections": [
+        { "heading": "Hands & waste", "body": "Wash your hands (or use a clean cloth and water) before eating and after relieving yourself — field illness disables you fast. Dig a cat-hole for waste at least 60 m (200 ft) from water, camp, and trails, and bury it." },
+        { "heading": "Feet", "body": "Keep your feet clean and dry, and air them at rest stops — foot rot ends journeys. Change and dry your socks daily, and treat trench foot by warming, drying, and elevating the feet. Tend hot spots before they become blisters." },
+        { "heading": "Small problems, big risks", "body": "Keep small cuts clean and covered; infection from a trivial wound can become life-threatening. Brush your teeth (a frayed twig works) — oral infections are miserable in the field. Protect your eyes from sun and glare." },
+        { "heading": "Rest", "body": "Rest is a survival skill — fatigue causes the mistakes that turn a bad day into a disaster. Manage morale like a resource: eat, warm up, and sleep before you tackle the hardest problem." }
+      ]
+    },
+    {
+      "id": "urban",
+      "title": "Disaster Preparedness",
+      "category": "Preparedness",
+      "summary": "Go-bags, home safety and common disasters.",
+      "sections": [
+        { "heading": "Go-bag", "body": "Keep a grab-and-go bag ready: water, food, first aid, flashlight, a battery or hand-crank radio, medications, cash, and copies of important documents. Store at least 4 litres (1 gallon) of water per person per day for a minimum of three days, and rotate stored water and food every six months." },
+        { "heading": "Know your utilities", "body": "Learn how to shut off your home's gas, water, and electricity before an emergency, not during one. Agree on a family meeting point and an out-of-area contact everyone can call after a disaster. Keep a written list of emergency numbers and medications — phones die, paper does not." },
+        { "heading": "Common disasters", "body": "Earthquake: drop, cover, and hold on under sturdy furniture. Flood: turn around, don't drown — 30 cm (1 ft) of moving water can float a car. Building fire: stay low under the smoke, feel doors for heat before opening, and get out without gathering belongings." },
+        { "heading": "Carbon monoxide", "body": "Never run a generator, grill, or camp stove indoors or in a garage — carbon monoxide is silent and deadly. Keep sturdy shoes and a flashlight by the bed, and charge power banks and devices before a forecast storm." }
+      ]
     }
   ]
 }

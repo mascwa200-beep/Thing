@@ -165,9 +165,12 @@ class Notifier(private val context: Context) {
         )
 
     /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
-     *  new tip silently replaces the last); opens the Survival guides. */
-    fun notifyTip(id: Int, title: String, body: String) =
-        post(NotificationChannels.DIGEST, id, "SURVIVAL TIP", title, body, "survival", NotificationCompat.PRIORITY_LOW)
+     *  new tip silently replaces the last). Taps open straight to the SPECIFIC guide that teaches the tip's
+     *  skill ([guideId], e.g. a knot tip → the knots guide); falls back to the guides list when unknown. */
+    fun notifyTip(id: Int, title: String, body: String, guideId: String? = null) {
+        val route = if (guideId.isNullOrBlank()) "survival" else "survival?guide=$guideId"
+        post(NotificationChannels.DIGEST, id, "SURVIVAL TIP", title, body, route, NotificationCompat.PRIORITY_LOW)
+    }
 
     /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
     fun notifyFinding(id: Int, title: String, body: String) =

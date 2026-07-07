@@ -17,6 +17,115 @@ object SurvivalTips {
     /** How many distinct tips are in the catalog. */
     val size: Int get() = TIPS.size
 
+    /**
+     * The survival-guide ids a tip can deep-link to. These MUST match the `id`s in
+     * `app/src/main/assets/survival/guides.json` — a tip notification taps straight into its guide.
+     */
+    val GUIDE_IDS: Set<String> = setOf(
+        "mindset", "water", "fire", "shelter", "cold", "heat", "first-aid", "food",
+        "navigation", "signaling", "weather-hazards", "wildlife", "knots", "terrain", "hygiene", "urban",
+    )
+
+    // Keyword rules, ordered most-specific → most-general; the first topic with a matching keyword wins, so
+    // e.g. "snakebite" (treatment) resolves to first-aid before the wildlife rule's "snake" can catch it, and
+    // the fire/cold rules run before water so "waterproof shell"/"waterproof your matches" don't fall to water.
+    // A tip that matches nothing lands on the general survival-mindset guide. Validated over the whole catalog.
+    private val RULES: List<Pair<String, List<String>>> = listOf(
+        "first-aid" to listOf(
+            "bleed", "tourniquet", " cpr", "heimlich", "choking", "fracture", "splint", "sprain", "rice:",
+            "wound", "burns:", "a burn ", "burn for infection", "cool with clean running", "blister",
+            "snakebite", "nosebleed", "impaled", "for shock", "abcs", "epipen", "inhaler", "insulin",
+            "triangular bandage", "near-drowning", "heat cramp", "small cuts", "first-aid kit",
+            "unequal pupils", "internal injury", "broken finger",
+        ),
+        "knots" to listOf(
+            "knot", "bowline", "hitch", "clove", "paracord", "duct tape", "a knife", "your knife",
+            "baton", "repair kit", "lanyard", "metal container", "single-wall metal", "sharp, and cut",
+        ),
+        "urban" to listOf(
+            "go-bag", "earthquake", " flood", "generator", "disaster", "carbon monoxide", "building fire",
+            "power bank", "shut off your home", "meeting point", "hand-crank", "hand-cranked", "copies of documents",
+            "winter kit", "out-of-area contact", "rotate stored", "emergency numbers", "battery or hand",
+        ),
+        "signaling" to listOf(
+            "signal", "mirror", "whistle", "sos", "distress", "flashes", "flashed", "flash rescuers",
+            "flash a mirror", "flash across", "ground-to-air", "rescue", "three fires", "three whistle",
+            "smoke", "flare", "wave bright", " 'v' ", " 'x' ", "large messages", "aircraft", "searchers",
+        ),
+        "hygiene" to listOf(
+            "hygiene", "wash your hand", "brush your teeth", "cat-hole", "for waste", "socks daily",
+            "trench foot", "feet clean", "air them at rest", "foot rot", "sanitise", "sanitize",
+            "oral infection", "relieving yourself",
+        ),
+        "wildlife" to listOf(
+            "bear", "grizzly", "predator", "snakes", "give snakes", "a tick", "for ticks", "mosquito",
+            "scorpion", "wild animal", "wildlife", "mother and her", "hang it high", "feed wildlife",
+        ),
+        "terrain" to listOf(
+            "swift river", "cross a", "river at", "scree", "avalanche", "snow bridge", "switchback",
+            "descen", "steep snow", "ice edge", "hip belt", "side-step", "three points of contact",
+            "kick steps", "postholing",
+        ),
+        "navigation" to listOf(
+            "north star", "polaris", "compass", "bearing", "southern cross", "landmark", "sun rises",
+            "shadow", "map and compass", "orient", "your paces", "handrail", "guide star", "back-bearing",
+            "true north", "offline map", "whiteout", "in fog", "big dipper", "climb to a high point",
+            "streams lead", "follow water downhill", "mark north",
+        ),
+        "weather-hazards" to listOf(
+            "lightning", "thunder", "a storm", "storm is", "bad weather", "red sky", "halo", "cumulus",
+            "anvil", "wind shift", "the weather set", "swing to the west", "before bad weather", "precipitation",
+        ),
+        "cold" to listOf(
+            "hypothermia", "frostbite", "frost-nip", "windchill", "umbles", "cotton kills", "wool or synth",
+            "snow blindness", "shiver", "rewarm", "vapour barrier", "the cold", "in the cold", "cold-air",
+            "wicking base", "layer for cold", "windproof", "frozen", "dry socks", "damp feet",
+        ),
+        "heat" to listOf(
+            "desert", "heat exhaustion", "heat stroke", "heatstroke", "peak heat", "hot sand", "hot rock",
+            "in extreme sun", "in the heat", "in heat,", "extreme heat", "salt matters", "cool the blood",
+            "build shade", "in shade",
+        ),
+        "fire" to listOf(
+            "fire", "tinder", "kindling", "a spark", "an ember", "flame", "ferro", "char cloth", "fatwood",
+            "coals", "feather stick", "dakota", "steel wool", "matches", "dry fuel", "wet fuel", "candle",
+        ),
+        "food" to listOf(
+            "forag", "berries", "berry", "mushroom", "edible", "edibility", "wild plant", "wild greens",
+            "a fish", "fishing", "fish trap", "snare", " traps", "cattail", "acorn", "grub", "insects are",
+            "grasshopper", "cricket", "nettle", "dandelion", "plantain", "cambium", "inner bark",
+            "pine nut", "pine needle", "cook wild", "wild meat", "clams", "mussels", "game promptly",
+            "survival protein", "preserve it",
+        ),
+        "water" to listOf(
+            "water", "hydrat", "drink", "boil", "purif", "dew", "sodis", "solar still", "bleach", "giardia",
+            "seawater", "urine", "sip ", "thirst", "melt snow", "transpiration", "coconut water", "disinfect",
+            "urinat",
+        ),
+        "shelter" to listOf(
+            "shelter", "lean-to", "insulat", "leaves", "bough", "tarp", "snow cave", "quinzhee", "sleeping bag",
+            "space blanket", "ridgeline", "off the ground", "debris", "get off the ground", "bed of dry",
+            "sleeping insulation", "sleeping platform", "a-frame", "hat to bed",
+        ),
+        "mindset" to listOf(
+            "rule of threes", "stop:", "your attitude", "morale", "panic", "priorit", "keep calm",
+            "hope is", "keep your head", "two is one", "practice", "practise", "reassess", "stay put",
+            "conserve energy", "the four keeps", "decide to live", "channel it into tasks", "small goals",
+        ),
+    )
+
+    /** Which survival guide best matches this [tip] — a guide id in [GUIDE_IDS] for a notification deep-link. */
+    fun guideIdFor(tip: String): String {
+        val t = tip.lowercase()
+        for ((id, keys) in RULES) {
+            if (keys.any { it in t }) return id
+        }
+        return "mindset"
+    }
+
+    /** The guide id for the tip shown at [index] (mirrors [tip]'s catalog cycling). */
+    fun guideIdAt(index: Int): String = guideIdFor(tip(index))
+
     val TIPS: List<String> = listOf(
         // --- Priorities & mindset ---
         "Rule of Threes: ~3 minutes without air, ~3 hours without shelter in harsh weather, ~3 days without water, ~3 weeks without food. Fix them in that order.",
