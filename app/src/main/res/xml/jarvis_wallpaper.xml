@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
-    android:label="@string/wallpaper_jarvis_label"
-    android:description="@string/wallpaper_jarvis_desc"
-    android:thumbnail="@mipmap/ic_launcher"
-    android:showMetadataInPreview="true" />

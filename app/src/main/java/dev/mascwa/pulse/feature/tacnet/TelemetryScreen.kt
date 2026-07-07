@@ -237,7 +237,6 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     GameSensors(vm)
     val t by vm.telemetry.collectAsStateWithLifecycle()
     val gps by vm.gps.collectAsStateWithLifecycle()
-    val log by vm.log.collectAsStateWithLifecycle()
     val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
     val character by vm.character.collectAsStateWithLifecycle()
     val c = Pulse.colors
@@ -321,19 +320,6 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
                     "No GPS fix yet — grant location and ensure GPS is on. Works without internet.",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 )
-            }
-        }
-
-        PipHeader("Data stream")
-        PipFrame(Modifier.fillMaxWidth()) {
-            Column {
-                if (log.isEmpty()) {
-                    Text("// initialising sensors…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
-                } else {
-                    log.forEach { line ->
-                        Text(line, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive, maxLines = 1)
-                    }
-                }
             }
         }
 

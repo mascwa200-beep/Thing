@@ -60,7 +60,7 @@ class AppContainer(private val appContext: Context) {
      */
     val imageLoader: coil.ImageLoader by lazy {
         coil.ImageLoader.Builder(appContext)
-            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.15).build() }
+            .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.06).build() }
             .diskCache {
                 coil.disk.DiskCache.Builder()
                     .directory(java.io.File(appContext.cacheDir, "image_cache"))
