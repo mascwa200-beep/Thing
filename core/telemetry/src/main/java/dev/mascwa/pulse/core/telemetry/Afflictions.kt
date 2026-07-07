@@ -120,6 +120,24 @@ object Afflictions {
         return AfflictionState(meter, active)
     }
 
+    /**
+     * MEDICINE: knock [cureMs] off the cure meter of the affliction for [need] (or ALL afflictions when
+     * [need] is null), clearing one that reaches zero. Instant analogue of the healthy-need recovery in
+     * [advance]. Deterministic; a non-positive [cureMs] or an already-healthy state is a no-op.
+     */
+    fun shorten(state: AfflictionState, cureMs: Long, need: NeedKind? = null): AfflictionState {
+        if (cureMs <= 0L || state.meterMs.isEmpty()) return state
+        val targets = if (need != null) setOf(Affliction.forNeed(need)) else Affliction.entries.toSet()
+        val meter = state.meterMs.toMutableMap()
+        val active = state.active.toMutableSet()
+        targets.forEach { a ->
+            val cur = meter[a] ?: return@forEach
+            val next = (cur - cureMs).coerceAtLeast(0L)
+            if (next <= 0L) { meter.remove(a); active -= a } else meter[a] = next
+        }
+        return AfflictionState(meter, active)
+    }
+
     /** The stacked check penalties from every active affliction. Empty when you're healthy. */
     fun effects(state: AfflictionState): List<LifeEffect> = state.active.flatMap { it.effects }
 
