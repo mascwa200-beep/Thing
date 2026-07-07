@@ -35,6 +35,18 @@ class RefreshWorker(
     override suspend fun doWork(): Result {
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
+
+        // Self-heal the always-on ambient watch/listen: if the owner left it on but the OS reclaimed the
+        // service (it's START_NOT_STICKY), (re)start it here each run. Idempotent — no-op if already up;
+        // best-effort (a background FGS start can be refused, then the next app-open re-arms it).
+        if (settings.ambientSensingAlways && settings.ambientSensing) {
+            runCatching {
+                dev.mascwa.pulse.data.perception.AmbientSensingService.start(
+                    applicationContext, mic = settings.ambientMic, cam = settings.ambientCamera,
+                )
+            }
+        }
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 
