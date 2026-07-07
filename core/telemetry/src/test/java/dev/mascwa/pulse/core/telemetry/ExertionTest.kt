@@ -100,4 +100,37 @@ class ExertionTest {
         assertEquals("−3 HYD −4 EN", ExertCost(3, 4, 0).describe())
         assertEquals("", ExertCost().describe())
     }
+
+    // --- Resilience perks: scale exertion cost ---
+
+    @Test fun scaleReducesCostRoundingToNearest() {
+        // 34% off (Conditioned): 3→2, 4→3, and a 1-point cost survives (round(0.34)=0).
+        assertEquals(ExertCost(2, 3, 1), Exertion.scale(ExertCost(3, 4, 1), 34))
+    }
+
+    @Test fun scaleZeroPctAndEmptyAreNoOps() {
+        assertEquals(ExertCost(3, 4, 1), Exertion.scale(ExertCost(3, 4, 1), 0))
+        assertTrue(Exertion.scale(ExertCost(), 50).isEmpty)
+    }
+
+    @Test fun scaleIsCappedSoExertionIsNeverFree() {
+        // A wild reduction is clamped to REDUCTION_CAP (60%): 10 → 4, same as asking for 60.
+        assertEquals(ExertCost(4, 0, 0), Exertion.scale(ExertCost(10, 0, 0), 200))
+        assertEquals(Exertion.scale(ExertCost(10, 0, 0), 60), Exertion.scale(ExertCost(10, 0, 0), 200))
+    }
+
+    @Test fun maxResilienceCanFullyAbsorbATinyCost() {
+        // A 1-point venture cost at the 60% cap rounds away to nothing (round(0.6)=1) — intended perk payoff.
+        assertTrue(Exertion.scale(ExertCost(energy = 1), 60).isEmpty)
+    }
+
+    @Test fun resiliencePerksResolveAndAggregateCapped() {
+        assertEquals(34, Perks.byId("conditioned")?.exertReductionPct)
+        assertEquals(20, Perks.byId("second_wind")?.exertReductionPct)
+        assertEquals(3, Perks.byId("second_wind")?.healOnWin) // still heals on a win too
+        val base = SpecialGame.newCharacter()
+        assertEquals(0, SpecialGame.exertReductionPct(base))
+        assertEquals(34, SpecialGame.exertReductionPct(base.copy(perks = setOf("conditioned"))))
+        assertEquals(54, SpecialGame.exertReductionPct(base.copy(perks = setOf("conditioned", "second_wind"))))
+    }
 }

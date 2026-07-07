@@ -461,6 +461,10 @@ object SpecialGame {
     private fun perkHealOnWin(c: Character): Int = owned(c).sumOf { it.healOnWin }
     private fun perkLuckierCrits(c: Character): Boolean = owned(c).any { it.luckierCrits }
 
+    /** The % a character's resilience perks shave off exertion need-cost (capped at [Exertion.REDUCTION_CAP]). */
+    fun exertReductionPct(c: Character): Int =
+        owned(c).sumOf { it.exertReductionPct }.coerceIn(0, Exertion.REDUCTION_CAP)
+
     // --- Companion effect resolution (the one active hired ally) ---
     private fun activeCompanion(c: Character): Companion? = c.companion?.let { Companions.byId(it) }
 

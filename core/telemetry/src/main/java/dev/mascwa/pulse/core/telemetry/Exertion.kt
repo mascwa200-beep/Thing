@@ -105,6 +105,21 @@ object Exertion {
         return cost to ExertCarry(hydAcc - cost.hydration, enAcc - cost.energy, nourAcc - cost.nourishment)
     }
 
+    /** The most a perk stack can shave off exertion cost — a floor so exertion never becomes free. */
+    const val REDUCTION_CAP = 60
+
+    /**
+     * Reduce a [cost] by [reductionPct] (0..[REDUCTION_CAP]), rounding each need to the nearest point and
+     * clamping at 0 — a resilience perk ([Perk.exertReductionPct]) makes the fight/trek cost the body less.
+     * Small one-point costs survive a modest reduction (round-to-nearest), which is intended.
+     */
+    fun scale(cost: ExertCost, reductionPct: Int): ExertCost {
+        val pct = reductionPct.coerceIn(0, REDUCTION_CAP)
+        if (pct == 0 || cost.isEmpty) return cost
+        fun cut(v: Int) = (v - (v * pct / 100.0).roundToInt()).coerceAtLeast(0)
+        return ExertCost(cut(cost.hydration), cut(cost.energy), cut(cost.nourishment))
+    }
+
     /** Apply a cost to the profile's needs, clamped 0..100. Never touches hygiene, HP or any [LifeEffect]. */
     fun apply(p: LifeProfile, cost: ExertCost): LifeProfile = p.copy(
         hydration = (p.hydration - cost.hydration).coerceIn(0, 100),

@@ -968,12 +968,14 @@ class SpecialGameStore(
      * (never HP, never a [LifeEffect]). Call from inside an already-loaded [scope] coroutine.
      */
     private fun exert(kind: ExertKind, cost: ExertCost) {
-        if (cost.isEmpty) return
-        lifeBase = Exertion.apply(currentLife(), cost) // captures any rest-regen up to now, then applies cost
+        // Resilience perks (Conditioned / Second Wind) shave the need-cost of every physical action.
+        val net = Exertion.scale(cost, SpecialGame.exertReductionPct(_character.value))
+        if (net.isEmpty) return
+        lifeBase = Exertion.apply(currentLife(), net) // captures any rest-regen up to now, then applies cost
         needsAnchorMs = System.currentTimeMillis()
         if (restUntilMs != 0L) { restUntilMs = 0L; _restUntil.value = 0L } // you got up to act — rest is broken
         _life.value = lifeBase
-        _exertReport.tryEmit(ExertReport(kind, cost))
+        _exertReport.tryEmit(ExertReport(kind, net))
         scheduleFlush()
     }
 
