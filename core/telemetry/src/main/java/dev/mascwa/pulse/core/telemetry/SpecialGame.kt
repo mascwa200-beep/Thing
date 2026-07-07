@@ -72,6 +72,8 @@ data class Character(
     val reputation: Map<String, Int> = emptyMap(),
     /** Your wasteland tale — global renown (curated by archetype + grown by deeds). Bends shops + CHARISMA. */
     val legend: Legend = Legend(),
+    /** Encounters still under a "well-fed" buff from a hearty meal — a small physical edge that ticks down. */
+    val wellFedFor: Int = 0,
 ) {
     fun stat(s: Special): Int = (stats[s] ?: 1).coerceIn(1, 10)
 
@@ -97,7 +99,7 @@ data class Character(
 data class CheckResult(val success: Boolean, val crit: Boolean, val total: Int, val roll: Int)
 
 /** Where a check modifier came from — so the UI can attribute it ("from your build", "worn gear", "renown"). */
-enum class ModSource { BASE, PERK, GEAR, GEAR_SET, COMPANION, LEGEND, ENVIRONMENT, LIFE, CHEM, AFFLICTION }
+enum class ModSource { BASE, PERK, GEAR, GEAR_SET, COMPANION, LEGEND, ENVIRONMENT, LIFE, CHEM, AFFLICTION, WELL_FED }
 
 /** One contributor to a stat check's value, with a human [label] and its [source]. The BASE entry carries
  *  the raw stat; the rest are the +/- modifiers stacked on top. */
@@ -147,6 +149,10 @@ object SpecialGame {
 
     /** The [CRIT_MARGIN] the "Born Lucky" perk swaps in — crits come easier. */
     const val LUCKY_CRIT_MARGIN = 3
+
+    /** A hearty meal's "well-fed" buff: +[WELL_FED_BONUS] to physical ([WELL_FED_STATS]) checks while it lasts. */
+    const val WELL_FED_BONUS = 1
+    val WELL_FED_STATS = setOf(Special.STRENGTH, Special.ENDURANCE)
 
     /** A fresh operative: every stat at [Character.START_STAT], with [Character.START_POINTS] to spend. */
     fun newCharacter(): Character {
@@ -238,6 +244,8 @@ object SpecialGame {
         var updated = applyOutcome(character, outcome)
         if (activeChem != null) updated = removeItem(updated, activeChem.id, 1)
         if (!encounter.repeatable) updated = updated.copy(seen = updated.seen + encounter.id)
+        // Facing an encounter burns a turn of the well-fed buff (floors at 0).
+        if (updated.wellFedFor > 0) updated = updated.copy(wellFedFor = updated.wellFedFor - 1)
         updated = updated.copy(currentEncounterId = null)
         return Resolution(result.success, result.crit, outcome, updated, roll, breakdown)
     }
@@ -286,6 +294,8 @@ object SpecialGame {
             ?.let { mods += CheckMod(it.name, it.statBonusAmt, ModSource.CHEM) }
         // A well-kept real-life routine (self-care streaks) gives a small flat edge on any check.
         if (wellKept != 0) mods += CheckMod("Self-care streak", wellKept, ModSource.LIFE)
+        // A hearty meal leaves you well-fed: a small edge on physical (STR/END) checks until it wears off.
+        if (c.wellFedFor > 0 && stat in WELL_FED_STATS) mods += CheckMod("Well-fed", WELL_FED_BONUS, ModSource.WELL_FED)
         return mods
     }
 
@@ -351,8 +361,10 @@ object SpecialGame {
     fun useProvision(c: Character, id: String): Character {
         val item = Items.byId(id) ?: return c
         if (item.kind != ItemKind.PROVISION || (c.inventory[id] ?: 0) <= 0) return c
-        val healed = if (item.healAmt > 0) c.copy(hp = (c.hp + item.healAmt).coerceIn(0, c.maxHp)) else c
-        return removeItem(healed, id, 1)
+        var updated = if (item.healAmt > 0) c.copy(hp = (c.hp + item.healAmt).coerceIn(0, c.maxHp)) else c
+        // A hearty meal leaves you well-fed for a few encounters (refresh to the larger, so it never stacks up).
+        if (item.wellFedTurns > 0) updated = updated.copy(wellFedFor = maxOf(updated.wellFedFor, item.wellFedTurns))
+        return removeItem(updated, id, 1)
     }
 
     /** Sell one of item [id] for half its [Item.value] in caps (min 1). No-op if none held. */

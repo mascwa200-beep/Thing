@@ -393,6 +393,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             onBrush = { vm.brushTeeth() }, onFloss = { vm.floss() },
         )
         AfflictionsBanner(afflictions, c)
+        WellFedBanner(character, c)
         Spacer(Modifier.height(8.dp))
 
         // Self-care check-in: asks, then catches a lie against the sensed evidence, then tops up the need.
@@ -1048,6 +1049,18 @@ private fun AfflictionsBanner(state: AfflictionState, c: NightwirePalette) {
                 fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.amber)
         }
     }
+}
+
+/** A hearty meal's "well-fed" buff, while it lasts: a small STR/END edge that ticks down each fight. */
+@Composable
+private fun WellFedBanner(ch: Character, c: NightwirePalette) {
+    if (ch.wellFedFor <= 0) return
+    val fights = if (ch.wellFedFor == 1) "1 fight" else "${ch.wellFedFor} fights"
+    Text(
+        "☘ WELL-FED · +${SpecialGame.WELL_FED_BONUS} STR/END · $fights left",
+        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.positive,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    )
 }
 
 /** Tier → colour ramp: healthy green, fading amber, low amber-orange, strained/critical red. */

@@ -112,4 +112,46 @@ class ProvisionsTest {
         // Not held → no-op.
         assertFalse(SpecialGame.canUseProvision(c, "field_medicine"))
     }
+
+    // --- Well-fed buff (hearty meals) ---
+
+    @Test fun heartyMealLeavesYouWellFed() {
+        val c = SpecialGame.newCharacter().copy(inventory = mapOf("hearty_stew" to 1, "trail_jerky" to 1))
+        assertEquals(4, SpecialGame.useProvision(c, "hearty_stew").wellFedFor)
+        assertEquals(2, SpecialGame.useProvision(c, "trail_jerky").wellFedFor)
+        // A plain water ration fills no belly → no buff.
+        val w = SpecialGame.newCharacter().copy(inventory = mapOf("water_ration" to 1))
+        assertEquals(0, SpecialGame.useProvision(w, "water_ration").wellFedFor)
+    }
+
+    @Test fun wellFedRefreshesToTheLargerNeverStacks() {
+        // Eating a lesser meal while already better-fed doesn't shorten it; a bigger meal refreshes it.
+        val fed = SpecialGame.newCharacter().copy(wellFedFor = 4, inventory = mapOf("trail_jerky" to 1, "hearty_stew" to 1))
+        assertEquals(4, SpecialGame.useProvision(fed, "trail_jerky").wellFedFor) // jerky(2) < 4 → unchanged
+        assertEquals(4, SpecialGame.useProvision(fed.copy(wellFedFor = 2), "hearty_stew").wellFedFor) // stew(4) > 2 → refresh
+    }
+
+    @Test fun wellFedBuffsOnlyPhysicalChecks() {
+        val c = SpecialGame.newCharacter().copy(wellFedFor = 3)
+        val strMods = SpecialGame.statMods(c, Choice("Push", Special.STRENGTH, 10, Outcome("w"), Outcome("l")))
+        assertTrue(strMods.any { it.source == ModSource.WELL_FED && it.amount == SpecialGame.WELL_FED_BONUS })
+        val endMods = SpecialGame.statMods(c, Choice("Endure", Special.ENDURANCE, 10, Outcome("w"), Outcome("l")))
+        assertTrue(endMods.any { it.source == ModSource.WELL_FED })
+        // A social check gets no physical edge.
+        val chaMods = SpecialGame.statMods(c, Choice("Charm", Special.CHARISMA, 10, Outcome("w"), Outcome("l")))
+        assertFalse(chaMods.any { it.source == ModSource.WELL_FED })
+        // Not fed → no buff even on a physical check.
+        val plain = SpecialGame.newCharacter()
+        assertFalse(SpecialGame.statMods(plain, Choice("Push", Special.STRENGTH, 10, Outcome("w"), Outcome("l")))
+            .any { it.source == ModSource.WELL_FED })
+    }
+
+    @Test fun wellFedTicksDownEachEncounter() {
+        val enc = Encounter("t", "T", "p", listOf(Choice("Push", Special.STRENGTH, 5, Outcome("w"), Outcome("l"))), repeatable = true)
+        val c = SpecialGame.newCharacter().copy(wellFedFor = 3)
+        assertEquals(2, SpecialGame.resolve(c, enc, 0, roll = 10).character.wellFedFor)
+        // Runs out and floors at 0 — never negative.
+        assertEquals(0, SpecialGame.resolve(c.copy(wellFedFor = 1), enc, 0, roll = 10).character.wellFedFor)
+        assertEquals(0, SpecialGame.resolve(c.copy(wellFedFor = 0), enc, 0, roll = 10).character.wellFedFor)
+    }
 }

@@ -42,6 +42,8 @@ data class Item(
     val restoreAmt: Int = 0,
     val cureNeed: NeedKind? = null,
     val cureMs: Long = 0L,
+    /** A hearty meal leaves you "well-fed" for this many encounters (a small STR/END edge). 0 = no buff. */
+    val wellFedTurns: Int = 0,
 )
 
 object Items {
@@ -94,8 +96,8 @@ object Items {
 
     // --- PROVISION: tend the operator's survival needs / cure afflictions (consumed) ---
     val WATER_RATION = Item("water_ration", "Water Ration", "A sealed pouch of clean water. Restores 45 hydration.", ItemKind.PROVISION, value = 14, rarity = 1, restoreNeed = NeedKind.HYDRATION, restoreAmt = 45)
-    val TRAIL_JERKY = Item("trail_jerky", "Trail Jerky", "Salted and dried. Restores 40 nourishment.", ItemKind.PROVISION, value = 16, rarity = 1, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 40)
-    val HEARTY_STEW = Item("hearty_stew", "Hearty Stew", "A hot meal. Restores 55 nourishment and 6 HP.", ItemKind.PROVISION, healAmt = 6, value = 28, rarity = 2, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 55)
+    val TRAIL_JERKY = Item("trail_jerky", "Trail Jerky", "Salted and dried. Restores 40 nourishment; leaves you well-fed for a couple of fights.", ItemKind.PROVISION, value = 16, rarity = 1, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 40, wellFedTurns = 2)
+    val HEARTY_STEW = Item("hearty_stew", "Hearty Stew", "A hot meal. Restores 55 nourishment and 6 HP; keeps you well-fed for several fights.", ItemKind.PROVISION, healAmt = 6, value = 28, rarity = 2, restoreNeed = NeedKind.NOURISHMENT, restoreAmt = 55, wellFedTurns = 4)
     val STIM_COFFEE = Item("stim_coffee", "Stim Coffee", "Bitter but bracing. Restores 35 energy.", ItemKind.PROVISION, value = 18, rarity = 2, restoreNeed = NeedKind.ENERGY, restoreAmt = 35)
     val SOAP_BAR = Item("soap_bar", "Soap Bar", "Lye soap. Restores 50 hygiene.", ItemKind.PROVISION, value = 12, rarity = 1, restoreNeed = NeedKind.HYGIENE, restoreAmt = 50)
     val TOOTHPASTE = Item("toothpaste", "Toothpaste", "Mint, mostly. Fully restores brushing.", ItemKind.PROVISION, value = 12, rarity = 1, restoreNeed = NeedKind.BRUSHING, restoreAmt = 100)
