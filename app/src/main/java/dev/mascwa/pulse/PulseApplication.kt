@@ -39,6 +39,9 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         appScope.launch { container.knowledgeSeeder.seedIfNeeded() }
         // Start Trusted Network Mode's monitor (reactive: no-op until the user enables it in Settings).
         runCatching { container.trustedNetworkMonitor.begin() }
+        // Auto-care: watch the sensed camera/mic activity → restore the matching game need when it catches you
+        // tending it in real life. No-op unless ambient sensing is on; cheap (only reacts to new evidence).
+        runCatching { container.needAutoCare.start(appScope) }
         // Keep the HTTPS-only egress guard in sync with the security setting + log blocked cleartext.
         CleartextPolicy.onBlocked = { host ->
             runCatching { container.usageRepository.log("network", "blocked cleartext egress to $host (HTTPS-only)") }

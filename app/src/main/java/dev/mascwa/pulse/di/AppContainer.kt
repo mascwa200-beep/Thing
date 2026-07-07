@@ -129,6 +129,14 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
     }
 
+    /** Auto-care: when the camera/mic catch you drinking/eating/washing/brushing, restore the matching game
+     *  need automatically (rate-limited, gated by ambient sensing). Started from PulseApplication's app scope. */
+    val needAutoCare: dev.mascwa.pulse.data.perception.NeedAutoCare by lazy {
+        dev.mascwa.pulse.data.perception.NeedAutoCare(
+            activityEvidenceStore.evidenceFlow, specialGameStore, settingsRepository, notifier,
+        )
+    }
+
     /** Runs ActivitySensing over the mic + camera labels → a persisted history of real self-care (shower /
      *  meal / bathroom), which the habit check-in reads to catch a lie. On-device (text evidence only). */
     val activityEvidenceStore: dev.mascwa.pulse.data.perception.ActivityEvidenceStore by lazy {
