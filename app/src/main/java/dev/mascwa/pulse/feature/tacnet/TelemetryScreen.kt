@@ -212,6 +212,16 @@ private fun GameSensors(vm: TelemetryViewModel) {
             vm.stop()
         }
     }
+    // While a game screen is open, keep the "neglect bites the phone" penalties reconciled to the live needs,
+    // so a need going critical locks its capability — and tending it (DRINK/EAT/…) lifts the lock — promptly.
+    // Fully defensive + a no-op unless the opt-in toggle is on AND Pulse is a Device Owner.
+    LaunchedEffect(Unit) {
+        val container = (context.applicationContext as? dev.mascwa.pulse.PulseApplication)?.container ?: return@LaunchedEffect
+        while (true) {
+            runCatching { container.phonePenaltyController.reconcile(container.specialGameStore.lifeSnapshot()) }
+            kotlinx.coroutines.delay(8_000)
+        }
+    }
 }
 
 /**
@@ -373,6 +383,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val checkinResult by vm.checkinResult.collectAsStateWithLifecycle()
     val selfCareStreak by vm.selfCareStreak.collectAsStateWithLifecycle()
     val wellKept by vm.wellKept.collectAsStateWithLifecycle()
+    val phonePenalties by vm.phonePenalties.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
     Column(
@@ -394,6 +405,7 @@ fun SpecialGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         )
         AfflictionsBanner(afflictions, c)
         WellFedBanner(character, c)
+        PhonePenaltyBanner(phonePenalties, c)
         Spacer(Modifier.height(8.dp))
 
         // Self-care check-in: asks, then catches a lie against the sensed evidence, then tops up the need.
@@ -1047,6 +1059,20 @@ private fun AfflictionsBanner(state: AfflictionState, c: NightwirePalette) {
             val pct = (Afflictions.incubation(state, a) * 100).roundToInt()
             Text("△ Coming down with ${a.label.lowercase()} ($pct%) — tend ${a.need.label.lowercase()}",
                 fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.amber)
+        }
+    }
+}
+
+/** The "neglect bites the phone" penalties, while any need is critical: which real capability is locked and
+ *  the care action that lifts it. Renders nothing unless the opt-in penalty toggle is on and a need is critical. */
+@Composable
+private fun PhonePenaltyBanner(penalties: List<PhonePenaltyView>, c: NightwirePalette) {
+    if (penalties.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text("🔒 PHONE LOCKED", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+            color = c.negative, letterSpacing = 1.sp)
+        penalties.forEach { p ->
+            Text("● ${p.lock} locked · ${p.hint}", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.negative)
         }
     }
 }
