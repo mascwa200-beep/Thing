@@ -26,3 +26,11 @@ here and inline in the guide text; the files are unmodified.
       by Rama — CC BY-SA 3.0, Wikimedia Commons
   campfire.svg — teepee/lean-to campfire lay
       by DerpMeep — CC BY-SA 4.0, Wikimedia Commons
+
+Clinical reproductive-anatomy diagrams for the Sexual Health guide
+(labelled medical schematics, unmodified):
+
+  female-reproductive.svg — "Scheme female reproductive system"
+      by CDC / Mysid — public domain, Wikimedia Commons
+  male-reproductive.svg — "Human male reproductive system"
+      by Wumingbai — CC BY-SA 4.0, Wikimedia Commons
