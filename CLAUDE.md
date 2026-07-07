@@ -1702,6 +1702,56 @@ Shipped as three CI-green slices; each mirrors the established store/UI/worker p
   with **always-on ambient sensing** on). **Open/steerable:** per-check-in cadence tuning; whether verification
   should also engage while a game screen is open (samplers running); a check-in adherence surface.
 
+### Deep-links · RAM diet · INVASIVE LOCK · SURVIVE search (owner batch, #362–#367 all merged)
+Owner's multi-part ask: every notification opens directly into its exact page (+ expandable dropdowns);
+survival tips open the SPECIFIC how-to guide; cut RAM (kill the live wallpaper + the stats data-stream);
+make the lockout TRULY invasive (user-armed, not criticality-gated, real screen lock, always-on background);
+and a SURVIVE search bar so pages don't eager-load. Shipped as 6 CI-green slices. Recon was 4 parallel Explore
+agents (whole-codebase map). **The compile-review subagent kept returning prompt-injected/corrupted output
+(0 tool calls) — disregarded every time; relied on manual verification + CI (noted in each PR body).**
+- **#362 — survival tip → the specific guide (flagship):** `SurvivalTips.guideIdFor(tip)`/`guideIdAt(i)`
+  classify each of the 310 tips to a guide id by keyword (validated by running it over the whole catalog +
+  tuning substring collisions; +4 tests). **9 new offline guides** in `assets/survival/guides.json` (knots,
+  food, wildlife, cold, heat, terrain, hygiene, urban, mindset) so every tip lands on a real page. Argumented
+  route **`survival?guide={id}`** + `GuidesScreen` pre-select; the deep-link consumer matches on the base route
+  (`substringBefore('?')`) so the arg survives. `Notifier.notifyTip(guideId)` → `RefreshWorker` passes it.
+- **#363 — every notification → its exact page + BigText dropdowns:** the shared `post()` helper already
+  set BigText+route; fixed the 3 that dead-ended on Home via a stale `"grid"` route (sky→`space_wx`,
+  safety→`safety`, flight→`radar`) + added those to `SHORTCUT_ROUTES`; added `BigTextStyle` to the 3
+  full-screen builders (`notifyCheckin`/`notifyPenaltyGate`/`notifyCareCheckin`).
+- **#364 — RAM diet:** **DELETED the live wallpaper entirely** (`JarvisWallpaperService.kt`, manifest
+  `<service>`, `res/xml/jarvis_wallpaper.xml`, its strings, the Settings Appearance controls, the
+  `AppSettings.liveWallpaperReadout` field — `ignoreUnknownKeys` makes old saves load). Removed the STATS ▸
+  STATUS **"Data stream"** panel + its VM machinery (`_log`/`pushLog`/`fmt`). Cut the shared Coil memory
+  cache **15% → 6% of heap** (the real lever — fixed-% shared across all image screens; removing news
+  thumbnails would NOT help). **Kept `largeHeap`** — load-bearing for the LLM + Filament AR (dropping it OOMs).
+  ⚠️ commit gotcha: `git rm` staged deletions, then a compound `git add` with the removed pathspec aborted →
+  the first commit had only deletions; fixed by staging mods + `--amend` + force-with-lease (own dev commit).
+- **#365 — USER-ARMED COMMITMENT LOCK (the invasive one):** from Settings → Device-owner controls, tap "Lock
+  until I shower/brush/eat/drink" and Pulse **genuinely locks the screen** via a new
+  `DevicePolicyController.lockNow()` (new `<force-lock/>` in `device_admin.xml`; DO-only, only locks — never
+  wipes) then shows the gate over the lock screen, releasing only when `ActivitySensing` confirms you did it —
+  **regardless of any need level**. Reuses `LockoutActivity` (`EXTRA_USER_ARMED`+`EXTRA_BACKSTOP_MIN`).
+  **Safety floors kept:** emergency dialer, a hard-capped owner-set auto-release backstop (15 min–4 h, no-brick),
+  a personal numeric **override code** (`AppSettings.lockOverrideCode`) that frees any lock + the 5-second hold,
+  degrades to a nag without DO.
+- **#366 — robust + default-on always-on sensing:** the 24/7 watch/listen the lock's completion-detection
+  relies on now survives reboot/OS-kill — `BootReceiver` revives `AmbientSensingService`, `RefreshWorker`
+  self-heals it each run (it's `START_NOT_STICKY`), and `AppSettings.ambientSensingAlways` now **defaults ON**
+  (owner's explicit "watch/listen at all times" ask; still fully toggle-gated; existing installs keep their
+  saved value — a fresh reinstall picks up the default).
+- **#367 — SURVIVE file-explorer search:** a Pip-Boy search bar atop `SurviveBody` indexes every hub
+  destination + every offline guide (title/category/summary/section headings); results deep-link straight to
+  the exact page (guide results reuse `survival?guide=`). Empty query = the existing tile grid (nothing heavy
+  loads; only cached guide titles are read, not the network screens). Both hosts (standalone + PIP-BOY ▸ STATS
+  ▸ SURVIVE) with no call-site change.
+- ⚠️ **All #362–#367 on-device-unverified** (CI compile-gates only). **Highest-stakes = the invasive lock +
+  24/7 sensing (#365/#366)** — owner should exercise first on the Pixel: arm a lock, set an override code,
+  confirm sensor-release + backstop + emergency paths, and watch battery with the camera on 24/7 (flip to
+  mic-only if it drains). **Open/steerable:** a deeper "organize SURVIVE *exactly* like a Pip-Boy" visual pass
+  (screenshot-driven); a JarvisTool to arm the commitment lock by voice; extend the override code to the
+  penalty gate; the survival-tip classifier has a few soft misroutes (mindset fallback) that are easy to tune.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
