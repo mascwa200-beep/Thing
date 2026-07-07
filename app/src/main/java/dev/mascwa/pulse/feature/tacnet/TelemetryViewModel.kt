@@ -57,6 +57,9 @@ import kotlin.math.roundToInt
 /** The nearest engageable wasteland [WorldSite], how far it is, and whether you're within reach to fight it. */
 data class SiteReach(val site: WorldSite, val distanceM: Double, val atSite: Boolean)
 
+/** An active "neglect bites the phone" penalty for the STATS banner: the locked capability + how to lift it. */
+data class PhonePenaltyView(val lock: String, val hint: String)
+
 class TelemetryViewModel(
     private val controller: TelemetryController,
     private val location: LocationProvider,
@@ -412,6 +415,21 @@ class TelemetryViewModel(
     // --- Real-life profile (LifeStats): body metrics + real money + hydration/hygiene, on-device only ---
     /** The operator's real-life profile with hydration/hygiene decayed to now. */
     val life: StateFlow<dev.mascwa.pulse.core.telemetry.LifeProfile> = game.lifeFlow
+
+    /** The active "neglect bites the phone" locks — a capability revoked per critically-neglected need, with
+     *  the care action that lifts it. Empty unless the opt-in penalty toggle is on. Drives the STATS banner. */
+    val phonePenalties: StateFlow<List<PhonePenaltyView>> = settings.settings
+        .map { s ->
+            if (!s.phonePenalties) emptyList()
+            else s.phonePenalisedNeeds
+                .mapNotNull { runCatching { dev.mascwa.pulse.core.telemetry.NeedKind.valueOf(it) }.getOrNull() }
+                .mapNotNull { need ->
+                    dev.mascwa.pulse.core.telemetry.PhonePenalties.DEFAULT_MAPPING[need]?.let { lock ->
+                        PhonePenaltyView(lock.label, dev.mascwa.pulse.core.telemetry.PhonePenalties.restoreHint(need))
+                    }
+                }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     /** Lingering afflictions contracted from long-neglected needs (advanced on the needs tick). */
     val afflictions: StateFlow<dev.mascwa.pulse.core.telemetry.AfflictionState> = game.afflictionsFlow
     /** Wall-clock ms an active REST window runs until (0 = not resting) — drives the "RESTING · Xh left" readout. */
