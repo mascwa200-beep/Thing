@@ -92,6 +92,38 @@ class Notifier(private val context: Context) {
         safeNotify(dev.mascwa.pulse.feature.checkin.CheckinActivity.NOTIF_ID, notification)
     }
 
+    /**
+     * The MAXIMUM phone penalty: a full-screen lock-screen gate (over the lock screen) that pins the phone
+     * until you tend the critically-neglected [needNames] (NeedKind names). Fires a full-screen intent to
+     * [dev.mascwa.pulse.feature.checkin.PenaltyGateActivity] on the high-importance REMINDERS channel; ongoing
+     * until the activity clears it on release. Opt-in (kiosk tier) + Device-Owner gated by the caller.
+     */
+    fun notifyPenaltyGate(needNames: List<String>) {
+        if (!canPost() || needNames.isEmpty()) return
+        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.PenaltyGateActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.EXTRA_NEEDS, needNames.toTypedArray())
+        }
+        val pi = PendingIntent.getActivity(
+            context, dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
+            .setSubText("// PHONE LOCKED")
+            .setContentTitle("Phone locked — take care of yourself")
+            .setContentText("Tend the need to get back in.")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setFullScreenIntent(pi, true)
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .build()
+        safeNotify(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, notification)
+    }
+
     /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
      *  new tip silently replaces the last); opens the Survival guides. */
     fun notifyTip(id: Int, title: String, body: String) =

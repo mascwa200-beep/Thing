@@ -533,7 +533,9 @@ class RefreshWorker(
         // Device Owner; fully defensive. ---
         runCatching {
             val life = container.specialGameStore.lifeSnapshot()
-            container.phonePenaltyController.reconcile(life)
+            // fireGate=true: the background worker is the only path that pops the harsher kiosk lock-screen gate
+            // (so it fires when the phone is idle, not while you're actively in Pulse). Cooldown-throttled inside.
+            container.phonePenaltyController.reconcile(life, fireGate = true)
         }
 
         // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each

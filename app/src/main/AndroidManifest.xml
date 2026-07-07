@@ -166,6 +166,18 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- The MAXIMUM phone penalty — a lock-screen gate that pins the phone (device-owner kiosk) when a
+             survival need goes critical, until you tend it. Opt-in (kiosk tier). Same safety nets as the
+             lockout: hard auto-release, emergency dialer reachable, hold-to-override. -->
+        <activity
+            android:name=".feature.checkin.PenaltyGateActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <receiver
             android:name=".notifications.BootReceiver"
