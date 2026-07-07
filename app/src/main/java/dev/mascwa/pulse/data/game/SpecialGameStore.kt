@@ -100,6 +100,8 @@ class SpecialGameStore(
         // Your wasteland tale (global renown + the curated archetype). Defaulted → old saves load neutral.
         val legendRenown: Int = 0,
         val legendArchetype: String? = null,
+        // Encounters still under a hearty-meal "well-fed" buff. Defaulted → old saves load with no buff.
+        val wellFedFor: Int = 0,
         // Lifetime counters + unlocked achievements (defaulted → old saves load).
         val wins: Int = 0,
         val crits: Int = 0,
@@ -299,6 +301,7 @@ class SpecialGameStore(
         perks = perks.toList(), perkPicks = perkPicks,
         inventory = inventory, companion = companion, reputation = reputation,
         legendRenown = legend.renown, legendArchetype = legend.archetype?.name,
+        wellFedFor = wellFedFor,
     )
 
     private fun Stored.domain(): Character {
@@ -319,6 +322,7 @@ class SpecialGameStore(
                 renown = legendRenown.coerceIn(Legends.MIN, Legends.MAX),
                 archetype = legendArchetype?.let { runCatching { Archetype.valueOf(it) }.getOrNull() },
             ),
+            wellFedFor = wellFedFor.coerceAtLeast(0),
         )
     }
 
