@@ -1,13 +1,18 @@
 package dev.mascwa.pulse.feature.survive
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -20,10 +25,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.feature.common.PipFrame
@@ -90,11 +100,33 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                     Column {
                         PipHeader(section.heading)
                         PipFrame(Modifier.fillMaxWidth()) {
-                            Text(section.body, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                            Column {
+                                Text(section.body, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                                section.image?.let { SurvivalDiagram(it) }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Renders a bundled offline survival diagram (from `assets/survival/images/`). The old-manual line
+ *  engravings read best on a light card; the width is capped so the small public-domain scans stay crisp. */
+@Composable
+private fun SurvivalDiagram(image: String) {
+    Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = "file:///android_asset/survival/images/$image",
+            contentDescription = "Survival diagram",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .widthIn(max = 260.dp)
+                .heightIn(max = 260.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFFF3EFE2))
+                .padding(8.dp),
+        )
     }
 }

@@ -1,0 +1,13 @@
+Survival guide diagrams — provenance & licensing
+=================================================
+The knot illustrations in this folder are scanned engravings from the
+1911 Encyclopaedia Britannica (11th edition), which is in the PUBLIC DOMAIN
+worldwide (published 1911). Sourced via Wikimedia Commons.
+
+  reef-knot.jpg, clove-hitch.jpg, two-half-hitches.jpg, taut-line-hitch.jpg
+  (Midshipman's Hitch), figure-eight.jpg, sheet-bend.jpg, timber-hitch.jpg
+      — EB1911 "Knot" article figures (public domain)
+  bowline.jpg — public-domain knot diagram (Wikimedia Commons)
+
+No attribution is legally required for public-domain works; provenance is
+recorded here as good practice. Only freely-licensed images are bundled.
