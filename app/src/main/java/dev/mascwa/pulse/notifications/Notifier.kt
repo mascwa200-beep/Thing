@@ -36,13 +36,13 @@ class Notifier(private val context: Context) {
         post(NotificationChannels.WEATHER, id, "WEATHER", title, body, "weather", NotificationCompat.PRIORITY_DEFAULT)
 
     fun notifySpace(id: Int, title: String, body: String) =
-        post(NotificationChannels.SPACE, id, "SKY", title, body, "grid", NotificationCompat.PRIORITY_DEFAULT)
+        post(NotificationChannels.SPACE, id, "SKY", title, body, "space_wx", NotificationCompat.PRIORITY_DEFAULT)
 
     fun notifySafety(id: Int, title: String, body: String) =
-        post(NotificationChannels.SAFETY, id, "SAFETY", title, body, "grid", NotificationCompat.PRIORITY_HIGH)
+        post(NotificationChannels.SAFETY, id, "SAFETY", title, body, "safety", NotificationCompat.PRIORITY_HIGH)
 
     fun notifyFlight(id: Int, title: String, body: String) =
-        post(NotificationChannels.FLIGHT, id, "TACNET", title, body, "grid", NotificationCompat.PRIORITY_LOW)
+        post(NotificationChannels.FLIGHT, id, "TACNET", title, body, "radar", NotificationCompat.PRIORITY_LOW)
 
     fun notifyUpdate(id: Int, title: String, body: String) =
         post(NotificationChannels.DIGEST, id, "UPDATE", title, body, "settings", NotificationCompat.PRIORITY_DEFAULT)
@@ -82,6 +82,10 @@ class Notifier(private val context: Context) {
             .setSubText("// CHECK-IN")
             .setContentTitle("Check-in required")
             .setContentText(habit.question)
+            .setStyle(
+                NotificationCompat.BigTextStyle().setBigContentTitle("Check-in required")
+                    .bigText("${habit.question}\n\nOpen to answer — it won't clear until you do."),
+            )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setFullScreenIntent(pi, true)
@@ -114,6 +118,13 @@ class Notifier(private val context: Context) {
             .setSubText("// PHONE LOCKED")
             .setContentTitle("Phone locked — take care of yourself")
             .setContentText("Tend the need to get back in.")
+            .setStyle(
+                NotificationCompat.BigTextStyle().setBigContentTitle("Phone locked — take care of yourself")
+                    .bigText(
+                        "Locked until you tend: ${needNames.joinToString(", ") { it.lowercase() }}.\n" +
+                            "Emergency calls still work, and the lock releases on its own after a while.",
+                    ),
+            )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setFullScreenIntent(pi, true)
@@ -145,6 +156,10 @@ class Notifier(private val context: Context) {
             .setSubText("// CHECK-IN")
             .setContentTitle(checkin.label)
             .setContentText(checkin.prompt)
+            .setStyle(
+                NotificationCompat.BigTextStyle().setBigContentTitle(checkin.label)
+                    .bigText("${checkin.prompt}\n\nOpen to confirm when it's done, or tap NOT YET."),
+            )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setFullScreenIntent(pi, true)

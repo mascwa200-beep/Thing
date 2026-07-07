@@ -311,7 +311,7 @@ class SettingsViewModel(
             id = 9999,
             title = "Pulse notifications are working",
             body = "If you can see this, alerts are enabled. Breaking news, market, weather, sky and safety alerts will appear like this.",
-            route = "grid",
+            route = "home",
         )
     }
 }
