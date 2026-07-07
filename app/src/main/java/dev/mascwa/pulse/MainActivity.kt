@@ -243,6 +243,14 @@ class MainActivity : ComponentActivity() {
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Catch a build that turned green while the app was backgrounded — prompt the install on return.
         maybeAutoUpdate()
+        // Reconcile the "neglect bites the phone" penalties against the decayed needs (engage new critical
+        // needs' locks, lift recovered ones). Opt-in + fully defensive; a no-op when the feature is off.
+        lifecycleScope.launch {
+            runCatching {
+                val life = app.container.specialGameStore.lifeSnapshot()
+                app.container.phonePenaltyController.reconcile(life)
+            }
+        }
     }
 
     override fun onStop() {

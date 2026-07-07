@@ -252,6 +252,8 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 var wipeN by remember { mutableStateOf(dpc.maxFailedForWipe()) }
                 var pendingWipe by remember { mutableStateOf<Int?>(null) }
                 var wipeError by remember { mutableStateOf(false) }
+                val penaltyScope = rememberCoroutineScope()
+                val container = remember { (context.applicationContext as dev.mascwa.pulse.PulseApplication).container }
                 PrefSection("Device-owner controls") {
                     if (!isOwner) {
                         Text(
@@ -318,6 +320,28 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                    // Phone penalties: let a neglected survival need lock a real phone capability until you tend
+                    // it (the game bleeds into the phone). Opt-in; turning it off releases everything at once.
+                    PrefSwitch(
+                        "Phone penalties (needs lock the phone)",
+                        "Let a survival need you've let go critical revoke a phone capability (pause distraction " +
+                            "apps, block installs, lock quick-settings, disable the camera, lock volume, block " +
+                            "screenshots — and pin Pulse while critical) until you tend it. Reversible; off releases all.",
+                        checked = s.phonePenalties,
+                        enabled = isOwner,
+                    ) { on ->
+                        vm.update { it.copy(phonePenalties = on) }
+                        // Turning it OFF releases everything now (the guaranteed escape); turning it ON engages
+                        // at the next reconcile (app foreground / background worker) as needs go critical.
+                        if (!on) penaltyScope.launch { runCatching { container.phonePenaltyController.releaseAll() } }
+                    }
+                    if (s.phonePenalties) {
+                        PrefClickable(
+                            "Release all phone penalties now",
+                            subtitle = "Lift every active lock immediately (the escape hatch).",
+                            onClick = { penaltyScope.launch { runCatching { container.phonePenaltyController.releaseAll() } } },
                         )
                     }
                 }

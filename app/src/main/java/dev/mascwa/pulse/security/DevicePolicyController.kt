@@ -75,4 +75,43 @@ class DevicePolicyController(context: Context) {
         dpm.setMaximumFailedPasswordsForWipe(admin, count.coerceAtLeast(0))
         true
     }.getOrDefault(false)
+
+    // --- Reversible capability locks (used by the self-care phone penalties) --------------------
+    // Each of these is a plain Device-Owner flag that toggles a single capability on/off. They are all
+    // reversible: passing the opposite value restores the capability. Every call is a defensive no-op
+    // unless Pulse is a Device Owner.
+
+    /**
+     * Add or clear a user restriction (an `UserManager.DISALLOW_*` key), e.g. block app installs or lock the
+     * volume. DO-only; true if applied. The restriction is lifted by calling again with `on = false`.
+     */
+    fun setUserRestriction(key: String, on: Boolean): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        if (on) dpm.addUserRestriction(admin, key) else dpm.clearUserRestriction(admin, key)
+        true
+    }.getOrDefault(false)
+
+    /** Disable/enable the notification shade + quick-settings pulldown. DO-only; true if applied. */
+    fun setStatusBarDisabled(disabled: Boolean): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.setStatusBarDisabled(admin, disabled)
+        true
+    }.getOrDefault(false)
+
+    /** Block/allow screen capture (screenshots + screen recording). DO-only; true if applied. */
+    fun setScreenCaptureDisabled(disabled: Boolean): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.setScreenCaptureDisabled(admin, disabled)
+        true
+    }.getOrDefault(false)
+
+    /**
+     * Suspend/unsuspend [packages] (tapping a suspended app shows the system "app paused" dialog). Reversible;
+     * DO-only. Returns the packages that could NOT be suspended (the platform refuses some critical ones), or
+     * null on failure. Never call this with Pulse's own package, the launcher or the dialer — the caller filters.
+     */
+    fun setPackagesSuspended(packages: List<String>, suspended: Boolean): Array<String>? = runCatching {
+        if (!isDeviceOwner() || dpm == null || packages.isEmpty()) return emptyArray()
+        dpm.setPackagesSuspended(admin, packages.toTypedArray(), suspended)
+    }.getOrNull()
 }

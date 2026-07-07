@@ -527,6 +527,15 @@ class RefreshWorker(
             }
         }
 
+        // --- Phone penalties: engage/lift the "neglect bites the phone" device locks from the background-
+        // decayed needs, so a need that lapses while the app is closed still locks its capability (and one
+        // that recovers is released). The controller no-ops unless the opt-in toggle is on AND Pulse is a
+        // Device Owner; fully defensive. ---
+        runCatching {
+            val life = container.specialGameStore.lifeSnapshot()
+            container.phonePenaltyController.reconcile(life)
+        }
+
         // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each
         // silently replaces the last). Gated to at most one per SURVIVAL_TIP_MIN_GAP_MS. The tip index is
         // DERIVED FROM THE CLOCK (not a persisted cursor), so the rotation can never get stuck on tip 0 even
