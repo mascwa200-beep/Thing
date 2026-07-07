@@ -112,4 +112,51 @@ object CareSchedule {
         }
         return c.basePriority + escalation
     }
+
+    // ── "…ensure that you do it right": verify a claimed completion against what the camera/mic actually saw ──
+
+    /** How far back to look for sensed corroboration when you claim a check-in done. */
+    const val VERIFY_WINDOW_MS = 15 * MIN
+
+    /**
+     * The real-world activities whose sensed evidence can back up a claimed completion of [c]. Empty = nothing
+     * the sensors can reliably see (flossing, resting), so a claim is taken on trust. Hygiene is corroborated by
+     * either a shower or a hand/face wash.
+     */
+    fun verifyActivities(c: CareCheckin): Set<RealActivity> = when (c) {
+        CareCheckin.WATER -> setOf(RealActivity.DRINKING)
+        CareCheckin.EAT -> setOf(RealActivity.EATING)
+        CareCheckin.BRUSH -> setOf(RealActivity.TOOTHBRUSH)
+        CareCheckin.WASH -> setOf(RealActivity.SHOWER, RealActivity.HANDWASH)
+        CareCheckin.FLOSS -> emptySet()
+        CareCheckin.REST -> emptySet()
+    }
+
+    /**
+     * Cross-reference a claimed "I did it" for [c] with the sensed [evidence] since [sinceMs] — the lie-catch that
+     * makes the check-in ensure you actually do it. Returns the best verdict across [c]'s verifiable activities.
+     *
+     * Deliberately forgiving so it can never make a FALSE accusation: when [c] has no sensor-visible activity, or
+     * the camera/mic weren't watching ([sensingActive] = false), it returns [ClaimVerdict.WEAK] (provisional
+     * trust) rather than accusing. Only a claim the ACTIVE sensors flatly failed to corroborate comes back
+     * [ClaimVerdict.NONE] — the one case the on-device layer bounces back with "sensors didn't catch that."
+     */
+    fun verifyClaim(
+        c: CareCheckin,
+        evidence: List<ActivityEvidence>,
+        sinceMs: Long,
+        sensingActive: Boolean,
+    ): ClaimVerdict {
+        val acts = verifyActivities(c)
+        if (acts.isEmpty() || !sensingActive) return ClaimVerdict.WEAK
+        val verdicts = acts.map { ActivitySensing.verifyClaim(it, evidence, sinceMs) }
+        return when {
+            verdicts.any { it == ClaimVerdict.CONFIRMED } -> ClaimVerdict.CONFIRMED
+            verdicts.any { it == ClaimVerdict.WEAK } -> ClaimVerdict.WEAK
+            else -> ClaimVerdict.NONE
+        }
+    }
+
+    /** Whether a [verdict] credits the check-in (the completion stands). Only a flat contradiction (NONE) fails. */
+    fun credits(verdict: ClaimVerdict): Boolean = verdict != ClaimVerdict.NONE
 }

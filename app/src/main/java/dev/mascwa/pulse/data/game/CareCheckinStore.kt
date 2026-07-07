@@ -9,7 +9,10 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.CareCheckin
 import dev.mascwa.pulse.core.telemetry.CareContext
 import dev.mascwa.pulse.core.telemetry.CareSchedule
+import dev.mascwa.pulse.core.telemetry.ClaimVerdict
 import dev.mascwa.pulse.core.telemetry.NeedKind
+import dev.mascwa.pulse.data.perception.ActivityEvidenceStore
+import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
@@ -33,6 +36,8 @@ class CareCheckinStore(
     private val context: Context,
     private val json: Json,
     private val game: SpecialGameStore,
+    private val evidence: ActivityEvidenceStore,
+    private val settings: SettingsRepository,
 ) {
     @Serializable
     private data class Stored(
@@ -70,6 +75,33 @@ class CareCheckinStore(
         stampDone(c, System.currentTimeMillis())
         restore(c)
         flush()
+    }
+
+    /**
+     * Verify a claimed "I did it" against what the camera/mic actually sensed ("…ensure that you do it right").
+     * When the active sensors corroborate — or can't (sensing off / no sensor for this task) — the completion
+     * stands (stamp + tend the need). When the sensors were watching and saw nothing at all, it's a caught
+     * claim: nothing is credited and the returned [ClaimVerdict.NONE] tells the prompt to bounce back and insist.
+     * Never a false accusation — only a claim the ACTIVE sensors flatly failed to back up fails.
+     */
+    suspend fun completeVerified(c: CareCheckin): ClaimVerdict = mutex.withLock {
+        ensureLoaded()
+        val now = System.currentTimeMillis()
+        // Only hold the claim to the sensors when the ALWAYS-ON sensing service is running — that's the one
+        // config where the camera/mic are actually watching during a lock-screen check-in. Otherwise (samplers
+        // only run inside the game, or sensing off) the window would be blank and every claim would falsely
+        // bounce — so we trust the tap. No false accusations.
+        val s = runCatching { settings.current() }.getOrNull()
+        val sensingActive = s != null && s.ambientSensing && s.ambientSensingAlways
+        val since = now - CareSchedule.VERIFY_WINDOW_MS
+        val ev = if (sensingActive) runCatching { evidence.recent(since) }.getOrDefault(emptyList()) else emptyList()
+        val verdict = CareSchedule.verifyClaim(c, ev, since, sensingActive)
+        if (CareSchedule.credits(verdict)) {
+            stampDone(c, now)
+            restore(c)
+            flush()
+        }
+        verdict
     }
 
     /** Observe the auto-care sensed stream — when the camera/mic catch you tending a need, treat it as a
