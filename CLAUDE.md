@@ -1565,6 +1565,51 @@ safety + geometry/determinism). All in `feature/ar3d/WastelandRenderer.kt` + `fe
   screenshot, or flip to the Ref-B amber-dusk mood; (b) resume the geo-gated core loop verification (still
   paused, CLAUDE.md above); (c) more Fallout atmosphere (dust motes, weathered grade) once the base is confirmed.
 
+### Survival-needs DEPTH arc — a real Sims-style survival layer (this session, #333–#346 all merged)
+Owner drove a long run deepening the life-sim needs into a judgmental, consequential survival system that
+"bleeds into reality." All CI-green slices, pure cores in `core:telemetry` (locally kotlinc + JUnit — the FULL
+game-core suite is now **~640+ tests**), Android layers compile-gated by CI + adversarial subagent reviews.
+Every runtime behaviour is **owner-verify on the Pixel** (CI can't run the store/decay/notifications).
+- **Needs 100× deeper + notifications (#333/#334):** `LifeStats` needs gained escalating penalty **tiers**
+  (LOW/POOR/CRITICAL), per-need **conditions**/advice, and **cross-need coupling** (neglect several at once →
+  compounding penalties). `SurvivalAlerts` (pure) → tier-coloured gauges + finer notification throttles.
+- **Afflictions (#335/#336/#337):** `core:telemetry/Afflictions.kt` — sustained-critical needs make you
+  **contract an ailment** (`Affliction` per `NeedKind`; a fill/drain meter with hysteresis; `advance`/`effects`/
+  `forNeed`). Folded into `SpecialGame.resolve` as `ModSource.AFFLICTION` (real check penalties); STAT-panel
+  badges; contracted/cured push notifications. Cured by time healthy, rest, or (later) medicine.
+- **Exertion (#338/#339/#340):** `core:telemetry/Exertion.kt` — the core loop **spends** survival needs.
+  Every ENGAGE/VENTURE/SCAVENGE + real-world TRAVEL costs hydration/energy/(hard)nourishment via `engageCost`/
+  `scavengeCost`/`travelCost` (per-mode, sub-point `ExertCarry`); the store applies it at the `exert()`
+  chokepoint with capture-decay-then-re-anchor discipline. **NEVER touches HP** (no soft-lock) or `LifeStats.effects`
+  (blank stays neutral) — only the 4 needs. So a run of action walks needs down through tiers→afflictions→alerts.
+- **Oral hygiene + harsher + rest window (#341/#342):** two new needs **BRUSHING + FLOSSING** (own decay
+  rates, `brush()`/`floss()`); harsher penalty bands + deeper cross-need coupling; **REST is now an 8h timer
+  WINDOW** (`restUntilMs`/`REST_WINDOW_MS`) — pressing REST opens a window during which energy regenerates
+  (`restingMs` in `currentLife`), so it doesn't assume you're always resting; `exert()` breaks the window
+  (you got up to act). LIFE panel FLOSS button + RESTING indicator; `SelfCareTool` verbs updated.
+- **Consumables (#343 core / #344 wiring):** `ItemKind.PROVISION` — **provisions restore needs**
+  (water_ration/trail_jerky/hearty_stew/stim_coffee/soap_bar/toothpaste/floss_pack…) and **medicine cures/
+  shortens afflictions** (antibiotics/dental_kit/painkillers/field_medicine, via `Afflictions.shorten`).
+  `SpecialGame.canUseProvision`/`useProvision` + `LifeStats.restoreNeed`; store `useProvision` re-anchors the
+  need + shortens the affliction meter; PACK **USE** button (cyan) for PROVISIONs; shops (`GameLocations.stock`)
+  stock them. **Additive** — the free LIFE-panel top-up buttons stay, so no soft-lock/balance risk.
+- **Craft food & medicine (#345):** 6 workbench recipes (`Recipes`) turn basic JUNK/AID into provisions/
+  medicine — cook (canteen/stew/jerky, no gate) + brew (antibiotics/dental-kit/painkillers, INT-gated). Pure-
+  core only: `Recipe` is output-agnostic + PROVISIONs already have a USE button + codex hook → zero Android change.
+- **Resilience perks (#346):** `Perk.exertReductionPct` + **Conditioned** (−34% exertion cost) / **Second Wind**
+  (−20% + heal-on-win 3) — the exertion loop's first counterplay/build dimension. `Exertion.scale(cost,pct)`
+  (rounded, capped 60% so never free) + `SpecialGame.exertReductionPct(c)`; applied at the store `exert()`
+  chokepoint. Perks auto-appear in the picker (`Perks.ALL`) → zero UI change.
+- **The survival loop is now:** needs decay (world-driven) → tiers/penalties → afflictions → exertion spends
+  them faster → provisions/medicine (bought OR crafted) restore/cure → resilience perks soften the drain →
+  push notifications nudge you. ⚠️ **All on-device-unverified** (store/decay/notifications/persistence, the
+  8h rest window, affliction contract/cure, exertion feel, perk reduction) — owner tunes/verifies on the Pixel.
+- **Steerable next:** peak-condition positive buff is OUT (a blank profile's needs default to 100/PEAK →
+  would break the `effects(LifeProfile())`-neutral invariant + overlaps the self-care streak reward); a
+  STASH is convenience-only (no carry cap exists). Open ideas: temporary "well-fed" food buffs (needs a timed-
+  buff subsystem), more provision/recipe/encounter content, affliction-resistance perks (touch the delicate
+  decay/tick path — thread carefully).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
