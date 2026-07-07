@@ -1669,6 +1669,39 @@ it in real life** — no button press — building on the existing `ActivitySens
   **Open:** sleep/rest → ENERGY detection deliberately NOT built ("dark+quiet+night" misfires — would falsely
   credit rest whenever you sit quietly at night); a conservative version is possible if the owner wants it.
 
+### SMART FULL-SCREEN SELF-CARE CHECK-INS (owner ask, #358–#360 all merged)
+Owner: "add check-ins where a huge pop-up from Pulse takes over the entire screen — brushing/flossing/water are
+the TOP priorities, the others deterministic by typical rhythms/cycles, and the whole point is contextual
+sequencing (you ate → brush the right time after → floss the right time after) and **ensure you do it right**."
+Shipped as three CI-green slices; each mirrors the established store/UI/worker patterns.
+- **Slice 1 — scheduler core (#358):** `core:telemetry/CareSchedule.kt` (+`CareScheduleTest`) — pure, deterministic.
+  `CareCheckin` enum (BRUSH 100 / FLOSS 95 / WATER 90 / EAT 70 / REST 55 / WASH 45 — `need`/`label`/`prompt`/
+  `basePriority`); `CareContext` (now/hour/lastConfirmed/lastMealMs/needs). `due`/`next` sort by `priority`
+  (base + escalation: +60 critical, +25 low). Rhythms: WATER 2h, EAT 5h, BRUSH 12h fallback, WASH/FLOSS daily.
+  **Contextual sequencing:** BRUSH comes due `POST_MEAL_BRUSH_MS` (30 min) after a meal (`lastMealMs` set, not
+  brushed since); FLOSS follows a brush within `FLOSS_AFTER_BRUSH_MS` (2h). Waking-window gated (WAKE 7–22) so it
+  never takes over at 3am; `MIN_ASK_GAP_MS` 90 min throttles re-asks; REST only when energy ≤ NEED_LOW.
+- **Slice 2 — takeover + store + worker + toggle (#359):** `feature/checkin/CareCheckinActivity.kt` — full-screen
+  PROMPT over the lock screen (`showWhenLocked`/`turnScreenOn`, BACK swallowed, always answerable DONE/NOT YET —
+  never a trap, distinct from the penalty *gate*). `data/game/CareCheckinStore.kt` (DataStore `pulse_carecheckin`,
+  Mutex; tracks confirmed/asked per check-in + lastMealMs; `schedule()`→`CareSchedule.next`, `markAsked`,
+  `complete`→stamp+tend-need). `start(scope, needAutoCare.sensed)` — a **sensed** care action counts as that
+  check-in done, so it won't nag you to do what the camera/mic just caught you doing. `Notifier.notifyCareCheckin`
+  (full-screen intent, REMINDERS). `RefreshWorker` raises the top due check-in each tick (gated by
+  `NotificationPrefs.smartCheckins`, default ON, + quiet hours). Settings → "Smart sequenced check-ins" toggle.
+- **Slice 3 — verification, "ensure you do it right" (#360):** answering DONE now cross-references the claim with
+  what the camera/mic sensed (reuses `ActivitySensing.verifyClaim`). Core `CareSchedule.verifyActivities`
+  (check-in→corroborating `RealActivity`; WASH ← shower OR handwash; FLOSS/REST = no sensor), `verifyClaim`
+  (forgiving: WEAK when unsensable or sensing-off → **never a false accusation**), `credits`, `VERIFY_WINDOW_MS`
+  (+5 tests, 12 total). `CareCheckinStore.completeVerified` gates teeth on **`ambientSensingAlways && ambientSensing`**
+  — the one config where sensors actually watch over the lock screen; otherwise trusts the tap. A flat NONE
+  (sensors watching, saw nothing) bounces the activity to an amber "SENSORS DIDN'T CATCH THAT — do it now, then
+  confirm" state (re-check re-verifies; NOT YET still escapes).
+- ⚠️ **All on-device-unverified** (CI compile-gates only): the full-screen takeover, the sequencing timing, the
+  worker cadence/throttles, and the verify/bounce path — owner verifies on the Pixel (the bounce only engages
+  with **always-on ambient sensing** on). **Open/steerable:** per-check-in cadence tuning; whether verification
+  should also engage while a game screen is open (samplers running); a check-in adherence surface.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
