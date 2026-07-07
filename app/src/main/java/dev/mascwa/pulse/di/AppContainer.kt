@@ -60,6 +60,8 @@ class AppContainer(private val appContext: Context) {
      */
     val imageLoader: coil.ImageLoader by lazy {
         coil.ImageLoader.Builder(appContext)
+            // Decode bundled .svg survival diagrams (crisp at any size) alongside the default raster fetchers.
+            .components { add(coil.decode.SvgDecoder.Factory()) }
             .memoryCache { coil.memory.MemoryCache.Builder(appContext).maxSizePercent(0.06).build() }
             .diskCache {
                 coil.disk.DiskCache.Builder()

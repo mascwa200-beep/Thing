@@ -11,6 +11,7 @@
         { "heading": "CPR (adult)", "body": "Unresponsive and not breathing normally: push hard and fast in the centre of the chest, ~5-6 cm deep, 100-120/min. 30 compressions then 2 breaths if trained, otherwise compressions only. Use an AED as soon as one is available and follow its voice prompts." },
         { "heading": "Choking", "body": "If they can cough, encourage it. If not: 5 back blows between the shoulder blades, then 5 abdominal thrusts (Heimlich). Alternate until clear or they go unconscious — then start CPR." },
         { "heading": "Shock", "body": "Pale, cold, clammy, rapid breathing. Lay them down, raise legs if no spinal/leg injury, keep warm, reassure, do not give food or drink." },
+        { "heading": "Recovery position", "body": "Someone unconscious but breathing goes on their SIDE, so the tongue and any vomit can't block the airway. Roll them toward you, bend the top knee, tilt the head back to open the airway, and rest the top hand under the cheek. Keep checking breathing until help arrives. (Diagram: Rama, CC BY-SA 3.0.)", "image": "recovery-position.svg" },
         { "heading": "Burns", "body": "Cool with running water for 20 minutes. Remove jewellery/loose clothing before swelling. Cover loosely with cling film or a clean non-fluffy cloth. Never apply ice, butter or creams." }
       ]
     },
@@ -33,7 +34,7 @@
       "summary": "Building and keeping a fire for warmth and signalling.",
       "sections": [
         { "heading": "Prepare", "body": "Clear a 1 m circle to bare earth, away from overhanging branches and wind. Gather three grades: tinder (dry grass, bark, lint), kindling (pencil-thin twigs), and fuel (thumb-thick and up). Gather far more than you think you need before lighting." },
-        { "heading": "Light it", "body": "Build a small teepee or lean-to of tinder and kindling. Light from the upwind side. Feed gradually from small to large. Shelter the flame from wind and ground damp with a platform of dry sticks." },
+        { "heading": "Light it", "body": "Build a small teepee or lean-to of tinder and kindling. Light from the upwind side. Feed gradually from small to large. Shelter the flame from wind and ground damp with a platform of dry sticks. (Diagram: DerpMeep, CC BY-SA 4.0.)", "image": "campfire.svg" },
         { "heading": "Keep it", "body": "Bank larger logs around the edge. To preserve coals overnight, cover with ash. Never leave a fire unattended; drown, stir, and feel for heat before leaving." }
       ]
     },
@@ -69,7 +70,7 @@
       "sections": [
         { "heading": "Use the Compass", "body": "The app's Compass works offline and shows true north using the World Magnetic Model. Note a landmark on your bearing before moving." },
         { "heading": "Sun", "body": "The sun rises in the east and sets in the west everywhere. At local noon it is due south in the Northern Hemisphere (due north in the Southern). A shadow stick: mark a shadow tip, wait 15+ min, mark again — the line between marks runs roughly west-to-east." },
-        { "heading": "Stars (Northern Hemisphere)", "body": "Find the Big Dipper; the two stars at the end of its 'cup' point to Polaris, the North Star, which sits over true north." },
+        { "heading": "Stars (Northern Hemisphere)", "body": "Find the Big Dipper; the two stars at the end of its 'cup' point to Polaris, the North Star, which sits over true north. (Diagram: AstroOgier, CC0 / public domain.)", "image": "find-north.svg" },
         { "heading": "Stars (Southern Hemisphere)", "body": "Find the Southern Cross; extend its long axis ~4.5x its length to an empty point — straight down from there is roughly south." }
       ]
     },

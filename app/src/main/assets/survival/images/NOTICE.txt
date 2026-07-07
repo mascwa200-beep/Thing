@@ -15,3 +15,14 @@ recorded here as good practice. Only freely-licensed images are bundled.
   morse-code.png — International Morse Code chart (public domain, Wikimedia Commons)
   ground-to-air.png — "Ground-Air Visual Code for use by Ground Search Parties"
       (public domain, Wikimedia Commons)
+
+The following are freely-licensed SVG diagrams (crisp at any size, rendered
+on-device via coil-svg). CC-BY-SA requires attribution — it is given both
+here and inline in the guide text; the files are unmodified.
+
+  find-north.svg — "Finding the North Star (Polaris) from the Big Dipper"
+      by AstroOgier — CC0 1.0 (public domain dedication), Wikimedia Commons
+  recovery-position.svg — first-aid recovery position
+      by Rama — CC BY-SA 3.0, Wikimedia Commons
+  campfire.svg — teepee/lean-to campfire lay
+      by DerpMeep — CC BY-SA 4.0, Wikimedia Commons

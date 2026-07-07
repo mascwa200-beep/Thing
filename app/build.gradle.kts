@@ -213,6 +213,7 @@ dependencies {
     // (faster cold start / less jank) on the non-debuggable shipped build.
     implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg) // renders bundled offline .svg survival diagrams (crisp at any size)
     implementation(libs.play.services.location)
 
     // Spotify App Remote: the "real" player — connects to the installed Spotify app and drives its
