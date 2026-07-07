@@ -42,6 +42,9 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
         // Auto-care: watch the sensed camera/mic activity → restore the matching game need when it catches you
         // tending it in real life. No-op unless ambient sensing is on; cheap (only reacts to new evidence).
         runCatching { container.needAutoCare.start(appScope) }
+        // Keep the smart check-in scheduler in sync with what the camera/mic sense — a sensed care action
+        // counts as that check-in done, so it won't then nag you to do what you just did.
+        runCatching { container.careCheckinStore.start(appScope, container.needAutoCare.sensed) }
         // Keep the HTTPS-only egress guard in sync with the security setting + log blocked cleartext.
         CleartextPolicy.onBlocked = { host ->
             runCatching { container.usageRepository.log("network", "blocked cleartext egress to $host (HTTPS-only)") }

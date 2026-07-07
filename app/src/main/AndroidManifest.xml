@@ -155,6 +155,17 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- Smart self-care check-in — a full-screen prompt (over the lock screen) for the top thing to do now
+             (brush/floss/water…), timed by rhythm + context. Answerable (DONE / NOT YET), never a lock. -->
+        <activity
+            android:name=".feature.checkin.CareCheckinActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
         <!-- The self-care lockout — pins the phone (device-owner kiosk) after a dodged check-in until the
              task is sensed done. Safe: hard auto-release, emergency dialer stays reachable, hold-to-override. -->
         <activity

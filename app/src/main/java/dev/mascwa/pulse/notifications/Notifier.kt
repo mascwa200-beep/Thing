@@ -124,6 +124,36 @@ class Notifier(private val context: Context) {
         safeNotify(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, notification)
     }
 
+    /**
+     * A smart self-care check-in: a full-screen takeover (over the lock screen) prompting the one thing that
+     * needs doing most now (brush / floss / water / …). Fires a full-screen intent to [CareCheckinActivity] on
+     * the high-importance REMINDERS channel; the activity clears it on answer. Answerable (DONE / NOT YET).
+     */
+    fun notifyCareCheckin(checkin: dev.mascwa.pulse.core.telemetry.CareCheckin) {
+        if (!canPost()) return
+        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.EXTRA_CHECKIN, checkin.name)
+        }
+        val pi = PendingIntent.getActivity(
+            context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
+            .setSubText("// CHECK-IN")
+            .setContentTitle(checkin.label)
+            .setContentText(checkin.prompt)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setFullScreenIntent(pi, true)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        safeNotify(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, notification)
+    }
+
     /** Quiet confirmation that the camera/mic caught you tending a need in real life and the game credited it
      *  automatically — one fixed id per need so it replaces, on the low-priority DIGEST channel. */
     fun notifySensedCare(need: dev.mascwa.pulse.core.telemetry.NeedKind) =

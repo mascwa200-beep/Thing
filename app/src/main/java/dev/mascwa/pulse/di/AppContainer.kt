@@ -111,6 +111,12 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.game.QuestStore(appContext, json)
     }
 
+    /** The smart self-care check-in scheduler's state (last done/asked per check-in + last meal) — picks the
+     *  next full-screen check-in via CareSchedule; synced from the auto-care sensed stream. */
+    val careCheckinStore: dev.mascwa.pulse.data.game.CareCheckinStore by lazy {
+        dev.mascwa.pulse.data.game.CareCheckinStore(appContext, json, specialGameStore)
+    }
+
     /** Turns neglected survival needs into reversible Device-Owner phone locks (opt-in "neglect bites the
      *  phone"). Reconciled on app foreground + from RefreshWorker; releases everything when the toggle is off. */
     val phonePenaltyController: dev.mascwa.pulse.security.PhonePenaltyController by lazy {
