@@ -72,4 +72,58 @@ class CareScheduleTest {
         val allFresh = CareCheckin.entries.associateWith { T - 1 * MIN }
         assertEquals(null, CareSchedule.next(ctx(last = allFresh)))
     }
+
+    // ── verification (ensure you actually did it) ──
+
+    private fun ev(a: RealActivity, conf: Float, at: Long = T - 2 * MIN) = ActivityEvidence(a, conf, at)
+
+    @Test fun claimIsConfirmedWhenSensorsSawIt() {
+        val evidence = listOf(ev(RealActivity.TOOTHBRUSH, 0.9f))
+        assertEquals(
+            ClaimVerdict.CONFIRMED,
+            CareSchedule.verifyClaim(CareCheckin.BRUSH, evidence, T - CareSchedule.VERIFY_WINDOW_MS, sensingActive = true),
+        )
+        assertTrue(CareSchedule.credits(ClaimVerdict.CONFIRMED))
+    }
+
+    @Test fun claimIsBouncedWhenActiveSensorsSawNothing() {
+        // Sensing is on, the window has no brushing evidence → a caught claim (NONE), which does not credit.
+        val evidence = listOf(ev(RealActivity.EATING, 0.9f))
+        val verdict = CareSchedule.verifyClaim(
+            CareCheckin.BRUSH, evidence, T - CareSchedule.VERIFY_WINDOW_MS, sensingActive = true,
+        )
+        assertEquals(ClaimVerdict.NONE, verdict)
+        assertFalse(CareSchedule.credits(verdict))
+    }
+
+    @Test fun claimIsTrustedWhenSensingIsOff() {
+        // Camera/mic weren't watching → never a false accusation; provisional trust (WEAK, credits).
+        val verdict = CareSchedule.verifyClaim(
+            CareCheckin.BRUSH, emptyList(), T - CareSchedule.VERIFY_WINDOW_MS, sensingActive = false,
+        )
+        assertEquals(ClaimVerdict.WEAK, verdict)
+        assertTrue(CareSchedule.credits(verdict))
+    }
+
+    @Test fun unsensableCheckinsAreAlwaysTrusted() {
+        // Flossing/resting have no reliable sensor → trusted even with sensing on and no evidence.
+        assertTrue(CareSchedule.verifyActivities(CareCheckin.FLOSS).isEmpty())
+        val verdict = CareSchedule.verifyClaim(
+            CareCheckin.FLOSS, emptyList(), T - CareSchedule.VERIFY_WINDOW_MS, sensingActive = true,
+        )
+        assertEquals(ClaimVerdict.WEAK, verdict)
+        assertTrue(CareSchedule.credits(verdict))
+    }
+
+    @Test fun washIsCorroboratedByEitherShowerOrHandwash() {
+        val since = T - CareSchedule.VERIFY_WINDOW_MS
+        assertEquals(
+            ClaimVerdict.CONFIRMED,
+            CareSchedule.verifyClaim(CareCheckin.WASH, listOf(ev(RealActivity.HANDWASH, 0.8f)), since, true),
+        )
+        assertEquals(
+            ClaimVerdict.CONFIRMED,
+            CareSchedule.verifyClaim(CareCheckin.WASH, listOf(ev(RealActivity.SHOWER, 0.8f)), since, true),
+        )
+    }
 }
