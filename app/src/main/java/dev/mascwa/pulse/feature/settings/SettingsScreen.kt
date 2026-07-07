@@ -345,6 +345,58 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                             onClick = { penaltyScope.launch { runCatching { container.phonePenaltyController.releaseAll() } } },
                         )
                     }
+
+                    // User-armed COMMITMENT LOCK — lock yourself out of the phone until you actually do a
+                    // real-world self-care action (sensor-confirmed). A deliberate self-request: it fires
+                    // regardless of any need level and genuinely locks the screen. Always escapable — emergency
+                    // calls work, your override code or a 5s hold frees it, and it auto-releases at the backstop.
+                    Text(
+                        "Commitment lock — lock yourself out until you do it",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 2.dp),
+                    )
+                    Text(
+                        "Tap one to lock the phone NOW until the camera/mic sense you've actually done it. It fires " +
+                            "even if the need isn't low. Emergency calls always work; it auto-releases after the " +
+                            "backstop, and your override code or a 5-second hold frees it any time. Detecting " +
+                            "completion needs always-on ambient sensing (Security & network) enabled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
+                    val armCommitmentLock: (String) -> Unit = { activityName ->
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(
+                                    context, dev.mascwa.pulse.feature.checkin.LockoutActivity::class.java,
+                                ).apply {
+                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_ACTIVITY, activityName)
+                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_USER_ARMED, true)
+                                    putExtra(
+                                        dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_BACKSTOP_MIN,
+                                        s.commitmentLockBackstopMin,
+                                    )
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                },
+                            )
+                        }
+                    }
+                    if (isOwner) {
+                        PrefClickable("🚿  Lock until I shower") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.SHOWER.name) }
+                        PrefClickable("🪥  Lock until I brush my teeth") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.TOOTHBRUSH.name) }
+                        PrefClickable("🍽  Lock until I eat") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.EATING.name) }
+                        PrefClickable("💧  Lock until I drink water") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.DRINKING.name) }
+                        SingleChoiceRow(
+                            "Auto-release backstop",
+                            s.commitmentLockBackstopMin,
+                            listOf(15 to "15 min", 30 to "30 min", 60 to "1 hour", 120 to "2 hours", 240 to "4 hours"),
+                        ) { m -> vm.update { it.copy(commitmentLockBackstopMin = m) } }
+                        EditableValueRow(
+                            "Override code (frees any lock)",
+                            value = if (s.lockOverrideCode.isBlank()) "Not set" else "••••",
+                            onSet = { code -> vm.update { it.copy(lockOverrideCode = code.filter(Char::isDigit).take(12)) } },
+                        )
+                    }
                 }
                 pendingWipe?.let { n ->
                     AlertDialog(

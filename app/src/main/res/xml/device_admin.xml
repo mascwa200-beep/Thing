@@ -12,5 +12,7 @@
         <!-- "Wipe after N failed unlocks" anti-theft control (setMaximumFailedPasswordsForWipe). -->
         <watch-login />
         <wipe-data />
+        <!-- Lock the screen on demand (lockNow) — used by the user-armed commitment lock. -->
+        <force-lock />
     </uses-policies>
 </device-admin>

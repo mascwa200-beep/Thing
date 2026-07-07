@@ -474,6 +474,12 @@ data class AppSettings(
     /** When the kiosk lock-screen gate last fired (throttle) — so a just-completed gate can't immediately
      *  re-pop (gives ENERGY's rest window time to recover). Managed by PhonePenaltyController. */
     val lastPenaltyGateMs: Long = 0,
+    /** A personal override code to force-release ANY lock (commitment lock / penalty gate). Empty = no code set
+     *  (the deliberate 5-second hold + the guaranteed auto-release backstop are always available regardless). */
+    val lockOverrideCode: String = "",
+    /** The user-armed commitment lock's auto-release backstop, in minutes (the no-brick net — the lock NEVER
+     *  holds longer than this even if the sensors never confirm). Clamped to a safe range at the call site. */
+    val commitmentLockBackstopMin: Int = 30,
 )
 
 /**
