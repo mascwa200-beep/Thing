@@ -48,13 +48,13 @@ object ActivitySensing {
     private const val MEAL_HOUR_BONUS = 0.1f
 
     // Keyword vocab (lowercased substring match against YAMNet sound / image-classifier scene labels).
-    private val WATER = listOf("water", "shower", "bathtub", "faucet", "tap", "sink")
+    private val WATER = listOf("water", "shower", "bathtub", "faucet", "tap", "sink", "basin", "spray", "trickle", "splash", "running water")
     private val TOILET_SND = listOf("toilet", "flush")
-    private val TOOTH = listOf("toothbrush", "tooth")
-    private val EAT = listOf("chewing", "eating", "cutlery", "crockery", "dishes", "chopping", "mastication")
-    private val DRINK = listOf("gulp", "gurgling", "pour", "sip", "slurp")
-    private val BATHROOM_SCENE = listOf("bathroom", "toilet", "shower", "washbasin", "washroom", "tub")
-    private val KITCHEN_SCENE = listOf("kitchen", "restaurant", "dining", "plate", "meal", "food", "grocery")
+    private val TOOTH = listOf("toothbrush", "tooth", "electric toothbrush", "brushing")
+    private val EAT = listOf("chewing", "eating", "cutlery", "crockery", "dishes", "chopping", "mastication", "biting", "crunch", "munch")
+    private val DRINK = listOf("gulp", "gurgling", "pour", "sip", "slurp", "swallow", "drink")
+    private val BATHROOM_SCENE = listOf("bathroom", "toilet", "shower", "washbasin", "washroom", "tub", "sink", "basin")
+    private val KITCHEN_SCENE = listOf("kitchen", "restaurant", "dining", "plate", "meal", "food", "grocery", "cup", "mug", "bottle", "cooking")
 
     /**
      * Distil a window of sound + scene labels (with how long water ran + context) into activity evidence.
