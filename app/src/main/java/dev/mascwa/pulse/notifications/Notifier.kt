@@ -124,6 +124,16 @@ class Notifier(private val context: Context) {
         safeNotify(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, notification)
     }
 
+    /** Quiet confirmation that the camera/mic caught you tending a need in real life and the game credited it
+     *  automatically — one fixed id per need so it replaces, on the low-priority DIGEST channel. */
+    fun notifySensedCare(need: dev.mascwa.pulse.core.telemetry.NeedKind) =
+        post(
+            NotificationChannels.DIGEST, 7790 + need.ordinal, "SENSED",
+            "👁 Caught you taking care of yourself",
+            "The camera/mic sensed it — ${need.label} restored.",
+            "tacnet", NotificationCompat.PRIORITY_LOW,
+        )
+
     /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
      *  new tip silently replaces the last); opens the Survival guides. */
     fun notifyTip(id: Int, title: String, body: String) =
