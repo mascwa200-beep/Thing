@@ -454,6 +454,19 @@ data class AppSettings(
     /** What the user wants J.A.R.V.I.S. to brief them on in the home status feed (free text, e.g. a
      *  project, a topic, "device health"). Drives the feed's MONITORING line. Never chat content. */
     val jarvisFeedTopic: String = "",
+    /** PHONE PENALTIES (the life-sim needs revoke real device capabilities when neglected). Master switch,
+     *  default OFF — it uses Device-Owner powers to lock phone features until you tend the need. Every lock is
+     *  reversible; turning this OFF releases everything. Needs Device Owner to have any effect. */
+    val phonePenalties: Boolean = false,
+    /** The harsher "kiosk" tier: while ANY need is critical, pin Pulse to the foreground so you must tend it
+     *  (emergency dialer stays reachable; guaranteed auto-release net). On by default WITHIN the opt-in feature. */
+    val phonePenaltyKiosk: Boolean = true,
+    /** Packages the "distraction apps" lock (hydration penalty) suspends. Empty = that one lock is a no-op
+     *  until you pick apps. Pulse / the dialer / the launcher are always filtered out defensively. */
+    val phonePenaltyDistractionApps: List<String> = emptyList(),
+    /** Persisted set of currently-penalised needs (NeedKind names) — the hysteresis state, so a penalty
+     *  survives a restart and releases only when the need recovers. Managed by PhonePenaltyController. */
+    val phonePenalisedNeeds: List<String> = emptyList(),
 )
 
 /**

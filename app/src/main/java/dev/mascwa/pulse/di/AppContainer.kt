@@ -111,6 +111,14 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.game.QuestStore(appContext, json)
     }
 
+    /** Turns neglected survival needs into reversible Device-Owner phone locks (opt-in "neglect bites the
+     *  phone"). Reconciled on app foreground + from RefreshWorker; releases everything when the toggle is off. */
+    val phonePenaltyController: dev.mascwa.pulse.security.PhonePenaltyController by lazy {
+        dev.mascwa.pulse.security.PhonePenaltyController(
+            appContext, settingsRepository, dev.mascwa.pulse.security.DevicePolicyController(appContext),
+        )
+    }
+
     /** On-device ambient hearing (MediaPipe YAMNet) → the life-sim's perceived SceneContext. */
     val ambientPerceptionSampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler by lazy {
         dev.mascwa.pulse.data.perception.AmbientPerceptionSampler(appContext, http)
