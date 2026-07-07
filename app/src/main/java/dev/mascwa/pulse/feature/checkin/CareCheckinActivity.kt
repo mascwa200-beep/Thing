@@ -1,0 +1,117 @@
+package dev.mascwa.pulse.feature.checkin
+
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.lifecycleScope
+import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.CareCheckin
+import kotlinx.coroutines.launch
+
+/**
+ * A smart self-care CHECK-IN as a full-screen takeover (over the lock screen). Unlike the penalty gate this is
+ * a PROMPT, not a lock: it asks the one thing that needs doing most right now (brush / floss / water / …, from
+ * [dev.mascwa.pulse.core.telemetry.CareSchedule]) and you answer **DONE** (tends the need + records it, so the
+ * follow-up in the sequence can come due — you ate → brush → floss) or **NOT YET** (a nudge; it'll ask again
+ * after the gap). Always answerable — never a trap.
+ */
+class CareCheckinActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { /* swallow — answer DONE or NOT YET */ }
+        })
+
+        val checkin = runCatching { CareCheckin.valueOf(intent.getStringExtra(EXTRA_CHECKIN) ?: "") }.getOrNull()
+        if (checkin == null) { finish(); return }
+        val store = (application as PulseApplication).container.careCheckinStore
+
+        setContent {
+            CareCheckinScreen(
+                checkin = checkin,
+                onDone = {
+                    lifecycleScope.launch {
+                        runCatching { store.complete(checkin) }
+                        runCatching { NotificationManagerCompat.from(this@CareCheckinActivity).cancel(NOTIF_ID) }
+                        finish()
+                    }
+                },
+                onNotYet = {
+                    lifecycleScope.launch {
+                        runCatching { store.markAsked(checkin) }
+                        runCatching { NotificationManagerCompat.from(this@CareCheckinActivity).cancel(NOTIF_ID) }
+                        finish()
+                    }
+                },
+            )
+        }
+    }
+
+    companion object {
+        const val EXTRA_CHECKIN = "care_checkin"
+        /** Fixed id so a new check-in replaces the last and the activity can clear it on answer. */
+        const val NOTIF_ID = 91_850
+    }
+}
+
+@Composable
+private fun CareCheckinScreen(checkin: CareCheckin, onDone: () -> Unit, onNotYet: () -> Unit) {
+    val cyan = Color(0xFF5AD1FF)
+    val dim = Color(0xFF7C8A93)
+
+    Box(Modifier.fillMaxSize().background(Color(0xFF04070A)).padding(28.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(22.dp)) {
+            Text("SELF-CARE CHECK-IN", color = cyan, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 2.sp)
+            Text(
+                checkin.label.uppercase(),
+                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 30.sp, textAlign = TextAlign.Center,
+            )
+            Text(checkin.prompt, color = dim, fontSize = 15.sp, textAlign = TextAlign.Center)
+
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(cyan.copy(alpha = 0.16f))
+                    .border(1.dp, cyan.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                    .clickable(onClick = onDone).padding(vertical = 18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("✓ DONE", color = cyan, fontWeight = FontWeight.Bold, fontSize = 18.sp, letterSpacing = 1.sp)
+            }
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, dim.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                    .clickable(onClick = onNotYet).padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("not yet", color = dim, fontSize = 14.sp)
+            }
+        }
+    }
+}

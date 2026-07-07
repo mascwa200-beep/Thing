@@ -642,6 +642,14 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
                     )
                     PrefSwitch(
+                        "Smart sequenced check-ins",
+                        "Full-screen prompts for whatever needs doing most (brush / floss / water are top " +
+                            "priority), timed by real-world rhythm + context — you ate, so brush your teeth, then " +
+                            "floss, at the right time. Answerable (DONE / NOT YET); respects quiet hours. On by default.",
+                        checked = s.notifications.smartCheckins, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(smartCheckins = v)) } },
+                    )
+                    PrefSwitch(
                         "Lock phone until done (device-owner)",
                         "If you dodge a full-screen check-in (\"not yet\", or a claim the sensors catch as false), " +
                             "pin the phone until they sense you did the task. Safe: auto-unlocks after 10 min no " +

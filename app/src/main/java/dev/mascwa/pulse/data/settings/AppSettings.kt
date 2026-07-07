@@ -263,6 +263,11 @@ data class NotificationPrefs(
     /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
      *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
     val aggressiveCheckin: Boolean = false,
+    /** SMART sequenced check-ins: the CareSchedule scheduler raises a full-screen prompt for whatever needs
+     *  attention most (brush/floss/water top priority), timed by real-world rhythm + context (you ate → brush
+     *  → floss). Full-screen over the lock screen but answerable (DONE / NOT YET); respects quiet hours + the
+     *  waking window. Default ON — this is the self-care nudge system. */
+    val smartCheckins: Boolean = true,
     /** LOCKOUT: after you dodge a check-in ("not yet" / caught lie), pin the phone (device-owner kiosk) until
      *  the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no matter what,
      *  the emergency dialer stays reachable, and a 5-second hold overrides it. */

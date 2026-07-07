@@ -61,6 +61,19 @@ class RefreshWorker(
             }
         }
 
+        // --- SMART self-care check-ins (CareSchedule): the top-priority thing that needs attention now, timed
+        // by rhythm + context (you ate → brush → floss). Raised as a full-screen takeover; respects the quiet-
+        // hours early-return above + CareSchedule's own waking window. Answered → tends the need + records it. ---
+        if (prefs.smartCheckins) {
+            runCatching {
+                val due = container.careCheckinStore.schedule()
+                if (due != null) {
+                    notifier.notifyCareCheckin(due)
+                    container.careCheckinStore.markAsked(due)
+                }
+            }
+        }
+
         // --- App update available? (in-app updater; dedup by build number) ---
         if (prefs.updateChecks) {
             runCatching {
