@@ -51,11 +51,11 @@ object GameLocations {
 
     /** The item ids a [kind] sells (buy at [Item.value] via [SpecialGame.buyItem]). All resolve in [Items]. */
     fun stock(kind: LocationKind): List<String> = when (kind) {
-        LocationKind.TRADER -> listOf("clean_water", "ration_pack", "bandage", "trauma_patch", "scrap_metal", "wire_spool", "fusion_cell", "gold_trinket")
-        LocationKind.MEDIC -> listOf("bandage", "trauma_patch", "medkit", "auto_injector", "surgeon_kit", "grit_ration")
+        LocationKind.TRADER -> listOf("clean_water", "ration_pack", "water_ration", "trail_jerky", "soap_bar", "toothpaste", "floss_pack", "bandage", "trauma_patch", "scrap_metal", "wire_spool", "fusion_cell", "gold_trinket")
+        LocationKind.MEDIC -> listOf("bandage", "trauma_patch", "medkit", "auto_injector", "surgeon_kit", "grit_ration", "antibiotics", "dental_kit", "painkillers", "field_medicine")
         LocationKind.FIXER -> listOf("grip_gloves", "optics_visor", "leather_rig", "runner_boots", "data_slate", "comms_badge", "lucky_charm", "power_gauntlet", "recon_optics", "combat_webbing", "negotiator_suit", "neural_implant", "sprint_servos", "fortune_idol")
-        LocationKind.BARKEEP -> listOf("brute_serum", "focus_tabs", "adrenaline", "silver_tongue", "rabbit_foot", "titan_serum", "quicksilver", "fortune_vial")
-        LocationKind.OUTPOST -> listOf("clean_water", "ration_pack", "medkit", "scrap_metal", "circuit_board")
+        LocationKind.BARKEEP -> listOf("brute_serum", "focus_tabs", "adrenaline", "silver_tongue", "rabbit_foot", "titan_serum", "quicksilver", "fortune_vial", "stim_coffee", "hearty_stew")
+        LocationKind.OUTPOST -> listOf("clean_water", "ration_pack", "water_ration", "trail_jerky", "medkit", "scrap_metal", "circuit_board")
     }
 
     private val TRADER_NAMES = listOf("Mick", "Dara", "Old Pete", "Sal", "Junko")

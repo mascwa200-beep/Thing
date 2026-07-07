@@ -393,6 +393,7 @@ class TelemetryViewModel(
     fun choosePerk(perkId: String) = game.choosePerk(perkId)
     /** Use an AID item from the pack to heal. */
     fun useItem(itemId: String) = game.useItem(itemId)
+    fun useProvision(itemId: String) = game.useProvision(itemId)
     /** Sell one of an item for caps. */
     fun sellItem(itemId: String) = game.sellItem(itemId)
     /** Craft a recipe at the workbench. */

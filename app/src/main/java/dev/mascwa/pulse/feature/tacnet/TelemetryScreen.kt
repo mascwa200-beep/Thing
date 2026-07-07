@@ -573,7 +573,7 @@ fun ItemsGameBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         LoadoutPanel(character, c)
         Spacer(Modifier.height(8.dp))
         PipHeader("Inventory")
-        InventoryPanel(character, c, onUseItem = { vm.useItem(it) }, onSellItem = { vm.sellItem(it) })
+        InventoryPanel(character, c, onUseItem = { vm.useItem(it) }, onUseProvision = { vm.useProvision(it) }, onSellItem = { vm.sellItem(it) })
         Spacer(Modifier.height(8.dp))
         PipHeader("Workbench")
         WorkbenchPanel(character, c) { vm.craft(it) }
@@ -1418,9 +1418,9 @@ private fun CodexPanel(discovered: Set<String>, c: NightwirePalette) {
     }
 }
 
-/** The player's pack: AID to heal, GEAR/CHEM held, junk to sell. USE (aid) + SELL per row. */
+/** The player's pack: AID to heal, PROVISIONs to tend needs/cure, GEAR/CHEM held, junk to sell. */
 @Composable
-private fun InventoryPanel(ch: Character, c: NightwirePalette, onUseItem: (String) -> Unit, onSellItem: (String) -> Unit) {
+private fun InventoryPanel(ch: Character, c: NightwirePalette, onUseItem: (String) -> Unit, onUseProvision: (String) -> Unit, onSellItem: (String) -> Unit) {
     PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("PACK", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
@@ -1433,14 +1433,14 @@ private fun InventoryPanel(ch: Character, c: NightwirePalette, onUseItem: (Strin
                 Text("Empty. Venture out and loot the wasteland.",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
             } else {
-                items.forEach { (item, qty) -> InventoryRow(item, qty, c, onUseItem, onSellItem) }
+                items.forEach { (item, qty) -> InventoryRow(item, qty, c, onUseItem, onUseProvision, onSellItem) }
             }
         }
     }
 }
 
 @Composable
-private fun InventoryRow(item: Item, qty: Int, c: NightwirePalette, onUseItem: (String) -> Unit, onSellItem: (String) -> Unit) {
+private fun InventoryRow(item: Item, qty: Int, c: NightwirePalette, onUseItem: (String) -> Unit, onUseProvision: (String) -> Unit, onSellItem: (String) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
             .border(1.dp, c.line, RoundedCornerShape(4.dp)).background(c.amber.copy(alpha = 0.05f))
@@ -1460,6 +1460,9 @@ private fun InventoryRow(item: Item, qty: Int, c: NightwirePalette, onUseItem: (
         }
         if (item.kind == ItemKind.AID) {
             InvAction("USE", c.positive) { onUseItem(item.id) }
+            Spacer(Modifier.width(8.dp))
+        } else if (item.kind == ItemKind.PROVISION) {
+            InvAction("USE", c.sky) { onUseProvision(item.id) }
             Spacer(Modifier.width(8.dp))
         }
         InvAction("SELL ${(item.value / 2).coerceAtLeast(1)}", c.amber) { onSellItem(item.id) }
