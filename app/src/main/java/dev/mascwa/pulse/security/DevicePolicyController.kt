@@ -50,6 +50,20 @@ class DevicePolicyController(context: Context) {
         true
     }.getOrDefault(false)
 
+    // --- Lock the screen on demand (force-lock) ---------------------------------------------------
+
+    /**
+     * Immediately lock the screen (as if the power button were pressed). Requires the `<force-lock/>` policy
+     * declared in device_admin.xml; DO-only + defensive → false. Used by the user-armed commitment lock to
+     * make the phone genuinely lock (the full-screen gate then shows over the lock screen). Never wipes or
+     * changes credentials — it only locks, so it can't strand the device.
+     */
+    fun lockNow(): Boolean = runCatching {
+        if (!isDeviceOwner() || dpm == null) return false
+        dpm.lockNow()
+        true
+    }.getOrDefault(false)
+
     // --- Lock task (kiosk) allow-list — for the self-care lockout ---------------------------------
 
     /**

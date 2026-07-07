@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +27,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,23 +82,40 @@ class LockoutActivity : ComponentActivity() {
         val h = HabitCheckin.DEFAULTS.firstOrNull { it.activity.name == intent.getStringExtra(EXTRA_ACTIVITY) }
         if (h == null) { finish(); return }
         habit = h
+        // A USER-ARMED commitment lock ("lock me out until I brush") is a deliberate self-request — it fires
+        // regardless of any need level, genuinely locks the screen, and uses the owner's chosen backstop.
+        val userArmed = intent.getBooleanExtra(EXTRA_USER_ARMED, false)
+        // The no-brick auto-release net — the lock can NEVER hold longer than this, whatever happens. A
+        // commitment lock uses the owner's chosen minutes (clamped to a safe range); the penalty path is fixed.
+        val backstopMs = if (userArmed) {
+            intent.getIntExtra(EXTRA_BACKSTOP_MIN, 30).coerceIn(MIN_BACKSTOP_MIN, MAX_BACKSTOP_MIN) * 60_000L
+        } else {
+            MAX_LOCK_MS
+        }
 
         // Enter device-owner lock task (kiosk pin) — best-effort; keep the DIALER on the allow-list so the
-        // emergency button can always launch it. No-op (degrades to a plain full-screen nag) if not DO.
+        // emergency button can always launch it. No-op (degrades to a plain full-screen nag) if not DO. For a
+        // user-armed lock, also genuinely lock the screen (this gate then shows over the lock screen).
         runCatching {
             val dpc = DevicePolicyController(this)
             if (dpc.isDeviceOwner()) {
                 val dialer = runCatching { getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()
                 dpc.setLockTaskPackages(listOfNotNull(packageName, dialer))
                 startLockTask()
+                if (userArmed) dpc.lockNow()
             }
         }
 
-        val deadline = SystemClock.elapsedRealtime() + MAX_LOCK_MS
+        val deadline = SystemClock.elapsedRealtime() + backstopMs
         setContent {
             LockoutScreen(
                 habit = habit,
+                userArmed = userArmed,
                 deadlineElapsed = deadline,
+                overrideCodeProvider = {
+                    runCatching { (application as PulseApplication).container.settingsRepository.current().lockOverrideCode }
+                        .getOrDefault("")
+                },
                 onEmergency = { runCatching { startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
                 onOverride = { release(sensedDone = false) },
             )
@@ -131,15 +154,29 @@ class LockoutActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ACTIVITY = "lockout_activity"
-        /** The hard auto-release net — the lockout NEVER holds longer than this, whatever happens. */
+        /** true = a user-armed commitment lock (fires regardless of need level; locks the screen). */
+        const val EXTRA_USER_ARMED = "lockout_user_armed"
+        /** The commitment lock's auto-release backstop in minutes (clamped to [MIN_BACKSTOP_MIN]..[MAX_BACKSTOP_MIN]). */
+        const val EXTRA_BACKSTOP_MIN = "lockout_backstop_min"
+        /** The penalty-path hard auto-release net — the lockout NEVER holds longer than this, whatever happens. */
         private const val MAX_LOCK_MS = 10 * 60_000L
+        private const val MIN_BACKSTOP_MIN = 5
+        /** A hard ceiling on the commitment lock — it can never hold longer than this (no-brick guarantee). */
+        private const val MAX_BACKSTOP_MIN = 240
         /** How long the override must be held — deliberate friction so it isn't a one-tap bail-out. */
         const val OVERRIDE_HOLD_MS = 5_000L
     }
 }
 
 @Composable
-private fun LockoutScreen(habit: Habit, deadlineElapsed: Long, onEmergency: () -> Unit, onOverride: () -> Unit) {
+private fun LockoutScreen(
+    habit: Habit,
+    userArmed: Boolean,
+    deadlineElapsed: Long,
+    overrideCodeProvider: suspend () -> String,
+    onEmergency: () -> Unit,
+    onOverride: () -> Unit,
+) {
     val red = Color(0xFFFF5A6E)
     val amber = Color(0xFFE0B341)
     val dim = Color(0xFF7C8A93)
@@ -154,11 +191,20 @@ private fun LockoutScreen(habit: Habit, deadlineElapsed: Long, onEmergency: () -
     val mm = remainingMs / 60_000
     val ss = (remainingMs % 60_000) / 1_000
 
+    // The owner's personal override code (loaded once); the code field only shows when a code is set.
+    var overrideCode by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { overrideCode = overrideCodeProvider() }
+    var entry by remember { mutableStateOf("") }
+
     Box(Modifier.fillMaxSize().background(Color(0xFF04070A)).padding(28.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text("🔒  PHONE LOCKED", color = red, fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 2.sp)
             Text(
-                "Go ${habit.label.lowercase()}. Your phone unlocks the moment I sense you've done it.",
+                if (userArmed) "🔒  COMMITMENT LOCK" else "🔒  PHONE LOCKED",
+                color = red, fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 2.sp,
+            )
+            Text(
+                if (userArmed) "You locked yourself out until you ${habit.label.lowercase()}. It unlocks the moment I sense you've done it."
+                else "Go ${habit.label.lowercase()}. Your phone unlocks the moment I sense you've done it.",
                 color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp, textAlign = TextAlign.Center,
             )
             Text("Auto-unlocks in %d:%02d".format(mm, ss), color = dim, fontSize = 13.sp)
@@ -169,6 +215,36 @@ private fun LockoutScreen(habit: Habit, deadlineElapsed: Long, onEmergency: () -
                 contentAlignment = Alignment.Center,
             ) {
                 Text("EMERGENCY CALL", color = amber, fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.sp)
+            }
+
+            // Code override: enter the personal override code to force-release immediately. Only shown when set.
+            if (overrideCode.isNotBlank()) {
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, dim.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicTextField(
+                        value = entry,
+                        onValueChange = {
+                            entry = it.filter(Char::isDigit).take(12)
+                            if (entry == overrideCode) onOverride()
+                        },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center),
+                        cursorBrush = SolidColor(amber),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.Center) {
+                                if (entry.isEmpty()) {
+                                    Text("enter override code", color = dim, fontSize = 14.sp)
+                                }
+                                inner()
+                            }
+                        },
+                    )
+                }
             }
 
             // Deliberate friction: hold 5s to give up (for a broken detection) — not a one-tap escape.
