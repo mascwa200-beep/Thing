@@ -29,6 +29,7 @@ import dev.mascwa.pulse.core.telemetry.TodayMetrics
 import dev.mascwa.pulse.core.telemetry.GameMetrics
 import dev.mascwa.pulse.core.telemetry.ItemCodex
 import dev.mascwa.pulse.core.telemetry.LifeProfile
+import dev.mascwa.pulse.core.telemetry.Items
 import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.LootTable
 import dev.mascwa.pulse.core.telemetry.Recipes
@@ -700,6 +701,34 @@ class SpecialGameStore(
         scope.launch {
             ensureLoaded()
             _character.value = SpecialGame.useAid(_character.value, itemId)
+            runAchievementCheck()
+            scheduleFlush()
+        }
+    }
+
+    /**
+     * Consume a PROVISION: removes one from the pack + applies its HP heal (via [SpecialGame.useProvision]),
+     * then applies its need top-up (re-anchoring the needs clock, like any restore) and shortens/cures its
+     * targeted afflictions (after ticking the meter to now). No-op if it isn't a held provision.
+     */
+    fun useProvision(itemId: String) {
+        scope.launch {
+            ensureLoaded()
+            val item = Items.byId(itemId) ?: return@launch
+            if (!SpecialGame.canUseProvision(_character.value, itemId)) return@launch
+            _character.value = SpecialGame.useProvision(_character.value, itemId)
+            item.restoreNeed?.let { need ->
+                if (item.restoreAmt > 0) {
+                    lifeBase = LifeStats.restoreNeed(currentLife(), need, item.restoreAmt)
+                    needsAnchorMs = System.currentTimeMillis()
+                    _life.value = lifeBase
+                }
+            }
+            if (item.cureMs > 0L) {
+                tickAfflictions() // bring the sickness meter to now, then knock the medicine off it
+                val next = Afflictions.shorten(afflictions, item.cureMs, item.cureNeed)
+                if (next != afflictions) { afflictions = next; _afflictions.value = next }
+            }
             runAchievementCheck()
             scheduleFlush()
         }
