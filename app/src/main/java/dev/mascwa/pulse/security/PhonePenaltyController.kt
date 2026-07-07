@@ -85,21 +85,38 @@ class PhonePenaltyController(
                 PhoneLock.LOCK_QUICK_SETTINGS -> devicePolicy.setStatusBarDisabled(on)
                 PhoneLock.LOCK_VOLUME -> devicePolicy.setUserRestriction(UserManager.DISALLOW_ADJUST_VOLUME, on)
                 PhoneLock.BLOCK_SCREENSHOTS -> devicePolicy.setScreenCaptureDisabled(on)
-                PhoneLock.PAUSE_DISTRACTIONS -> devicePolicy.setPackagesSuspended(safeApps(apps), on)
+                // Lock the apps for real: if the owner picked specific apps, lock those; otherwise lock EVERY
+                // non-essential app (the default — all launchable apps minus the safe-list). Symmetric on
+                // release (unsuspending a non-suspended app is a harmless no-op).
+                PhoneLock.PAUSE_DISTRACTIONS ->
+                    devicePolicy.setPackagesSuspended(safeApps(apps.ifEmpty { allLockableApps() }), on)
             }
         }
     }
 
+    /** Every launchable app on the device — the candidate set for the broad "lock all apps" default. */
+    private fun allLockableApps(): List<String> = runCatching {
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        appContext.packageManager.queryIntentActivities(launcher, 0).map { it.activityInfo.packageName }.distinct()
+    }.getOrDefault(emptyList())
+
     private fun decode(names: List<String>): Set<NeedKind> =
         names.mapNotNullTo(mutableSetOf()) { runCatching { NeedKind.valueOf(it) }.getOrNull() }
 
-    /** Never suspend Pulse, the launcher, the dialer or Settings — suspending any could strand the owner. */
+    /** Never suspend the essentials — suspending any of these could strand the owner or block emergencies:
+     *  Pulse itself, the launcher (or you can't navigate), the dialer (emergencies), Settings, and the active
+     *  keyboard (or you can't type to get out). Everything else is fair game. */
     private fun safeApps(apps: List<String>): List<String> {
         val protectedPkgs = buildSet {
             add(appContext.packageName)
             runCatching { appContext.getSystemService(TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()?.let { add(it) }
             launcherPackage()?.let { add(it) }
             add("com.android.settings")
+            // The active input method — suspending the keyboard would trap you unable to type.
+            runCatching {
+                android.provider.Settings.Secure.getString(appContext.contentResolver, android.provider.Settings.Secure.DEFAULT_INPUT_METHOD)
+                    ?.substringBefore('/')
+            }.getOrNull()?.takeIf { it.isNotBlank() }?.let { add(it) }
         }
         return apps.filter { it.isNotBlank() && it !in protectedPkgs }
     }

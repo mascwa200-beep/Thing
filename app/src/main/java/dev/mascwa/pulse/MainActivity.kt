@@ -248,7 +248,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching {
                 val life = app.container.specialGameStore.lifeSnapshot()
-                app.container.phonePenaltyController.reconcile(life)
+                // fireGate=true so opening the app with a critical need locks you straight into the gate.
+                app.container.phonePenaltyController.reconcile(life, fireGate = true)
             }
         }
     }
