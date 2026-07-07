@@ -467,6 +467,9 @@ data class AppSettings(
     /** Persisted set of currently-penalised needs (NeedKind names) — the hysteresis state, so a penalty
      *  survives a restart and releases only when the need recovers. Managed by PhonePenaltyController. */
     val phonePenalisedNeeds: List<String> = emptyList(),
+    /** When the kiosk lock-screen gate last fired (throttle) — so a just-completed gate can't immediately
+     *  re-pop (gives ENERGY's rest window time to recover). Managed by PhonePenaltyController. */
+    val lastPenaltyGateMs: Long = 0,
 )
 
 /**

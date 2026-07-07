@@ -115,7 +115,7 @@ class AppContainer(private val appContext: Context) {
      *  phone"). Reconciled on app foreground + from RefreshWorker; releases everything when the toggle is off. */
     val phonePenaltyController: dev.mascwa.pulse.security.PhonePenaltyController by lazy {
         dev.mascwa.pulse.security.PhonePenaltyController(
-            appContext, settingsRepository, dev.mascwa.pulse.security.DevicePolicyController(appContext),
+            appContext, settingsRepository, dev.mascwa.pulse.security.DevicePolicyController(appContext), notifier,
         )
     }
 

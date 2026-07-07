@@ -9,6 +9,7 @@ import dev.mascwa.pulse.core.telemetry.NeedKind
 import dev.mascwa.pulse.core.telemetry.PhonePenalties
 import dev.mascwa.pulse.core.telemetry.PhonePenalties.PhoneLock
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.notifications.Notifier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -28,6 +29,7 @@ class PhonePenaltyController(
     context: Context,
     private val settings: SettingsRepository,
     private val devicePolicy: DevicePolicyController,
+    private val notifier: Notifier,
 ) {
     private val appContext = context.applicationContext
     private val mutex = Mutex()
@@ -35,9 +37,10 @@ class PhonePenaltyController(
     /**
      * Reconcile the locks against the [life] needs snapshot — engages newly-critical needs' locks and lifts
      * recovered ones. Call on app foreground and from the background worker. Serialised so a foreground and a
-     * worker pass can't race on the persisted state.
+     * worker pass can't race on the persisted state. When [fireGate] is true (the background worker only) and
+     * the harsher kiosk tier is on, it also fires the lock-screen gate for genuinely-critical needs, throttled.
      */
-    suspend fun reconcile(life: LifeProfile) = mutex.withLock {
+    suspend fun reconcile(life: LifeProfile, fireGate: Boolean = false) = mutex.withLock {
         val s = settings.current()
         val prev = decode(s.phonePenalisedNeeds)
         if (!s.phonePenalties || !devicePolicy.isDeviceOwner()) {
@@ -49,12 +52,23 @@ class PhonePenaltyController(
             return@withLock
         }
         val now = PhonePenalties.penalisedNeeds(life, prev)
-        if (now == prev) return@withLock
-        val prevLocks = PhonePenalties.locksFor(prev)
-        val nowLocks = PhonePenalties.locksFor(now)
-        setLocks(nowLocks - prevLocks, on = true, apps = s.phonePenaltyDistractionApps)   // engage newly-critical
-        setLocks(prevLocks - nowLocks, on = false, apps = s.phonePenaltyDistractionApps)  // lift recovered
-        settings.update { it.copy(phonePenalisedNeeds = now.map { n -> n.name }) }
+        if (now != prev) {
+            val prevLocks = PhonePenalties.locksFor(prev)
+            val nowLocks = PhonePenalties.locksFor(now)
+            setLocks(nowLocks - prevLocks, on = true, apps = s.phonePenaltyDistractionApps)   // engage newly-critical
+            setLocks(prevLocks - nowLocks, on = false, apps = s.phonePenaltyDistractionApps)  // lift recovered
+            settings.update { it.copy(phonePenalisedNeeds = now.map { n -> n.name }) }
+        }
+        // The harsher kiosk lock-screen gate — fire (background worker only) when a need is genuinely critical
+        // right now and the cooldown has elapsed, so a just-completed gate can't immediately re-pop.
+        if (fireGate && s.phonePenaltyKiosk) {
+            val critical = now.filter { it.value(life) <= PhonePenalties.ENGAGE_AT }
+            if (critical.isNotEmpty() && System.currentTimeMillis() - s.lastPenaltyGateMs >= GATE_COOLDOWN_MS) {
+                val nowMs = System.currentTimeMillis()
+                notifier.notifyPenaltyGate(critical.map { it.name })
+                settings.update { it.copy(lastPenaltyGateMs = nowMs) }
+            }
+        }
     }
 
     /** Unconditionally lift every penalty lock and clear the state — the guaranteed escape hatch. */
@@ -94,4 +108,10 @@ class PhonePenaltyController(
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         appContext.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
     }.getOrNull()
+
+    companion object {
+        /** Min gap between kiosk lock-screen gates — a just-completed gate can't re-pop within this window
+         *  (gives ENERGY's rest window time to recover so REST doesn't immediately re-lock you). */
+        private const val GATE_COOLDOWN_MS = 2L * 60 * 60 * 1000 // ~2 hours
+    }
 }
