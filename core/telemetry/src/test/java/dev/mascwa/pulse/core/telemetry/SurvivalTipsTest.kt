@@ -62,4 +62,26 @@ class SurvivalTipsTest {
     @Test fun unclassifiableTipFallsBackToMindset() {
         assertEquals("mindset", SurvivalTips.guideIdFor("Believe in yourself and keep a positive outlook."))
     }
+
+    @Test fun retargetedTipsClassifyToTheirGuide() {
+        // These real tips used to fall through to "mindset"; added keywords now route them correctly.
+        assertEquals("fire", SurvivalTips.guideIdFor("Split wood burns easier than round; dry inner faces catch faster."))
+        assertEquals("fire", SurvivalTips.guideIdFor("Dead branches on a tree are usually drier than wood on the ground."))
+        assertEquals("cold", SurvivalTips.guideIdFor("Do not rub frostbitten skin or thaw it if it might refreeze."))
+        assertEquals("cold", SurvivalTips.guideIdFor("Warm your core first; cold blood from the limbs can shock the heart."))
+        assertEquals("heat", SurvivalTips.guideIdFor("Breathe through your nose to cut moisture loss in dry heat."))
+        assertEquals("first-aid", SurvivalTips.guideIdFor("Never move someone with a suspected spine or neck injury."))
+        assertEquals("food", SurvivalTips.guideIdFor("Avoid plants with milky sap, a soapy taste, or a three-leaf pattern."))
+        assertEquals("navigation", SurvivalTips.guideIdFor("Moss does NOT reliably grow on the north side; that is a myth."))
+        assertEquals("navigation", SurvivalTips.guideIdFor("Point the hour hand at the sun and bisect the angle for direction."))
+        assertEquals("weather-hazards", SurvivalTips.guideIdFor("Fast-moving, low, dark clouds mean the weather is changing fast."))
+        assertEquals("wildlife", SurvivalTips.guideIdFor("Most animals want nothing to do with you; make noise on the trail."))
+        assertEquals("urban", SurvivalTips.guideIdFor("Keep sturdy shoes and a flashlight by your bed for a night emergency."))
+    }
+
+    @Test fun mindsetFallbackStaysBounded() {
+        // The mindset fallback should catch only genuine attitude/priority tips, not a misrouted tail.
+        val mindset = SurvivalTips.TIPS.count { SurvivalTips.guideIdFor(it) == "mindset" }
+        assertTrue("too many tips fall through to mindset ($mindset/${SurvivalTips.size})", mindset <= SurvivalTips.size / 8)
+    }
 }
