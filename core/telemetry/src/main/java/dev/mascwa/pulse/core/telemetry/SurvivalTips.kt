@@ -36,7 +36,7 @@ object SurvivalTips {
             "wound", "burns:", "a burn ", "burn for infection", "cool with clean running", "blister",
             "snakebite", "nosebleed", "impaled", "for shock", "abcs", "epipen", "inhaler", "insulin",
             "triangular bandage", "near-drowning", "heat cramp", "small cuts", "first-aid kit",
-            "unequal pupils", "internal injury", "broken finger",
+            "unequal pupils", "internal injury", "broken finger", "neck injury", "spine or neck", "spinal",
         ),
         "knots" to listOf(
             "knot", "bowline", "hitch", "clove", "paracord", "duct tape", "a knife", "your knife",
@@ -46,6 +46,7 @@ object SurvivalTips {
             "go-bag", "earthquake", " flood", "generator", "disaster", "carbon monoxide", "building fire",
             "power bank", "shut off your home", "meeting point", "hand-crank", "hand-cranked", "copies of documents",
             "winter kit", "out-of-area contact", "rotate stored", "emergency numbers", "battery or hand",
+            "by your bed",
         ),
         "signaling" to listOf(
             "signal", "mirror", "whistle", "sos", "distress", "flashes", "flashed", "flash rescuers",
@@ -60,6 +61,7 @@ object SurvivalTips {
         "wildlife" to listOf(
             "bear", "grizzly", "predator", "snakes", "give snakes", "a tick", "for ticks", "mosquito",
             "scorpion", "wild animal", "wildlife", "mother and her", "hang it high", "feed wildlife",
+            "most animals",
         ),
         "terrain" to listOf(
             "swift river", "cross a", "river at", "scree", "avalanche", "snow bridge", "switchback",
@@ -70,32 +72,36 @@ object SurvivalTips {
             "north star", "polaris", "compass", "bearing", "southern cross", "landmark", "sun rises",
             "shadow", "map and compass", "orient", "your paces", "handrail", "guide star", "back-bearing",
             "true north", "offline map", "whiteout", "in fog", "big dipper", "climb to a high point",
-            "streams lead", "follow water downhill", "mark north",
+            "streams lead", "follow water downhill", "mark north", "north side", "hour hand", "cairn",
+            "hold a heading", "same star ahead", "mark your route",
         ),
         "weather-hazards" to listOf(
             "lightning", "thunder", "a storm", "storm is", "bad weather", "red sky", "halo", "cumulus",
             "anvil", "wind shift", "the weather set", "swing to the west", "before bad weather", "precipitation",
+            "dark clouds",
         ),
         "cold" to listOf(
             "hypothermia", "frostbite", "frost-nip", "windchill", "umbles", "cotton kills", "wool or synth",
             "snow blindness", "shiver", "rewarm", "vapour barrier", "the cold", "in the cold", "cold-air",
             "wicking base", "layer for cold", "windproof", "frozen", "dry socks", "damp feet",
+            "frostbit", "warm your core", "cold blood", "can't get warm", "cold saps", "wet layers freeze",
         ),
         "heat" to listOf(
             "desert", "heat exhaustion", "heat stroke", "heatstroke", "peak heat", "hot sand", "hot rock",
             "in extreme sun", "in the heat", "in heat,", "extreme heat", "salt matters", "cool the blood",
-            "build shade", "in shade",
+            "build shade", "in shade", "dry heat",
         ),
         "fire" to listOf(
             "fire", "tinder", "kindling", "a spark", "an ember", "flame", "ferro", "char cloth", "fatwood",
             "coals", "feather stick", "dakota", "steel wool", "matches", "dry fuel", "wet fuel", "candle",
+            "split wood", "dead branches", "drier than wood",
         ),
         "food" to listOf(
             "forag", "berries", "berry", "mushroom", "edible", "edibility", "wild plant", "wild greens",
             "a fish", "fishing", "fish trap", "snare", " traps", "cattail", "acorn", "grub", "insects are",
             "grasshopper", "cricket", "nettle", "dandelion", "plantain", "cambium", "inner bark",
             "pine nut", "pine needle", "cook wild", "wild meat", "clams", "mussels", "game promptly",
-            "survival protein", "preserve it",
+            "survival protein", "preserve it", "milky sap", "soapy taste", "three-leaf",
         ),
         "water" to listOf(
             "water", "hydrat", "drink", "boil", "purif", "dew", "sodis", "solar still", "bleach", "giardia",
