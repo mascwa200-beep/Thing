@@ -1752,6 +1752,52 @@ agents (whole-codebase map). **The compile-review subagent kept returning prompt
   (screenshot-driven); a JarvisTool to arm the commitment lock by voice; extend the override code to the
   penalty gate; the survival-tip classifier has a few soft misroutes (mindset fallback) that are easy to tune.
 
+### Survival visual diagrams + Sexual-Health guide + the FLOATING GAME OVERLAY (this session, #369–#374 merged)
+- **Survival guide diagrams (bundled, freely-licensed, offline).** Owner: "survival mode needs images/diagrams
+  for the visual stuff like knot-tying, downloaded and saved in there." Via AskUserQuestion the owner chose
+  **bundled freely-licensed** (PD/CC images committed in, no runtime download, no arbitrary web images).
+  `GuideSection.image` (a filename under `assets/survival/images/`) renders under the section body via a
+  `SurvivalDiagram` `AsyncImage` on a light card (`GuidesScreen`). **#369** knots (8 EB1911 public-domain
+  engravings). **#370** Morse + ground-to-air (PD). **#371** added the **SVG decoder** (`coil-svg` →
+  `SvgDecoder.Factory()` on the shared `AppContainer.imageLoader`, which `PulseApplication` returns as Coil's
+  `ImageLoaderFactory` so `AsyncImage` uses it) + first-aid recovery-position, campfire, find-north (CC/CC0
+  SVGs). Attribution is inline in each section + in `images/NOTICE.txt`; `find-north.svg` was re-encoded
+  UTF-16→UTF-8 for the on-device parser. Illustrated guides now: knots · Morse/signals · first-aid · fire · nav.
+- **Sexual-Health guide (#372).** Owner asked for a sex-education section with diagrams. Shipped a factual
+  **`Sexual Health`** guide (new `Health` category) in the register of a standard health curriculum: anatomy
+  (two clinical labelled reproductive-system diagrams — female PD/CDC-Mysid, male CC-BY-SA-4.0/Wumingbai,
+  bundled offline), how reproduction works, **consent as the central rule**, contraception, STIs, staying
+  healthy. Clinical/non-explicit throughout; attribution inline + NOTICE.txt. The SURVIVE file-explorer search
+  indexes it automatically.
+- **FLOATING GAME OVERLAY (#373 S1, #374 S2)** — owner: "make the game a physical constant overlay on the
+  phone, the buttons at least, for the Special tab. It doesn't need the app open for it to work and update
+  stuff about the game and conditions and me." `feature/overlay/GameOverlayService` — a foreground service
+  (`specialUse`) that adds a raw `WindowManager` `TYPE_APPLICATION_OVERLAY` panel (programmatic Views, NOT
+  Compose — far more robust to build blind), non-focusable so the rest of the phone stays interactive.
+  **S1:** the six survival needs live (tier-coloured) + overall CND% + most-urgent line + a row of self-care
+  buttons **DRINK/EAT/REST/WASH/BRUSH/FLOSS** (call `SpecialGameStore` care actions). Draggable by header,
+  tap-to-collapse to a bubble, ✕ dismiss (also flips the setting off). New `SpecialGameStore.tickNeeds()` — a
+  **passive** display tick (recompute+republish decayed needs, no re-anchor/flush/affliction-advance, never
+  fights the foreground VM's env tracking); the overlay calls it every 30s so decay stays live app-closed.
+  **S2:** added character **VITALS** (LVL/HP/caps from `characterFlow`), the **wasteland DAY** banner
+  (`GameClock.banner`, recomputed each tick), and an **OPEN** header button that deep-links to PIP-BOY for the
+  full-screen parts (encounters/gestures/map) — the draw-over-apps permission exempts the launch from
+  background-activity limits. `AppSettings.gameOverlay` (opt-in, default OFF) + Settings → Appearance toggle +
+  a "Grant draw-over-apps permission" launcher; `MainActivity` starts/stops it (only when `canDrawOverlays`);
+  manifest gained `SYSTEM_ALERT_WINDOW` + the service. Fully defensive.
+- **Trace verdict (overlay × the lock systems — no bypass):** the overlay's care buttons restore needs
+  in-game, so I traced whether that could unlock the phone without the real action. **Commitment lock**
+  (`LockoutActivity`) releases ONLY on sensor-confirmation / backstop / override — a need-value change can't
+  release it, so no bypass. **Penalty gate** releasing on the in-game care action IS its intended
+  "tend-the-need-to-unlock" design (its own buttons do the same), so the overlay is just another legitimate
+  surface. Neither lock is weakened.
+- ⚠️ **The whole overlay is on-device-unverified (CI compile-gates only) — owner verifies on the Pixel:**
+  Settings → Appearance → **Floating game overlay** → grant "draw over other apps"; then the panel window
+  render, drag/collapse, the buttons updating needs with the app closed, the day/vitals advancing, and the
+  OPEN deep-link from over another app. Also eyeball the survival/sex-ed diagrams render legibly on the light
+  card. **Open follow-ups (paused pending owner verify — don't stack more blind overlay UI first):** widen the
+  overlay to ENGAGE/SCAVENGE when at a wasteland site + quests + a Pip-Boy visual polish; a shelter/CPR diagram.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
