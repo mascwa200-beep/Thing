@@ -139,6 +139,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // Floating game overlay (opt-in): keep the draw-over-apps Pip-Boy HUD service in step with the
+            // toggle. Only starts when the setting is on AND the draw-over permission is granted (the service
+            // no-ops otherwise); starts on cold launch + every foreground return via this effect.
+            androidx.compose.runtime.LaunchedEffect(settings.gameOverlay) {
+                if (settings.gameOverlay && android.provider.Settings.canDrawOverlays(ctx)) {
+                    dev.mascwa.pulse.feature.overlay.GameOverlayService.start(ctx)
+                } else {
+                    dev.mascwa.pulse.feature.overlay.GameOverlayService.stop(ctx)
+                }
+            }
+
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
                 // Hardware attestation runs once, async, and STRENGTHENS the gate: a genuine result is

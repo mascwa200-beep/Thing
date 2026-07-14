@@ -952,6 +952,16 @@ class SpecialGameStore(
     }
 
     /**
+     * A **passive** display tick: recompute the live decayed needs from the EXISTING anchor/env and republish,
+     * without re-anchoring, flushing, or advancing afflictions. Safe to call at any cadence from the
+     * background game overlay — it never touches persisted state or fights the foreground VM's env tracking
+     * (which is the one that owns [refreshNeeds] with a real [EnvContext]). Just keeps the meters moving.
+     */
+    fun tickNeeds() {
+        scope.launch { ensureLoaded(); _life.value = currentLife() }
+    }
+
+    /**
      * Apply [transform] to the CURRENT (decayed) profile, then re-anchor: the decayed needs become the new
      * base and the clock resets to now. So editing a field or topping up a need never drops accrued decay.
      */

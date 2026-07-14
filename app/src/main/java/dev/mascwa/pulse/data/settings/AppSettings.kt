@@ -326,6 +326,7 @@ data class AppSettings(
     val bootAnimation: Boolean = false,               // cold-open boot sequence on launch (off by default to save startup RAM; re-enable in Settings → Appearance)
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
     val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
+    val gameOverlay: Boolean = false,                 // floating draw-over-apps SPECIAL-tab overlay (needs readout + self-care buttons); opt-in, needs the "draw over other apps" permission
     val haptics: Boolean = true,                      // subtle UI haptic ticks
 
     // Locale / region (International defaults; everything overridable here)

@@ -539,6 +539,30 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
                     }
+                    // Floating game overlay — draws over other apps so the survival game keeps running with
+                    // Pulse closed. Opt-in; needs the user-granted draw-over-apps permission.
+                    PrefSwitch(
+                        "Floating game overlay",
+                        "Float the Pip-Boy survival stats + DRINK/EAT/REST/WASH/BRUSH/FLOSS buttons over every " +
+                            "app, so the game keeps updating with Pulse closed. Drag to move, tap to collapse. " +
+                            "Needs the draw-over-other-apps permission.",
+                        s.gameOverlay,
+                    ) { v -> vm.update { it.copy(gameOverlay = v) } }
+                    if (s.gameOverlay && !android.provider.Settings.canDrawOverlays(context)) {
+                        PrefClickable(
+                            "Grant draw-over-apps permission",
+                            subtitle = "Required for the overlay — opens system settings.",
+                        ) {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${context.packageName}"),
+                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        }
+                    }
                 }
             }
             item { HorizontalDivider() }
