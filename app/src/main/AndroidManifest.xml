@@ -58,6 +58,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <!-- PIP-BOY radio: keep streaming while the app is backgrounded. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Optional floating game overlay (opt-in): draw the Pip-Boy survival HUD + self-care buttons over
+         other apps so the game keeps running with Pulse closed. User-granted in system settings. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
@@ -340,6 +343,18 @@
             android:name=".data.perception.AmbientSensingService"
             android:exported="false"
             android:foregroundServiceType="camera|microphone|dataSync" />
+
+        <!-- Opt-in floating game overlay — the Pip-Boy survival HUD + self-care buttons drawn over other
+             apps so the S.P.E.C.I.A.L. game keeps updating with Pulse closed. Default OFF; needs the
+             user-granted draw-over-other-apps permission. -->
+        <service
+            android:name=".feature.overlay.GameOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="game_status_overlay" />
+        </service>
 
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->
