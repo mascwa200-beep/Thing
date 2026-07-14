@@ -25,10 +25,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import dev.mascwa.pulse.MainActivity
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.Character
+import dev.mascwa.pulse.core.telemetry.GameClock
 import dev.mascwa.pulse.core.telemetry.LifeProfile
 import dev.mascwa.pulse.core.telemetry.LifeStats
 import dev.mascwa.pulse.core.telemetry.NeedKind
 import dev.mascwa.pulse.core.telemetry.NeedTier
+import java.util.Calendar
 import dev.mascwa.pulse.data.game.SpecialGameStore
 import dev.mascwa.pulse.navigation.Routes
 import kotlinx.coroutines.CoroutineScope
@@ -67,10 +70,13 @@ class GameOverlayService : Service() {
     // View handles updated on each state emission.
     private var titleView: TextView? = null
     private var conditionView: TextView? = null
+    private var vitalsView: TextView? = null
+    private var dayView: TextView? = null
     private val needValueViews = HashMap<NeedKind, TextView>()
     private var body: LinearLayout? = null
     private var collapsed = false
     private var observing = false
+    private var lastStarted = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -119,13 +125,33 @@ class GameOverlayService : Service() {
         scope.launch {
             runCatching { store.lifeFlow.collect { profile -> runCatching { render(profile) } } }
         }
+        // Character vitals (level / HP / caps).
+        scope.launch {
+            runCatching { store.characterFlow.collect { c -> runCatching { renderVitals(c) } } }
+        }
+        // Wasteland day (recomputed against the wall clock each tick, so the phase advances).
+        scope.launch {
+            runCatching { store.startedFlow.collect { s -> lastStarted = s; runCatching { renderDay() } } }
+        }
         // Keep the decay moving even with the app closed (a passive display tick — no disk writes).
         scope.launch {
             while (isActive) {
                 runCatching { store.tickNeeds() }
+                runCatching { renderDay() }
                 delay(TICK_MS)
             }
         }
+    }
+
+    private fun renderVitals(c: Character) {
+        vitalsView?.text = "LVL ${c.level}   HP ${c.hp}/${c.maxHp}   ⚑ ${c.caps}"
+    }
+
+    private fun renderDay() {
+        val started = lastStarted
+        if (started <= 0L) { dayView?.text = ""; return }
+        val hour = runCatching { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }.getOrDefault(12)
+        dayView?.text = runCatching { GameClock.banner(started, System.currentTimeMillis(), hour) }.getOrDefault("")
     }
 
     private fun render(profile: LifeProfile) {
@@ -177,6 +203,14 @@ class GameOverlayService : Service() {
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         titleView = title
+        val open = TextView(this).apply {
+            text = "OPEN"
+            setTextColor(GREEN)
+            textSize = 10f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setPadding(dp(6), dp(2), dp(6), dp(2))
+            setOnClickListener { openGame() }
+        }
         val close = TextView(this).apply {
             text = "  ✕"
             setTextColor(DIM)
@@ -186,6 +220,7 @@ class GameOverlayService : Service() {
             setOnClickListener { stopEverything() }
         }
         header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(open)
         header.addView(close)
         rootView.addView(header, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
@@ -196,10 +231,27 @@ class GameOverlayService : Service() {
         }
         body = bodyView
 
+        dayView = TextView(this).apply {
+            setTextColor(GREEN)
+            textSize = 10f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        bodyView.addView(dayView)
+
+        vitalsView = TextView(this).apply {
+            setTextColor(DIM)
+            textSize = 10f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setPadding(0, dp(2), 0, 0)
+        }
+        bodyView.addView(vitalsView)
+
         conditionView = TextView(this).apply {
             setTextColor(DIM)
             textSize = 10f
             typeface = android.graphics.Typeface.MONOSPACE
+            setPadding(0, dp(2), 0, 0)
         }
         bodyView.addView(conditionView)
 
@@ -247,7 +299,7 @@ class GameOverlayService : Service() {
         root = rootView
 
         val lp = WindowManager.LayoutParams(
-            dp(200),
+            dp(224),
             WindowManager.LayoutParams.WRAP_CONTENT,
             // minSdk 31 → TYPE_APPLICATION_OVERLAY (API 26+) is always available.
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -324,6 +376,18 @@ class GameOverlayService : Service() {
         body?.visibility = if (collapsed) View.GONE else View.VISIBLE
         // Refresh the title's %, which changes with collapse.
         store()?.let { runCatching { render(it.lifeFlow.value) } }
+    }
+
+    /** Bring up the full PIP-BOY game (for the parts that need the whole screen — encounters/gestures/map).
+     *  The draw-over-apps permission exempts us from background-activity-launch restrictions. */
+    private fun openGame() {
+        runCatching {
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_ROUTE, Routes.TACNET)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 
     private fun stopEverything() {
