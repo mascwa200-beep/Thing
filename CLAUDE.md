@@ -1798,6 +1798,37 @@ agents (whole-codebase map). **The compile-review subagent kept returning prompt
   card. **Open follow-ups (paused pending owner verify — don't stack more blind overlay UI first):** widen the
   overlay to ENGAGE/SCAVENGE when at a wasteland site + quests + a Pip-Boy visual polish; a shelter/CPR diagram.
 
+### Autonomous continuation — classifier fix, encounters, overlay S3 (this session cont., #376–#378 merged)
+Owner: "keep going autonomously … and make the whole thing." Shipped as CI-green slices; two subsystems
+(auto-updater, RefreshWorker notification passes) were also traced and came back clean (no forced fixes).
+- **Survival-tip classifier fix (#376):** `SurvivalTips.guideIdFor` let 40/310 tips fall through to the
+  general `mindset` guide, incl. 16 that clearly belong elsewhere (a spinal-injury tip → first-aid, the
+  moss-north-side/wristwatch/cairn myths → navigation, "split wood burns" → fire, frostbite rewarming →
+  cold, etc.). Added narrow collision-free keywords so exactly those 16 retarget (mindset 40→24); verified
+  over the whole catalog that ONLY those 16 change. +2 tests (retargeted-tips + a mindset-bound guard);
+  locally kotlinc-run, 10 SurvivalTipsTest green.
+- **8 new encounters (#377):** `SpecialEncounters` 63 → 71 — Dust-Choked Pass, Beggar's Bargain, Frozen
+  Convoy, Frayed Crossing, Picked-Over Pharmacy, Collapsed Mine, Snake-Oil Doctor, + a repeatable SCAVENGE —
+  The Buried Bus. Across all seven stats + tiers; all loot ids resolve. The id-uniqueness test caught a
+  `rope_bridge` collision (renamed `frayed_crossing`) before push. 60 game-core tests green locally.
+- **Game overlay S3 — "make the whole thing" (#378):** the floating overlay is now the **full S.P.E.C.I.A.L.
+  game playable app-closed**. Added a **WASTELAND** section (VENTURE → an encounter's stat-gated choices as
+  odds-tagged buttons [SURE/LIKELY/EVEN/RISKY/LONGSHOT via `SpecialGame.check`] → tap to resolve → ✓/✗/✦CRIT
+  outcome → VENTURE again), a **SCAVENGE** button with the 3-min cooldown + haul readout, and an
+  **OBJECTIVES** section (top quests + progress from `QuestStore`). New collectors on `characterFlow`/
+  `resolutionFlow`/`lastScavengeFlow`/`questStore.quests`; dynamic sections rebuild on change; the 30s tick
+  keeps decay + cooldown live. **Design note (owner-vetoable):** the overlay's VENTURE/SCAVENGE call the
+  store directly — **couch-play**, NOT the geo-gated in-app path (the GEO-GATED arc retired couch-play in the
+  SPECIAL tab). It's the "play from anywhere" surface the overlay exists for; the geo-gated + gesture
+  experience stays in-app (OPEN jumps there). If the owner wants the overlay to respect geo-gating, gate
+  VENTURE/SCAVENGE behind presence.
+- ⚠️ **All #376–#378 CI-gated only; the overlay S3 is a large blind Android build (CI compiled it, can't run
+  it).** Owner-verify on the Pixel: the encounter/scavenge/quest render + interaction in the overlay window
+  app-closed, the panel height with every section expanded (no ScrollView yet — if it overflows the screen,
+  add one), and the couch-play loop. **Open/steerable:** ScrollView if the panel is too tall; a per-section
+  collapse; whether the overlay should respect geo-gating; a stat-allocate control in the overlay (currently
+  routed to OPEN).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
