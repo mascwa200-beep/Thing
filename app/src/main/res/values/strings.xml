@@ -24,6 +24,8 @@
     <string name="empty_generic">Nothing to show yet.</string>
 
     <!-- Notification channels -->
+    <string name="channel_emergency_name">Emergency · This just in</string>
+    <string name="channel_emergency_desc">Major breaking emergencies anywhere — disasters, attacks, crises — the moment they are reported</string>
     <string name="channel_breaking_name">Breaking news</string>
     <string name="channel_breaking_desc">Top headlines as they happen</string>
     <string name="channel_markets_name">Market &amp; price alerts</string>

@@ -18,6 +18,15 @@ enum class NewsCategory(
     BUSINESS("Business", "BUSINESS", null, "business"),
     TECH("Tech", "TECHNOLOGY", null, "technology"),
     POPCULTURE("Pop Culture", "ENTERTAINMENT", null, "entertainment"),
+    // The "seen everywhere, right now" wall — the Hollywood/movie idea of how fast the internet + social media
+    // spread a story: the biggest, fastest-moving stuff the whole feed is buzzing about this minute. A
+    // search-driven feed on the velocity/virality words, recency-sorted (the default), so it reads as the
+    // instant "this is blowing up everywhere" page — NOT celebrity/showbiz.
+    TRENDING(
+        "Trending", null,
+        "breaking OR trending OR viral OR \"goes viral\" OR \"this just in\" OR \"developing\" OR \"happening now\"",
+        null,
+    ),
     SCIENCE("Science", "SCIENCE", null, "science"),
     HEALTH("Health", "HEALTH", null, "health"),
     SPORTS("Sports", "SPORTS", null, "sports"),

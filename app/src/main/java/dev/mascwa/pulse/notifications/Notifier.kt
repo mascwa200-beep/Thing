@@ -29,6 +29,10 @@ class Notifier(private val context: Context) {
     fun notifyBreaking(id: Int, title: String, body: String, route: String = "news") =
         post(NotificationChannels.BREAKING, id, "BREAKING", title, body, route, NotificationCompat.PRIORITY_HIGH)
 
+    /** A major "this just in" emergency — its own channel + the most-urgent priority, distinct from breaking. */
+    fun notifyEmergency(id: Int, title: String, body: String, route: String = "news") =
+        post(NotificationChannels.EMERGENCY, id, "THIS JUST IN", title, body, route, NotificationCompat.PRIORITY_MAX)
+
     fun notifyMarket(id: Int, title: String, body: String) =
         post(NotificationChannels.MARKETS, id, "MARKET", title, body, "markets", NotificationCompat.PRIORITY_DEFAULT)
 

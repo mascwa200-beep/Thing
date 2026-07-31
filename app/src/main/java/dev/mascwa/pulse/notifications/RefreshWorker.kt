@@ -273,8 +273,10 @@ class RefreshWorker(
             }
         }
 
-        // --- Breaking news (shared with the resident live poller; manages its own notify_state) ---
-        if (prefs.breakingNews) {
+        // --- Breaking + emergency news (shared with the resident live poller; manages its own notify_state).
+        // The check fetches the top feed once and fires each notification per its own pref, so emergencies
+        // come through even if the general breaking feed is off. ---
+        if (prefs.breakingNews || prefs.emergencyAlerts) {
             runCatching { BreakingNewsPulse.check(container) }
         }
 

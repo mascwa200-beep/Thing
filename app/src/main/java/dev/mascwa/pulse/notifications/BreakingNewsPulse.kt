@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.notifications
 
+import dev.mascwa.pulse.core.telemetry.EmergencyNews
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +17,7 @@ object BreakingNewsPulse {
     private const val STATE_KEY = "notify_state"
 
     suspend fun check(container: AppContainer) = withContext(Dispatchers.IO) {
+        val prefs = container.settingsRepository.current().notifications
         val state = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
         val top = container.newsRepository.fetchCategory(NewsCategory.TOP, force = true).data
         // Dedup by TITLE, not URL: Google News RSS item URLs mutate between fetches (tracking/redirect
@@ -24,13 +26,33 @@ object BreakingNewsPulse {
         val firstRun = seen.isEmpty()
         val fresh = top.filter { it.title.isNotBlank() && it.title !in seen }
         if (!firstRun && fresh.isNotEmpty()) {
-            val lead = fresh.first()
-            val extra = if (fresh.size > 1) " (+${fresh.size - 1} more)" else ""
-            container.notifier.notifyBreaking(
-                id = 1001,
-                title = "Breaking" + (lead.source.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
-                body = lead.title + extra,
-            )
+            // The general breaking feed — the lead fresh headline.
+            if (prefs.breakingNews) {
+                val lead = fresh.first()
+                val extra = if (fresh.size > 1) " (+${fresh.size - 1} more)" else ""
+                container.notifier.notifyBreaking(
+                    id = 1001,
+                    title = "Breaking" + (lead.source.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                    body = lead.title + extra,
+                )
+            }
+            // "This just in" — a SEPARATE, most-urgent alert for the most-severe fresh headline that reads as
+            // a major emergency (disaster/attack/crisis), on its own channel + notification id. Fires
+            // independently of the general breaking feed.
+            if (prefs.emergencyAlerts) {
+                val emergency = fresh
+                    .map { it to EmergencyNews.severity(it.title, it.summary) }
+                    .filter { it.second > 0 }
+                    .maxByOrNull { it.second }
+                    ?.first
+                if (emergency != null) {
+                    container.notifier.notifyEmergency(
+                        id = 1002,
+                        title = "🚨 THIS JUST IN" + (emergency.source.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                        body = emergency.title,
+                    )
+                }
+            }
         }
         // Accumulate seen titles (bounded) so an item briefly leaving the top list won't re-alert.
         // Re-read the LATEST state immediately before writing and touch ONLY our field (seenTopUrls): the
