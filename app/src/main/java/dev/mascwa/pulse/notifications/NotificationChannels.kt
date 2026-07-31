@@ -7,6 +7,7 @@ import androidx.core.content.getSystemService
 import dev.mascwa.pulse.R
 
 object NotificationChannels {
+    const val EMERGENCY = "channel_emergency"
     const val BREAKING = "channel_breaking"
     const val MARKETS = "channel_markets"
     const val WEATHER = "channel_weather"
@@ -19,6 +20,20 @@ object NotificationChannels {
     fun ensure(context: Context) {
         val mgr = context.getSystemService<NotificationManager>() ?: return
         val channels = listOf(
+            // Its own, most-attention-grabbing channel for major "this just in" emergency events — a
+            // distinct urgent vibration + light so it reads differently from the general breaking feed.
+            NotificationChannel(
+                EMERGENCY,
+                context.getString(R.string.channel_emergency_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = context.getString(R.string.channel_emergency_desc)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 180, 400, 180, 650)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(false)
+            },
             NotificationChannel(
                 BREAKING,
                 context.getString(R.string.channel_breaking_name),

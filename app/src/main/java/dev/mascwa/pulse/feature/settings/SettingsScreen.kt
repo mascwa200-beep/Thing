@@ -632,6 +632,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     PrefSwitch("Enable notifications", checked = s.notifications.masterEnabled,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(masterEnabled = v)) } })
                     val on = s.notifications.masterEnabled
+                    PrefSwitch(
+                        "Emergency · This just in",
+                        subtitle = "Major breaking emergencies anywhere (disasters/attacks/crises), the moment they're reported — its own urgent alert.",
+                        checked = s.notifications.emergencyAlerts, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(emergencyAlerts = v)) } })
                     PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
                     PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
