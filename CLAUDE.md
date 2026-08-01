@@ -1926,6 +1926,41 @@ one CLEAN compile-review subagent on the map UI).
   remove Social from TOOLS entirely; a topographic base for the wildlife map (needs online DEM); tune the
   biome heuristic / animal catalogue from real use.
 
+### Market strip ×40 · news infographics · BREAKING NEWS takeover (this session cont., #392–#395 merged)
+Owner: broaden the market strip to catch anything with market effect (local/small/community stocks, consumer
+demand, politics, economics); add more infographic strips; and a Hollywood BREAKING-NEWS interruption that
+force-opens a full-screen page.
+- **Market strip ×40 (#392):** `core:telemetry/NewsMarketLink.kt` grown 15→~40 markets — macro (Small Caps =
+  small/local/main-street business, Bonds & Rates, US Dollar), every sector (Nat Gas/Solar/Uranium/Silver/
+  Copper/Steel/Lithium/Mining/AI/Cyber/Cloud/Social/Telecom/Regional Banks/Insurance/Biotech/Shipping/
+  Industrials/REITs/Utilities…), consumer behaviour (Retail/E-comm/Staples/Restaurants/Travel/Alcohol/Tobacco/
+  Cannabis/Gaming/Media/Luxury), softs (Coffee/Cocoa/OJ/Grains), politics→broad market (tariff/election/
+  regulation→Stocks). PRECISE multi-word triggers ("local business" not "local") keep genuinely non-market
+  news empty. Cap 3→4. +5 tests (18/18). `data/news/NewsMarketPulse.kt` basket resynced + expanded to a
+  curated ~26 liquid instruments (kept modest — `quotesFor` fires one throttled request/symbol, a 40-burst
+  would risk Yahoo 429s; wider markets show the heuristic arrow). Direction+why work OFFLINE for all markets.
+- **News at-a-glance infographics (#393):** pure `core:telemetry/NewsInsights.kt` (+9 tests) — `tone` (Upbeat/
+  Mixed/Grim/Tense + a −1..1 score), `topics` (auto topic + region tags), `marketImpact(links)` (NONE/LOW/MED/
+  HIGH). UI `NewsComponents.GlanceStrip` under each summary (a MOOD bar green→red + #topic chips) + the MARKET
+  REACTION header now shows the IMPACT level.
+- **BREAKING NEWS takeover (#394 core+repo, #395 UI+trigger):** the app force-opens a cinematic full-screen
+  page on a MAJOR event. **#394:** `EmergencyNews.isMajor` (higher bar than isEmergency — STRONG disaster, a
+  notable death [fiction-guarded], or a historic event) + `topicQuery`; `data/breaking/BreakingCoverageRepository`
+  aggregates the topic across trusted FREE sources via the keyless Google News search (Reuters/AP/BBC/…),
+  trusted-first, ad-free, short-cached. **#395:** `feature/breaking/BreakingNewsActivity` (full-screen takeover
+  over the lock screen, mirrors CareCheckinActivity) + `BreakingNewsScreen` (red BREAKING banner + pulsing LIVE
+  + clock + tab system TOP COVERAGE/LATEST/SOURCES, trusted badges); `Notifier.notifyBreakingInterrupt` (FSI,
+  CATEGORY_CALL, new BREAKING_INTERRUPT channel); fired from `BreakingNewsPulse` only on `isMajor`, gated by the
+  opt-out `NotificationPrefs.breakingInterrupt` (default ON) + HARD throttle (per-title dedup `breakingInterruptSeen`
+  + 25-min `breakingInterruptLastMs`, both preserved in `RefreshWorker.writeState`); Settings toggle; manifest
+  `<activity>`. **Honest Android ceiling (documented):** FSI takes over instantly from lock/idle; while the
+  phone is in active use the OS renders a max-priority heads-up to tap — the same path the app's lockout/care
+  takeovers use. ⚠️ One CI failure fixed: the recurring `Modifier.padding(horizontal=, top=/bottom=)` overload
+  trap in BreakingNewsScreen (no overload mixes horizontal with top/bottom → use start/end).
+- ⚠️ All #392–#395 on-device-unverified (pure cores locally kotlinc-tested; the takeover render + lock-screen
+  FSI firing + the wider strip are CI-unprovable). **Open/steerable:** live ±% for more markets (needs a
+  heavier fetch strategy); tune the isMajor bar / trusted-source list; a manual "test the takeover" trigger.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
