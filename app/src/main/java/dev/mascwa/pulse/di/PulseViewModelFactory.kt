@@ -47,6 +47,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 PlacesViewModel(c.overpassRepository, c.locationProvider)
             modelClass.isAssignableFrom(GuidesViewModel::class.java) ->
                 GuidesViewModel(c.survivalContentRepository)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.survive.HabitatViewModel::class.java) ->
+                dev.mascwa.pulse.feature.survive.HabitatViewModel(c.locationProvider)
             modelClass.isAssignableFrom(ToolsViewModel::class.java) ->
                 ToolsViewModel(c.survivalTools)
             modelClass.isAssignableFrom(SosViewModel::class.java) ->

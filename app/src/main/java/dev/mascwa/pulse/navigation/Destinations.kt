@@ -40,6 +40,7 @@ object Routes {
     const val SURVIVAL = "survival"
     const val TOOLS = "tools"
     const val SAFETY = "safety"
+    const val HABITAT = "habitat" // offline animal-habitat / wildlife map
 
     // Social & search (Phase 3)
     const val SOCIAL = "social"

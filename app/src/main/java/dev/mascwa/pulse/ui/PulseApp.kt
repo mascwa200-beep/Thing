@@ -264,6 +264,10 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
                 PipGreen { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
             }
+            composable(Routes.HABITAT) {
+                val vm: dev.mascwa.pulse.feature.survive.HabitatViewModel = viewModel(factory = factory)
+                PipGreen { dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() }) }
+            }
 
             // ---- Social & search (Phase 3) — Pip-Boy green ----
             composable(Routes.SOCIAL) {
