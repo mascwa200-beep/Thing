@@ -312,6 +312,12 @@ fun PulseApp(
             }
 
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
+            composable(Routes.ORACLE) {
+                val vm: dev.mascwa.pulse.feature.oracle.OracleViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.oracle.OracleScreen(
+                    vm, onOpenRoute = openRoute, onBack = { navController.popBackStack() },
+                )
+            }
             composable(Routes.JARVIS) {
                 val vm: dev.mascwa.pulse.feature.jarvis.JarvisViewModel = viewModel(factory = factory)
                 // The console chat bar must dock FLUSH on the soft keyboard (Claude-app style). The outer
@@ -425,7 +431,7 @@ fun PulseApp(
  *  straight to the page it's about (see AppShortcuts + Notifier). */
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.QUESTS, Routes.SURVIVAL,
-    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR,
+    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
 )
 
 /** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH

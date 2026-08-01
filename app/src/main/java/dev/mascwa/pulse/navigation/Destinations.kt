@@ -51,6 +51,9 @@ object Routes {
     const val RADAR = "radar"
     const val TELEMETRY = "telemetry"
 
+    // ORACLE — J.A.R.V.I.S.'s cross-signal foresight HUD
+    const val ORACLE = "oracle"
+
     // J.A.R.V.I.S. Matrix (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"
