@@ -10,6 +10,9 @@ import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.social.SocialItem
+import dev.mascwa.pulse.data.social.SocialRepository
+import dev.mascwa.pulse.feature.social.SocialTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +27,8 @@ data class NewsTab(
     val category: NewsCategory?,
     val custom: Boolean,
     val breaking: Boolean = false,
+    /** A community source (Lemmy / Hacker News / Mastodon) surfaced as its own News tab, or null. */
+    val social: SocialTab? = null,
 )
 
 data class NewsUiState(
@@ -40,6 +45,7 @@ class NewsViewModel(
     private val repo: NewsRepository,
     private val settings: SettingsRepository,
     private val markets: dev.mascwa.pulse.data.markets.MarketsRepository,
+    private val socialRepo: SocialRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -59,6 +65,8 @@ class NewsViewModel(
                         // Breaking leads: the freshest stories across topics, "just reported on".
                         add(NewsTab("BREAKING", "Breaking", null, custom = false, breaking = true))
                         NewsCategory.entries.forEach { add(NewsTab(it.name, it.title, it, false)) }
+                        // Community sources, each its own tab (Lemmy · Mastodon · Hacker News).
+                        SocialTab.entries.forEach { add(NewsTab("SOCIAL_${it.name}", it.label, null, custom = false, social = it)) }
                         if (hasCustom) add(NewsTab("MYFEEDS", "My Feeds", null, true))
                     }
                     _state.update { it.copy(tabs = tabs) }
@@ -114,8 +122,22 @@ class NewsViewModel(
     private suspend fun fetchTab(tab: NewsTab, force: Boolean): Fetched<List<Article>> = when {
         tab.breaking -> repo.fetchBreaking(force)
         tab.custom -> repo.fetchCustomFeeds(force)
+        tab.social != null -> loadSocial(tab.social, force)
         else -> repo.fetchCategory(tab.category!!, force)
     }
+
+    /** Fetch a community source and adapt its items into the news [Article] shape so it renders in the
+     *  same list (title · upvotes/comments as the summary · source · thumbnail). */
+    private suspend fun loadSocial(src: SocialTab, force: Boolean): Fetched<List<Article>> = when (src) {
+        SocialTab.LEMMY -> socialRepo.lemmy(force).let { Fetched(it.data.items.map { i -> i.toArticle(src.label) }, it.fromCache, it.timestampEpochMs) }
+        SocialTab.HN -> socialRepo.hackerNews(force).let { Fetched(it.data.items.map { i -> i.toArticle(src.label) }, it.fromCache, it.timestampEpochMs) }
+        SocialTab.MASTODON -> socialRepo.mastodon(force).let { Fetched(it.data.statuses.map { i -> i.toArticle(src.label) }, it.fromCache, it.timestampEpochMs) }
+    }
+
+    private fun SocialItem.toArticle(cat: String): Article = Article(
+        title = title, url = url, summary = meta, source = source,
+        publishedEpochMs = publishedEpochMs, imageUrl = thumbnail, category = cat,
+    )
 
     fun refresh() {
         if (_state.value.searchMode) search(_state.value.query)
