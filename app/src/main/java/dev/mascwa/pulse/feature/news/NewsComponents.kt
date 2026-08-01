@@ -4,14 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.MarketImpact
+import dev.mascwa.pulse.core.telemetry.MarketLink
+import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.feature.common.CyberChipCut
@@ -69,12 +75,56 @@ fun ArticleCard(
                         modifier = Modifier.padding(top = 5.dp),
                     )
                 }
+                // Which markets this story touches / would move, and which way (+ a short why).
+                val links = remember(article.url) {
+                    NewsMarketLink.linksFor(article.title, article.summary, article.category)
+                }
+                if (links.isNotEmpty()) MarketStrip(links)
                 Text(
                     meta(article).uppercase(),
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.accent,
                     modifier = Modifier.padding(top = 9.dp),
                 )
             }
+        }
+    }
+}
+
+/** The market strip beneath a story's summary: a chip per associated market, coloured + arrowed by the
+ *  story's likely push (▲ up / ▼ down / • unclear), and a one-line "why" caption. Heuristic, not a quote. */
+@Composable
+private fun MarketStrip(links: List<MarketLink>) {
+    val c = Pulse.colors
+    Column(Modifier.padding(top = 7.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            links.forEach { link ->
+                val col = when (link.impact) {
+                    MarketImpact.UP -> c.positive
+                    MarketImpact.DOWN -> c.negative
+                    MarketImpact.MIXED -> c.muted
+                }
+                val arrow = when (link.impact) {
+                    MarketImpact.UP -> "▲"
+                    MarketImpact.DOWN -> "▼"
+                    MarketImpact.MIXED -> "•"
+                }
+                Text(
+                    "$arrow ${link.market}",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(col.copy(alpha = 0.13f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+        val why = NewsMarketLink.summarize(links)
+        if (why.isNotBlank()) {
+            Text(
+                why,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
