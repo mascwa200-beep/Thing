@@ -94,7 +94,7 @@ fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
                 item { PipHubTile("Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, c.accent) { onOpenRoute(Routes.PLACES) } }
                 item { PipHubTile("Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, c.amber) { onOpenRoute(Routes.SAFETY) } }
                 item { PipHubTile("Map", "Incidents & help on the live nav map", Icons.Filled.Map, c.accent) { onOpenRoute(Routes.NAV) } }
-                item { PipHubTile("Survival Guides", "First aid, water, fire, signalling · offline", Icons.AutoMirrored.Filled.MenuBook, c.positive) { onOpenRoute(Routes.SURVIVAL) } }
+                item { PipHubTile("Knowledge Base", "Science · medicine · math · survival — offline wiki", Icons.AutoMirrored.Filled.MenuBook, c.positive) { onOpenRoute(Routes.SURVIVAL) } }
                 item { PipHubTile("Wildlife", "Animals in your region + what to do · offline", Icons.Filled.Pets, c.amber) { onOpenRoute(Routes.HABITAT) } }
                 item { PipHubTile("Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, c.positive) { onOpenRoute(Routes.TOOLS) } }
             }
@@ -177,8 +177,8 @@ private fun buildSurviveIndex(guides: List<Guide>): List<SurviveResult> {
             "quake earthquake disaster weather alert flood storm wildfire safety hazard"),
         SurviveResult("Map", "NAV · incidents & help", Routes.NAV,
             "map incident nav navigation route waypoint compass directions"),
-        SurviveResult("Survival Guides", "GUIDES · offline library", Routes.SURVIVAL,
-            "guide guides library offline reference"),
+        SurviveResult("Knowledge Base", "WIKI · offline library", Routes.SURVIVAL,
+            "guide guides library offline reference knowledge wiki textbook encyclopedia science chemistry biology physics math medicine engineering astronomy nutrition"),
         SurviveResult("Wildlife", "MAP · animals in your region", Routes.HABITAT,
             "wildlife animal animals habitat bear snake spider scorpion shark predator venom bite sting heat map offline"),
         SurviveResult("Tools", "TOOLS · strobe · morse · whistle", Routes.TOOLS,
