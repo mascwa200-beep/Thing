@@ -276,7 +276,7 @@ class RefreshWorker(
         // --- Breaking + emergency news (shared with the resident live poller; manages its own notify_state).
         // The check fetches the top feed once and fires each notification per its own pref, so emergencies
         // come through even if the general breaking feed is off. ---
-        if (prefs.breakingNews || prefs.emergencyAlerts) {
+        if (prefs.breakingNews || prefs.emergencyAlerts || prefs.breakingInterrupt) {
             runCatching { BreakingNewsPulse.check(container) }
         }
 
@@ -691,12 +691,16 @@ class RefreshWorker(
     private suspend fun readState(): NotifyState =
         container.diskCache.readAny("notify_state", NotifyState.serializer())?.value ?: NotifyState()
 
-    // The worker owns every notify_state field EXCEPT seenTopUrls, which the resident BreakingNewsPulse
-    // poller advances on its own cadence. Re-read the latest blob and keep its seenTopUrls so our (older)
-    // snapshot — held across this whole doWork — doesn't clobber breaking-news dedup written meanwhile.
+    // The worker owns every notify_state field EXCEPT the ones the resident BreakingNewsPulse poller advances
+    // on its own cadence (seenTopUrls + the breaking-interrupt throttle/dedup). Re-read the latest blob and
+    // keep those so our (older) snapshot — held across this whole doWork — doesn't clobber them.
     private suspend fun writeState(state: NotifyState) {
         val latest = container.diskCache.readAny("notify_state", NotifyState.serializer())?.value
-        val merged = if (latest != null) state.copy(seenTopUrls = latest.seenTopUrls) else state
+        val merged = if (latest != null) state.copy(
+            seenTopUrls = latest.seenTopUrls,
+            breakingInterruptLastMs = latest.breakingInterruptLastMs,
+            breakingInterruptSeen = latest.breakingInterruptSeen,
+        ) else state
         container.diskCache.write("notify_state", merged, NotifyState.serializer())
     }
 

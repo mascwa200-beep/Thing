@@ -9,6 +9,7 @@ import dev.mascwa.pulse.R
 object NotificationChannels {
     const val EMERGENCY = "channel_emergency"
     const val BREAKING = "channel_breaking"
+    const val BREAKING_INTERRUPT = "channel_breaking_interrupt"
     const val MARKETS = "channel_markets"
     const val WEATHER = "channel_weather"
     const val DIGEST = "channel_digest"
@@ -39,6 +40,21 @@ object NotificationChannels {
                 context.getString(R.string.channel_breaking_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { description = context.getString(R.string.channel_breaking_desc) },
+            // The full-screen BREAKING NEWS takeover — its own urgent channel (literal strings to avoid a
+            // resource dependency). IMPORTANCE_HIGH is the max a channel can declare; the full-screen intent
+            // is what actually takes over the screen.
+            NotificationChannel(
+                BREAKING_INTERRUPT,
+                "Breaking news takeover",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Force-opens a full-screen breaking-news page on a major event."
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 200, 500)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(false)
+            },
             NotificationChannel(
                 MARKETS,
                 context.getString(R.string.channel_markets_name),

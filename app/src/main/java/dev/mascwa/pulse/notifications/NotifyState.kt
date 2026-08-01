@@ -33,4 +33,8 @@ data class NotifyState(
     val survivalTipLastMs: Long = 0L,
     /** Local epoch-day we last fired a "don't break your streak" reminder, so it nudges at most once a day. */
     val streakReminderDay: Int = -1,
+    /** Last time (epoch ms) the full-screen BREAKING NEWS takeover fired — a hard throttle so it can't spam. */
+    val breakingInterruptLastMs: Long = 0L,
+    /** Titles already used for a breaking takeover, so the same major story can't re-interrupt. */
+    val breakingInterruptSeen: List<String> = emptyList(),
 )

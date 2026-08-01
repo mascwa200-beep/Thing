@@ -639,6 +639,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(emergencyAlerts = v)) } })
                     PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                    PrefSwitch(
+                        "Breaking takeover (full-screen)",
+                        subtitle = "On a MAJOR event (a death, a disaster), force-open a full-screen breaking-news page — trusted free sources, ad-free. Rare + hard-throttled.",
+                        checked = s.notifications.breakingInterrupt, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
                     PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
                         checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
