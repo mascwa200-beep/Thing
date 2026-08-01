@@ -196,6 +196,9 @@ class AppContainer(private val appContext: Context) {
     val newsRepository: NewsRepository by lazy {
         NewsRepository(http, diskCache, settingsRepository)
     }
+    val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
+        dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
+    }
     val marketsRepository: MarketsRepository by lazy {
         MarketsRepository(http, diskCache, settingsRepository)
     }
