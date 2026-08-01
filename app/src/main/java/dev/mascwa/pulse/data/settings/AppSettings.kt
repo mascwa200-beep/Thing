@@ -243,6 +243,9 @@ data class NotificationPrefs(
     /** BREAKING takeover: on a MAJOR event (a death, a disaster), force-open the full-screen cinematic
      *  breaking-news page (over the lock screen). Rarer + harder-throttled than the emergency alert. Default ON. */
     val breakingInterrupt: Boolean = true,
+    /** ORACLE foresight: proactive cross-signal pushes (leave now / charge now / drink / aurora tonight).
+     *  One throttled push per worker pass for the single most important interrupt-worthy insight. Default ON. */
+    val oracleEnabled: Boolean = true,
     /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
      *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
     val liveBreakingNews: Boolean = false,

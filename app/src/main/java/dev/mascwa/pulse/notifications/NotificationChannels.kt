@@ -10,6 +10,7 @@ object NotificationChannels {
     const val EMERGENCY = "channel_emergency"
     const val BREAKING = "channel_breaking"
     const val BREAKING_INTERRUPT = "channel_breaking_interrupt"
+    const val ORACLE = "channel_oracle"
     const val MARKETS = "channel_markets"
     const val WEATHER = "channel_weather"
     const val DIGEST = "channel_digest"
@@ -54,6 +55,15 @@ object NotificationChannels {
                 enableLights(true)
                 lightColor = android.graphics.Color.RED
                 setBypassDnd(false)
+            },
+            // ORACLE — proactive foresight pushes (J.A.R.V.I.S. surfacing the most important thing now).
+            NotificationChannel(
+                ORACLE,
+                "Oracle foresight",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Proactive, cross-signal heads-ups: leave now, charge now, aurora tonight…"
+                enableVibration(true)
             },
             NotificationChannel(
                 MARKETS,
