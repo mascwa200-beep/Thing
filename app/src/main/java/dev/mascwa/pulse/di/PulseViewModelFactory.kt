@@ -106,6 +106,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
+                dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T
