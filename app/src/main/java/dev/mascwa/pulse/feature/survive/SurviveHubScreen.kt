@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Sos
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -94,6 +95,7 @@ fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
                 item { PipHubTile("Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, c.amber) { onOpenRoute(Routes.SAFETY) } }
                 item { PipHubTile("Map", "Incidents & help on the live nav map", Icons.Filled.Map, c.accent) { onOpenRoute(Routes.NAV) } }
                 item { PipHubTile("Survival Guides", "First aid, water, fire, signalling · offline", Icons.AutoMirrored.Filled.MenuBook, c.positive) { onOpenRoute(Routes.SURVIVAL) } }
+                item { PipHubTile("Wildlife", "Animals in your region + what to do · offline", Icons.Filled.Pets, c.amber) { onOpenRoute(Routes.HABITAT) } }
                 item { PipHubTile("Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, c.positive) { onOpenRoute(Routes.TOOLS) } }
             }
         } else {
@@ -177,6 +179,8 @@ private fun buildSurviveIndex(guides: List<Guide>): List<SurviveResult> {
             "map incident nav navigation route waypoint compass directions"),
         SurviveResult("Survival Guides", "GUIDES · offline library", Routes.SURVIVAL,
             "guide guides library offline reference"),
+        SurviveResult("Wildlife", "MAP · animals in your region", Routes.HABITAT,
+            "wildlife animal animals habitat bear snake spider scorpion shark predator venom bite sting heat map offline"),
         SurviveResult("Tools", "TOOLS · strobe · morse · whistle", Routes.TOOLS,
             "tool tools torch flashlight strobe alarm morse whistle compass siren beacon"),
     )
