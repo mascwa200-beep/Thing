@@ -246,6 +246,9 @@ data class NotificationPrefs(
     /** ORACLE foresight: proactive cross-signal pushes (leave now / charge now / drink / aurora tonight).
      *  One throttled push per worker pass for the single most important interrupt-worthy insight. Default ON. */
     val oracleEnabled: Boolean = true,
+    /** WORLD PULSE: a quiet, always-latest live feed — one intimate cross-signal read of the world woven with
+     *  your day, updating in place on a silent MIN-importance channel (never buzzes). Default ON. */
+    val worldPulse: Boolean = true,
     /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
      *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
     val liveBreakingNews: Boolean = false,

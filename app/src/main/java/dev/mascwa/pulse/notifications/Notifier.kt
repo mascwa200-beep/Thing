@@ -33,13 +33,48 @@ class Notifier(private val context: Context) {
     fun notifyEmergency(id: Int, title: String, body: String, route: String = "news") =
         post(NotificationChannels.EMERGENCY, id, "THIS JUST IN", title, body, route, NotificationCompat.PRIORITY_MAX)
 
-    /** A proactive ORACLE foresight push — J.A.R.V.I.S. surfacing the single most important thing right now. */
+    /** A proactive ORACLE foresight push — J.A.R.V.I.S. surfacing the single most important thing right now.
+     *  ONE fixed id so a newer top insight replaces the last (latest-only, no tray pile-up). */
     fun notifyOracle(insight: dev.mascwa.pulse.core.telemetry.Insight) =
         post(
-            NotificationChannels.ORACLE, 2000 + (insight.id.hashCode() and 0xffff),
-            "ORACLE", insight.title, insight.detail, insight.actionRoute ?: "jarvis",
+            NotificationChannels.ORACLE, NotifId.ORACLE,
+            "ORACLE", insight.title, insight.detail, insight.actionRoute ?: "oracle",
             NotificationCompat.PRIORITY_HIGH,
         )
+
+    /**
+     * The WORLD PULSE — a quiet, always-latest live feed: one intimate cross-signal read of the world woven
+     * with your day, updating IN PLACE (one fixed id, silent MIN-importance channel). Taps open the ORACLE HUD
+     * where the full ranked read lives. Composed by [dev.mascwa.pulse.core.telemetry.Oracle.worldPulse].
+     */
+    fun notifyWorldPulse(pulse: dev.mascwa.pulse.core.telemetry.WorldPulse) {
+        if (!canPost()) return
+        val body = pulse.lines.joinToString("\n")
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_ROUTE, "oracle")
+        }
+        val pi = PendingIntent.getActivity(
+            context, "world_pulse".hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NotificationChannels.WORLD_PULSE)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
+            .setSubText("// WORLD PULSE")
+            .setContentTitle(pulse.headline)
+            .setContentText(pulse.lines.getOrNull(1) ?: pulse.headline)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("⚡ WORLD PULSE").bigText(body),
+            )
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        safeNotify(NotifId.WORLD_PULSE, notification)
+    }
 
     fun notifyMarket(id: Int, title: String, body: String) =
         post(NotificationChannels.MARKETS, id, "MARKET", title, body, "markets", NotificationCompat.PRIORITY_DEFAULT)
@@ -62,16 +97,18 @@ class Notifier(private val context: Context) {
     fun notifyReminder(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "REMINDER", title, body, "home", NotificationCompat.PRIORITY_HIGH)
 
-    /** Life-sim survival check-in (a decaying need ran low) — opens the game to tend it. */
+    /** Life-sim survival check-in (a decaying need ran low) — opens straight to STATS ▸ SPECIAL where the
+     *  needs, meters and self-care buttons live (not just the PIP-BOY front page). */
     fun notifySurvival(id: Int, title: String, body: String, urgent: Boolean) =
         post(
-            NotificationChannels.REMINDERS, id, "SURVIVAL", title, body, "tacnet",
+            NotificationChannels.REMINDERS, id, "SURVIVAL", title, body, "tacnet?tab=SPECIAL",
             if (urgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
         )
 
-    /** Life-sim agenda check-in (a real appointment is imminent) — opens the game's agenda. */
+    /** Life-sim agenda check-in (a real appointment is imminent) — opens straight to DATA ▸ WASTELAND where
+     *  the AGENDA panel lives. */
     fun notifyAgenda(id: Int, title: String, body: String) =
-        post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet", NotificationCompat.PRIORITY_HIGH)
+        post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet?tab=WASTELAND", NotificationCompat.PRIORITY_HIGH)
 
     /**
      * The AGGRESSIVE self-care check-in: a full-screen alert (over the lock screen) that can't be dismissed
@@ -222,7 +259,7 @@ class Notifier(private val context: Context) {
             NotificationChannels.DIGEST, 7790 + need.ordinal, "SENSED",
             "👁 Caught you taking care of yourself",
             "The camera/mic sensed it — ${need.label} restored.",
-            "tacnet", NotificationCompat.PRIORITY_LOW,
+            "tacnet?tab=SPECIAL", NotificationCompat.PRIORITY_LOW,
         )
 
     /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
@@ -279,4 +316,30 @@ class Notifier(private val context: Context) {
             // POST_NOTIFICATIONS revoked between check and post; ignore.
         }
     }
+}
+
+/**
+ * The canonical notification ids. Each notification CATEGORY owns ONE fixed id, so a newer item silently
+ * replaces the previous one in place — the tray always shows the single latest thing per category, never a
+ * pile-up. (The per-need/per-affliction survival ids are the deliberate exception: each is a distinct,
+ * individually-actionable check-in and the set is bounded and small.) Kept in one place so the "latest-only"
+ * contract is auditable.
+ */
+object NotifId {
+    const val BREAKING = 1001
+    const val EMERGENCY = 1002
+    const val ORACLE = 2100
+    const val WORLD_PULSE = 2200
+    const val MARKET = 3100      // one rolled-up "biggest mover (+N more)" — was one-per-instrument
+    const val WEATHER = 3001
+    const val DIGEST = 4001
+    const val SPACE_STORM = 5001
+    const val SPACE_NEO = 5002
+    const val SPACE_AURORA = 5003
+    const val SAFETY = 6100      // one rolled-up "nearest severe incident (+N more)" — was one-per-incident
+    const val FLIGHT = 7000      // one overhead aircraft, latest
+    const val UPDATE = 7401
+    const val FINDING = 7501
+    const val AGENDA = 7721      // one rolled-up "soonest appointment (+N more)" — was one-per-event
+    const val TIP = 7760
 }

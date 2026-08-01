@@ -18,6 +18,7 @@ object NotificationChannels {
     const val SAFETY = "channel_safety"
     const val FLIGHT = "channel_flight"
     const val REMINDERS = "channel_reminders"
+    const val WORLD_PULSE = "channel_world_pulse"
 
     fun ensure(context: Context) {
         val mgr = context.getSystemService<NotificationManager>() ?: return
@@ -100,6 +101,18 @@ object NotificationChannels {
                 context.getString(R.string.channel_reminders_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { description = context.getString(R.string.channel_reminders_desc) },
+            // The WORLD PULSE — a silent, low-key live feed that stays in the tray and updates in place with
+            // the latest intimate cross-signal read. MIN importance so it never buzzes or heads-up; it's an
+            // ambient dashboard, not an alert. (Literal strings to avoid a resource dependency.)
+            NotificationChannel(
+                WORLD_PULSE,
+                "World pulse",
+                NotificationManager.IMPORTANCE_MIN,
+            ).apply {
+                description = "A quiet, always-latest live feed of the world woven with your day."
+                enableVibration(false)
+                setShowBadge(false)
+            },
         )
         mgr.createNotificationChannels(channels)
     }
