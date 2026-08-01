@@ -1884,6 +1884,48 @@ the full camera/mic → gameplay pipeline. **Verdict: genuinely functional, with
   Note: `strategy()` only ever produces tempoNudge 0 or +1 (no code path subtracts), so the coerce/-1 floor is
   defensive; that's fine. ⚠️ On-device runtime feel is owner-verify (CI can't run the samplers).
 
+### Survival offline/depth · animal-habitat map · Trading-Places market strip · Social→News (this session, #387–#390 merged)
+Owner batch: make survival completely offline + in-depth (word-for-word, materials/chemicals) + a clickable
+animal-habitat heat map; redesign the news market strip "Trading Places but legal"; fold Social into News as
+per-source tabs. Shipped as CI-green slices (pure cores locally kotlinc-run; Android layers compile-gated +
+one CLEAN compile-review subagent on the map UI).
+- **News MARKET REACTION strip (#387):** `core:telemetry/NewsMarketLink.kt` — `MarketLink` gained a per-story
+  causal `rationale` + a 1..3 `strength`; `linksFor` now uses the news `category` for a broad-market baseline
+  (Business→Stocks etc.) and sorts by strength; new on-theme **OJ Futures** market (frost/freeze→up, the
+  literal Trading Places setup) + per-market up/down phrasings + `headline()`. `summarize()` → "Reality check:
+  lifts X; weighs on Y." UI `feature/news/NewsComponents.kt` MarketStrip is now a framed "◢ MARKET REACTION ·
+  LIVE" block (chips w/ live ±% or heuristic arrow · sharpest causal line · winners/losers), chip → `MarketChip`.
+  `data/news/NewsMarketPulse.kt` added OJ=F to the live basket. +5 tests (13/13).
+- **Offline animal-habitat map (#388):** pure `core:telemetry/AnimalHabitats.kt` (offline `continentFor`/
+  `biomeFor` coordinate heuristics → `habitatFor(lat,lon)→Habitat`, `dangerLevel()`) + `AnimalCatalog.kt`
+  (~55 species, each identify→behaviour→what-to-do→bite/sting first aid; `faunaFor(biome,continent)` regional
+  table + per-continent fallback + global biome fauna). +10 tests (classification vs known cities, every
+  fauna id resolves, hostiles-lead, determinism). UI `feature/survive/HabitatScreen.kt` — a Compose **Canvas**
+  heat scope (you at centre, each species a radial-gradient territory coloured green→red by danger, range
+  rings, tap a zone/card → read-out + field detail), `HabitatViewModel` (GPS fix → habitatFor, no network).
+  Wired `Routes.HABITAT` + factory + NavHost(PipGreen) + SURVIVE hub "Wildlife" tile + search. **Regional
+  model, not a live tracker** (biome estimated offline; positions illustrative). No map tiles → fully offline.
+- **Survival guides deepened (#389):** +15 in-depth sections to `assets/survival/guides.json` (offline
+  already) — water (exact bleach/iodine/tablet doses, DIY charcoal filter, distillation), fire (char cloth,
+  bow drill, ferro/flint), food (full 7-step Universal Edibility Test + never-test list, edible plants/insects,
+  snare + gorge-hook), first-aid (wound irrigation + infection signs, splinting, RICE), shelter (debris hut
+  dimensions), navigation (shadow-stick, analog-watch). Guide ids unchanged → search/tip deep-links intact.
+- **Social → News per-source tabs (#390):** `NewsTab` gained `social: SocialTab?`; the News tab bar appends
+  Lemmy · Mastodon · Hacker News after the categories. `NewsViewModel` takes `SocialRepository`; `fetchTab`
+  routes a social tab to `loadSocial()` which adapts each `SocialItem`→`Article` (upvotes/comments as summary,
+  thumbnail) so it renders in the existing list. No NewsScreen change. The standalone Social screen + PIP-BOY
+  SOCIAL sub-tab (which also carries Mastodon trending TAGS) left intact — fully removing Social from TOOLS is
+  an owner follow-up.
+- **Survival "completely offline" scope:** the offline CORE is now comprehensive (deepened guides, wildlife
+  map, tools, SOS, compass/nav — all offline). "Nearest Help" (Overpass POIs) + "Nearby Safety" (live incident
+  feeds) are inherently live-data — they cache + serve stale offline but can't bundle the world's hospitals/
+  quakes. Honest scoping, not a gap to paper over.
+- ⚠️ All #387–#390 on-device-unverified (CI compile-gates; pure cores locally tested). Owner-verify on the
+  Pixel: the MARKET REACTION strip legibility + live ±%, the wildlife heat-map render/tap/GPS-biome, the
+  deepened guide sections, and the new News social tabs (feed render, tab switching). **Open/steerable:**
+  remove Social from TOOLS entirely; a topographic base for the wildlife map (needs online DEM); tune the
+  biome heuristic / animal catalogue from real use.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
