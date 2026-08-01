@@ -134,9 +134,9 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    PipChip("ALL", selected = category == null) { category = null }
+                    PipChip("ALL", selected = category == null, onClick = { category = null })
                     categories.forEach { cat ->
-                        PipChip(cat, selected = category == cat) { category = if (category == cat) null else cat }
+                        PipChip(cat, selected = category == cat, onClick = { category = if (category == cat) null else cat })
                     }
                 }
                 LazyColumn(
