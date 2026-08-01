@@ -16,6 +16,8 @@ import kotlinx.coroutines.withContext
 object BreakingNewsPulse {
 
     private const val STATE_KEY = "notify_state"
+    /** A hard floor between full-screen breaking takeovers, so even a run of major events can't spam. */
+    private const val INTERRUPT_MIN_GAP_MS = 25 * 60 * 1000L
 
     suspend fun check(container: AppContainer) = withContext(Dispatchers.IO) {
         val prefs = container.settingsRepository.current().notifications
@@ -33,6 +35,8 @@ object BreakingNewsPulse {
         val fresh = top.filter { it.title.isNotBlank() && it.title !in seen }
         // Emergencies are drawn from TOP + WORLD (deduped); the general breaking lead is TOP-only.
         val emergencyPool = (fresh + world.filter { it.title.isNotBlank() && it.title !in seen }).distinctBy { it.title }
+        var firedInterrupt: String? = null
+        var firedInterruptMs = 0L
         if (!firstRun) {
             // The general breaking feed — the lead fresh TOP headline.
             if (prefs.breakingNews && fresh.isNotEmpty()) {
@@ -61,6 +65,23 @@ object BreakingNewsPulse {
                     )
                 }
             }
+            // BREAKING INTERRUPT — the full-screen cinematic takeover. Only for a MAJOR event (EmergencyNews.isMajor
+            // — a death, a disaster; a much higher bar than the emergency notification), opt-out-gated, hard-throttled
+            // (per-title dedup + a time floor) so it can NEVER spam. Fires at most one takeover per check.
+            if (prefs.breakingInterrupt) {
+                val now = System.currentTimeMillis()
+                val major = emergencyPool.firstOrNull {
+                    it.title !in state.breakingInterruptSeen && EmergencyNews.isMajor(it.title, it.summary)
+                }
+                if (major != null && now - state.breakingInterruptLastMs >= INTERRUPT_MIN_GAP_MS) {
+                    container.notifier.notifyBreakingInterrupt(
+                        headline = major.title,
+                        query = EmergencyNews.topicQuery(major.title),
+                    )
+                    firedInterrupt = major.title
+                    firedInterruptMs = now
+                }
+            }
         }
         // Accumulate seen titles (bounded) so an item briefly leaving a feed won't re-alert. Include WORLD
         // titles so a world emergency won't re-fire, and widen the window for the two feeds.
@@ -71,6 +92,13 @@ object BreakingNewsPulse {
         val latest = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: state
         val merged = (latest.seenTopUrls + top.take(20).map { it.title } + world.take(20).map { it.title })
             .filter { it.isNotBlank() }.distinct().takeLast(100)
-        container.diskCache.write(STATE_KEY, latest.copy(seenTopUrls = merged), NotifyState.serializer())
+        var updated = latest.copy(seenTopUrls = merged)
+        if (firedInterrupt != null) {
+            updated = updated.copy(
+                breakingInterruptLastMs = firedInterruptMs,
+                breakingInterruptSeen = (latest.breakingInterruptSeen + firedInterrupt).distinct().takeLast(50),
+            )
+        }
+        container.diskCache.write(STATE_KEY, updated, NotifyState.serializer())
     }
 }

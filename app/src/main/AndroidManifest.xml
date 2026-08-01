@@ -169,6 +169,17 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- BREAKING NEWS takeover — force-opens (over the lock screen) a cinematic, ad-free, tabbed page of
+             aggregated coverage from trusted free sources on a major detected event. -->
+        <activity
+            android:name=".feature.breaking.BreakingNewsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
         <!-- The self-care lockout — pins the phone (device-owner kiosk) after a dodged check-in until the
              task is sensed done. Safe: hard auto-release, emergency dialer stays reachable, hold-to-override. -->
         <activity

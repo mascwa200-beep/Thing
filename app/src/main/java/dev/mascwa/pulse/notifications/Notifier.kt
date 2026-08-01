@@ -173,6 +173,40 @@ class Notifier(private val context: Context) {
         safeNotify(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, notification)
     }
 
+    /**
+     * The BREAKING NEWS interrupt — a full-screen intent that force-opens the cinematic
+     * [dev.mascwa.pulse.feature.breaking.BreakingNewsActivity] on a MAJOR detected event (a death, a
+     * disaster). Over the lock screen it takes over instantly (the Hollywood moment); while the phone is in
+     * active use the OS shows it as a max-priority heads-up to tap — the ceiling Android allows. CATEGORY_CALL
+     * is the category that most reliably triggers the full-screen path. Opt-out gated by the caller.
+     */
+    fun notifyBreakingInterrupt(headline: String, query: String) {
+        if (!canPost()) return
+        val intent = Intent(context, dev.mascwa.pulse.feature.breaking.BreakingNewsActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.EXTRA_HEADLINE, headline)
+            putExtra(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.EXTRA_QUERY, query)
+        }
+        val pi = PendingIntent.getActivity(
+            context, dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NotificationChannels.BREAKING_INTERRUPT)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
+            .setSubText("// BREAKING")
+            .setContentTitle("🔴 BREAKING NEWS")
+            .setContentText(headline)
+            .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle("🔴 BREAKING NEWS").bigText(headline))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setFullScreenIntent(pi, true)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        safeNotify(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID, notification)
+    }
+
     /** Quiet confirmation that the camera/mic caught you tending a need in real life and the game credited it
      *  automatically — one fixed id per need so it replaces, on the low-priority DIGEST channel. */
     fun notifySensedCare(need: dev.mascwa.pulse.core.telemetry.NeedKind) =
