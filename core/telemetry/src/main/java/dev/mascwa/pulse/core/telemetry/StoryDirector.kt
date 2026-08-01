@@ -132,9 +132,12 @@ object StoryDirector {
             )
         }
 
-        // 4 · DAILY — scaled to your level, flavoured by the scene the game perceives around you.
+        // 4 · DAILY — scaled to your level, and PACED by the scene the game perceives around you: an
+        // energetic environment (loud/active/crowded, tempoNudge +1) pushes for a bit more, a calm one
+        // (quiet/still/dark, -1) eases off. So the ambient sensing actually moves the objective, not just
+        // the flavour text.
         val strat = Perception.strategy(life.scene)
-        val dailyTarget = 2 + life.level / 2
+        val dailyTarget = (2 + life.level / 2 + strat.tempoNudge).coerceAtLeast(1)
         quests += Quest(
             id = "q_daily_${life.day}",
             title = "Prove Your Worth",
