@@ -91,55 +91,89 @@ fun ArticleCard(
     }
 }
 
-/** The market strip beneath a story's summary: a chip per associated market, coloured + arrowed by the
- *  story's likely push (▲ up / ▼ down / • unclear), and a one-line "why" caption. Heuristic, not a quote. */
+/** The MARKET REACTION strip beneath a story's summary — the (legal) *Trading Places* read: which markets
+ *  this news moves, which way, LIVE if we have a quote, and WHY. A framed readout: header · market chips ·
+ *  the sharpest causal line · a winners/losers summary. Heuristic, not a quote or advice. */
 @Composable
 private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
     val c = Pulse.colors
-    Column(Modifier.padding(top = 7.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            links.forEach { link ->
-                // Prefer the market's LIVE move today (coloured by its actual sign); otherwise the story's
-                // heuristic lean (▲ up / ▼ down / • unclear).
-                val live = pulse[link.market]
-                val col = when {
-                    live != null && live > 0.0 -> c.positive
-                    live != null && live < 0.0 -> c.negative
-                    live != null -> c.muted
-                    link.impact == MarketImpact.UP -> c.positive
-                    link.impact == MarketImpact.DOWN -> c.negative
-                    else -> c.muted
-                }
-                val text = if (live != null) {
-                    val sign = if (live >= 0.0) "+" else ""
-                    "${if (live >= 0.0) "▲" else "▼"} ${link.market} $sign${"%.1f".format(live)}%"
-                } else {
-                    val arrow = when (link.impact) {
-                        MarketImpact.UP -> "▲"
-                        MarketImpact.DOWN -> "▼"
-                        MarketImpact.MIXED -> "•"
-                    }
-                    "$arrow ${link.market}"
-                }
-                Text(
-                    text,
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(col.copy(alpha = 0.13f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
+    val hasLive = links.any { pulse[it.market] != null }
+    Column(
+        Modifier
+            .padding(top = 9.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(c.accent.copy(alpha = 0.06f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "◢ MARKET REACTION",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = c.accent,
+            )
+            if (hasLive) Text("· LIVE", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted)
         }
+        FlowRow(
+            Modifier.padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            links.forEach { link -> MarketChip(link, pulse[link.market]) }
+        }
+        // The sharpest causal read — "what reality is doing to this market" (Trading Places framing).
+        val head = NewsMarketLink.headline(links)
+        if (head.isNotBlank()) {
+            Text(
+                head,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
+                modifier = Modifier.padding(top = 7.dp),
+            )
+        }
+        // Winners/losers one-liner.
         val why = NewsMarketLink.summarize(links)
         if (why.isNotBlank()) {
             Text(
                 why,
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                modifier = Modifier.padding(top = 4.dp),
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                modifier = Modifier.padding(top = 3.dp),
             )
         }
     }
+}
+
+/** One market chip: prefers the market's LIVE % move today (coloured by its actual sign); otherwise the
+ *  story's heuristic lean (▲ up / ▼ down / • unclear). */
+@Composable
+private fun MarketChip(link: MarketLink, live: Double?) {
+    val c = Pulse.colors
+    val col = when {
+        live != null && live > 0.0 -> c.positive
+        live != null && live < 0.0 -> c.negative
+        live != null -> c.muted
+        link.impact == MarketImpact.UP -> c.positive
+        link.impact == MarketImpact.DOWN -> c.negative
+        else -> c.muted
+    }
+    val text = if (live != null) {
+        val sign = if (live >= 0.0) "+" else ""
+        "${if (live >= 0.0) "▲" else "▼"} ${link.market} $sign${"%.1f".format(live)}%"
+    } else {
+        val arrow = when (link.impact) {
+            MarketImpact.UP -> "▲"
+            MarketImpact.DOWN -> "▼"
+            MarketImpact.MIXED -> "•"
+        }
+        "$arrow ${link.market}"
+    }
+    Text(
+        text,
+        fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(col.copy(alpha = 0.14f))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 /** Compact list variant — the CP2077 inventory row (accent blade + hairline) with a chamfered thumb. */
