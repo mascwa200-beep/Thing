@@ -140,7 +140,7 @@ fun BreakingNewsScreen(
         Text(
             headline,
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = INK,
-            modifier = Modifier.padding(horizontal = 14.dp, top = 12.dp, bottom = 4.dp),
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
         )
         data?.let { d ->
             val n = d.sources.size
@@ -148,7 +148,7 @@ fun BreakingNewsScreen(
                 Text(
                     "Covered by $n source${if (n == 1) "" else "s"} · updated ${Formatters.relativeTime(d.fetchedAtMs)}",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = MUTED,
-                    modifier = Modifier.padding(horizontal = 14.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
                 )
             }
         }
