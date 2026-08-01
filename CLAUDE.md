@@ -1867,6 +1867,23 @@ Owner-driven; all CI-green, squash-merged, re-synced.
   `NewsMarketLink` sector keywords, and the `NewsMarketPulse` basket symbols. **Open/steerable:** broaden
   emergency scan to WORLD; the market strip on the compact article row / home news preview.
 
+### Ambient-sensing audit — "is it just visual?" (#386 merged)
+Owner asked to "make sure the ambient environment sensing thing is not just some visual stuff only." Traced
+the full camera/mic → gameplay pipeline. **Verdict: genuinely functional, with one dead output (now fixed).**
+- **Already functional (NOT decoration):** the mic (`AmbientPerceptionSampler`/YAMNet) + camera
+  (`CameraPerceptionSampler`/EfficientNet) → `PerceptLabel`s → `Perception.distill` → `SceneContext` →
+  `Perception.strategy`. Its `favored` stat set **biases which encounters appear** (`TelemetryViewModel.venture()`
+  unions it with circadian + world-event + perception favoured); `NeedAutoCare` **auto-restores survival needs**
+  when the camera/mic catches you actually drinking/eating/washing/brushing (`game.drink()/eat()/wash()/brushTeeth()`);
+  `ActivitySensing` **verifies self-care check-in claims** (bounces a "DONE" the sensors didn't corroborate);
+  `flavor` writes the quest brief.
+- **The one dead output → fixed (#386):** `SceneStrategy.tempoNudge` was computed but consumed nowhere (only
+  its own test). Wired into `StoryDirector` daily `WIN_ENCOUNTERS` target: `2 + level/2 + tempoNudge`, floored
+  at 1 — an active scene (moving/vehicle/dark → +1) asks for a bit more, calm eases off. So the perceived tempo
+  now MOVES the objective, not just words. +2 `StoryDirectorTest` cases (13/13 green, locally kotlinc-run).
+  Note: `strategy()` only ever produces tempoNudge 0 or +1 (no code path subtracts), so the coerce/-1 floor is
+  defensive; that's fine. ⚠️ On-device runtime feel is owner-verify (CI can't run the samplers).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
