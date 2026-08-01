@@ -45,4 +45,26 @@ class EmergencyNewsTest {
         assertEquals(1, EmergencyNews.severity("Explosion at a warehouse, cause unknown"))
         assertEquals(0, EmergencyNews.severity("Weather stays mild through the weekend"))
     }
+
+    @Test fun majorFiresOnStrongDisastersAndDeaths() {
+        assertTrue(EmergencyNews.isMajor("Magnitude 7.1 earthquake strikes the coast"))
+        assertTrue(EmergencyNews.isMajor("Beloved actor John Smith dies at 78"))
+        assertTrue(EmergencyNews.isMajor("Former president has died, aides confirm"))
+        assertTrue(EmergencyNews.isMajor("Nation declares war after border incursion"))
+    }
+
+    @Test fun majorIgnoresFictionalDeathsAndOrdinaryNews() {
+        assertFalse(EmergencyNews.isMajor("Fan-favourite character dies in the season finale"))
+        assertFalse(EmergencyNews.isMajor("Stocks rise as earnings beat expectations"))
+        assertFalse(EmergencyNews.isMajor("New restaurant opens downtown this weekend"))
+        // A moderate-only signal (severity 1) is NOT enough to force a takeover.
+        assertFalse(EmergencyNews.isMajor("Explosion at a warehouse, cause unknown"))
+    }
+
+    @Test fun topicQueryStripsSourceSuffixAndTags() {
+        assertEquals("Major earthquake strikes the coast",
+            EmergencyNews.topicQuery("Breaking: Major earthquake strikes the coast - Reuters"))
+        assertEquals("Former leader has died",
+            EmergencyNews.topicQuery("Former leader has died"))
+    }
 }
