@@ -81,6 +81,24 @@ class StoryDirectorTest {
         assertTrue(daily.brief.startsWith(flavor))
     }
 
+    @Test fun anEnergeticSceneRaisesTheDailyTarget() {
+        // The scene the game PERCEIVES around you moves the objective, not just the flavour text: an active
+        // scene (tempoNudge +1) asks for more daily wins than a calm one. This is what makes the ambient
+        // camera/mic sensing functional gameplay and not decoration.
+        val active = SceneContext(activity = Activity.MOVING) // tempoNudge +1
+        val calmTarget = StoryDirector.compose(LifeContext(level = 4), seed = 1)
+            .first { it.kind == QuestKind.DAILY }.target
+        val activeTarget = StoryDirector.compose(LifeContext(level = 4, scene = active), seed = 1)
+            .first { it.kind == QuestKind.DAILY }.target
+        assertTrue(activeTarget > calmTarget)
+        assertEquals(calmTarget + Perception.strategy(active).tempoNudge, activeTarget)
+    }
+
+    @Test fun dailyTargetNeverDropsBelowOne() {
+        val daily = StoryDirector.compose(LifeContext(level = 0), seed = 1).first { it.kind == QuestKind.DAILY }
+        assertTrue(daily.target >= 1)
+    }
+
     @Test fun fractionClamps() {
         assertEquals(0f, StoryDirector.fraction(0, 2), 0.0001f)
         assertEquals(0.5f, StoryDirector.fraction(1, 2), 0.0001f)
