@@ -280,6 +280,11 @@ class RefreshWorker(
             runCatching { BreakingNewsPulse.check(container) }
         }
 
+        // ORACLE — fuse every signal and fire one throttled proactive foresight push if warranted.
+        if (prefs.masterEnabled && prefs.oracleEnabled) {
+            runCatching { dev.mascwa.pulse.data.oracle.OracleEngine.run(container, settings) }
+        }
+
         // Read the rest of the dedup state AFTER the breaking check so we don't clobber its
         // seenTopUrls update when we persist the other sections below.
         var state = readState()

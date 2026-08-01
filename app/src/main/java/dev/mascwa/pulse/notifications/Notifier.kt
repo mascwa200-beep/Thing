@@ -33,6 +33,14 @@ class Notifier(private val context: Context) {
     fun notifyEmergency(id: Int, title: String, body: String, route: String = "news") =
         post(NotificationChannels.EMERGENCY, id, "THIS JUST IN", title, body, route, NotificationCompat.PRIORITY_MAX)
 
+    /** A proactive ORACLE foresight push — J.A.R.V.I.S. surfacing the single most important thing right now. */
+    fun notifyOracle(insight: dev.mascwa.pulse.core.telemetry.Insight) =
+        post(
+            NotificationChannels.ORACLE, 2000 + (insight.id.hashCode() and 0xffff),
+            "ORACLE", insight.title, insight.detail, insight.actionRoute ?: "jarvis",
+            NotificationCompat.PRIORITY_HIGH,
+        )
+
     fun notifyMarket(id: Int, title: String, body: String) =
         post(NotificationChannels.MARKETS, id, "MARKET", title, body, "markets", NotificationCompat.PRIORITY_DEFAULT)
 

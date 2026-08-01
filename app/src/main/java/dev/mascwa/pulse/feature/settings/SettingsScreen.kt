@@ -644,6 +644,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         subtitle = "On a MAJOR event (a death, a disaster), force-open a full-screen breaking-news page — trusted free sources, ad-free. Rare + hard-throttled.",
                         checked = s.notifications.breakingInterrupt, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
+                    PrefSwitch(
+                        "Oracle foresight",
+                        subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, needs, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
+                        checked = s.notifications.oracleEnabled, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
                     PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
                         checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
