@@ -162,6 +162,38 @@ fun ArticleRowCompact(
                     fontFamily = ChakraPetch, fontWeight = FontWeight.Medium, fontSize = 15.sp,
                     color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
+                // A light market tag on the dense home row: up to 2 chips, arrow-coloured (no why caption).
+                val links = remember(article.url) {
+                    NewsMarketLink.linksFor(article.title, article.summary, article.category)
+                }
+                if (links.isNotEmpty()) {
+                    FlowRow(
+                        Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        links.take(2).forEach { link ->
+                            val col = when (link.impact) {
+                                MarketImpact.UP -> c.positive
+                                MarketImpact.DOWN -> c.negative
+                                MarketImpact.MIXED -> c.muted
+                            }
+                            val arrow = when (link.impact) {
+                                MarketImpact.UP -> "▲"
+                                MarketImpact.DOWN -> "▼"
+                                MarketImpact.MIXED -> "•"
+                            }
+                            Text(
+                                "$arrow ${link.market}",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = col,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(col.copy(alpha = 0.13f))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                            )
+                        }
+                    }
+                }
                 Text(
                     meta(article).uppercase(),
                     fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.7.sp, color = c.muted,
