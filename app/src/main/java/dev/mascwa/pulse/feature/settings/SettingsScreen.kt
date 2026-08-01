@@ -649,6 +649,11 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, needs, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
                         checked = s.notifications.oracleEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
+                    PrefSwitch(
+                        "World pulse (live feed)",
+                        subtitle = "A quiet, always-latest dashboard notification — the world's state (breaking, markets, space weather) woven with your day (next event, low needs). Silent; updates in place, never buzzes.",
+                        checked = s.notifications.worldPulse, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(worldPulse = v)) } })
                     PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
                         checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })

@@ -414,6 +414,14 @@ fun PulseApp(
         if (!startRoute.isNullOrBlank()) {
             if (startRoute != Routes.HOME) {
                 when {
+                    // A "tacnet?tab=SPECIAL"-style deep-link opens the PIP-BOY (a top destination) AND selects
+                    // a specific sub-tab: stash the tab for PipBoyScreen, then navigate to the top destination
+                    // (query args can't ride a top-level nav, so the holder carries it).
+                    startRoute.substringBefore('?') == Routes.TACNET && startRoute.contains("tab=") -> {
+                        dev.mascwa.pulse.feature.tacnet.PipBoyDeepLink.target.value =
+                            startRoute.substringAfter("tab=").substringBefore('&')
+                        navigateTopLevel(Routes.TACNET)
+                    }
                     TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
                     // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
                     // QUESTS, or an argumented one like "survival?guide=fire" — match on the base route).

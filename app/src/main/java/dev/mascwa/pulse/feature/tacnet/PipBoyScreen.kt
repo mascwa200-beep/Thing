@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,6 +90,16 @@ private enum class PipTab(val label: String, val section: PipSection) {
     }
 }
 
+/**
+ * A process-scoped deep-link target for the PIP-BOY screen's sub-tab. A notification or launcher shortcut
+ * sets [target] to a [PipTab] name (e.g. "SPECIAL", "WASTELAND") just before navigating to TACNET; because
+ * TACNET is a top destination navigated without query args, this holder carries the sub-tab. [PipBoyScreen]
+ * consumes and clears it on arrival. Backed by Compose state so an already-composed screen reacts too.
+ */
+object PipBoyDeepLink {
+    val target = mutableStateOf<String?>(null)
+}
+
 @Composable
 fun PipBoyScreen(
     radarVm: RadarViewModel,
@@ -109,6 +120,14 @@ fun PipBoyScreen(
     onOpenSettings: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
+    // A notification/shortcut can deep-link straight to a specific sub-tab (e.g. a survival check-in → STATS ▸
+    // SPECIAL, an agenda reminder → DATA ▸ WASTELAND) by setting PipBoyDeepLink.target before navigating here.
+    // Consume it reactively — the screen may already be composed when the deep-link arrives.
+    LaunchedEffect(PipBoyDeepLink.target.value) {
+        val t = PipBoyDeepLink.target.value ?: return@LaunchedEffect
+        PipTab.entries.firstOrNull { it.name == t }?.let { tab = it }
+        PipBoyDeepLink.target.value = null
+    }
     // Live device readouts for the persistent STAT strip (STATUS is the default tab, so telemetry
     // starts on open; values persist across sub-tabs).
     val telem by telemetryVm.telemetry.collectAsStateWithLifecycle()

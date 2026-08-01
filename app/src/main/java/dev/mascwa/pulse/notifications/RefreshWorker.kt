@@ -92,7 +92,7 @@ class RefreshWorker(
                 val info = container.updateRepository.check().available
                 if (info != null && info.versionCode > settings.lastUpdateNotifiedCode) {
                     notifier.notifyUpdate(
-                        id = 7401,
+                        id = NotifId.UPDATE,
                         title = "J.A.R.V.I.S. update available",
                         body = "Build #${info.versionCode} is ready — tap to download & install.",
                     )
@@ -144,7 +144,7 @@ class RefreshWorker(
                     if (container.findingStore.unseenCount() > before) {
                         val latest = container.findingStore.findingsFlow.value.firstOrNull { !it.seen }
                         notifier.notifyFinding(
-                            id = 7501,
+                            id = NotifId.FINDING,
                             title = "J.A.R.V.I.S. has a finding",
                             body = latest?.headline ?: "I came across something — ready when you are.",
                         )
@@ -280,8 +280,9 @@ class RefreshWorker(
             runCatching { BreakingNewsPulse.check(container) }
         }
 
-        // ORACLE — fuse every signal and fire one throttled proactive foresight push if warranted.
-        if (prefs.masterEnabled && prefs.oracleEnabled) {
+        // ORACLE — fuse every signal, refresh the always-latest WORLD PULSE feed, and fire one throttled
+        // proactive foresight push if warranted. Runs when EITHER surface is enabled (each is gated inside).
+        if (prefs.oracleEnabled || prefs.worldPulse) {
             runCatching { dev.mascwa.pulse.data.oracle.OracleEngine.run(container, settings) }
         }
 
@@ -296,17 +297,24 @@ class RefreshWorker(
                     state.marketAlertedSymbols.toMutableSet()
                 } else mutableSetOf()
                 val quotes = container.marketsRepository.fetchAll(force = true).data
-                quotes.forEach { q ->
-                    val pct = q.changePercent ?: return@forEach
-                    if (abs(pct) >= prefs.marketMovePercent && q.id !in alreadyToday) {
-                        val dir = if (pct >= 0) "▲" else "▼"
-                        notifier.notifyMarket(
-                            id = 2000 + (q.id.hashCode() and 0xFFF),
-                            title = "${q.label} $dir ${Formatters.signedPercent(pct)}",
-                            body = "Now ${Formatters.number(q.price, 2)} ${q.currency}".trim(),
-                        )
-                        alreadyToday += q.id
-                    }
+                // Latest-only: collapse all fresh movers into ONE in-place notification (biggest + "N more"),
+                // instead of one-per-instrument piling up the tray.
+                val fresh = quotes.filter { q ->
+                    val pct = q.changePercent
+                    pct != null && abs(pct) >= prefs.marketMovePercent && q.id !in alreadyToday
+                }.sortedByDescending { abs(it.changePercent ?: 0.0) }
+                if (fresh.isNotEmpty()) {
+                    val lead = fresh.first()
+                    val pct = lead.changePercent ?: 0.0
+                    val dir = if (pct >= 0) "▲" else "▼"
+                    val more = fresh.size - 1
+                    notifier.notifyMarket(
+                        id = NotifId.MARKET,
+                        title = "${lead.label} $dir ${Formatters.signedPercent(pct)}" + if (more > 0) "  (+$more more)" else "",
+                        body = "Now ${Formatters.number(lead.price, 2)} ${lead.currency}".trim() +
+                            if (more > 0) " · also ${fresh.drop(1).take(3).joinToString(", ") { it.label }}" else "",
+                    )
+                    fresh.forEach { alreadyToday += it.id }
                 }
                 state = state.copy(marketAlertDay = today, marketAlertedSymbols = alreadyToday.toList())
             }
@@ -322,7 +330,7 @@ class RefreshWorker(
                     val wet = (day.precipProbabilityMax ?: 0) >= 70
                     if (severe || wet) {
                         notifier.notifyWeather(
-                            id = 3001,
+                            id = NotifId.WEATHER,
                             title = "${weather!!.locationName}: ${WeatherCode.describe(day.weatherCode)}",
                             body = buildString {
                                 append("High ${Formatters.number(day.tempMax, 0)}${weather!!.tempUnitSymbol}")
@@ -343,7 +351,7 @@ class RefreshWorker(
                 val kp = sw.kp
                 if (kp != null && kp >= 5.0) {
                     notifier.notifySpace(
-                        id = 5001,
+                        id = NotifId.SPACE_STORM,
                         title = "Geomagnetic storm: ${sw.stormLevel}",
                         body = "Planetary Kp ${"%.1f".format(kp)}. Aurora: ${sw.auroraChance}.",
                     )
@@ -361,7 +369,7 @@ class RefreshWorker(
                     val pct = sw.auroraProbabilityPct
                     if (pct != null && pct >= 25) {
                         notifier.notifySpace(
-                            id = 5003,
+                            id = NotifId.SPACE_AURORA,
                             title = "Aurora likely — $pct% overhead",
                             body = "NOAA OVATION puts aurora at $pct% over your location" +
                                 (sw.kp?.let { " · Kp ${"%.1f".format(it)}" } ?: "") + ".",
@@ -379,7 +387,7 @@ class RefreshWorker(
                 val hazard = orbital.neos.firstOrNull { it.hazardous }
                 if (hazard != null) {
                     notifier.notifySpace(
-                        id = 5002,
+                        id = NotifId.SPACE_NEO,
                         title = "Close approach: ${orbital.neoHazardousCount} flagged object(s)",
                         body = "${hazard.name.removeSurrounding("(", ")")} passes today" +
                             (hazard.missDistanceKm?.let { " · ${Formatters.compact(it)} km" } ?: ""),
@@ -404,16 +412,18 @@ class RefreshWorker(
                             sev == dev.mascwa.pulse.data.safety.Severity.EXTREME) &&
                             it.distanceMeters <= radiusM && it.id !in already
                     }
-                    severe.take(3).forEach { inc ->
-                        notifier.notifySafety(
-                            id = 6000 + (inc.id.hashCode() and 0xFFF),
-                            title = "Safety: ${inc.title.take(60)}",
-                            body = (if (inc.distanceMeters > 0)
-                                "${Formatters.compact(inc.distanceMeters / 1000)} km away · " else "Your area · ") + inc.source,
-                        )
-                        already += inc.id
-                    }
+                    // Latest-only: ONE in-place notification for the NEAREST fresh severe incident (+ "N more"),
+                    // instead of up to three stacking in the tray.
                     if (severe.isNotEmpty()) {
+                        val lead = severe.minByOrNull { it.distanceMeters } ?: severe.first()
+                        val more = severe.size - 1
+                        notifier.notifySafety(
+                            id = NotifId.SAFETY,
+                            title = "Safety: ${lead.title.take(60)}" + if (more > 0) "  (+$more more)" else "",
+                            body = (if (lead.distanceMeters > 0)
+                                "${Formatters.compact(lead.distanceMeters / 1000)} km away · " else "Your area · ") + lead.source,
+                        )
+                        severe.forEach { already += it.id }
                         state = state.copy(safetyAlertedIds = already.toList().takeLast(100))
                     }
                 }
@@ -436,7 +446,7 @@ class RefreshWorker(
                     overhead.firstOrNull()?.let { ac ->
                         val altFt = ((ac.altitudeM ?: 0.0) / 0.3048).toInt()
                         notifier.notifyFlight(
-                            id = 7000 + (ac.id.hashCode() and 0xFFF),
+                            id = NotifId.FLIGHT,
                             title = "Overhead: ${ac.label}",
                             body = "$altFt ft" +
                                 (ac.groundSpeedKmh?.let { " · ${it.toInt()} km/h" } ?: "") +
@@ -522,13 +532,18 @@ class RefreshWorker(
                     container.calendarRepository.upcoming(now), now, max = 5,
                 )
                 val notified = state.agendaNotifiedIds.toMutableSet()
-                agenda.filter { it.imminent && it.id.toString() !in notified }.take(3).forEach { q ->
+                // Latest-only: ONE in-place reminder for the SOONEST imminent appointment (+ "N more");
+                // CalendarQuests.compose returns soonest-first.
+                val dueAgenda = agenda.filter { it.imminent && it.id.toString() !in notified }
+                if (dueAgenda.isNotEmpty()) {
+                    val lead = dueAgenda.first()
+                    val more = dueAgenda.size - 1
                     notifier.notifyAgenda(
-                        id = 7720 + (q.id.hashCode() and 0xFF),
-                        title = "⏰ Incoming: ${q.title.take(60)}",
-                        body = "${q.countdown} — ${q.briefing}",
+                        id = NotifId.AGENDA,
+                        title = "⏰ Incoming: ${lead.title.take(60)}" + if (more > 0) "  (+$more more)" else "",
+                        body = "${lead.countdown} — ${lead.briefing}",
                     )
-                    notified += q.id.toString()
+                    dueAgenda.forEach { notified += it.id.toString() }
                 }
                 // Keep only ids still in the agenda window so the dedup set can't grow without bound.
                 val liveIds = agenda.map { it.id.toString() }.toSet()
@@ -583,7 +598,7 @@ class RefreshWorker(
                     val idx = (bucket * 131).toInt()
                     val tips = dev.mascwa.pulse.core.telemetry.SurvivalTips
                     // Deep-link the tip to the specific guide that teaches its skill (knot tip → knots guide).
-                    notifier.notifyTip(7760, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
+                    notifier.notifyTip(NotifId.TIP, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
                     state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
                 }
             }
@@ -595,7 +610,7 @@ class RefreshWorker(
                 val lines = buildDigestLines(settings, weather)
                 if (lines.isNotEmpty()) {
                     notifier.notifyDigest(
-                        id = 4001,
+                        id = NotifId.DIGEST,
                         title = "Your daily Pulse",
                         body = lines.first(),
                         lines = lines,

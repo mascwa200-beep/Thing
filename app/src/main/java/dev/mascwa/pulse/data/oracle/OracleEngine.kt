@@ -135,7 +135,16 @@ object OracleEngine {
      */
     suspend fun run(container: AppContainer, settings: AppSettings) {
         val signals = snapshot(container, settings)
-        val push = Oracle.pushWorthy(Oracle.divine(signals))
+        val insights = Oracle.divine(signals)
+
+        // The WORLD PULSE — a quiet, always-latest ambient feed of the world woven with your day. It updates
+        // in place every pass (silent MIN channel), so it just reflects the current read (no throttle/dedup).
+        if (settings.notifications.worldPulse) {
+            Oracle.worldPulse(signals, insights)?.let { container.notifier.notifyWorldPulse(it) }
+        }
+
+        if (!settings.notifications.oracleEnabled) return
+        val push = Oracle.pushWorthy(insights)
         if (push.isEmpty()) return
         val state = runCatching { container.diskCache.readAny(STATE_KEY, OracleState.serializer())?.value }.getOrNull()
             ?: OracleState()
