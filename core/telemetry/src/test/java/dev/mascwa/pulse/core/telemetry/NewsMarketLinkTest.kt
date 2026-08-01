@@ -44,11 +44,36 @@ class NewsMarketLinkTest {
         assertTrue(NewsMarketLink.linksFor("Local team wins the championship").isEmpty())
     }
 
-    @Test fun capsToThreeMarketsForACompactStrip() {
+    @Test fun capsForACompactStrip() {
         val many = NewsMarketLink.linksFor(
             "Oil, gold, tech, banks and airlines all react as war, chip and mortgage news hits",
         )
-        assertTrue(many.size <= 3)
+        assertTrue(many.size <= 4)
+    }
+
+    @Test fun catchesLocalAndSmallBusinessNews() {
+        assertTrue("Small Caps" in markets("Small business owners on Main Street feel the credit squeeze"))
+    }
+
+    @Test fun catchesConsumerBehaviourNews() {
+        // "products in stores that are/aren't being bought" → the consumer/retail read.
+        val links = NewsMarketLink.linksFor("Shoppers cut back as retail sales fall for a third month")
+        assertTrue(links.any { it.market == "Retail" })
+        assertEquals(MarketImpact.DOWN, links.first { it.market == "Retail" }.impact)
+    }
+
+    @Test fun catchesPoliticsAndPolicyNews() {
+        assertTrue("Stocks" in markets("Government announces new tariffs on imported goods"))
+    }
+
+    @Test fun catchesAGranularCommodity() {
+        val coffee = NewsMarketLink.linksFor("Coffee prices jump after frost hits Brazil's crop")
+            .firstOrNull { it.market == "Coffee" }
+        assertTrue(coffee != null && coffee.impact == MarketImpact.UP)
+    }
+
+    @Test fun catchesRegionalBanks() {
+        assertTrue("Regional Banks" in markets("Regional banks slump on deposit flight fears"))
     }
 
     @Test fun summarizeReadsAsAWhyLine() {
