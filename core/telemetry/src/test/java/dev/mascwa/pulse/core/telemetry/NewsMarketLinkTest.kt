@@ -57,4 +57,39 @@ class NewsMarketLinkTest {
         assertTrue(line.isNotBlank())
         assertTrue(line.contains("Oil") || line.contains("Airlines"))
     }
+
+    @Test fun everyLinkCarriesACausalRationale() {
+        val links = NewsMarketLink.linksFor("Oil prices surge as OPEC agrees a production cut")
+        assertTrue(links.isNotEmpty())
+        assertTrue(links.all { it.rationale.isNotBlank() })
+    }
+
+    @Test fun aKeywordMatchOutranksACategoryBaseline() {
+        // A keyword-matched market with a stated direction is the strongest read; a market added only
+        // because of the news category is the weakest.
+        val links = NewsMarketLink.linksFor("Bitcoin surges to a record high", category = "Business")
+        assertEquals("Bitcoin", links.first().market)
+        val stocks = links.firstOrNull { it.market == "Stocks" }
+        assertTrue(stocks != null && links.first().strength > stocks.strength)
+    }
+
+    @Test fun theFrozenCropStorySpikesOjFutures() {
+        // The literal Trading Places setup: a bad freeze report → OJ up.
+        val oj = NewsMarketLink.linksFor("Florida orange crop hit by hard freeze, shortage feared")
+            .firstOrNull { it.market == "OJ Futures" }
+        assertTrue(oj != null && oj.impact == MarketImpact.UP)
+    }
+
+    @Test fun aCategoryGivesABroadReadWhenNoKeywordMatches() {
+        // A business headline with no sector keyword still surfaces the broad market (low strength).
+        val links = NewsMarketLink.linksFor("Quarterly figures come in ahead of forecasts", category = "Business")
+        assertTrue(links.any { it.market == "Stocks" })
+        // But it stays a weak, watch-list association, not a confident call.
+        assertEquals(1, links.first { it.market == "Stocks" }.strength)
+    }
+
+    @Test fun headlineIsTheSharpestRationale() {
+        val links = NewsMarketLink.linksFor("Gold climbs as war fears grip investors")
+        assertTrue(NewsMarketLink.headline(links).isNotBlank())
+    }
 }

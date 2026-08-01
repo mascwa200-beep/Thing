@@ -16,6 +16,7 @@ object NewsMarketPulse {
     // "^spx"/etc. resolve via YAHOO_OVERRIDES, ".f" -> "=F" commodities, ETF tickers pass through).
     private val BASKET: Map<String, WatchItem> = mapOf(
         "Oil" to WatchItem("cl.f", "Oil", WatchType.COMMODITY),          // WTI crude CL=F
+        "OJ Futures" to WatchItem("oj.f", "OJ Futures", WatchType.COMMODITY), // frozen OJ concentrate OJ=F
         "Gold" to WatchItem("gc.f", "Gold", WatchType.COMMODITY),        // GC=F
         "Defense" to WatchItem("ita", "Defense", WatchType.STOCK),       // iShares Aerospace & Defense
         "Bitcoin" to WatchItem("btc-usd", "Bitcoin", WatchType.CRYPTO),  // BTC-USD via Yahoo
