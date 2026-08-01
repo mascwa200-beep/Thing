@@ -30,6 +30,8 @@ data class NewsUiState(
     val tabs: List<NewsTab> = emptyList(),
     val selectedIndex: Int = 0,
     val content: Async<List<Article>> = Async(loading = true),
+    /** market name (from NewsMarketLink) -> today's % change, for the article market strips. */
+    val marketPulse: Map<String, Double> = emptyMap(),
     val searchMode: Boolean = false,
     val query: String = "",
 )
@@ -37,6 +39,7 @@ data class NewsUiState(
 class NewsViewModel(
     private val repo: NewsRepository,
     private val settings: SettingsRepository,
+    private val markets: dev.mascwa.pulse.data.markets.MarketsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -71,6 +74,14 @@ class NewsViewModel(
                     cache.clear()
                     if (!_state.value.searchMode) selectTab(_state.value.selectedIndex, force = false)
                 }
+        }
+        // The market pulse: fetch the fixed basket once so each article's strip can show its linked
+        // markets' live ±% today. Best-effort — a throttled/failed quote just omits its %.
+        viewModelScope.launch {
+            val pulse = runCatching {
+                dev.mascwa.pulse.data.news.NewsMarketPulse.fetch(markets)
+            }.getOrDefault(emptyMap())
+            if (pulse.isNotEmpty()) _state.update { it.copy(marketPulse = pulse) }
         }
     }
 
