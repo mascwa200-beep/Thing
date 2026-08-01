@@ -42,6 +42,7 @@ fun ArticleCard(
     article: Article,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    pulse: Map<String, Double> = emptyMap(),
 ) {
     val c = Pulse.colors
     NeonPanel(
@@ -79,7 +80,7 @@ fun ArticleCard(
                 val links = remember(article.url) {
                     NewsMarketLink.linksFor(article.title, article.summary, article.category)
                 }
-                if (links.isNotEmpty()) MarketStrip(links)
+                if (links.isNotEmpty()) MarketStrip(links, pulse)
                 Text(
                     meta(article).uppercase(),
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.accent,
@@ -93,23 +94,35 @@ fun ArticleCard(
 /** The market strip beneath a story's summary: a chip per associated market, coloured + arrowed by the
  *  story's likely push (▲ up / ▼ down / • unclear), and a one-line "why" caption. Heuristic, not a quote. */
 @Composable
-private fun MarketStrip(links: List<MarketLink>) {
+private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
     val c = Pulse.colors
     Column(Modifier.padding(top = 7.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             links.forEach { link ->
-                val col = when (link.impact) {
-                    MarketImpact.UP -> c.positive
-                    MarketImpact.DOWN -> c.negative
-                    MarketImpact.MIXED -> c.muted
+                // Prefer the market's LIVE move today (coloured by its actual sign); otherwise the story's
+                // heuristic lean (▲ up / ▼ down / • unclear).
+                val live = pulse[link.market]
+                val col = when {
+                    live != null && live > 0.0 -> c.positive
+                    live != null && live < 0.0 -> c.negative
+                    live != null -> c.muted
+                    link.impact == MarketImpact.UP -> c.positive
+                    link.impact == MarketImpact.DOWN -> c.negative
+                    else -> c.muted
                 }
-                val arrow = when (link.impact) {
-                    MarketImpact.UP -> "▲"
-                    MarketImpact.DOWN -> "▼"
-                    MarketImpact.MIXED -> "•"
+                val text = if (live != null) {
+                    val sign = if (live >= 0.0) "+" else ""
+                    "${if (live >= 0.0) "▲" else "▼"} ${link.market} $sign${"%.1f".format(live)}%"
+                } else {
+                    val arrow = when (link.impact) {
+                        MarketImpact.UP -> "▲"
+                        MarketImpact.DOWN -> "▼"
+                        MarketImpact.MIXED -> "•"
+                    }
+                    "$arrow ${link.market}"
                 }
                 Text(
-                    "$arrow ${link.market}",
+                    text,
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))

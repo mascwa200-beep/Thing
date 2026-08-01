@@ -131,7 +131,7 @@ fun NewsScreen(vm: NewsViewModel) {
                 ) {
                     if (content.stale) item { StaleBanner(true) }
                     items(content.data!!.distinctBy { it.url }, key = { it.url }) { article ->
-                        ArticleCard(article, onClick = { openUrl(context, article.url) })
+                        ArticleCard(article, pulse = state.marketPulse, onClick = { openUrl(context, article.url) })
                     }
                 }
             }
