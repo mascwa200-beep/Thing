@@ -3,14 +3,19 @@ package dev.mascwa.pulse.feature.news
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,7 +32,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.MarketImpact
 import dev.mascwa.pulse.core.telemetry.MarketLink
+import dev.mascwa.pulse.core.telemetry.NewsInsights
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
+import dev.mascwa.pulse.core.telemetry.Tone
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.feature.common.CyberChipCut
@@ -76,6 +84,8 @@ fun ArticleCard(
                         modifier = Modifier.padding(top = 5.dp),
                     )
                 }
+                // At-a-glance infographics: the story's mood + auto topic tags.
+                GlanceStrip(article)
                 // Which markets this story touches / would move, and which way (+ a short why).
                 val links = remember(article.url) {
                     NewsMarketLink.linksFor(article.title, article.summary, article.category)
@@ -91,6 +101,57 @@ fun ArticleCard(
     }
 }
 
+/** An at-a-glance infographic band: the story's MOOD (a tone bar) and auto-extracted topic/region tags.
+ *  A quick visual read that complements the MARKET REACTION strip. Pure heuristic (offline). */
+@Composable
+private fun GlanceStrip(article: Article) {
+    val c = Pulse.colors
+    val toneRead = remember(article.url) { NewsInsights.tone(article.title, article.summary) }
+    val tags = remember(article.url) { NewsInsights.topics(article.title, article.summary) }
+    val tone = toneRead.first
+    val score = toneRead.second
+    val toneCol = toneColor(tone)
+    Column(Modifier.padding(top = 7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("MOOD", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.muted)
+            Spacer(Modifier.width(6.dp))
+            Box(
+                Modifier.height(6.dp).weight(1f).clip(RoundedCornerShape(3.dp)).background(c.raise),
+            ) {
+                val frac = ((score + 1f) / 2f).coerceIn(0.06f, 1f)
+                Box(Modifier.fillMaxHeight().fillMaxWidth(frac).clip(RoundedCornerShape(3.dp)).background(toneCol))
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(tone.label, fontFamily = JetBrainsMono, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = toneCol)
+        }
+        if (tags.isNotEmpty()) {
+            FlowRow(
+                Modifier.padding(top = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                tags.forEach { tag ->
+                    Text(
+                        "#$tag",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.ink2,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(c.accent.copy(alpha = 0.10f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun toneColor(t: Tone): Color = when (t) {
+    Tone.UPBEAT -> Color(0xFF35C46A)
+    Tone.MIXED -> Color(0xFFC9B23A)
+    Tone.GRIM -> Color(0xFFE0721A)
+    Tone.TENSE -> Color(0xFFE0331A)
+}
+
 /** The MARKET REACTION strip beneath a story's summary — the (legal) *Trading Places* read: which markets
  *  this news moves, which way, LIVE if we have a quote, and WHY. A framed readout: header · market chips ·
  *  the sharpest causal line · a winners/losers summary. Heuristic, not a quote or advice. */
@@ -98,6 +159,7 @@ fun ArticleCard(
 private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
     val c = Pulse.colors
     val hasLive = links.any { pulse[it.market] != null }
+    val impact = NewsInsights.marketImpact(links)
     Column(
         Modifier
             .padding(top = 9.dp)
@@ -112,6 +174,10 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
                 fontWeight = FontWeight.Bold, color = c.accent,
             )
+            if (impact != dev.mascwa.pulse.core.telemetry.ImpactLevel.NONE) {
+                Text("· ${impact.label.uppercase()} IMPACT", fontFamily = JetBrainsMono, fontSize = 8.sp,
+                    letterSpacing = 0.8.sp, color = c.ink2)
+            }
             if (hasLive) Text("· LIVE", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted)
         }
         FlowRow(
