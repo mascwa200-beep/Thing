@@ -1829,6 +1829,44 @@ Owner: "keep going autonomously … and make the whole thing." Shipped as CI-gre
   collapse; whether the overlay should respect geo-gating; a stat-allocate control in the overlay (currently
   routed to OPEN).
 
+### News: Trending page · EMERGENCY alert type · market strip under each article (#380–#382 merged)
+Owner-driven; all CI-green, squash-merged, re-synced.
+- **Trending "seen everywhere" page (#380):** owner wanted "Hollywood instant news seen everywhere" —
+  clarified as *how fast the internet/social media spread a story*, NOT celebrity/showbiz (I initially
+  mis-built it as a Hollywood-celebrity query; corrected via `--amend` on the same draft PR). New **TRENDING**
+  `NewsCategory` — a search-driven feed on velocity/virality words (`breaking OR trending OR viral OR "this
+  just in" OR developing OR "happening now"`), recency-sorted. Tabs auto-build from `NewsCategory.entries`, so
+  the WIRE screen picks up the "Trending" tab with no UI change.
+- **EMERGENCY "this just in" notification type (#380):** major breaking emergencies anywhere get their OWN
+  distinct notification, independent of the general breaking feed. `core:telemetry/EmergencyNews.kt` (+6 tests)
+  — pure classifier: STRONG disaster/violence/crisis keywords fire alone; MODERATE ones fire unless an
+  entertainment/sport context word sits alongside (so a "box-office explosion"/a striker's "blast" don't);
+  two-tier `severity()`. New `NotificationChannels.EMERGENCY` (own urgent vibration pattern + red light),
+  `Notifier.notifyEmergency` (PRIORITY_MAX, "THIS JUST IN" tag, id 1002 vs breaking's 1001),
+  `NotificationPrefs.emergencyAlerts` (default ON) + a Settings toggle. `BreakingNewsPulse` now reads prefs and
+  fires each notification per its own pref off the SAME top-feed fetch — the breaking lead AND, separately, the
+  most-severe fresh emergency headline. `RefreshWorker` triggers the check when breaking OR emergency is on, so
+  emergencies come through even with the breaking feed off. (Only scans TOP — broadening to WORLD is a
+  follow-up for "everywhere.")
+- **Market strip under each article (#381 core+chips, #382 live ±%):** owner — "on each news report add the
+  market they're associated with / would affect, beneath the summary; a small strip showing what markets it
+  affected + why." `core:telemetry/NewsMarketLink.kt` (+8 tests) — pure heuristic: keyword sector-matching
+  (Oil/Gold/Defense/Bitcoin/Chips/Tech/Banks/Airlines/Housing/Pharma/Autos-EV/Retail/Food/broad-Stocks) for the
+  association + a move/event lexicon for direction (UP good / DOWN bad when the headline states/implies a move,
+  MIXED otherwise; havens like Gold/Defense lift on crisis words). `linksFor()` caps at 3; `summarize()` → the
+  "Could lift Oil; weigh on Airlines." why-line. A test caught a greedy-match bug ("miss" matched "missile").
+  `NewsComponents.MarketStrip` renders beneath each `ArticleCard` summary — a wrapping `FlowRow` of chips.
+  **#382** added the LIVE move: `data/news/NewsMarketPulse.kt` (a fixed pulse basket → `MarketsRepository`
+  market→WatchItem, fetched once via `quotesFor`); `NewsViewModel` gained the `MarketsRepository` dep + a
+  one-time fetch into `NewsUiState.marketPulse` (factory wires it); the chip shows the live `▲ Oil +2.3%`
+  coloured by the ACTUAL sign, falling back to the heuristic arrow when a quote is missing. Fully defensive.
+- ⚠️ **All #380–#382 on-device-unverified** (CI compile-gates; the pure cores are locally kotlinc-tested).
+  Owner-verify on the Pixel: the Trending feed feel, the emergency channel's distinct buzz + a real emergency
+  firing the separate alert, and the market strip's layout/legibility + the live ±% populating (needs a
+  successful Yahoo basket fetch). **Easy tunes:** the `TRENDING` query, the `EmergencyNews` keyword lists, the
+  `NewsMarketLink` sector keywords, and the `NewsMarketPulse` basket symbols. **Open/steerable:** broaden
+  emergency scan to WORLD; the market strip on the compact article row / home news preview.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
