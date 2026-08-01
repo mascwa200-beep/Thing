@@ -1961,6 +1961,34 @@ force-opens a full-screen page.
   FSI firing + the wider strip are CI-unprovable). **Open/steerable:** live ±% for more markets (needs a
   heavier fetch strategy); tune the isMajor bar / trusted-source list; a manual "test the takeover" trigger.
 
+### ORACLE — the magnum opus: J.A.R.V.I.S.'s cross-signal foresight engine (this session, #397–#399 merged)
+Owner asked for the single most overpowered, genuinely-useful feature — the capstone that ties the whole
+J.A.R.V.I.S. cognitive stack together. ORACLE is J.A.R.V.I.S.'s predictive cortex: it fuses ~18 on-device
+signal domains and reasons ACROSS them to surface (and proactively push) the one thing you should know/do now.
+- **1/3 core (#397):** pure, deterministic, CI-tested `core:telemetry/Oracle.kt` — `OracleSignals` (a full
+  snapshot: time/location/movement/calendar/tasks/interests/survival-needs/perception-scene/weather/market-
+  movers/emergency/space-wx/device/usage-rhythm/steps, every field optional), a library of CROSS-signal rules
+  (calendar+distance+rain→"leave 10 early, umbrella"; low-battery+plans→"charge now"; low-water+heat+moving→
+  "drink"; high-Kp+night+astro-interest→"aurora, look north"; watchlist mover; settled+task→"good moment";
+  storage/wind-down/steps/habit-prefetch/interest-pulse/meeting-prep). `divine()` fires all rules, dedupes,
+  ranks by urgency×timeliness×relevance; `focus()`/`briefing()`/`pushWorthy()`. Each `Insight` carries its
+  `sources` (which domains fired it). +15 tests, kotlinc-green.
+- **2/3 engine (#398):** `data/oracle/OracleEngine.kt` — `snapshot(container, settings)` gathers every store
+  defensively (force=false, warm caches; a missing signal/permission mutes its rules) into `OracleSignals`;
+  `read()` for the surface; `run()` fires ONE throttled proactive push (per-insight 3h via `OracleState`).
+  Wired: `Notifier.notifyOracle` (new ORACLE channel, deep-links the insight's action route),
+  `NotificationPrefs.oracleEnabled` (default ON) + Settings toggle, `RefreshWorker` runs the pass each cycle.
+  Built from a signature-level integration map of ~12 stores; adversarial compile-review CLEAN.
+- **3/3 HUD (#399):** `feature/oracle/OracleScreen.kt` + `OracleViewModel.kt` — a cinematic HUD: a J.A.R.V.I.S.
+  briefing line, the FOCUS insight writ large (tap ▸ ACT → deep-link), then the ranked stream, each card
+  urgency-coloured + showing the ⌁ signal domains that combined. `Routes.ORACLE` + NavHost (deep-links via
+  the shared `openRoute`) + factory `OracleViewModel(container)` + SHORTCUT_ROUTES + a launcher app-shortcut.
+  The proactive push is the primary path (it comes to you); the HUD is where you browse/act. Compile-review CLEAN.
+- ⚠️ All on-device-unverified (CI compile-gates; the pure core is kotlinc-tested): the real proactive push
+  firing from live signals, the HUD render, and each rule's real-world feel are owner-verify on the Pixel.
+  **Open follow-ups (offered):** a prominent in-app nav button (Home/JARVIS) beyond the shortcut+push; an
+  on-device LLM briefing that narrates the top insights; more rules (traffic/commute, sleep-debt, roaming).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
