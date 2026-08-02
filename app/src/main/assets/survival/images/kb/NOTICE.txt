@@ -1,0 +1,39 @@
+Knowledge-base diagrams — Wikimedia Commons, freely licensed (Public Domain / CC0 / CC BY / CC BY-SA).
+Downloaded for offline use. Per-file source, license and author:
+
+chem-atoms-elements-periodic-table.png  —  Periodic table large.svg  —  CC BY 3.0  —  2012rc
+chem-chemical-bonds-molecules.png  —  Covalent bond hydrogen.svg  —  CC BY-SA 3.0  —  Jacek FH
+chem-acids-bases-ph-buffers.png  —  PH Scale.svg  —  CC BY 3.0  —  Edward Stevens
+bio-the-cell.png  —  Animal cell structure en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz)
+bio-dna-genes-heredity.png  —  DNA chemical structure.svg  —  CC BY-SA 3.0  —  Madprime (talk · contribs)
+bio-human-body-systems.jpg  —  Organ Systems I.jpg  —  CC BY 3.0  —  Connexions
+bio-microbes-viruses-immunity.png  —  Bacterial morphology diagram.svg  —  Public domain  —  Mariana Ruiz LadyofHats
+bio-ecology-ecosystems.png  —  FoodWeb.svg  —  CC0  —  Original:  Thompsma Vector:  Pixelsquid
+phys-motion-forces-newtons-laws.png  —  Newtons cradle animation book 2.gif  —  CC BY-SA 3.0  —  DemonDeLuxe (Dominique Toussaint)
+phys-electricity-and-magnetism.png  —  VFPt cylindrical magnet thumb.svg  —  CC BY-SA 3.0  —  Geek3
+phys-heat-and-thermodynamics.png  —  Convection.gif  —  CC BY-SA 3.0  —  User:Oni Lukos
+phys-waves-sound-light-optics.png  —  EM spectrum.svg  —  CC BY-SA 3.0  —  Philip Ronan
+math-geometry-measurement.png  —  Pythagorean.svg  —  CC BY-SA 3.0  —  en:User:Wapcaplet
+math-trigonometry.png  —  Circle-trig6.svg  —  CC BY-SA 3.0  —  Original: Steven G. Johnson at English Wikipedia Vector:  Limaner
+math-algebra-language-of-math.png  —  Quadratic formula.svg  —  Public domain  —  Jamie Twells
+math-probability-statistics.png  —  Standard deviation diagram.svg  —  CC BY 2.5  —  M. W. Toews
+med-anatomy-by-system.png  —  Human skeleton front en.svg  —  Public domain  —  LadyofHats Mariana Ruiz Villarreal
+med-vital-signs-assessment.jpg  —  Blood pressure measurement (2009).jpg  —  CC BY-SA 3.0  —  Администрация Волгоградской области
+astro-solar-system-tour.png  —  Planets2013.svg  —  CC BY-SA 3.0  —  WP
+astro-stellar-life-cycles.png  —  HR-diag-no-text-2.svg  —  CC BY-SA 3.0  —  User:Spacepotato
+astro-galaxies-and-cosmology.png  —  Hubble Tuning Fork diagram.svg  —  CC0  —  Cosmogoblin
+astro-celestial-navigation.png  —  Ursa Major constellation map.svg  —  CC BY-SA 3.0  —  Ursa_major_constellation_map.png: Torsten Bronger
+derivative work: Kxx (talk)
+earth-plate-tectonics-earthquakes-volcanoes.png  —  Tectonic plate boundaries.png  —  Public domain  —  Jose F. Vigil. USGS
+earth-water-cycle-hydrology.png  —  Water cycle.png  —  Public domain  —  John M. Even / USGS
+eng-electricity-and-circuits-from-scratch.png  —  Ohm's Law with Voltage source TeX.svg  —  CC0  —  GorillaWarfare
+eng-ohms-and-kirchhoffs-laws.png  —  Ohms law voltage source.svg  —  CC BY-SA 3.0  —  Created by User:Omegatron using Klunky schematic editor, which the creator consi
+phys-energy-work-power-machines.png  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
+astro-telescopes-and-observing.jpg  —  Moon phases en.jpg  —  CC BY-SA 3.0  —  Orion 8
+earth-rocks-minerals-rock-cycle.png  —  Rock cycle nps.PNG  —  Public domain  —  NPS
+eng-electronic-components.jpg  —  Electronic components in Printed Circuit Board.jpg  —  CC BY-SA 3.0  —  Soumyapatra13
+eng-simple-machines-and-structures.png  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
+food-macronutrients-micronutrients-metabolism.jpg  —  Dinner meal - MyPlate 20210810-FNS-UNC-0017.jpg  —  Public domain  —  U.S. Department of Agriculture
+food-preservation-canning-drying-salting-curing.jpg  —  PreservedFood1.jpg  —  Public domain  —  
+phys-motion-forces-newtons-laws.png  —  Free body diagram mod.png  —  Public domain  —  Own work by Studi111 at en.wikipedia
+phys-heat-and-thermodynamics.jpg  —  Heat-transmittance-means2.jpg  —  CC BY-SA 4.0  —  Kmecfiunit, cmglee
