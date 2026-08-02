@@ -59,11 +59,14 @@ class PhonePenaltyController(
             setLocks(prevLocks - nowLocks, on = false, apps = s.phonePenaltyDistractionApps)  // lift recovered
             settings.update { it.copy(phonePenalisedNeeds = now.map { n -> n.name }) }
         }
-        // The harsher kiosk lock-screen gate — fire (background worker only) when a need is genuinely critical
-        // right now and the cooldown has elapsed, so a just-completed gate can't immediately re-pop.
+        // The harsher kiosk lock-screen gate — fire (background worker only) whenever a need is genuinely
+        // critical right now. No re-trigger cooldown (owner's explicit choice: max notification frequency,
+        // including this mechanism) — the RELEASE side is untouched and remains the real safety net: the
+        // gate's own backstop auto-release timer, override code, and emergency-dialer button (all in
+        // PenaltyGateActivity) still guarantee you're never stuck, regardless of how often it re-engages.
         if (fireGate && s.phonePenaltyKiosk) {
             val critical = now.filter { it.value(life) <= PhonePenalties.ENGAGE_AT }
-            if (critical.isNotEmpty() && System.currentTimeMillis() - s.lastPenaltyGateMs >= GATE_COOLDOWN_MS) {
+            if (critical.isNotEmpty()) {
                 val nowMs = System.currentTimeMillis()
                 notifier.notifyPenaltyGate(critical.map { it.name })
                 settings.update { it.copy(lastPenaltyGateMs = nowMs) }
@@ -126,9 +129,4 @@ class PhonePenaltyController(
         appContext.packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName
     }.getOrNull()
 
-    companion object {
-        /** Min gap between kiosk lock-screen gates — a just-completed gate can't re-pop within this window
-         *  (gives ENERGY's rest window time to recover so REST doesn't immediately re-lock you). */
-        private const val GATE_COOLDOWN_MS = 2L * 60 * 60 * 1000 // ~2 hours
-    }
 }

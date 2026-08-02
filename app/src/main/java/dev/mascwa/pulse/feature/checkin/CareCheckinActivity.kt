@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.checkin
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -42,7 +43,12 @@ import kotlinx.coroutines.launch
  * a PROMPT, not a lock: it asks the one thing that needs doing most right now (brush / floss / water / …, from
  * [dev.mascwa.pulse.core.telemetry.CareSchedule]) and you answer **DONE** (tends the need + records it, so the
  * follow-up in the sequence can come due — you ate → brush → floss) or **NOT YET** (a nudge; it'll ask again
- * after the gap). Always answerable — never a trap.
+ * next tick). Always answerable — never a trap.
+ *
+ * [EXTRA_STRICT] carries the merged former "aggressive" mode (the owner's `aggressiveCheckin` switch): when
+ * true and the device-owner lockout is armed, answering NOT YET escalates straight into [LockoutActivity]
+ * instead of just re-asking later — the harder-to-dismiss behaviour the old standalone aggressive check-in
+ * used to provide, now living on this one merged scheduler instead of a second parallel system.
  */
 class CareCheckinActivity : ComponentActivity() {
 
@@ -58,11 +64,32 @@ class CareCheckinActivity : ComponentActivity() {
 
         val checkin = runCatching { CareCheckin.valueOf(intent.getStringExtra(EXTRA_CHECKIN) ?: "") }.getOrNull()
         if (checkin == null) { finish(); return }
-        val store = (application as PulseApplication).container.careCheckinStore
+        val strict = intent.getBooleanExtra(EXTRA_STRICT, false)
+        val container = (application as PulseApplication).container
+        val store = container.careCheckinStore
 
         fun clearAndFinish() {
             runCatching { NotificationManagerCompat.from(this).cancel(NOTIF_ID) }
             finish()
+        }
+
+        suspend fun maybeEscalate(): Boolean {
+            if (!strict) return false
+            val armed = runCatching { container.settingsRepository.current().notifications.lockoutEnabled }.getOrDefault(false)
+            if (!armed) return false
+            // Only escalate check-ins the sensors can actually corroborate — locking the phone over something
+            // unsensable (FLOSS, REST) would just release itself on the very next watchdog tick, a pointless
+            // lock/unlock flicker rather than a real hold.
+            if (CareSchedule.verifyActivities(checkin).isEmpty()) return false
+            runCatching {
+                startActivity(
+                    Intent(this, LockoutActivity::class.java).apply {
+                        putExtra(LockoutActivity.EXTRA_CHECKIN, checkin.name)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                )
+            }
+            return true
         }
 
         setContent {
@@ -74,6 +101,7 @@ class CareCheckinActivity : ComponentActivity() {
                 onNotYet = {
                     lifecycleScope.launch {
                         runCatching { store.markAsked(checkin) }
+                        maybeEscalate()
                         clearAndFinish()
                     }
                 },
@@ -83,6 +111,8 @@ class CareCheckinActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_CHECKIN = "care_checkin"
+        /** Strict mode (the merged former "aggressive" switch) — see class doc. */
+        const val EXTRA_STRICT = "care_checkin_strict"
         /** Fixed id so a new check-in replaces the last and the activity can clear it on answer. */
         const val NOTIF_ID = 91_850
     }

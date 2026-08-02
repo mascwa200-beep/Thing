@@ -18,23 +18,15 @@ import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.settings.TemperatureUnit
 import dev.mascwa.pulse.data.usage.FeatureCatalog
 import dev.mascwa.pulse.di.AppContainer
-import kotlinx.serialization.Serializable
 import java.util.Calendar
-
-/** Per-insight last-fired bookkeeping so a proactive Oracle push can't repeat too soon. */
-@Serializable
-data class OracleState(val firedMs: Map<String, Long> = emptyMap())
 
 /**
  * The on-device ORACLE — gathers a full [OracleSignals] snapshot from every store/repository, runs the pure
- * [Oracle] reasoning engine, and (from the background worker) fires ONE throttled proactive push for the most
- * important thing worth interrupting you for. All reads are defensive + `force = false` (warm the caches the
- * worker already fills); a missing signal (no permission / null) simply mutes its rules.
+ * [Oracle] reasoning engine, and (from the background worker) fires a proactive push for the most important
+ * thing worth interrupting you for on every eligible pass. All reads are defensive + `force = false` (warm
+ * the caches the worker already fills); a missing signal (no permission / null) simply mutes its rules.
  */
 object OracleEngine {
-
-    private const val STATE_KEY = "oracle_state"
-    private const val PUSH_THROTTLE_MS = 3 * 60 * 60 * 1000L // don't repeat the same insight within 3h
 
     /** Snapshot every subsystem into the pure signal bundle the [Oracle] reasons over. */
     suspend fun snapshot(container: AppContainer, settings: AppSettings): OracleSignals {
@@ -130,8 +122,9 @@ object OracleEngine {
         Oracle.divine(snapshot(container, settings))
 
     /**
-     * Background pass: fire ONE throttled push for the most important interrupt-worthy insight. Called from
-     * [dev.mascwa.pulse.notifications.RefreshWorker]; gated by the caller's opt-out + master switch.
+     * Background pass: fire a push for the most important interrupt-worthy insight on every eligible run —
+     * no per-insight cooldown. Called from [dev.mascwa.pulse.notifications.RefreshWorker]; gated by the
+     * caller's opt-out + master switch.
      */
     suspend fun run(container: AppContainer, settings: AppSettings) {
         val signals = snapshot(container, settings)
@@ -144,15 +137,7 @@ object OracleEngine {
         }
 
         if (!settings.notifications.oracleEnabled) return
-        val push = Oracle.pushWorthy(insights)
-        if (push.isEmpty()) return
-        val state = runCatching { container.diskCache.readAny(STATE_KEY, OracleState.serializer())?.value }.getOrNull()
-            ?: OracleState()
-        val now = signals.nowMs
-        val top = push.firstOrNull { now - (state.firedMs[it.id] ?: 0L) >= PUSH_THROTTLE_MS } ?: return
+        val top = Oracle.pushWorthy(insights).firstOrNull() ?: return
         container.notifier.notifyOracle(top)
-        val fired = (state.firedMs + (top.id to now)).entries
-            .sortedByDescending { it.value }.take(40).associate { it.key to it.value }
-        runCatching { container.diskCache.write(STATE_KEY, OracleState(fired), OracleState.serializer()) }
     }
 }

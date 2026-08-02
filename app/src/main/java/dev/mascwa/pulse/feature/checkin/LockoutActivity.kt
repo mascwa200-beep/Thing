@@ -41,10 +41,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.PulseApplication
-import dev.mascwa.pulse.core.telemetry.ActivitySensing
+import dev.mascwa.pulse.core.telemetry.CareCheckin
+import dev.mascwa.pulse.core.telemetry.CareSchedule
 import dev.mascwa.pulse.core.telemetry.ClaimVerdict
-import dev.mascwa.pulse.core.telemetry.Habit
-import dev.mascwa.pulse.core.telemetry.HabitCheckin
 import dev.mascwa.pulse.security.DevicePolicyController
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
@@ -57,16 +56,22 @@ import kotlinx.coroutines.withTimeoutOrNull
  * caught the lie), this pins the phone (device-owner kiosk lock task) with a "go do it" screen, and releases
  * the moment the sensors confirm you actually did it. Opt-in, off by default.
  *
+ * Keyed on [CareCheckin] — the merged self-care scheduler's own vocabulary (brush/floss/water/eat/rest/wash),
+ * so it's driven by the same single due-check engine as the ordinary check-in prompt, not a second parallel
+ * habit model. [CareSchedule.verifyClaim] already knows which check-ins have no reliable sensor signal
+ * (FLOSS, REST) and is deliberately forgiving there — trusts rather than holds you hostage to an unsensable task.
+ *
  * Safe by construction — it can NEVER trap you:
  *  - **Guaranteed auto-release**: it unconditionally unlocks after [MAX_LOCK_MS] no matter what (the hard net).
- *  - **Sensor release**: unlocks + credits the moment [ActivitySensing] confirms the task from the evidence log.
+ *  - **Sensor release**: unlocks + credits the moment [CareSchedule.verifyClaim] confirms the task from the
+ *    evidence log (or, for an unsensable check-in, trusts immediately — see above).
  *  - **Emergency**: a prominent button opens the dialer (the dialer is kept on the lock-task allow-list).
  *  - **Override**: a deliberate 5-second hold releases it (a friction escape for a broken detection).
  *  - If Pulse isn't a Device Owner, there's no kiosk pin at all — it degrades to a full-screen nag.
  */
 class LockoutActivity : ComponentActivity() {
 
-    private lateinit var habit: Habit
+    private lateinit var checkin: CareCheckin
     private var released = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,9 +84,9 @@ class LockoutActivity : ComponentActivity() {
             override fun handleOnBackPressed() { /* swallow — do the task or wait it out */ }
         })
 
-        val h = HabitCheckin.DEFAULTS.firstOrNull { it.activity.name == intent.getStringExtra(EXTRA_ACTIVITY) }
-        if (h == null) { finish(); return }
-        habit = h
+        val c = runCatching { CareCheckin.valueOf(intent.getStringExtra(EXTRA_CHECKIN) ?: "") }.getOrNull()
+        if (c == null) { finish(); return }
+        checkin = c
         // A USER-ARMED commitment lock ("lock me out until I brush") is a deliberate self-request — it fires
         // regardless of any need level, genuinely locks the screen, and uses the owner's chosen backstop.
         val userArmed = intent.getBooleanExtra(EXTRA_USER_ARMED, false)
@@ -109,7 +114,7 @@ class LockoutActivity : ComponentActivity() {
         val deadline = SystemClock.elapsedRealtime() + backstopMs
         setContent {
             LockoutScreen(
-                habit = habit,
+                checkin = checkin,
                 userArmed = userArmed,
                 deadlineElapsed = deadline,
                 overrideCodeProvider = {
@@ -121,13 +126,17 @@ class LockoutActivity : ComponentActivity() {
             )
         }
 
-        // Watchdog: release the instant the task is SENSED done, else unconditionally at the deadline.
+        // Watchdog: release the instant the task is SENSED done, else unconditionally at the deadline. A
+        // sliding window (not the check-in's whole cadence) — this is "are you doing it NOW", not a re-check
+        // of the last several hours. verifyClaim is deliberately forgiving for check-ins with no reliable
+        // sensor (FLOSS, REST) — it trusts rather than holding you hostage to an unsensable task.
         lifecycleScope.launch {
             val container = (application as PulseApplication).container
             while (isActive && !released) {
-                val since = System.currentTimeMillis() - habit.everyMs
+                val since = System.currentTimeMillis() - LOCK_SENSE_WINDOW_MS
                 val evidence = runCatching { container.activityEvidenceStore.recent(since) }.getOrDefault(emptyList())
-                if (ActivitySensing.verifyClaim(habit.activity, evidence, since) != ClaimVerdict.NONE) {
+                val verdict = CareSchedule.verifyClaim(checkin, evidence, since, sensingActive = true)
+                if (verdict != ClaimVerdict.NONE) {
                     release(sensedDone = true)
                     break
                 }
@@ -140,20 +149,21 @@ class LockoutActivity : ComponentActivity() {
         }
     }
 
-    /** Unlock. [sensedDone] = the sensors confirmed it, so credit the need; the override/timeout doesn't. */
+    /** Unlock. [sensedDone] = the sensors confirmed it (or it's unsensable and trusted), so credit the
+     *  need; the override/timeout doesn't. */
     private fun release(sensedDone: Boolean) {
         if (released) return
         released = true
         if (sensedDone) {
             val container = (application as PulseApplication).container
-            lifecycleScope.launch { runCatching { container.habitStore.answer(habit, true) } }
+            lifecycleScope.launch { runCatching { container.careCheckinStore.complete(checkin) } }
         }
         runCatching { stopLockTask() }
         finish()
     }
 
     companion object {
-        const val EXTRA_ACTIVITY = "lockout_activity"
+        const val EXTRA_CHECKIN = "lockout_checkin"
         /** true = a user-armed commitment lock (fires regardless of need level; locks the screen). */
         const val EXTRA_USER_ARMED = "lockout_user_armed"
         /** The commitment lock's auto-release backstop in minutes (clamped to [MIN_BACKSTOP_MIN]..[MAX_BACKSTOP_MIN]). */
@@ -163,6 +173,8 @@ class LockoutActivity : ComponentActivity() {
         private const val MIN_BACKSTOP_MIN = 5
         /** A hard ceiling on the commitment lock — it can never hold longer than this (no-brick guarantee). */
         private const val MAX_BACKSTOP_MIN = 240
+        /** How long the watchdog looks back for sensed corroboration — a recent, "right now" window. */
+        private const val LOCK_SENSE_WINDOW_MS = 30 * 60_000L
         /** How long the override must be held — deliberate friction so it isn't a one-tap bail-out. */
         const val OVERRIDE_HOLD_MS = 5_000L
     }
@@ -170,7 +182,7 @@ class LockoutActivity : ComponentActivity() {
 
 @Composable
 private fun LockoutScreen(
-    habit: Habit,
+    checkin: CareCheckin,
     userArmed: Boolean,
     deadlineElapsed: Long,
     overrideCodeProvider: suspend () -> String,
@@ -203,8 +215,8 @@ private fun LockoutScreen(
                 color = red, fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 2.sp,
             )
             Text(
-                if (userArmed) "You locked yourself out until you ${habit.label.lowercase()}. It unlocks the moment I sense you've done it."
-                else "Go ${habit.label.lowercase()}. Your phone unlocks the moment I sense you've done it.",
+                if (userArmed) "You locked yourself out until you ${checkin.label.lowercase()}. It unlocks the moment I sense you've done it."
+                else "Go ${checkin.label.lowercase()}. Your phone unlocks the moment I sense you've done it.",
                 color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp, textAlign = TextAlign.Center,
             )
             Text("Auto-unlocks in %d:%02d".format(mm, ss), color = dim, fontSize = 13.sp)

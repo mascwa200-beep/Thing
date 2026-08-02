@@ -29,13 +29,16 @@ class NeedAutoCare(
     private val settings: SettingsRepository,
     private val notifier: Notifier,
 ) {
-    private val lastCredited = mutableMapOf<NeedKind, Long>()
     private val _sensed = MutableSharedFlow<NeedKind>(extraBufferCapacity = 8)
     /** Emits each time a need was auto-credited from sensed real-world care (drives a UI flourish). */
     val sensed: SharedFlow<NeedKind> = _sensed
 
     /** Begin observing the evidence stream in [scope] (the app scope) — runs for the process lifetime; cheap
-     *  (it only reacts when the samplers produce new evidence, and only while ambient sensing is on). */
+     *  (it only reacts when the samplers produce new evidence, and only while ambient sensing is on). No
+     *  cooldown (owner's explicit choice: max notification frequency, applied everywhere) — a long,
+     *  continuous activity (a slow meal, a long shower) can now credit its need more than once per sitting
+     *  as fresh evidence keeps arriving, trading the earlier "credit once per activity" guarantee for the
+     *  requested maximum responsiveness. */
     fun start(scope: CoroutineScope) {
         scope.launch {
             evidence.collect { list ->
@@ -43,12 +46,9 @@ class NeedAutoCare(
                 val now = System.currentTimeMillis()
                 val recent = list.filter { now - it.atMs <= WINDOW_MS }
                 NeedSensing.sensedNeeds(recent).forEach { need ->
-                    if (now - (lastCredited[need] ?: 0L) >= COOLDOWN_MS) {
-                        lastCredited[need] = now
-                        restore(need)
-                        runCatching { notifier.notifySensedCare(need) }
-                        _sensed.tryEmit(need)
-                    }
+                    restore(need)
+                    runCatching { notifier.notifySensedCare(need) }
+                    _sensed.tryEmit(need)
                 }
             }
         }
@@ -66,7 +66,5 @@ class NeedAutoCare(
     companion object {
         /** Only evidence this recent counts — a live catch, not stale history from hours ago. */
         private const val WINDOW_MS = 5L * 60 * 1000 // 5 minutes
-        /** Min gap before the same need can be auto-credited again (one long meal credits once, not ten times). */
-        private const val COOLDOWN_MS = 30L * 60 * 1000 // 30 minutes
     }
 }

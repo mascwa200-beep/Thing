@@ -29,9 +29,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.lifecycleScope
 import dev.mascwa.pulse.PulseApplication
+import dev.mascwa.pulse.core.telemetry.CareCheckin
 import dev.mascwa.pulse.core.telemetry.CheckinOutcome
 import dev.mascwa.pulse.core.telemetry.Habit
 import dev.mascwa.pulse.core.telemetry.HabitCheckin
+import dev.mascwa.pulse.core.telemetry.RealActivity
 import kotlinx.coroutines.launch
 
 /**
@@ -73,16 +75,20 @@ class CheckinActivity : ComponentActivity() {
     }
 
     /** If the lockout is armed and you dodged it (said "not yet", or got caught lying), pin the phone until
-     *  the task is sensed done. Off (no-op) unless the owner enabled it; the lockout itself is safe-by-design. */
+     *  the task is sensed done. Off (no-op) unless the owner enabled it; the lockout itself is safe-by-design.
+     *  [LockoutActivity] is keyed on the merged [CareCheckin] vocabulary, so a habit's [RealActivity] is
+     *  mapped across first — this is the same, direct mapping [dev.mascwa.pulse.core.telemetry.CareSchedule]
+     *  already uses in reverse ([dev.mascwa.pulse.core.telemetry.CareSchedule.verifyActivities]). */
     private suspend fun maybeLockout(habit: Habit, outcome: CheckinOutcome?) {
         if (outcome != CheckinOutcome.HONEST_NO && outcome != CheckinOutcome.CAUGHT_LIE) return
         val container = (application as PulseApplication).container
         val armed = runCatching { container.settingsRepository.current().notifications.lockoutEnabled }.getOrDefault(false)
         if (!armed) return
+        val checkin = careCheckinFor(habit.activity) ?: return
         runCatching {
             startActivity(
                 Intent(this, LockoutActivity::class.java).apply {
-                    putExtra(LockoutActivity.EXTRA_ACTIVITY, habit.activity.name)
+                    putExtra(LockoutActivity.EXTRA_CHECKIN, checkin.name)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 },
             )
@@ -94,6 +100,15 @@ class CheckinActivity : ComponentActivity() {
         /** Fixed id so a new check-in replaces the last, and the activity can clear it on answer. */
         const val NOTIF_ID = 91_837
     }
+}
+
+/** The merged scheduler's check-in for a legacy [RealActivity] habit, where one exists. */
+private fun careCheckinFor(activity: RealActivity): CareCheckin? = when (activity) {
+    RealActivity.SHOWER -> CareCheckin.WASH
+    RealActivity.TOOTHBRUSH -> CareCheckin.BRUSH
+    RealActivity.EATING -> CareCheckin.EAT
+    RealActivity.DRINKING -> CareCheckin.WATER
+    else -> null
 }
 
 @Composable

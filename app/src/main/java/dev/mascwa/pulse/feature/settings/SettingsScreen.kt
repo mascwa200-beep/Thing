@@ -399,13 +399,13 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
                     )
-                    val armCommitmentLock: (String) -> Unit = { activityName ->
+                    val armCommitmentLock: (String) -> Unit = { checkinName ->
                         runCatching {
                             context.startActivity(
                                 android.content.Intent(
                                     context, dev.mascwa.pulse.feature.checkin.LockoutActivity::class.java,
                                 ).apply {
-                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_ACTIVITY, activityName)
+                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_CHECKIN, checkinName)
                                     putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_USER_ARMED, true)
                                     putExtra(
                                         dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_BACKSTOP_MIN,
@@ -417,10 +417,10 @@ fun SettingsScreen(
                         }
                     }
                     if (isOwner) {
-                        PrefClickable("🚿  Lock until I shower") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.SHOWER.name) }
-                        PrefClickable("🪥  Lock until I brush my teeth") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.TOOTHBRUSH.name) }
-                        PrefClickable("🍽  Lock until I eat") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.EATING.name) }
-                        PrefClickable("💧  Lock until I drink water") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.RealActivity.DRINKING.name) }
+                        PrefClickable("🚿  Lock until I shower") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.WASH.name) }
+                        PrefClickable("🪥  Lock until I brush my teeth") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.BRUSH.name) }
+                        PrefClickable("🍽  Lock until I eat") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.EAT.name) }
+                        PrefClickable("💧  Lock until I drink water") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.WATER.name) }
                         SingleChoiceRow(
                             "Auto-release backstop",
                             s.commitmentLockBackstopMin,
@@ -735,19 +735,19 @@ fun SettingsScreen(
                         }
                     }
                     PrefSwitch(
-                        "Full-screen check-ins (aggressive)",
-                        "When a self-care habit is overdue, take over the whole screen (even the lock screen) " +
-                            "with a check-in you can't dismiss until you answer YES/NO. Off by default.",
-                        checked = s.notifications.aggressiveCheckin, enabled = on && s.notifications.selfCareCheckins,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
-                    )
-                    PrefSwitch(
                         "Smart sequenced check-ins",
                         "Full-screen prompts for whatever needs doing most (brush / floss / water are top " +
                             "priority), timed by real-world rhythm + context — you ate, so brush your teeth, then " +
                             "floss, at the right time. Answerable (DONE / NOT YET); respects quiet hours. On by default.",
                         checked = s.notifications.smartCheckins, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(smartCheckins = v)) } },
+                    )
+                    PrefSwitch(
+                        "Strict mode (harder to dismiss)",
+                        "Makes the check-in above stay on screen (ongoing, not swipeable away) and, if you dodge " +
+                            "it with \"not yet\", makes it eligible to escalate into the phone lock below. Off by default.",
+                        checked = s.notifications.aggressiveCheckin, enabled = on && s.notifications.smartCheckins,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
                     )
                     PrefSwitch(
                         "Lock phone until done (device-owner)",

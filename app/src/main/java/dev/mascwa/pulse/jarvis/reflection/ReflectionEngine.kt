@@ -32,9 +32,10 @@ class ReflectionEngine(
         val s = settings.current()
         if (!s.jarvis.reflectionEnabled) return emptyList()
         // Needs a working backend — the on-device echo engine can't synthesise, so this effectively gates
-        // on the cloud brain being configured + Ready.
+        // on the cloud brain being configured + Ready. No cooldown between passes — `since` below (the
+        // last-reflection bookmark, not a suppression gate) already keeps each pass looking only at
+        // genuinely new observations, so a tight worker cadence just means fresher reflections, not repeats.
         if (engine.state.value !is EngineState.Ready) return emptyList()
-        if (now - s.lastReflectionMs < MIN_INTERVAL_MS) return emptyList()
 
         val memories = memoryStream.all()
         val since = if (s.lastReflectionMs > 0L) s.lastReflectionMs else now - LOOKBACK_MS
@@ -68,7 +69,6 @@ class ReflectionEngine(
     }
 
     private companion object {
-        const val MIN_INTERVAL_MS = 4L * 60 * 60 * 1000  // reflect at most ~every 4 hours
         const val LOOKBACK_MS = 24L * 60 * 60 * 1000     // first run considers the last day of observations
         const val MAX_INSIGHTS = 3
     }
