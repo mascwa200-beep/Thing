@@ -18,8 +18,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.ui.theme.ChakraPetch
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -73,7 +89,12 @@ import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.feature.economy.CountryPicker
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpenSecurityAudit: () -> Unit = {}) {
+fun SettingsScreen(
+    vm: SettingsViewModel,
+    onOpenCrashLog: () -> Unit = {},
+    onOpenSecurityAudit: () -> Unit = {},
+    initialCategory: SettingsCategory? = null,
+) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -81,11 +102,12 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
     // Collapse state for the sections whose content is rendered as separate LazyColumn items (so the
     // PrefSection header alone can't gate them). Hoisted here so the header + its items toggle together.
     // All start collapsed, matching the rest of Settings.
-    var homeCollapsed by rememberSaveable { mutableStateOf(true) }
-    var watchlistCollapsed by rememberSaveable { mutableStateOf(true) }
-    var feedsCollapsed by rememberSaveable { mutableStateOf(true) }
-    var mutedCollapsed by rememberSaveable { mutableStateOf(true) }
-    var imageSitesCollapsed by rememberSaveable { mutableStateOf(true) }
+    // Expanded by default now — the Steam-style category page does the hiding, not per-section collapse.
+    var homeCollapsed by rememberSaveable { mutableStateOf(false) }
+    var watchlistCollapsed by rememberSaveable { mutableStateOf(false) }
+    var feedsCollapsed by rememberSaveable { mutableStateOf(false) }
+    var mutedCollapsed by rememberSaveable { mutableStateOf(false) }
+    var imageSitesCollapsed by rememberSaveable { mutableStateOf(false) }
 
     fun notificationsAllowed(): Boolean =
         android.os.Build.VERSION.SDK_INT < 33 ||
@@ -107,11 +129,25 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
         else dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
     }
 
-    PulseScaffold(title = "Settings") { innerPadding ->
-        LazyColumn(modifier = Modifier.padding(innerPadding), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
+    // Steam-style master-detail state: which category is open (null = the compact master list), and the
+    // cross-category search query. A section is visible when it belongs to the active category, or (while
+    // searching) when its title/keywords match — so a search result is the real, live control.
+    var selectedCat by remember { mutableStateOf(initialCategory) }
+    var query by remember { mutableStateOf("") }
+    val activeCat = selectedCat ?: SettingsCategory.FIRST
+    fun vis(cat: SettingsCategory, keywords: String): Boolean {
+        val q = query.trim()
+        return if (q.isBlank()) cat == activeCat
+        else "${cat.title} ${cat.keywords} $keywords".contains(q, ignoreCase = true)
+    }
+
+    // The detail pane: the settings sections as a LazyColumn, each gated by category/search. Rendered by the
+    // shell wherever the detail belongs (right pane on wide screens, pushed page on a phone).
+    val detail: @Composable (Modifier) -> Unit = { detailModifier ->
+        LazyColumn(modifier = detailModifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 32.dp)) {
 
             // ----- Software update (in-app updater) -----
-            item {
+            if (vis(SettingsCategory.SYSTEM, "update version build install download apk")) item {
                 val u by vm.updateState.collectAsStateWithLifecycle()
                 // Auto-check on open so arriving from the update notification lands on the action.
                 LaunchedEffect(Unit) { vm.checkForUpdate() }
@@ -153,10 +189,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Device, OS & special access -----
-            item {
+            if (vis(SettingsCategory.DEVICE, "hardware os graphene attestation sensors")) item {
                 val graphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context) }
                 val gate = remember { dev.mascwa.pulse.core.device.DeviceGate.evaluate() }
                 val deviceOwner = remember {
@@ -243,7 +278,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
 
             // ----- Device-owner security policies (effective only once provisioned) -----
-            item {
+            if (vis(SettingsCategory.DEVICE, "owner usb camera wipe penalty commitment lock")) item {
                 val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
                 val isOwner = remember { dpc.isDeviceOwner() }
                 val usbSupported = remember { dpc.usbDataControlSupported() }
@@ -426,7 +461,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
 
             // ----- GrapheneOS hardening (surface the OS's own controls; they beat app-level versions) -----
-            item {
+            if (vis(SettingsCategory.DEVICE, "graphene hardening mte usb sandboxed play")) item {
                 val isGraphene = remember { dev.mascwa.pulse.core.device.GrapheneOs.detect(context).isGraphene }
                 val sandboxedPlay = remember { dev.mascwa.pulse.core.device.GrapheneOs.hasSandboxedPlay(context) }
                 PrefSection("GrapheneOS hardening") {
@@ -464,7 +499,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
 
             // ----- Special access & restricted settings -----
-            item {
+            if (vis(SettingsCategory.DEVICE, "special access restricted usage install app info")) item {
                 PrefSection("Special access & restricted settings") {
                     PrefClickable(
                         "Allow restricted settings",
@@ -491,7 +526,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
 
             // ----- Accessibility -----
-            item {
+            if (vis(SettingsCategory.INTERFACE, "accessibility contrast haptics")) item {
                 PrefSection("Accessibility") {
                     PrefSwitch("High contrast", "Stronger contrast across the UI", s.highContrast) { v ->
                         vm.update { it.copy(highContrast = v) }
@@ -509,7 +544,7 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
             }
 
             // ----- Diagnostics & debug reporting -----
-            item {
+            if (vis(SettingsCategory.SYSTEM, "diagnostics debug crash console report")) item {
                 PrefSection("Diagnostics") {
                     PrefSwitch(
                         "Auto-send debug reports",
@@ -524,10 +559,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     )
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Appearance -----
-            item {
+            if (vis(SettingsCategory.INTERFACE, "appearance accent amoled haptics boot overlay theme")) item {
                 PrefSection("Appearance") {
                     AccentSwatchRow(selected = s.accentColor, onSelect = { a -> vm.update { it.copy(accentColor = a) } })
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
@@ -565,10 +599,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Region & units -----
-            item {
+            if (vis(SettingsCategory.REGION, "region country currency units temperature wind precipitation clock language")) item {
                 PrefSection("Region & units") {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -600,10 +633,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                         onChange = { v -> vm.update { it.copy(use24HourClock = v) } })
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Data & refresh -----
-            item {
+            if (vis(SettingsCategory.CONTENT, "refresh interval wifi articles data")) item {
                 PrefSection("Data & refresh") {
                     SingleChoiceRow(
                         "Background refresh", s.refreshIntervalMinutes,
@@ -617,10 +649,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     ) { n -> vm.update { it.copy(newsItemsPerCategory = n) } }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Notifications -----
-            item {
+            if (vis(SettingsCategory.NOTIFICATIONS, "notifications alerts push quiet hours")) item {
                 PrefSection("Notifications") {
                     if (Build.VERSION.SDK_INT >= 33) {
                         PrefClickable(
@@ -771,10 +802,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     )
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Security & network (Trusted Network Mode + encryption) -----
-            item {
+            if (vis(SettingsCategory.SECURITY, "security ambient sensing network wifi ssid encryption https audit ledger")) item {
                 PrefSection("Security & network") {
                     PrefSwitch(
                         "Ambient sensing (game)",
@@ -876,11 +906,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     )
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Home dashboard -----
-            collapsibleHeader("Home dashboard", homeCollapsed) { homeCollapsed = !homeCollapsed }
-            if (!homeCollapsed) {
+            if (vis(SettingsCategory.INTERFACE, "home dashboard layout sections reorder")) collapsibleHeader("Home dashboard", homeCollapsed) { homeCollapsed = !homeCollapsed }
+            if (vis(SettingsCategory.INTERFACE, "home dashboard layout sections reorder") && !homeCollapsed) {
                 item {
                     Text(
                         "Toggle and reorder the sections shown on Home.",
@@ -896,11 +925,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     )
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Watchlist -----
-            collapsibleHeader("Markets watchlist", watchlistCollapsed) { watchlistCollapsed = !watchlistCollapsed }
-            if (!watchlistCollapsed) {
+            if (vis(SettingsCategory.CONTENT, "watchlist markets crypto symbols stooq coingecko")) collapsibleHeader("Markets watchlist", watchlistCollapsed) { watchlistCollapsed = !watchlistCollapsed }
+            if (vis(SettingsCategory.CONTENT, "watchlist markets crypto symbols stooq coingecko") && !watchlistCollapsed) {
                 watchlistEditor(
                     title = "Symbols (Stooq) & crypto (CoinGecko)",
                     items = s.watchlist + s.cryptoList,
@@ -922,11 +950,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Custom feeds -----
-            collapsibleHeader("Custom RSS feeds", feedsCollapsed) { feedsCollapsed = !feedsCollapsed }
-            if (!feedsCollapsed) {
+            if (vis(SettingsCategory.CONTENT, "custom rss feed news source")) collapsibleHeader("Custom RSS feeds", feedsCollapsed) { feedsCollapsed = !feedsCollapsed }
+            if (vis(SettingsCategory.CONTENT, "custom rss feed news source") && !feedsCollapsed) {
                 itemsIndexed(s.customFeeds) { i, feed ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -948,11 +975,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Muted keywords -----
-            collapsibleHeader("Muted keywords", mutedCollapsed) { mutedCollapsed = !mutedCollapsed }
-            if (!mutedCollapsed) {
+            if (vis(SettingsCategory.CONTENT, "muted keyword filter hide block")) collapsibleHeader("Muted keywords", mutedCollapsed) { mutedCollapsed = !mutedCollapsed }
+            if (vis(SettingsCategory.CONTENT, "muted keyword filter hide block") && !mutedCollapsed) {
                 itemsIndexed(s.mutedKeywords) { i, kw ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
@@ -970,11 +996,10 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Image search sites -----
-            collapsibleHeader("Image search sites", imageSitesCollapsed) { imageSitesCollapsed = !imageSitesCollapsed }
-            if (!imageSitesCollapsed) {
+            if (vis(SettingsCategory.CONTENT, "image search site url")) collapsibleHeader("Image search sites", imageSitesCollapsed) { imageSitesCollapsed = !imageSitesCollapsed }
+            if (vis(SettingsCategory.CONTENT, "image search site url") && !imageSitesCollapsed) {
                 item {
                     Text(
                         "Sites you've added on the Images screen (a %s is replaced with your keyword).",
@@ -1001,10 +1026,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Optional API keys -----
-            item {
+            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google")) item {
                 PrefSection("Optional API keys") {
                     Text(
                         "All sections work without keys. Add free keys to unlock richer sources.",
@@ -1032,10 +1056,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Safety (SOS) -----
-            item {
+            if (vis(SettingsCategory.SAFETY, "safety sos medical emergency contact blood allergy sms")) item {
                 PrefSection("Safety (SOS)") {
                     Text(
                         "Medical info & contacts for the SOS screen. Stays on this device.",
@@ -1089,10 +1112,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Backup & restore (local, offline) -----
-            item {
+            if (vis(SettingsCategory.SYSTEM, "backup restore export import settings")) item {
                 val backupStatus by vm.backupStatus.collectAsStateWithLifecycle()
                 val exportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/json"),
@@ -1123,10 +1145,9 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                     }
                 }
             }
-            item { HorizontalDivider() }
 
             // ----- Storage & about -----
-            item {
+            if (vis(SettingsCategory.STORAGE, "storage cache clear activity log memory profile tasks reflexes episodic reset about")) item {
                 val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
                 val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
                 val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
@@ -1253,6 +1274,17 @@ fun SettingsScreen(vm: SettingsViewModel, onOpenCrashLog: () -> Unit = {}, onOpe
                 }
             }
         }
+    }
+
+    PulseScaffold(title = "Settings") { innerPadding ->
+        SettingsShell(
+            modifier = Modifier.padding(innerPadding),
+            selectedCat = selectedCat,
+            query = query,
+            onSelect = { selectedCat = it },
+            onQuery = { query = it },
+            detail = detail,
+        )
     }
 }
 
@@ -1569,3 +1601,131 @@ private fun AddTextRow(title: String, onAdd: (String) -> Unit) {
             onConfirm = { if (it.isNotBlank()) onAdd(it.trim()); show = false })
     }
 }
+
+/**
+ * The Steam-style shell. Three width modes via BoxWithConstraints:
+ *  - WIDE (≥ 720dp, landscape/foldable): a fixed 210dp category rail + the detail pane side by side.
+ *  - COMPACT (phone portrait): master → detail push. selectedCat == null (and no search) shows the master
+ *    category list; picking one (or typing a search) shows the detail pane with a back/▸ header.
+ * [detail] is the settings LazyColumn (gated by category/search in the caller's closure) — rendered wherever
+ * the detail belongs. [onSelect]/[onQuery] drive the shared state the detail gates on.
+ */
+@Composable
+private fun SettingsShell(
+    modifier: Modifier,
+    selectedCat: SettingsCategory?,
+    query: String,
+    onSelect: (SettingsCategory?) -> Unit,
+    onQuery: (String) -> Unit,
+    detail: @Composable (Modifier) -> Unit,
+) {
+    val c = Pulse.colors
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val wide = maxWidth >= 720.dp
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.width(210.dp).fillMaxHeight()
+                        .background(c.panel)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    SettingsSearchField(query, onQuery, Modifier.padding(10.dp))
+                    SettingsCategory.entries.forEach { cat ->
+                        SettingsRailRow(cat, selected = (selectedCat ?: SettingsCategory.FIRST) == cat, compact = false) {
+                            onSelect(cat); onQuery("")
+                        }
+                    }
+                }
+                Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))
+                detail(Modifier.weight(1f).fillMaxHeight())
+            }
+        } else {
+            val master = selectedCat == null && query.isBlank()
+            if (master) {
+                Column(Modifier.fillMaxSize()) {
+                    SettingsSearchField(query, onQuery, Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp))
+                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                        SettingsCategory.entries.forEach { cat ->
+                            SettingsMasterRow(cat) { onSelect(cat) }
+                        }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    // Back header — ‹ SETTINGS ▸ CATEGORY  (or ‹ SETTINGS ▸ SEARCH while searching)
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onSelect(null); onQuery("") }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.accent, modifier = Modifier.size(18.dp))
+                        Text(
+                            "SETTINGS ▸ ${(selectedCat ?: SettingsCategory.FIRST).title.uppercase()}",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                            color = c.ink, modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                    SettingsSearchField(query, onQuery, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp))
+                    detail(Modifier.weight(1f).fillMaxWidth())
+                }
+            }
+        }
+    }
+}
+
+/** The rail search field (Steam's "Search settings"). A Pip-Boy framed monospace field. */
+@Composable
+private fun SettingsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    dev.mascwa.pulse.feature.common.PipFrame(modifier.fillMaxWidth()) {
+        androidx.compose.foundation.text.BasicTextField(
+            value = query, onValueChange = onQuery, singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
+                    Text("🔍 Search settings", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
+                }
+                inner()
+            },
+        )
+    }
+}
+
+/** A rail row (WIDE mode): icon + title, selected = inverted accent block (the canonical pick-one look). */
+@Composable
+private fun SettingsRailRow(cat: SettingsCategory, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .background(if (selected) c.accent else Color.Transparent)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(cat.icon, null, tint = if (selected) c.void else c.muted, modifier = Modifier.size(18.dp))
+        Text(
+            cat.title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+            color = if (selected) c.void else c.ink, modifier = Modifier.padding(start = 10.dp),
+        )
+    }
+}
+
+/** A master-list row (COMPACT mode): icon + title + blurb + ›. */
+@Composable
+private fun SettingsMasterRow(cat: SettingsCategory, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(cat.icon, null, tint = c.accent, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+            Text(cat.title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = c.ink)
+            Text(cat.blurb, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text("›", fontFamily = ChakraPetch, fontSize = 18.sp, color = c.muted)
+    }
+}
+
