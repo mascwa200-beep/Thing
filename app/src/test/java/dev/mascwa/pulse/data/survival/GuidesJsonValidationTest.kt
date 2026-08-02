@@ -23,6 +23,7 @@ class GuidesJsonValidationTest {
         "Essentials", "Foundations", "Geography", "Hazards", "Health", "Making", "Mathematics", "Medical",
         "Movement", "Navigation", "Nutrition", "Physics", "Preparedness", "Psychology", "Reference", "Rescue",
         "Skills", "Sustenance", "Weather",
+        "Cooking — Food Safety",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
