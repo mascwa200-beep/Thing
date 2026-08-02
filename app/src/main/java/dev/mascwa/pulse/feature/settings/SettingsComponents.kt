@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun PrefSection(title: String, initiallyExpanded: Boolean = false, content: @Composable () -> Unit) {
+fun PrefSection(title: String, initiallyExpanded: Boolean = true, content: @Composable () -> Unit) {
     // All sections start COLLAPSED by default (declutter); pass initiallyExpanded = true to open one
     // (e.g. Software update). State is saved per section title so manual toggles stick.
     var collapsed by androidx.compose.runtime.saveable.rememberSaveable(title) { androidx.compose.runtime.mutableStateOf(!initiallyExpanded) }
