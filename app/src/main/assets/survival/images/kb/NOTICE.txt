@@ -91,3 +91,15 @@ chem-everyday-survival-chemistry.png  —  CNX Chem 17 05 Lead.png  —  CC BY 4
 psy-learn-anything-study.png  —  Leitner system alternative.svg  —  CC0  —  Zirguezi
 psy-communication-persuasion-negotiation.jpg  —  TwoWomenTalkingBodyLanguage.jpg  —  CC BY 2.0  —  Andrew
 cook-food-safety-fundamentals.jpg  —  Pork thermometer.jpg  —  Public domain  —  USDA
+astro-exoplanets-search-for-other-worlds.png  —  Theoretical Transiting Exoplanet Light Curve.svg  —  CC BY-SA 4.0
+astro-rockets-and-orbital-mechanics.jpg  —  Apollo 11 Launch2.jpg  —  Public domain  —  NASA
+astro-the-moon-up-close.jpg  —  Moon phases en.jpg  —  CC BY-SA 3.0
+bio-evolution-natural-selection.png  —  Darwin's finches.png  —  CC BY-SA 4.0
+bio-plant-biology.png  —  Xylem and phloem diagram.svg  —  CC BY-SA 4.0
+bio-animal-behavior-ethology.png  —  Stick tool use by chimpanzees.png  —  CC BY-SA 4.0
+chem-organic-chemistry-basics.jpg  —  Ochem 6 important functional groups.jpg  —  CC BY-SA 4.0
+chem-thermochemistry-energy-reactions.png  —  Bomb Calorimeter Diagram.png  —  CC BY-SA 3.0
+chem-electrochemistry-redox-reactions.png  —  Galvanic Cell Diagram.svg  —  CC BY 3.0
+cs-networking-internet.jpg  —  Network-Switch-Architecture-Diagram.jpeg  —  CC BY-SA 4.0
+cs-databases-relational.png  —  Relational database terms.svg  —  Public domain
+cs-ai-machine-learning-basics.png  —  Neural Network.svg  —  CC0
