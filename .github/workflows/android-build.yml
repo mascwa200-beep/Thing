@@ -45,7 +45,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured

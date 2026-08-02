@@ -221,4 +221,6 @@ dependencies {
     // manually-vendored AAR (not on Maven); it needs Gson at runtime.
     implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
     implementation("com.google.code.gson:gson:2.11.0")
+
+    testImplementation(libs.junit)
 }
