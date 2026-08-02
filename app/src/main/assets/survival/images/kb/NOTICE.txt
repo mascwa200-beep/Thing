@@ -37,3 +37,20 @@ food-macronutrients-micronutrients-metabolism.jpg  —  Dinner meal - MyPlate 20
 food-preservation-canning-drying-salting-curing.jpg  —  PreservedFood1.jpg  —  Public domain  —  
 phys-motion-forces-newtons-laws.png  —  Free body diagram mod.png  —  Public domain  —  Own work by Studi111 at en.wikipedia
 phys-heat-and-thermodynamics.jpg  —  Heat-transmittance-means2.jpg  —  CC BY-SA 4.0  —  Kmecfiunit, cmglee
+cs-how-computers-work.png  —  Von Neumann Architecture.svg  —  CC BY-SA 3.0  —  Kapooht
+cs-cryptography.png  —  Public key encryption.svg  —  Public domain  —  Davidgothberg
+cs-encoding-compression.png  —  ASCII-Table-wide.svg  —  Public domain  —  ASCII-Table.svg: ZZT32
+derivative work: YUFENG HUANG
+cs-algorithms.png  —  Binary search tree.svg  —  Public domain  —  No machine-readable author provided. Dcoetzee assumed (based on copyright claims
+cs-formal-logic.png  —  Venn diagram gr la ru.svg  —  Public domain  —  WatchduckYou can name the author as "T. Piesk", "Tilman Piesk" or "Watchduck".
+psy-brain-memory-attention.png  —  Lobes of the brain NL.svg  —  Public domain  —  Henry Vandyke Carter
+wx-reading-the-sky-clouds.png  —  Cloud types en.svg  —  CC BY-SA 3.0  —  Valentin de Bruyn / Coton / This illustration has been created for Coton, the cl
+wx-severe-weather-storms-tornadoes-hurricanes.jpg  —  Hurricane structure graphic.jpg  —  Public domain  —  
+wx-atmosphere-temperature-humidity-pressure.png  —  Atmosphere layers-en.svg  —  Public domain  —  NOAA &amp; User:Mysid
+wx-forecasting-without-instruments.jpg  —  Cumulonimbus cloud over Africa.jpg  —  Public domain  —  NASA
+geo-map-reading-coordinates-scale.png  —  Latitude and Longitude of the Earth.svg  —  CC0  —  Djexplo
+geo-globe-time-zones-lat-long.png  —  Standard World Time Zones.png  —  Public domain  —  UnaitxuGV, Heitordp and others
+geo-biomes-and-regions.png  —  Vegetation.png  —  CC BY-SA 3.0  —  Ville Koistinen (user Vzb83)
+geo-rivers-mountains-landscapes.png  —  Ashuapmushuan River basin map.png  —  Public domain  —  Global Watersheds (web application): Heberger, Matthew
+Base map: U.S. Geological
+make-metalworking-forging-heat-tools.jpg  —  Forging.jpg  —  CC BY-SA 3.0  —  Labberté K.J.
