@@ -278,7 +278,7 @@ fun SettingsScreen(
             }
 
             // ----- Device-owner security policies (effective only once provisioned) -----
-            if (vis(SettingsCategory.DEVICE, "owner usb camera wipe penalty commitment lock")) item {
+            if (vis(SettingsCategory.DEVICE, "owner usb camera wipe")) item {
                 val dpc = remember { dev.mascwa.pulse.security.DevicePolicyController(context) }
                 val isOwner = remember { dpc.isDeviceOwner() }
                 val usbSupported = remember { dpc.usbDataControlSupported() }
@@ -287,8 +287,6 @@ fun SettingsScreen(
                 var wipeN by remember { mutableStateOf(dpc.maxFailedForWipe()) }
                 var pendingWipe by remember { mutableStateOf<Int?>(null) }
                 var wipeError by remember { mutableStateOf(false) }
-                val penaltyScope = rememberCoroutineScope()
-                val container = remember { (context.applicationContext as dev.mascwa.pulse.PulseApplication).container }
                 PrefSection("Device-owner controls") {
                     if (!isOwner) {
                         Text(
@@ -355,81 +353,6 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                    }
-                    // Phone penalties: let a neglected survival need lock a real phone capability until you tend
-                    // it (the game bleeds into the phone). Opt-in; turning it off releases everything at once.
-                    PrefSwitch(
-                        "Phone penalties (needs lock the phone)",
-                        "Let a survival need you've let go critical revoke a phone capability — LOCK ALL YOUR " +
-                            "APPS, block installs, lock quick-settings, disable the camera, lock volume, block " +
-                            "screenshots, and pin the phone over the lock screen until you tend it. Emergency " +
-                            "calls always work. Reversible; turning this off releases everything.",
-                        checked = s.phonePenalties,
-                        enabled = isOwner,
-                    ) { on ->
-                        vm.update { it.copy(phonePenalties = on) }
-                        // Turning it OFF releases everything now (the guaranteed escape); turning it ON engages
-                        // at the next reconcile (app foreground / background worker) as needs go critical.
-                        if (!on) penaltyScope.launch { runCatching { container.phonePenaltyController.releaseAll() } }
-                    }
-                    if (s.phonePenalties) {
-                        PrefClickable(
-                            "Release all phone penalties now",
-                            subtitle = "Lift every active lock immediately (the escape hatch).",
-                            onClick = { penaltyScope.launch { runCatching { container.phonePenaltyController.releaseAll() } } },
-                        )
-                    }
-
-                    // User-armed COMMITMENT LOCK — lock yourself out of the phone until you actually do a
-                    // real-world self-care action (sensor-confirmed). A deliberate self-request: it fires
-                    // regardless of any need level and genuinely locks the screen. Always escapable — emergency
-                    // calls work, your override code or a 5s hold frees it, and it auto-releases at the backstop.
-                    Text(
-                        "Commitment lock — lock yourself out until you do it",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 2.dp),
-                    )
-                    Text(
-                        "Tap one to lock the phone NOW until the camera/mic sense you've actually done it. It fires " +
-                            "even if the need isn't low. Emergency calls always work; it auto-releases after the " +
-                            "backstop, and your override code or a 5-second hold frees it any time. Detecting " +
-                            "completion needs always-on ambient sensing (Security & network) enabled.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                    )
-                    val armCommitmentLock: (String) -> Unit = { checkinName ->
-                        runCatching {
-                            context.startActivity(
-                                android.content.Intent(
-                                    context, dev.mascwa.pulse.feature.checkin.LockoutActivity::class.java,
-                                ).apply {
-                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_CHECKIN, checkinName)
-                                    putExtra(dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_USER_ARMED, true)
-                                    putExtra(
-                                        dev.mascwa.pulse.feature.checkin.LockoutActivity.EXTRA_BACKSTOP_MIN,
-                                        s.commitmentLockBackstopMin,
-                                    )
-                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                },
-                            )
-                        }
-                    }
-                    if (isOwner) {
-                        PrefClickable("🚿  Lock until I shower") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.WASH.name) }
-                        PrefClickable("🪥  Lock until I brush my teeth") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.BRUSH.name) }
-                        PrefClickable("🍽  Lock until I eat") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.EAT.name) }
-                        PrefClickable("💧  Lock until I drink water") { armCommitmentLock(dev.mascwa.pulse.core.telemetry.CareCheckin.WATER.name) }
-                        SingleChoiceRow(
-                            "Auto-release backstop",
-                            s.commitmentLockBackstopMin,
-                            listOf(15 to "15 min", 30 to "30 min", 60 to "1 hour", 120 to "2 hours", 240 to "4 hours"),
-                        ) { m -> vm.update { it.copy(commitmentLockBackstopMin = m) } }
-                        EditableValueRow(
-                            "Override code (frees any lock)",
-                            value = if (s.lockOverrideCode.isBlank()) "Not set" else "••••",
-                            onSet = { code -> vm.update { it.copy(lockOverrideCode = code.filter(Char::isDigit).take(12)) } },
                         )
                     }
                 }
@@ -561,7 +484,7 @@ fun SettingsScreen(
             }
 
             // ----- Appearance -----
-            if (vis(SettingsCategory.INTERFACE, "appearance accent amoled haptics boot overlay theme")) item {
+            if (vis(SettingsCategory.INTERFACE, "appearance accent amoled haptics boot theme")) item {
                 PrefSection("Appearance") {
                     AccentSwatchRow(selected = s.accentColor, onSelect = { a -> vm.update { it.copy(accentColor = a) } })
                     PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
@@ -572,30 +495,6 @@ fun SettingsScreen(
                     }
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
-                    }
-                    // Floating game overlay — draws over other apps so the survival game keeps running with
-                    // Pulse closed. Opt-in; needs the user-granted draw-over-apps permission.
-                    PrefSwitch(
-                        "Floating game overlay",
-                        "Float the Pip-Boy survival stats + DRINK/EAT/REST/WASH/BRUSH/FLOSS buttons over every " +
-                            "app, so the game keeps updating with Pulse closed. Drag to move, tap to collapse. " +
-                            "Needs the draw-over-other-apps permission.",
-                        s.gameOverlay,
-                    ) { v -> vm.update { it.copy(gameOverlay = v) } }
-                    if (s.gameOverlay && !android.provider.Settings.canDrawOverlays(context)) {
-                        PrefClickable(
-                            "Grant draw-over-apps permission",
-                            subtitle = "Required for the overlay — opens system settings.",
-                        ) {
-                            runCatching {
-                                context.startActivity(
-                                    android.content.Intent(
-                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        android.net.Uri.parse("package:${context.packageName}"),
-                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -677,12 +576,12 @@ fun SettingsScreen(
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
                     PrefSwitch(
                         "Oracle foresight",
-                        subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, needs, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
+                        subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
                         checked = s.notifications.oracleEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
                     PrefSwitch(
                         "World pulse (live feed)",
-                        subtitle = "A quiet, always-latest dashboard notification — the world's state (breaking, markets, space weather) woven with your day (next event, low needs). Silent; updates in place, never buzzes.",
+                        subtitle = "A quiet, always-latest dashboard notification — the world's state (breaking, markets, space weather) woven with your day (next event). Silent; updates in place, never buzzes.",
                         checked = s.notifications.worldPulse, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(worldPulse = v)) } })
                     PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
@@ -700,73 +599,6 @@ fun SettingsScreen(
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(safetyAlerts = v)) } })
                     PrefSwitch("Overhead flights (Tacnet)", checked = s.notifications.flightAlerts, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
-                    PrefSwitch("Survival check-ins (Pip-Boy)", checked = s.notifications.survivalAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalAlerts = v)) } })
-                    PrefSwitch("Survival tips (frequent)", checked = s.notifications.survivalTips, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(survivalTips = v)) } })
-                    PrefSwitch(
-                        "Don't-break-your-streak nudge",
-                        "When a self-care streak is in its grace day (done yesterday, not yet today), remind you " +
-                            "once to keep it alive.",
-                        checked = s.notifications.streakReminders, enabled = on && s.notifications.selfCareCheckins,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(streakReminders = v)) } },
-                    )
-                    PrefSwitch(
-                        "Self-care check-ins",
-                        "Let J.A.R.V.I.S. ask whether you've showered, brushed, eaten and hydrated — and top up " +
-                            "the matching need when the sensors back you up. Turn individual habits off below.",
-                        checked = s.notifications.selfCareCheckins, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(selfCareCheckins = v)) } },
-                    )
-                    if (s.notifications.selfCareCheckins) {
-                        dev.mascwa.pulse.core.telemetry.HabitCheckin.DEFAULTS.forEach { habit ->
-                            val key = habit.activity.name
-                            PrefSwitch(
-                                "     · ${habit.label}",
-                                checked = key !in s.notifications.disabledHabits, enabled = on,
-                                onChange = { v ->
-                                    vm.update {
-                                        val cur = it.notifications.disabledHabits
-                                        val next = if (v) cur - key else (cur + key).distinct()
-                                        it.copy(notifications = it.notifications.copy(disabledHabits = next))
-                                    }
-                                },
-                            )
-                        }
-                    }
-                    PrefSwitch(
-                        "Smart sequenced check-ins",
-                        "Full-screen prompts for whatever needs doing most (brush / floss / water are top " +
-                            "priority), timed by real-world rhythm + context — you ate, so brush your teeth, then " +
-                            "floss, at the right time. Answerable (DONE / NOT YET); respects quiet hours. On by default.",
-                        checked = s.notifications.smartCheckins, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(smartCheckins = v)) } },
-                    )
-                    PrefSwitch(
-                        "Strict mode (harder to dismiss)",
-                        "Makes the check-in above stay on screen (ongoing, not swipeable away) and, if you dodge " +
-                            "it with \"not yet\", makes it eligible to escalate into the phone lock below. Off by default.",
-                        checked = s.notifications.aggressiveCheckin, enabled = on && s.notifications.smartCheckins,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(aggressiveCheckin = v)) } },
-                    )
-                    PrefSwitch(
-                        "Lock phone until done (device-owner)",
-                        "If you dodge a full-screen check-in (\"not yet\", or a claim the sensors catch as false), " +
-                            "pin the phone until they sense you did the task. Safe: auto-unlocks after 10 min no " +
-                            "matter what, the emergency dialer stays reachable, and a 5-second hold overrides it. Off by default.",
-                        checked = s.notifications.lockoutEnabled, enabled = on && s.notifications.aggressiveCheckin,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(lockoutEnabled = v)) } },
-                    )
-                    PrefSwitch(
-                        "Let J.A.R.V.I.S. decide when to ask",
-                        "Instead of a fixed clock, J.A.R.V.I.S. reads your self-care directive (set in " +
-                            "J.A.R.V.I.S. Setup) + your current needs + what the sensors actually saw, and " +
-                            "checks in only when he judges the moment right. Needs cloud chat on — it spends " +
-                            "provider credits. Off by default.",
-                        checked = s.notifications.jarvisDrivenCheckins,
-                        enabled = on && s.notifications.selfCareCheckins,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(jarvisDrivenCheckins = v)) } },
-                    )
                     PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
                     PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
@@ -804,36 +636,8 @@ fun SettingsScreen(
             }
 
             // ----- Security & network (Trusted Network Mode + encryption) -----
-            if (vis(SettingsCategory.SECURITY, "security ambient sensing network wifi ssid encryption https audit ledger")) item {
+            if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {
                 PrefSection("Security & network") {
-                    PrefSwitch(
-                        "Ambient sensing (game)",
-                        "Let the S.P.E.C.I.A.L. game sense your surroundings via the camera + mic while its " +
-                            "screen is open — classified on-device to text labels only, nothing stored or sent. " +
-                            "Off = the game uses a neutral scene and the camera/mic are never touched.",
-                        checked = s.ambientSensing,
-                        onChange = { v -> vm.update { it.copy(ambientSensing = v) } },
-                    )
-                    if (s.ambientSensing) {
-                        PrefSwitch(
-                            "     · Microphone (hearing)",
-                            checked = s.ambientMic,
-                            onChange = { v -> vm.update { it.copy(ambientMic = v) } },
-                        )
-                        PrefSwitch(
-                            "     · Camera (seeing)",
-                            checked = s.ambientCamera,
-                            onChange = { v -> vm.update { it.copy(ambientCamera = v) } },
-                        )
-                        PrefSwitch(
-                            "     · Always on (background + lock screen)",
-                            "Keep sensing in a foreground service even when the game screen is closed, so the " +
-                                "self-care lie-catcher has a continuous history. Shows a persistent notification " +
-                                "(and the camera/mic indicators); uses more battery. Off by default.",
-                            checked = s.ambientSensingAlways,
-                            onChange = { v -> vm.update { it.copy(ambientSensingAlways = v) } },
-                        )
-                    }
                     PrefClickable(
                         "Security auditor",
                         subtitle = "Read-only, local-only audit: app permissions, trust store, encryption & " +

@@ -64,10 +64,6 @@ object Routes {
     // 3D cyberpunk navigation map
     const val NAV = "nav"
 
-    // AR wasteland camera — projects nearby geo-gated sites through the live camera (compass "magic window");
-    // its ◉ 3D toggle swaps the flat markers for a Filament-rendered 3D wasteland of the immediate vicinity
-    const val AR = "ar"
-
     // Objectives / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
 

@@ -135,11 +135,6 @@ class JarvisSetupViewModel(
     /** Let J.A.R.V.I.S. autonomously research standing interests + his own curiosities in the background. */
     val autonomousCuriosity: StateFlow<Boolean> = _autonomousCuriosity.asStateFlow()
 
-    private val _selfCareDirective = MutableStateFlow("")
-    /** Free-text directive J.A.R.V.I.S. interprets to decide how/when to tend the owner's real-life needs
-     *  and habit check-ins (injected into every prompt; drives the `selfcare` tool). Blank = no directive. */
-    val selfCareDirective: StateFlow<String> = _selfCareDirective.asStateFlow()
-
     private val _chatFormat = MutableStateFlow(ChatFormat.AUTO)
     /** Chat template used to format prompts for the model (Auto/ChatML/Gemma/Plain). */
     val chatFormat: StateFlow<ChatFormat> = _chatFormat.asStateFlow()
@@ -211,7 +206,6 @@ class JarvisSetupViewModel(
             _curiosityLevel.value = saved.curiosityLevel
             _feedTopic.value = settings.current().jarvisFeedTopic
             _autonomousCuriosity.value = saved.autonomousCuriosity
-            _selfCareDirective.value = saved.selfCareDirective
             _charter.value = runCatching { selfEdit.current().charter }.getOrDefault("")
             // If a model is already on disk, make sure the engine is warmed.
             engine.ensureReady()
@@ -285,15 +279,6 @@ class JarvisSetupViewModel(
     /** Persist the persona charter (snapshotting the previous one for rollback). */
     fun saveCharter() {
         viewModelScope.launch { runCatching { selfEdit.setCharter(_charter.value) } }
-    }
-
-    fun onDirectiveChange(value: String) { _selfCareDirective.value = value }
-
-    /** Persist the free-text self-care directive J.A.R.V.I.S. interprets each turn. */
-    fun saveDirective() {
-        viewModelScope.launch {
-            runCatching { settings.update { it.copy(jarvis = it.jarvis.copy(selfCareDirective = _selfCareDirective.value.trim())) } }
-        }
     }
 
     /** Persist the resident-service preference. Starting/stopping the service itself is

@@ -27,7 +27,7 @@
 
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Full-screen self-care check-in that shows over the lock screen (opt-in, default off). -->
+    <!-- Full-screen takeovers that show over the lock screen (e.g. the BREAKING NEWS interrupt). -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- On-device security auditor (read-only, local-only): enumerate installed apps + their permissions
@@ -52,29 +52,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word or always-on ambient sensing is enabled. -->
+    <!-- Only used while the opt-in "J.A.R.V.I.S." wake word is enabled. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <!-- Only used while the opt-in always-on ambient sensing (life-sim attestation) is enabled. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <!-- PIP-BOY radio: keep streaming while the app is backgrounded. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <!-- Optional floating game overlay (opt-in): draw the Pip-Boy survival HUD + self-care buttons over
-         other apps so the game keeps running with Pulse closed. User-granted in system settings. -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Optional voice: on-device speech-to-text (tap-to-talk) and the J.A.R.V.I.S. wake word.
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <!-- Ambient SEEING for the life-sim: short camera frames are classified on-device (object/scene labels)
-         and immediately discarded — no image is ever stored or transmitted (opt-in, runtime-gated). -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
-
-    <!-- Real-world activity for the life-sim: today's step count (TYPE_STEP_COUNTER) buffs the character.
-         Aggregate + on-device only — the raw count never leaves the device (opt-in, runtime-gated on API 29+). -->
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
 
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
@@ -147,55 +132,10 @@
             </intent-filter>
         </activity>
 
-        <!-- The aggressive full-screen self-care check-in — shows over the lock screen and can't be
-             dismissed until answered (opt-in). Launched via a full-screen intent from the worker. -->
-        <activity
-            android:name=".feature.checkin.CheckinActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.Pulse" />
-
-        <!-- Smart self-care check-in — a full-screen prompt (over the lock screen) for the top thing to do now
-             (brush/floss/water…), timed by rhythm + context. Answerable (DONE / NOT YET), never a lock. -->
-        <activity
-            android:name=".feature.checkin.CareCheckinActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.Pulse" />
-
         <!-- BREAKING NEWS takeover — force-opens (over the lock screen) a cinematic, ad-free, tabbed page of
              aggregated coverage from trusted free sources on a major detected event. -->
         <activity
             android:name=".feature.breaking.BreakingNewsActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.Pulse" />
-
-        <!-- The self-care lockout — pins the phone (device-owner kiosk) after a dodged check-in until the
-             task is sensed done. Safe: hard auto-release, emergency dialer stays reachable, hold-to-override. -->
-        <activity
-            android:name=".feature.checkin.LockoutActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:excludeFromRecents="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.Pulse" />
-
-        <!-- The MAXIMUM phone penalty — a lock-screen gate that pins the phone (device-owner kiosk) when a
-             survival need goes critical, until you tend it. Opt-in (kiosk tier). Same safety nets as the
-             lockout: hard auto-release, emergency dialer reachable, hold-to-override. -->
-        <activity
-            android:name=".feature.checkin.PenaltyGateActivity"
             android:exported="false"
             android:launchMode="singleTask"
             android:excludeFromRecents="true"
@@ -346,26 +286,6 @@
             android:name=".feature.tacnet.RadioService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-
-        <!-- Opt-in always-on ambient sensing (life-sim attestation) — keeps the on-device camera/mic
-             samplers running in the background so the lie-catcher has a continuous evidence history.
-             Default OFF; labels only, nothing stored or sent. -->
-        <service
-            android:name=".data.perception.AmbientSensingService"
-            android:exported="false"
-            android:foregroundServiceType="camera|microphone|dataSync" />
-
-        <!-- Opt-in floating game overlay — the Pip-Boy survival HUD + self-care buttons drawn over other
-             apps so the S.P.E.C.I.A.L. game keeps updating with Pulse closed. Default OFF; needs the
-             user-granted draw-over-other-apps permission. -->
-        <service
-            android:name=".feature.overlay.GameOverlayService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="game_status_overlay" />
-        </service>
 
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->

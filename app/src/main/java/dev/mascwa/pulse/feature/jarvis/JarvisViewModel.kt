@@ -556,12 +556,6 @@ class JarvisViewModel(
         if (procedures.isNotBlank()) {
             prompt += "\n\n" + procedures
         }
-        val directive = runCatching { settings.current().jarvis.selfCareDirective }.getOrDefault("")
-        if (directive.isNotBlank()) {
-            prompt += "\n\nThe user's self-care directive — interpret it to decide when to nudge/enforce their " +
-                "real-life needs & habits, and use the `selfcare` tool to read the game state + tend needs / " +
-                "answer check-ins accordingly:\n" + directive.trim()
-        }
         return prompt
     }
 

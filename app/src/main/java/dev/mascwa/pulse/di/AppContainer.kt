@@ -98,70 +98,7 @@ class AppContainer(private val appContext: Context) {
     val taskStore: dev.mascwa.pulse.data.tasks.TaskStore by lazy {
         dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
     }
-    /** The S.P.E.C.I.A.L. game save (STAT-tab wasteland RPG) — character sheet + current encounter. */
-    val specialGameStore: dev.mascwa.pulse.data.game.SpecialGameStore by lazy {
-        dev.mascwa.pulse.data.game.SpecialGameStore(appContext, json)
-    }
-
-    /** The Pokémon-Go layer: real nearby shops → game locations + real-world travel tracking. */
-    val gameWorldStore: dev.mascwa.pulse.data.game.GameWorldStore by lazy {
-        dev.mascwa.pulse.data.game.GameWorldStore(appContext, json, overpassRepository)
-    }
-
-    /** Persists + tracks the personalised quest log (completion + rewards) for the life-sim. */
-    val questStore: dev.mascwa.pulse.data.game.QuestStore by lazy {
-        dev.mascwa.pulse.data.game.QuestStore(appContext, json)
-    }
-
-    /** The smart self-care check-in scheduler's state (last done/asked per check-in + last meal) — picks the
-     *  next full-screen check-in via CareSchedule; synced from the auto-care sensed stream. */
-    val careCheckinStore: dev.mascwa.pulse.data.game.CareCheckinStore by lazy {
-        dev.mascwa.pulse.data.game.CareCheckinStore(
-            appContext, json, specialGameStore, activityEvidenceStore, settingsRepository,
-        )
-    }
-
-    /** Turns neglected survival needs into reversible Device-Owner phone locks (opt-in "neglect bites the
-     *  phone"). Reconciled on app foreground + from RefreshWorker; releases everything when the toggle is off. */
-    val phonePenaltyController: dev.mascwa.pulse.security.PhonePenaltyController by lazy {
-        dev.mascwa.pulse.security.PhonePenaltyController(
-            appContext, settingsRepository, dev.mascwa.pulse.security.DevicePolicyController(appContext), notifier,
-        )
-    }
-
-    /** On-device ambient hearing (MediaPipe YAMNet) → the life-sim's perceived SceneContext. */
-    val ambientPerceptionSampler: dev.mascwa.pulse.data.perception.AmbientPerceptionSampler by lazy {
-        dev.mascwa.pulse.data.perception.AmbientPerceptionSampler(appContext, http)
-    }
-
-    /** On-device ambient seeing (MediaPipe EfficientNet-Lite via CameraX) → the life-sim's SceneContext. */
-    val cameraPerceptionSampler: dev.mascwa.pulse.data.perception.CameraPerceptionSampler by lazy {
-        dev.mascwa.pulse.data.perception.CameraPerceptionSampler(appContext, http)
-    }
-
-    /** Auto-care: when the camera/mic catch you drinking/eating/washing/brushing, restore the matching game
-     *  need automatically (rate-limited, gated by ambient sensing). Started from PulseApplication's app scope. */
-    val needAutoCare: dev.mascwa.pulse.data.perception.NeedAutoCare by lazy {
-        dev.mascwa.pulse.data.perception.NeedAutoCare(
-            activityEvidenceStore.evidenceFlow, specialGameStore, settingsRepository, notifier,
-        )
-    }
-
-    /** Runs ActivitySensing over the mic + camera labels → a persisted history of real self-care (shower /
-     *  meal / bathroom), which the habit check-in reads to catch a lie. On-device (text evidence only). */
-    val activityEvidenceStore: dev.mascwa.pulse.data.perception.ActivityEvidenceStore by lazy {
-        dev.mascwa.pulse.data.perception.ActivityEvidenceStore(
-            appContext, json, ambientPerceptionSampler.soundLabels, cameraPerceptionSampler.sceneLabels,
-        )
-    }
-
-    /** The habit check-in loop: asks "showered/ate/drank yet?", verifies the claim against the evidence
-     *  history, and tops up the matching real-life need on a truthful yes (no lockout). */
-    val habitStore: dev.mascwa.pulse.data.game.HabitStore by lazy {
-        dev.mascwa.pulse.data.game.HabitStore(appContext, json, activityEvidenceStore, specialGameStore, settingsRepository)
-    }
-
-    /** Real calendar → the life-sim's agenda (upcoming events become wasteland objectives; on-device only). */
+    /** Real calendar (on-device only) — feeds ORACLE's calendar-aware signal. */
     val calendarRepository: dev.mascwa.pulse.data.calendar.CalendarRepository by lazy {
         dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)
     }
@@ -224,16 +161,6 @@ class AppContainer(private val appContext: Context) {
     }
 
     val overpassRepository: OverpassRepository by lazy { OverpassRepository(http, diskCache) }
-
-    /** Real OSM building footprints for the AR wasteland (geo-anchored wireframe buildings). */
-    val buildingRepository: dev.mascwa.pulse.data.ar.BuildingRepository by lazy {
-        dev.mascwa.pulse.data.ar.BuildingRepository(http)
-    }
-
-    /** Real DEM elevation for the AR wasteland floor (the invisible ground anchor). */
-    val elevationRepository: dev.mascwa.pulse.data.ar.ElevationRepository by lazy {
-        dev.mascwa.pulse.data.ar.ElevationRepository(http)
-    }
 
     /** Road-snapped routing (free, keyless OSRM) for the NAV navigation path. */
     val routingRepository: dev.mascwa.pulse.data.places.RoutingRepository by lazy {
@@ -417,15 +344,6 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),
             dev.mascwa.pulse.jarvis.agent.TaskTool(taskStore),
-            dev.mascwa.pulse.jarvis.agent.SelfCareTool(specialGameStore, habitStore, activityEvidenceStore) { habit ->
-                // Fire the check-in per the owner's switches: aggressive full-screen if enabled, else a soft
-                // reminder. Master switch gates it (no self-care check-ins at all when off).
-                val prefs = runCatching { settingsRepository.current().notifications }.getOrNull()
-                if (prefs == null || prefs.selfCareCheckins) {
-                    if (prefs?.aggressiveCheckin == true) notifier.notifyCheckin(habit)
-                    else notifier.notifySurvival(91838, "Check-in · ${habit.label}", habit.question, urgent = false)
-                }
-            },
             dev.mascwa.pulse.jarvis.agent.NotesTool(notesStore),
             dev.mascwa.pulse.jarvis.agent.DiaryTool(diaryStore),
             dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),

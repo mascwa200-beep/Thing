@@ -365,13 +365,6 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.nav.NavScreen(vm, objVm, onBack = { navController.popBackStack() })
             }
 
-            // ---- AR wasteland camera (compass "magic window" over the geo-gated sites; ◉ 3D toggle
-            //      swaps the flat markers for a Filament-rendered 3D wasteland of the immediate vicinity) ----
-            composable(Routes.AR) {
-                val vm: dev.mascwa.pulse.feature.ar.ArViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.ar.ArScreen(vm, onBack = { navController.popBackStack() })
-            }
-
             // ---- Objectives / waypoint tracker ----
             composable(Routes.OBJECTIVES) {
                 val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)

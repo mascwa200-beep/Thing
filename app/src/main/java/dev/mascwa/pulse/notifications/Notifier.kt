@@ -97,133 +97,6 @@ class Notifier(private val context: Context) {
     fun notifyReminder(id: Int, title: String, body: String) =
         post(NotificationChannels.REMINDERS, id, "REMINDER", title, body, "home", NotificationCompat.PRIORITY_HIGH)
 
-    /** Life-sim survival check-in (a decaying need ran low) — opens straight to STATS ▸ SPECIAL where the
-     *  needs, meters and self-care buttons live (not just the PIP-BOY front page). */
-    fun notifySurvival(id: Int, title: String, body: String, urgent: Boolean) =
-        post(
-            NotificationChannels.REMINDERS, id, "SURVIVAL", title, body, "tacnet?tab=SPECIAL",
-            if (urgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT,
-        )
-
-    /** Life-sim agenda check-in (a real appointment is imminent) — opens straight to DATA ▸ WASTELAND where
-     *  the AGENDA panel lives. */
-    fun notifyAgenda(id: Int, title: String, body: String) =
-        post(NotificationChannels.REMINDERS, id, "AGENDA", title, body, "tacnet?tab=WASTELAND", NotificationCompat.PRIORITY_HIGH)
-
-    /**
-     * The AGGRESSIVE self-care check-in: a full-screen alert (over the lock screen) that can't be dismissed
-     * until answered. Fires a full-screen intent to [CheckinActivity] on the high-importance REMINDERS
-     * channel; ongoing so it persists until the activity clears it on answer.
-     */
-    fun notifyCheckin(habit: dev.mascwa.pulse.core.telemetry.Habit) {
-        if (!canPost()) return
-        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.CheckinActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(dev.mascwa.pulse.feature.checkin.CheckinActivity.EXTRA_ACTIVITY, habit.activity.name)
-        }
-        val pi = PendingIntent.getActivity(
-            context, dev.mascwa.pulse.feature.checkin.CheckinActivity.NOTIF_ID, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
-            .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
-            .setSubText("// CHECK-IN")
-            .setContentTitle("Check-in required")
-            .setContentText(habit.question)
-            .setStyle(
-                NotificationCompat.BigTextStyle().setBigContentTitle("Check-in required")
-                    .bigText("${habit.question}\n\nOpen to answer — it won't clear until you do."),
-            )
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setFullScreenIntent(pi, true)
-            .setContentIntent(pi)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .build()
-        safeNotify(dev.mascwa.pulse.feature.checkin.CheckinActivity.NOTIF_ID, notification)
-    }
-
-    /**
-     * The MAXIMUM phone penalty: a full-screen lock-screen gate (over the lock screen) that pins the phone
-     * until you tend the critically-neglected [needNames] (NeedKind names). Fires a full-screen intent to
-     * [dev.mascwa.pulse.feature.checkin.PenaltyGateActivity] on the high-importance REMINDERS channel; ongoing
-     * until the activity clears it on release. Opt-in (kiosk tier) + Device-Owner gated by the caller.
-     */
-    fun notifyPenaltyGate(needNames: List<String>) {
-        if (!canPost() || needNames.isEmpty()) return
-        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.PenaltyGateActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.EXTRA_NEEDS, needNames.toTypedArray())
-        }
-        val pi = PendingIntent.getActivity(
-            context, dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
-            .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
-            .setSubText("// PHONE LOCKED")
-            .setContentTitle("Phone locked — take care of yourself")
-            .setContentText("Tend the need to get back in.")
-            .setStyle(
-                NotificationCompat.BigTextStyle().setBigContentTitle("Phone locked — take care of yourself")
-                    .bigText(
-                        "Locked until you tend: ${needNames.joinToString(", ") { it.lowercase() }}.\n" +
-                            "Emergency calls still work, and the lock releases on its own after a while.",
-                    ),
-            )
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setFullScreenIntent(pi, true)
-            .setContentIntent(pi)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .build()
-        safeNotify(dev.mascwa.pulse.feature.checkin.PenaltyGateActivity.NOTIF_ID, notification)
-    }
-
-    /**
-     * A smart self-care check-in: a full-screen takeover (over the lock screen) prompting the one thing that
-     * needs doing most now (brush / floss / water / …). Fires a full-screen intent to [CareCheckinActivity] on
-     * the high-importance REMINDERS channel; the activity clears it on answer. Answerable (DONE / NOT YET).
-     *
-     * [strict] is the merged former "aggressive" mode (owner's `aggressiveCheckin` switch): the notification
-     * stays ongoing (can't be swiped away without opening it) rather than auto-cancelling, and
-     * [CareCheckinActivity] becomes eligible to escalate an explicit "not yet" into the lockout.
-     */
-    fun notifyCareCheckin(checkin: dev.mascwa.pulse.core.telemetry.CareCheckin, strict: Boolean = false) {
-        if (!canPost()) return
-        val intent = Intent(context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.EXTRA_CHECKIN, checkin.name)
-            putExtra(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.EXTRA_STRICT, strict)
-        }
-        val pi = PendingIntent.getActivity(
-            context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(context, NotificationChannels.REMINDERS)
-            .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setColor(ContextCompat.getColor(context, R.color.cp_yellow))
-            .setSubText("// CHECK-IN")
-            .setContentTitle(checkin.label)
-            .setContentText(checkin.prompt)
-            .setStyle(
-                NotificationCompat.BigTextStyle().setBigContentTitle(checkin.label)
-                    .bigText("${checkin.prompt}\n\nOpen to confirm when it's done, or tap NOT YET."),
-            )
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setFullScreenIntent(pi, true)
-            .setContentIntent(pi)
-            .setOngoing(strict)
-            .setAutoCancel(!strict)
-            .build()
-        safeNotify(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, notification)
-    }
-
     /**
      * The BREAKING NEWS interrupt — a full-screen intent that force-opens the cinematic
      * [dev.mascwa.pulse.feature.breaking.BreakingNewsActivity] on a MAJOR detected event (a death, a
@@ -256,24 +129,6 @@ class Notifier(private val context: Context) {
             .setAutoCancel(true)
             .build()
         safeNotify(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID, notification)
-    }
-
-    /** Quiet confirmation that the camera/mic caught you tending a need in real life and the game credited it
-     *  automatically — one fixed id per need so it replaces, on the low-priority DIGEST channel. */
-    fun notifySensedCare(need: dev.mascwa.pulse.core.telemetry.NeedKind) =
-        post(
-            NotificationChannels.DIGEST, 7790 + need.ordinal, "SENSED",
-            "👁 Caught you taking care of yourself",
-            "The camera/mic sensed it — ${need.label} restored.",
-            "tacnet?tab=SPECIAL", NotificationCompat.PRIORITY_LOW,
-        )
-
-    /** A rotating field-survival tip — frequent and QUIET (low-priority DIGEST channel, fixed id so each
-     *  new tip silently replaces the last). Taps open straight to the SPECIFIC guide that teaches the tip's
-     *  skill ([guideId], e.g. a knot tip → the knots guide); falls back to the guides list when unknown. */
-    fun notifyTip(id: Int, title: String, body: String, guideId: String? = null) {
-        val route = if (guideId.isNullOrBlank()) "survival" else "survival?guide=$guideId"
-        post(NotificationChannels.DIGEST, id, "SURVIVAL TIP", title, body, route, NotificationCompat.PRIORITY_LOW)
     }
 
     /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
@@ -327,9 +182,7 @@ class Notifier(private val context: Context) {
 /**
  * The canonical notification ids. Each notification CATEGORY owns ONE fixed id, so a newer item silently
  * replaces the previous one in place — the tray always shows the single latest thing per category, never a
- * pile-up. (The per-need/per-affliction survival ids are the deliberate exception: each is a distinct,
- * individually-actionable check-in and the set is bounded and small.) Kept in one place so the "latest-only"
- * contract is auditable.
+ * pile-up. Kept in one place so the "latest-only" contract is auditable.
  */
 object NotifId {
     const val BREAKING = 1001
@@ -346,6 +199,4 @@ object NotifId {
     const val FLIGHT = 7000      // one overhead aircraft, latest
     const val UPDATE = 7401
     const val FINDING = 7501
-    const val AGENDA = 7721      // one rolled-up "soonest appointment (+N more)" — was one-per-event
-    const val TIP = 7760
 }
