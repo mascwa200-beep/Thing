@@ -115,3 +115,15 @@ geo-cartography-map-projections.png  —  Comparison of Mercator projections.svg
 math-calculus-first-principles.png  —  Graph of the function f(x)=x^2 with a tangent line drawn to (2,4).png  —  CC BY-SA 4.0
 math-linear-algebra-vectors-matrices.png  —  Transformation matrix diagram with colours.svg  —  CC BY-SA 4.0
 math-number-theory-primes-cryptography.png  —  Academ Bijection between angles and 12 positions of a clock hand.svg  —  CC BY-SA 3.0  —  Baelde
+med-pediatric-elderly-care-differences.jpg  —  BTape2.jpg  —  CC BY-SA 3.0
+med-chronic-disease-management-home.jpg  —  Blood Glucose Testing.JPG  —  CC BY-SA 3.0
+med-poisoning-overdose-response.png  —  Ansi Z35 1968 Poison Warning Symbol.svg  —  CC0
+food-sports-performance-nutrition.jpg  —  Hydration Station (7084766921).jpg  —  CC BY 2.0
+food-special-diets-without-gaps.jpg  —  Anjuna, Goa, India, Vegan food plate, plant foods.jpg  —  CC BY 4.0
+food-reading-nutrition-labels-claims.png  —  FDA Nutrition Facts Label 2016.png  —  Public domain  —  FDA
+phys-modern-physics-relativity-quantum.jpg  —  Double Slit Experiment - Simplified Diagram.jpg  —  CC BY-SA 4.0
+phys-fluid-statics-buoyancy.png  —  Fluid statics, pressure depth dependence.svg  —  CC0
+phys-nuclear-physics-radioactivity.png  —  Penetrating power of different types of radiation - alpha, beta, gamma and neutrons.svg  —  CC0
+psy-personality-individual-differences.png  —  Big Five Personality Traits Bubble Diagram.svg  —  CC BY-SA 4.0
+psy-motivation-habit-formation.png  —  The habit loop.webp  —  CC BY-SA 4.0
+psy-child-development-stages.jpg  —  Development Sequences of the Human Mind.jpg  —  CC BY-SA 4.0
