@@ -9,19 +9,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,10 +32,10 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * Retro-CRT terminal building blocks for the TOOLS / PIP-BOY feeds — a flat framed panel with drawn
- * corner brackets, a section header with a rule line, and a framed stat tile. They read their colours
- * from [Pulse.colors], so under the phosphor-green TOOLS palette they render as the green terminal
- * look (and stay on-theme everywhere else). Generic terminal chrome — no third-party art or marks.
+ * LCARS-style building blocks for the TOOLS feeds — a swept-corner framed panel, a section header
+ * with a rounded-cap lead block, a tabbed data row, and a framed stat tile. They read their colours
+ * from [Pulse.colors], so they render in whatever palette is provided (LCARS under TOOLS, the default
+ * cyberpunk palette elsewhere). Generic terminal chrome — no third-party art or marks.
  */
 @Composable
 fun PipFrame(
@@ -44,31 +45,17 @@ fun PipFrame(
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
+    val shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp, topEnd = 3.dp, bottomEnd = 3.dp)
     Box(
         modifier
+            .clip(shape)
             .background(c.panel)
-            .drawWithContent {
-                drawContent()
-                val w = size.width
-                val h = size.height
-                val len = 12.dp.toPx()
-                val sw = 1.5.dp.toPx()
-                // Thin full border + bright L-brackets at each corner.
-                drawRect(c.line, style = Stroke(1f))
-                drawLine(accent, Offset(0f, 0f), Offset(len, 0f), sw)
-                drawLine(accent, Offset(0f, 0f), Offset(0f, len), sw)
-                drawLine(accent, Offset(w, 0f), Offset(w - len, 0f), sw)
-                drawLine(accent, Offset(w, 0f), Offset(w, len), sw)
-                drawLine(accent, Offset(0f, h), Offset(len, h), sw)
-                drawLine(accent, Offset(0f, h), Offset(0f, h - len), sw)
-                drawLine(accent, Offset(w, h), Offset(w - len, h), sw)
-                drawLine(accent, Offset(w, h), Offset(w, h - len), sw)
-            }
+            .border(1.5.dp, accent, shape)
             .padding(padding),
     ) { content() }
 }
 
-/** A terminal section header: a solid lead block, the title, then a rule line out to the edge. */
+/** A section header: a rounded-cap lead block, the title, then a rule line out to the edge. */
 @Composable
 fun PipHeader(title: String, modifier: Modifier = Modifier, trailing: String? = null) {
     val c = Pulse.colors
@@ -77,7 +64,7 @@ fun PipHeader(title: String, modifier: Modifier = Modifier, trailing: String? = 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.size(11.dp).background(c.accent))
+        Box(Modifier.height(11.dp).width(28.dp).clip(RoundedCornerShape(50)).background(c.accent))
         Text(
             title.uppercase(),
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 2.sp,
@@ -93,71 +80,60 @@ fun PipHeader(title: String, modifier: Modifier = Modifier, trailing: String? = 
 }
 
 /**
- * THE canonical Fallout Pip-Boy list row (DATA>STATS look): an edge-to-edge faint-green band with a
- * bright phosphor hairline rule along its bottom edge, the [label] on the left and the [value] on the
- * right in bright phosphor. Stack these with NO gaps (a plain Column) so the hairlines form the
- * continuous Pip-Boy list. Use this for every readout/stat list from here on.
+ * THE canonical LCARS list row: a rounded colour tab on the left edge, the [label] on the left and the
+ * [value] on the right, with a hairline rule beneath. Stack these with NO gaps (a plain Column) so the
+ * rules form a continuous list. Use this for every readout/stat list from here on.
  */
 @Composable
 fun PipDataRow(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Pulse.colors.ink) {
     val c = Pulse.colors
-    Box(
-        modifier
-            .fillMaxWidth()
-            .drawBehind {
-                drawRect(c.accent.copy(alpha = 0.08f))
-                drawLine(
-                    c.accent.copy(alpha = 0.35f),
-                    Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx(),
-                )
-            }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                label, fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.width(4.dp).fillMaxHeight()
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+                    .background(c.accent),
             )
-            Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = valueColor)
+            Row(
+                Modifier.weight(1f).padding(start = 12.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    label, fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = valueColor)
+            }
+        }
+        Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+            drawLine(c.line, Offset(0f, 0f), Offset(size.width, 0f), 1f)
         }
     }
 }
 
 /**
- * THE canonical Fallout selectable list item (the category/menu column): the [selected] one is a solid
- * bright-green bar with inverted (void/black) text; the rest are bright phosphor on transparent. Use for
- * every pick-one list from here on.
+ * THE canonical LCARS pick-one chip for horizontal rails (categories/tabs/engines) — a rounded pill:
+ * the [selected] one is a solid accent-coloured pill with inverted (void) text, the rest are plain text
+ * with a hairline pill outline.
  */
 @Composable
-fun PipSelectRow(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun PipChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color = Pulse.colors.accent,
+) {
     val c = Pulse.colors
-    Text(
-        label,
-        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp,
-        color = if (selected) c.void else c.ink,
-        modifier = modifier
-            .fillMaxWidth()
-            .background(if (selected) c.accent else Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    )
-}
-
-/**
- * THE canonical Pip-Boy pick-one chip for horizontal rails (categories/tabs/engines) — FLAT and
- * rectangular (no cut/rounded corners): the [selected] one is a solid bright-green block with inverted
- * (void) text, the rest are bright phosphor with a hairline outline. Drop-in for the old cut-corner
- * `NeonChip` so the feed rails read as the same terminal as the STATS page.
- */
-@Composable
-fun PipChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Pulse.colors
+    val shape = RoundedCornerShape(50)
     Box(
         modifier
-            .background(if (selected) c.accent else Color.Transparent)
-            .border(1.dp, if (selected) c.accent else c.line)
+            .clip(shape)
+            .background(if (selected) accent else Color.Transparent)
+            .border(1.dp, if (selected) accent else c.line, shape)
             .clickable { onClick() }
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         Text(
             text.uppercase(),

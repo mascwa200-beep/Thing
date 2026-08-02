@@ -13,16 +13,16 @@ import androidx.compose.ui.Modifier
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.LocalNightwire
 import dev.mascwa.pulse.ui.theme.Pulse
-import dev.mascwa.pulse.ui.theme.pipBoyPalette
+import dev.mascwa.pulse.ui.theme.lcarsPalette
 
 /**
- * QUESTS feed tab — the same objectives/quest log as the NAV map's OBJECTIVES sub-tab, in the Pip-Boy
- * phosphor-green palette. Shares the one [ObjectivesViewModel]/`WaypointStore`, so tracking here updates
- * the map markers (and vice-versa) live. Reuses [ObjectivesPanel] (the Fallout quest-tracker layout).
+ * QUESTS feed tab — the same objectives/quest log as the NAV map's OBJECTIVES sub-tab, in the LCARS
+ * palette. Shares the one [ObjectivesViewModel]/`WaypointStore`, so tracking here updates the map
+ * markers (and vice-versa) live. Reuses [ObjectivesPanel] (the shared objectives-tracker layout).
  */
 @Composable
 fun QuestsScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
-    CompositionLocalProvider(LocalNightwire provides pipBoyPalette) {
+    CompositionLocalProvider(LocalNightwire provides lcarsPalette) {
         val c = Pulse.colors
         PulseScaffold(
             title = "QUESTS",

@@ -144,10 +144,10 @@ fun PulseApp(
     ) { innerPadding ->
         val isFeed = currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
         val feedCtx = if (isFeed) dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
-        // The whole TOOLS section wears the Fallout Pip-Boy phosphor-green palette; everything else
-        // keeps the NIGHTWIRE theme. Provided once around the NavHost so feed screens re-theme with
-        // no per-screen edits (the bottom nav stays base — it reads `nw` captured above the provider).
-        val feedPalette = if (isFeed) dev.mascwa.pulse.ui.theme.pipBoyPalette else nw
+        // The whole TOOLS section wears the LCARS palette; everything else keeps the NIGHTWIRE theme.
+        // Provided once around the NavHost so feed screens re-theme with no per-screen edits (the
+        // bottom nav stays base — it reads `nw` captured above the provider).
+        val feedPalette = if (isFeed) dev.mascwa.pulse.ui.theme.lcarsPalette else nw
         androidx.compose.runtime.CompositionLocalProvider(
             dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx,
             dev.mascwa.pulse.ui.theme.LocalNightwire provides feedPalette,
@@ -234,13 +234,13 @@ fun PulseApp(
                 OrbitalScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Survive (Phase 2) — all in the Pip-Boy green palette (matches PIP-BOY/QUESTS) ----
+            // ---- Survive (Phase 2) — all in the LCARS palette (matches TOOLS/QUESTS) ----
             composable(Routes.SURVIVE) {
-                PipGreen { SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() }) }
+                Lcars { SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.PLACES) {
                 val vm: PlacesViewModel = viewModel(factory = factory)
-                PipGreen { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
             }
             // Optional ?guide= arg lets a notification (e.g. a survival tip about knots) open straight to a
             // specific guide; a plain "survival" navigation matches with guide=null and shows the list.
@@ -250,33 +250,33 @@ fun PulseApp(
             ) { backStackEntry ->
                 val vm: GuidesViewModel = viewModel(factory = factory)
                 val guideId = backStackEntry.arguments?.getString("guide")
-                PipGreen { GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId) }
+                Lcars { GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId) }
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
-                PipGreen { ToolsScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { ToolsScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SOS) {
                 val vm: SosViewModel = viewModel(factory = factory)
-                PipGreen { SosScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { SosScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SAFETY) {
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
-                PipGreen { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.HABITAT) {
                 val vm: dev.mascwa.pulse.feature.survive.HabitatViewModel = viewModel(factory = factory)
-                PipGreen { dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() }) }
             }
 
-            // ---- Social & search (Phase 3) — Pip-Boy green ----
+            // ---- Social & search (Phase 3) — LCARS palette ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                PipGreen { dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                PipGreen { dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() }) }
+                Lcars { dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() }) }
             }
 
             // ---- Tacnet (real-time radar + telemetry) ----
@@ -435,12 +435,12 @@ private val SHORTCUT_ROUTES = setOf(
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
 )
 
-/** Renders [content] in the Pip-Boy phosphor-green palette — used to put the SURVIVE/SOCIAL/SEARCH
- *  feeds (and their sub-screens) in the same Fallout look as the PIP-BOY and QUESTS tabs. */
+/** Renders [content] in the LCARS palette — used to put the SURVIVE/SOCIAL/SEARCH feeds (and their
+ *  sub-screens) in the same look as the TOOLS and QUESTS tabs. */
 @Composable
-private fun PipGreen(content: @Composable () -> Unit) {
+private fun Lcars(content: @Composable () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(
-        dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.pipBoyPalette,
+        dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
         content = content,
     )
 }
