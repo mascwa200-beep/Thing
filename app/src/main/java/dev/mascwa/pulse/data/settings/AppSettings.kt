@@ -266,28 +266,32 @@ data class NotificationPrefs(
     /** "Don't break your streak" nudge: when a meaningful self-care streak is in its grace day (done
      *  yesterday, not yet today) remind you once to check in and keep it alive. Default ON. */
     val streakReminders: Boolean = true,
-    /** Master switch for the self-care habit check-in system (the due-habit card + the aggressive path). Off
-     *  = J.A.R.V.I.S. never asks whether you've showered/brushed/eaten/hydrated. Default ON. */
+    /** Master switch for the in-game due-habit card + the J.A.R.V.I.S.-driven check-in path ([jarvisDrivenCheckins]).
+     *  Off = J.A.R.V.I.S. never asks whether you've showered/brushed/eaten/hydrated via those two surfaces.
+     *  The clock-driven full-screen prompt itself is [smartCheckins] below. Default ON. */
     val selfCareCheckins: Boolean = true,
     /** Habits (by [RealActivity] name) the owner has switched OFF individually — never checked in on. Default
      *  empty = all of [HabitCheckin.DEFAULTS] active. */
     val disabledHabits: List<String> = emptyList(),
-    /** AGGRESSIVE self-care check-ins: a full-screen alert over the lock screen that can't be dismissed until
-     *  answered (vs. an ordinary notification). Default OFF — opt in knowingly; it takes over the screen. */
-    val aggressiveCheckin: Boolean = false,
-    /** SMART sequenced check-ins: the CareSchedule scheduler raises a full-screen prompt for whatever needs
-     *  attention most (brush/floss/water top priority), timed by real-world rhythm + context (you ate → brush
-     *  → floss). Full-screen over the lock screen but answerable (DONE / NOT YET); respects quiet hours + the
-     *  waking window. Default ON — this is the self-care nudge system. */
+    /** SMART sequenced check-ins: the CareSchedule scheduler — the SOLE clock-driven due-check engine — raises
+     *  a full-screen prompt for whatever needs attention most (brush/floss/water top priority), timed by
+     *  real-world rhythm + context (you ate → brush → floss). Full-screen over the lock screen but answerable
+     *  (DONE / NOT YET); respects quiet hours + the waking window. Default ON — this is the self-care nudge
+     *  system. (The older fixed-interval habit scheduler that used to run in parallel has been merged into
+     *  this one; [aggressiveCheckin] is now a strictness mode on it, not a second system.) */
     val smartCheckins: Boolean = true,
-    /** LOCKOUT: after you dodge a check-in ("not yet" / caught lie), pin the phone (device-owner kiosk) until
-     *  the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no matter what,
-     *  the emergency dialer stays reachable, and a 5-second hold overrides it. */
+    /** STRICT mode on the [smartCheckins] check-in above: the notification stays ongoing (can't be swiped
+     *  away without opening it) instead of auto-cancelling, and dodging it with "not yet" becomes eligible to
+     *  escalate into [lockoutEnabled]. Default OFF — opt in knowingly. */
+    val aggressiveCheckin: Boolean = false,
+    /** LOCKOUT: after you dodge a strict check-in ("not yet" / caught lie), pin the phone (device-owner
+     *  kiosk) until the sensors confirm you did the task. Default OFF. Safe: auto-releases after 10 min no
+     *  matter what, the emergency dialer stays reachable, and a 5-second hold overrides it. */
     val lockoutEnabled: Boolean = false,
     /** J.A.R.V.I.S.-DRIVEN timing: instead of a fixed clock, let the assistant decide WHEN to check in — it
      *  reads your directive + current needs + what the sensors actually saw and nudges only when it judges the
-     *  moment right. Needs cloud chat on (spends credits). Off by default; when on it supersedes the fixed
-     *  schedule and fires an aggressive/soft check-in per your other switches. */
+     *  moment right (delivered via the separate [CheckinActivity] full-screen path). Needs cloud chat on
+     *  (spends credits). Off by default; when on it supersedes [smartCheckins]'s fixed clock scheduling. */
     val jarvisDrivenCheckins: Boolean = false,
     val dailyDigest: Boolean = true,
     /** Notify when a newer app build is available to download/install in Settings. */

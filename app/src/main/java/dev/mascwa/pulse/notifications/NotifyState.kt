@@ -16,8 +16,9 @@ data class NotifyState(
     val safetyAlertedIds: List<String> = emptyList(),
     val flightAlertedIds: List<String> = emptyList(),
     /**
-     * Last time (epoch ms) each survival need+band was alerted (key `NEED|BAND` → ms), so a nag is
-     * throttled per severity and an escalation (LOW → URGENT → CRITICAL) fires promptly on its own key.
+     * Unused (kept only so an older persisted blob still deserializes cleanly — `ignoreUnknownKeys` makes it
+     * safe to drop the writes but this stays for one more release of backward compatibility). Survival alerts
+     * now re-fire every eligible tick with no per-band cooldown.
      */
     val survivalFiredMs: Map<String, Long> = emptyMap(),
     /** Needs currently in a real concern band (LOW or worse) that we've alerted — so we can fire a single
@@ -33,7 +34,9 @@ data class NotifyState(
     val survivalTipLastMs: Long = 0L,
     /** Local epoch-day we last fired a "don't break your streak" reminder, so it nudges at most once a day. */
     val streakReminderDay: Int = -1,
-    /** Last time (epoch ms) the full-screen BREAKING NEWS takeover fired — a hard throttle so it can't spam. */
+    /** Last time (epoch ms) the full-screen BREAKING NEWS takeover fired — an audit timestamp only; the
+     *  identity-dedup [breakingInterruptSeen] below is what stops the same story re-interrupting, not a
+     *  time-based throttle (removed, owner's explicit choice: max notification frequency). */
     val breakingInterruptLastMs: Long = 0L,
     /** Titles already used for a breaking takeover, so the same major story can't re-interrupt. */
     val breakingInterruptSeen: List<String> = emptyList(),

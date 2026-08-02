@@ -23,6 +23,16 @@ data class NewsInsight(
     val marketImpact: ImpactLevel,
 )
 
+/** The literal keyword-hit counts behind a [tone] read, so a UI can show its work instead of an opaque
+ *  single number — "4 upbeat terms, 1 tense" is more informative than a bare score. */
+data class ToneBreakdown(
+    val tone: Tone,
+    val score: Float,
+    val positive: Int,
+    val negative: Int,
+    val tense: Int,
+)
+
 object NewsInsights {
 
     private val POSITIVE = listOf(
@@ -75,8 +85,9 @@ object NewsInsights {
 
     private fun List<String>.hits(t: String): Int = count { it in t }
 
-    /** The mood read: a score in -1..1 plus a [Tone] label. */
-    fun tone(title: String, summary: String = ""): Pair<Tone, Float> {
+    /** The full signal breakdown behind the mood read — the actual positive/negative/tense keyword hit
+     *  counts plus the derived score and label, so a UI can render WHY the tone landed where it did. */
+    fun toneBreakdown(title: String, summary: String = ""): ToneBreakdown {
         val t = " ${(title + " " + summary).lowercase()} "
         val pos = POSITIVE.hits(t)
         val neg = NEGATIVE.hits(t)
@@ -89,7 +100,13 @@ object NewsInsights {
             score < -0.25f -> Tone.GRIM
             else -> Tone.MIXED
         }
-        return label to score.coerceIn(-1f, 1f)
+        return ToneBreakdown(label, score.coerceIn(-1f, 1f), pos, neg, tense)
+    }
+
+    /** The mood read: a score in -1..1 plus a [Tone] label. */
+    fun tone(title: String, summary: String = ""): Pair<Tone, Float> {
+        val b = toneBreakdown(title, summary)
+        return b.tone to b.score
     }
 
     /** Auto topic + region tags for the story (topics first), capped at [max]. */
@@ -98,6 +115,15 @@ object NewsInsights {
         val topicTags = TOPICS.filter { (_, kws) -> kws.any { it in t } }.map { it.first }
         val regionTags = REGIONS.filter { (_, kws) -> kws.any { it in t } }.map { it.first }
         return (topicTags + regionTags).distinct().take(max)
+    }
+
+    /** How many OTHER stories (by their own pre-computed topic/region tags, via [topics]) share at least
+     *  one tag with [tags] — the "how much of the crowd is on this right now" signal. Pure: the caller
+     *  supplies every candidate's tags so this module stays free of any article/UI type dependency. */
+    fun clusterSize(tags: List<String>, othersTags: List<List<String>>): Int {
+        if (tags.isEmpty()) return 0
+        val tagSet = tags.toSet()
+        return othersTags.count { other -> other.any { it in tagSet } }
     }
 
     /** How market-relevant the story is, from its [MarketLink]s. */

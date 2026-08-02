@@ -125,13 +125,21 @@ fun NewsScreen(vm: NewsViewModel) {
                 content.isInitialLoading -> LoadingState()
                 content.isError -> ErrorState(content.error ?: "Error", onRetry = { vm.refresh() })
                 content.data.isNullOrEmpty() -> EmptyState("No articles found.")
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
-                ) {
-                    if (content.stale) item { StaleBanner(true) }
-                    items(content.data!!.distinctBy { it.url }, key = { it.url }) { article ->
-                        ArticleCard(article, pulse = state.marketPulse, onClick = { openUrl(context, article.url) })
+                else -> {
+                    val distinctArticles = content.data!!.distinctBy { it.url }
+                    LazyColumn(
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (content.stale) item { StaleBanner(true) }
+                        items(distinctArticles, key = { it.url }) { article ->
+                            ArticleCard(
+                                article,
+                                pulse = state.marketPulse,
+                                allArticles = distinctArticles,
+                                onClick = { openUrl(context, article.url) },
+                            )
+                        }
                     }
                 }
             }

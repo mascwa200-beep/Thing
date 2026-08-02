@@ -67,4 +67,43 @@ class NewsInsightsTest {
         assertTrue(insight.marketImpact != ImpactLevel.NONE)
         assertEquals(NewsInsights.tone(title).first, insight.tone) // analyze delegates to tone()
     }
+
+    @Test fun toneBreakdownExposesRealCounts() {
+        val b = NewsInsights.toneBreakdown("Stocks crash as layoffs and bankruptcy fears spread")
+        assertEquals(Tone.GRIM, b.tone)
+        assertTrue(b.negative > 0)
+        assertEquals(0, b.positive)
+        assertEquals(0, b.tense)
+    }
+
+    @Test fun toneBreakdownAgreesWithTone() {
+        val title = "Missile attack escalates the war overnight"
+        val b = NewsInsights.toneBreakdown(title)
+        val (tone, score) = NewsInsights.tone(title)
+        assertEquals(tone, b.tone)
+        assertEquals(score, b.score, 0.0001f)
+        assertTrue(b.tense > 0)
+    }
+
+    @Test fun toneBreakdownZeroOnNeutral() {
+        val b = NewsInsights.toneBreakdown("City council to review the annual budget schedule")
+        assertEquals(0, b.positive)
+        assertEquals(0, b.negative)
+        assertEquals(0, b.tense)
+        assertEquals(Tone.MIXED, b.tone)
+    }
+
+    @Test fun clusterSizeCountsSharedTagStories() {
+        val tags = listOf("Tech", "Markets")
+        val others = listOf(listOf("Tech"), listOf("Sports"), listOf("Markets", "Economy"), listOf("Health"))
+        assertEquals(2, NewsInsights.clusterSize(tags, others))
+    }
+
+    @Test fun clusterSizeZeroWithNoOverlap() {
+        assertEquals(0, NewsInsights.clusterSize(listOf("Tech"), listOf(listOf("Sports"), listOf("Health"))))
+    }
+
+    @Test fun clusterSizeZeroWhenNoTags() {
+        assertEquals(0, NewsInsights.clusterSize(emptyList(), listOf(listOf("Tech"))))
+    }
 }

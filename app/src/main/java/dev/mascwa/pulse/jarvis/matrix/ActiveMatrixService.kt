@@ -190,11 +190,10 @@ class ActiveMatrixService : Service() {
     }
 
     private fun inQuietNow(prefs: dev.mascwa.pulse.data.settings.NotificationPrefs): Boolean {
-        if (!prefs.quietHoursEnabled) return false
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        val s = prefs.quietStartHour
-        val e = prefs.quietEndHour
-        return if (s <= e) hour in s until e else hour >= s || hour < e
+        return dev.mascwa.pulse.core.telemetry.QuietHours.isQuiet(
+            prefs.quietHoursEnabled, prefs.quietStartHour, prefs.quietEndHour, hour,
+        )
     }
 
     private fun startForegroundCompat(notification: Notification, withMic: Boolean) {

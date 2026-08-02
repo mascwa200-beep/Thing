@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.telemetry.Affliction
 import dev.mascwa.pulse.core.telemetry.AlertLevel
+import dev.mascwa.pulse.core.telemetry.QuietHours
 import dev.mascwa.pulse.core.telemetry.SurvivalAlerts
 import dev.mascwa.pulse.core.telemetry.SurvivalNeed
 import dev.mascwa.pulse.core.util.Formatters
@@ -53,34 +54,25 @@ class RefreshWorker(
         val cal = Calendar.getInstance()
         val today = dayKey(cal)
         val hour = cal.get(Calendar.HOUR_OF_DAY)
-        if (inQuietHours(prefs.quietHoursEnabled, prefs.quietStartHour, prefs.quietEndHour, hour)) {
+        if (QuietHours.isQuiet(prefs.quietHoursEnabled, prefs.quietStartHour, prefs.quietEndHour, hour)) {
             return Result.success()
         }
 
         val notifier = container.notifier
 
-        // --- Fixed-schedule aggressive self-care check-in (opt-in): a full-screen alert over the lock screen
-        //     when a habit is overdue. markAsked stamps it so it won't re-fire until the ask-gap. Steps aside
-        //     when J.A.R.V.I.S. is driving the timing himself (the pass below owns the "when" then). ---
+        // --- Self-care check-ins: CareSchedule is now the SOLE clock-driven due-check engine — the older
+        //     HabitCheckin fixed-interval scheduling path has been retired from here (merged, not duplicated).
+        //     `aggressiveCheckin` is no longer a second, independently-scheduled system; it's a STRICTNESS mode
+        //     on this same due check-in (an ongoing, harder-to-dismiss notification that, on a dodge, is
+        //     eligible to escalate into the lockout — see CareCheckinActivity/LockoutActivity). Steps aside
+        //     when J.A.R.V.I.S. is driving the timing himself (the pass below owns the "when" then), exactly
+        //     like the retired aggressive path used to. ---
         val jarvisDrivenCheckins = prefs.jarvisDrivenCheckins && settings.jarvis.cloudActive
-        if (prefs.aggressiveCheckin && !jarvisDrivenCheckins) {
-            runCatching {
-                val habit = container.habitStore.nextDue()
-                if (habit != null) {
-                    notifier.notifyCheckin(habit)
-                    container.habitStore.markAsked(habit)
-                }
-            }
-        }
-
-        // --- SMART self-care check-ins (CareSchedule): the top-priority thing that needs attention now, timed
-        // by rhythm + context (you ate → brush → floss). Raised as a full-screen takeover; respects the quiet-
-        // hours early-return above + CareSchedule's own waking window. Answered → tends the need + records it. ---
-        if (prefs.smartCheckins) {
+        if (prefs.smartCheckins && !jarvisDrivenCheckins) {
             runCatching {
                 val due = container.careCheckinStore.schedule()
                 if (due != null) {
-                    notifier.notifyCareCheckin(due)
+                    notifier.notifyCareCheckin(due, strict = prefs.aggressiveCheckin)
                     container.careCheckinStore.markAsked(due)
                 }
             }
@@ -125,8 +117,7 @@ class RefreshWorker(
         if (jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
             runCatching {
                 val now = System.currentTimeMillis()
-                val curiosityIntervalMs = 4L * 60 * 60 * 1000 // at most every ~4 hours
-                if (now - settings.lastCuriosityMs >= curiosityIntervalMs) {
+                run {
                     // Rotate over the standing interests + a "your own device" subject so it covers both the
                     // owner's orders and J.A.R.V.I.S.'s own substrate over time.
                     val subjects = container.interestStore.all().map { it.topic } +
@@ -163,10 +154,7 @@ class RefreshWorker(
         if (prefs.selfCareCheckins && jarvisDrivenCheckins) {
             runCatching {
                 val now = System.currentTimeMillis()
-                val selfCareIntervalMs = 90L * 60 * 1000 // at most every ~90 min (it's a cloud call)
-                if (now - settings.lastSelfCareCheckMs >= selfCareIntervalMs &&
-                    container.habitStore.nextDue() != null
-                ) {
+                if (container.habitStore.nextDue() != null) {
                     val directive = settings.jarvis.selfCareDirective
                     val sys = dev.mascwa.pulse.jarvis.JarvisPersona.SYSTEM_PROMPT +
                         if (directive.isNotBlank()) {
@@ -189,7 +177,8 @@ class RefreshWorker(
         }
 
         // --- Mnemosyne reflection: synthesise recent episodic observations into higher-level REFLECTION
-        // memories (cloud-gated + throttled inside the engine; silent — surfaces in the Memory screen). ---
+        // memories (cloud-gated; silent — surfaces in the Memory screen). No cooldown — `since` inside the
+        // engine is a bookmark of what's already been reflected on, not a suppression timer. ---
         if (jcfg.reflectionEnabled && settings.jarvis.cloudActive) {
             runCatching { container.reflectionEngine.reflectIfDue() }
         }
@@ -199,16 +188,15 @@ class RefreshWorker(
         if (settings.autoAnchorLedger) {
             runCatching {
                 val now = System.currentTimeMillis()
-                val anchorIntervalMs = 24L * 60 * 60 * 1000 // at most once a day
-                if (now - settings.lastLedgerAnchorMs >= anchorIntervalMs) {
-                    val head = container.auditLedgerStore.headHash()
-                    // Only anchor when the head advanced since the last anchor (don't re-stamp the same head).
-                    if (head != dev.mascwa.pulse.core.telemetry.HashChain.GENESIS_HASH &&
-                        head != container.auditLedgerStore.anchoredHead()
-                    ) {
-                        if (container.auditLedgerStore.anchorHead()) {
-                            container.settingsRepository.update { it.copy(lastLedgerAnchorMs = now) }
-                        }
+                val head = container.auditLedgerStore.headHash()
+                // Only anchor when the head advanced since the last anchor (don't re-stamp the same head) —
+                // this alone keeps anchoring from spamming the TSA even with no time-based cooldown, since
+                // an unchanged head is a genuine no-op regardless of how often the worker ticks.
+                if (head != dev.mascwa.pulse.core.telemetry.HashChain.GENESIS_HASH &&
+                    head != container.auditLedgerStore.anchoredHead()
+                ) {
+                    if (container.auditLedgerStore.anchorHead()) {
+                        container.settingsRepository.update { it.copy(lastLedgerAnchorMs = now) }
                     }
                 }
             }
@@ -217,45 +205,40 @@ class RefreshWorker(
         // --- Hardware-attestation posture into the ledger: record ONLY when the verdict changes (a posture
         // change — bootloader unlocked, GrapheneOS key mismatch, hardware-backing lost — is a real security
         // event; identical verdicts are deduped so the append-only log isn't spammed). Local-only probe, no
-        // network; the secure-element probe is throttled to ~6h so it doesn't run on every worker tick. ---
+        // network — no time throttle, so a posture change is caught as soon as the next tick runs. ---
         runCatching {
             val now = System.currentTimeMillis()
-            val attestIntervalMs = 6L * 60 * 60 * 1000 // probe the secure element at most every ~6h
-            if (now - settings.lastAttestationCheckMs >= attestIntervalMs) {
-                val report = container.deviceAttestation.run()
-                val v = report.verdict
-                val sig: String
-                val detail: String
-                if (v != null) {
-                    sig = "${v.grapheneVerified}|${v.hardwareBacked}|${v.strongBox}|${v.bootloaderLocked}|" +
-                        "${v.verifiedBoot}|${report.info?.verifiedBootKeyHex.orEmpty()}"
-                    detail = v.summary
-                } else {
-                    sig = "unavailable|${report.error.orEmpty()}"
-                    detail = "attestation unavailable" + (report.error?.let { ": ${it.take(80)}" }.orEmpty())
+            val report = container.deviceAttestation.run()
+            val v = report.verdict
+            val sig: String
+            val detail: String
+            if (v != null) {
+                sig = "${v.grapheneVerified}|${v.hardwareBacked}|${v.strongBox}|${v.bootloaderLocked}|" +
+                    "${v.verifiedBoot}|${report.info?.verifiedBootKeyHex.orEmpty()}"
+                detail = v.summary
+            } else {
+                sig = "unavailable|${report.error.orEmpty()}"
+                detail = "attestation unavailable" + (report.error?.let { ": ${it.take(80)}" }.orEmpty())
+            }
+            if (sig != settings.lastAttestationSig) {
+                container.auditLedgerStore.record(
+                    dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
+                    "device.attestation",
+                    detail,
+                )
+                container.settingsRepository.update {
+                    it.copy(lastAttestationSig = sig, lastAttestationCheckMs = now)
                 }
-                if (sig != settings.lastAttestationSig) {
-                    container.auditLedgerStore.record(
-                        dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
-                        "device.attestation",
-                        detail,
-                    )
-                    container.settingsRepository.update {
-                        it.copy(lastAttestationSig = sig, lastAttestationCheckMs = now)
-                    }
-                } else {
-                    container.settingsRepository.update { it.copy(lastAttestationCheckMs = now) }
-                }
+            } else {
+                container.settingsRepository.update { it.copy(lastAttestationCheckMs = now) }
             }
         }
 
         // --- Periodic security audit (read-only, local-only; only after the user has run it once) ---
         runCatching {
-            val now = System.currentTimeMillis()
-            val auditIntervalMs = 55L * 60 * 1000 // ~hourly
             container.securityAuditStore.load()
             val lastScan = container.securityAuditStore.auditFlow.value.lastScanMs
-            if (lastScan > 0 && now - lastScan >= auditIntervalMs) {
+            if (lastScan > 0) {
                 val crit = dev.mascwa.pulse.core.telemetry.SecurityAudit.Severity.CRITICAL
                 val prevCritical = container.securityAuditStore.auditFlow.value.findings
                     .filter { it.severity == crit }.map { it.id }.toSet()
@@ -280,8 +263,9 @@ class RefreshWorker(
             runCatching { BreakingNewsPulse.check(container) }
         }
 
-        // ORACLE — fuse every signal, refresh the always-latest WORLD PULSE feed, and fire one throttled
-        // proactive foresight push if warranted. Runs when EITHER surface is enabled (each is gated inside).
+        // ORACLE — fuse every signal, refresh the always-latest WORLD PULSE feed, and fire the top proactive
+        // foresight push every eligible tick (no per-insight cooldown). Runs when EITHER surface is enabled
+        // (each is gated inside).
         if (prefs.oracleEnabled || prefs.worldPulse) {
             runCatching { dev.mascwa.pulse.data.oracle.OracleEngine.run(container, settings) }
         }
@@ -290,18 +274,16 @@ class RefreshWorker(
         // seenTopUrls update when we persist the other sections below.
         var state = readState()
 
-        // --- Market / price alerts ---
+        // --- Market / price alerts. No daily dedup: a mover still past the threshold re-alerts on every
+        // eligible tick (owner's explicit choice — max frequency over once-a-day quiet). ---
         if (prefs.marketAlerts) {
             runCatching {
-                val alreadyToday = if (state.marketAlertDay == today) {
-                    state.marketAlertedSymbols.toMutableSet()
-                } else mutableSetOf()
                 val quotes = container.marketsRepository.fetchAll(force = true).data
                 // Latest-only: collapse all fresh movers into ONE in-place notification (biggest + "N more"),
                 // instead of one-per-instrument piling up the tray.
                 val fresh = quotes.filter { q ->
                     val pct = q.changePercent
-                    pct != null && abs(pct) >= prefs.marketMovePercent && q.id !in alreadyToday
+                    pct != null && abs(pct) >= prefs.marketMovePercent
                 }.sortedByDescending { abs(it.changePercent ?: 0.0) }
                 if (fresh.isNotEmpty()) {
                     val lead = fresh.first()
@@ -314,15 +296,14 @@ class RefreshWorker(
                         body = "Now ${Formatters.number(lead.price, 2)} ${lead.currency}".trim() +
                             if (more > 0) " · also ${fresh.drop(1).take(3).joinToString(", ") { it.label }}" else "",
                     )
-                    fresh.forEach { alreadyToday += it.id }
                 }
-                state = state.copy(marketAlertDay = today, marketAlertedSymbols = alreadyToday.toList())
+                state = state.copy(marketAlertDay = today)
             }
         }
 
-        // --- Severe weather alerts ---
+        // --- Severe weather alerts. No daily dedup — a still-severe forecast re-alerts each tick. ---
         var weather: WeatherData? = null
-        if (prefs.weatherAlerts && state.weatherAlertDay != today) {
+        if (prefs.weatherAlerts) {
             runCatching {
                 weather = resolveWeather(settings)
                 weather?.daily?.firstOrNull()?.let { day ->
@@ -344,8 +325,8 @@ class RefreshWorker(
             }
         }
 
-        // --- Space weather (geomagnetic storm) ---
-        if (prefs.spaceAlerts && state.spaceAlertDay != today) {
+        // --- Space weather (geomagnetic storm). No daily dedup — an ongoing storm re-alerts each tick. ---
+        if (prefs.spaceAlerts) {
             runCatching {
                 val sw = container.spaceWeatherRepository.fetch(force = true).data
                 val kp = sw.kp
@@ -360,8 +341,8 @@ class RefreshWorker(
             }
         }
 
-        // --- Aurora likely (NOAA OVATION at the user's location) ---
-        if (prefs.auroraAlerts && state.auroraAlertDay != today) {
+        // --- Aurora likely (NOAA OVATION at the user's location). No daily dedup. ---
+        if (prefs.auroraAlerts) {
             runCatching {
                 val loc = container.locationProvider.current()
                 if (loc != null) {
@@ -380,8 +361,8 @@ class RefreshWorker(
             }
         }
 
-        // --- Hazardous near-Earth object ---
-        if (prefs.spaceAlerts && state.neoAlertDay != today) {
+        // --- Hazardous near-Earth object. No daily dedup. ---
+        if (prefs.spaceAlerts) {
             runCatching {
                 val orbital = container.orbitalRepository.fetch(null, null, force = true).data
                 val hazard = orbital.neos.firstOrNull { it.hazardous }
@@ -467,49 +448,36 @@ class RefreshWorker(
             runCatching {
                 val now = System.currentTimeMillis()
                 val life = container.specialGameStore.lifeSnapshot()
-                val fired = state.survivalFiredMs.toMutableMap()
                 val active = state.survivalNeedActive.toMutableSet()
                 SurvivalNeed.entries.forEach { need ->
                     val value = need.kind.value(life)
                     val band = SurvivalAlerts.bandFor(value)
                     if (band != null) {
                         val alert = SurvivalAlerts.alertFor(need, value, now) ?: return@forEach
-                        // Per-band throttle: gentler bands nag less; an escalation to a worse band fires
-                        // promptly because it's a fresh NEED|BAND key, not gated by the prior band's stamp.
-                        val gate = when (band) {
-                            AlertLevel.CRITICAL -> 90L * 60 * 1000      // ~1.5h
-                            AlertLevel.URGENT -> 2L * 60 * 60 * 1000    // ~2h
-                            AlertLevel.LOW -> 3L * 60 * 60 * 1000       // ~3h
-                            AlertLevel.NOTICE -> 6L * 60 * 60 * 1000    // ~6h — a soft heads-up
+                        // No per-band cooldown — a need still in a bad band re-nags every eligible tick
+                        // (owner's explicit choice: max notification frequency).
+                        // Richer body: the themed line + the live stat stakes (when it's biting) + advice.
+                        val body = buildString {
+                            append(alert.body)
+                            if (alert.stakes.isNotBlank()) append("\nToll right now: ${alert.stakes}")
+                            append("\n${alert.advice}")
                         }
-                        val key = "${need.name}|${band.name}"
-                        if (now - (fired[key] ?: 0L) >= gate) {
-                            // Richer body: the themed line + the live stat stakes (when it's biting) + advice.
-                            val body = buildString {
-                                append(alert.body)
-                                if (alert.stakes.isNotBlank()) append("\nToll right now: ${alert.stakes}")
-                                append("\n${alert.advice}")
-                            }
-                            notifier.notifySurvival(
-                                id = 7700 + need.ordinal,
-                                title = alert.title,
-                                body = body,
-                                urgent = band.isPressing,
-                            )
-                            fired[key] = now
-                        }
+                        notifier.notifySurvival(
+                            id = 7700 + need.ordinal,
+                            title = alert.title,
+                            body = body,
+                            urgent = band.isPressing,
+                        )
                         // Track LOW-or-worse so a recovery can be confirmed; a mere NOTICE isn't worth one.
                         if (band != AlertLevel.NOTICE) active += need.name
                     } else if (need.name in active) {
-                        // Climbed back to healthy after being a real concern → confirm the recovery once,
-                        // then clear its throttle keys so a later decline nags fresh (not gated by an old stamp).
+                        // Climbed back to healthy after being a real concern → confirm the recovery once.
                         val rec = SurvivalAlerts.recovery(need, now)
                         notifier.notifySurvival(id = 7700 + need.ordinal, title = rec.title, body = rec.body, urgent = false)
                         active -= need.name
-                        fired.keys.removeAll { it.startsWith("${need.name}|") }
                     }
                 }
-                state = state.copy(survivalFiredMs = fired, survivalNeedActive = active.toList())
+                state = state.copy(survivalNeedActive = active.toList())
 
                 // Lingering afflictions: fire once when a disease takes hold (a neglected need went sick),
                 // once when it clears. Deduped via afflictedNotified. Shares the survival-alerts toggle.
@@ -552,13 +520,13 @@ class RefreshWorker(
         }
 
         // --- "Don't break your streak": if a meaningful self-care streak is in its grace day (done
-        // yesterday, not yet today) nudge once to keep it alive. Uses the SAME local-epoch-day the streaks
-        // were stamped with, so "yesterday" lines up. One reminder per day (streakReminderDay dedup). ---
+        // yesterday, not yet today) nudge to keep it alive. Uses the SAME local-epoch-day the streaks were
+        // stamped with, so "yesterday" lines up. No daily dedup — re-nags every eligible tick while at risk. ---
         if (prefs.selfCareCheckins && prefs.streakReminders) {
             runCatching {
                 val now = System.currentTimeMillis()
                 val todayDay = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
-                if (state.streakReminderDay != todayDay) {
+                run {
                     val streaks = container.habitStore.streaks().values
                     val atRisk = dev.mascwa.pulse.core.telemetry.SelfCareStreak.bestAtRisk(streaks, todayDay)
                     if (atRisk > 0) {
@@ -581,31 +549,32 @@ class RefreshWorker(
         runCatching {
             val life = container.specialGameStore.lifeSnapshot()
             // fireGate=true: the background worker is the only path that pops the harsher kiosk lock-screen gate
-            // (so it fires when the phone is idle, not while you're actively in Pulse). Cooldown-throttled inside.
+            // (so it fires when the phone is idle, not while you're actively in Pulse). No re-trigger cooldown.
             container.phonePenaltyController.reconcile(life, fireGate = true)
         }
 
         // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each
-        // silently replaces the last). Gated to at most one per SURVIVAL_TIP_MIN_GAP_MS. The tip index is
-        // DERIVED FROM THE CLOCK (not a persisted cursor), so the rotation can never get stuck on tip 0 even
-        // if state fails to persist, and the ×131 scramble (coprime with the ~310-tip catalog) makes it feel
-        // random while still covering everything over time. ---
+        // silently replaces the last). No cooldown — fires every eligible tick. The tip index is DERIVED
+        // FROM THE CLOCK on a fine ROTATION_MS granularity (not a persisted cursor, and not a suppression
+        // gate — purely which tip is "current"), so the rotation can never get stuck on tip 0 even if state
+        // fails to persist, consecutive ticks show a genuinely different tip, and the ×131 scramble (coprime
+        // with the ~310-tip catalog) makes it feel random while still covering everything over time. ---
         if (prefs.survivalTips) {
             runCatching {
                 val now = System.currentTimeMillis()
-                if (now - state.survivalTipLastMs >= SURVIVAL_TIP_MIN_GAP_MS) {
-                    val bucket = now / SURVIVAL_TIP_MIN_GAP_MS // advances once per gap, from the real clock
-                    val idx = (bucket * 131).toInt()
-                    val tips = dev.mascwa.pulse.core.telemetry.SurvivalTips
-                    // Deep-link the tip to the specific guide that teaches its skill (knot tip → knots guide).
-                    notifier.notifyTip(NotifId.TIP, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
-                    state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
-                }
+                val bucket = now / TIP_ROTATION_MS
+                val idx = (bucket * 131).toInt()
+                val tips = dev.mascwa.pulse.core.telemetry.SurvivalTips
+                // Deep-link the tip to the specific guide that teaches its skill (knot tip → knots guide).
+                notifier.notifyTip(NotifId.TIP, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
+                state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
             }
         }
 
-        // --- Daily digest ---
-        if (prefs.dailyDigest && hour >= prefs.digestHour && state.lastDigestDay != today) {
+        // --- Daily digest. digestHour is a "not before this local time" floor, not a repeat cooldown — kept.
+        // No daily dedup beyond that, so it refreshes with the latest lines on every eligible tick after
+        // digestHour rather than freezing at whatever was true the first time it fired that day. ---
+        if (prefs.dailyDigest && hour >= prefs.digestHour) {
             runCatching {
                 val lines = buildDigestLines(settings, weather)
                 if (lines.isNotEmpty()) {
@@ -727,16 +696,11 @@ class RefreshWorker(
     private fun dayKey(cal: Calendar): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
 
-    private fun inQuietHours(enabled: Boolean, start: Int, end: Int, hour: Int): Boolean {
-        if (!enabled) return false
-        return if (start <= end) hour in start until end
-        else hour >= start || hour < end // overnight window
-    }
-
     companion object {
         const val UNIQUE_NAME = "pulse_periodic_refresh"
-        // Minimum gap between survival tips — a floor so double-runs don't double-fire; the worker's own
-        // period (≥15 min) is the real cadence, so tips arrive roughly every tick while awake.
-        private const val SURVIVAL_TIP_MIN_GAP_MS = 3L * 60 * 60 * 1000 // ~one tip every 3 hours, not every tick
+        // Rotation granularity for which survival tip is "current" — NOT a suppression cooldown (there is
+        // none: tips fire every eligible worker tick). A small value just guarantees consecutive ticks show
+        // a genuinely different tip instead of repeating the same one for hours.
+        private const val TIP_ROTATION_MS = 60L * 1000 // one minute
     }
 }

@@ -188,12 +188,17 @@ class Notifier(private val context: Context) {
      * A smart self-care check-in: a full-screen takeover (over the lock screen) prompting the one thing that
      * needs doing most now (brush / floss / water / …). Fires a full-screen intent to [CareCheckinActivity] on
      * the high-importance REMINDERS channel; the activity clears it on answer. Answerable (DONE / NOT YET).
+     *
+     * [strict] is the merged former "aggressive" mode (owner's `aggressiveCheckin` switch): the notification
+     * stays ongoing (can't be swiped away without opening it) rather than auto-cancelling, and
+     * [CareCheckinActivity] becomes eligible to escalate an explicit "not yet" into the lockout.
      */
-    fun notifyCareCheckin(checkin: dev.mascwa.pulse.core.telemetry.CareCheckin) {
+    fun notifyCareCheckin(checkin: dev.mascwa.pulse.core.telemetry.CareCheckin, strict: Boolean = false) {
         if (!canPost()) return
         val intent = Intent(context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.EXTRA_CHECKIN, checkin.name)
+            putExtra(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.EXTRA_STRICT, strict)
         }
         val pi = PendingIntent.getActivity(
             context, dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, intent,
@@ -213,7 +218,8 @@ class Notifier(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setFullScreenIntent(pi, true)
             .setContentIntent(pi)
-            .setAutoCancel(true)
+            .setOngoing(strict)
+            .setAutoCancel(!strict)
             .build()
         safeNotify(dev.mascwa.pulse.feature.checkin.CareCheckinActivity.NOTIF_ID, notification)
     }

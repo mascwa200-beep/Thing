@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,11 +31,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.ImpactLevel
 import dev.mascwa.pulse.core.telemetry.MarketImpact
 import dev.mascwa.pulse.core.telemetry.MarketLink
 import dev.mascwa.pulse.core.telemetry.NewsInsights
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.telemetry.Tone
+import dev.mascwa.pulse.core.telemetry.ToneBreakdown
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.feature.common.CyberChipCut
@@ -51,6 +54,9 @@ fun ArticleCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     pulse: Map<String, Double> = emptyMap(),
+    /** Every article currently loaded in this feed (including [article] itself) — used only to compute the
+     *  "how many other stories are on this right now" crowd signal in [GlanceStrip]. Empty = no crowd read. */
+    allArticles: List<Article> = emptyList(),
 ) {
     val c = Pulse.colors
     NeonPanel(
@@ -84,8 +90,8 @@ fun ArticleCard(
                         modifier = Modifier.padding(top = 5.dp),
                     )
                 }
-                // At-a-glance infographics: the story's mood + auto topic tags.
-                GlanceStrip(article)
+                // At-a-glance infographics: the story's mood + auto topic tags + the live crowd signal.
+                GlanceStrip(article, allArticles)
                 // Which markets this story touches / would move, and which way (+ a short why).
                 val links = remember(article.url) {
                     NewsMarketLink.linksFor(article.title, article.summary, article.category)
@@ -101,28 +107,49 @@ fun ArticleCard(
     }
 }
 
-/** An at-a-glance infographic band: the story's MOOD (a tone bar) and auto-extracted topic/region tags.
- *  A quick visual read that complements the MARKET REACTION strip. Pure heuristic (offline). */
+/** An at-a-glance infographic band: the story's MOOD as a SEGMENTED bar that shows its own work (real
+ *  positive/negative/tense keyword counts, not an opaque single fill), a live "how many other stories are
+ *  on this right now" crowd signal, and auto-extracted topic/region tags. The insider-knowledge read: not
+ *  just what the mood is, but why, and how much of the feed is already talking about it. Pure heuristic
+ *  (offline) — [allArticles] only feeds the crowd count, never leaves the device. */
 @Composable
-private fun GlanceStrip(article: Article) {
+private fun GlanceStrip(article: Article, allArticles: List<Article>) {
     val c = Pulse.colors
-    val toneRead = remember(article.url) { NewsInsights.tone(article.title, article.summary) }
+    val breakdown = remember(article.url) { NewsInsights.toneBreakdown(article.title, article.summary) }
     val tags = remember(article.url) { NewsInsights.topics(article.title, article.summary) }
-    val tone = toneRead.first
-    val score = toneRead.second
-    val toneCol = toneColor(tone)
+    val cluster = remember(article.url, allArticles) {
+        if (tags.isEmpty()) {
+            0
+        } else {
+            val othersTags = allArticles.asSequence()
+                .filter { it.url != article.url }
+                .map { NewsInsights.topics(it.title, it.summary) }
+                .toList()
+            NewsInsights.clusterSize(tags, othersTags)
+        }
+    }
+    val toneCol = toneColor(breakdown.tone)
     Column(Modifier.padding(top = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("MOOD", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp, color = c.muted)
             Spacer(Modifier.width(6.dp))
-            Box(
-                Modifier.height(6.dp).weight(1f).clip(RoundedCornerShape(3.dp)).background(c.raise),
-            ) {
-                val frac = ((score + 1f) / 2f).coerceIn(0.06f, 1f)
-                Box(Modifier.fillMaxHeight().fillMaxWidth(frac).clip(RoundedCornerShape(3.dp)).background(toneCol))
-            }
+            SegmentedMoodBar(breakdown, Modifier.height(6.dp).weight(1f))
             Spacer(Modifier.width(6.dp))
-            Text(tone.label, fontFamily = JetBrainsMono, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = toneCol)
+            Text(breakdown.tone.label, fontFamily = JetBrainsMono, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = toneCol)
+        }
+        val caption = moodCaption(breakdown)
+        if (caption.isNotBlank() || cluster > 0) {
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (caption.isNotBlank()) {
+                    Text(caption, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+                }
+                if (cluster > 0) {
+                    Text(
+                        "🔥 $cluster other ${if (cluster == 1) "story" else "stories"} on this",
+                        fontFamily = JetBrainsMono, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = c.accent,
+                    )
+                }
+            }
         }
         if (tags.isNotEmpty()) {
             FlowRow(
@@ -143,6 +170,43 @@ private fun GlanceStrip(article: Article) {
             }
         }
     }
+}
+
+/** How many keyword hits fill the whole bar — a story with this many charged terms (or more) reads as
+ *  maximally intense; fewer hits leave visible neutral track, preserving a sense of magnitude rather than
+ *  just direction (1 negative word looks very different from 5). */
+private const val MOOD_BAR_SCALE = 6
+
+/** A proportional multi-colour bar — upbeat/tense/negative segments sized by their real hit counts, plus a
+ *  neutral remainder — so the bar visually explains itself instead of being an abstract single fill. */
+@Composable
+private fun SegmentedMoodBar(b: ToneBreakdown, modifier: Modifier) {
+    val c = Pulse.colors
+    val segments = buildList {
+        if (b.positive > 0) add(b.positive.toFloat() to Color(0xFF35C46A))
+        if (b.tense > 0) add(b.tense.toFloat() to Color(0xFFE0331A))
+        if (b.negative > 0) add(b.negative.toFloat() to Color(0xFFE0721A))
+    }
+    val filled = segments.sumOf { it.first.toDouble() }.toFloat()
+    val neutralWeight = (MOOD_BAR_SCALE - filled).coerceAtLeast(if (segments.isEmpty()) 1f else 0f)
+    Row(modifier.clip(RoundedCornerShape(3.dp)).background(c.raise)) {
+        segments.forEach { (weight, color) ->
+            Box(Modifier.weight(weight).fillMaxHeight().background(color))
+        }
+        if (neutralWeight > 0f) {
+            Box(Modifier.weight(neutralWeight).fillMaxHeight())
+        }
+    }
+}
+
+/** A short "what actually drove this" line — e.g. "4 upbeat · 1 tense" — blank when there's nothing to show. */
+private fun moodCaption(b: ToneBreakdown): String {
+    val bits = buildList {
+        if (b.positive > 0) add("${b.positive} upbeat")
+        if (b.negative > 0) add("${b.negative} negative")
+        if (b.tense > 0) add("${b.tense} tense")
+    }
+    return bits.joinToString(" · ")
 }
 
 private fun toneColor(t: Tone): Color = when (t) {
@@ -174,9 +238,10 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
                 fontWeight = FontWeight.Bold, color = c.accent,
             )
-            if (impact != dev.mascwa.pulse.core.telemetry.ImpactLevel.NONE) {
+            if (impact != ImpactLevel.NONE) {
                 Text("· ${impact.label.uppercase()} IMPACT", fontFamily = JetBrainsMono, fontSize = 8.sp,
                     letterSpacing = 0.8.sp, color = c.ink2)
+                ImpactBar(impact)
             }
             if (hasLive) Text("· LIVE", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted)
         }
@@ -209,7 +274,9 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
 }
 
 /** One market chip: prefers the market's LIVE % move today (coloured by its actual sign); otherwise the
- *  story's heuristic lean (▲ up / ▼ down / • unclear). */
+ *  story's heuristic lean (▲ up / ▼ down / • unclear). Carries a small strength readout (dots) so a glance
+ *  tells you not just direction but how clearly the story implies the move — the "how big a deal is this"
+ *  insider signal. */
 @Composable
 private fun MarketChip(link: MarketLink, live: Double?) {
     val c = Pulse.colors
@@ -232,14 +299,56 @@ private fun MarketChip(link: MarketLink, live: Double?) {
         }
         "$arrow ${link.market}"
     }
-    Text(
-        text,
-        fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(col.copy(alpha = 0.14f))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
+    ) {
+        Text(text, fontFamily = JetBrainsMono, fontSize = 10.sp, color = col)
+        StrengthDots(link.strength, col)
+    }
+}
+
+/** 1..3 filled dots showing [strength] — "how strongly the story implies this move," the reader's insider
+ *  cue for which chips are the real story and which are a minor side mention. */
+@Composable
+private fun StrengthDots(strength: Int, color: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
+        repeat(3) { i ->
+            Box(
+                Modifier
+                    .size(3.dp)
+                    .clip(CircleShape)
+                    .background(if (i < strength) color else color.copy(alpha = 0.25f)),
+            )
+        }
+    }
+}
+
+/** A 3-segment fill bar for the IMPACT label — visual weight instead of just a text word. */
+@Composable
+private fun ImpactBar(impact: ImpactLevel) {
+    val c = Pulse.colors
+    val filled = when (impact) {
+        ImpactLevel.NONE -> 0
+        ImpactLevel.LOW -> 1
+        ImpactLevel.MEDIUM -> 2
+        ImpactLevel.HIGH -> 3
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
+        repeat(3) { i ->
+            Box(
+                Modifier
+                    .width(6.dp)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(if (i < filled) c.accent else c.raise),
+            )
+        }
+    }
 }
 
 /** Compact list variant — the CP2077 inventory row (accent blade + hairline) with a chamfered thumb. */
