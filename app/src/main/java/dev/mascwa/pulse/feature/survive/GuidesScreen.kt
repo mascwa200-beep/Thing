@@ -86,7 +86,12 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
         guides.map { g ->
             val blob = buildString {
                 append(g.title); append(' '); append(g.category); append(' '); append(g.summary); append(' ')
-                g.sections.forEach { append(it.heading); append(' '); append(it.body); append(' ') }
+                g.safetyNote?.let { append(it); append(' ') }
+                g.sections.forEach { s ->
+                    append(s.heading); append(' '); append(s.body); append(' ')
+                    s.ingredients?.forEach { append(it); append(' ') }
+                    s.steps?.forEach { append(it); append(' ') }
+                }
             }.lowercase()
             GuideIndex(g, blob)
         }
@@ -183,12 +188,47 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                             modifier = Modifier.padding(top = 4.dp))
                     }
                 }
+                sel.safetyNote?.let { note ->
+                    item {
+                        PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+                            Column {
+                                Text("⚠ SAFETY", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp, letterSpacing = 1.sp, color = c.amber)
+                                Text(note, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink,
+                                    modifier = Modifier.padding(top = 6.dp))
+                            }
+                        }
+                    }
+                }
                 items(sel.sections, key = { it.heading }) { section ->
                     Column {
                         PipHeader(section.heading)
                         PipFrame(Modifier.fillMaxWidth()) {
                             Column {
-                                Text(section.body, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                                if (section.body.isNotBlank()) {
+                                    Text(section.body, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                                }
+                                section.ingredients?.let { list ->
+                                    Column(Modifier.padding(top = if (section.body.isNotBlank()) 8.dp else 0.dp)) {
+                                        list.forEach { line ->
+                                            Row {
+                                                Text("▸ ", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.accent)
+                                                Text(line, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                                            }
+                                        }
+                                    }
+                                }
+                                section.steps?.let { list ->
+                                    Column(Modifier.padding(top = 8.dp)) {
+                                        list.forEachIndexed { i, step ->
+                                            Row {
+                                                Text("${i + 1}. ", fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp, color = c.accent)
+                                                Text(step, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2)
+                                            }
+                                        }
+                                    }
+                                }
                                 section.image?.let { SurvivalDiagram(it) }
                             }
                         }

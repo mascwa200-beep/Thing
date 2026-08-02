@@ -83,6 +83,11 @@ class GuidesJsonValidationTest {
                 errors += "$where has unrecognized category \"${g.category}\" — add it to knownCategories if intentional"
             }
 
+            g.safetyNote?.let { if (it.isBlank()) errors += "$where has a blank safetyNote (omit the field instead of \"\")" }
+            if (g.category.startsWith("Cooking — ") && g.category != "Cooking — Food Safety" && g.safetyNote.isNullOrBlank()) {
+                errors += "$where is a recipe (category \"${g.category}\") but has no safetyNote"
+            }
+
             val headings = g.sections.map { it.heading }
             if (headings.size != headings.toSet().size) {
                 val dupes = headings.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
@@ -91,7 +96,20 @@ class GuidesJsonValidationTest {
 
             for (s in g.sections) {
                 if (s.heading.isBlank()) errors += "$where has a blank section heading"
-                if (s.body.isBlank()) errors += "$where section \"${s.heading}\" has a blank body"
+                val hasBody = s.body.isNotBlank()
+                val hasIngredients = !s.ingredients.isNullOrEmpty()
+                val hasSteps = !s.steps.isNullOrEmpty()
+                if (!hasBody && !hasIngredients && !hasSteps) {
+                    errors += "$where section \"${s.heading}\" has no body, ingredients, or steps — completely empty"
+                }
+                s.ingredients?.let { list ->
+                    if (list.isEmpty()) errors += "$where section \"${s.heading}\" has an empty (non-null) ingredients list"
+                    list.forEachIndexed { i, line -> if (line.isBlank()) errors += "$where section \"${s.heading}\" ingredients[$i] is blank" }
+                }
+                s.steps?.let { list ->
+                    if (list.isEmpty()) errors += "$where section \"${s.heading}\" has an empty (non-null) steps list"
+                    list.forEachIndexed { i, line -> if (line.isBlank()) errors += "$where section \"${s.heading}\" steps[$i] is blank" }
+                }
                 s.image?.let { img ->
                     if (img !in bundledImages) errors += "$where section \"${s.heading}\" references missing image \"$img\""
                 }
