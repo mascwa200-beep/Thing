@@ -85,7 +85,7 @@ class CompassController(context: Context, private val cameraUpright: Boolean = f
         filteredAzimuth = smoothed
         if (cameraUpright) {
             // In the remapped (camera-upright) frame, orientation[1] is the up/down aim. Negate so tilting the
-            // phone UP reads as positive pitch (looking up), matching ArProjection.screenY's convention.
+            // phone UP reads as positive pitch (looking up).
             val rawPitch = -Math.toDegrees(orientation[1].toDouble()).toFloat()
             val p = filteredPitch?.let { it + PITCH_SMOOTHING * (rawPitch - it) } ?: rawPitch
             filteredPitch = p

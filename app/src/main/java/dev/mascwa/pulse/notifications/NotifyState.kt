@@ -15,25 +15,6 @@ data class NotifyState(
     val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
     val flightAlertedIds: List<String> = emptyList(),
-    /**
-     * Unused (kept only so an older persisted blob still deserializes cleanly — `ignoreUnknownKeys` makes it
-     * safe to drop the writes but this stays for one more release of backward compatibility). Survival alerts
-     * now re-fire every eligible tick with no per-band cooldown.
-     */
-    val survivalFiredMs: Map<String, Long> = emptyMap(),
-    /** Needs currently in a real concern band (LOW or worse) that we've alerted — so we can fire a single
-     *  recovery confirmation when one is brought back up to healthy. Need names. */
-    val survivalNeedActive: List<String> = emptyList(),
-    /** Afflictions we've already announced as active — so a disease pushes once when it takes hold and once
-     *  when it clears. Affliction names. */
-    val afflictedNotified: List<String> = emptyList(),
-    /** Calendar event ids already reminded about while imminent, so an appointment nudges once. */
-    val agendaNotifiedIds: List<String> = emptyList(),
-    /** Rotating survival-tip cursor (walks the whole catalog before repeating) + when one last fired. */
-    val survivalTipIndex: Int = 0,
-    val survivalTipLastMs: Long = 0L,
-    /** Local epoch-day we last fired a "don't break your streak" reminder, so it nudges at most once a day. */
-    val streakReminderDay: Int = -1,
     /** Last time (epoch ms) the full-screen BREAKING NEWS takeover fired — an audit timestamp only; the
      *  identity-dedup [breakingInterruptSeen] below is what stops the same story re-interrupting, not a
      *  time-based throttle (removed, owner's explicit choice: max notification frequency). */

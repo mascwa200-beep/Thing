@@ -5,8 +5,8 @@ import kotlin.math.roundToInt
 
 /**
  * ORACLE — J.A.R.V.I.S.'s predictive cortex. The capstone that fuses EVERYTHING the app senses and knows —
- * time, location, movement, calendar, tasks, interests, real survival needs, what the camera/mic perceive,
- * weather, market movers, breaking emergencies, space weather, device state, your usage rhythms, your steps —
+ * time, location, movement, calendar, tasks, interests, weather, market movers, breaking emergencies, space
+ * weather, device state, your usage rhythms —
  * into a single ranked stream of proactive [Insight]s: what's about to happen, what to do now to be ready,
  * what to avoid, and what opportunity is open. It's the answer to "what's the ONE thing I should know right
  * now?" — computed before you ask.
@@ -73,11 +73,6 @@ data class OracleSignals(
     val pendingTasks: List<String> = emptyList(),
     // Profile
     val interests: List<String> = emptyList(),
-    // Life-sim survival needs (real, decaying), 0..100 (100 = fine)
-    val needs: Map<String, Int> = emptyMap(), // keys: HYDRATION, ENERGY, NOURISHMENT, HYGIENE, ...
-    // Perception (what the camera/mic distilled)
-    val setting: Setting? = null,
-    val social: Social? = null,
     // Weather
     val tempC: Double? = null,
     val precipChancePct: Int? = null,
@@ -97,8 +92,6 @@ data class OracleSignals(
     // Usage rhythm — the feature you usually open around now (route) + its label
     val habitualRoute: String? = null,
     val habitualLabel: String? = null,
-    // Real activity
-    val stepsToday: Int? = null,
 ) {
     val minutesNow: Int get() = minuteOfDay
     val isNight: Boolean get() = hourOfDay >= 22 || hourOfDay < 6
@@ -109,6 +102,7 @@ object Oracle {
     private const val WALK_MPS = 1.35        // average walking pace
     private const val DRIVE_MPS = 11.0       // ~40 km/h effective urban drive
     private const val ARRIVE_BUFFER_MIN = 5  // be there a few minutes early
+    private const val MOVEMENT_THRESHOLD = 0.09f // smoothed motion intensity above which you're "moving"
 
     private fun minutesUntil(ms: Long, nowMs: Long): Double = (ms - nowMs) / 60_000.0
 
@@ -171,66 +165,12 @@ object Oracle {
         )
     }
 
-    private fun hydrate(s: OracleSignals): Insight? = needNudge(
-        s, "HYDRATION", InsightKind.RISK, "Drink water",
-        heatFactor = true, moveFactor = true,
-        detailBase = "You're running low on water",
-    )
-
-    private fun refuel(s: OracleSignals): Insight? = needNudge(
-        s, "NOURISHMENT", InsightKind.REMINDER, "Eat something",
-        heatFactor = false, moveFactor = true,
-        detailBase = "You haven't eaten in a while",
-    )
-
-    private fun rest(s: OracleSignals): Insight? {
-        val e = s.needs["ENERGY"] ?: return null
-        if (e > 25) return null
-        val nightBoost = if (s.isNight) 1 else 0
-        val urgency = if (e <= 12) Urgency.URGENT else Urgency.IMPORTANT
-        return Insight(
-            id = "need_energy", kind = InsightKind.REMINDER, urgency = urgency,
-            title = "You're running on empty — rest",
-            detail = "Energy at $e%${if (s.isNight) " and it's late" else ""}. A break now beats burning out.",
-            score = urgency.weight * 1000.0 + (30 - e) + nightBoost * 5,
-            actionRoute = "tacnet",
-            sources = listOf("life-sim", "time"),
-        )
-    }
-
-    private fun needNudge(
-        s: OracleSignals, key: String, kind: InsightKind, title: String,
-        heatFactor: Boolean, moveFactor: Boolean, detailBase: String,
-    ): Insight? {
-        val v = s.needs[key] ?: return null
-        if (v > 30) return null
-        val hot = heatFactor && (s.tempC ?: 0.0) >= 28.0
-        val moving = moveFactor && s.movement >= Perception.MOVEMENT_THRESHOLD
-        val urgency = when {
-            v <= 12 -> Urgency.URGENT
-            v <= 22 || hot || moving -> Urgency.IMPORTANT
-            else -> Urgency.NOTABLE
-        }
-        val ctx = buildList {
-            if (hot) add("it's hot out")
-            if (moving) add("you're on the move")
-        }
-        val why = if (ctx.isEmpty()) "$detailBase ($v%)." else "$detailBase ($v%) and ${ctx.joinToString(" and ")}."
-        return Insight(
-            id = "need_${key.lowercase()}", kind = kind, urgency = urgency,
-            title = title, detail = why,
-            score = urgency.weight * 1000.0 + (35 - v) + (if (hot) 6 else 0) + (if (moving) 4 else 0),
-            actionRoute = "tacnet",
-            sources = buildList { add("life-sim"); if (hot) add("weather"); if (moving) add("perception") },
-        )
-    }
-
     private fun weatherPrep(s: OracleSignals): Insight? {
         val chance = s.precipChancePct ?: return null
         if (chance < 55) return null
         // Only actionable if you're heading out: an event with a location soon, or you're already out.
         val outSoon = s.events.any { it.hasLocation && minutesUntil(it.startMs, s.nowMs) in 0.0..240.0 }
-        if (!outSoon && s.awayFromHome != true && s.setting != Setting.OUTDOOR) return null
+        if (!outSoon && s.awayFromHome != true) return null
         return Insight(
             id = "weather_rain", kind = InsightKind.PREPARATION, urgency = Urgency.NOTABLE,
             title = "Rain likely ($chance%) — grab an umbrella",
@@ -244,7 +184,7 @@ object Oracle {
     private fun uvWarn(s: OracleSignals): Insight? {
         val uv = s.uvIndex ?: return null
         if (uv < 7.0) return null
-        val outdoor = s.setting == Setting.OUTDOOR || s.awayFromHome == true
+        val outdoor = s.awayFromHome == true
         if (!outdoor && s.hourOfDay !in 10..16) return null
         return Insight(
             id = "uv_high", kind = InsightKind.RISK, urgency = Urgency.NOTABLE,
@@ -252,7 +192,7 @@ object Oracle {
             detail = "Sunburn territory. Sunscreen, hat, shade — especially midday.",
             score = Urgency.NOTABLE.weight * 1000.0 + uv,
             actionRoute = "weather",
-            sources = listOf("weather", "perception"),
+            sources = listOf("weather", "location"),
         )
     }
 
@@ -304,9 +244,8 @@ object Oracle {
 
     private fun focusMoment(s: OracleSignals): Insight? {
         val task = s.pendingTasks.firstOrNull() ?: return null
-        // A good moment = you're settled (still, indoors/unknown, alone) and nothing imminent.
-        val settled = s.movement < Perception.MOVEMENT_THRESHOLD && s.setting != Setting.VEHICLE &&
-            s.social != Social.CROWD
+        // A good moment = you're settled (still) and nothing imminent.
+        val settled = s.movement < MOVEMENT_THRESHOLD
         val imminent = s.events.any { minutesUntil(it.startMs, s.nowMs) in 0.0..20.0 }
         if (!settled || imminent || s.isNight) return null
         return Insight(
@@ -334,27 +273,13 @@ object Oracle {
 
     private fun windDown(s: OracleSignals): Insight? {
         if (!s.isNight || s.hourOfDay < 23) return null
-        val home = s.awayFromHome == false
-        val tired = (s.needs["ENERGY"] ?: 100) < 45
-        if (!home && !tired) return null
+        if (s.awayFromHome != false) return null
         return Insight(
             id = "wind_down", kind = InsightKind.REMINDER, urgency = Urgency.AMBIENT,
             title = "It's late — start winding down",
             detail = "Screens off soon pays back tomorrow. Tomorrow-you will thank you.",
             score = Urgency.AMBIENT.weight * 1000.0 + (s.hourOfDay - 22),
-            sources = listOf("time", "life-sim"),
-        )
-    }
-
-    private fun overexertion(s: OracleSignals): Insight? {
-        val steps = s.stepsToday ?: return null
-        if (steps < 15000) return null
-        return Insight(
-            id = "steps_high", kind = InsightKind.INSIGHT, urgency = Urgency.AMBIENT,
-            title = "Big day on your feet — ${fmtInt(steps)} steps",
-            detail = "Well past 15k. Hydrate, refuel, and give your legs a rest tonight.",
-            score = Urgency.AMBIENT.weight * 1000.0 + steps / 1000.0,
-            sources = listOf("activity"),
+            sources = listOf("time", "location"),
         )
     }
 
@@ -402,9 +327,9 @@ object Oracle {
     }
 
     private val RULES: List<(OracleSignals) -> Insight?> = listOf(
-        ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow, ::hydrate, ::refuel, ::rest,
+        ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
-        ::windDown, ::overexertion, ::habitPrefetch, ::interestPulse,
+        ::windDown, ::habitPrefetch, ::interestPulse,
     )
 
     /**
@@ -457,11 +382,6 @@ object Oracle {
             (s.tempC ?: 15.0) <= -5 -> lines += "🌡 ${s.tempC!!.roundToInt()}°C — bitter cold"
             (s.uvIndex ?: 0.0) >= 8 -> lines += "☀ UV ${s.uvIndex!!.roundToInt()} — burns fast"
         }
-        // Your own body, quietly ticking down.
-        s.needs.entries.filter { it.value <= 30 }.minByOrNull { it.value }
-            ?.let { lines += "💧 ${it.key.lowercase().replaceFirstChar { c -> c.uppercase() }} running low (${it.value}%)" }
-        // Movement you've put in.
-        s.stepsToday?.takeIf { it >= 4000 }?.let { lines += "👟 ${fmtInt(it)} steps today" }
         // The Oracle's own top read, if it isn't already covered above.
         insights.firstOrNull()?.let { top ->
             if (lines.none { it.contains(top.title.take(12), ignoreCase = true) }) lines += "🔮 ${top.title.trimEnd('.')}"
@@ -475,7 +395,6 @@ object Oracle {
     // ---- small formatting helpers (pure) ----
     private fun km(m: Double): String = if (m >= 1000) "${(m / 100).roundToInt() / 10.0} km" else "${m.roundToInt()} m"
     private fun fmtPct(p: Double): String = (if (p >= 0) "+" else "") + "${(p * 10).roundToInt() / 10.0}%"
-    private fun fmtInt(n: Int): String = n.toString().reversed().chunked(3).joinToString(",").reversed()
     private fun startsIn(ms: Long, nowMs: Long): String {
         val m = minutesUntil(ms, nowMs)
         return when {

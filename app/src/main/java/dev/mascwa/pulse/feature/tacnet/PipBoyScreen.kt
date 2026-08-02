@@ -55,9 +55,9 @@ import kotlin.math.roundToInt
 /**
  * The combined PIP-BOY hub — every TOOLS feed under one Fallout Pip-Boy device, organised under the
  * three canonical Pip-Boy sections selected from the global bottom nav (STATS / ITEMS / DATA):
- *  - STATS  → STATUS (phone telemetry / condition / S.P.E.C.I.A.L.), plus the folded-in SURVIVE hub,
- *             SOCIAL feed and web SEARCH sub-tabs.
- *  - ITEMS  → the collected-inventory view (favourite stations, notes, tracked objectives).
+ *  - STATS  → STATUS (phone telemetry / condition), plus the folded-in SURVIVE hub, SOCIAL feed and web
+ *             SEARCH sub-tabs.
+ *  - ITEMS  → the collected-inventory view (notes, tasks, tracked objectives).
  *  - DATA   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), QUESTS
  *             (objectives log), NOTES (library), RADIO and MUSIC.
  * The sub-tab rail shows only the active section's tabs; each feed's scaffold-free *Body is hosted
@@ -67,13 +67,10 @@ private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"
 
 private enum class PipTab(val label: String, val section: PipSection) {
     STATUS("STATUS", PipSection.STATS),
-    SPECIAL("SPECIAL", PipSection.STATS),
     SURVIVE("SURVIVE", PipSection.STATS),
     SOCIAL("SOCIAL", PipSection.STATS),
     SEARCH("SEARCH", PipSection.STATS),
-    GEAR("GEAR", PipSection.ITEMS),
     STORED("STORED", PipSection.ITEMS),
-    WASTELAND("WASTELAND", PipSection.DATA),
     MAP("MAP", PipSection.DATA),
     RADAR("RADAR", PipSection.DATA),
     ORBIT("ORBIT", PipSection.DATA),
@@ -92,7 +89,7 @@ private enum class PipTab(val label: String, val section: PipSection) {
 
 /**
  * A process-scoped deep-link target for the PIP-BOY screen's sub-tab. A notification or launcher shortcut
- * sets [target] to a [PipTab] name (e.g. "SPECIAL", "WASTELAND") just before navigating to TACNET; because
+ * sets [target] to a [PipTab] name (e.g. "STATUS", "QUESTS") just before navigating to TACNET; because
  * TACNET is a top destination navigated without query args, this holder carries the sub-tab. [PipBoyScreen]
  * consumes and clears it on arrival. Backed by Compose state so an already-composed screen reacts too.
  */
@@ -120,9 +117,9 @@ fun PipBoyScreen(
     onOpenSettings: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
-    // A notification/shortcut can deep-link straight to a specific sub-tab (e.g. a survival check-in → STATS ▸
-    // SPECIAL, an agenda reminder → DATA ▸ WASTELAND) by setting PipBoyDeepLink.target before navigating here.
-    // Consume it reactively — the screen may already be composed when the deep-link arrives.
+    // A notification/shortcut can deep-link straight to a specific sub-tab (e.g. a nearby-safety alert → DATA
+    // ▸ MAP) by setting PipBoyDeepLink.target before navigating here. Consume it reactively — the screen may
+    // already be composed when the deep-link arrives.
     LaunchedEffect(PipBoyDeepLink.target.value) {
         val t = PipBoyDeepLink.target.value ?: return@LaunchedEffect
         PipTab.entries.firstOrNull { it.name == t }?.let { tab = it }
@@ -142,13 +139,10 @@ fun PipBoyScreen(
             IconButton(onClick = {
                 when (tab) {
                     PipTab.STATUS -> Unit // telemetry is live; nothing to pull
-                    PipTab.SPECIAL -> Unit // the game is live (self-managed via GameSensors)
                     PipTab.SURVIVE -> Unit // the survive hub is a static tile grid
                     PipTab.SOCIAL -> socialVm.refresh()
                     PipTab.SEARCH -> Unit // search has no feed to pull
-                    PipTab.GEAR -> Unit // the game loadout is live
                     PipTab.STORED -> objectivesVm.refresh() // refresh tracked objectives in the inventory
-                    PipTab.WASTELAND -> Unit // the wasteland map has its own SCAN control
                     PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
                     PipTab.RADAR -> radarVm.refresh()
@@ -174,13 +168,10 @@ fun PipBoyScreen(
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (tab) {
                         PipTab.STATUS -> TelemetryBody(telemetryVm)
-                        PipTab.SPECIAL -> SpecialGameBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.SURVIVE -> dev.mascwa.pulse.feature.survive.SurviveBody(onOpenRoute, Modifier.fillMaxSize())
                         PipTab.SOCIAL -> dev.mascwa.pulse.feature.social.SocialBody(socialVm, Modifier.fillMaxSize())
                         PipTab.SEARCH -> dev.mascwa.pulse.feature.search.SearchBody(searchVm, Modifier.fillMaxSize())
-                        PipTab.GEAR -> ItemsGameBody(telemetryVm, Modifier.fillMaxSize())
                         PipTab.STORED -> ItemsBody(tasksVm, notesVm, objectivesVm)
-                        PipTab.WASTELAND -> WastelandDataBody(telemetryVm, onOpenRoute, Modifier.fillMaxSize())
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)

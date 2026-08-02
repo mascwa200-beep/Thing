@@ -41,17 +41,6 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(context) }
                 }
-                // Revive the always-on ambient watch/listen if the owner left it on, so the 24/7 sensing
-                // (which powers the commitment lock's completion detection + the game) survives a reboot.
-                // Best-effort: the OS may block starting a mic/camera FGS from boot on newer Android — then
-                // the MainActivity effect starts it next app-open (the same graceful fallback as above).
-                if (settings.ambientSensingAlways && settings.ambientSensing) {
-                    runCatching {
-                        dev.mascwa.pulse.data.perception.AmbientSensingService.start(
-                            context, mic = settings.ambientMic, cam = settings.ambientCamera,
-                        )
-                    }
-                }
             } finally {
                 pending.finish()
             }

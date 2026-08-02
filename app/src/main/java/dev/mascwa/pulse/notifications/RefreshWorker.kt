@@ -5,11 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.flow.collect
 import dev.mascwa.pulse.PulseApplication
-import dev.mascwa.pulse.core.telemetry.Affliction
-import dev.mascwa.pulse.core.telemetry.AlertLevel
 import dev.mascwa.pulse.core.telemetry.QuietHours
-import dev.mascwa.pulse.core.telemetry.SurvivalAlerts
-import dev.mascwa.pulse.core.telemetry.SurvivalNeed
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.AppSettings
@@ -37,17 +33,6 @@ class RefreshWorker(
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
 
-        // Self-heal the always-on ambient watch/listen: if the owner left it on but the OS reclaimed the
-        // service (it's START_NOT_STICKY), (re)start it here each run. Idempotent — no-op if already up;
-        // best-effort (a background FGS start can be refused, then the next app-open re-arms it).
-        if (settings.ambientSensingAlways && settings.ambientSensing) {
-            runCatching {
-                dev.mascwa.pulse.data.perception.AmbientSensingService.start(
-                    applicationContext, mic = settings.ambientMic, cam = settings.ambientCamera,
-                )
-            }
-        }
-
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 
@@ -59,24 +44,6 @@ class RefreshWorker(
         }
 
         val notifier = container.notifier
-
-        // --- Self-care check-ins: CareSchedule is now the SOLE clock-driven due-check engine — the older
-        //     HabitCheckin fixed-interval scheduling path has been retired from here (merged, not duplicated).
-        //     `aggressiveCheckin` is no longer a second, independently-scheduled system; it's a STRICTNESS mode
-        //     on this same due check-in (an ongoing, harder-to-dismiss notification that, on a dodge, is
-        //     eligible to escalate into the lockout — see CareCheckinActivity/LockoutActivity). Steps aside
-        //     when J.A.R.V.I.S. is driving the timing himself (the pass below owns the "when" then), exactly
-        //     like the retired aggressive path used to. ---
-        val jarvisDrivenCheckins = prefs.jarvisDrivenCheckins && settings.jarvis.cloudActive
-        if (prefs.smartCheckins && !jarvisDrivenCheckins) {
-            runCatching {
-                val due = container.careCheckinStore.schedule()
-                if (due != null) {
-                    notifier.notifyCareCheckin(due, strict = prefs.aggressiveCheckin)
-                    container.careCheckinStore.markAsked(due)
-                }
-            }
-        }
 
         // --- App update available? (in-app updater; dedup by build number) ---
         if (prefs.updateChecks) {
@@ -143,35 +110,6 @@ class RefreshWorker(
                     container.settingsRepository.update {
                         it.copy(lastCuriosityMs = now, curiosityIndex = it.curiosityIndex + 1)
                     }
-                }
-            }
-        }
-
-        // --- J.A.R.V.I.S.-driven self-care timing (opt-in, cloud-gated, throttled): rather than a fixed
-        //     clock, let the assistant decide WHEN to nudge — it reads the owner's directive + current needs +
-        //     what the sensors actually saw and asks (via `selfcare ask`) only when it judges the moment right.
-        //     Only consult the model when something is genuinely overdue (saves credits). ---
-        if (prefs.selfCareCheckins && jarvisDrivenCheckins) {
-            runCatching {
-                val now = System.currentTimeMillis()
-                if (container.habitStore.nextDue() != null) {
-                    val directive = settings.jarvis.selfCareDirective
-                    val sys = dev.mascwa.pulse.jarvis.JarvisPersona.SYSTEM_PROMPT +
-                        if (directive.isNotBlank()) {
-                            "\n\nThe owner's self-care directive (interpret it): ${directive.trim()}"
-                        } else {
-                            ""
-                        }
-                    val query =
-                        "Quietly review the owner's self-care right now. Use `selfcare due` to see what habit is " +
-                            "overdue, `selfcare needs` for their need levels, and `selfcare evidence` for what " +
-                            "the sensors actually saw recently. Then — ONLY if their directive and the evidence " +
-                            "make this a genuinely good moment to nudge them about ONE specific unmet need — " +
-                            "fire a single check-in with `selfcare ask <shower|teeth|meal|water>`. If it's a " +
-                            "poor time (they clearly just did it, nothing's due, or the directive says leave " +
-                            "them be), do nothing. Be sparing — at most one nudge. Reply with a one-line note."
-                    container.agentOrchestrator.run(query, sys).collect { /* drive to completion */ }
-                    container.settingsRepository.update { it.copy(lastSelfCareCheckMs = now) }
                 }
             }
         }
@@ -439,138 +377,6 @@ class RefreshWorker(
             }
         }
 
-        // --- Life-sim survival check-ins: nudge when a real-decaying need runs low, escalating through four
-        // bands (NOTICE → LOW → URGENT → CRITICAL) each throttled on its own NEED|BAND key (worse = sooner),
-        // with the live stat toll + advice in the body, and a one-shot recovery confirmation when a need is
-        // brought back up; + remind when a real appointment is imminent (once per event). The needs bleed into
-        // reality, so this doubles as a "drink / eat / rest / wash" reminder. Keeps you alive. ---
-        if (prefs.survivalAlerts) {
-            runCatching {
-                val now = System.currentTimeMillis()
-                val life = container.specialGameStore.lifeSnapshot()
-                val active = state.survivalNeedActive.toMutableSet()
-                SurvivalNeed.entries.forEach { need ->
-                    val value = need.kind.value(life)
-                    val band = SurvivalAlerts.bandFor(value)
-                    if (band != null) {
-                        val alert = SurvivalAlerts.alertFor(need, value, now) ?: return@forEach
-                        // No per-band cooldown — a need still in a bad band re-nags every eligible tick
-                        // (owner's explicit choice: max notification frequency).
-                        // Richer body: the themed line + the live stat stakes (when it's biting) + advice.
-                        val body = buildString {
-                            append(alert.body)
-                            if (alert.stakes.isNotBlank()) append("\nToll right now: ${alert.stakes}")
-                            append("\n${alert.advice}")
-                        }
-                        notifier.notifySurvival(
-                            id = 7700 + need.ordinal,
-                            title = alert.title,
-                            body = body,
-                            urgent = band.isPressing,
-                        )
-                        // Track LOW-or-worse so a recovery can be confirmed; a mere NOTICE isn't worth one.
-                        if (band != AlertLevel.NOTICE) active += need.name
-                    } else if (need.name in active) {
-                        // Climbed back to healthy after being a real concern → confirm the recovery once.
-                        val rec = SurvivalAlerts.recovery(need, now)
-                        notifier.notifySurvival(id = 7700 + need.ordinal, title = rec.title, body = rec.body, urgent = false)
-                        active -= need.name
-                    }
-                }
-                state = state.copy(survivalNeedActive = active.toList())
-
-                // Lingering afflictions: fire once when a disease takes hold (a neglected need went sick),
-                // once when it clears. Deduped via afflictedNotified. Shares the survival-alerts toggle.
-                val aff = container.specialGameStore.afflictionSnapshot()
-                val activeAfflictions = aff.active.map { it.name }
-                val knownAfflictions = state.afflictedNotified
-                aff.active.filter { it.name !in knownAfflictions }.forEach { a ->
-                    notifier.notifySurvival(7780 + a.ordinal, "⚕ AFFLICTED · ${a.label}", "${a.desc} ${a.cure}", urgent = true)
-                }
-                Affliction.entries.filter { it.name in knownAfflictions && it.name !in activeAfflictions }.forEach { a ->
-                    notifier.notifySurvival(
-                        7780 + a.ordinal, "✓ RECOVERED · ${a.label}",
-                        "You've shaken off ${a.label.lowercase()}. Back to fighting form.", urgent = false,
-                    )
-                }
-                state = state.copy(afflictedNotified = activeAfflictions)
-
-                // Imminent real appointment → an agenda reminder, once per event while it's imminent.
-                val agenda = dev.mascwa.pulse.core.telemetry.CalendarQuests.compose(
-                    container.calendarRepository.upcoming(now), now, max = 5,
-                )
-                val notified = state.agendaNotifiedIds.toMutableSet()
-                // Latest-only: ONE in-place reminder for the SOONEST imminent appointment (+ "N more");
-                // CalendarQuests.compose returns soonest-first.
-                val dueAgenda = agenda.filter { it.imminent && it.id.toString() !in notified }
-                if (dueAgenda.isNotEmpty()) {
-                    val lead = dueAgenda.first()
-                    val more = dueAgenda.size - 1
-                    notifier.notifyAgenda(
-                        id = NotifId.AGENDA,
-                        title = "⏰ Incoming: ${lead.title.take(60)}" + if (more > 0) "  (+$more more)" else "",
-                        body = "${lead.countdown} — ${lead.briefing}",
-                    )
-                    dueAgenda.forEach { notified += it.id.toString() }
-                }
-                // Keep only ids still in the agenda window so the dedup set can't grow without bound.
-                val liveIds = agenda.map { it.id.toString() }.toSet()
-                state = state.copy(agendaNotifiedIds = notified.filter { it in liveIds })
-            }
-        }
-
-        // --- "Don't break your streak": if a meaningful self-care streak is in its grace day (done
-        // yesterday, not yet today) nudge to keep it alive. Uses the SAME local-epoch-day the streaks were
-        // stamped with, so "yesterday" lines up. No daily dedup — re-nags every eligible tick while at risk. ---
-        if (prefs.selfCareCheckins && prefs.streakReminders) {
-            runCatching {
-                val now = System.currentTimeMillis()
-                val todayDay = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
-                run {
-                    val streaks = container.habitStore.streaks().values
-                    val atRisk = dev.mascwa.pulse.core.telemetry.SelfCareStreak.bestAtRisk(streaks, todayDay)
-                    if (atRisk > 0) {
-                        notifier.notifySurvival(
-                            id = 7740,
-                            title = "🔥 Keep your $atRisk-day streak alive",
-                            body = "Check in on your self-care today so your $atRisk-day streak doesn't break.",
-                            urgent = false,
-                        )
-                        state = state.copy(streakReminderDay = todayDay)
-                    }
-                }
-            }
-        }
-
-        // --- Phone penalties: engage/lift the "neglect bites the phone" device locks from the background-
-        // decayed needs, so a need that lapses while the app is closed still locks its capability (and one
-        // that recovers is released). The controller no-ops unless the opt-in toggle is on AND Pulse is a
-        // Device Owner; fully defensive. ---
-        runCatching {
-            val life = container.specialGameStore.lifeSnapshot()
-            // fireGate=true: the background worker is the only path that pops the harsher kiosk lock-screen gate
-            // (so it fires when the phone is idle, not while you're actively in Pulse). No re-trigger cooldown.
-            container.phonePenaltyController.reconcile(life, fireGate = true)
-        }
-
-        // --- Survival tips: push one tip from the 300+ catalog (quiet, low-priority, fixed id so each
-        // silently replaces the last). No cooldown — fires every eligible tick. The tip index is DERIVED
-        // FROM THE CLOCK on a fine ROTATION_MS granularity (not a persisted cursor, and not a suppression
-        // gate — purely which tip is "current"), so the rotation can never get stuck on tip 0 even if state
-        // fails to persist, consecutive ticks show a genuinely different tip, and the ×131 scramble (coprime
-        // with the ~310-tip catalog) makes it feel random while still covering everything over time. ---
-        if (prefs.survivalTips) {
-            runCatching {
-                val now = System.currentTimeMillis()
-                val bucket = now / TIP_ROTATION_MS
-                val idx = (bucket * 131).toInt()
-                val tips = dev.mascwa.pulse.core.telemetry.SurvivalTips
-                // Deep-link the tip to the specific guide that teaches its skill (knot tip → knots guide).
-                notifier.notifyTip(NotifId.TIP, "⛑ Survival tip", tips.tip(idx), guideId = tips.guideIdAt(idx))
-                state = state.copy(survivalTipIndex = idx, survivalTipLastMs = now)
-            }
-        }
-
         // --- Daily digest. digestHour is a "not before this local time" floor, not a repeat cooldown — kept.
         // No daily dedup beyond that, so it refreshes with the latest lines on every eligible tick after
         // digestHour rather than freezing at whatever was true the first time it fired that day. ---
@@ -657,23 +463,6 @@ class RefreshWorker(
             val sw = runCatching { container.spaceWeatherRepository.fetch(false, lat, lon).data }.getOrNull()
             dev.mascwa.pulse.data.orbital.SkyDigest.lines(orb, sw, lat, lon).take(2).forEach { lines += it }
         }
-        // Self-care streak: a glanceable nudge (grace-day) or a "going strong" line — only when the check-in
-        // system is on and a streak actually exists, so it never clutters the digest for non-players.
-        if (settings.notifications.selfCareCheckins) {
-            runCatching {
-                val streaks = container.habitStore.streaks().values
-                val now = System.currentTimeMillis()
-                val today = ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
-                val atRisk = dev.mascwa.pulse.core.telemetry.SelfCareStreak.bestAtRisk(streaks, today)
-                val liveBest = streaks.maxOfOrNull {
-                    dev.mascwa.pulse.core.telemetry.SelfCareStreak.currentAsOf(it, today)
-                } ?: 0
-                when {
-                    atRisk > 0 -> lines += "🔥 Keep your $atRisk-day self-care streak alive today"
-                    liveBest > 0 -> lines += "🔥 $liveBest-day self-care streak going strong"
-                }
-            }
-        }
         return lines
     }
 
@@ -698,9 +487,5 @@ class RefreshWorker(
 
     companion object {
         const val UNIQUE_NAME = "pulse_periodic_refresh"
-        // Rotation granularity for which survival tip is "current" — NOT a suppression cooldown (there is
-        // none: tips fire every eligible worker tick). A small value just guarantees consecutive ticks show
-        // a genuinely different tip instead of repeating the same one for hours.
-        private const val TIP_ROTATION_MS = 60L * 1000 // one minute
     }
 }

@@ -124,32 +124,6 @@ class MainActivity : ComponentActivity() {
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
             val online by app.container.connectivityObserver.isOnline.collectAsStateWithLifecycle()
 
-            // Always-on ambient sensing (opt-in): keep the foreground sensing service in step with the
-            // settings — starts/stops immediately on a toggle change and on cold launch. Defensive inside.
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            androidx.compose.runtime.LaunchedEffect(
-                settings.ambientSensingAlways, settings.ambientSensing, settings.ambientMic, settings.ambientCamera,
-            ) {
-                if (settings.ambientSensingAlways && settings.ambientSensing) {
-                    dev.mascwa.pulse.data.perception.AmbientSensingService.start(
-                        ctx, mic = settings.ambientMic, cam = settings.ambientCamera,
-                    )
-                } else {
-                    dev.mascwa.pulse.data.perception.AmbientSensingService.stop(ctx)
-                }
-            }
-
-            // Floating game overlay (opt-in): keep the draw-over-apps Pip-Boy HUD service in step with the
-            // toggle. Only starts when the setting is on AND the draw-over permission is granted (the service
-            // no-ops otherwise); starts on cold launch + every foreground return via this effect.
-            androidx.compose.runtime.LaunchedEffect(settings.gameOverlay) {
-                if (settings.gameOverlay && android.provider.Settings.canDrawOverlays(ctx)) {
-                    dev.mascwa.pulse.feature.overlay.GameOverlayService.start(ctx)
-                } else {
-                    dev.mascwa.pulse.feature.overlay.GameOverlayService.stop(ctx)
-                }
-            }
-
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
                 // Hardware attestation runs once, async, and STRENGTHENS the gate: a genuine result is
@@ -254,15 +228,6 @@ class MainActivity : ComponentActivity() {
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Catch a build that turned green while the app was backgrounded — prompt the install on return.
         maybeAutoUpdate()
-        // Reconcile the "neglect bites the phone" penalties against the decayed needs (engage new critical
-        // needs' locks, lift recovered ones). Opt-in + fully defensive; a no-op when the feature is off.
-        lifecycleScope.launch {
-            runCatching {
-                val life = app.container.specialGameStore.lifeSnapshot()
-                // fireGate=true so opening the app with a critical need locks you straight into the gate.
-                app.container.phonePenaltyController.reconcile(life, fireGate = true)
-            }
-        }
     }
 
     override fun onStop() {
@@ -280,7 +245,6 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
             runCatching { app.container.securityAuditStore.flushNow() }
-            runCatching { app.container.gameWorldStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

@@ -4,13 +4,20 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
-import dev.mascwa.pulse.core.telemetry.CalEvent
+
+/** A single real device-calendar event, distilled for on-device use (e.g. ORACLE's calendar signal). */
+data class CalEvent(
+    val id: Long,
+    val title: String,
+    val startMs: Long,
+    val endMs: Long,
+    val allDay: Boolean,
+)
 
 /**
- * Reads the device calendar (upcoming events only) → [CalEvent]s for the life-sim's real-schedule agenda.
- * Permission-gated (READ_CALENDAR) and fully defensive — no permission / no provider / any failure yields an
- * empty list. ON-DEVICE ONLY: the event title + times are used locally to frame wasteland objectives and are
- * never persisted off-device or transmitted.
+ * Reads the device calendar (upcoming events only) → [CalEvent]s. Permission-gated (READ_CALENDAR) and fully
+ * defensive — no permission / no provider / any failure yields an empty list. ON-DEVICE ONLY: the event title
+ * + times are used locally and are never persisted off-device or transmitted.
  */
 class CalendarRepository(private val context: Context) {
 

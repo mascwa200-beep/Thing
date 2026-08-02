@@ -181,20 +181,6 @@ dependencies {
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
 
-    // On-device audio classification (MediaPipe YAMNet) — the life-sim's ambient hearing.
-    implementation(libs.mediapipe.tasks.audio)
-
-    // On-device image classification (MediaPipe EfficientNet-Lite) + CameraX — the life-sim's ambient seeing.
-    implementation(libs.mediapipe.tasks.vision)
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    // Filament — 3D AR wasteland renderer (arm64 native; no ARCore/Play Services).
-    implementation(libs.filament.android)
-    implementation(libs.filament.utils.android)
-    implementation(libs.filamat.android)
-
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.
     implementation(libs.vosk.android)

@@ -67,26 +67,9 @@ class OracleTest {
         assertNull(Oracle.divine(base().copy(batteryPct = 80)).byId("charge_low"))
     }
 
-    @Test fun hydrateEscalatesWithHeatAndMotion() {
-        val calm = Oracle.divine(base().copy(needs = mapOf("HYDRATION" to 28))).byId("need_hydration")
-        assertNotNull(calm)
-        assertEquals(Urgency.NOTABLE, calm!!.urgency)
-        val hotMoving = Oracle.divine(
-            base().copy(needs = mapOf("HYDRATION" to 28), tempC = 32.0, movement = 0.2f),
-        ).byId("need_hydration")
-        assertEquals(Urgency.IMPORTANT, hotMoving!!.urgency)
-        assertTrue(hotMoving.detail.contains("hot"))
-    }
-
-    @Test fun restFiresOnLowEnergy() {
-        val ins = Oracle.divine(base(hour = 23).copy(needs = mapOf("ENERGY" to 10))).byId("need_energy")
-        assertNotNull(ins)
-        assertEquals(Urgency.URGENT, ins!!.urgency)
-    }
-
     @Test fun weatherPrepNeedsToBeHeadingOut() {
-        // Rain but stuck indoors with no outing → no nudge.
-        assertNull(Oracle.divine(base().copy(precipChancePct = 80, setting = Setting.INDOOR)).byId("weather_rain"))
+        // Rain but nothing indicates you're heading out → no nudge.
+        assertNull(Oracle.divine(base().copy(precipChancePct = 80)).byId("weather_rain"))
         // Rain + an event with a location soon → fires.
         val ins = Oracle.divine(
             base().copy(precipChancePct = 80, events = listOf(OracleEvent("Lunch", inMin(90), hasLocation = true, distanceM = 500.0))),
@@ -119,13 +102,13 @@ class OracleTest {
     @Test fun focusMomentWhenSettledAndFree() {
         val s = base(hour = 14).copy(
             pendingTasks = listOf("File the report"),
-            movement = 0.0f, setting = Setting.INDOOR, social = Social.ALONE,
+            movement = 0.0f,
         )
         val ins = Oracle.divine(s).byId("focus_task")
         assertNotNull(ins)
         assertTrue(ins!!.title.contains("File the report"))
-        // In a vehicle → not a focus moment.
-        assertNull(Oracle.divine(s.copy(setting = Setting.VEHICLE)).byId("focus_task"))
+        // Moving around → not a focus moment.
+        assertNull(Oracle.divine(s.copy(movement = 0.5f)).byId("focus_task"))
     }
 
     @Test fun divineRanksByUrgencyThenScore() {
@@ -155,7 +138,7 @@ class OracleTest {
 
     @Test fun limitCapsTheSurface() {
         val s = base(hour = 8).copy(
-            emergencyHeadline = "X", batteryPct = 10, needs = mapOf("HYDRATION" to 10, "NOURISHMENT" to 10, "ENERGY" to 10),
+            emergencyHeadline = "X", batteryPct = 10,
             movers = listOf(OracleMover("A", 9.0)), kpIndex = 8.0, storageFreePct = 2,
         )
         assertTrue(Oracle.divine(s, limit = 3).size <= 3)
@@ -172,7 +155,6 @@ class OracleTest {
             emergencyHeadline = "Storm makes landfall",
             movers = listOf(OracleMover("Oil", 3.4, onWatchlist = true)),
             kpIndex = 6.0,
-            stepsToday = 8200,
         )
         val p = Oracle.worldPulse(s)
         assertNotNull(p)
@@ -181,19 +163,16 @@ class OracleTest {
         // The feed body fuses multiple independent domains.
         assertTrue(p.lines.any { it.contains("Oil") && it.contains("yours") })
         assertTrue(p.lines.any { it.contains("Kp") })
-        assertTrue(p.lines.any { it.contains("steps") })
         assertTrue(p.lines.size <= 5)
     }
 
-    @Test fun worldPulseSurfacesLowNeedAndUpcomingEvent() {
+    @Test fun worldPulseSurfacesUpcomingEvent() {
         val s = base(hour = 13).copy(
-            needs = mapOf("HYDRATION" to 20),
             events = listOf(OracleEvent("Team sync", inMin(45))),
         )
         val p = Oracle.worldPulse(s)
         assertNotNull(p)
-        assertTrue(p!!.lines.any { it.contains("Hydration", ignoreCase = true) })
-        assertTrue(p.lines.any { it.contains("Team sync") })
+        assertTrue(p!!.lines.any { it.contains("Team sync") })
     }
 
     @Test fun worldPulseFallsBackToTopInsight() {

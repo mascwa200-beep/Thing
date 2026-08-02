@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -65,17 +66,7 @@ fun ArticleCard(
         padding = PaddingValues(0.dp),
     ) {
         Column {
-            if (!article.imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = article.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(c.raise),
-                )
-            }
+            ArticleImage(article, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
             Column(Modifier.padding(14.dp)) {
                 Text(
                     article.title,
@@ -104,6 +95,41 @@ fun ArticleCard(
                 )
             }
         }
+    }
+}
+
+/** The article's lead image, ALWAYS a full-width slot — every tab, every story, a real photo where the feed
+ *  actually has one, a themed procedural placeholder otherwise (a category-tinted gradient + glyph, no
+ *  network, no bundled asset). Wire/social sources without a thumbnail no longer read as text-only rows. */
+@Composable
+private fun ArticleImage(article: Article, modifier: Modifier) {
+    val c = Pulse.colors
+    if (!article.imageUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = article.imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.background(c.raise),
+        )
+    } else {
+        ArticlePlaceholder(article, modifier)
+    }
+}
+
+/** A deterministic gradient + initial, tinted by the story's category (or source, if categoryless) so a
+ *  browse session reads as visually consistent per topic rather than a random colour every time. */
+@Composable
+private fun ArticlePlaceholder(article: Article, modifier: Modifier) {
+    val key = article.category.ifBlank { article.source }.ifBlank { article.title }
+    val hue = (key.hashCode().mod(360)).toFloat()
+    val base = Color.hsv(hue, 0.5f, 0.30f)
+    val edge = Color.hsv((hue + 26f).mod(360f), 0.55f, 0.16f)
+    val glyph = key.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "◉"
+    Box(
+        modifier.background(Brush.linearGradient(listOf(base, edge))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(glyph, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 44.sp, color = Color.White.copy(alpha = 0.22f))
     }
 }
 
@@ -199,14 +225,15 @@ private fun SegmentedMoodBar(b: ToneBreakdown, modifier: Modifier) {
     }
 }
 
-/** A short "what actually drove this" line — e.g. "4 upbeat · 1 tense" — blank when there's nothing to show. */
+/** A short, confiding "here's what's actually driving the mood" line — e.g. "4 lines running upbeat, 1
+ *  genuinely tense" — blank when there's nothing to show. Shows its work instead of a bare score. */
 private fun moodCaption(b: ToneBreakdown): String {
     val bits = buildList {
-        if (b.positive > 0) add("${b.positive} upbeat")
-        if (b.negative > 0) add("${b.negative} negative")
-        if (b.tense > 0) add("${b.tense} tense")
+        if (b.positive > 0) add("${b.positive} running upbeat")
+        if (b.negative > 0) add("${b.negative} turning sour")
+        if (b.tense > 0) add("${b.tense} genuinely tense")
     }
-    return bits.joinToString(" · ")
+    return bits.joinToString(", ")
 }
 
 private fun toneColor(t: Tone): Color = when (t) {

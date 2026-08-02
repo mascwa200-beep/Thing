@@ -61,12 +61,6 @@ object OracleEngine {
             UserProfile.inCategory(container.profileStore.all(), ProfileCategory.INTEREST).map { it.text }
         }.getOrDefault(emptyList())
 
-        val life = runCatching { container.specialGameStore.lifeSnapshot() }.getOrNull()
-        val needs = if (life != null) mapOf(
-            "HYDRATION" to life.hydration, "ENERGY" to life.energy,
-            "NOURISHMENT" to life.nourishment, "HYGIENE" to life.hygiene,
-        ) else emptyMap()
-
         // Weather — device location first, else a saved location. Convert temperature to °C (the API returns
         // it in the user's chosen unit).
         val wxLat = loc?.latitude ?: settings.savedLocations.firstOrNull()?.latitude
@@ -107,13 +101,12 @@ object OracleEngine {
         return OracleSignals(
             nowMs = now, hourOfDay = hour, minuteOfDay = minute, dayOfWeek = dow,
             lat = loc?.latitude, lon = loc?.longitude, placeName = loc?.name, speedMps = loc?.speedMps,
-            events = events, pendingTasks = pendingTasks, interests = interests, needs = needs,
+            events = events, pendingTasks = pendingTasks, interests = interests,
             tempC = tempC, precipChancePct = precip, uvIndex = uv,
             movers = movers, emergencyHeadline = emergency, kpIndex = kp,
             batteryPct = dc?.batteryPct?.takeIf { it >= 0 }, charging = dc?.isCharging ?: false,
             storageFreePct = storageFreePct, onCellular = dc?.let { it.network == NetworkKind.CELLULAR },
             habitualRoute = feat?.key, habitualLabel = feat?.let { FeatureCatalog.labelFor(it.key) },
-            stepsToday = life?.stepsToday?.takeIf { it > 0 },
         )
     }
 
