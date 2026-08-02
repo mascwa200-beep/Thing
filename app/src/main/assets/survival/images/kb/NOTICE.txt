@@ -103,3 +103,15 @@ chem-electrochemistry-redox-reactions.png  —  Galvanic Cell Diagram.svg  —  
 cs-networking-internet.jpg  —  Network-Switch-Architecture-Diagram.jpeg  —  CC BY-SA 4.0
 cs-databases-relational.png  —  Relational database terms.svg  —  Public domain
 cs-ai-machine-learning-basics.png  —  Neural Network.svg  —  CC0
+earth-climate-system.png  —  Diagram showing the Earth's energy budget, which includes the greenhouse effect (NASA).png  —  Public domain  —  NASA
+earth-glaciers-ice-ages-cryosphere.jpg  —  Ice core extracted at Talos Dome showing an ash layer corresponding to the Toba eruption.jpg  —  CC BY-SA 4.0
+earth-oceans-currents-tides-chemistry.jpg  —  Ocean circulation conveyor belt.jpg  —  Public domain
+eng-materials-science-metals-polymers-ceramics.png  —  Stress strain ductile.svg  —  CC BY 4.0
+eng-fluid-mechanics-and-hydraulics.png  —  Diagram of Bernoulli's principle.png  —  CC BY-SA 3.0
+eng-control-systems-and-feedback.png  —  Simple feedback control loop.svg  —  CC BY-SA 3.0
+geo-population-human-geography.png  —  Population density map of the world.svg  —  CC BY 4.0  —  Our World in Data
+geo-koppen-climate-classification.png  —  Köppen-Geiger Climate Classification Map (1980–2016) no borders.png  —  CC BY-SA 4.0
+geo-cartography-map-projections.png  —  Comparison of Mercator projections.svg  —  CC BY-SA 4.0
+math-calculus-first-principles.png  —  Graph of the function f(x)=x^2 with a tangent line drawn to (2,4).png  —  CC BY-SA 4.0
+math-linear-algebra-vectors-matrices.png  —  Transformation matrix diagram with colours.svg  —  CC BY-SA 4.0
+math-number-theory-primes-cryptography.png  —  Academ Bijection between angles and 12 positions of a clock hand.svg  —  CC BY-SA 3.0  —  Baelde
