@@ -39,8 +39,8 @@ import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.Objective
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.ObjectiveSource
-import dev.mascwa.pulse.feature.common.NeonChip
-import dev.mascwa.pulse.feature.common.NeonPanel
+import dev.mascwa.pulse.feature.common.PipChip
+import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -91,7 +91,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
     ) {
         if (needsPerm) {
             item {
-                NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = c.amber.copy(alpha = 0.6f)) {
+                PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
                     Column {
                         Text("LINK CALENDAR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                         Text(
@@ -110,7 +110,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
 
         // Manual add.
         item {
-            NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+            PipFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text("ADD WAYPOINT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                     OutlinedTextField(
@@ -125,8 +125,8 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        NeonChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
-                        NeonChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
+                        PipChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
+                        PipChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
                     }
                     Text(
                         "◢ ADD",
@@ -144,7 +144,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
         if (objectives.isEmpty()) {
             item {
                 Text(
-                    "No quests yet. Add a waypoint above, or link your calendar. Tracked quests appear on " +
+                    "No objectives yet. Add a waypoint above, or link your calendar. Tracked objectives appear on " +
                         "the NAV map as ★ gold main / ◆ white side / ● green work markers.",
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     modifier = Modifier.padding(top = 4.dp),
@@ -152,17 +152,17 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
             }
         }
 
-        // Fallout-style quest log: grouped by tier (MAIN / SIDE / MISC), tracked one highlighted.
+        // LCARS-style objective log: grouped by tier (MAIN / SIDE / WORK), the tracked one highlighted.
         listOf(
-            "MAIN QUESTS" to ObjectiveKind.MAIN,
-            "SIDE QUESTS" to ObjectiveKind.SIDE,
-            "WORK · CALENDAR" to ObjectiveKind.WORK,
+            "PRIMARY OBJECTIVES" to ObjectiveKind.MAIN,
+            "SECONDARY OBJECTIVES" to ObjectiveKind.SIDE,
+            "DUTY LOG · CALENDAR" to ObjectiveKind.WORK,
         ).forEach { (title, kindOf) ->
             val group = objectives.filter { it.kind == kindOf }
             if (group.isNotEmpty()) {
-                item(key = "hdr-$title") { QuestSectionHeader(title, group.size, c) }
+                item(key = "hdr-$title") { ObjectiveSectionHeader(title, group.size, c) }
                 items(group, key = { it.id }) { o ->
-                    QuestRow(
+                    ObjectiveRow(
                         o = o,
                         active = o.id == activeId,
                         c = c,
@@ -175,9 +175,9 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
     }
 }
 
-/** A Fallout quest-log section header: a bracketed tier label + a count, over a rule line. */
+/** An LCARS objective-log section header: a bracketed tier label + a count, over a rule line. */
 @Composable
-private fun QuestSectionHeader(title: String, count: Int, c: NightwirePalette) {
+private fun ObjectiveSectionHeader(title: String, count: Int, c: NightwirePalette) {
     Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -194,10 +194,10 @@ private fun QuestSectionHeader(title: String, count: Int, c: NightwirePalette) {
     }
 }
 
-/** A Fallout quest-log entry: a diamond marker (filled when tracked), the title, and an objective
- *  sub-line. Tapping the row tracks it; the active quest is highlighted with a "TRACKING" flag. */
+/** An objective-log entry: a diamond marker (filled when tracked), the title, and a meta sub-line.
+ *  Tapping the row tracks it; the active objective is highlighted with a "TRACKING" flag. */
 @Composable
-private fun QuestRow(
+private fun ObjectiveRow(
     o: Objective,
     active: Boolean,
     c: NightwirePalette,
