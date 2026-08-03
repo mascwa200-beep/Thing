@@ -133,6 +133,14 @@ class AppContainer(private val appContext: Context) {
     val newsRepository: NewsRepository by lazy {
         NewsRepository(http, diskCache, settingsRepository)
     }
+    /** Persisted per-article LLM cache (a story is analyzed at most once ever — real API cost). */
+    val newsAnalysisStore: dev.mascwa.pulse.data.news.NewsAnalysisStore by lazy {
+        dev.mascwa.pulse.data.news.NewsAnalysisStore(appContext, json)
+    }
+    /** Cloud-gated, per-article "what's really going on" synthesis for the MARKET REACTION/MOOD copy. */
+    val newsAnalysisEngine: dev.mascwa.pulse.data.news.NewsAnalysisEngine by lazy {
+        dev.mascwa.pulse.data.news.NewsAnalysisEngine(inferenceEngine, settingsRepository)
+    }
     val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
         dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
     }

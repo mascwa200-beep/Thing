@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +41,7 @@ import dev.mascwa.pulse.core.telemetry.Tone
 import dev.mascwa.pulse.core.telemetry.ToneBreakdown
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.news.Article
+import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.feature.common.CyberChipCut
 import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -58,8 +59,17 @@ fun ArticleCard(
     /** Every article currently loaded in this feed (including [article] itself) — used only to compute the
      *  "how many other stories are on this right now" crowd signal in [GlanceStrip]. Empty = no crowd read. */
     allArticles: List<Article> = emptyList(),
+    /** The cloud "what's really going on" synthesis for this article, if one's cached — upgrades the mood/
+     *  market copy from the heuristic read and adds the WIDER PICTURE block. Null = heuristic-only. */
+    analysis: NewsAnalysis? = null,
+    /** Called once as this card first composes, so its analysis can be requested lazily (only for cards
+     *  that actually become visible in the LazyColumn). Null = don't request one (e.g. a compact preview). */
+    onNeedsAnalysis: ((Article) -> Unit)? = null,
 ) {
     val c = Pulse.colors
+    if (onNeedsAnalysis != null) {
+        LaunchedEffect(article.url) { onNeedsAnalysis(article) }
+    }
     NeonPanel(
         modifier.fillMaxWidth().clickable(onClick = onClick),
         corners = true,
@@ -82,12 +92,14 @@ fun ArticleCard(
                     )
                 }
                 // At-a-glance infographics: the story's mood + auto topic tags + the live crowd signal.
-                GlanceStrip(article, allArticles)
+                GlanceStrip(article, allArticles, analysis)
                 // Which markets this story touches / would move, and which way (+ a short why).
                 val links = remember(article.url) {
                     NewsMarketLink.linksFor(article.title, article.summary, article.category)
                 }
-                if (links.isNotEmpty()) MarketStrip(links, pulse)
+                if (links.isNotEmpty() || analysis != null) MarketStrip(links, pulse, analysis)
+                // The deeper cross-domain read — LLM-only, never fabricated from heuristics.
+                analysis?.let { WiderPictureStrip(it) }
                 Text(
                     meta(article).uppercase(),
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.8.sp, color = c.accent,
@@ -136,10 +148,12 @@ private fun ArticlePlaceholder(article: Article, modifier: Modifier) {
 /** An at-a-glance infographic band: the story's MOOD as a SEGMENTED bar that shows its own work (real
  *  positive/negative/tense keyword counts, not an opaque single fill), a live "how many other stories are
  *  on this right now" crowd signal, and auto-extracted topic/region tags. The insider-knowledge read: not
- *  just what the mood is, but why, and how much of the feed is already talking about it. Pure heuristic
- *  (offline) — [allArticles] only feeds the crowd count, never leaves the device. */
+ *  just what the mood is, but why, and how much of the feed is already talking about it. [allArticles] only
+ *  feeds the crowd count, never leaves the device. The caption prefers the cloud [analysis]'s plain-English
+ *  mood line when cached, falling back to the heuristic keyword-count caption otherwise; a small permanent
+ *  legend under the bar keeps it readable either way. */
 @Composable
-private fun GlanceStrip(article: Article, allArticles: List<Article>) {
+private fun GlanceStrip(article: Article, allArticles: List<Article>, analysis: NewsAnalysis?) {
     val c = Pulse.colors
     val breakdown = remember(article.url) { NewsInsights.toneBreakdown(article.title, article.summary) }
     val tags = remember(article.url) { NewsInsights.topics(article.title, article.summary) }
@@ -163,7 +177,12 @@ private fun GlanceStrip(article: Article, allArticles: List<Article>) {
             Spacer(Modifier.width(6.dp))
             Text(breakdown.tone.label, fontFamily = JetBrainsMono, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = toneCol)
         }
-        val caption = moodCaption(breakdown)
+        Text(
+            "green = upbeat · red = tense · from the coverage's own words",
+            fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.faint,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        val caption = analysis?.moodLine ?: moodCaption(breakdown)
         if (caption.isNotBlank() || cluster > 0) {
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (caption.isNotBlank()) {
@@ -245,9 +264,11 @@ private fun toneColor(t: Tone): Color = when (t) {
 
 /** The MARKET REACTION strip beneath a story's summary — the (legal) *Trading Places* read: which markets
  *  this news moves, which way, LIVE if we have a quote, and WHY. A framed readout: header · market chips ·
- *  the sharpest causal line · a winners/losers summary. Heuristic, not a quote or advice. */
+ *  a plain-English causal line — the cloud [analysis]'s MARKET line when cached (it already explains the
+ *  "how big a deal" read in plain words, so the old unlabeled strength dots are dropped), the heuristic
+ *  prose otherwise. */
 @Composable
-private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
+private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>, analysis: NewsAnalysis?) {
     val c = Pulse.colors
     val hasLive = links.any { pulse[it.market] != null }
     val impact = NewsInsights.marketImpact(links)
@@ -272,15 +293,18 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
             }
             if (hasLive) Text("· LIVE", fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp, color = c.muted)
         }
-        FlowRow(
-            Modifier.padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            links.forEach { link -> MarketChip(link, pulse[link.market]) }
+        if (links.isNotEmpty()) {
+            FlowRow(
+                Modifier.padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                links.forEach { link -> MarketChip(link, pulse[link.market]) }
+            }
         }
-        // The sharpest causal read — "what reality is doing to this market" (Trading Places framing).
-        val head = NewsMarketLink.headline(links)
+        // The causal read — the cloud synthesis in plain words when cached, "what reality is doing to this
+        // market" (Trading Places framing) heuristic prose otherwise.
+        val head = analysis?.marketLine ?: NewsMarketLink.headline(links)
         if (head.isNotBlank()) {
             Text(
                 head,
@@ -288,22 +312,22 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>) {
                 modifier = Modifier.padding(top = 7.dp),
             )
         }
-        // Winners/losers one-liner.
-        val why = NewsMarketLink.summarize(links)
-        if (why.isNotBlank()) {
-            Text(
-                why,
-                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                modifier = Modifier.padding(top = 3.dp),
-            )
+        // Winners/losers one-liner — heuristic only (the cloud MARKET line above already covers this read).
+        if (analysis == null) {
+            val why = NewsMarketLink.summarize(links)
+            if (why.isNotBlank()) {
+                Text(
+                    why,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
         }
     }
 }
 
 /** One market chip: prefers the market's LIVE % move today (coloured by its actual sign); otherwise the
- *  story's heuristic lean (▲ up / ▼ down / • unclear). Carries a small strength readout (dots) so a glance
- *  tells you not just direction but how clearly the story implies the move — the "how big a deal is this"
- *  insider signal. */
+ *  story's heuristic lean (▲ up / ▼ down / • unclear). */
 @Composable
 private fun MarketChip(link: MarketLink, live: Double?) {
     val c = Pulse.colors
@@ -326,32 +350,45 @@ private fun MarketChip(link: MarketLink, live: Double?) {
         }
         "$arrow ${link.market}"
     }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    Text(
+        text, fontFamily = JetBrainsMono, fontSize = 10.sp, color = col,
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(col.copy(alpha = 0.14f))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(text, fontFamily = JetBrainsMono, fontSize = 10.sp, color = col)
-        StrengthDots(link.strength, col)
-    }
+    )
 }
 
-/** 1..3 filled dots showing [strength] — "how strongly the story implies this move," the reader's insider
- *  cue for which chips are the real story and which are a minor side mention. */
+/** The deeper cross-domain read — LLM-only (never fabricated from heuristics): how different audiences are
+ *  likely reacting (everyday readers, social media, political leanings, the international angle, any real
+ *  economic/conflict backdrop), plus a forward-looking "where this likely heads" line. A distinct accent
+ *  (violet) separates it visually from the MARKET REACTION panel above. */
 @Composable
-private fun StrengthDots(strength: Int, color: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
-        repeat(3) { i ->
-            Box(
-                Modifier
-                    .size(3.dp)
-                    .clip(CircleShape)
-                    .background(if (i < strength) color else color.copy(alpha = 0.25f)),
-            )
-        }
+private fun WiderPictureStrip(analysis: NewsAnalysis) {
+    val c = Pulse.colors
+    Column(
+        Modifier
+            .padding(top = 9.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(c.violet.copy(alpha = 0.08f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(
+            "◈ WIDER PICTURE",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+            fontWeight = FontWeight.Bold, color = c.violet,
+        )
+        Text(
+            analysis.widerLine,
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            "▸ ${analysis.nextLine}",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.violet,
+            modifier = Modifier.padding(top = 5.dp),
+        )
     }
 }
 
