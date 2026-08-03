@@ -121,4 +121,15 @@ class GuidesJsonValidationTest {
             fail("guides*.json validation failed (${errors.size} issue(s)):\n" + errors.joinToString("\n") { "  - $it" })
         }
     }
+
+    /** Every category in [knownCategories] must have a supergroup mapping in [CATEGORY_SUPERGROUP] — an
+     *  omission would silently drop that category's guides into the [OTHER] fallback bucket in the browse
+     *  rail instead of a real supergroup. */
+    @Test fun everyKnownCategoryHasASupergroup() {
+        val unmapped = knownCategories.filter { it !in CATEGORY_SUPERGROUP }
+        assertTrue(
+            "These categories have no GuideTaxonomy.CATEGORY_SUPERGROUP mapping: $unmapped",
+            unmapped.isEmpty(),
+        )
+    }
 }
