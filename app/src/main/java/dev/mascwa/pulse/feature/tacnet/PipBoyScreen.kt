@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.tacnet
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -33,17 +34,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.sensors.Telemetry
-import dev.mascwa.pulse.feature.common.PipChip
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.feature.sky.DataBody
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
@@ -216,7 +217,7 @@ private fun PipTabRail(current: PipTab, onSelect: (PipTab) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             tabs.forEach { t ->
-                PipChip(t.label, selected = t == current, onClick = { onSelect(t) }, accent = accent)
+                LcarsChip(t.label, selected = t == current, onClick = { onSelect(t) }, accent = accent)
             }
         }
     }
@@ -321,7 +322,7 @@ private fun SectionButton(label: String, accent: Color, selected: Boolean, onCli
             Modifier
                 .height(8.dp)
                 .width(if (selected) 46.dp else 30.dp)
-                .clip(RoundedCornerShape(50))
+                .clip(CutCornerShape(topStart = 0.dp, topEnd = 4.dp, bottomEnd = 0.dp, bottomStart = 4.dp))
                 .background(if (selected) accent else accent.copy(alpha = 0.4f)),
         )
         Text(
@@ -336,20 +337,17 @@ private fun SectionButton(label: String, accent: Color, selected: Boolean, onCli
     }
 }
 
-/** A small utility pill. Interactive (bright, bordered) when [onClick] is set; else dim chrome. */
+/** A small utility block. Interactive (bright, bordered) when [onClick] is set; else dim chrome. A single
+ *  swept corner instead of the earlier hand-drawn uniform rounded-rect outline. */
 @Composable
 private fun UtilPill(label: String, onClick: (() -> Unit)?) {
     val color = if (onClick != null) Pip.mid else Pip.dim
+    val shape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
     Box(
         Modifier
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .drawBehind {
-                drawRoundRect(
-                    color.copy(alpha = 0.45f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx(), 8.dp.toPx()),
-                    style = Stroke(width = 1f),
-                )
-            }
+            .clip(shape)
+            .border(1.dp, color.copy(alpha = 0.45f), shape)
             .padding(horizontal = 7.dp, vertical = 3.dp),
     ) {
         Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.5.sp, color = color)
@@ -398,30 +396,30 @@ private fun ItemsBody(
                     ItemCat.NOTES -> notes.size
                     ItemCat.OBJECTIVES -> objectives.size
                 }
-                PipChip("${ic.label} [$n]", selected = ic == cat, onClick = { cat = ic }, accent = logsAccent)
+                LcarsChip("${ic.label} [$n]", selected = ic == cat, onClick = { cat = ic }, accent = logsAccent)
             }
         }
-        dev.mascwa.pulse.feature.common.PipHeader(cat.label, Modifier.padding(horizontal = 14.dp), trailing = "$count")
+        dev.mascwa.pulse.feature.common.LcarsHeaderBar(cat.label, Modifier.padding(horizontal = 14.dp), trailing = "$count")
         when (cat) {
             ItemCat.TASKS ->
                 if (orderedTasks.isEmpty()) EmptyItems("No tasks. J.A.R.V.I.S. captures \"I need to…\" / \"todo:\".")
                 else orderedTasks.forEach { t ->
                     val detail = t.note.ifBlank { t.status.name }
-                    dev.mascwa.pulse.feature.common.PipDataRow(
+                    dev.mascwa.pulse.feature.common.LcarsDataRow(
                         t.title, detail,
                         valueColor = if (t.status == dev.mascwa.pulse.core.telemetry.TaskStatus.DONE) Pip.dim else Pulse.colors.ink,
                     )
                 }
             ItemCat.NOTES ->
                 if (notes.isEmpty()) EmptyItems("No notes saved. Add one in NOTES.")
-                else notes.forEach { n -> dev.mascwa.pulse.feature.common.PipDataRow(n.title.ifBlank { "Untitled" }, n.category.ifBlank { "—" }) }
+                else notes.forEach { n -> dev.mascwa.pulse.feature.common.LcarsDataRow(n.title.ifBlank { "Untitled" }, n.category.ifBlank { "—" }) }
             ItemCat.OBJECTIVES ->
                 if (objectives.isEmpty()) EmptyItems("No tracked objectives. Add one in OBJECTIVES / MAP.")
                 else objectives.forEach { o ->
                     val detail = o.whenLabel
                         ?: o.distanceMeters?.let { if (it >= 1000) "%.1f km".format(it / 1000) else "${it.roundToInt()} m" }
                         ?: o.kind.name
-                    dev.mascwa.pulse.feature.common.PipDataRow(o.title, detail)
+                    dev.mascwa.pulse.feature.common.LcarsDataRow(o.title, detail)
                 }
         }
     }
@@ -439,9 +437,11 @@ private fun EmptyItems(message: String) {
     )
 }
 
-/** One labelled PWR/MEM-style gauge: label + value over a thin rounded filled bar. */
+/** One labelled PWR/MEM-style gauge: label + value over a thin elbow-capped filled bar — one swept corner
+ *  (the leading edge) instead of the earlier uniformly-rounded bar. */
 @Composable
 private fun StatGauge(label: String, value: String, fraction: Float, modifier: Modifier) {
+    val gaugeShape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)
     Column(modifier) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim)
@@ -449,12 +449,12 @@ private fun StatGauge(label: String, value: String, fraction: Float, modifier: M
         }
         Box(
             Modifier.fillMaxWidth().height(6.dp).padding(top = 2.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(gaugeShape)
                 .background(Pip.gridSoft),
         ) {
             Box(
                 Modifier.fillMaxHeight().fillMaxWidth(fraction.coerceIn(0f, 1f))
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(gaugeShape)
                     .background(Pip.bright),
             )
         }
