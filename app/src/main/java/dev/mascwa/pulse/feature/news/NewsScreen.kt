@@ -49,6 +49,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 fun NewsScreen(vm: NewsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val analyses by vm.analyses.collectAsStateWithLifecycle()
+    val coverageByUrl by vm.coverageByUrl.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var searchActive by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
@@ -141,6 +142,8 @@ fun NewsScreen(vm: NewsViewModel) {
                                 onClick = { openUrl(context, article.url) },
                                 analysis = analyses[article.url],
                                 onNeedsAnalysis = vm::ensureAnalyzed,
+                                coverage = coverageByUrl[article.url],
+                                onNeedsCoverage = vm::ensureCoverage,
                             )
                         }
                     }

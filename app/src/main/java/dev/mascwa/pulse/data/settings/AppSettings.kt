@@ -321,6 +321,10 @@ data class AppSettings(
     val refreshIntervalMinutes: Int = 60,
     val refreshOnlyOnWifi: Boolean = false,
     val newsItemsPerCategory: Int = 30,
+    /** Per-article bias-distribution + social-buzz "COVERAGE" strip — does one extra (cached, lazy) network
+     *  search per viewed article to find who else is covering the story. Default on; off = the extra fetch
+     *  never fires. */
+    val showNewsCoverageStrip: Boolean = true,
 
     // Home dashboard
     val homeSections: List<HomeSection> = HomeSection.entries.toList(),
