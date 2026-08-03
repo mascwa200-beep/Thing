@@ -29,9 +29,9 @@ import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
-import dev.mascwa.pulse.feature.common.PipStatTile
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.LcarsStatBlock
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -83,10 +83,10 @@ fun LazyListScope.orbitalSections(d: OrbitalData?, stale: Boolean, c: NightwireP
     if (stale) item { StaleBanner(true) }
 
     // ISS
-    item { PipHeader("International Space Station") }
+    item { LcarsHeaderBar("International Space Station") }
     item {
         val iss = d?.iss
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsFrame(Modifier.fillMaxWidth()) {
             if (iss == null) {
                 Text("ISS position unavailable.", style = MaterialTheme.typography.bodyMedium, color = c.muted)
             } else Column {
@@ -103,16 +103,16 @@ fun LazyListScope.orbitalSections(d: OrbitalData?, stale: Boolean, c: NightwireP
     }
 
     // Sun & Moon
-    item { PipHeader("Sun & Moon") }
+    item { LcarsHeaderBar("Sun & Moon") }
     item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PipStatTile("Sunrise", timeOrDash(d?.sun?.sunriseEpochMs), Modifier.weight(1f))
-            PipStatTile("Sunset", timeOrDash(d?.sun?.sunsetEpochMs), Modifier.weight(1f))
+            LcarsStatBlock("Sunrise", timeOrDash(d?.sun?.sunriseEpochMs), Modifier.weight(1f))
+            LcarsStatBlock("Sunset", timeOrDash(d?.sun?.sunsetEpochMs), Modifier.weight(1f))
         }
     }
     item {
         val moon = d?.moon
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(moon?.emoji ?: "🌙", fontSize = 40.sp)
                 Column(Modifier.padding(start = 14.dp)) {
@@ -125,10 +125,10 @@ fun LazyListScope.orbitalSections(d: OrbitalData?, stale: Boolean, c: NightwireP
     }
 
     // Planets
-    item { PipHeader("Planets — visible now") }
+    item { LcarsHeaderBar("Planets — visible now") }
     item {
         val visible = d?.planets.orEmpty().filter { it.aboveHorizon }.sortedBy { it.magnitude }
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsFrame(Modifier.fillMaxWidth()) {
             if (visible.isEmpty()) {
                 Text("No naked-eye planets above the horizon right now.",
                     style = MaterialTheme.typography.bodyMedium, color = c.muted)
@@ -152,7 +152,7 @@ fun LazyListScope.orbitalSections(d: OrbitalData?, stale: Boolean, c: NightwireP
 
     // NEOs
     item {
-        PipHeader(
+        LcarsHeaderBar(
             "Near-Earth objects (today)",
             trailing = (d?.neoHazardousCount ?: 0).takeIf { it > 0 }?.let { "$it HAZARDOUS" },
         )
@@ -181,7 +181,7 @@ private fun KV(label: String, value: String) {
 @Composable
 private fun NeoRow(neo: NeoObject) {
     val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth(), accent = if (neo.hazardous) c.magenta else c.accent) {
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (neo.hazardous) c.magenta else c.accent) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(neo.name.removeSurrounding("(", ")"), style = MaterialTheme.typography.titleSmall, color = c.ink)

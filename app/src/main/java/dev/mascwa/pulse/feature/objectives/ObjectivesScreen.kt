@@ -39,8 +39,8 @@ import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.Objective
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.ObjectiveSource
-import dev.mascwa.pulse.feature.common.PipChip
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -91,7 +91,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
     ) {
         if (needsPerm) {
             item {
-                PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+                LcarsFrame(Modifier.fillMaxWidth(), accent = c.amber) {
                     Column {
                         Text("LINK CALENDAR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                         Text(
@@ -110,7 +110,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
 
         // Manual add.
         item {
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text("ADD WAYPOINT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                     OutlinedTextField(
@@ -125,8 +125,8 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        PipChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
-                        PipChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
+                        LcarsChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
+                        LcarsChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
                     }
                     Text(
                         "◢ ADD",

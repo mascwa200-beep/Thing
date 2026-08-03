@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
-import dev.mascwa.pulse.feature.common.PipChip
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -74,8 +74,8 @@ fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier.padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
     ) {
-            PipHeader("Query")
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsHeaderBar("Query")
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("⌕", fontFamily = JetBrainsMono, fontSize = 18.sp, color = c.accent)
                     BasicTextField(
@@ -97,15 +97,15 @@ fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            PipHeader("Engine")
+            LcarsHeaderBar("Engine")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SearchEngine.entries.forEach { e ->
-                    PipChip(e.label, selected = e == engine, onClick = { vm.setEngine(e) },
+                    LcarsChip(e.label, selected = e == engine, onClick = { vm.setEngine(e) },
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
             }
 
-            PipFrame(
+            LcarsFrame(
                 Modifier.fillMaxWidth().padding(top = 8.dp).clickable { go() },
                 accent = c.accent,
             ) {

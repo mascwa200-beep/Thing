@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -1487,7 +1487,7 @@ private fun SettingsShell(
 @Composable
 private fun SettingsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
-    dev.mascwa.pulse.feature.common.PipFrame(modifier.fillMaxWidth()) {
+    dev.mascwa.pulse.feature.common.LcarsFrame(modifier.fillMaxWidth()) {
         androidx.compose.foundation.text.BasicTextField(
             value = query, onValueChange = onQuery, singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),

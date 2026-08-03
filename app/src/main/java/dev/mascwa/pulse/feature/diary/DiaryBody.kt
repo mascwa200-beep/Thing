@@ -34,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.diary.DiaryEntry
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -56,8 +56,8 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- NEW ENTRY ----
-        PipHeader("New Entry")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("New Entry")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 DiaryField(title, { title = it }, "Title (optional)", c)
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -97,7 +97,7 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
             )
         } else {
-            PipHeader("Journal", trailing = entries.size.toString())
+            LcarsHeaderBar("Journal", trailing = entries.size.toString())
             entries.forEach { entry -> EntryRow(entry, c) { vm.delete(entry.id) } }
             Box(
                 Modifier.padding(top = 14.dp, bottom = 28.dp)

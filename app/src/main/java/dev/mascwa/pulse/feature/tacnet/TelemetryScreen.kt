@@ -50,8 +50,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.sensors.Telemetry
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -119,22 +119,22 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-        PipHeader("Operator")
+        LcarsHeaderBar("Operator")
         OperatorPortrait(portraitUri, c) {
             runCatching { pickPortrait.launch(arrayOf("image/*")) }
         }
 
-        PipHeader("Condition")
+        LcarsHeaderBar("Condition")
         ConditionPanel(t, c)
 
-        PipHeader("Stress")
+        LcarsHeaderBar("Stress")
         StressPanel(t, c)
 
-        PipHeader("Advisories")
+        LcarsHeaderBar("Advisories")
         AdvisoriesPanel(t, gps != null, c)
 
-        PipHeader("Vitals")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Vitals")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SegmentGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
                 SegmentGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
@@ -148,8 +148,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        PipHeader("Sensors")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Sensors")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 TelemetryStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
                 TelemetryStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
@@ -159,8 +159,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        PipHeader("System")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("System")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 TelemetryStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
                 TelemetryStatRow("Power", if (t.charging) "Charging" else "On battery")
@@ -170,8 +170,8 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        PipHeader("Position")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Position")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             val loc = gps
             if (loc != null) {
                 Column {
@@ -227,7 +227,7 @@ private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
         overall >= 0.33f -> "DEGRADED"
         else -> "CRITICAL"
     }
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ConditionFigure(
                 Modifier.size(width = 78.dp, height = 116.dp),
@@ -338,17 +338,17 @@ private fun SegmentGauge(label: String, value: String, fraction: Float, color: C
     }
 }
 
-/** A SENSORS/SYSTEM/POSITION readout row (shared [PipDataRow]). */
+/** A SENSORS/SYSTEM/POSITION readout row (shared [LcarsDataRow]). */
 @Composable
 private fun TelemetryStatRow(label: String, value: String) {
-    dev.mascwa.pulse.feature.common.PipDataRow(label, value)
+    dev.mascwa.pulse.feature.common.LcarsDataRow(label, value)
 }
 
 /** The operator portrait: tap to pick an image — it persists and renders in true color inside the LCARS
  *  frame; empty shows the upload prompt. */
 @Composable
 private fun OperatorPortrait(uri: String, c: NightwirePalette, onPick: () -> Unit) {
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (uri.isBlank()) {
                 Box(
@@ -384,7 +384,7 @@ private fun StressPanel(t: Telemetry, c: NightwirePalette) {
     val temp = t.batteryTempC ?: 25f
     val stress = ((memPct * 5 + (maxOf(0f, temp - 25f) * 20f).toInt()) / 10).coerceIn(0, 100)
     val tolerance = (100 - memPct).coerceIn(0, 100)
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("TOLERANCE $tolerance%", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
@@ -440,7 +440,7 @@ private fun activeAdvisories(t: Telemetry, hasGps: Boolean): List<Advisory> {
 @Composable
 private fun AdvisoriesPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
     val advisories = activeAdvisories(t, hasGps)
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         if (advisories.isEmpty()) {
             Text("No active advisories.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
         } else {

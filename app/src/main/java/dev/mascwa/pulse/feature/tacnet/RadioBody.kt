@@ -57,8 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.radio.RadioStation
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -96,8 +96,8 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
-        PipHeader("Tuner")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Tuner")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val label = when (state.status) {
@@ -152,8 +152,8 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- SEARCH any station ----
-        PipHeader("Search")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Search")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("⌕", fontFamily = JetBrainsMono, fontSize = 16.sp, color = c.accent)
                 BasicTextField(
@@ -194,12 +194,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 
         // ---- FAVOURITES (starred; persisted) ----
         if (favorites.isNotEmpty()) {
-            PipHeader("Favourites")
+            LcarsHeaderBar("Favourites")
             StationStrip(favorites, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
         // ---- LOCAL signals (geo-sourced, on-demand) ----
-        PipHeader("Local Signals", trailing = localPlace?.takeIf { localStatus == RadioViewModel.LocalStatus.READY })
+        LcarsHeaderBar("Local Signals", trailing = localPlace?.takeIf { localStatus == RadioViewModel.LocalStatus.READY })
         LocalStatusLine(
             status = localStatus,
             count = localStations.size,
@@ -212,7 +212,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- WORLD (browse the planet's stations by country) ----
-        PipHeader("World")
+        LcarsHeaderBar("World")
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 2.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -235,7 +235,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- CURATED streams (always available) ----
-        PipHeader("Stations")
+        LcarsHeaderBar("Stations")
         StationStrip(vm.curatedStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
 
         Text(

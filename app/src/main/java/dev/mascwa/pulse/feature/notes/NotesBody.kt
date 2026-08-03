@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.notes.Note
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -55,8 +55,8 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- ADD ENTRY ----
-        PipHeader("Add Entry")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Add Entry")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 NoteField(title, { title = it }, "Title", c)
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp)) { NoteField(body, { body = it }, "Details…", c, single = false) }
@@ -97,7 +97,7 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
             val order = vm.categories + grouped.keys.filterNot { it in vm.categories }
             order.forEach { cat ->
                 val items = grouped[cat] ?: return@forEach
-                PipHeader(cat, trailing = items.size.toString())
+                LcarsHeaderBar(cat, trailing = items.size.toString())
                 items.forEach { note -> NoteRow(note, c) { vm.delete(note.id) } }
             }
             Box(Modifier.padding(bottom = 24.dp))

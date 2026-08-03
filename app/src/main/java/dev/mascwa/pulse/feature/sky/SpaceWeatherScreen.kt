@@ -35,9 +35,9 @@ import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LineChart
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
-import dev.mascwa.pulse.feature.common.PipStatTile
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.LcarsStatBlock
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -106,7 +106,7 @@ fun LazyListScope.spaceWeatherSections(
         val kp = sw?.kp
         val storm = sw?.stormLevel ?: "—"
         val stormy = (kp ?: 0.0) >= 5
-        PipFrame(
+        LcarsFrame(
             Modifier.fillMaxWidth().clickable(enabled = sw != null) {
                 onExplain("Planetary K-index", buildList {
                     kp?.let { add(SpaceWeatherExplainers.kp(it)) }
@@ -132,11 +132,11 @@ fun LazyListScope.spaceWeatherSections(
     }
     item {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PipStatTile("Solar wind", sw?.solarWindSpeed?.let { "${it.toInt()} km/s" } ?: "—",
+            LcarsStatBlock("Solar wind", sw?.solarWindSpeed?.let { "${it.toInt()} km/s" } ?: "—",
                 Modifier.weight(1f).clickable(enabled = sw?.solarWindSpeed != null) {
                     onExplain("Solar wind", listOf(SpaceWeatherExplainers.solarWind(sw!!.solarWindSpeed!!)))
                 })
-            PipStatTile("Bz (IMF)", sw?.bz?.let { "%+.1f nT".format(it) } ?: "—",
+            LcarsStatBlock("Bz (IMF)", sw?.bz?.let { "%+.1f nT".format(it) } ?: "—",
                 Modifier.weight(1f).clickable(enabled = sw?.bz != null) {
                     onExplain("Bz (IMF)", listOf(SpaceWeatherExplainers.bz(sw!!.bz!!)))
                 },
@@ -146,7 +146,7 @@ fun LazyListScope.spaceWeatherSections(
     item {
         val pct = sw?.auroraProbabilityPct
         val bright = (pct ?: 0) >= 25
-        PipFrame(
+        LcarsFrame(
             Modifier.fillMaxWidth().clickable(enabled = pct != null) {
                 onExplain("Aurora chance", listOf(SpaceWeatherExplainers.aurora(pct!!)))
             },
@@ -172,7 +172,7 @@ fun LazyListScope.spaceWeatherSections(
             }
         }
     }
-    item { PipHeader("Active alerts") }
+    item { LcarsHeaderBar("Active alerts") }
     val alerts = sw?.alerts.orEmpty()
     if (alerts.isEmpty()) {
         item {
@@ -181,7 +181,7 @@ fun LazyListScope.spaceWeatherSections(
         }
     } else {
         items(alerts.distinctBy { it.title + it.issued }, key = { it.title + it.issued }) { a ->
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text(a.title, style = MaterialTheme.typography.titleSmall, color = c.amber)
                     if (a.issued.isNotBlank())

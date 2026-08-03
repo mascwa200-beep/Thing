@@ -54,8 +54,8 @@ import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -132,7 +132,7 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- PLAYER (App Remote — the real in-app player) ----
-        PipHeader(
+        LcarsHeaderBar(
             "Player",
             trailing = when {
                 remote.connected -> "CONNECTED"
@@ -159,8 +159,8 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
         // ---- ACCOUNT (Web API: search + devices) ----
         if (!auth.linked) {
-            PipHeader("Account")
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsHeaderBar("Account")
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text(
                         "Link a Spotify account to search the catalogue and choose Connect devices.",
@@ -177,13 +177,13 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
         } else {
             // When the App Remote player isn't connected, show what's on a Web-API Connect device.
             if (!remote.connected) {
-                PipHeader("Now Playing", trailing = auth.displayName.ifBlank { "LINKED" })
+                LcarsHeaderBar("Now Playing", trailing = auth.displayName.ifBlank { "LINKED" })
                 WebNowPlaying(playback, c, vm)
             }
 
             // ---- SEARCH ----
-            PipHeader("Search")
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsHeaderBar("Search")
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     SpotifyField(query, { query = it }, "Search tracks…", c)
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -214,18 +214,18 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
             // ---- YOUR PLAYLISTS ----
             if (playlists.isNotEmpty()) {
-                PipHeader("Your Playlists", trailing = playlists.size.toString())
+                LcarsHeaderBar("Your Playlists", trailing = playlists.size.toString())
                 playlists.forEach { pl -> PlaylistRow(pl, c) { vm.playPlaylist(pl) } }
             }
 
             // ---- RECENTLY PLAYED ----
             if (recent.isNotEmpty()) {
-                PipHeader("Recently Played")
+                LcarsHeaderBar("Recently Played")
                 recent.forEach { track -> TrackRow(track, c) { vm.play(track) } }
             }
 
             // ---- DEVICES ----
-            PipHeader("Devices", trailing = devices.size.toString())
+            LcarsHeaderBar("Devices", trailing = devices.size.toString())
             if (devices.isEmpty()) {
                 StatusLine("No devices. Open Spotify on a phone/desktop/speaker to make one available.", c)
             } else {
@@ -263,7 +263,7 @@ private fun AppPlayerCard(
 ) {
     if (remote.connected) return
     val failed = remote.error != null
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             if (failed) {
                 Text("⚠ ${remote.error}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Amber)
@@ -290,7 +290,7 @@ private fun ConnectedPlayer(
     vm: SpotifyViewModel,
     onDisconnect: () -> Unit,
 ) {
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AlbumArt(null, remote.artBitmap, c, 60.dp)
@@ -325,7 +325,7 @@ private fun ConnectedPlayer(
 /** Web-API now-playing (a Connect device), shown when the App Remote player isn't connected. */
 @Composable
 private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: SpotifyViewModel) {
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             if (playback == null) {
                 Text(
