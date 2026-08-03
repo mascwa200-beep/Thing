@@ -433,6 +433,7 @@ fun PulseApp(
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.QUESTS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
+    Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
 )
 
 /** Renders [content] in the LCARS palette — used to put the SURVIVE/SOCIAL/SEARCH feeds (and their
