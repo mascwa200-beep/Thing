@@ -383,9 +383,10 @@ private fun ForYouCard(
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
-    // The J.A.R.V.I.S. feed is the one cyan "Stark HUD" island on the crimson home — a professional,
-    // non-chat status briefing. It NEVER surfaces chat content: only operational awareness — usage-based
-    // educated guesses, the user's chosen monitoring focus, and APK/internal diagnostics.
+    // The J.A.R.V.I.S. card reads the palette's `sky` accent slot — its own distinguishing hue within the
+    // one app-wide LCARS palette, not a separate hardcoded colour — for a professional, non-chat status
+    // briefing. It NEVER surfaces chat content: only operational awareness — usage-based educated guesses,
+    // the user's chosen monitoring focus, and APK/internal diagnostics.
     val hud = c.sky
     val topic = LocalJarvisFeedTopic.current
     NeonPanel(

@@ -98,7 +98,10 @@ fun PulseApp(
         if (currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES) lastFeed = currentRoute
     }
 
-    val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
+    // LCARS is the app's one palette now — the bottom nav bar (rendered outside the NavHost's own
+    // provider below) reads it directly rather than the ambient default so it doesn't fall back to the
+    // pre-LCARS cyberpunk chrome.
+    val nw = dev.mascwa.pulse.ui.theme.lcarsPalette
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -144,13 +147,12 @@ fun PulseApp(
     ) { innerPadding ->
         val isFeed = currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
         val feedCtx = if (isFeed) dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
-        // The whole TOOLS section wears the LCARS palette; everything else keeps the NIGHTWIRE theme.
-        // Provided once around the NavHost so feed screens re-theme with no per-screen edits (the
-        // bottom nav stays base — it reads `nw` captured above the provider).
-        val feedPalette = if (isFeed) dev.mascwa.pulse.ui.theme.lcarsPalette else nw
+        // LCARS is the app's one palette now (every screen, not just the TOOLS feed section) — provided
+        // once around the whole NavHost so every route re-themes with no per-screen edits. `isFeed`/
+        // `feedCtx` above is unrelated to palette — it only drives the feed-tab-bar UI mechanism.
         androidx.compose.runtime.CompositionLocalProvider(
             dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx,
-            dev.mascwa.pulse.ui.theme.LocalNightwire provides feedPalette,
+            dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
         ) {
         NavHost(
             navController = navController,
@@ -236,11 +238,11 @@ fun PulseApp(
 
             // ---- Survive (Phase 2) — all in the LCARS palette (matches TOOLS/QUESTS) ----
             composable(Routes.SURVIVE) {
-                Lcars { SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() }) }
+                SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
             }
             composable(Routes.PLACES) {
                 val vm: PlacesViewModel = viewModel(factory = factory)
-                Lcars { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
+                PlacesScreen(vm, onBack = { navController.popBackStack() })
             }
             // Optional ?guide= arg lets a notification (e.g. a survival tip about knots) open straight to a
             // specific guide; a plain "survival" navigation matches with guide=null and shows the list.
@@ -250,33 +252,33 @@ fun PulseApp(
             ) { backStackEntry ->
                 val vm: GuidesViewModel = viewModel(factory = factory)
                 val guideId = backStackEntry.arguments?.getString("guide")
-                Lcars { GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId) }
+                GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId)
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
-                Lcars { ToolsScreen(vm, onBack = { navController.popBackStack() }) }
+                ToolsScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SOS) {
                 val vm: SosViewModel = viewModel(factory = factory)
-                Lcars { SosScreen(vm, onBack = { navController.popBackStack() }) }
+                SosScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SAFETY) {
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.HABITAT) {
                 val vm: dev.mascwa.pulse.feature.survive.HabitatViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Social & search (Phase 3) — LCARS palette ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Tacnet (real-time radar + telemetry) ----
@@ -435,13 +437,3 @@ private val SHORTCUT_ROUTES = setOf(
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
 )
-
-/** Renders [content] in the LCARS palette — used to put the SURVIVE/SOCIAL/SEARCH feeds (and their
- *  sub-screens) in the same look as the TOOLS and QUESTS tabs. */
-@Composable
-private fun Lcars(content: @Composable () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(
-        dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
-        content = content,
-    )
-}
