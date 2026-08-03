@@ -32,14 +32,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.BiasBreakdown
 import dev.mascwa.pulse.core.telemetry.ImpactLevel
+import dev.mascwa.pulse.core.telemetry.Lean
 import dev.mascwa.pulse.core.telemetry.MarketImpact
 import dev.mascwa.pulse.core.telemetry.MarketLink
+import dev.mascwa.pulse.core.telemetry.MediaBias
 import dev.mascwa.pulse.core.telemetry.NewsInsights
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.telemetry.Tone
 import dev.mascwa.pulse.core.telemetry.ToneBreakdown
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.data.breaking.BreakingCoverage
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.feature.common.CyberChipCut
@@ -65,10 +69,19 @@ fun ArticleCard(
     /** Called once as this card first composes, so its analysis can be requested lazily (only for cards
      *  that actually become visible in the LazyColumn). Null = don't request one (e.g. a compact preview). */
     onNeedsAnalysis: ((Article) -> Unit)? = null,
+    /** Multi-outlet coverage of this story, if cached — drives the COVERAGE bias-distribution strip. Null =
+     *  not fetched yet / disabled / genuinely no cross-outlet matches found. */
+    coverage: BreakingCoverage? = null,
+    /** Called once as this card first composes, so coverage can be requested lazily — mirrors
+     *  [onNeedsAnalysis]. Null = don't request one. */
+    onNeedsCoverage: ((Article) -> Unit)? = null,
 ) {
     val c = Pulse.colors
     if (onNeedsAnalysis != null) {
         LaunchedEffect(article.url) { onNeedsAnalysis(article) }
+    }
+    if (onNeedsCoverage != null) {
+        LaunchedEffect(article.url) { onNeedsCoverage(article) }
     }
     NeonPanel(
         modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -93,6 +106,11 @@ fun ArticleCard(
                 }
                 // At-a-glance infographics: the story's mood + auto topic tags + the live crowd signal.
                 GlanceStrip(article, allArticles, analysis)
+                // Who's covering this story and how their politics spread — the Ground-News-style read.
+                coverage?.let { cov ->
+                    val breakdown = remember(cov.sources) { MediaBias.breakdown(cov.sources) }
+                    if (breakdown.total > 0) CoverageStrip(breakdown)
+                }
                 // Which markets this story touches / would move, and which way (+ a short why).
                 val links = remember(article.url) {
                     NewsMarketLink.linksFor(article.title, article.summary, article.category)
@@ -260,6 +278,97 @@ private fun toneColor(t: Tone): Color = when (t) {
     Tone.MIXED -> Color(0xFFC9B23A)
     Tone.GRIM -> Color(0xFFE0721A)
     Tone.TENSE -> Color(0xFFE0331A)
+}
+
+/** The blue-through-red spread Ground News made recognizable — used consistently for the bar segments, the
+ *  legend dots, and nowhere else, so "blue/red" reads unambiguously as politics, never confused with the
+ *  MOOD bar's unrelated green/red (upbeat/tense) or MARKET REACTION's up/down colours. */
+private fun leanColor(l: Lean): Color = when (l) {
+    Lean.LEFT -> Color(0xFF3B82F6)
+    Lean.LEAN_LEFT -> Color(0xFF93C5FD)
+    Lean.CENTER -> Color(0xFFB3A6D9)
+    Lean.LEAN_RIGHT -> Color(0xFFF3A0A0)
+    Lean.RIGHT -> Color(0xFFDC2626)
+}
+
+/** The "◢ COVERAGE" strip — the Ground-News-style read: how many outlets are covering this exact story, and
+ *  how their politics spread from left to right. A DIFFERENT bar shape than [SegmentedMoodBar] on purpose:
+ *  the mood bar's segments are sized against a fixed intensity ceiling ([MOOD_BAR_SCALE]); this bar's
+ *  segments are sized against the REAL outlet count, because a proportion of outlets is exactly what it
+ *  claims to show — normalizing it to an arbitrary scale would make the percentages read wrong. */
+@Composable
+private fun CoverageStrip(breakdown: BiasBreakdown) {
+    val c = Pulse.colors
+    Column(
+        Modifier
+            .padding(top = 9.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF3B82F6).copy(alpha = 0.06f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "◢ COVERAGE", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.Bold, color = Color(0xFF3B82F6),
+            )
+            val outlets = if (breakdown.total == 1) "outlet" else "outlets"
+            Text("· ${breakdown.total} $outlets", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
+        BiasBar(breakdown, Modifier.padding(top = 6.dp).height(8.dp).fillMaxWidth())
+        val legend = buildList {
+            if (breakdown.left > 0) add("Left ${breakdown.left}" to Lean.LEFT)
+            if (breakdown.leanLeft > 0) add("Lean Left ${breakdown.leanLeft}" to Lean.LEAN_LEFT)
+            if (breakdown.center > 0) add("Center ${breakdown.center}" to Lean.CENTER)
+            if (breakdown.leanRight > 0) add("Lean Right ${breakdown.leanRight}" to Lean.LEAN_RIGHT)
+            if (breakdown.right > 0) add("Right ${breakdown.right}" to Lean.RIGHT)
+        }
+        if (legend.isNotEmpty()) {
+            FlowRow(
+                Modifier.padding(top = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                legend.forEach { (label, lean) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(leanColor(lean)))
+                        Spacer(Modifier.width(3.dp))
+                        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.ink2)
+                    }
+                }
+            }
+        }
+        val summary = remember(breakdown) { MediaBias.summarize(breakdown) }
+        if (summary.isNotBlank()) {
+            Text(
+                summary, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+        }
+    }
+}
+
+/** A proportional multi-colour bar sized against the REAL rated-outlet count (unlike [SegmentedMoodBar]'s
+ *  fixed-scale sizing) — an unrated outlet renders as unfilled track, same convention as the mood bar's
+ *  neutral remainder. */
+@Composable
+private fun BiasBar(b: BiasBreakdown, modifier: Modifier) {
+    val c = Pulse.colors
+    val segments = buildList {
+        if (b.left > 0) add(b.left.toFloat() to leanColor(Lean.LEFT))
+        if (b.leanLeft > 0) add(b.leanLeft.toFloat() to leanColor(Lean.LEAN_LEFT))
+        if (b.center > 0) add(b.center.toFloat() to leanColor(Lean.CENTER))
+        if (b.leanRight > 0) add(b.leanRight.toFloat() to leanColor(Lean.LEAN_RIGHT))
+        if (b.right > 0) add(b.right.toFloat() to leanColor(Lean.RIGHT))
+    }
+    Row(modifier.clip(RoundedCornerShape(3.dp)).background(c.raise)) {
+        segments.forEach { (weight, color) ->
+            Box(Modifier.weight(weight).fillMaxHeight().background(color))
+        }
+        if (b.unrated > 0) {
+            Box(Modifier.weight(b.unrated.toFloat()).fillMaxHeight())
+        }
+    }
 }
 
 /** The MARKET REACTION strip beneath a story's summary — the (legal) *Trading Places* read: which markets

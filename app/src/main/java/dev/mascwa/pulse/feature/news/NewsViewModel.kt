@@ -2,11 +2,14 @@ package dev.mascwa.pulse.feature.news
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.EmergencyNews
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.load
 import dev.mascwa.pulse.core.util.toUserMessage
+import dev.mascwa.pulse.data.breaking.BreakingCoverage
+import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.data.news.NewsAnalysisEngine
@@ -55,6 +58,7 @@ class NewsViewModel(
     private val socialRepo: SocialRepository,
     private val analysisEngine: NewsAnalysisEngine,
     private val analysisStore: NewsAnalysisStore,
+    private val breakingCoverageRepo: BreakingCoverageRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -71,6 +75,16 @@ class NewsViewModel(
     private val analyzing: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
     // Caps concurrent cloud calls — a fast scroll through many new cards shouldn't burst-fire requests.
     private val analysisSemaphore = Semaphore(2)
+
+    /** Multi-outlet coverage per article, keyed by url — see [ensureCoverage]. Session-scoped in memory
+     *  (persistence-across-restarts already comes free from [BreakingCoverageRepository]'s own disk cache,
+     *  keyed by search query) so a "who else is covering this" bias read doesn't refetch every recomposition. */
+    private val _coverageByUrl = MutableStateFlow<Map<String, BreakingCoverage>>(emptyMap())
+    val coverageByUrl: StateFlow<Map<String, BreakingCoverage>> = _coverageByUrl.asStateFlow()
+
+    private val coverageInFlight: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+    // A separate cap from analysisSemaphore — this is a plain network fetch, not a cloud LLM call.
+    private val coverageSemaphore = Semaphore(2)
 
     init {
         viewModelScope.launch {
@@ -146,6 +160,36 @@ class NewsViewModel(
         }
     }
 
+    /**
+     * Ask how many outlets — and which — are covering [article]'s story, for the bias-distribution
+     * ("COVERAGE") strip. A no-op when already cached this session, already in flight, or when the owner has
+     * disabled the strip in Settings. Fire-and-forget, mirrors [ensureAnalyzed]'s shape; results surface
+     * reactively via [coverageByUrl]. A genuinely empty result (no cross-outlet matches) is simply not
+     * stored, so a later app session can retry rather than caching a permanent "nothing found" — matches
+     * [BreakingCoverageRepository]'s own defensive fallback-on-empty behavior.
+     */
+    fun ensureCoverage(article: Article) {
+        val url = article.url
+        if (_coverageByUrl.value.containsKey(url)) return
+        if (!coverageInFlight.add(url)) return
+        viewModelScope.launch {
+            try {
+                if (!settings.current().showNewsCoverageStrip) return@launch
+                coverageSemaphore.withPermit {
+                    val query = EmergencyNews.topicQuery(article.title)
+                    val result = runCatching {
+                        breakingCoverageRepo.coverage(query, maxAgeMs = COVERAGE_MAX_AGE_MS)
+                    }.getOrNull()
+                    if (result != null && result.sources.isNotEmpty()) {
+                        _coverageByUrl.update { it + (url to result) }
+                    }
+                }
+            } finally {
+                coverageInFlight.remove(url)
+            }
+        }
+    }
+
     fun selectTab(index: Int, force: Boolean = false) {
         val tabs = _state.value.tabs
         if (tabs.isEmpty()) return
@@ -217,5 +261,12 @@ class NewsViewModel(
     fun clearSearch() {
         _state.update { it.copy(searchMode = false, query = "") }
         selectTab(_state.value.selectedIndex)
+    }
+
+    companion object {
+        // "Which outlets covered this headline" is treated as a stable-once-fetched fact, not a
+        // freshness-driven read (unlike the 90s default tuned for the time-critical BREAKING NEWS
+        // takeover) — a day-long cache avoids re-searching the same story on every app open.
+        private const val COVERAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000L
     }
 }

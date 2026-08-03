@@ -31,11 +31,15 @@ class BreakingCoverageRepository(
     private val cache: DiskCache,
 ) {
 
-    suspend fun coverage(query: String, force: Boolean = false): BreakingCoverage {
+    /** [maxAgeMs] lets a non-time-critical caller (e.g. a lazily-loaded per-article strip in a normal
+     *  scrolling news list) treat "which outlets covered this" as a longer-lived fact than the 90s default
+     *  tuned for the time-critical BREAKING NEWS takeover — same cache, same fetch/dedupe, just a different
+     *  freshness bar. */
+    suspend fun coverage(query: String, force: Boolean = false, maxAgeMs: Long = TTL_MS): BreakingCoverage {
         val q = query.trim().ifBlank { return BreakingCoverage(query) }
         val key = "breaking_cov_${q.lowercase().hashCode()}"
         if (!force) {
-            runCatching { cache.read(key, TTL_MS, BreakingCoverage.serializer())?.value }.getOrNull()?.let { return it }
+            runCatching { cache.read(key, maxAgeMs, BreakingCoverage.serializer())?.value }.getOrNull()?.let { return it }
         }
         val raw = runCatching { news.search(q) }.getOrDefault(emptyList())
         if (raw.isEmpty()) {
