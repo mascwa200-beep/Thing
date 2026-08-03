@@ -3,7 +3,7 @@ package dev.mascwa.pulse.data.objectives
 import kotlinx.serialization.Serializable
 
 /**
- * Objective tiers — colour-coded on the map and in the quest tracker:
+ * Objective tiers — colour-coded on the map and in the objective tracker:
  *  - MAIN = **gold** — a main objective (you classify it as main),
  *  - SIDE = **white** — a side location you placed yourself,
  *  - WORK = **green** — from work / your calendar.
