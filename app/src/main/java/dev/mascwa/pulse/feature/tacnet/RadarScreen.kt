@@ -89,7 +89,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     }
 }
 
-/** The MAP feed body (RADSCOPE), scaffold-free for hosting as a PIP-BOY sub-tab. */
+/** The MAP feed body (RADSCOPE), scaffold-free for hosting as a TOOLS sub-tab. */
 @Composable
 fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -216,14 +216,14 @@ private fun RadarScope(
     online: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    // Pip-Boy phosphor monochrome — variable names kept so the drawing code below is unchanged.
-    val accent = Pip.bright
+    // LCARS: each contact kind gets its own hue rather than a shared colour at different brightness.
+    val accent = Pip.bright    // aircraft (default) — LCARS orange
     val ring = Pip.grid
     val ringSoft = Pip.gridSoft
-    val violet = Pip.glow      // ISS / orbital — brightest
-    val amber = Pip.dim        // seismic — dim
-    val magenta = Pip.alert    // emergency — the one off-green accent
-    val positive = Pip.bright  // military — bright
+    val issColor = Pip.glow      // ISS / orbital — brightest, white
+    val quakeColor = Pip.dim     // seismic — subdued grey
+    val emergencyColor = Pip.alert
+    val militaryColor = Pip.violet
     val backdrop = Pip.bg
     val cardinalN = Pip.alert.toArgb()
     val cardinalInk = Pip.dim.toArgb()
@@ -332,10 +332,10 @@ private fun RadarScope(
                 val diff = (((sweep - ct.bearingDeg) % 360) + 360) % 360
                 val ping = if (diff < 80) 1f - (diff / 80f).toFloat() else 0f
                 val baseCol = when {
-                    ct.emergency -> magenta
-                    ct.kind == ContactKind.ISS.name -> violet
-                    ct.kind == ContactKind.QUAKE.name -> amber
-                    ct.military -> positive
+                    ct.emergency -> emergencyColor
+                    ct.kind == ContactKind.ISS.name -> issColor
+                    ct.kind == ContactKind.QUAKE.name -> quakeColor
+                    ct.military -> militaryColor
                     else -> accent
                 }
                 val col = baseCol.copy(alpha = 0.4f + 0.6f * ping)
@@ -346,12 +346,11 @@ private fun RadarScope(
                     else -> drawCircle(col, 5.5f, pos)
                 }
                 // Emergency squawk: always-on pulsing ring.
-                if (ct.emergency) drawCircle(magenta.copy(alpha = 0.3f + 0.5f * pulse), 16f, pos, style = Stroke(2f))
-                if (ct.id == selectedId) drawCircle(magenta, 14f, pos, style = Stroke(2f))
+                if (ct.emergency) drawCircle(emergencyColor.copy(alpha = 0.3f + 0.5f * pulse), 16f, pos, style = Stroke(2f))
+                if (ct.id == selectedId) drawCircle(emergencyColor, 14f, pos, style = Stroke(2f))
             }
 
-            // CRT scanline texture + a soft phosphor edge glow (Pip-Boy tube feel).
-            crtScanlines(Pip.bg.copy(alpha = 0.6f))
+            // A soft edge glow around the scope's rim.
             drawCircle(Pip.bright.copy(alpha = 0.06f), r, center, style = Stroke(7f))
 
             // Cardinal letters + ring distance labels (native canvas, unrotated).
@@ -380,7 +379,7 @@ private fun RadarScope(
             Text(
                 "// LINK LOST — LAST PICTURE",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.5.sp,
-                color = magenta, modifier = Modifier.padding(top = 6.dp),
+                color = emergencyColor, modifier = Modifier.padding(top = 6.dp),
             )
         }
     }
@@ -415,7 +414,7 @@ private fun StatCell(label: String, value: String) {
 }
 
 /**
- * Pip-Boy sky & space-weather readout — the Moon, naked-eye planets above the
+ * Sky & space-weather readout — the Moon, naked-eye planets above the
  * horizon (offline ephemeris, az/elevation) and the NOAA space-weather picture,
  * grouped into the same scope screen as the aircraft / ISS / quakes.
  */
@@ -464,7 +463,7 @@ private fun SkyPanel(sky: RadarViewModel.SkyState) {
     }
 }
 
-/** Astronomical symbol for a naked-eye planet (Pip-Boy contact glyph). */
+/** Astronomical symbol for a naked-eye planet (radar contact glyph). */
 private fun planetGlyph(name: String): String = when (name) {
     "Mercury" -> "☿"
     "Venus" -> "♀"
@@ -511,7 +510,7 @@ private fun ContactRow(ct: Contact, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Pip-Boy contact glyph by kind. */
+/** Contact glyph by kind. */
 private fun glyph(ct: Contact): String = when {
     ct.emergency -> "⚠"
     ct.kind == ContactKind.ISS.name -> "⬡"
