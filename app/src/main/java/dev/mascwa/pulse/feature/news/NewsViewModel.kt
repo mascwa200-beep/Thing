@@ -47,6 +47,11 @@ data class NewsUiState(
     val content: Async<List<Article>> = Async(loading = true),
     /** market name (from NewsMarketLink) -> today's % change, for the article market strips. */
     val marketPulse: Map<String, Double> = emptyMap(),
+    /** Raw Lemmy/HN/Mastodon-status titles fetched once this session — the "who's talking about this on
+     *  social" signal for [dev.mascwa.pulse.core.telemetry.SocialBuzz]. */
+    val socialTitles: List<String> = emptyList(),
+    /** Mastodon trending hashtag names fetched once this session, alongside [socialTitles]. */
+    val trendTagNames: List<String> = emptyList(),
     val searchMode: Boolean = false,
     val query: String = "",
 )
@@ -126,6 +131,22 @@ class NewsViewModel(
         // Warm the on-device analysis cache from disk once, so a previously-analyzed article's LLM copy
         // is available immediately instead of only after a redundant re-analysis.
         viewModelScope.launch { analysisStore.preload() }
+        // The social buzz signal: fetch every community source once so each article's buzz strip can show
+        // how much its own vocabulary overlaps with what's live on Lemmy/HN/Mastodon right now. Best-effort,
+        // mirrors the marketPulse fetch above — a failed/empty source just contributes nothing.
+        viewModelScope.launch {
+            val titles = mutableListOf<String>()
+            var trends: List<String> = emptyList()
+            runCatching { socialRepo.lemmy(false) }.getOrNull()?.let { titles += it.data.items.map { i -> i.title } }
+            runCatching { socialRepo.hackerNews(false) }.getOrNull()?.let { titles += it.data.items.map { i -> i.title } }
+            runCatching { socialRepo.mastodon(false) }.getOrNull()?.let { m ->
+                titles += m.data.statuses.map { i -> i.title }
+                trends = m.data.tags.map { it.name }
+            }
+            if (titles.isNotEmpty() || trends.isNotEmpty()) {
+                _state.update { it.copy(socialTitles = titles, trendTagNames = trends) }
+            }
+        }
     }
 
     /**

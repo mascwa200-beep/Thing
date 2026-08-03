@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.telemetry.BiasBreakdown
+import dev.mascwa.pulse.core.telemetry.BuzzLevel
 import dev.mascwa.pulse.core.telemetry.ImpactLevel
 import dev.mascwa.pulse.core.telemetry.Lean
 import dev.mascwa.pulse.core.telemetry.MarketImpact
@@ -40,6 +41,7 @@ import dev.mascwa.pulse.core.telemetry.MarketLink
 import dev.mascwa.pulse.core.telemetry.MediaBias
 import dev.mascwa.pulse.core.telemetry.NewsInsights
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
+import dev.mascwa.pulse.core.telemetry.SocialBuzz
 import dev.mascwa.pulse.core.telemetry.Tone
 import dev.mascwa.pulse.core.telemetry.ToneBreakdown
 import dev.mascwa.pulse.core.util.Formatters
@@ -75,6 +77,11 @@ fun ArticleCard(
     /** Called once as this card first composes, so coverage can be requested lazily — mirrors
      *  [onNeedsAnalysis]. Null = don't request one. */
     onNeedsCoverage: ((Article) -> Unit)? = null,
+    /** Raw Lemmy/HN/Mastodon-status titles fetched once this session — feeds the buzz bar. Empty = no
+     *  social data yet / nothing fetched. */
+    socialTitles: List<String> = emptyList(),
+    /** Mastodon trending hashtag names fetched alongside [socialTitles]. */
+    trendTagNames: List<String> = emptyList(),
 ) {
     val c = Pulse.colors
     if (onNeedsAnalysis != null) {
@@ -106,10 +113,16 @@ fun ArticleCard(
                 }
                 // At-a-glance infographics: the story's mood + auto topic tags + the live crowd signal.
                 GlanceStrip(article, allArticles, analysis)
-                // Who's covering this story and how their politics spread — the Ground-News-style read.
-                coverage?.let { cov ->
-                    val breakdown = remember(cov.sources) { MediaBias.breakdown(cov.sources) }
-                    if (breakdown.total > 0) CoverageStrip(breakdown)
+                // Who's covering this story and how their politics spread, plus how much of that same
+                // vocabulary is live on social right now — the Ground-News-style bias read + the buzz read,
+                // stacked under one COVERAGE header.
+                val tags = remember(article.url) { NewsInsights.topics(article.title, article.summary) }
+                val buzz = remember(article.url, socialTitles, trendTagNames) {
+                    SocialBuzz.score(tags, socialTitles, article.title, article.summary, trendTagNames)
+                }
+                val breakdown = coverage?.let { cov -> remember(cov.sources) { MediaBias.breakdown(cov.sources) } }
+                if (buzz != BuzzLevel.NONE || (breakdown != null && breakdown.total > 0)) {
+                    CoverageStrip(breakdown, buzz)
                 }
                 // Which markets this story touches / would move, and which way (+ a short why).
                 val links = remember(article.url) {
@@ -291,14 +304,22 @@ private fun leanColor(l: Lean): Color = when (l) {
     Lean.RIGHT -> Color(0xFFDC2626)
 }
 
-/** The "◢ COVERAGE" strip — the Ground-News-style read: how many outlets are covering this exact story, and
- *  how their politics spread from left to right. A DIFFERENT bar shape than [SegmentedMoodBar] on purpose:
- *  the mood bar's segments are sized against a fixed intensity ceiling ([MOOD_BAR_SCALE]); this bar's
- *  segments are sized against the REAL outlet count, because a proportion of outlets is exactly what it
- *  claims to show — normalizing it to an arbitrary scale would make the percentages read wrong. */
+/** The "◢ COVERAGE" strip — the Ground-News-style bias read (how many outlets are covering this exact story,
+ *  and how their politics spread from left to right) stacked with a separate BUZZ bar (how much of the
+ *  story's own vocabulary is live on Lemmy/HN/Mastodon right now), both under one header since they're both
+ *  "who else is paying attention to this" reads. Two distinct bars, not one bar with an extra segment: a
+ *  political-lean distribution is a PROPORTION (sums to the outlet count) while buzz is a MAGNITUDE
+ *  (unbounded) — forcing both into one [Row.weight]-based bar would need an arbitrary weight-to-magnitude
+ *  mapping and risk the lean percentages reading wrong. Either half can render alone: [breakdown] is null
+ *  when no coverage has been fetched (or the setting is off) — buzz still shows; [buzz] is [BuzzLevel.NONE]
+ *  when nothing overlaps on social — the bias half still shows. The caller only invokes this when at least
+ *  one half has something to say. A DIFFERENT bar shape than [SegmentedMoodBar] on purpose: the mood bar's
+ *  segments are sized against a fixed intensity ceiling ([MOOD_BAR_SCALE]); the bias bar's segments are sized
+ *  against the REAL outlet count, because a proportion of outlets is exactly what it claims to show. */
 @Composable
-private fun CoverageStrip(breakdown: BiasBreakdown) {
+private fun CoverageStrip(breakdown: BiasBreakdown?, buzz: BuzzLevel) {
     val c = Pulse.colors
+    val hasBias = breakdown != null && breakdown.total > 0
     Column(
         Modifier
             .padding(top = 9.dp)
@@ -312,39 +333,74 @@ private fun CoverageStrip(breakdown: BiasBreakdown) {
                 "◢ COVERAGE", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
                 fontWeight = FontWeight.Bold, color = Color(0xFF3B82F6),
             )
-            val outlets = if (breakdown.total == 1) "outlet" else "outlets"
-            Text("· ${breakdown.total} $outlets", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            if (hasBias) {
+                val outlets = if (breakdown!!.total == 1) "outlet" else "outlets"
+                Text("· ${breakdown.total} $outlets", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            }
         }
-        BiasBar(breakdown, Modifier.padding(top = 6.dp).height(8.dp).fillMaxWidth())
-        val legend = buildList {
-            if (breakdown.left > 0) add("Left ${breakdown.left}" to Lean.LEFT)
-            if (breakdown.leanLeft > 0) add("Lean Left ${breakdown.leanLeft}" to Lean.LEAN_LEFT)
-            if (breakdown.center > 0) add("Center ${breakdown.center}" to Lean.CENTER)
-            if (breakdown.leanRight > 0) add("Lean Right ${breakdown.leanRight}" to Lean.LEAN_RIGHT)
-            if (breakdown.right > 0) add("Right ${breakdown.right}" to Lean.RIGHT)
-        }
-        if (legend.isNotEmpty()) {
-            FlowRow(
-                Modifier.padding(top = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                legend.forEach { (label, lean) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(leanColor(lean)))
-                        Spacer(Modifier.width(3.dp))
-                        Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.ink2)
+        if (hasBias) {
+            BiasBar(breakdown!!, Modifier.padding(top = 6.dp).height(8.dp).fillMaxWidth())
+            val legend = buildList {
+                if (breakdown.left > 0) add("Left ${breakdown.left}" to Lean.LEFT)
+                if (breakdown.leanLeft > 0) add("Lean Left ${breakdown.leanLeft}" to Lean.LEAN_LEFT)
+                if (breakdown.center > 0) add("Center ${breakdown.center}" to Lean.CENTER)
+                if (breakdown.leanRight > 0) add("Lean Right ${breakdown.leanRight}" to Lean.LEAN_RIGHT)
+                if (breakdown.right > 0) add("Right ${breakdown.right}" to Lean.RIGHT)
+            }
+            if (legend.isNotEmpty()) {
+                FlowRow(
+                    Modifier.padding(top = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    legend.forEach { (label, lean) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(leanColor(lean)))
+                            Spacer(Modifier.width(3.dp))
+                            Text(label, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.ink2)
+                        }
                     }
                 }
             }
+            val summary = remember(breakdown) { MediaBias.summarize(breakdown) }
+            if (summary.isNotBlank()) {
+                Text(
+                    summary, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
         }
-        val summary = remember(breakdown) { MediaBias.summarize(breakdown) }
-        if (summary.isNotBlank()) {
-            Text(
-                summary, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                modifier = Modifier.padding(top = 5.dp),
-            )
+        if (buzz != BuzzLevel.NONE) {
+            Row(
+                Modifier.padding(top = if (hasBias) 8.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    "◈ BUZZ", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                    fontWeight = FontWeight.Bold, color = c.violet,
+                )
+                Text("· ${buzz.label}", fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+            }
+            BuzzBar(buzz, Modifier.padding(top = 6.dp).height(6.dp).fillMaxWidth())
         }
+    }
+}
+
+/** A single-fill bar sized by [BuzzLevel] intensity — a different shape than [BiasBar] on purpose (buzz is a
+ *  magnitude with no natural "total" to be proportional against, unlike the bias bar's real outlet count). */
+@Composable
+private fun BuzzBar(level: BuzzLevel, modifier: Modifier) {
+    val c = Pulse.colors
+    val frac = when (level) {
+        BuzzLevel.NONE -> 0f
+        BuzzLevel.LOW -> 0.25f
+        BuzzLevel.MODERATE -> 0.5f
+        BuzzLevel.HIGH -> 0.75f
+        BuzzLevel.VIRAL -> 1f
+    }
+    Row(modifier.clip(RoundedCornerShape(3.dp)).background(c.raise)) {
+        if (frac > 0f) Box(Modifier.weight(frac).fillMaxHeight().background(c.violet))
+        if (frac < 1f) Box(Modifier.weight(1f - frac).fillMaxHeight())
     }
 }
 

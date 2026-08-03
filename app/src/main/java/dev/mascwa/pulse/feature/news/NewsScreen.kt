@@ -144,6 +144,8 @@ fun NewsScreen(vm: NewsViewModel) {
                                 onNeedsAnalysis = vm::ensureAnalyzed,
                                 coverage = coverageByUrl[article.url],
                                 onNeedsCoverage = vm::ensureCoverage,
+                                socialTitles = state.socialTitles,
+                                trendTagNames = state.trendTagNames,
                             )
                         }
                     }
