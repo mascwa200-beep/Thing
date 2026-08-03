@@ -152,7 +152,7 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                 // Supergroup rail — the top level of the taxonomy.
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, top = 6.dp, bottom = 4.dp),
+                        .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     LcarsChip("ALL", selected = supergroup == null, onClick = { supergroup = null; category = null })
@@ -166,7 +166,7 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                 // Category rail — the second level, scoped to the selected supergroup.
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, bottom = 6.dp),
+                        .padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     LcarsChip("ALL", selected = category == null, onClick = { category = null },

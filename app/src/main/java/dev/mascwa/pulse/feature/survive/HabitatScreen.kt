@@ -49,7 +49,7 @@ import dev.mascwa.pulse.core.telemetry.DangerLevel
 import dev.mascwa.pulse.core.telemetry.Habitat
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -279,7 +279,7 @@ private fun DangerBanner(level: DangerLevel) {
 private fun AnimalCard(a: Animal, expanded: Boolean, onClick: () -> Unit) {
     val c = Pulse.colors
     val col = dangerColor(a.danger)
-    PipFrame(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    LcarsFrame(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(col))
@@ -314,7 +314,7 @@ private fun Field(label: String, body: String) {
 @Composable
 private fun PermissionPrompt(onGrant: () -> Unit) {
     val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth().padding(16.dp)) {
+    LcarsFrame(Modifier.fillMaxWidth().padding(16.dp)) {
         Column {
             Text("Location needed", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink)
             Text("Grant location so the wildlife map can read the biome you're actually in. Works offline after that.",

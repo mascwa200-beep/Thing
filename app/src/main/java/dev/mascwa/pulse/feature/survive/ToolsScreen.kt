@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,11 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -60,33 +59,35 @@ fun ToolsScreen(vm: ToolsViewModel, onBack: (() -> Unit)? = null) {
     ) { innerPadding ->
         Column(
             Modifier.padding(innerPadding).padding(16.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            LcarsHeaderBar("Signal")
             ToolButton(
                 title = if (strobe) "SOS strobe — ON" else "SOS strobe",
                 subtitle = if (vm.torchAvailable) "Flashes · · · — — — · · · in morse" else "No flashlight on this device",
                 active = strobe, accent = c.amber, enabled = vm.torchAvailable,
             ) { vm.toggleStrobe() }
+            ToolButton("Screen flare", "Full-bright white screen to signal", active = false, accent = c.sky) { flare = true }
 
+            LcarsHeaderBar("Light")
             ToolButton(
                 title = if (torch) "Flashlight — ON" else "Flashlight",
                 subtitle = if (vm.torchAvailable) "Steady torch" else "No flashlight on this device",
                 active = torch, accent = c.amber, enabled = vm.torchAvailable,
             ) { vm.toggleTorch() }
 
+            LcarsHeaderBar("Alert")
             ToolButton(
                 title = if (alarm) "Loud alarm — ON" else "Loud alarm",
                 subtitle = "Maximum-volume attention tone",
                 active = alarm, accent = c.magenta,
             ) { vm.toggleAlarm() }
-
             ToolButton("Vibrate SOS", "Pulse the SOS pattern", active = false, accent = c.accent) { vm.sosVibrate() }
-
-            ToolButton("Screen flare", "Full-bright white screen to signal", active = false, accent = c.sky) { flare = true }
 
             Text(
                 "These tools run fully offline. The strobe and alarm keep running until you turn them off — mind your battery.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                modifier = Modifier.padding(top = 6.dp),
             )
         }
     }
@@ -102,7 +103,7 @@ private fun ToolButton(
     onClick: () -> Unit,
 ) {
     val c = Pulse.colors
-    PipFrame(
+    LcarsFrame(
         modifier = Modifier.fillMaxWidth()
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
         accent = if (active) accent else c.line,
