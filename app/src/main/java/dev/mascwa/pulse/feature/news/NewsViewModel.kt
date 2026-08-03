@@ -2,11 +2,15 @@ package dev.mascwa.pulse.feature.news
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.load
 import dev.mascwa.pulse.core.util.toUserMessage
 import dev.mascwa.pulse.data.news.Article
+import dev.mascwa.pulse.data.news.NewsAnalysis
+import dev.mascwa.pulse.data.news.NewsAnalysisEngine
+import dev.mascwa.pulse.data.news.NewsAnalysisStore
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -20,6 +24,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.Collections
 
 data class NewsTab(
     val key: String,
@@ -46,6 +53,8 @@ class NewsViewModel(
     private val settings: SettingsRepository,
     private val markets: dev.mascwa.pulse.data.markets.MarketsRepository,
     private val socialRepo: SocialRepository,
+    private val analysisEngine: NewsAnalysisEngine,
+    private val analysisStore: NewsAnalysisStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NewsUiState())
@@ -53,6 +62,15 @@ class NewsViewModel(
 
     // In-memory cache so switching tabs is instant.
     private val cache = mutableMapOf<String, Async<List<Article>>>()
+
+    /** The cloud-LLM "what's really going on" read per article, keyed by url — see [ensureAnalyzed]. Falls
+     *  back to the existing heuristic copy (NewsMarketLink/NewsInsights) wherever an entry is missing. */
+    val analyses: StateFlow<Map<String, NewsAnalysis>> = analysisStore.analysesFlow
+
+    // Urls currently being analyzed, so rapid recomposition can't fire the same article twice concurrently.
+    private val analyzing: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+    // Caps concurrent cloud calls — a fast scroll through many new cards shouldn't burst-fire requests.
+    private val analysisSemaphore = Semaphore(2)
 
     init {
         viewModelScope.launch {
@@ -90,6 +108,41 @@ class NewsViewModel(
                 dev.mascwa.pulse.data.news.NewsMarketPulse.fetch(markets)
             }.getOrDefault(emptyMap())
             if (pulse.isNotEmpty()) _state.update { it.copy(marketPulse = pulse) }
+        }
+        // Warm the on-device analysis cache from disk once, so a previously-analyzed article's LLM copy
+        // is available immediately instead of only after a redundant re-analysis.
+        viewModelScope.launch { analysisStore.preload() }
+    }
+
+    /**
+     * Ask the "what's really going on" cloud analysis for [article], if it doesn't already have one. A
+     * no-op when already cached, already failed this session, or already in flight. Fire-and-forget — the
+     * result (or lack of one) surfaces reactively via [analyses]; callers keep showing the existing
+     * heuristic copy until/unless an entry appears. Never throws (NewsAnalysisEngine is fully defensive).
+     */
+    fun ensureAnalyzed(article: Article) {
+        val url = article.url
+        if (analysisStore.get(url) != null) return
+        if (analysisStore.hasFailed(url)) return
+        if (!analyzing.add(url)) return
+        viewModelScope.launch {
+            try {
+                analysisSemaphore.withPermit {
+                    val links = NewsMarketLink.linksFor(article.title, article.summary, article.category)
+                    val pulse = _state.value.marketPulse
+                    val result = analysisEngine.analyze(
+                        title = article.title,
+                        summary = article.summary,
+                        source = article.source,
+                        category = article.category,
+                        links = links,
+                        livePulse = pulse,
+                    )
+                    if (result != null) analysisStore.record(url, result) else analysisStore.markFailed(url)
+                }
+            } finally {
+                analyzing.remove(url)
+            }
         }
     }
 

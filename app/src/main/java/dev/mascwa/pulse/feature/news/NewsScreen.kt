@@ -48,6 +48,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 @Composable
 fun NewsScreen(vm: NewsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val analyses by vm.analyses.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var searchActive by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
@@ -138,6 +139,8 @@ fun NewsScreen(vm: NewsViewModel) {
                                 pulse = state.marketPulse,
                                 allArticles = distinctArticles,
                                 onClick = { openUrl(context, article.url) },
+                                analysis = analyses[article.url],
+                                onNeedsAnalysis = vm::ensureAnalyzed,
                             )
                         }
                     }

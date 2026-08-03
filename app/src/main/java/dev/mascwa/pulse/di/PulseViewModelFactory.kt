@@ -30,7 +30,10 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                     c.usageRepository, c.profileStore, c.taskStore,
                 )
             modelClass.isAssignableFrom(NewsViewModel::class.java) ->
-                NewsViewModel(c.newsRepository, c.settingsRepository, c.marketsRepository, c.socialRepository)
+                NewsViewModel(
+                    c.newsRepository, c.settingsRepository, c.marketsRepository, c.socialRepository,
+                    c.newsAnalysisEngine, c.newsAnalysisStore,
+                )
             modelClass.isAssignableFrom(MarketsViewModel::class.java) ->
                 MarketsViewModel(c.marketsRepository, c.settingsRepository)
             modelClass.isAssignableFrom(EconomyViewModel::class.java) ->
