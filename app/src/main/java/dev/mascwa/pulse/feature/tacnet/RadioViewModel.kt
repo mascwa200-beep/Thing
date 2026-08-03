@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Backs the PIP-BOY RADIO feed. Playback itself lives in the process-wide [RadioController] (kept alive
- * by [RadioService]) so audio survives leaving the PIP-BOY/app; this ViewModel just exposes that state
+ * Backs the LCARS RADIO feed. Playback itself lives in the process-wide [RadioController] (kept alive
+ * by [RadioService]) so audio survives leaving LCARS/the app; this ViewModel just exposes that state
  * and owns the on-demand **LOCAL** station lookup (location → reverse-geocode → Radio Browser), beside
  * the always-available **CURATED** SomaFM streams.
  */

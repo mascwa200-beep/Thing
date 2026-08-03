@@ -132,7 +132,7 @@ class RadioBrowserRepository(private val http: HttpClient) {
         return Mapped(RadioStation(name = title, band = band, streamUrl = stream), stateKey = state.trim().lowercase())
     }
 
-    /** A short Pip-Boy "band" tag: top genre tags, else the state/country. */
+    /** A short "band" tag: top genre tags, else the state/country. */
     private fun ApiStation.buildBand(): String {
         val tagPart = tags.split(',')
             .map { it.trim() }

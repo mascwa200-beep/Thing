@@ -45,7 +45,7 @@ import java.util.Date
 import java.util.Locale
 
 /** The DIARY feed — a dated personal journal: write an entry (optionally moodtagged), then browse the
- *  whole journal newest-first. Renders in the PIP-BOY green palette, mirroring the LIBRARY (NOTES). */
+ *  whole journal newest-first. Renders in the LCARS palette, mirroring the LIBRARY (NOTES). */
 @Composable
 fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
     val entries by vm.entries.collectAsStateWithLifecycle()
@@ -111,7 +111,7 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** A banded journal row (Fallout DATA>STATS look): date + optional mood header, title, body, delete. */
+/** A banded journal row (DATA>STATS look): date + optional mood header, title, body, delete. */
 @Composable
 private fun EntryRow(entry: DiaryEntry, c: NightwirePalette, onDelete: () -> Unit) {
     Row(
@@ -155,7 +155,7 @@ private fun MoodChip(label: String, selected: Boolean, c: NightwirePalette, onCl
     }
 }
 
-/** A Pip-Boy terminal text input. */
+/** An LCARS terminal text input. */
 @Composable
 private fun DiaryField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette, single: Boolean = true) {
     Box(

@@ -35,8 +35,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -96,7 +94,7 @@ private fun TelemetryLifecycle(vm: TelemetryViewModel) {
 }
 
 /**
- * The STATS ▸ STATUS body — the pure device readout (operator portrait, condition, radiation, effects, and
+ * The STATS ▸ STATUS body — the pure device readout (operator portrait, condition, stress, advisories, and
  * the raw vitals / sensors / system / position panels). Scaffold-free.
  */
 @Composable
@@ -129,23 +127,23 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Condition")
         ConditionPanel(t, c)
 
-        PipHeader("Radiation")
-        RadiationPanel(t, c)
+        PipHeader("Stress")
+        StressPanel(t, c)
 
-        PipHeader("Effects")
-        EffectsPanel(t, gps != null, c)
+        PipHeader("Advisories")
+        AdvisoriesPanel(t, gps != null, c)
 
         PipHeader("Vitals")
         PipFrame(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                FalloutGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
-                FalloutGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
+                SegmentGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
+                SegmentGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
                     if (t.memTotalMb > 0) t.memUsedMb.toFloat() / t.memTotalMb else 0f, c.violet)
-                FalloutGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
+                SegmentGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
                     min(1f, (t.lightLux ?: 0f) / 2000f), c.amber)
-                FalloutGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
+                SegmentGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
                     min(1f, (t.magneticUt ?: 0f) / 100f), c.sky)
-                FalloutGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
+                SegmentGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
                     min(1f, (t.accelG ?: 0f) / 2f), c.magenta)
             }
         }
@@ -153,22 +151,22 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         PipHeader("Sensors")
         PipFrame(Modifier.fillMaxWidth()) {
             Column {
-                FalloutStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
-                FalloutStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
-                FalloutStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                FalloutStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                FalloutStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
+                TelemetryStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
+                TelemetryStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
+                TelemetryStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                TelemetryStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
+                TelemetryStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
             }
         }
 
         PipHeader("System")
         PipFrame(Modifier.fillMaxWidth()) {
             Column {
-                FalloutStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
-                FalloutStatRow("Power", if (t.charging) "Charging" else "On battery")
-                FalloutStatRow("Network", t.netType)
-                FalloutStatRow("Signal", t.netSignal)
-                FalloutStatRow("Memory used", "${t.memUsedMb} MB")
+                TelemetryStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
+                TelemetryStatRow("Power", if (t.charging) "Charging" else "On battery")
+                TelemetryStatRow("Network", t.netType)
+                TelemetryStatRow("Signal", t.netSignal)
+                TelemetryStatRow("Memory used", "${t.memUsedMb} MB")
             }
         }
 
@@ -177,9 +175,9 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
             val loc = gps
             if (loc != null) {
                 Column {
-                    FalloutStatRow("Latitude", "%.5f".format(loc.latitude))
-                    FalloutStatRow("Longitude", "%.5f".format(loc.longitude))
-                    FalloutStatRow("Place", loc.name)
+                    TelemetryStatRow("Latitude", "%.5f".format(loc.latitude))
+                    TelemetryStatRow("Longitude", "%.5f".format(loc.longitude))
+                    TelemetryStatRow("Place", loc.name)
                 }
             } else {
                 Text(
@@ -202,7 +200,7 @@ private fun batteryText(t: Telemetry): String {
     return if (t.charging) "$pct ⚡" else pct
 }
 
-// ---- CONDITION: an original Pip-Boy-style figure whose body regions tint by live device health. ----
+// ---- CONDITION: an original operator-silhouette figure whose body regions tint by live device health. ----
 
 private fun powerScore(t: Telemetry): Float = if (t.charging) 1f else (t.batteryPct ?: 100) / 100f
 private fun memoryScore(t: Telemetry): Float =
@@ -216,7 +214,7 @@ private fun condColor(c: NightwirePalette, score: Float): Color = when {
     else -> c.negative
 }
 
-/** The STATUS condition readout: a tinted humanoid figure + a CND score and per-system breakdown. */
+/** The STATUS condition readout: a tinted humanoid figure + an INTEGRITY score and per-system breakdown. */
 @Composable
 private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
     val power = powerScore(t)
@@ -225,8 +223,8 @@ private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
     val overall = (power + memory + thermal) / 3f
     val overallColor = condColor(c, overall)
     val label = when {
-        overall >= 0.66f -> "OPTIMAL"
-        overall >= 0.33f -> "FAIR"
+        overall >= 0.66f -> "NOMINAL"
+        overall >= 0.33f -> "DEGRADED"
         else -> "CRITICAL"
     }
     PipFrame(Modifier.fillMaxWidth()) {
@@ -239,7 +237,7 @@ private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
                 legs = condColor(c, power),
             )
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                Text("CND ${(overall * 100).roundToInt()}%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                Text("INTEGRITY ${(overall * 100).roundToInt()}%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
                     fontSize = 22.sp, color = overallColor)
                 Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.5.sp, color = c.muted,
                     modifier = Modifier.padding(bottom = 6.dp))
@@ -305,10 +303,10 @@ private fun ConditionFigure(modifier: Modifier, head: Color, torso: Color, limbs
     }
 }
 
-/** A VITALS gauge in the Fallout HP/AP idiom: a green-banded label/value header over a notched,
- *  segment-lit bar (Pip-Boy SPECIAL/condition bars are segmented, not smooth). */
+/** A VITALS gauge: a banded label/value header over a notched, segment-lit bar (segmented rather than
+ *  smooth, for LCARS-style at-a-glance legibility). */
 @Composable
-private fun FalloutGauge(label: String, value: String, fraction: Float, color: Color) {
+private fun SegmentGauge(label: String, value: String, fraction: Float, color: Color) {
     val c = Pulse.colors
     val frac = fraction.coerceIn(0f, 1f)
     Box(
@@ -340,26 +338,14 @@ private fun FalloutGauge(label: String, value: String, fraction: Float, color: C
     }
 }
 
-/** A SENSORS/SYSTEM/POSITION readout — the canonical Fallout DATA>STATS banded row (shared [PipDataRow]). */
+/** A SENSORS/SYSTEM/POSITION readout row (shared [PipDataRow]). */
 @Composable
-private fun FalloutStatRow(label: String, value: String) {
+private fun TelemetryStatRow(label: String, value: String) {
     dev.mascwa.pulse.feature.common.PipDataRow(label, value)
 }
 
-/** Green-phosphor duotone (luminance → green) so a portrait reads as part of the Pip-Boy CRT. */
-private val PortraitDuotone = ColorFilter.colorMatrix(
-    ColorMatrix(
-        floatArrayOf(
-            0.030f, 0.059f, 0.011f, 0f, 0f,
-            0.299f, 0.587f, 0.114f, 0f, 0f,
-            0.090f, 0.176f, 0.034f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f,
-        ),
-    ),
-)
-
-/** The operator portrait (Fallout STATUS character image): tap to pick an image — it persists and renders
- *  in the green CRT duotone; empty shows the upload prompt. */
+/** The operator portrait: tap to pick an image — it persists and renders in true color inside the LCARS
+ *  frame; empty shows the upload prompt. */
 @Composable
 private fun OperatorPortrait(uri: String, c: NightwirePalette, onPick: () -> Unit) {
     PipFrame(Modifier.fillMaxWidth()) {
@@ -380,7 +366,6 @@ private fun OperatorPortrait(uri: String, c: NightwirePalette, onPick: () -> Uni
                     contentDescription = "Operator portrait",
                     modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(4.dp)).clickable { onPick() },
                     contentScale = ContentScale.Crop,
-                    colorFilter = PortraitDuotone,
                 )
             }
             Text(
@@ -391,28 +376,28 @@ private fun OperatorPortrait(uri: String, c: NightwirePalette, onPick: () -> Uni
     }
 }
 
-/** The RADIATION readout (Fallout STATUS>RAD): "rads" = live system stress — memory pressure plus
- *  thermal load above nominal — on the 0–1000 RADS ruler; RAD RESIST = free headroom. */
+/** The STRESS readout: live system load — memory pressure plus thermal load above nominal — as a direct
+ *  0–100% gauge; TOLERANCE = free headroom. */
 @Composable
-private fun RadiationPanel(t: Telemetry, c: NightwirePalette) {
+private fun StressPanel(t: Telemetry, c: NightwirePalette) {
     val memPct = if (t.memTotalMb > 0) ((t.memUsedMb * 100) / t.memTotalMb).toInt() else 0
     val temp = t.batteryTempC ?: 25f
-    val rads = (memPct * 5 + (maxOf(0f, temp - 25f) * 20f).toInt()).coerceIn(0, 1000)
-    val resist = (100 - memPct).coerceIn(0, 100)
+    val stress = ((memPct * 5 + (maxOf(0f, temp - 25f) * 20f).toInt()) / 10).coerceIn(0, 100)
+    val tolerance = (100 - memPct).coerceIn(0, 100)
     PipFrame(Modifier.fillMaxWidth()) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("RAD RESIST $resist%", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
-                Text("$rads / 1000 RADS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+                Text("TOLERANCE $tolerance%", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
+                Text("STRESS $stress%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
             }
-            RadRuler(rads, c, Modifier.fillMaxWidth().padding(top = 12.dp))
+            StressGauge(stress, c, Modifier.fillMaxWidth().padding(top = 12.dp))
         }
     }
 }
 
-/** The Fallout RADS ruler: a tick scale 0…1000 with an arrow pointer at the current reading. */
+/** The STRESS gauge: a tick scale 0…100% with an arrow pointer at the current reading. */
 @Composable
-private fun RadRuler(rads: Int, c: NightwirePalette, modifier: Modifier) {
+private fun StressGauge(stress: Int, c: NightwirePalette, modifier: Modifier) {
     Canvas(modifier.height(34.dp)) {
         val w = size.width
         val y = size.height * 0.62f
@@ -422,7 +407,7 @@ private fun RadRuler(rads: Int, c: NightwirePalette, modifier: Modifier) {
             val tall = i % 5 == 0
             drawLine(c.accent.copy(alpha = if (tall) 0.7f else 0.4f), Offset(x, y), Offset(x, y - if (tall) 11f else 6f), 1.dp.toPx())
         }
-        val px = (w * (rads / 1000f)).coerceIn(0f, w)
+        val px = (w * (stress / 100f)).coerceIn(0f, w)
         val arrow = Path().apply {
             moveTo(px, y - 3f)
             lineTo(px - 7f, y + 11f)
@@ -433,40 +418,40 @@ private fun RadRuler(rads: Int, c: NightwirePalette, modifier: Modifier) {
     }
 }
 
-/** A Fallout-style status effect derived from live device state. */
-private data class StatusEffect(val tag: String, val name: String, val desc: String, val good: Boolean)
+/** A system advisory derived from live device state. */
+private data class Advisory(val tag: String, val name: String, val desc: String, val good: Boolean)
 
-/** Active "effects" — real device/app state surfaced as Fallout status effects (the STATUS>EFF panel):
- *  charging, low power, thermal, data link, GPS. */
-private fun activeEffects(t: Telemetry, hasGps: Boolean): List<StatusEffect> {
-    val out = ArrayList<StatusEffect>()
+/** Active advisories — real device/app state surfaced as short flags: charging, low power, thermal,
+ *  data link, GPS. */
+private fun activeAdvisories(t: Telemetry, hasGps: Boolean): List<Advisory> {
+    val out = ArrayList<Advisory>()
     val bat = t.batteryPct ?: 0
-    if (t.charging) out += StatusEffect("⚡", "CHARGING", "Power cell recharging", true)
-    if (!t.charging && bat in 1..20) out += StatusEffect("▼", "LOW POWER", "Reserves critical — conserve energy", false)
+    if (t.charging) out += Advisory("⚡", "CHARGING", "Power cell recharging", true)
+    if (!t.charging && bat in 1..20) out += Advisory("▼", "LOW POWER", "Reserves critical — conserve energy", false)
     val temp = t.batteryTempC
-    if (temp != null && temp >= 40f) out += StatusEffect("△", "OVERHEATING", "Core temperature elevated", false)
-    if (t.netType.isNotBlank()) out += StatusEffect("≋", "${t.netType.uppercase()} LINK", "Data uplink established", true)
-    else out += StatusEffect("⊘", "OFFLINE", "No uplink — running on local cache", false)
-    if (hasGps) out += StatusEffect("◎", "GPS LOCK", "Position fix acquired", true)
+    if (temp != null && temp >= 40f) out += Advisory("△", "OVERHEATING", "Core temperature elevated", false)
+    if (t.netType.isNotBlank()) out += Advisory("≋", "${t.netType.uppercase()} LINK", "Data uplink established", true)
+    else out += Advisory("⊘", "OFFLINE", "No uplink — running on local cache", false)
+    if (hasGps) out += Advisory("◎", "GPS LOCK", "Position fix acquired", true)
     return out
 }
 
-/** The EFFECTS readout (Fallout STATUS>EFF): active device state as status effects. */
+/** The ADVISORIES readout: active device state as short system flags. */
 @Composable
-private fun EffectsPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
-    val effects = activeEffects(t, hasGps)
+private fun AdvisoriesPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
+    val advisories = activeAdvisories(t, hasGps)
     PipFrame(Modifier.fillMaxWidth()) {
-        if (effects.isEmpty()) {
-            Text("No active effects.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+        if (advisories.isEmpty()) {
+            Text("No active advisories.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
         } else {
-            Column { effects.forEach { EffectRow(it, c) } }
+            Column { advisories.forEach { AdvisoryRow(it, c) } }
         }
     }
 }
 
-/** One status-effect row: a tag glyph, the effect name (bold) and a short description, banded. */
+/** One advisory row: a tag glyph, the advisory name (bold) and a short description, banded. */
 @Composable
-private fun EffectRow(e: StatusEffect, c: NightwirePalette) {
+private fun AdvisoryRow(e: Advisory, c: NightwirePalette) {
     Row(
         Modifier.fillMaxWidth()
             .drawBehind {

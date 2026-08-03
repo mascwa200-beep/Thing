@@ -57,7 +57,7 @@ fun SpaceWeatherScreen(vm: SpaceWeatherViewModel, onBack: (() -> Unit)? = null) 
     }
 }
 
-/** The space-weather feed body, scaffold-free for hosting as a PIP-BOY sub-tab. */
+/** The space-weather feed body, scaffold-free for hosting as an LCARS sub-tab. */
 @Composable
 fun SpaceWeatherBody(vm: SpaceWeatherViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()

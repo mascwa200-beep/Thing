@@ -145,7 +145,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
 }
 
 /** The scaffold-free NAV map body — the live MapLibre map with the MAP | OBJECTIVES sub-switch. Extracted
- *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the PIP-BOY hub. */
+ *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the LCARS hub. */
 @Composable
 fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modifier = Modifier) {
     val c = Pulse.colors
@@ -269,7 +269,7 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
         style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeLineGeoJson(route))
     }
 
-    // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● PLAIN), active emphasised.
+    // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● WORK), active emphasised.
     LaunchedEffect(allWaypoints, activeWaypointId, map) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(OBJECTIVE_SOURCE)?.setGeoJson(objectiveGeoJson(allWaypoints, activeWaypointId))
@@ -559,7 +559,7 @@ private fun addPlayerMarker(style: Style, c: NightwirePalette) {
 }
 
 /** The navigation path from the player to the active waypoint: a bright gold line over a white casing
- *  (the Cyberpunk/Fallout nav-route look — rounded, glowing, no minimap). Two layers on one source. */
+ *  (rounded, glowing, no minimap). Two layers on one source. */
 private fun addRouteLayer(style: Style) {
     if (style.getSource(ROUTE_SOURCE) != null) return
     style.addSource(GeoJsonSource(ROUTE_SOURCE))
@@ -602,7 +602,7 @@ private fun addWaypointLayer(style: Style, c: NightwirePalette) {
     )
 }
 
-/** Register the three procedurally-drawn objective glyphs (★ MAIN gold, ◆ SIDE blue, ● PLAIN white).
+/** Register the three procedurally-drawn objective glyphs (★ MAIN gold, ◆ SIDE white, ● WORK green).
  *  Bitmaps, not a glyph font — robust on any map style (no font-stack dependency) and crisp at any zoom. */
 private fun addObjectiveIcons(style: Style) {
     if (style.getImage("obj-main") != null) return

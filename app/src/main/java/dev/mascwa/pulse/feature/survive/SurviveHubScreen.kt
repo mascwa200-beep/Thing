@@ -62,8 +62,8 @@ fun SurviveHubScreen(onOpenRoute: (String) -> Unit, onBack: (() -> Unit)? = null
 }
 
 /** The scaffold-free SURVIVE hub — hosted standalone in [SurviveHubScreen] and as the SURVIVE sub-tab
- *  inside the PIP-BOY STATS page. A file-explorer-style search across every survival destination + offline
- *  guide sits on top; empty query shows the Pip-Boy tile grid, so nothing heavy loads until you pick a page.
+ *  inside the LCARS STATS page. A file-explorer-style search across every survival destination + offline
+ *  guide sits on top; empty query shows the tile grid, so nothing heavy loads until you pick a page.
  *  Search results deep-link straight to the exact page (a guide result opens that specific guide). */
 @Composable
 fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -121,7 +121,7 @@ fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** The Pip-Boy search bar: a corner-bracketed frame with a monospace field. */
+/** The LCARS search bar: a corner-bracketed frame with a monospace field. */
 @Composable
 private fun SurviveSearchField(query: String, onQuery: (String) -> Unit) {
     val c = Pulse.colors
@@ -144,7 +144,7 @@ private fun SurviveSearchField(query: String, onQuery: (String) -> Unit) {
     }
 }
 
-/** A search result row: a Pip-Boy framed entry that deep-links to its exact page on tap. */
+/** A search result row: an LCARS framed entry that deep-links to its exact page on tap. */
 @Composable
 private fun SurviveResultRow(r: SurviveResult, onClick: () -> Unit) {
     val c = Pulse.colors
@@ -196,7 +196,7 @@ private fun buildSurviveIndex(guides: List<Guide>): List<SurviveResult> {
     return hub + guideResults
 }
 
-/** A Survive hub tile in the Pip-Boy terminal idiom: a flat corner-bracketed frame with an accent
+/** A Survive hub tile in the LCARS terminal idiom: a flat corner-bracketed frame with an accent
  *  icon, title, and subtitle. */
 @Composable
 private fun PipHubTile(

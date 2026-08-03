@@ -43,8 +43,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** The LIBRARY (NOTES) feed — a Fallout DATA>NOTES log: add an entry, then browse it sorted into
- *  category sections with banded rows. Renders in the PIP-BOY green palette. */
+/** The LIBRARY (NOTES) feed — a DATA>NOTES log: add an entry, then browse it sorted into
+ *  category sections with banded rows. Renders in the LCARS palette. */
 @Composable
 fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
     val notes by vm.notes.collectAsStateWithLifecycle()
@@ -105,7 +105,7 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** A banded library row in the canonical Fallout DATA>STATS look: an edge-to-edge faint-green band with
+/** A banded library row in the canonical DATA>STATS look: an edge-to-edge banded row with
  *  a bright hairline rule beneath (rows stack gap-free), holding title + body + date and a delete control. */
 @Composable
 private fun NoteRow(note: Note, c: NightwirePalette, onDelete: () -> Unit) {
@@ -147,7 +147,7 @@ private fun CatChip(label: String, selected: Boolean, c: NightwirePalette, onCli
     }
 }
 
-/** A Pip-Boy terminal text input. */
+/** An LCARS terminal text input. */
 @Composable
 private fun NoteField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette, single: Boolean = true) {
     Box(

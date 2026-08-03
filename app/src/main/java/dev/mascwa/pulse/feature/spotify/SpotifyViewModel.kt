@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Drives the PIP-BOY MUSIC (Spotify) tab over [SpotifyRepository]. Surfaces the OAuth link state, polls
+ * Drives the LCARS MUSIC (Spotify) tab over [SpotifyRepository]. Surfaces the OAuth link state, polls
  * now-playing while linked, lists Connect devices, and runs transport/transfer/search. Connecting opens
  * the Spotify authorize page in the browser; the redirect is handled by [SpotifyAuthActivity].
  */

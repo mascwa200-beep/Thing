@@ -65,7 +65,7 @@ import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlin.math.sin
 
-/** The RADIO feed — a Fallout-style tuner: a now-playing readout + local & curated stations to tune. */
+/** The RADIO feed — an LCARS tuner: a now-playing readout + local & curated stations to tune. */
 @Composable
 fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -248,7 +248,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** A Pip-Boy country selector pill for the WORLD browse — bright/filled when selected. */
+/** An LCARS country selector pill for the WORLD browse — bright/filled when selected. */
 @Composable
 private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
     Box(
@@ -269,7 +269,7 @@ private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, o
     }
 }
 
-/** A vertical Fallout list of stations — canonical banded rows, tap to tune. */
+/** A vertical list of stations — canonical banded rows, tap to tune. */
 @Composable
 private fun StationStrip(
     stations: List<RadioStation>,
@@ -310,7 +310,7 @@ private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) ->
     }
 }
 
-/** A station as a canonical Fallout banded list row: a status glyph / signal bars, the station name + a
+/** A station as a canonical banded list row: a status glyph / signal bars, the station name + a
  *  tiny genre/region (or live now-playing) line, and a ★ favourite toggle. Tap the row to tune. Rows
  *  stack gap-free, separated by the bright hairline rule. */
 @Composable
@@ -332,7 +332,7 @@ private fun StationRow(
             .fillMaxWidth()
             .drawBehind {
                 drawRect(c.accent.copy(alpha = if (active) 0.20f else 0.08f))
-                // The tuned station is the "selected" row — a bright left cursor bar (Fallout selection).
+                // The tuned station is the "selected" row — a bright left cursor bar.
                 if (active) drawRect(c.accent, size = Size(3.dp.toPx(), size.height))
                 drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
             }

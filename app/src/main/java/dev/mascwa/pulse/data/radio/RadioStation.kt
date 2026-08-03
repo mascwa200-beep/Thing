@@ -2,7 +2,7 @@ package dev.mascwa.pulse.data.radio
 
 import kotlinx.serialization.Serializable
 
-/** A tunable internet-radio station for the PIP-BOY RADIO feed. [band] is a short genre/flavour tag.
+/** A tunable internet-radio station for the LCARS RADIO feed. [band] is a short genre/flavour tag.
  *  Serializable so favourited stations persist in the settings JSON. */
 @Serializable
 data class RadioStation(

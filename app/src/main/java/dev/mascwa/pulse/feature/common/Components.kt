@@ -33,7 +33,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 // The shared loading / error / empty / stale states, in the app's terminal idiom. They read the active
-// [Pulse.colors] palette, so they render green under the TOOLS Pip-Boy theme and in the accent elsewhere.
+// [Pulse.colors] palette, so they render LCARS-orange under the TOOLS theme and in the accent elsewhere.
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {

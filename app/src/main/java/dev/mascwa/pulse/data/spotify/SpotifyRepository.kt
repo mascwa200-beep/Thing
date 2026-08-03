@@ -52,7 +52,7 @@ sealed interface SearchOutcome {
 /**
  * High-level Spotify Web API client. Holds the OAuth lifecycle (begin/complete/refresh/disconnect) over
  * [SettingsRepository] (tokens persist in the settings JSON; the backup export scrubs them) and exposes
- * read/control calls used by the PIP-BOY MUSIC tab: profile, now-playing, devices, transport, transfer
+ * read/control calls used by the LCARS MUSIC tab: profile, now-playing, devices, transport, transfer
  * and search. Tokens auto-refresh when near expiry. Fully defensive — every call yields null / false on
  * failure rather than throwing.
  *

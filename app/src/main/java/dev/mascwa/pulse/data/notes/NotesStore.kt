@@ -36,7 +36,7 @@ data class Note(
 
 /**
  * On-device persistence for the LIBRARY / NOTES — the user's notes and saved information, sorted into
- * Fallout-style categories. In-memory state (authoritative) + debounced flush, mirroring
+ * named categories. In-memory state (authoritative) + debounced flush, mirroring
  * TaskStore / ProfileStore. Stays on-device; the user can wipe it.
  */
 class NotesStore(

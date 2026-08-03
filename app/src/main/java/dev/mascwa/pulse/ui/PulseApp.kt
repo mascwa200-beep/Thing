@@ -85,7 +85,7 @@ fun PulseApp(
         }
     }
 
-    // Pip-Boy feed tabs: tapping a tab replaces the current feed (shallow back stack).
+    // LCARS feed tabs: tapping a tab replaces the current feed (shallow back stack).
     val openTab: (String) -> Unit = { route ->
         if (route != currentRoute) navController.navigate(route) {
             launchSingleTop = true
@@ -109,7 +109,7 @@ fun PulseApp(
                 tonalElevation = 0.dp,
             ) {
                 TOP_DESTINATIONS.forEach { dest ->
-                    // TOOLS now opens the Pip-Boy feed tabs; it highlights on any feed route.
+                    // TOOLS now opens the LCARS feed tabs; it highlights on any feed route.
                     val isTools = dest.route == Routes.TACNET
                     val selected = if (isTools) currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
                         else currentRoute == dest.route
@@ -371,7 +371,7 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.objectives.ObjectivesScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Quests — the objectives/quest log as its own Pip-Boy feed tab ----
+            // ---- Objectives — the objective log as its own LCARS feed tab ----
             composable(Routes.QUESTS) {
                 val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.objectives.QuestsScreen(vm, onBack = { navController.popBackStack() })
@@ -407,7 +407,7 @@ fun PulseApp(
         if (!startRoute.isNullOrBlank()) {
             if (startRoute != Routes.HOME) {
                 when {
-                    // A "tacnet?tab=SPECIAL"-style deep-link opens the PIP-BOY (a top destination) AND selects
+                    // A "tacnet?tab=SPECIAL"-style deep-link opens the LCARS console (a top destination) AND selects
                     // a specific sub-tab: stash the tab for PipBoyScreen, then navigate to the top destination
                     // (query args can't ride a top-level nav, so the holder carries it).
                     startRoute.substringBefore('?') == Routes.TACNET && startRoute.contains("tab=") -> {

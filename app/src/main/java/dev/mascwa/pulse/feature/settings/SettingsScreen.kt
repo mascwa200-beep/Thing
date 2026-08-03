@@ -1477,7 +1477,7 @@ private fun SettingsShell(
     }
 }
 
-/** The rail search field (Steam's "Search settings"). A Pip-Boy framed monospace field. */
+/** The rail search field (Steam's "Search settings"). An LCARS framed monospace field. */
 @Composable
 private fun SettingsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors

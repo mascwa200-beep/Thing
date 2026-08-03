@@ -94,7 +94,7 @@ class RadioService : Service() {
         if (mgr.getNotificationChannel(CHANNEL_ID) == null) {
             mgr.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Radio", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "PIP-BOY radio playback"
+                    description = "LCARS radio playback"
                     setShowBadge(false)
                 },
             )
