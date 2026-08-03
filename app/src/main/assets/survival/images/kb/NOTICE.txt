@@ -127,3 +127,11 @@ phys-nuclear-physics-radioactivity.png  —  Penetrating power of different type
 psy-personality-individual-differences.png  —  Big Five Personality Traits Bubble Diagram.svg  —  CC BY-SA 4.0
 psy-motivation-habit-formation.png  —  The habit loop.webp  —  CC BY-SA 4.0
 psy-child-development-stages.jpg  —  Development Sequences of the Human Mind.jpg  —  CC BY-SA 4.0
+astro-the-sun-our-star.png  —  Solar internal structure.svg  —  CC BY-SA 3.0  —  Sakurambobigrocksolid (French translation)
+astro-asteroids-comets-meteors.jpg  —  Anatomy of a comet.jpg  —  Public domain  —  NASA/JPL-Caltech/UMD
+bio-classification-of-life.png  —  Biological classification L Pengo.svg  —  Public domain  —  Peter Halasz (User:Pengo)
+bio-metabolism-cellular-respiration.png  —  Cellular Respiration Simple.png  —  CC BY-SA 4.0  —  Christinelmiller
+chem-states-of-matter-phase-changes.png  —  Phase change - en.svg  —  Public domain  —  Flanker, penubag
+chem-kinetics-and-equilibrium.png  —  Enzyme activation energy.png  —  CC BY-SA 3.0  —  G. Andruk
+cs-operating-systems.png  —  Operating system placement.svg  —  CC BY-SA 3.0  —  Golftheman
+cs-cybersecurity-fundamentals.png  —  CIAJMK1209-en.svg  —  CC BY-SA 4.0  —  Michel Bakni
