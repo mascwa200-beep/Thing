@@ -34,3 +34,71 @@ Clinical reproductive-anatomy diagrams for the Sexual Health guide
       by CDC / Mysid — public domain, Wikimedia Commons
   male-reproductive.svg — "Human male reproductive system"
       by Wumingbai — CC BY-SA 4.0, Wikimedia Commons
+
+Diagrams/photos for the 8 textbook-expansion guides (Sleep, Vaccines, Topo Maps, GPS/GNSS,
+Risk Assessment, Situational Awareness, Sewing, Woodworking). Files renamed on import;
+sources are the original Wikimedia Commons "File:" pages (image dimensions reduced from the
+original upload where noted, to keep the bundle size reasonable; artwork itself unmodified).
+
+  sleep-hypnogram.svg — "Hypnogram of sleep between midnight and 6.30 am"
+      by RazerM — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Sleep_Hypnogram.svg
+  circadian-clock.svg — "Overview of biological circadian clock in humans"
+      by YassineMrabet (fixed by Addicted04) — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Biological_clock_human.svg
+  vaccine-antibody-structure.svg — "Schematic diagram of an antibody (immunoglobulin)"
+      by Tokenzero — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Antibody_basic_unit.svg
+  jenner-cowpox-cartoon.jpg — "The Cow-Pock—or—the Wonderful Effects of the New
+      Inoculation!" (1802 satirical engraving of Jenner's cowpox vaccination)
+      by James Gillray — Public Domain, Wikimedia Commons (resized from the original)
+      https://commons.wikimedia.org/wiki/File:The_cow_pock.jpg
+  mrna-vaccine-lnp.jpg — "mRNA lipid nanoparticle structure" diagram
+      by Buschmann, Carrasco, Alishetty, Paige, Alameh & Weissman — CC BY 4.0,
+      Wikimedia Commons (resized/re-encoded from the original .webp upload)
+      https://commons.wikimedia.org/wiki/File:Vaccines-09-00065-g001.webp
+  smallpox-vaccine-needle.jpg — CDC clinician demonstrating a bifurcated vaccination
+      needle, 2002 Smallpox Vaccinator Workshop; photo by James Gathany
+      Public Domain (U.S. federal government work), Wikimedia Commons (resized)
+      https://commons.wikimedia.org/wiki/File:Smallpox_vaccine_injection.jpg
+  topo-map-contours.png — USGS topographic map excerpt, Stowe, Vermont (20-ft contours,
+      1:24,000) — Public Domain (U.S. federal government work, USGS), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Topographic_map_example.png
+  magnetic-declination.svg — "Magnetic declination diagram as used in USGS maps,
+      including grid north" — by arielCo — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Magnetic_grid_declination_diagram.svg
+  gps-trilateration.svg — GPS trilateration with three satellites
+      by Javiersanp — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Trilateration-with-3-satellites.svg
+  gnss-constellation.jpg — "The orbiting constellation of GPS satellites"
+      by NOAA — Public Domain (U.S. federal government work), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:GPS_satellite_constellation.jpg
+  risk-matrix.svg — Risk matrix (FAA Safety Risk Management Policy, 8040.4B)
+      by U.S. DOT / Federal Aviation Administration — Public Domain (U.S. federal
+      government work), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:FAA_8040.4B_Risk_matrix.svg
+  ooda-loop.svg — "A simple diagram of the four steps of John Boyd's OODA Loop"
+      by Thomasbcox23 — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:OODA_Loop_(Simple).svg
+  proxemic-zones.jpg — Edward Hall's proxemic zones (intimate/personal/social/public)
+      by Richard L. West and Lynn H. Turner — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Proxemic_Zones.jpg
+  stitch-running.png, stitch-backstitch.png, stitch-blanket.png — from the "Hand
+      Stitches" series (Running Stitch / Closed Backstitch / Blanket Stitch)
+      by Stilfehler — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Hand_Stitches_-_Running_Stitch.png
+      https://commons.wikimedia.org/wiki/File:Hand_Stitches_-_Closed_Backstitch.png
+      https://commons.wikimedia.org/wiki/File:Hand_Stitches_-_Blanket_Stitch.png
+  woodworking-chisel.jpg — "24mm wood chisel" photo
+      by Za (Isabelle Grosjean) — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Chisel_wood_24mm.jpg
+  hand-plane-parts.jpg — "Parts of a Plane" (labeled woodworking hand-plane diagram)
+      by User:etune, uploaded by User:Za — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Plane_parts.jpg
+  mortise-tenon-joint.png — illustration of the mortise-and-tenon woodworking joint
+      by Luigi Zanasi — CC BY-SA 2.5, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Mortise_and_Tenon.png
+
+CC BY / CC BY-SA works above are unmodified apart from resizing (noted) — no crops,
+recolors, or edits to the artwork itself. Public-domain works need no attribution;
+it is recorded here as good practice, matching the rest of this file.
