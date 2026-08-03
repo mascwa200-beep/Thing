@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The "real" Spotify player on Android: connects to the **installed Spotify app** via the App Remote SDK
- * and drives its playback — audio plays through the Spotify app, controlled from PIP-BOY. Process-wide so
+ * and drives its playback — audio plays through the Spotify app, controlled from LCARS. Process-wide so
  * the link survives leaving the tab.
  *
  * Connection model (the native analogue of the web SDK's lifecycle the owner asked for — App Remote, not

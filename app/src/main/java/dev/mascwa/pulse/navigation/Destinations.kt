@@ -67,7 +67,7 @@ object Routes {
     // Objectives / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
 
-    // Quests — the objectives/quest log as its own Pip-Boy feed tab
+    // Objectives — the objective log as its own LCARS feed tab
     const val QUESTS = "quests"
 
     // Diagnostics
@@ -90,8 +90,8 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
     TopDestination(Routes.JARVIS, "JARVIS", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
-    // TOOLS is a pseudo-destination: it opens the Pip-Boy feed tabs (FEED_HOME) and highlights on
-    // any feed route — handled specially in PulseApp. TACNET (the PIP-BOY screen) is the feed home.
+    // TOOLS is a pseudo-destination: it opens the LCARS feed tabs (FEED_HOME) and highlights on
+    // any feed route — handled specially in PulseApp. TACNET (the LCARS screen) is the feed home.
     TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
     TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
 )

@@ -87,7 +87,7 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
     }
 }
 
-/** A flat corner-bracketed Pip-Boy tile (matches the Survive hub): accent icon, title, subtitle. */
+/** A flat corner-bracketed LCARS tile (matches the Survive hub): accent icon, title, subtitle. */
 @Composable
 private fun PipHubTile(
     title: String,

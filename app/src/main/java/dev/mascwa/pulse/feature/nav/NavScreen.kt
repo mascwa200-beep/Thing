@@ -145,7 +145,7 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
 }
 
 /** The scaffold-free NAV map body — the live MapLibre map with the MAP | OBJECTIVES sub-switch. Extracted
- *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the PIP-BOY hub. */
+ *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the LCARS hub. */
 @Composable
 fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modifier = Modifier) {
     val c = Pulse.colors

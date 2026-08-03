@@ -364,13 +364,13 @@ data class AppSettings(
     val waypoints: List<Waypoint> = emptyList(),
     val activeWaypointId: String? = null,
 
-    // PIP-BOY radio: favourited stations (local or curated), surfaced as a FAVOURITES section.
+    // LCARS radio: favourited stations (local or curated), surfaced as a FAVOURITES section.
     val favoriteRadio: List<dev.mascwa.pulse.data.radio.RadioStation> = emptyList(),
 
-    // PIP-BOY music: Spotify OAuth (PKCE) link state. Scrubbed from the settings backup export.
+    // LCARS music: Spotify OAuth (PKCE) link state. Scrubbed from the settings backup export.
     val spotify: SpotifyAuthState = SpotifyAuthState(),
 
-    // PIP-BOY STATUS: a user-chosen operator portrait (content URI) shown in the CND section. Blank = none.
+    // LCARS STATUS: a user-chosen operator portrait (content URI) shown in the INTEGRITY section. Blank = none.
     val operatorPortraitUri: String = "",
 
     // Network security / privacy (Trusted Network Mode + at-rest/HTTPS encryption controls)

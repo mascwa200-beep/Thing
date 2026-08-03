@@ -22,7 +22,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * The PIP-BOY **DATA** feed — orbital readouts and space weather mixed into one scroll. Reuses each
+ * The LCARS **NAV ▸ DATA** feed — orbital readouts and space weather mixed into one scroll. Reuses each
  * feed's `LazyListScope` sections (orbitalSections / spaceWeatherSections) so there's one source of
  * truth; the space-weather metrics still tap through to their plain-English explainers.
  */

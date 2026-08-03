@@ -55,50 +55,52 @@ import dev.mascwa.pulse.ui.theme.lcarsPalette
 import kotlin.math.roundToInt
 
 /**
- * The combined TOOLS hub — every feed under one LCARS console, organised under the three canonical
- * sections selected from the global bottom nav (STATS / ITEMS / DATA):
- *  - STATS  → STATUS (phone telemetry / condition), plus the folded-in SURVIVE hub, SOCIAL feed and web
- *             SEARCH sub-tabs.
- *  - ITEMS  → the collected-inventory view (notes, tasks, tracked objectives).
- *  - DATA   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), QUESTS
- *             (objectives log), NOTES (library), RADIO and MUSIC.
+ * The combined TOOLS hub — every feed under one LCARS console, organised under four balanced bridge-
+ * station sections selected from the top nav (OPS / NAV / LOGS / COMMS):
+ *  - OPS   → STATUS (phone telemetry / condition) — operations, alone at the top.
+ *  - NAV   → MAP (the NAV map), RADAR (the RADSCOPE), ORBIT (orbital + space weather), and the folded-in
+ *            SURVIVE hub — everything about the world around you.
+ *  - LOGS  → OBJECTIVES (the objective log), NOTES (library), DIARY, and STORED (the tasks/notes/
+ *            objectives inventory) — everything you record.
+ *  - COMMS → the folded-in SOCIAL feed, web SEARCH, RADIO and MUSIC — everything in and out.
  * The sub-tab rail shows only the active section's tabs; each feed's scaffold-free *Body is hosted
  * inside the LCARS chrome.
  */
-private enum class PipSection(val label: String) { STATS("STATS"), ITEMS("ITEMS"), DATA("DATA") }
+private enum class PipSection(val label: String) { OPS("OPS"), NAV("NAV"), LOGS("LOGS"), COMMS("COMMS") }
 
 /** The hero accent each section reads in its chrome (section buttons, sub-tab pills). */
 private fun sectionAccent(section: PipSection): Color = when (section) {
-    PipSection.STATS -> Pip.bright
-    PipSection.ITEMS -> Pip.mid
-    PipSection.DATA -> Pip.violet
+    PipSection.OPS -> Pip.bright
+    PipSection.NAV -> Pip.mid
+    PipSection.LOGS -> Pip.violet
+    PipSection.COMMS -> Pip.glow
 }
 
 private enum class PipTab(val label: String, val section: PipSection) {
-    STATUS("STATUS", PipSection.STATS),
-    SURVIVE("SURVIVE", PipSection.STATS),
-    SOCIAL("SOCIAL", PipSection.STATS),
-    SEARCH("SEARCH", PipSection.STATS),
-    STORED("STORED", PipSection.ITEMS),
-    MAP("MAP", PipSection.DATA),
-    RADAR("RADAR", PipSection.DATA),
-    ORBIT("ORBIT", PipSection.DATA),
-    QUESTS("QUESTS", PipSection.DATA),
-    NOTES("NOTES", PipSection.DATA),
-    DIARY("DIARY", PipSection.DATA),
-    RADIO("STATIONS", PipSection.DATA),
-    MUSIC("MUSIC", PipSection.DATA),
+    STATUS("STATUS", PipSection.OPS),
+    MAP("MAP", PipSection.NAV),
+    RADAR("RADAR", PipSection.NAV),
+    ORBIT("ORBIT", PipSection.NAV),
+    SURVIVE("SURVIVE", PipSection.NAV),
+    OBJECTIVES("OBJECTIVES", PipSection.LOGS),
+    NOTES("NOTES", PipSection.LOGS),
+    DIARY("DIARY", PipSection.LOGS),
+    STORED("STORED", PipSection.LOGS),
+    SOCIAL("SOCIAL", PipSection.COMMS),
+    SEARCH("SEARCH", PipSection.COMMS),
+    RADIO("STATIONS", PipSection.COMMS),
+    MUSIC("MUSIC", PipSection.COMMS),
     ;
 
     companion object {
-        /** The default (first) tab for a section — what the bottom-nav section button selects. */
+        /** The default (first) tab for a section — what the top-nav section button selects. */
         fun firstOf(section: PipSection): PipTab = entries.first { it.section == section }
     }
 }
 
 /**
  * A process-scoped deep-link target for the TOOLS screen's sub-tab. A notification or launcher shortcut
- * sets [target] to a [PipTab] name (e.g. "STATUS", "QUESTS") just before navigating to TACNET; because
+ * sets [target] to a [PipTab] name (e.g. "STATUS", "OBJECTIVES") just before navigating to TACNET; because
  * TACNET is a top destination navigated without query args, this holder carries the sub-tab. [PipBoyScreen]
  * consumes and clears it on arrival. Backed by Compose state so an already-composed screen reacts too.
  */
@@ -126,7 +128,7 @@ fun PipBoyScreen(
     onOpenSettings: (() -> Unit)? = null,
 ) {
     var tab by remember { mutableStateOf(PipTab.STATUS) }
-    // A notification/shortcut can deep-link straight to a specific sub-tab (e.g. a nearby-safety alert → DATA
+    // A notification/shortcut can deep-link straight to a specific sub-tab (e.g. a nearby-safety alert → NAV
     // ▸ MAP) by setting PipBoyDeepLink.target before navigating here. Consume it reactively — the screen may
     // already be composed when the deep-link arrives.
     LaunchedEffect(PipBoyDeepLink.target.value) {
@@ -155,7 +157,7 @@ fun PipBoyScreen(
                     PipTab.ORBIT -> { orbitalVm.refresh(); spaceWxVm.refresh() }
                     PipTab.MAP -> Unit // the NAV map is live (self-managed)
                     PipTab.RADAR -> radarVm.refresh()
-                    PipTab.QUESTS -> objectivesVm.refresh()
+                    PipTab.OBJECTIVES -> objectivesVm.refresh()
                     PipTab.NOTES -> Unit // the library is local; nothing to refresh
                     PipTab.DIARY -> Unit // the diary is local; nothing to refresh
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
@@ -168,8 +170,8 @@ fun PipBoyScreen(
         // app-wide for the TOOLS section; kept here so this screen is self-contained).
         CompositionLocalProvider(LocalNightwire provides lcarsPalette) {
             Column(Modifier.padding(innerPadding).fillMaxSize().background(Pip.bg)) {
-                // The STATS / ITEMS / DATA menu (with the HP/AP gauges) now sits at the TOP — the primary
-                // selector — with the section's sub-tabs and the [SECTION] readout beneath it.
+                // The OPS / NAV / LOGS / COMMS menu (with the PWR/MEM gauges) now sits at the TOP — the
+                // primary selector — with the section's sub-tabs and the [SECTION] readout beneath it.
                 PipTopNav(telem, section = tab.section, onSection = { tab = PipTab.firstOf(it) })
                 PipTabRail(tab) { tab = it }
                 PipStatHeader(telem, tab.section)
@@ -184,7 +186,7 @@ fun PipBoyScreen(
                         PipTab.ORBIT -> DataBody(orbitalVm, spaceWxVm)
                         PipTab.MAP -> dev.mascwa.pulse.feature.nav.NavBody(navVm, objectivesVm, Modifier.fillMaxSize())
                         PipTab.RADAR -> RadarBody(radarVm)
-                        PipTab.QUESTS -> dev.mascwa.pulse.feature.objectives.ObjectivesPanel(
+                        PipTab.OBJECTIVES -> dev.mascwa.pulse.feature.objectives.ObjectivesPanel(
                             objectivesVm, Pulse.colors, Modifier.fillMaxSize(),
                         )
                         PipTab.NOTES -> dev.mascwa.pulse.feature.notes.NotesBody(notesVm)
@@ -220,12 +222,12 @@ private fun PipTabRail(current: PipTab, onSelect: (PipTab) -> Unit) {
     }
 }
 
-/** Free memory as a 0–100 %, used for the AP gauge. */
+/** Free memory as a 0–100 %, used for the MEM gauge. */
 private fun freeMemPercent(t: Telemetry): Float =
     if (t.memTotalMb > 0) (((t.memTotalMb - t.memUsedMb) * 100f) / t.memTotalMb).coerceIn(0f, 100f) else 0f
 
-/** The top STAT readout strip — `[SECTION] LVL n · HP x/100 · AP x/100 · NET`. HP = battery, AP = free
- *  memory, LVL = build. Live device data; the leading bracket names the active section. */
+/** The top STAT readout strip — `[SECTION] REV n · PWR x/100 · MEM x/100 · NET`. PWR = battery, MEM =
+ *  free memory, REV = build. Live device data; the leading bracket names the active section. */
 @Composable
 private fun PipStatHeader(t: Telemetry, section: PipSection) {
     val bat = (t.batteryPct ?: 0).coerceIn(0, 100)
@@ -242,9 +244,9 @@ private fun PipStatHeader(t: Telemetry, section: PipSection) {
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.5.sp,
             color = sectionAccent(section),
         )
-        StatReadout("LVL", "$level")
-        StatReadout("HP", "$bat / 100" + if (t.charging) " ⚡" else "")
-        StatReadout("AP", "$mem / 100")
+        StatReadout("REV", "$level")
+        StatReadout("PWR", "$bat / 100" + if (t.charging) " ⚡" else "")
+        StatReadout("MEM", "$mem / 100")
         if (t.netType.isNotBlank()) StatReadout("NET", t.netType)
     }
 }
@@ -259,8 +261,8 @@ private fun StatReadout(label: String, value: String) {
 }
 
 /**
- * The top section nav: the HP/AP gauges over the STATS / ITEMS / DATA selector — the primary menu, at
- * the top of the console. HP = battery, AP = free memory.
+ * The top section nav: the PWR/MEM gauges over the OPS / NAV / LOGS / COMMS selector — the primary menu,
+ * at the top of the console. PWR = battery, MEM = free memory.
  */
 @Composable
 private fun PipTopNav(t: Telemetry, section: PipSection, onSection: (PipSection) -> Unit) {
@@ -268,8 +270,8 @@ private fun PipTopNav(t: Telemetry, section: PipSection, onSection: (PipSection)
     val freeMem = freeMemPercent(t)
     Column(Modifier.fillMaxWidth().background(Pip.bg).padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            StatGauge("HP", "$bat%", bat / 100f, Modifier.weight(1f))
-            StatGauge("AP", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
+            StatGauge("PWR", "$bat%", bat / 100f, Modifier.weight(1f))
+            StatGauge("MEM", "${freeMem.roundToInt()}%", freeMem / 100f, Modifier.weight(1f))
         }
         Row(
             Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -354,14 +356,14 @@ private fun UtilPill(label: String, onClick: (() -> Unit)?) {
     }
 }
 
-/** The collected-inventory categories for the ITEMS section, mapped to what the app actually saves. */
+/** The collected-inventory categories for the STORED tab, mapped to what the app actually saves. */
 private enum class ItemCat(val label: String) { TASKS("TASKS"), NOTES("NOTES"), OBJECTIVES("OBJECTIVES") }
 
 /**
- * The ITEMS section body — an inventory of the things the user is tracking in Pulse: open tasks (the
- * deliberate-goal layer J.A.R.V.I.S. captures), saved notes and tracked objectives, picked through a
- * category rail and listed as the canonical data rows. Read-only here; each item is curated from its
- * own screen (J.A.R.V.I.S. / NOTES / QUESTS). Favourite stations now live under the STATIONS tab.
+ * The LOGS section's STORED tab body — an inventory of the things the user is tracking in Pulse: open
+ * tasks (the deliberate-goal layer J.A.R.V.I.S. captures), saved notes and tracked objectives, picked
+ * through a category rail and listed as the canonical data rows. Read-only here; each item is curated
+ * from its own screen (J.A.R.V.I.S. / NOTES / OBJECTIVES). Favourite stations now live under the STATIONS tab.
  */
 @Composable
 private fun ItemsBody(
@@ -382,7 +384,7 @@ private fun ItemsBody(
         ItemCat.NOTES -> notes.size
         ItemCat.OBJECTIVES -> objectives.size
     }
-    val itemsAccent = sectionAccent(PipSection.ITEMS)
+    val logsAccent = sectionAccent(PipSection.LOGS)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
@@ -396,7 +398,7 @@ private fun ItemsBody(
                     ItemCat.NOTES -> notes.size
                     ItemCat.OBJECTIVES -> objectives.size
                 }
-                PipChip("${ic.label} [$n]", selected = ic == cat, onClick = { cat = ic }, accent = itemsAccent)
+                PipChip("${ic.label} [$n]", selected = ic == cat, onClick = { cat = ic }, accent = logsAccent)
             }
         }
         dev.mascwa.pulse.feature.common.PipHeader(cat.label, Modifier.padding(horizontal = 14.dp), trailing = "$count")
@@ -414,7 +416,7 @@ private fun ItemsBody(
                 if (notes.isEmpty()) EmptyItems("No notes saved. Add one in NOTES.")
                 else notes.forEach { n -> dev.mascwa.pulse.feature.common.PipDataRow(n.title.ifBlank { "Untitled" }, n.category.ifBlank { "—" }) }
             ItemCat.OBJECTIVES ->
-                if (objectives.isEmpty()) EmptyItems("No tracked objectives. Add one in QUESTS / MAP.")
+                if (objectives.isEmpty()) EmptyItems("No tracked objectives. Add one in OBJECTIVES / MAP.")
                 else objectives.forEach { o ->
                     val detail = o.whenLabel
                         ?: o.distanceMeters?.let { if (it >= 1000) "%.1f km".format(it / 1000) else "${it.roundToInt()} m" }
@@ -437,7 +439,7 @@ private fun EmptyItems(message: String) {
     )
 }
 
-/** One labelled HP/AP-style gauge: label + value over a thin rounded filled bar. */
+/** One labelled PWR/MEM-style gauge: label + value over a thin rounded filled bar. */
 @Composable
 private fun StatGauge(label: String, value: String, fraction: Float, modifier: Modifier) {
     Column(modifier) {

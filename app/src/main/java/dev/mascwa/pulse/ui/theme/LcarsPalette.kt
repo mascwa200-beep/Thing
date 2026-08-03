@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
  * flat black surfaces with bold orange as the primary accent and periwinkle/mauve/salmon/pale-gold as
  * the secondary accents. Provided over [LocalNightwire] across the entire TOOLS feed section (see
  * PulseApp) so every feed screen re-themes with no per-screen edits. Style/interaction-language homage
- * only — no franchise branding assets, same boundary the earlier Pip-Boy skin held to.
+ * only — no franchise branding assets.
  */
 val lcarsPalette = NightwirePalette(
     accent = Color(0xFFFF9C42),

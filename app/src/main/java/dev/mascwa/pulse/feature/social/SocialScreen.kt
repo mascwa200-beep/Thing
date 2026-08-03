@@ -54,7 +54,7 @@ fun SocialScreen(vm: SocialViewModel, onBack: (() -> Unit)? = null) {
 }
 
 /** The scaffold-free SOCIAL feed (tab rail + feed list) — hosted standalone in [SocialScreen] and as the
- *  SOCIAL sub-tab inside the PIP-BOY STATS page. */
+ *  SOCIAL sub-tab inside the LCARS COMMS section. */
 @Composable
 fun SocialBody(vm: SocialViewModel, modifier: Modifier = Modifier) {
     val tab by vm.tab.collectAsStateWithLifecycle()

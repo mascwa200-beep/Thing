@@ -54,7 +54,7 @@ fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
     }
 }
 
-/** The orbital feed body, scaffold-free for hosting as a PIP-BOY sub-tab. */
+/** The orbital feed body, scaffold-free for hosting as an LCARS sub-tab. */
 @Composable
 fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()

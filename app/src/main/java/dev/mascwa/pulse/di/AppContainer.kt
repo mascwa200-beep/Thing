@@ -103,7 +103,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)
     }
 
-    /** Library / NOTES: the user's notes + saved information, sorted into Fallout-style categories. */
+    /** Library / NOTES: the user's notes + saved information, sorted into named categories. */
     val notesStore: dev.mascwa.pulse.data.notes.NotesStore by lazy {
         dev.mascwa.pulse.data.notes.NotesStore(appContext, json)
     }
@@ -175,7 +175,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.radio.RadioBrowserRepository(http)
     }
 
-    /** PIP-BOY music: Spotify Web API (OAuth PKCE, tokens in settings). */
+    /** LCARS music: Spotify Web API (OAuth PKCE, tokens in settings). */
     val spotifyRepository: dev.mascwa.pulse.data.spotify.SpotifyRepository by lazy {
         dev.mascwa.pulse.data.spotify.SpotifyRepository(settingsRepository)
     }

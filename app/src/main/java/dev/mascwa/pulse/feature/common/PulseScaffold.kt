@@ -37,7 +37,7 @@ fun PulseScaffold(
                 val feedTabs = LocalFeedTabs.current
                 when {
                     topBarOverride != null -> topBarOverride()
-                    // Feed screens get the phosphor-green Pip-Boy header so the whole TOOLS top chrome
+                    // Feed screens get the LCARS header so the whole TOOLS top chrome
                     // (header + tabs) reads as one CRT terminal panel, not a Material bar over a green strip.
                     feedTabs != null -> PipBoyHeader(title, navigationIcon, actions)
                     else -> TopAppBar(
@@ -47,7 +47,7 @@ fun PulseScaffold(
                         scrollBehavior = scrollBehavior,
                     )
                 }
-                // Fallout Pip-Boy feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
+                // LCARS feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
                 feedTabs?.let { FeedTabBar(it) }
             }
         },

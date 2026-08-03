@@ -56,7 +56,7 @@ fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
 }
 
 /** The scaffold-free web-search feed (query box + engine picker) — hosted standalone in [SearchScreen]
- *  and as the SEARCH sub-tab inside the PIP-BOY STATS page. */
+ *  and as the SEARCH sub-tab inside the LCARS COMMS section. */
 @Composable
 fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
     val engine by vm.engine.collectAsStateWithLifecycle()

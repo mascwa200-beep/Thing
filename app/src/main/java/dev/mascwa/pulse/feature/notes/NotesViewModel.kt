@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
  */
 class NotesViewModel(private val store: NotesStore) : ViewModel() {
 
-    /** The categories the user can file an entry under (Fallout-flavoured). */
+    /** The categories the user can file an entry under. */
     val categories = listOf("GENERAL", "INTEL", "MISSION", "PERSONAL", "IDEAS")
 
     val notes: StateFlow<List<Note>> = store.notesFlow

@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Process-wide radio playback: one [ExoPlayer] that keeps playing after the PIP-BOY — or the whole
+ * Process-wide radio playback: one [ExoPlayer] that keeps playing after the LCARS console — or the whole
  * Activity — goes away, kept alive by [RadioService] (a `mediaPlayback` foreground service). The
  * ViewModel and the service notification both drive and observe this single object, so "what's on air"
  * has one source of truth. Defensive throughout — a bad URL / network drop lands in [Status.ERROR],

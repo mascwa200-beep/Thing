@@ -35,8 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -66,20 +64,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 /** Caution amber for App-Remote errors, readable against the green CRT. */
 private val Amber = Color(0xFFE0B341)
 
-/** A green-phosphor duotone (luminance → green) so album art reads as part of the Pip-Boy CRT instead
- *  of a jarring full-colour thumbnail. R/B carry a faint share for body; G carries the luminance. */
-private val PhosphorDuotone = ColorFilter.colorMatrix(
-    ColorMatrix(
-        floatArrayOf(
-            0.030f, 0.059f, 0.011f, 0f, 0f, // R = 0.10·luma
-            0.299f, 0.587f, 0.114f, 0f, 0f, // G = luma
-            0.090f, 0.176f, 0.034f, 0f, 0f, // B = 0.30·luma
-            0f, 0f, 0f, 1f, 0f,             // A = A
-        ),
-    ),
-)
-
-/** A framed, green-duotone album thumbnail — from an App Remote [bitmap] or a Web API [url]. */
+/** A framed, true-color album thumbnail — from an App Remote [bitmap] or a Web API [url]. */
 @Composable
 private fun AlbumArt(url: String?, bitmap: android.graphics.Bitmap?, c: NightwirePalette, side: Dp) {
     if (url == null && bitmap == null) return
@@ -89,17 +74,16 @@ private fun AlbumArt(url: String?, bitmap: android.graphics.Bitmap?, c: Nightwir
             .border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(4.dp)),
     ) {
         if (bitmap != null) {
-            Image(bitmap.asImageBitmap(), "Album art", Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop, colorFilter = PhosphorDuotone)
+            Image(bitmap.asImageBitmap(), "Album art", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else if (url != null) {
             AsyncImage(model = url, contentDescription = "Album art", modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop, colorFilter = PhosphorDuotone)
+                contentScale = ContentScale.Crop)
         }
     }
 }
 
 /**
- * The PIP-BOY MUSIC (Spotify) feed. Two layers in the Fallout green idiom:
+ * The LCARS MUSIC (Spotify) feed. Two layers:
  *  1) **PLAYER** — the App Remote "real player": connects to the installed Spotify app and plays/controls
  *     it in-app (the audio comes from the Spotify app). Works standalone.
  *  2) **ACCOUNT** — the Web API: link an account to search the catalogue and pick Connect devices. Search
