@@ -18,22 +18,30 @@ object Pulse {
         @Composable get() = LocalNightwire.current
 }
 
+/**
+ * [accent]/[amoledBlack] are vestigial — LCARS became the app's one fixed palette (see `PulseApp.kt`'s
+ * unconditional `LocalNightwire provides lcarsPalette`), so both the composition-local default here and the
+ * Material3 [darkColorScheme] below are built from [lcarsPalette] directly rather than the old
+ * accent-configurable [nightwirePalette]. Kept as parameters (not removed) so this stays a pure internal
+ * simplification — no call-site or Settings-screen change needed. Before this, the Material3 `scheme` was
+ * the ONE place still deriving from the old palette: any un-migrated default Material component (a system
+ * dialog, an un-overridden `TextField`/`ScrollableTabRow` default) would have picked up the wrong colours.
+ */
 @Composable
 fun NightwireTheme(
     accent: AccentColor,
     amoledBlack: Boolean,
     content: @Composable () -> Unit,
 ) {
-    val accentColor = accentColorOf(accent)
-    val palette = nightwirePalette(accentColor, amoledBlack)
+    val palette = lcarsPalette
 
     val scheme = darkColorScheme(
-        primary = accentColor,
-        onPrimary = Color(0xFF04121A),
-        primaryContainer = accentColor.copy(alpha = 0.16f),
-        onPrimaryContainer = accentColor,
+        primary = palette.accent,
+        onPrimary = palette.void,
+        primaryContainer = palette.accent.copy(alpha = 0.16f),
+        onPrimaryContainer = palette.accent,
         secondary = palette.magenta,
-        onSecondary = Color(0xFF1A0207),
+        onSecondary = palette.void,
         tertiary = palette.amber,
         background = palette.void,
         onBackground = palette.ink,

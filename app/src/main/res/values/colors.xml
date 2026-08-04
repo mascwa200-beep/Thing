@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- NIGHTWIRE shell colours (Compose drives the live palette at runtime). -->
-    <color name="nw_void">#05070D</color>
+    <!-- NIGHTWIRE shell colours (Compose drives the live palette at runtime). Matches lcarsPalette.void
+         exactly (pure black) so the earliest-visible frame (window/splash background, launcher icon) is
+         consistent with the in-app LCARS palette, not the retired cyberpunk one. -->
+    <color name="nw_void">#000000</color>
     <color name="nw_accent">#2DE2E6</color>
-    <color name="ic_launcher_background">#05070D</color>
+    <color name="ic_launcher_background">#000000</color>
     <!-- Cyberpunk 2077 notification palette -->
     <color name="cp_yellow">#FCEE0A</color>
     <color name="cp_red">#FF2A3C</color>

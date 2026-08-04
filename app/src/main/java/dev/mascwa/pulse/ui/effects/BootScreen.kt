@@ -16,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -70,42 +69,56 @@ private fun hex(r: Random, digits: Int): String =
 
 /**
  * The boot log is **procedurally generated, unique on every launch** — not a fixed list read from a
- * file. A fresh `Random` (seeded from the wall clock) fills secure power-on diagnostics with new hex
- * addresses, module names, seeds, sizes and pass/fail tokens, then a random handful of middle lines is
- * shuffled in, so the terminal "decrypts" a different roll each cold start. POST opens it; the operator
- * handoff always closes it.
+ * file. A fresh `Random` (seeded from the wall clock) fills main-computer power-on diagnostics with new
+ * hex addresses, subsystem names, seeds, sizes and status tokens, then a random handful of middle lines
+ * is shuffled in, so the terminal "decrypts" a different roll each cold start. POST opens it; the
+ * computer's own handoff line always closes it.
  */
 private fun generateBootLog(): List<String> {
     val r = Random(System.nanoTime() xor System.currentTimeMillis())
-    val modules = listOf("kern", "vault", "telemetry", "geo", "signals", "crypto", "sensorhub", "netd",
-        "rtc", "dma", "mmu", "sched", "gnss", "baseband", "watchdog", "keystore")
-    val sensors = listOf("inertial", "magnetometer", "barometric", "gyroscopic", "photometric", "proximity")
-    val subsystems = listOf("geospatial", "telemetry", "signals-intel", "navigation", "cryptographic", "diagnostics")
-    val volumes = listOf("vault", "core", "cache", "secure", "ramdisk", "enclave")
-    val ifaces = listOf("eth0", "wlan0", "rmnet0", "mesh0")
+    val modules = listOf("warpcore", "lifesupport", "navigation", "sensors", "comms", "shields", "impulse",
+        "deflector", "transporter", "replicator", "inertial", "structural", "environmental", "powergrid",
+        "computer", "medbay")
+    val sensors = listOf("inertial", "magnetometer", "gravimetric", "subspace", "thermal", "biometric")
+    val subsystems = listOf("navigation", "sensors", "communications", "life-support", "tactical", "engineering")
+    val volumes = listOf("core", "library", "records", "archive", "banks", "database")
+    val ifaces = listOf("subspace0", "shipnet0", "deflector0", "relay0")
     val ok = listOf("OK", "PASS", "READY", "NOMINAL", "ONLINE")
 
     val head = mutableListOf(
-        "> POWER-ON SELF TEST .............. ${ok.random(r)}",
-        "boot rom 0x${hex(r, 8)} · stage-2 loader 0x${hex(r, 4)}",
-        "secure boot chain verified — ${2 + r.nextInt(4)} signatures valid",
-        "mounting encrypted volume /${volumes.random(r)} ... ${ok.random(r)}",
-        "crypto online (AES-256-GCM · RNG seeded 0x${hex(r, 8)})",
+        "> MAIN COMPUTER CORE — POWER-ON SELF TEST .... ${ok.random(r)}",
+        "isolinear core 0x${hex(r, 8)} · LCARS loader 0x${hex(r, 4)}",
+        "computer core verified — ${2 + r.nextInt(4)} authorization codes accepted",
+        "mounting library computer banks /${volumes.random(r)} ... ${ok.random(r)}",
+        "encryption grid online (rotating cipher · seed 0x${hex(r, 8)})",
     )
     val mids = mutableListOf<String>()
     repeat(3 + r.nextInt(3)) { mids += "init ${modules.random(r)} @ 0x${hex(r, 8)} ... ${ok.random(r)}" }
     mids += "calibrating ${sensors.random(r)} array (${256 + r.nextInt(2048)} samples)"
-    mids += "runtime heap allocated ${8192 + r.nextInt(8192)} MB"
-    mids += "link ${ifaces.random(r)} up — ${50 + r.nextInt(950)} Mbit/s"
+    mids += "isolinear storage allocated ${8 + r.nextInt(24)} kiloquads"
+    mids += "${ifaces.random(r)} up — ${50 + r.nextInt(950)} kiloquads/sec"
     mids += "${1 shl (10 + r.nextInt(6))} sectors verified · CRC 0x${hex(r, 8)}"
     mids += "loading ${subsystems.random(r)} subsystem ... ${ok.random(r)}"
     mids.shuffle(r)
 
     return head + mids.take(4 + r.nextInt(3)) +
         listOf(
-            "system integrity self-check ....... ${ok.random(r)}",
-            "all subsystems nominal — operator handoff",
+            "computer core diagnostic complete ....... ${ok.random(r)}",
+            "all systems nominal — computer interface online",
         )
+}
+
+/** A one-time, deterministic-from-the-real-clock stardate flourish for the boot reveal — advances with
+ *  the wall clock like the show's own convention, not a canon-precise formula (nobody's fact-checking the
+ *  exact math; it just needs to read like a stardate). */
+private fun starfleetStardate(): String {
+    val cal = java.util.Calendar.getInstance()
+    val year = cal.get(java.util.Calendar.YEAR)
+    val dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR)
+    val frac = (dayOfYear * 1000L) / 365
+    val base = (year % 100) * 1000 + frac
+    val tenths = cal.get(java.util.Calendar.HOUR_OF_DAY) * 10 / 24
+    return "STARDATE %d.%d".format(base, tenths)
 }
 
 // Deliberately unhurried (~half the old pace) so the message can actually be read.
@@ -114,10 +127,10 @@ private const val MOTE_COUNT = 800
 private const val TAU = 6.2831855f
 
 /**
- * Cinematic secure-boot sequence shown once per launch. A swirling field of motes is drawn
- * inward into a waking eye / seal while an escalating "clearance" arc fills and the power-on
- * diagnostic log decrypts in — the contractor terminal bringing its subsystems up, then naming
- * itself. Deliberately **unskippable** (no tap handler), then fades into the app. All-procedural
+ * Cinematic main-computer boot sequence shown once per launch. A swirling field of motes is drawn
+ * inward into a waking computer-core aperture while an escalating "clearance" arc fills and the
+ * power-on diagnostic log decrypts in — the ship's main computer bringing its subsystems online, then
+ * naming itself. Deliberately **unskippable** (no tap handler), then fades into the app. All-procedural
  * vector + analytic motes — kilobytes of state, well under the 2 MB budget.
  */
 @Composable
@@ -137,6 +150,7 @@ fun BootScreen(onFinished: () -> Unit) {
 
     // Fresh, unique boot log generated once for this launch.
     val bootLines = remember { generateBootLog() }
+    val stardate = remember { starfleetStardate() }
 
     val motes = remember {
         val r = Random(20260619)
@@ -165,14 +179,17 @@ fun BootScreen(onFinished: () -> Unit) {
     }
 
     AnimatedVisibility(visible = visible, enter = EnterTransition.None, exit = fadeOut(tween(580))) {
-        BootContent(c, progress.value, swirl, pulse, motes, bootLines)
+        BootContent(c, progress.value, swirl, pulse, motes, bootLines, stardate)
     }
 }
 
 @Composable
-private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>, bootLines: List<String>) {
+private fun BootContent(
+    c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>, bootLines: List<String>,
+    stardate: String,
+) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Canvas(Modifier.fillMaxSize()) { drawOmenField(c, p, swirl, pulse, motes) }
+        Canvas(Modifier.fillMaxSize()) { drawComputerCoreField(c, p, swirl, pulse, motes) }
 
         // Force the decrypt effect regardless of the user's reduced-motion setting — the
         // cold-open is a deliberate, one-time cinematic.
@@ -202,7 +219,7 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                 }
             }
 
-            // The reveal — the contractor naming itself, over the open eye.
+            // The reveal — the main computer naming itself, over the open aperture.
             val brand = ((p - 0.82f) / 0.16f).coerceIn(0f, 1f)
             if (brand > 0f) {
                 Column(
@@ -210,15 +227,21 @@ private fun BootContent(c: NightwirePalette, p: Float, swirl: Float, pulse: Floa
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Row {
-                        Text("ARGUS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = 2.sp, color = c.ink.copy(alpha = brand))
-                        Text(" DYNAMICS", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = 2.sp, color = c.accent.copy(alpha = brand))
-                    }
                     Text(
-                        "ADVANCED SIGNALS DIVISION",
-                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 3.sp,
-                        color = c.sky.copy(alpha = 0.85f * brand),
+                        "L C A R S", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp,
+                        letterSpacing = 6.sp, color = c.accent.copy(alpha = brand),
+                    )
+                    Text(
+                        "LIBRARY COMPUTER ACCESS / RETRIEVAL SYSTEM",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 2.sp,
+                        color = c.ink.copy(alpha = 0.85f * brand),
                         modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Text(
+                        stardate,
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 3.sp,
+                        color = c.sky.copy(alpha = 0.75f * brand),
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
@@ -234,7 +257,7 @@ private fun bootLineColor(c: NightwirePalette, i: Int, total: Int): Color = when
     else -> c.ink2.copy(alpha = 0.92f)
 }
 
-private fun DrawScope.drawOmenField(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>) {
+private fun DrawScope.drawComputerCoreField(c: NightwirePalette, p: Float, swirl: Float, pulse: Float, motes: List<Mote>) {
     val w = size.width
     val h = size.height
     // The eye/seal sits in the UPPER portion so the boot-log band below it never overlaps it.
