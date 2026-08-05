@@ -60,4 +60,27 @@ object NewsExplainers {
             "can just mean nobody on those three platforms happened to post about it recently, not that no " +
             "one anywhere is talking about it.",
     )
+
+    /** What the MARKET REACTION strip means and its honest limits — a headline-reading heuristic, not advice. */
+    fun market(impact: ImpactLevel, links: List<MarketLink>): Explainer {
+        val coverage = if (links.isEmpty()) {
+            "No market ties were found in this story's own wording."
+        } else {
+            "This story's wording ties to: ${links.joinToString(", ") { it.market }}."
+        }
+        val headline = if (impact == ImpactLevel.NONE) {
+            "MARKET REACTION — what this measures"
+        } else {
+            "MARKET REACTION — ${impact.label.lowercase()} impact"
+        }
+        return Explainer(
+            headline,
+            "$coverage Pulse matches the headline's own words against a fixed list of ~40 markets and sectors, " +
+                "then reads whether the wording states or clearly implies a move up or down — the same " +
+                "\"reality moves the market\" read as Trading Places, done with keyword matching, not financial " +
+                "modeling. A ▲/▼ shown WITH a percentage is a real live quote; a bare ▲/▼ is only the heuristic " +
+                "direction. This is not financial advice — treat it as \"markets worth watching,\" never a " +
+                "signal to act on.",
+        )
+    }
 }
