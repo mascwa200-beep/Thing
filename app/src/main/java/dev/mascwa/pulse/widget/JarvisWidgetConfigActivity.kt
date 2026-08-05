@@ -74,7 +74,7 @@ private fun ConfigUi(onPick: (JarvisWidgetMode) -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("J.A.R.V.I.S. WIDGET", color = Color(0xFF2DE2E6), fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.sp)
+        Text("COMPUTER WIDGET", color = Color(0xFF2DE2E6), fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(6.dp))
         Text("Choose a look", color = Color(0xFFA9B8CE), fontSize = 13.sp)
         Spacer(Modifier.height(24.dp))

@@ -34,11 +34,11 @@ object JarvisWidgetPrefs {
     fun clear(c: Context, id: Int) = prefs(c).edit().remove("mode_$id").apply()
 }
 
-/** The four J.A.R.V.I.S. widgets. [route] is where a tap lands in the app. */
+/** The four Computer widgets. [route] is where a tap lands in the app. */
 enum class JarvisWidgetType(val title: String, val route: String) {
-    STATUS("J.A.R.V.I.S.", "jarvis"),
+    STATUS("COMPUTER", "jarvis"),
     OBJECTIVE("OBJECTIVE", "nav"),
-    FINDING("J.A.R.V.I.S.", "jarvis"),
+    FINDING("COMPUTER", "jarvis"),
     BRIEF("BRIEF", "home");
 
     companion object {

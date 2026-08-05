@@ -62,7 +62,7 @@ class HudPresentation(context: Context, display: Display) : Presentation(context
             nav?.text = navText?.takeIf { it.isNotBlank() } ?: ""
             nav?.visibility = if (navText.isNullOrBlank()) View.GONE else View.VISIBLE
             brief?.text = briefText
-            reply?.text = replyText?.takeIf { it.isNotBlank() }?.let { "J.A.R.V.I.S.: $it" } ?: ""
+            reply?.text = replyText?.takeIf { it.isNotBlank() }?.let { "COMPUTER: $it" } ?: ""
             reply?.visibility = if (replyText.isNullOrBlank()) View.GONE else View.VISIBLE
         }
     }

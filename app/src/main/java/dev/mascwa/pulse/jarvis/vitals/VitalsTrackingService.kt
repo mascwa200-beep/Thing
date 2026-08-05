@@ -185,7 +185,7 @@ class VitalsTrackingService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setContentTitle("J.A.R.V.I.S. Vitals")
+            .setContentTitle("Computer Vitals")
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)
@@ -207,11 +207,11 @@ class VitalsTrackingService : Service() {
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_CHECKIN)
             .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setContentTitle("J.A.R.V.I.S. · everything OK?")
+            .setContentTitle("Computer · everything OK?")
             .setContentText("Heart rate jumped to $bpm bpm without movement. Tap if you need help.")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Heart rate jumped to $bpm bpm with no rise in movement. Tap to open J.A.R.V.I.S. " +
+                    "Heart rate jumped to $bpm bpm with no rise in movement. Tap to open the Computer " +
                         "if you'd like a check-in or to reach an emergency contact.",
                 ),
             )

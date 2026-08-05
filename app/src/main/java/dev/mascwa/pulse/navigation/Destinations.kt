@@ -89,7 +89,7 @@ val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.NEWS, "NEWS", Icons.Filled.Article, Icons.Outlined.Article),
     TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
     TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
-    TopDestination(Routes.JARVIS, "JARVIS", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
+    TopDestination(Routes.JARVIS, "COMPUTER", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
     // TOOLS is a pseudo-destination: it opens the LCARS feed tabs (FEED_HOME) and highlights on
     // any feed route — handled specially in PulseApp. TACNET (the LCARS screen) is the feed home.
     TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),

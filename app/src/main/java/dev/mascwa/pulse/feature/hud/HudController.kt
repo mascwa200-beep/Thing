@@ -50,7 +50,7 @@ class HudController(
     /** Heading source for the waypoint nav card; started/stopped with the HUD. */
     private val compass = container.newCompassController()
 
-    @Volatile private var brief: String = "J.A.R.V.I.S. online, sir."
+    @Volatile private var brief: String = "Computer online."
     @Volatile private var latestReply: String? = null
     // Active-waypoint guidance state (all touched on the Main dispatcher).
     @Volatile private var navLine: String? = null

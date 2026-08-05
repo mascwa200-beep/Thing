@@ -582,7 +582,7 @@ fun SettingsScreen(
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
                     PrefSwitch(
                         "Oracle foresight",
-                        subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
+                        subtitle = "The Computer reads every signal (calendar, location, weather, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
                         checked = s.notifications.oracleEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
                     PrefSwitch(
@@ -976,13 +976,13 @@ fun SettingsScreen(
                     PrefClickable(
                         "Clear usage data",
                         subtitle = "Forget the on-device usage history & real-time activity log that power " +
-                            "J.A.R.V.I.S.'s tailored tips and self-awareness. Never leaves your device.",
+                            "the Computer's tailored tips and self-awareness. Never leaves your device.",
                         onClick = { vm.clearUsageData() },
                     )
                     PrefClickable(
                         "Reset learned reflexes",
                         subtitle = "Wipe the virtual cerebellum — the practiced skills & reliability " +
-                            "J.A.R.V.I.S. has learned from its own actions. It relearns from scratch.",
+                            "the Computer has learned from its own actions. It relearns from scratch.",
                         onClick = { vm.resetReflexes() },
                     )
                     PrefClickable(

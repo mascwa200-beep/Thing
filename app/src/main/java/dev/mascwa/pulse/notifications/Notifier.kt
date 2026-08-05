@@ -131,9 +131,9 @@ class Notifier(private val context: Context) {
         safeNotify(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID, notification)
     }
 
-    /** J.A.R.V.I.S. has curated a finding and is ready to talk about it — opens the console. */
+    /** The Computer has curated a finding and is ready to talk about it — opens the console. */
     fun notifyFinding(id: Int, title: String, body: String) =
-        post(NotificationChannels.DIGEST, id, "J.A.R.V.I.S.", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)
+        post(NotificationChannels.DIGEST, id, "COMPUTER", title, body, "jarvis", NotificationCompat.PRIORITY_DEFAULT)
 
     /** Trusted Network Mode status (e.g. needs Device-Owner provisioning) — opens Settings. */
     fun notifySecurity(id: Int, title: String, body: String) =

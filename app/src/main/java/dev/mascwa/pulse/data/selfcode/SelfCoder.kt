@@ -117,13 +117,13 @@ class SelfCoder(
             repo.createBranch(branch, base)
             files.forEach { f ->
                 val p = f.path.trim().trimStart('/')
-                repo.putFile(p, f.content, "J.A.R.V.I.S.: $goal", branch, repo.fileSha(p, "main"))
+                repo.putFile(p, f.content, "Computer: $goal", branch, repo.fileSha(p, "main"))
             }
             val fileList = files.joinToString("\n") { "- `${it.path}`" + if (it.isNew) " (new)" else "" }
             val pr = repo.openPr(
-                title = "J.A.R.V.I.S.: ${goal.take(60)}",
+                title = "Computer: ${goal.take(60)}",
                 head = branch,
-                body = "Autonomous change drafted by J.A.R.V.I.S.\n\n**Goal:** $goal\n\n**Files:**\n$fileList\n\n" +
+                body = "Autonomous change drafted by the Computer.\n\n**Goal:** $goal\n\n**Files:**\n$fileList\n\n" +
                     "CI must pass before this can merge.",
             )
             "Opened PR #${pr.number} — ${pr.url}. CI is building it now; when it's green you'll be prompted " +

@@ -531,7 +531,7 @@ class ActiveMatrixService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setContentTitle("J.A.R.V.I.S. Matrix")
+            .setContentTitle("Computer · Active Matrix")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setOngoing(true)

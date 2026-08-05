@@ -15,7 +15,7 @@ object FeatureCatalog {
         FeatureMeta(Routes.NEWS, "News", "Headlines from free, public feeds."),
         FeatureMeta(Routes.MARKETS, "Markets", "Indices, stocks, FX, commodities & crypto."),
         FeatureMeta(Routes.WEATHER, "Weather", "Forecast, feels-like & air quality."),
-        FeatureMeta(Routes.JARVIS, "J.A.R.V.I.S.", "Your private, on-device assistant — ask it anything."),
+        FeatureMeta(Routes.JARVIS, "Computer", "Your private, on-device assistant — ask it anything."),
         FeatureMeta(Routes.SPACE_WX, "Space Weather", "Aurora odds, Kp & solar storms."),
         FeatureMeta(Routes.NAV, "Nav", "A 3D, heading-up cyber-map with a trail."),
         FeatureMeta(Routes.OBJECTIVES, "Objectives", "Track waypoints & calendar missions."),

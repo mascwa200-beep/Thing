@@ -52,7 +52,7 @@ class RefreshWorker(
                 if (info != null && info.versionCode > settings.lastUpdateNotifiedCode) {
                     notifier.notifyUpdate(
                         id = NotifId.UPDATE,
-                        title = "J.A.R.V.I.S. update available",
+                        title = "Computer update available",
                         body = "Build #${info.versionCode} is ready — tap to download & install.",
                     )
                     container.settingsRepository.update { it.copy(lastUpdateNotifiedCode = info.versionCode) }
@@ -60,7 +60,7 @@ class RefreshWorker(
             }
         }
 
-        // --- Self-coding: auto-merge J.A.R.V.I.S.'s own PRs once CI is green (opt-in) ---
+        // --- Self-coding: auto-merge the Computer's own PRs once CI is green (opt-in) ---
         val jcfg = settings.jarvis
         if (jcfg.selfCodingEnabled && jcfg.selfCodeAutoMerge) {
             runCatching {
@@ -70,7 +70,7 @@ class RefreshWorker(
                         if (container.gitHubRepo.merge(pr.number)) {
                             notifier.notifyUpdate(
                                 id = 7402 + (pr.number and 0xFF),
-                                title = "J.A.R.V.I.S. shipped a change",
+                                title = "Computer shipped a change",
                                 body = "Merged PR #${pr.number} — a new build will follow; you'll be prompted to install it.",
                             )
                         }
@@ -79,14 +79,14 @@ class RefreshWorker(
             }
         }
 
-        // --- J.A.R.V.I.S. autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
+        // --- Computer autonomous curiosity (opt-in, cloud-gated, throttled): research a standing
         // interest or the device itself, record ONE finding via the agent's `finding` tool, then notify. ---
         if (jcfg.autonomousCuriosity && settings.jarvis.cloudActive) {
             runCatching {
                 val now = System.currentTimeMillis()
                 run {
                     // Rotate over the standing interests + a "your own device" subject so it covers both the
-                    // owner's orders and J.A.R.V.I.S.'s own substrate over time.
+                    // owner's orders and the Computer's own substrate over time.
                     val subjects = container.interestStore.all().map { it.topic } +
                         "your own device — its sensors, capabilities and settings (your substrate)"
                     val subject = subjects[settings.curiosityIndex.mod(subjects.size)]
@@ -103,7 +103,7 @@ class RefreshWorker(
                         val latest = container.findingStore.findingsFlow.value.firstOrNull { !it.seen }
                         notifier.notifyFinding(
                             id = NotifId.FINDING,
-                            title = "J.A.R.V.I.S. has a finding",
+                            title = "Computer has a finding",
                             body = latest?.headline ?: "I came across something — ready when you are.",
                         )
                     }

@@ -298,7 +298,7 @@ private fun AssistantCard(status: String, pendingCode: Int, onOpen: () -> Unit) 
             Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
             Column(Modifier.padding(start = 10.dp).weight(1f)) {
                 Text(
-                    "J.A.R.V.I.S.",
+                    "COMPUTER",
                     fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 2.sp,
                     fontWeight = FontWeight.Bold, color = c.accent,
                 )
@@ -396,7 +396,7 @@ private fun ForYouCard(
         padding = PaddingValues(0.dp),
     ) {
         Column(Modifier.fillMaxWidth()) {
-            // J.A.R.V.I.S. HUD header (cyan, Stark-style).
+            // Computer HUD header — its own distinguishing hue within the one app-wide LCARS palette.
             Row(
                 Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -404,7 +404,7 @@ private fun ForYouCard(
             ) {
                 Text("◆", fontFamily = JetBrainsMono, fontSize = 11.sp, color = hud)
                 DecryptText(
-                    text = "J.A.R.V.I.S.",
+                    text = "COMPUTER",
                     fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
                     letterSpacing = 3.sp, color = hud,
                 )
