@@ -33,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.notes.Note
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -70,7 +72,7 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
                 }
                 Box(
                     Modifier.padding(top = 12.dp)
-                        .border(1.dp, c.accent, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                        .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                         .clickable {
                             if (title.isNotBlank() || body.isNotBlank()) {
                                 vm.add(title, body, category)
@@ -136,9 +138,9 @@ private fun NoteRow(note: Note, c: NightwirePalette, onDelete: () -> Unit) {
 @Composable
 private fun CatChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
     Box(
-        Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+        Modifier.clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .background(if (selected) c.accent.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (selected) c.accent else c.line, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) c.accent else c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .clickable { onClick() }
             .padding(horizontal = 11.dp, vertical = 6.dp),
     ) {
@@ -152,7 +154,7 @@ private fun CatChip(label: String, selected: Boolean, c: NightwirePalette, onCli
 private fun NoteField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette, single: Boolean = true) {
     Box(
         Modifier.fillMaxWidth()
-            .border(1.dp, c.line, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart))
             .padding(horizontal = 10.dp, vertical = 9.dp),
     ) {
         if (value.isEmpty()) {

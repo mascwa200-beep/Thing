@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -54,8 +53,10 @@ import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -68,10 +69,11 @@ private val Amber = Color(0xFFE0B341)
 @Composable
 private fun AlbumArt(url: String?, bitmap: android.graphics.Bitmap?, c: NightwirePalette, side: Dp) {
     if (url == null && bitmap == null) return
+    val shape = lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)
     Box(
-        Modifier.size(side).clip(RoundedCornerShape(4.dp))
+        Modifier.size(side).clip(shape)
             .background(c.accent.copy(alpha = 0.06f))
-            .border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(4.dp)),
+            .border(1.dp, c.accent.copy(alpha = 0.5f), shape),
     ) {
         if (bitmap != null) {
             Image(bitmap.asImageBitmap(), "Album art", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -441,8 +443,9 @@ private fun StatusLine(text: String, c: NightwirePalette) {
 
 @Composable
 private fun PipButton(label: String, c: NightwirePalette, modifier: Modifier, onClick: () -> Unit) {
+    val shape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)
     Box(
-        modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, c.accent, RoundedCornerShape(6.dp))
+        modifier.clip(shape).border(1.dp, c.accent, shape)
             .clickable { onClick() }.padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -454,7 +457,7 @@ private fun PipButton(label: String, c: NightwirePalette, modifier: Modifier, on
 @Composable
 private fun SpotifyField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette) {
     Box(
-        Modifier.fillMaxWidth().border(1.dp, c.line, RoundedCornerShape(4.dp)).padding(horizontal = 10.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth().border(1.dp, c.line, lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)).padding(horizontal = 10.dp, vertical = 9.dp),
     ) {
         if (value.isEmpty()) Text(placeholder, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
         BasicTextField(

@@ -51,8 +51,10 @@ import dev.mascwa.pulse.data.weather.WeatherCode
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.mascwa.pulse.feature.common.SectionBar
@@ -262,7 +264,7 @@ private fun IconChip(icon: androidx.compose.ui.graphics.vector.ImageVector, cd: 
     Box(
         Modifier
             .size(34.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart))
             .background(c.panel)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
@@ -475,7 +477,7 @@ private fun BreakingHero(article: Article, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(top = 14.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart))
             .background(
                 Brush.linearGradient(listOf(c.magenta.copy(alpha = 0.18f), c.accent.copy(alpha = 0.12f), c.panel)),
             )
@@ -509,7 +511,7 @@ private fun BreakingHero(article: Article, onClick: () -> Unit) {
 private fun Tag(text: String, color: androidx.compose.ui.graphics.Color, filled: Boolean) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(5.dp))
+            .clip(lcarsBlockShape(sweep = 5.dp, corner = LcarsCorner.TopStart))
             .background(if (filled) color else color.copy(alpha = 0.12f))
             .padding(horizontal = 7.dp, vertical = 3.dp),
     ) {

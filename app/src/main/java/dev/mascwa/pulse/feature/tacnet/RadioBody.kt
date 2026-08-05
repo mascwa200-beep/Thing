@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,8 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.radio.RadioStation
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -251,11 +252,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 /** An LCARS country selector pill for the WORLD browse — bright/filled when selected. */
 @Composable
 private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    val shape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)
     Box(
         Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(shape)
             .background(if (selected) c.accent.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (selected) c.accent else c.line, RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) c.accent else c.line, shape)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
@@ -300,9 +302,9 @@ private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) ->
                 color = if (on) c.void else c.ink2,
                 modifier = Modifier
                     .padding(start = 6.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .background(if (on) c.accent else c.panel)
-                    .border(1.dp, if (on) c.accent else c.line, RoundedCornerShape(6.dp))
+                    .border(1.dp, if (on) c.accent else c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(mins) }
                     .padding(horizontal = 9.dp, vertical = 4.dp),
             )
