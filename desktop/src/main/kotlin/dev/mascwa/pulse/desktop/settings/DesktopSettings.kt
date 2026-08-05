@@ -73,15 +73,6 @@ class DesktopSettingsStore(
         scheduleFlush()
     }
 
-    /** Fire-and-forget save, e.g. on window close — uses this store's own background [scope] rather than
-     *  Compose's, so it isn't gated on the composition tearing down as the window closes. */
-    fun saveInBackground(transform: (DesktopSettings) -> DesktopSettings) {
-        scope.launch {
-            update(transform)
-            flushNow()
-        }
-    }
-
     /** Force a buffered write to disk now. */
     suspend fun flushNow() {
         flushJob?.cancel()
@@ -96,14 +87,21 @@ class DesktopSettingsStore(
         }
     }
 
+    /** The disk IO runs INSIDE the lock (not just the snapshot read) so two flushes can never race on the
+     *  same `.tmp` sibling file — [flushNow]'s `flushJob?.cancel()` can't interrupt a job that's already
+     *  past its `delay()` and into this blocking section, so without this the debounced and forced paths
+     *  could both reach here at once. A small local JSON write is fast enough that serializing it is a
+     *  fine trade for never risking a torn/interleaved write. */
     private suspend fun flush() {
-        val snapshot = mutex.withLock { cached } ?: return
-        withContext(Dispatchers.IO) {
-            runCatching {
-                path.parent?.let(Files::createDirectories)
-                val tmp = path.resolveSibling(path.fileName.toString() + ".tmp")
-                Files.writeString(tmp, json.encodeToString(DesktopSettings.serializer(), snapshot))
-                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING)
+        mutex.withLock {
+            val snapshot = cached ?: return@withLock
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    path.parent?.let(Files::createDirectories)
+                    val tmp = path.resolveSibling(path.fileName.toString() + ".tmp")
+                    Files.writeString(tmp, json.encodeToString(DesktopSettings.serializer(), snapshot))
+                    Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING)
+                }
             }
         }
     }

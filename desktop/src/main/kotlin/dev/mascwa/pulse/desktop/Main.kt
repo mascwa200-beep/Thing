@@ -19,11 +19,19 @@ fun main() {
         val state = rememberWindowState(size = DpSize(initial.windowWidth.dp, initial.windowHeight.dp))
         Window(
             onCloseRequest = {
-                settingsStore.saveInBackground {
-                    it.copy(
-                        windowWidth = state.size.width.value.toInt(),
-                        windowHeight = state.size.height.value.toInt(),
-                    )
+                // Blocking, not fire-and-forget: Compose Desktop's exitApplication() calls
+                // System.exit(0) right after this returns, with no shutdown hook to wait for a
+                // background save — a fire-and-forget write would race the process dying. The
+                // write is a few bytes of local JSON, so blocking the AWT event thread for it
+                // here is negligible.
+                runBlocking {
+                    settingsStore.update {
+                        it.copy(
+                            windowWidth = state.size.width.value.toInt(),
+                            windowHeight = state.size.height.value.toInt(),
+                        )
+                    }
+                    settingsStore.flushNow()
                 }
                 exitApplication()
             },
