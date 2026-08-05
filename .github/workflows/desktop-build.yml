@@ -1,0 +1,41 @@
+name: Desktop Build
+
+# Compiles/tests the :desktop module only — a separate workflow (own file, own job) from android-build.yml
+# so this genuinely-separate, still-early module never slows down or risks the Android build's own gate.
+# A Windows packaging job (packageMsi/packageExe) is a follow-up, added once the module has a real screen
+# worth packaging (Phase B+) rather than testing an empty shell's installer today.
+on:
+  push:
+    paths:
+      - "desktop/**"
+      - "settings.gradle.kts"
+      - "build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/desktop-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build :desktop
+        run: ./gradlew :desktop:build --stacktrace --no-daemon
