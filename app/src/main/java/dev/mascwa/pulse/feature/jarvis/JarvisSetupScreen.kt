@@ -47,8 +47,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
 import dev.mascwa.pulse.core.util.openUrl
@@ -609,8 +611,8 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
         MODEL_PRESETS.forEach { preset ->
             Column(
                 Modifier
-                    .border(1.dp, c.lineSoft, RoundedCornerShape(6.dp))
-                    .background(c.muted.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                    .border(1.dp, c.lineSoft, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(c.muted.copy(alpha = 0.05f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onPick(preset.url) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -631,8 +633,8 @@ private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -679,8 +681,8 @@ private fun CuriositySelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -699,8 +701,8 @@ private fun CloudProviderSelector(selected: CloudProvider, onSelect: (CloudProvi
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(provider) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -720,8 +722,8 @@ private fun MaxTokensSelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -740,8 +742,8 @@ private fun ChatFormatSelector(selected: ChatFormat, onSelect: (ChatFormat) -> U
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(format) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -859,8 +861,8 @@ private fun NeonButton(text: String, enabled: Boolean, color: Color, onClick: ()
     val tint = if (enabled) color else Pulse.colors.muted
     Box(
         Modifier
-            .border(1.dp, tint.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-            .background(tint.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+            .border(1.dp, tint.copy(alpha = 0.6f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(tint.copy(alpha = 0.08f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {

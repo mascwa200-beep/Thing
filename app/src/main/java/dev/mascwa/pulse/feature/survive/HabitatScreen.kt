@@ -49,8 +49,10 @@ import dev.mascwa.pulse.core.telemetry.DangerLevel
 import dev.mascwa.pulse.core.telemetry.Habitat
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -163,11 +165,12 @@ private fun HabitatScope(habitat: Habitat, selectedId: String?, onSelect: (Strin
     val accent = c.accent
     val raise = c.raise
     val ink = c.ink
+    val scopeShape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
     Box(
         Modifier.fillMaxWidth().height(300.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(scopeShape)
             .background(raise.copy(alpha = 0.35f))
-            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+            .border(1.dp, accent.copy(alpha = 0.4f), scopeShape),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
@@ -216,7 +219,7 @@ private fun HabitatScope(habitat: Habitat, selectedId: String?, onSelect: (Strin
             if (sel != null) {
                 Box(
                     Modifier.align(Alignment.TopStart).padding(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart))
                         .background(Color.Black.copy(alpha = 0.55f))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
@@ -245,7 +248,7 @@ private fun DangerLegend() {
     ) {
         listOf(0 to "Calm", 2 to "Caution", 3 to "Danger", 4 to "Deadly").forEach { (d, label) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).clip(RoundedCornerShape(2.dp)).background(dangerColor(d)))
+                Box(Modifier.size(9.dp).clip(lcarsBlockShape(sweep = 2.dp, corner = LcarsCorner.TopStart)).background(dangerColor(d)))
                 Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp,
                     color = Pulse.colors.muted, modifier = Modifier.padding(start = 4.dp))
             }
@@ -261,7 +264,7 @@ private fun DangerBanner(level: DangerLevel) {
         DangerLevel.MODERATE -> dangerColor(2); DangerLevel.HIGH -> dangerColor(3); DangerLevel.SEVERE -> dangerColor(4)
     }
     Row(
-        Modifier.padding(top = 8.dp).clip(RoundedCornerShape(4.dp))
+        Modifier.padding(top = 8.dp).clip(lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart))
             .background(col.copy(alpha = 0.14f)).padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -282,7 +285,7 @@ private fun AnimalCard(a: Animal, expanded: Boolean, onClick: () -> Unit) {
     LcarsFrame(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(col))
+                Box(Modifier.size(10.dp).clip(lcarsBlockShape(sweep = 2.dp, corner = LcarsCorner.TopStart)).background(col))
                 Column(Modifier.weight(1f).padding(start = 8.dp)) {
                     Text(a.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                     Text(

@@ -73,9 +73,11 @@ import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.NavGuidance
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.feature.objectives.ObjectivesViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -778,12 +780,13 @@ private fun MapControlButton(
     onClick: () -> Unit,
 ) {
     val tint = if (active) c.accent else c.ink
+    val shape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
     Box(
         Modifier
             .size(44.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(shape)
             .background(c.panel.copy(alpha = 0.82f))
-            .border(1.dp, tint, RoundedCornerShape(8.dp))
+            .border(1.dp, tint, shape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -892,12 +895,13 @@ private fun PoiDetailCard(
             poi.address?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
             }
+            val buttonShape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(buttonShape)
                     .background(c.amber.copy(alpha = 0.16f))
-                    .border(1.dp, c.amber, RoundedCornerShape(8.dp))
+                    .border(1.dp, c.amber, buttonShape)
                     .clickable(onClick = onSetWaypoint)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -905,8 +909,8 @@ private fun PoiDetailCard(
             }
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, c.sky, RoundedCornerShape(8.dp))
+                    .clip(buttonShape)
+                    .border(1.dp, c.sky, buttonShape)
                     .clickable { openLocationExternally(context, poi.name, poi.latitude, poi.longitude) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -954,12 +958,13 @@ private fun WaypointDetailCard(
             waypoint.note?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 2.dp))
             }
+            val buttonShape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(buttonShape)
                         .background((if (active) c.amber else c.accent).copy(alpha = 0.16f))
-                        .border(1.dp, if (active) c.amber else c.accent, RoundedCornerShape(8.dp))
+                        .border(1.dp, if (active) c.amber else c.accent, buttonShape)
                         .clickable(enabled = !active, onClick = onTrack)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
@@ -971,8 +976,8 @@ private fun WaypointDetailCard(
                 }
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, c.sky, RoundedCornerShape(8.dp))
+                        .clip(buttonShape)
+                        .border(1.dp, c.sky, buttonShape)
                         .clickable { openLocationExternally(context, waypoint.label, waypoint.latitude, waypoint.longitude) }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
@@ -980,8 +985,8 @@ private fun WaypointDetailCard(
                 }
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, c.muted, RoundedCornerShape(8.dp))
+                        .clip(buttonShape)
+                        .border(1.dp, c.muted, buttonShape)
                         .clickable(onClick = onRemove)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
@@ -1021,15 +1026,16 @@ private fun FilterBar(
     onToggle: (NavCategory) -> Unit,
     c: NightwirePalette,
 ) {
+    val chipShape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
             Modifier
-                .clip(RoundedCornerShape(10.dp))
+                .clip(chipShape)
                 .background(c.panel.copy(alpha = 0.92f))
-                .border(1.dp, c.accent, RoundedCornerShape(10.dp))
+                .border(1.dp, c.accent, chipShape)
                 .clickable(enabled = !scanning, onClick = onScan)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
@@ -1041,9 +1047,9 @@ private fun FilterBar(
             val dot = Color(cat.colorArgb)
             Column(
                 Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(chipShape)
                     .background(c.panel.copy(alpha = if (on) 0.92f else 0.7f))
-                    .border(1.dp, if (on) dot else c.muted, RoundedCornerShape(10.dp))
+                    .border(1.dp, if (on) dot else c.muted, chipShape)
                     .clickable { onToggle(cat) }
                     .padding(horizontal = 10.dp, vertical = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1065,11 +1071,12 @@ private fun FilterBar(
 private fun NavCompass(heading: Float, headingUp: Boolean, c: NightwirePalette, modifier: Modifier = Modifier) {
     // In heading-up mode the map rotates, so North on screen sits at -heading; north-up keeps N up.
     val northRotation = if (headingUp) -heading else 0f
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
     Row(
         modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(shape)
             .background(c.panel.copy(alpha = 0.9f))
-            .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .border(1.dp, c.accent.copy(alpha = 0.6f), shape)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1119,13 +1126,14 @@ private fun NavSearchBar(
     c: NightwirePalette,
     modifier: Modifier,
 ) {
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
     Column(modifier) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(shape)
                 .background(c.panel.copy(alpha = 0.9f))
-                .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .border(1.dp, c.accent.copy(alpha = 0.6f), shape)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
