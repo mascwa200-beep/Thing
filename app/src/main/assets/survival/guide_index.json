@@ -1,6 +1,71 @@
 {
  "entries": [
   {
+   "id": "archaeological-excavation-methods-and-techniques",
+   "title": "Archaeological Excavation: Methods and Techniques",
+   "category": "Archaeology & Anthropology",
+   "summary": "A comprehensive account of how archaeologists dig sites: the principles of stratigraphy and controlled destruction, planning and spatial control, horizontal and vertical strategies, single-context recording, tools and recovery methods, documentation, difficult contexts, and the post-excavation work that turns a hole in the ground into knowledge.",
+   "headings": [
+    "Excavation as Controlled Destruction",
+    "Stratigraphy and the Law of Superposition",
+    "Research Design, Survey, and Permissions",
+    "Establishing Spatial Control: Grids, Datums, and Levels",
+    "Horizontal Strategies: Open-Area and Box-Grid Excavation",
+    "Vertical Strategies: Test Pits, Trenches, and Sondages",
+    "Single-Context Recording and Digging Stratigraphically",
+    "The Physical Craft: Tools and Careful Removal",
+    "Recovering the Small and the Invisible: Sieving, Sampling, and Flotation",
+    "Recording the Evidence: Drawing, Photography, and Digital Capture",
+    "Demanding Contexts: Burials, Waterlogged Deposits, and Standing Fabric",
+    "After the Trench: Conservation, Analysis, Archiving, and Publication",
+    "Ethics, Misconceptions, and Connections Onward"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "history-of-archaeology-as-a-science",
+   "title": "History of Archaeology as a Science",
+   "category": "Archaeology & Anthropology",
+   "summary": "How the study of the human past grew from treasure-hunting and antiquarian curiosity into a rigorous science with its own methods, dating techniques, and competing theoretical schools. Traces the key people, discoveries, and turning points from the Renaissance to the digital present.",
+   "headings": [
+    "What Archaeology Is and Why Its History Matters",
+    "Antiquarianism and the Prescientific Roots",
+    "Stratigraphy and the Discovery of Deep Time",
+    "The Three-Age System and the Birth of Prehistory",
+    "From Treasure-Hunting to Recording: The Rise of Method",
+    "Culture-History, Typology, and Diffusion",
+    "The Radiocarbon Revolution and Absolute Dating",
+    "Processual Archaeology and the New Archaeology",
+    "Post-Processual and Interpretive Archaeologies",
+    "The Modern Scientific Toolkit and Archaeological Science",
+    "Ethics, Repatriation, and Indigenous Archaeology",
+    "Contemporary Directions and Digital Archaeology",
+    "Misconceptions and How the Field Connects Onward"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "introduction-to-archaeology-as-a-discipline",
+   "title": "Introduction to Archaeology as a Discipline",
+   "category": "Archaeology & Anthropology",
+   "summary": "A comprehensive introduction to archaeology: what it studies, how it grew into a science, and the full sequence of methods by which archaeologists find, excavate, date, and interpret the material remains of the human past.",
+   "headings": [
+    "What Archaeology Is and Is Not",
+    "A Brief History of the Discipline",
+    "The Nature of the Archaeological Record",
+    "Finding Sites: Survey and Remote Sensing",
+    "Excavation and the Principles of Stratigraphy",
+    "Recording, Provenience, and Documentation",
+    "Dating the Past: Relative and Absolute Methods",
+    "Analysing Artefacts and Ecofacts",
+    "Reconstructing Past Environments and Subsistence",
+    "Interpreting Society, Economy, and Belief",
+    "Theory: How Archaeologists Explain the Past",
+    "Ethics, Stewardship, and the Future of Archaeology"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
    "id": "astro-solar-system-tour",
    "title": "A Tour of the Solar System",
    "category": "Astronomy",
@@ -421,6 +486,48 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "membrane-transport-diffusion-osmosis-and-active-transport",
+   "title": "Membrane Transport: Diffusion, Osmosis and Active Transport",
+   "category": "Biology",
+   "summary": "A comprehensive account of how substances cross the cell membrane, from passive diffusion and osmosis through protein-mediated facilitated diffusion to energy-driven active transport and bulk transport. Covers the underlying physics, the proteins involved, worked reasoning, and how these processes keep cells alive.",
+   "headings": [
+    "The Cell Membrane and the Fluid Mosaic Model",
+    "Concentration Gradients, Equilibrium, and Free Energy",
+    "Simple Diffusion and Fick's Law",
+    "Osmosis and Water Potential",
+    "Tonicity: Cells in Different Solutions",
+    "Facilitated Diffusion: Channels and Carriers",
+    "Active Transport and the Sodium-Potassium Pump",
+    "Secondary Active Transport: Symport and Antiport",
+    "Membrane Potential and the Electrochemical Gradient",
+    "Bulk Transport: Endocytosis and Exocytosis",
+    "Comparing, Measuring, and Quantifying Transport",
+    "Misconceptions, Pitfalls, and Onward Connections"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
+   "id": "the-cell-membrane-and-the-fluid-mosaic-model",
+   "title": "The Cell Membrane and the Fluid Mosaic Model",
+   "category": "Biology",
+   "summary": "A thorough account of the plasma membrane: the chemistry of its lipids and proteins, the history and content of the fluid mosaic model, and how the membrane controls what enters and leaves the cell.",
+   "headings": [
+    "Why Every Cell Needs a Membrane",
+    "The Chemistry of Phospholipids",
+    "The Lipid Bilayer and Its Spontaneous Assembly",
+    "The Road to the Fluid Mosaic Model",
+    "The Fluid Mosaic Model Explained",
+    "Membrane Fluidity and How Cells Control It",
+    "Membrane Proteins and Their Many Roles",
+    "Carbohydrates and the Cell Surface",
+    "Passive Transport: Diffusion and Osmosis",
+    "Active Transport and the Membrane Potential",
+    "Bulk Transport and the Dynamic Membrane",
+    "Membrane Diversity, Asymmetry, and Medicine"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
    "id": "chem-atoms-elements-periodic-table",
    "title": "Atoms, Elements & the Periodic Table",
    "category": "Chemistry",
@@ -633,6 +740,48 @@
    "file": "guides_chemistry.json"
   },
   {
+   "id": "measurement-units-and-significant-figures-in-chemistry",
+   "title": "Measurement, Units and Significant Figures in Chemistry",
+   "category": "Chemistry",
+   "summary": "A thorough guide to the language of quantitative chemistry: the SI system of units, metric prefixes, dimensional analysis, precision and accuracy, significant figures, rounding, and scientific notation. Includes worked examples and the rules that keep calculated results honest.",
+   "headings": [
+    "Why Measurement Is the Foundation of Chemistry",
+    "The SI System and the Seven Base Units",
+    "Derived Units and Everyday Chemical Quantities",
+    "Metric Prefixes and Scaling by Powers of Ten",
+    "Dimensional Analysis: The Factor-Label Method",
+    "Precision, Accuracy, and the Nature of Error",
+    "Significant Figures: Reading and Counting",
+    "Significant Figures in Calculations",
+    "Rounding Rules and Exact Numbers",
+    "Scientific Notation and Orders of Magnitude",
+    "Temperature, the Mole, and Other Special Cases",
+    "Common Mistakes, Good Practice, and Onward Connections"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
+   "id": "the-mole-concept-and-avogadro-s-number",
+   "title": "The Mole Concept and Avogadro's Number",
+   "category": "Chemistry",
+   "summary": "A complete explanation of the mole, chemistry's unit for counting atoms and molecules, and Avogadro's number, showing how they connect the invisible world of atoms to the measurable quantities of the laboratory.",
+   "headings": [
+    "Why Chemists Need to Count Atoms",
+    "Atomic Mass and the Atomic Mass Unit",
+    "Defining the Mole",
+    "Avogadro's Number and the Avogadro Constant",
+    "Molar Mass: Linking Grams to Moles",
+    "Converting Between Mass, Moles, and Particles",
+    "The Mole and Chemical Formulas",
+    "Stoichiometry: Moles in Chemical Reactions",
+    "Limiting Reactants and Percent Yield",
+    "The Mole and Gases: Molar Volume",
+    "The Mole in Solutions: Concentration",
+    "Common Misconceptions and the Wider Importance of the Mole"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -750,6 +899,50 @@
     "Health Effects of Chronic Dry, Dusty Air",
     "Wells, Groundwater, and Long-Term Aquifer Limits",
     "Long-Term Arid Living Checklist"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "carbon-dioxide-and-the-greenhouse-gases",
+   "title": "Carbon Dioxide and the Greenhouse Gases",
+   "category": "Climate",
+   "summary": "A comprehensive guide to carbon dioxide and the other greenhouse gases: the physics of how they trap heat, the carbon cycle, how emissions are measured and sourced, their consequences for climate, and how the warming can be limited.",
+   "headings": [
+    "The greenhouse effect: how the atmosphere warms the surface",
+    "Carbon dioxide: molecule, chemistry, and physical behaviour",
+    "The family of greenhouse gases",
+    "Radiative forcing: how molecules absorb infrared",
+    "The global carbon cycle",
+    "Measuring atmospheric CO2: the Keeling curve and ice cores",
+    "Sources of emissions: fossil fuels, land, and industry",
+    "Sinks, the oceans, and ocean acidification",
+    "Global warming potential and comparing gases",
+    "Feedbacks and climate sensitivity",
+    "Consequences of a warming atmosphere",
+    "Mitigation, carbon removal, and stabilising the climate",
+    "Common misconceptions and honest uncertainties"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "the-greenhouse-effect-explained",
+   "title": "The Greenhouse Effect Explained",
+   "category": "Climate",
+   "summary": "How the Earth's atmosphere keeps the surface warm by absorbing and re-radiating infrared energy: the underlying radiation physics, the gases responsible, the natural and human-enhanced effect, feedbacks, evidence, and consequences.",
+   "headings": [
+    "What the Greenhouse Effect Is",
+    "The Earth's Energy Budget",
+    "Blackbody Radiation and the Planet's Effective Temperature",
+    "How Gases Absorb Infrared Radiation",
+    "The Principal Greenhouse Gases",
+    "The Carbon Cycle and Rising Carbon Dioxide",
+    "Feedbacks That Amplify or Dampen Change",
+    "Radiative Forcing and Climate Sensitivity",
+    "The Natural Effect and Its Human Enhancement",
+    "How We Know: Evidence and Measurement",
+    "Consequences of an Enhanced Effect",
+    "Common Misconceptions",
+    "Connections: Other Planets, Models, and Mitigation"
    ],
    "file": "guides_climate.json"
   },
@@ -966,6 +1159,48 @@
     "Judging a Website or Link Before You Trust It",
     "Software Updates: Why That Nagging Prompt Matters",
     "Your Personal Security Checklist"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
+   "id": "charles-babbage-and-the-analytical-engine",
+   "title": "Charles Babbage and the Analytical Engine",
+   "category": "Computing",
+   "summary": "A comprehensive account of Charles Babbage, his calculating engines, and the Analytical Engine's design: the mechanical general-purpose computer conceived a century before electronic computing, the people around it, why it was never built, and its lasting significance.",
+   "headings": [
+    "Charles Babbage: the man and his world",
+    "The problem of error-filled tables",
+    "The Difference Engine No. 1",
+    "How the Difference Engine works: the method of differences",
+    "From difference to analysis: conceiving a general engine",
+    "Architecture: the Mill and the Store",
+    "Punched cards and the control of operations",
+    "Ada Lovelace and the first programs",
+    "Why the Analytical Engine was never built",
+    "Reconstruction, rediscovery, and verification",
+    "Legacy and connections to modern computing",
+    "Misconceptions, historiography, and open questions"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
+   "id": "history-of-computing-from-the-abacus-to-the-microprocessor",
+   "title": "History of Computing: From the Abacus to the Microprocessor",
+   "category": "Computing",
+   "summary": "The long development of computing machinery, from ancient counting aids and mechanical calculators through the theoretical foundations of computation to electronic computers and the invention of the microprocessor.",
+   "headings": [
+    "What Computing Means and Why Its History Matters",
+    "Ancient Counting and the Abacus",
+    "Mechanical Calculators: Pascal, Leibniz, and the Carry Problem",
+    "Babbage, Lovelace, and the Programmable Engine",
+    "Logic and the Theory of Computation",
+    "Punched Cards and the Data-Processing Industry",
+    "Electromechanical and the First Electronic Computers",
+    "The Stored-Program Concept and Modern Architecture",
+    "The Transistor and the Second Generation",
+    "Integrated Circuits and the Third Generation",
+    "The Microprocessor",
+    "Legacy, Themes, and What Came After"
    ],
    "file": "guides_computing.json"
   },
@@ -1280,6 +1515,137 @@
    "file": "guides_earth_science.json"
   },
   {
+   "id": "crystallography-and-crystal-systems",
+   "title": "Crystallography and Crystal Systems",
+   "category": "Earth Science",
+   "summary": "A comprehensive introduction to crystallography: the ordered structure of crystalline solids, lattices and symmetry, the seven crystal systems and fourteen Bravais lattices, how X-ray diffraction reveals atomic arrangements, and how crystals form, fail, and are used.",
+   "headings": [
+    "What crystallography studies: the crystalline state",
+    "A history from Steno to X-ray diffraction",
+    "Lattices, unit cells, and the basis",
+    "Symmetry operations and the point groups",
+    "The seven crystal systems",
+    "The fourteen Bravais lattices",
+    "Miller indices: describing planes and directions",
+    "Space groups and the 230 symmetries",
+    "X-ray diffraction and Bragg's law",
+    "Crystal defects and their consequences",
+    "Polymorphism, isomorphism, and crystal growth",
+    "Modern methods, applications, and frontiers",
+    "Misconceptions, quasicrystals, and redefining the crystal"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
+   "id": "introduction-to-mineralogy",
+   "title": "Introduction to Mineralogy",
+   "category": "Earth Science",
+   "summary": "A foundational tour of minerals: what defines them, how their atoms are arranged into crystals, the physical and optical properties used to identify them, the major chemical classes, how minerals form, and their role in rocks and human life.",
+   "headings": [
+    "What Mineralogy Is and What a Mineral Is",
+    "Crystals, Lattices, and Symmetry",
+    "The Chemistry of Minerals",
+    "Physical Properties: Hardness, Cleavage, and Fracture",
+    "Optical Properties: Luster, Color, and Streak",
+    "Density, Magnetism, and Other Diagnostic Tests",
+    "Classifying Minerals: The Silicates",
+    "The Non-Silicate Mineral Classes",
+    "How Minerals Form",
+    "Identifying Minerals in Hand Specimen",
+    "Minerals, Rocks, and the Rock Cycle",
+    "Uses of Minerals and the Frontiers of Mineralogy"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
+   "id": "automotive-electronics-and-engine-control-units",
+   "title": "Automotive electronics and engine control units",
+   "category": "Electronics",
+   "summary": "A comprehensive guide to the electronic systems that run a modern vehicle, from the sensors and actuators of the engine control unit to in-vehicle networks, emissions diagnostics, high-voltage powertrains, and the software and safety standards that tie them together.",
+   "headings": [
+    "From carburettors to computers: why cars became electronic",
+    "The engine control unit: architecture and hardware",
+    "Sensors: how the control unit perceives the engine",
+    "Actuators: how the control unit commands the engine",
+    "Fuel injection and air-fuel ratio control",
+    "Ignition timing, knock control and combustion management",
+    "Emissions control and on-board diagnostics",
+    "In-vehicle networks: CAN, LIN, FlexRay and automotive Ethernet",
+    "The proliferation of control units and domain architecture",
+    "Electrical architecture: power, grounding and voltage systems",
+    "Electric and hybrid powertrain electronics",
+    "Software, calibration, tuning and functional safety",
+    "Failure modes, diagnostics and common misconceptions"
+   ],
+   "file": "guides_electronics.json"
+  },
+  {
+   "id": "induction-heating-and-industrial-electric-heating",
+   "title": "Induction heating and industrial electric heating",
+   "category": "Electronics",
+   "summary": "A comprehensive guide to heating materials with electricity in industry, covering induction, resistance, arc, dielectric, microwave, infrared and beam methods, the physics behind them, and how they are engineered, controlled and applied.",
+   "headings": [
+    "What industrial electric heating is and why it matters",
+    "Foundations: electromagnetic induction and Faraday's law",
+    "Eddy currents, the skin effect, and reference depth",
+    "Hysteresis, magnetic materials, and the Curie point",
+    "The induction heating system: power supply, inverter, work coil and load",
+    "Frequency, coupling and coil design: matching the method to the job",
+    "Resistance heating: direct and indirect",
+    "Arc heating and the electric arc furnace",
+    "Dielectric and microwave heating",
+    "Infrared, electron-beam, laser and plasma heating",
+    "Applications: hardening, melting, brazing, welding, forging and beyond",
+    "Efficiency, control, safety, and common misconceptions",
+    "Where it connects onward: materials, power electronics and decarbonization"
+   ],
+   "file": "guides_electronics.json"
+  },
+  {
+   "id": "population-ecology-and-population-growth",
+   "title": "Population Ecology and Population Growth",
+   "category": "Energy & Environment",
+   "summary": "A comprehensive introduction to how populations of organisms change in size and structure over time, covering the mathematics of growth, the forces that regulate it, and applications from conservation and harvesting to human demography.",
+   "headings": [
+    "What population ecology studies",
+    "Describing and measuring a population: density, dispersion and demography",
+    "Exponential growth and the intrinsic rate of increase",
+    "Logistic growth and carrying capacity",
+    "Life tables, survivorship curves and age structure",
+    "Life-history strategies: r-selection, K-selection and trade-offs",
+    "Density dependence and density independence",
+    "Population regulation and limiting factors",
+    "Fluctuations, cycles and predator-prey dynamics",
+    "Spatial structure: metapopulations, dispersal and habitat",
+    "Human population growth and the demographic transition",
+    "Applications: conservation, harvesting, and pest and disease management",
+    "Misconceptions, uncertainties and connections onward"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
+   "id": "population-regulation-and-density-dependence",
+   "title": "Population Regulation and Density Dependence",
+   "category": "Energy & Environment",
+   "summary": "An in-depth account of how animal and plant populations are kept within bounds, covering exponential and logistic growth, the mechanisms and detection of density dependence, time lags and cycles, life-history strategy, spatial and low-density processes, and the applications and controversies of the field.",
+   "headings": [
+    "The central question of population ecology",
+    "Exponential and geometric growth: the unregulated baseline",
+    "Logistic growth and carrying capacity",
+    "Density dependence: the core concept",
+    "Density-independent factors and their distinction",
+    "Mechanisms that generate density dependence",
+    "Detecting density dependence in real populations",
+    "Time lags, delayed density dependence and population cycles",
+    "Life history, r- and K-selection and reproductive strategy",
+    "Metapopulations, dispersal and spatial regulation",
+    "The Allee effect and processes at low density",
+    "Applications: fisheries, pests, harvesting and conservation",
+    "Controversies, complications and where the field stands"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
    "id": "eng-electricity-and-circuits-from-scratch",
    "title": "Electricity & Circuits From Scratch",
    "category": "Engineering",
@@ -1441,6 +1807,28 @@
     "Tools & materials for feeling a feedback loop work",
     "Step-by-step: measure your thermostat's real deadband, then feel open- vs. closed-loop control with your own hands",
     "James Watt's flyball governor — the machine that invented automatic feedback control"
+   ],
+   "file": "guides_engineering.json"
+  },
+  {
+   "id": "the-engineering-design-process",
+   "title": "The engineering design process",
+   "category": "Engineering",
+   "summary": "A thorough walkthrough of how engineers turn an ill-defined need into a working, validated solution, covering problem definition, requirements, ideation, concept selection, analysis, prototyping, testing, iteration, documentation, and the ethics and variants of the process.",
+   "headings": [
+    "What engineering design is and why a process helps",
+    "Defining the problem and understanding the need",
+    "Research, background and gathering constraints",
+    "Specifications, metrics and setting targets",
+    "Ideation and generating concepts",
+    "Evaluating and selecting a concept",
+    "Modelling, analysis and simulation",
+    "Prototyping and experimentation",
+    "Detailed design and design for X",
+    "Testing, verification and validation",
+    "Iteration, failure and design reviews",
+    "Documentation, communication and handoff",
+    "Variants, ethics and common misconceptions"
    ],
    "file": "guides_engineering.json"
   },
@@ -1736,6 +2124,49 @@
    "file": "guides_geography.json"
   },
   {
+   "id": "geography-of-algeria",
+   "title": "Geography of Algeria",
+   "category": "Geography",
+   "summary": "A comprehensive survey of Algeria's physical geography, from its Mediterranean coast and Atlas mountain systems to the vast Sahara, together with its climate, water, ecology, population, and natural resources.",
+   "headings": [
+    "Location, Size, and Continental Setting",
+    "Land Borders and the Mediterranean Frontier",
+    "The Tell Atlas and the Coastal Region",
+    "The High Plateaus and Interior Steppe",
+    "The Saharan Atlas and the Aures",
+    "The Sahara: Ergs, Regs, and Hamadas",
+    "The Hoggar and Tassili n'Ajjer Highlands",
+    "Climate and Seasonal Weather",
+    "Rivers, Wadis, Chotts, and Water Resources",
+    "Vegetation, Wildlife, and Ecological Zones",
+    "Population, Settlement, and Human Geography",
+    "Natural Resources, Economy, and Environmental Challenges"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
+   "id": "geography-of-angola",
+   "title": "Geography of Angola",
+   "category": "Geography",
+   "summary": "A comprehensive survey of Angola's physical and human geography, covering its location and borders, geology, relief, rivers, coastline, climate, ecosystems, natural resources, population, and environmental challenges.",
+   "headings": [
+    "Location, Size, and Boundaries",
+    "Territorial Divisions and the Cabinda Exclave",
+    "Geological Structure and Formation",
+    "Relief: Coastal Lowlands, Escarpment, and Interior Plateau",
+    "The Central Highlands and Highest Peaks",
+    "Rivers and Drainage Systems",
+    "The Atlantic Coast and the Benguela Current",
+    "Climate and Seasons",
+    "Soils, Vegetation, and Biomes",
+    "Wildlife and Protected Areas",
+    "Mineral, Oil, and Water Resources",
+    "Population, Settlement, and Administrative Geography",
+    "Environmental Issues and Human-Environment Interaction"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
    "id": "weather-hazards",
    "title": "Weather Hazards",
    "category": "Hazards",
@@ -1921,6 +2352,223 @@
    "file": "guides_health.json"
   },
   {
+   "id": "breastfeeding-a-practical-guide",
+   "title": "Breastfeeding: A Practical Guide",
+   "category": "Health",
+   "summary": "A thorough, practical guide to breastfeeding: how milk production works, how to establish and protect it, positioning and latch, feeding patterns, common problems and their solutions, expressing and storing milk, and what to do when breastfeeding is difficult.",
+   "headings": [
+    "Why Breastfeeding Matters: Benefits and Recommendations",
+    "How Lactation Works: The Physiology of Milk Production",
+    "The First Hours and Days: Colostrum and the First Latch",
+    "When the Milk Comes In: From Colostrum to Mature Milk",
+    "Positioning and Achieving a Deep Latch",
+    "Reading the Baby: Hunger Cues and Signs of a Good Feed",
+    "Feeding Frequency, Duration, and Patterns",
+    "Understanding and Protecting Milk Supply",
+    "Common Problems and How to Solve Them",
+    "Expressing, Storing, and Handling Breast Milk",
+    "The Nursing Parent: Nutrition, Medications, and Wellbeing",
+    "Weaning and Introducing Complementary Foods",
+    "When Breastfeeding Is Hard or Not Possible: Support and Alternatives"
+   ],
+   "file": "guides_health.json"
+  },
+  {
+   "id": "postpartum-recovery-and-newborn-care",
+   "title": "Postpartum Recovery and Newborn Care",
+   "category": "Health",
+   "summary": "A thorough guide to the postpartum period, covering the mother's physical and emotional recovery after birth and the daily care, feeding, sleep, and health of the newborn, including the warning signs that require urgent medical attention.",
+   "headings": [
+    "The Postpartum Period: An Overview",
+    "Physical Recovery of the Mother",
+    "Recovery After Vaginal Birth and Perineal Care",
+    "Recovery After Cesarean Birth",
+    "Postpartum Warning Signs and Emergencies",
+    "Postpartum Mental Health",
+    "Feeding the Newborn: Breastfeeding and Formula",
+    "The Newborn's Appearance, Reflexes, and Normal Variations",
+    "Everyday Newborn Care: Cord, Bathing, and Diapering",
+    "Newborn Feeding Cues, Output, and Growth",
+    "Newborn Sleep and Safe Sleep",
+    "Newborn Warning Signs and When to Seek Care",
+    "Support, Recovery Timeline, and Follow-Up Care"
+   ],
+   "file": "guides_health.json"
+  },
+  {
+   "id": "primary-and-secondary-sources-in-history",
+   "title": "Primary and Secondary Sources in History",
+   "category": "History",
+   "summary": "An in-depth explanation of how historians classify and use evidence, distinguishing primary, secondary, and tertiary sources, and covering source criticism, provenance, bias, corroboration, archives, citation, and common pitfalls.",
+   "headings": [
+    "Sources: The Foundation of Historical Knowledge",
+    "Defining Primary Sources",
+    "Defining Secondary Sources",
+    "Tertiary Sources and the Spectrum of Evidence",
+    "The Relativity of the Classification",
+    "The Forms and Types of Primary Sources",
+    "Source Criticism: External and Internal Evaluation",
+    "Provenance, Authenticity, and Forgery",
+    "Bias, Perspective, and Reliability",
+    "Corroboration, Triangulation, and Weighing Evidence",
+    "Archives, Libraries, and Finding Sources",
+    "Citation, Attribution, and Historiography",
+    "Common Pitfalls and Misconceptions"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "what-is-history-historiography-and-method",
+   "title": "What Is History? Historiography and Method",
+   "category": "History",
+   "summary": "An introduction to what history is as a discipline: how historians use sources, criticize evidence, explain change, and argue with one another, and how the theory and practice of history-writing, historiography, has developed and continues to evolve.",
+   "headings": [
+    "Defining History: The Past, the Record, and the Discipline",
+    "A Brief History of Historical Writing",
+    "Primary and Secondary Sources",
+    "Source Criticism: Testing the Evidence",
+    "Facts, Interpretation, and Historical Knowledge",
+    "Causation, Contingency, and Explanation",
+    "Periodization and the Shaping of Time",
+    "Schools and Approaches: From Ranke to the Annales",
+    "The Social, Cultural, and Linguistic Turns",
+    "Global, Comparative, and Postcolonial History",
+    "Methods and Craft: Quantitative, Oral, Digital, and Doing Research",
+    "Objectivity, Bias, and the Limits of Historical Knowledge",
+    "Memory, Public History, and the Uses of the Past"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "linguistics-the-scientific-study-of-language",
+   "title": "Linguistics — The Scientific Study of Language",
+   "category": "Language & Linguistics",
+   "summary": "A comprehensive introduction to linguistics: the descriptive study of human language across its levels of structure, from speech sounds to meaning in context, together with how language varies, is acquired, changes over time, and is put to practical and computational use.",
+   "headings": [
+    "What Linguistics Is and Is Not",
+    "Phonetics: The Physical Sounds of Speech",
+    "Phonology: How Languages Organize Sound",
+    "Morphology: The Internal Structure of Words",
+    "Syntax: How Sentences Are Structured",
+    "Semantics: The Study of Literal Meaning",
+    "Pragmatics: Meaning in Context and Use",
+    "Historical Linguistics and Language Change",
+    "Sociolinguistics: Language, Variation, and Society",
+    "Psycholinguistics and Language Acquisition",
+    "Writing Systems and the Speech-Writing Distinction",
+    "Applied and Computational Linguistics, and Common Misconceptions"
+   ],
+   "file": "guides_language_and_linguistics.json"
+  },
+  {
+   "id": "the-history-of-linguistics-p-ini-to-chomsky",
+   "title": "The History of Linguistics — Pāṇini to Chomsky",
+   "category": "Language & Linguistics",
+   "summary": "A chronological survey of the science of language, from the ancient Sanskrit and Greek grammarians through comparative philology, structuralism, and the generative revolution, with the methods and questions that define modern linguistics.",
+   "headings": [
+    "What Linguistics Is and Why Its History Matters",
+    "Ancient Beginnings: Pāṇini and the Sanskrit Grammarians",
+    "The Greek and Roman Grammatical Tradition",
+    "Medieval and Early Modern Grammar",
+    "The Comparative Turn and the Discovery of Indo-European",
+    "The Neogrammarians and the Regularity of Sound Change",
+    "Ferdinand de Saussure and the Birth of Structuralism",
+    "American Structuralism: Boas, Sapir, and Bloomfield",
+    "The Prague School, Phonology, and Functionalism",
+    "Noam Chomsky and the Generative Revolution",
+    "After Chomsky: Cognitive, Functional, and Usage-Based Approaches",
+    "The Branches and Methods of Modern Linguistics",
+    "Enduring Questions and Where the History Leads"
+   ],
+   "file": "guides_language_and_linguistics.json"
+  },
+  {
+   "id": "political-philosophy-the-great-questions",
+   "title": "Political Philosophy: The Great Questions",
+   "category": "Law & Government",
+   "summary": "An introduction to the enduring questions of political philosophy — authority, liberty, justice, equality, democracy, rights, and power — through the major thinkers and traditions that have shaped how we think about the state and living together.",
+   "headings": [
+    "What Political Philosophy Asks",
+    "The Ancient Foundations: Plato and Aristotle",
+    "Authority and Political Obligation: Why Obey the State?",
+    "The Social Contract Tradition: Hobbes, Locke, Rousseau",
+    "Liberty: Negative, Positive, and Its Limits",
+    "Justice and Distribution: Rawls, Nozick, and Beyond",
+    "Equality and Its Varieties",
+    "Democracy: Justifications and Discontents",
+    "Rights, Law, and the Rule of Law",
+    "Property, Markets, and Economic Justice",
+    "Community, Culture, and Identity",
+    "Power, Ideology, and the Radical Critique",
+    "Global Justice and Where the Questions Lead"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
+   "id": "what-political-science-studies",
+   "title": "What Political Science Studies",
+   "category": "Law & Government",
+   "summary": "A comprehensive introduction to political science: how the discipline studies power, the state, and collective decision-making, spanning political theory, comparative politics, democracy and authoritarianism, elections and behavior, international relations, and public policy, along with its methods, debates, and pitfalls.",
+   "headings": [
+    "Defining the Discipline: Power, Authority, and the State",
+    "The Discipline's Methods and Subfields",
+    "Political Theory: The Normative Tradition",
+    "Comparative Politics: Regimes and Institutions",
+    "The State, Sovereignty, and Legitimacy",
+    "Democracy: Forms, Measures, and Debates",
+    "Authoritarianism and Hybrid Regimes",
+    "Electoral Systems, Parties, and Representation",
+    "Political Behavior: Voters, Opinion, and Participation",
+    "International Relations: Politics Among Nations",
+    "Public Policy, Bureaucracy, and Political Economy",
+    "Enduring Debates, Pitfalls, and Connections"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
+   "id": "literary-theory-the-schools-of-criticism",
+   "title": "Literary Theory & the Schools of Criticism",
+   "category": "Literature & Writing",
+   "summary": "A survey of how literature has been read and interpreted, from classical poetics through formalism, structuralism, and deconstruction to psychoanalytic, Marxist, feminist, postcolonial, and ecological criticism, with the questions each school asks of a text.",
+   "headings": [
+    "What Literary Theory Is and What It Does",
+    "Classical and Pre-Modern Criticism: Mimesis to Rhetoric",
+    "Romantic and Nineteenth-Century Criticism",
+    "Russian Formalism and the Question of Literariness",
+    "New Criticism and Close Reading",
+    "Structuralism and Narratology",
+    "Post-Structuralism and Deconstruction",
+    "Psychoanalytic Criticism",
+    "Marxist and Materialist Criticism",
+    "Feminist, Gender, and Queer Theory",
+    "Postcolonial Criticism",
+    "Reader-Response, New Historicism, and Cultural Studies",
+    "Ecocriticism, Digital Humanities, and the Future of Theory"
+   ],
+   "file": "guides_literature_and_writing.json"
+  },
+  {
+   "id": "what-is-literature-an-introduction-to-literary-study",
+   "title": "What Is Literature? An Introduction to Literary Study",
+   "category": "Literature & Writing",
+   "summary": "A comprehensive introduction to the study of literature: how the field defines its object, the major genres of poetry, narrative, and drama, the tools of close reading and figurative language, literary history and criticism, and the enduring questions of value, meaning, and where interpretation lives.",
+   "headings": [
+    "The Problem of Defining Literature",
+    "Genre: The Major Kinds of Literary Writing",
+    "Poetry: Form, Meter, and Sound",
+    "Narrative: Story, Plot, and Point of View",
+    "Drama and the Theatrical Text",
+    "Figurative Language and Literary Devices",
+    "Reading Closely: The Art of Interpretation",
+    "Literary History, Periods, and Movements",
+    "Schools of Literary Criticism and Theory",
+    "The Canon, Literary Value, and Who Decides",
+    "Author, Text, and Reader: Where Meaning Lives",
+    "Studying Literature in Practice, and Common Misconceptions"
+   ],
+   "file": "guides_literature_and_writing.json"
+  },
+  {
    "id": "make-soap-saponification-lye-math",
    "title": "Making Soap: Saponification, Lye Math & Safety",
    "category": "Making",
@@ -2019,6 +2667,49 @@
     "Reading Grain Structure: Why Hammering Direction Matters"
    ],
    "file": "guides_making.json"
+  },
+  {
+   "id": "addition-and-subtraction-algorithms-and-strategies",
+   "title": "Addition and Subtraction: Algorithms and Strategies",
+   "category": "Mathematics",
+   "summary": "A comprehensive guide to the two most fundamental arithmetic operations, covering their meanings, mental strategies, the standard and alternative written algorithms, and their extension to negative numbers, decimals, and fractions.",
+   "headings": [
+    "What Addition and Subtraction Mean",
+    "The Place-Value Foundation",
+    "Number Facts and Fluency",
+    "Mental Strategies for Addition",
+    "Mental Strategies for Subtraction",
+    "The Standard Addition Algorithm",
+    "The Standard Subtraction Algorithm",
+    "Alternative Written Algorithms",
+    "Extending to Negative Numbers",
+    "Decimals, Fractions, and Other Quantities",
+    "A Brief History and the Tools of Calculation",
+    "Common Errors, Misconceptions, and Where This Leads"
+   ],
+   "file": "guides_mathematics.json"
+  },
+  {
+   "id": "counting-place-value-and-positional-number-systems",
+   "title": "Counting, Place Value and Positional Number Systems",
+   "category": "Mathematics",
+   "summary": "A complete introduction to how humans count, how position gives digits their value, and how the decimal, binary and other positional systems work and connect.",
+   "headings": [
+    "What Counting Is: Number, Numeral and Enumeration",
+    "Tallies, Body-Counting and the Origins of Number",
+    "The Idea of a Base: Grouping and Bundling",
+    "Place Value: How Position Encodes Magnitude",
+    "Zero: The Placeholder and the Number",
+    "The Hindu-Arabic Decimal System and Its History",
+    "Reading and Writing Numbers: Digits, Grouping and Expanded Form",
+    "Non-Decimal Bases: Binary, Octal and Hexadecimal",
+    "Converting Between Bases",
+    "Arithmetic in Place Value: Carrying and Borrowing",
+    "Fractions, the Decimal Point and Extending Place Value Rightward",
+    "Historical and Alternative Systems: Roman, Babylonian, Mayan and Chinese",
+    "Common Misconceptions and Where Number Systems Lead"
+   ],
+   "file": "guides_mathematics.json"
   },
   {
    "id": "math-number-sense-arithmetic",
@@ -2190,6 +2881,49 @@
     "Step-by-Step: Build a Real Modular Cipher, Then Sieve and Break Numbers Apart Yourself"
    ],
    "file": "guides_mathematics.json"
+  },
+  {
+   "id": "the-cardiac-conduction-system-and-the-heartbeat",
+   "title": "The Cardiac Conduction System and the Heartbeat",
+   "category": "Medical",
+   "summary": "A thorough account of how the heart generates and coordinates its own electrical rhythm, from pacemaker cells and ion channels through the conduction pathway, contraction, autonomic control, the electrocardiogram, and the arrhythmias that arise when the system fails.",
+   "headings": [
+    "The Heart as a Self-Exciting Electrical Pump",
+    "Cardiac Anatomy Relevant to Conduction",
+    "The Cardiac Action Potential",
+    "Automaticity and the Sinoatrial Node",
+    "The Atrioventricular Node and the Physiological Delay",
+    "The His-Purkinje System and Rapid Ventricular Spread",
+    "From Signal to Squeeze: Excitation-Contraction Coupling",
+    "The Cardiac Cycle and the Sound of the Beat",
+    "Autonomic Control and Regulation of Rate",
+    "Reading the Electrocardiogram",
+    "When Conduction Fails: Arrhythmias and Blocks",
+    "Clinical Interventions, History, and Open Questions"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "the-heart-chambers-valves-and-the-cardiac-cycle",
+   "title": "The Heart: Chambers, Valves and the Cardiac Cycle",
+   "category": "Medical",
+   "summary": "A thorough account of the heart's structure and function: its chambers, valves, blood supply and electrical system, and how they act together across each beat of the cardiac cycle.",
+   "headings": [
+    "Overview: The Heart as a Double Pump",
+    "Location, Size and the Pericardium",
+    "The Four Chambers: Atria and Ventricles",
+    "The Great Vessels and the Two Circulations",
+    "The Four Valves: Structure and Function",
+    "The Heart Wall: Endocardium, Myocardium and Epicardium",
+    "Coronary Circulation: The Heart's Own Blood Supply",
+    "The Conduction System and the Electrical Impulse",
+    "The Cardiac Cycle: Systole and Diastole",
+    "Heart Sounds, the Pulse and Blood Pressure",
+    "Cardiac Output, Regulation and Adaptation",
+    "When the Heart Fails: Common Disorders",
+    "Development, Comparative Anatomy and Onward Connections"
+   ],
+   "file": "guides_medical.json"
   },
   {
    "id": "first-aid",
@@ -2470,6 +3204,49 @@
    "file": "guides_movement.json"
   },
   {
+   "id": "music-notation-reading-and-writing-the-staff",
+   "title": "Music Notation: Reading and Writing the Staff",
+   "category": "Music",
+   "summary": "A complete beginner-to-competent guide to Western staff notation: how the staff, clefs, notes, rhythms, keys and expression marks encode pitch and time, and how to read and write them.",
+   "headings": [
+    "What Notation Is and Why It Exists",
+    "The Staff, Ledger Lines and Pitch in Space",
+    "Clefs: Treble, Bass and the C-Clefs",
+    "Note Names, the Musical Alphabet and the Octave",
+    "Accidentals: Sharps, Flats and Naturals",
+    "Note Values and Duration: Rhythm on the Page",
+    "Rests, Dots and Ties",
+    "Meter, Time Signatures and Bar Lines",
+    "Key Signatures and the Circle of Fifths",
+    "Dynamics, Articulation and Expression",
+    "Tempo, Repeats and Navigation Markings",
+    "Writing Music by Hand: Good Practice",
+    "History, Alternatives and Where Notation Leads"
+   ],
+   "file": "guides_music.json"
+  },
+  {
+   "id": "the-history-of-music-notation",
+   "title": "The History of Music Notation",
+   "category": "Music",
+   "summary": "A survey of how humans learned to write down music, from ancient precursors and medieval neumes through the invention of the staff, mensural rhythm, printing, and common-practice notation, to non-Western systems, twentieth-century experiments, and the digital era.",
+   "headings": [
+    "Why Notate Music? The Problem of Preserving Sound",
+    "Ancient Precursors and the First Written Music",
+    "Neumes and the Chant Tradition",
+    "The Staff and Guido of Arezzo",
+    "Measuring Time: The Rise of Mensural Notation",
+    "The Printing Revolution",
+    "The Consolidation of Common-Practice Notation",
+    "Expressive and Performance Markings",
+    "Tablature, Figured Bass, and Alternative Systems",
+    "Notation Beyond the Western Tradition",
+    "Twentieth-Century Experiments and New Notations",
+    "The Digital Era and the Limits of Notation"
+   ],
+   "file": "guides_music.json"
+  },
+  {
    "id": "navigation",
    "title": "Finding Direction",
    "category": "Navigation",
@@ -2535,6 +3312,49 @@
     "GPS as a Tool, Not a Replacement for Map and Compass"
    ],
    "file": "guides_navigation.json"
+  },
+  {
+   "id": "vitamin-d-and-sunlight",
+   "title": "Vitamin D and Sunlight",
+   "category": "Nutrition",
+   "summary": "A thorough guide to vitamin D: what it is, how sunlight makes it in the skin, how the body activates and uses it, its dietary sources, and how deficiency, dosing, toxicity and the scientific controversies fit together.",
+   "headings": [
+    "What Vitamin D Is and Why It Matters",
+    "The Discovery of Vitamin D and the Conquest of Rickets",
+    "How Sunlight Makes Vitamin D in the Skin",
+    "From Skin and Food to Active Hormone: Metabolism",
+    "What Vitamin D Does in the Body",
+    "Dietary Sources and Supplements",
+    "Measuring Vitamin D: Blood Tests and Thresholds",
+    "Deficiency: Rickets, Osteomalacia and Their Signs",
+    "Who Is at Risk of Deficiency",
+    "How Much Sun and How Much to Take",
+    "Toxicity and the Limits of Supplementation",
+    "Controversies, Uncertainties and What the Evidence Shows",
+    "Where Vitamin D Connects Onward"
+   ],
+   "file": "guides_nutrition.json"
+  },
+  {
+   "id": "vitamins-roles-sources-and-deficiencies",
+   "title": "Vitamins: Roles, Sources and Deficiencies",
+   "category": "Nutrition",
+   "summary": "A complete guide to the thirteen human vitamins: what each does in the body, the foods that supply it, the diseases caused by too little, and the harm caused by too much.",
+   "headings": [
+    "What Vitamins Are and Why They Matter",
+    "Fat-Soluble Versus Water-Soluble Vitamins",
+    "Vitamin A: Vision, Growth and Immunity",
+    "The B Vitamins, Part One: Thiamine, Riboflavin, Niacin and Pantothenic Acid",
+    "The B Vitamins, Part Two: B6, Biotin, Folate and B12",
+    "Vitamin C: Collagen, Antioxidants and Scurvy",
+    "Vitamin D: Sunlight, Bones and the Hormone Vitamin",
+    "Vitamin E and Vitamin K: Antioxidant Defence and Blood Clotting",
+    "Deficiency Diseases and the Birth of Nutritional Science",
+    "Too Much of a Good Thing: Toxicity and Upper Limits",
+    "Getting Vitamins from Food Versus Supplements",
+    "Vitamin Needs Across Life and in Special Circumstances"
+   ],
+   "file": "guides_nutrition.json"
   },
   {
    "id": "food-macronutrients-micronutrients-metabolism",
@@ -2705,6 +3525,49 @@
     "Step-by-step: audit your own pantry"
    ],
    "file": "guides_nutrition.json"
+  },
+  {
+   "id": "metaphysics-the-study-of-what-exists",
+   "title": "Metaphysics — The Study of What Exists",
+   "category": "Philosophy",
+   "summary": "An introduction to metaphysics, the branch of philosophy that asks what fundamentally exists and what reality is like: its history, its central problems of being, universals, identity, causation, time, freedom, possibility and mind, and the criticisms it has faced.",
+   "headings": [
+    "What Metaphysics Is and Its Place in Philosophy",
+    "The Origins: Aristotle and First Philosophy",
+    "Ontology: The Question of Being and Existence",
+    "Universals and Particulars: The Problem of Properties",
+    "Identity, Change and Persistence Through Time",
+    "Substance, Objects and the Bundle Theory",
+    "Causation and the Nature of Laws",
+    "Space, Time and the Metaphysics of Physics",
+    "Free Will, Determinism and Agency",
+    "Modality: Possibility, Necessity and Possible Worlds",
+    "Mind, Matter and the Metaphysics of Consciousness",
+    "Criticisms, Skeptics and Metaphysics Today"
+   ],
+   "file": "guides_philosophy.json"
+  },
+  {
+   "id": "what-is-philosophy-questions-methods-and-why-it-matters",
+   "title": "What Is Philosophy — Questions, Methods and Why It Matters",
+   "category": "Philosophy",
+   "summary": "An introduction to philosophy as a discipline: the questions it asks, its main branches, the methods it uses to reason, its major historical traditions, and why it remains useful.",
+   "headings": [
+    "Defining Philosophy: The Love of Wisdom",
+    "The Core Questions and How Philosophy Divides Its Labour",
+    "Metaphysics: The Study of What There Is",
+    "Epistemology: The Study of Knowledge",
+    "Logic and Argument: The Tools of Reasoning",
+    "Ethics: How We Ought to Live",
+    "Political and Social Philosophy",
+    "Aesthetics: Beauty, Art and Taste",
+    "The Methods of Philosophy",
+    "A Brief History of Philosophical Traditions",
+    "Philosophy and the Sciences",
+    "Common Misconceptions and Objections",
+    "Why Philosophy Matters"
+   ],
+   "file": "guides_philosophy.json"
   },
   {
    "id": "phys-motion-forces-newtons-laws",
@@ -2946,6 +3809,28 @@
    "file": "guides_preparedness.json"
   },
   {
+   "id": "depression-understanding-and-treating-it",
+   "title": "Depression: Understanding and Treating It",
+   "category": "Psychology",
+   "summary": "A thorough guide to depression as a medical condition: what it is, its symptoms and types, its causes, and the psychological, medical and self-help approaches that treat it, including how to respond to suicide risk.",
+   "headings": [
+    "What Depression Is: More Than Sadness",
+    "Symptoms and How Depression Is Diagnosed",
+    "Types of Depression and Related Conditions",
+    "How Common Depression Is and Who It Affects",
+    "Causes and Risk Factors: The Biology of Depression",
+    "Causes and Risk Factors: Psychology and Environment",
+    "The Course of Depression: Onset, Episodes and Recurrence",
+    "Psychotherapy: Treating Depression by Talking",
+    "Medication: Antidepressants and How They Work",
+    "Other Biological Treatments: Stimulation, Ketamine and Light",
+    "Self-Help, Lifestyle and Social Support",
+    "Suicide Risk and Responding to Crisis",
+    "Living With, Recovering From, and Understanding Depression"
+   ],
+   "file": "guides_psychology.json"
+  },
+  {
    "id": "psy-brain-memory-attention",
    "title": "How the Brain, Memory & Attention Work",
    "category": "Psychology",
@@ -3179,6 +4064,50 @@
    "file": "guides_reference.json"
   },
   {
+   "id": "comparative-religion-patterns-across-faiths",
+   "title": "Comparative Religion — Patterns Across Faiths",
+   "category": "Religion & Mythology",
+   "summary": "A survey of how the academic study of religion compares traditions across the world, mapping the recurring patterns in myth, ritual, ethics, and experience while respecting real differences.",
+   "headings": [
+    "What Comparative Religion Studies",
+    "The Sacred and the Profane",
+    "Myth, Cosmogony, and Sacred Time",
+    "Concepts of the Divine",
+    "Ritual and Its Patterns",
+    "Sacred Texts, Canon, and Oral Tradition",
+    "Founders, Prophets, and Charismatic Figures",
+    "Ethics, Law, and the Moral Order",
+    "Salvation, Liberation, and the Afterlife",
+    "Sacred Space, Pilgrimage, and Time",
+    "Mysticism and Religious Experience",
+    "Methods, Pitfalls, and Misconceptions",
+    "Where the Study Connects Onward"
+   ],
+   "file": "guides_religion_and_mythology.json"
+  },
+  {
+   "id": "what-is-religion-definitions-and-theories",
+   "title": "What Is Religion? — Definitions and Theories",
+   "category": "Religion & Mythology",
+   "summary": "How scholars have tried to define religion and the major theories that explain what it is, why it exists, and how it works in human life.",
+   "headings": [
+    "The Problem of Defining Religion",
+    "Substantive Definitions: The Sacred and the Supernatural",
+    "Functional Definitions: What Religion Does",
+    "Family Resemblance and Polythetic Definitions",
+    "The Sacred and the Profane",
+    "Classical Social Theories: Marx, Durkheim, Weber",
+    "Psychological Theories: Freud, James, and Jung",
+    "The Cognitive Science of Religion",
+    "Evolutionary and Adaptationist Theories",
+    "Anthropological and Interpretive Approaches",
+    "Is Religion a Western Invention? The Critique of the Category",
+    "Religion, Spirituality, and the Secular",
+    "Why the Question Matters and Where It Leads"
+   ],
+   "file": "guides_religion_and_mythology.json"
+  },
+  {
    "id": "signaling",
    "title": "Signalling for Rescue",
    "category": "Rescue",
@@ -3364,6 +4293,48 @@
    "file": "guides_skills.json"
   },
   {
+   "id": "classical-social-theory-marx-durkheim-weber",
+   "title": "Classical Social Theory: Marx, Durkheim & Weber",
+   "category": "Society & Culture",
+   "summary": "An introduction to the three thinkers who founded modern sociology, covering Marx on class and capital, Durkheim on social solidarity, and Weber on rationalization, plus how their ideas compare and endure.",
+   "headings": [
+    "The Birth of Sociology and the Classical Trio",
+    "Marx: Historical Materialism",
+    "Marx: Capital, Class, and Exploitation",
+    "Marx: Alienation, Ideology, and Fetishism",
+    "Durkheim: Social Facts and Method",
+    "Durkheim: Solidarity and the Division of Labor",
+    "Durkheim: Anomie, Religion, and the Sacred",
+    "Weber: Verstehen and Social Action",
+    "Weber: Rationalization and the Iron Cage",
+    "Weber: The Protestant Ethic and Authority",
+    "Comparing the Three Thinkers",
+    "Critiques, Limitations, and Legacy"
+   ],
+   "file": "guides_society_and_culture.json"
+  },
+  {
+   "id": "what-sociology-is-how-sociologists-think",
+   "title": "What Sociology Is & How Sociologists Think",
+   "category": "Society & Culture",
+   "summary": "An introduction to sociology as a discipline: what it studies, the distinctive way sociologists reason about human life, its founding theories, and the methods it uses to turn observation into evidence.",
+   "headings": [
+    "What Sociology Studies",
+    "The Sociological Imagination",
+    "The Origins of the Discipline",
+    "The Founding Figures",
+    "The Major Theoretical Perspectives",
+    "Levels of Analysis: Micro, Meso, and Macro",
+    "Core Concepts: Structure, Agency, and Socialization",
+    "Research Methods: Turning Questions into Evidence",
+    "Variables, Correlation, and Causation",
+    "Objectivity, Values, and Ethics",
+    "Common Misconceptions About Sociology",
+    "Where Sociology Connects Onward"
+   ],
+   "file": "guides_society_and_culture.json"
+  },
+  {
    "id": "food",
    "title": "Food & Foraging",
    "category": "Sustenance",
@@ -3430,6 +4401,27 @@
     "Realistic Expectations and When to Seek Help"
    ],
    "file": "guides_sustenance.json"
+  },
+  {
+   "id": "the-structure-and-layers-of-the-atmosphere",
+   "title": "The Structure and Layers of the Atmosphere",
+   "category": "Weather",
+   "summary": "A full account of Earth's atmosphere: what it is made of, why it thins with height, and the temperature-defined layers from the troposphere to the exosphere, plus the ozone layer, the ionosphere, and how we measure it all.",
+   "headings": [
+    "What the Atmosphere Is",
+    "The Composition of Air",
+    "Pressure, Density, and the Vertical Scale",
+    "Temperature and the Basis for Layering",
+    "The Troposphere",
+    "The Stratosphere and the Ozone Layer",
+    "The Mesosphere",
+    "The Thermosphere",
+    "The Exosphere and the Edge of Space",
+    "The Ionosphere and Atmospheric Electricity",
+    "The Homosphere, Heterosphere, and Composition with Height",
+    "How We Measure the Atmosphere and Where It Connects"
+   ],
+   "file": "guides_weather.json"
   },
   {
    "id": "wx-reading-the-sky-clouds",

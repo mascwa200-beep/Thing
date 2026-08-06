@@ -4,13 +4,13 @@
    "id": "t00001",
    "topic": "The Cell Membrane and the Fluid Mosaic Model",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-cell-membrane-and-the-fluid-mosaic-model"
   },
   {
    "id": "t00002",
    "topic": "Membrane Transport: Diffusion, Osmosis and Active Transport",
    "category": "Biology",
-   "guideId": null
+   "guideId": "membrane-transport-diffusion-osmosis-and-active-transport"
   },
   {
    "id": "t00003",
@@ -2992,13 +2992,13 @@
    "id": "t00499",
    "topic": "Population Ecology and Population Growth",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "population-ecology-and-population-growth"
   },
   {
    "id": "t00500",
    "topic": "Population Regulation and Density Dependence",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "population-regulation-and-density-dependence"
   },
   {
    "id": "t00501",
@@ -4264,13 +4264,13 @@
    "id": "t00711",
    "topic": "The Mole Concept and Avogadro's Number",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "the-mole-concept-and-avogadro-s-number"
   },
   {
    "id": "t00712",
    "topic": "Measurement, Units and Significant Figures in Chemistry",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "measurement-units-and-significant-figures-in-chemistry"
   },
   {
    "id": "t00713",
@@ -7588,13 +7588,13 @@
    "id": "t01265",
    "topic": "History of Computing: From the Abacus to the Microprocessor",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-computing-from-the-abacus-to-the-microprocessor"
   },
   {
    "id": "t01266",
    "topic": "Charles Babbage and the Analytical Engine",
    "category": "Computing",
-   "guideId": null
+   "guideId": "charles-babbage-and-the-analytical-engine"
   },
   {
    "id": "t01267",
@@ -11698,13 +11698,13 @@
    "id": "t01950",
    "topic": "Introduction to Mineralogy",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "introduction-to-mineralogy"
   },
   {
    "id": "t01951",
    "topic": "Crystallography and Crystal Systems",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "crystallography-and-crystal-systems"
   },
   {
    "id": "t01952",
@@ -12748,7 +12748,7 @@
    "id": "t02125",
    "topic": "The Structure and Layers of the Atmosphere",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-structure-and-layers-of-the-atmosphere"
   },
   {
    "id": "t02126",
@@ -13126,13 +13126,13 @@
    "id": "t02188",
    "topic": "The Greenhouse Effect Explained",
    "category": "Climate",
-   "guideId": null
+   "guideId": "the-greenhouse-effect-explained"
   },
   {
    "id": "t02189",
    "topic": "Carbon Dioxide and the Greenhouse Gases",
    "category": "Climate",
-   "guideId": null
+   "guideId": "carbon-dioxide-and-the-greenhouse-gases"
   },
   {
    "id": "t02190",
@@ -14986,7 +14986,7 @@
    "id": "t02498",
    "topic": "The engineering design process",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "the-engineering-design-process"
   },
   {
    "id": "t02499",
@@ -16168,7 +16168,7 @@
    "id": "t02695",
    "topic": "Induction heating and industrial electric heating",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "induction-heating-and-industrial-electric-heating"
   },
   {
    "id": "t02696",
@@ -16234,7 +16234,7 @@
    "id": "t02706",
    "topic": "Automotive electronics and engine control units",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "automotive-electronics-and-engine-control-units"
   },
   {
    "id": "t02707",
@@ -18214,13 +18214,13 @@
    "id": "t03036",
    "topic": "Geography of Algeria",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-algeria"
   },
   {
    "id": "t03037",
    "topic": "Geography of Angola",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-angola"
   },
   {
    "id": "t03038",
@@ -23272,19 +23272,19 @@
    "id": "t03879",
    "topic": "Introduction to Archaeology as a Discipline",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "introduction-to-archaeology-as-a-discipline"
   },
   {
    "id": "t03880",
    "topic": "History of Archaeology as a Science",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "history-of-archaeology-as-a-science"
   },
   {
    "id": "t03881",
    "topic": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "archaeological-excavation-methods-and-techniques"
   },
   {
    "id": "t03882",
@@ -24244,13 +24244,13 @@
    "id": "t04041",
    "topic": "What Is History? Historiography and Method",
    "category": "History",
-   "guideId": null
+   "guideId": "what-is-history-historiography-and-method"
   },
   {
    "id": "t04042",
    "topic": "Primary and Secondary Sources in History",
    "category": "History",
-   "guideId": null
+   "guideId": "primary-and-secondary-sources-in-history"
   },
   {
    "id": "t04043",
@@ -29944,13 +29944,13 @@
    "id": "t04991",
    "topic": "What Is Literature? An Introduction to Literary Study",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "what-is-literature-an-introduction-to-literary-study"
   },
   {
    "id": "t04992",
    "topic": "Literary Theory & the Schools of Criticism",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "literary-theory-the-schools-of-criticism"
   },
   {
    "id": "t04993",
@@ -32134,13 +32134,13 @@
    "id": "t05356",
    "topic": "Linguistics — The Scientific Study of Language",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "linguistics-the-scientific-study-of-language"
   },
   {
    "id": "t05357",
    "topic": "The History of Linguistics — Pāṇini to Chomsky",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "the-history-of-linguistics-p-ini-to-chomsky"
   },
   {
    "id": "t05358",
@@ -33310,13 +33310,13 @@
    "id": "t05552",
    "topic": "Counting, Place Value and Positional Number Systems",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "counting-place-value-and-positional-number-systems"
   },
   {
    "id": "t05553",
    "topic": "Addition and Subtraction: Algorithms and Strategies",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "addition-and-subtraction-algorithms-and-strategies"
   },
   {
    "id": "t05554",
@@ -36400,13 +36400,13 @@
    "id": "t06067",
    "topic": "The Heart: Chambers, Valves and the Cardiac Cycle",
    "category": "Medical",
-   "guideId": null
+   "guideId": "the-heart-chambers-valves-and-the-cardiac-cycle"
   },
   {
    "id": "t06068",
    "topic": "The Cardiac Conduction System and the Heartbeat",
    "category": "Medical",
-   "guideId": null
+   "guideId": "the-cardiac-conduction-system-and-the-heartbeat"
   },
   {
    "id": "t06069",
@@ -38776,13 +38776,13 @@
    "id": "t06463",
    "topic": "Breastfeeding: A Practical Guide",
    "category": "Health",
-   "guideId": null
+   "guideId": "breastfeeding-a-practical-guide"
   },
   {
    "id": "t06464",
    "topic": "Postpartum Recovery and Newborn Care",
    "category": "Health",
-   "guideId": null
+   "guideId": "postpartum-recovery-and-newborn-care"
   },
   {
    "id": "t06465",
@@ -39664,7 +39664,7 @@
    "id": "t06611",
    "topic": "Depression: Understanding and Treating It",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "depression-understanding-and-treating-it"
   },
   {
    "id": "t06612",
@@ -40396,13 +40396,13 @@
    "id": "t06733",
    "topic": "Vitamins: Roles, Sources and Deficiencies",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "vitamins-roles-sources-and-deficiencies"
   },
   {
    "id": "t06734",
    "topic": "Vitamin D and Sunlight",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "vitamin-d-and-sunlight"
   },
   {
    "id": "t06735",
@@ -41644,13 +41644,13 @@
    "id": "t06941",
    "topic": "Music Notation: Reading and Writing the Staff",
    "category": "Music",
-   "guideId": null
+   "guideId": "music-notation-reading-and-writing-the-staff"
   },
   {
    "id": "t06942",
    "topic": "The History of Music Notation",
    "category": "Music",
-   "guideId": null
+   "guideId": "the-history-of-music-notation"
   },
   {
    "id": "t06943",
@@ -44326,13 +44326,13 @@
    "id": "t07388",
    "topic": "What Is Philosophy — Questions, Methods and Why It Matters",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "what-is-philosophy-questions-methods-and-why-it-matters"
   },
   {
    "id": "t07389",
    "topic": "Metaphysics — The Study of What Exists",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "metaphysics-the-study-of-what-exists"
   },
   {
    "id": "t07390",
@@ -45706,13 +45706,13 @@
    "id": "t07618",
    "topic": "What Is Religion? — Definitions and Theories",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "what-is-religion-definitions-and-theories"
   },
   {
    "id": "t07619",
    "topic": "Comparative Religion — Patterns Across Faiths",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "comparative-religion-patterns-across-faiths"
   },
   {
    "id": "t07620",
@@ -47338,13 +47338,13 @@
    "id": "t07890",
    "topic": "What Sociology Is & How Sociologists Think",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "what-sociology-is-how-sociologists-think"
   },
   {
    "id": "t07891",
    "topic": "Classical Social Theory: Marx, Durkheim & Weber",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "classical-social-theory-marx-durkheim-weber"
   },
   {
    "id": "t07892",
@@ -48850,13 +48850,13 @@
    "id": "t08142",
    "topic": "What Political Science Studies",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "what-political-science-studies"
   },
   {
    "id": "t08143",
    "topic": "Political Philosophy: The Great Questions",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "political-philosophy-the-great-questions"
   },
   {
    "id": "t08144",

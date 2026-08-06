@@ -208,7 +208,7 @@ class GuidesJsonValidationTest {
     private companion object {
         const val FULL_PAGE_WORDS = 400
 
-        /** Measured after Wave E2 completed (168 guides · 2,020 sections). Ratchet upward as waves land. */
-        const val FULL_PAGE_BASELINE = 732
+        /** Measured after Wave B1 partial (214 guides · 2,598 sections). Ratchet upward as waves land. */
+        const val FULL_PAGE_BASELINE = 1310
     }
 }
