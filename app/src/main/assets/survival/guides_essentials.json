@@ -1,0 +1,233 @@
+{
+ "guides": [
+  {
+   "id": "water",
+   "title": "Water",
+   "category": "Essentials",
+   "summary": "Finding and making water safe to drink.",
+   "sections": [
+    {
+     "heading": "Rule of threes",
+     "body": "You can survive ~3 days without water. Prioritise it after immediate danger and shelter in extreme cold.",
+     "image": "kb/water.jpg"
+    },
+    {
+     "heading": "Finding water",
+     "body": "Follow valleys downhill, look for green vegetation, collect rain and dew, and morning condensation. In dry country, dig in the outside bend of a dry riverbed. Avoid stagnant water with no life around it."
+    },
+    {
+     "heading": "Make it safe",
+     "body": "Filter cloudy water through cloth first. Then BOIL for 1 minute (3 minutes above 2000 m) — the most reliable method. No fire? Chemical: unscented household bleach 2 drops per litre, wait 30 min. Or use purification tablets per their instructions. UV/clear-bottle solar (SODIS): full sun for 6 hours."
+    },
+    {
+     "heading": "Cautions",
+     "body": "Boiling/chemicals kill germs but do NOT remove chemical pollution, salt or heavy metals. Never drink seawater or urine."
+    },
+    {
+     "heading": "Chemical treatment — exact doses",
+     "body": "When you can't boil, disinfect CLEAR water with one of these, then wait: (1) Unscented household bleach, 5-6% sodium hypochlorite: 2 drops per litre (8 drops per US gallon). Double it to 4 drops/litre if the water is cloudy or cold. Stir, let stand 30 minutes — it should smell faintly of chlorine; if not, repeat the dose and wait another 15 minutes. For 8.25% bleach use 2 drops per 2 litres. NEVER use scented, colour-safe, or bleach with added cleaners. (2) Tincture of iodine 2%: 5 drops per litre clear water, 10 drops if cloudy; wait 30 minutes (60 if cold). Not for pregnant people, those with thyroid disease, or long-term use. (3) Purification tablets (chlorine dioxide / iodine): follow the packet — usually 1 tablet per litre, wait the stated time (often 30 minutes, up to 4 hours for chlorine dioxide against Cryptosporidium). Cold water always needs the longer wait — germs die slower below 10°C."
+    },
+    {
+     "heading": "Build a filter (materials)",
+     "body": "A DIY filter clears sediment and improves taste but does NOT reliably kill microbes — always boil or chemically treat the output. Make a cone from a cut-off bottle (neck down), a trouser leg, or bark. Pack it in layers, TOP to BOTTOM: a plug of grass or cloth, then crushed CHARCOAL from your fire (2-5 cm — this adsorbs chemicals and odour), then fine sand, then coarse sand, then small gravel/pebbles, with a cloth over the spout. Pour water through and re-pour until it runs clear. Rinse and repack the charcoal every day or so."
+    },
+    {
+     "heading": "Remove salt & chemicals (distillation)",
+     "body": "Boiling and chemicals do NOT remove salt, heavy metals, or chemical pollution — only DISTILLATION does. Boil water and catch the STEAM on a tilted cool surface or through a tube/cloth into a clean container; the condensate is pure. Solar still: dig a pit, set a clean container in the centre, heap green vegetation or contaminated/salt water around it (not in the container), stretch a plastic sheet over the pit sealed with soil at the edges, and place one small stone in the centre of the sheet so condensation runs down and drips into the container. Yields little water but it is safe to drink."
+    },
+    {
+     "heading": "How Waterborne Pathogens Actually Get You",
+     "body": "Untreated water rarely looks dangerous — that's what makes it dangerous. The organisms that put people in the ICU are invisible and often odorless. Giardia lamblia is a protozoan parasite that forms tough, football-shaped cysts as small as 8–12 micrometers; swallow as few as 10 of them and you can develop giardiasis 1–3 weeks later — explosive gas, cramping, greasy diarrhea that can drag on for weeks. Cryptosporidium is even nastier from a treatment standpoint: its oocysts (4–6 micrometers) shrug off the chlorine and iodine doses that kill Giardia, because their outer shell resists oxidation. In April 1993 a filtration failure at a Milwaukee, Wisconsin water treatment plant let Cryptosporidium into the municipal supply; an estimated 400,000 residents got sick and dozens died, mostly people with weakened immune systems — still the largest documented waterborne disease outbreak in U.S. history, and a big reason municipal water systems worldwide were re-engineered around finer filtration rather than chlorine alone.\n\nBacteria bring their own threats: E. coli O157:H7 causes bloody diarrhea within 3–4 days and can trigger hemolytic uremic syndrome, a kidney-damaging complication especially dangerous in children. Hepatitis A is a virus with a long fuse — 15 to 50 days incubation, average around 28 — so you can drink bad water on day one of a trip and not get sick until you're home and have forgotten about it. Norovirus is the outlier on dose: as few as 10–100 viral particles can infect you, which is why it tears through close-quarters groups (cruise ships, base camps) so efficiently.\n\nThe reason boiling remains the gold standard against all of the above is thermal, not chemical: virtually every waterborne pathogen is inactivated within seconds at temperatures well below 100°C (212°F), so a rolling boil is a large safety margin, not a bare minimum. The one wrinkle is altitude — water boils at a lower temperature as air pressure drops (roughly 1°C cooler for every 300 m / 1,000 ft of elevation gain), so the U.S. CDC recommends boiling for a full 3 minutes above 2,000 m (6,562 ft), versus 1 minute below it, just to keep the same thermal margin."
+    },
+    {
+     "heading": "Storing Water Long-Term at Home",
+     "body": "Finding water in the field is a skill; having enough of it already sitting in your garage is a different kind of preparedness, and the two overlap less than people assume. FEMA and the CDC both anchor their guidance on one number: one gallon (about 3.8 liters) of water per person, per day, covering both drinking and basic hygiene — more in hot climates, for pregnant or nursing people, for pets, or for anyone sick. The commonly cited minimum reserve is a 3-day supply; a genuinely comfortable cushion is closer to two weeks, which for a family of four means roughly 56 gallons — big enough that most households split it across several 5-gallon food-grade containers rather than one drum.\n\nContainer choice matters more than people expect. Use only food-grade plastic (look for the recycling symbol with a \"2\" HDPE, or containers explicitly sold for drinking water) — never a container that previously held gasoline, bleach concentrate, or other chemicals, because plastics absorb trace amounts of whatever they once stored and can slowly leach it back out. Store containers off a concrete floor if possible, away from direct sunlight (UV degrades some plastics and encourages algae growth in any water that isn't fully opaque to light) and away from petroleum products, solvents, or pesticides, which can permeate plastic walls over months.\n\nIf you're filling containers yourself from the tap rather than buying sealed bottled water, treat it the same way you'd treat questionable field water (see the chemical-treatment dosing above) before sealing it, and rotate — empty, rinse, and refill — every six months; write the fill date on the container in permanent marker so you're not guessing. Commercially bottled water is shelf-stable far longer if left factory-sealed, but check for cloudiness, a plastic taste, or a swollen container before drinking anything that's been sitting for a long time; when in doubt, treat it again rather than trust it."
+    },
+    {
+     "heading": "Gear Worth Keeping for Water Purification",
+     "body": "None of this needs to be expensive or exotic — most of it is either sitting in your kitchen already or a short trip to a general hardware or camping store.",
+     "ingredients": [
+      "A hollow-fiber or ceramic water filter rated to 0.2 micron or finer (pump-style or gravity bag), from an outdoor/camping retailer — removes protozoa and most bacteria but not viruses",
+      "Water purification tablets (chlorine dioxide or iodine-based), from a camping store or pharmacy — a compact chemical backup that needs no fuel or batteries",
+      "A metal pot or heat-safe container of at least 1-quart capacity for boiling, from any kitchen or camping supply",
+      "Unscented household liquid chlorine bleach (5–9% sodium hypochlorite, no added scents or dyes), from a grocery or hardware store — for dosed disinfection and for treating storage containers",
+      "A UV purifier pen (battery-powered, pen-style device), from an outdoor/camping retailer — fast for clear water, but ineffective on cloudy or turbid water since particles shield pathogens from the UV light",
+      "Two 5-gallon food-grade plastic buckets with lids, from a hardware store — for building and testing a field filter",
+      "Coarse gravel, fine gravel, and washed play sand in separate small bags, from a hardware store or garden center — filter media, graded from largest particles at the bottom to smallest near the top",
+      "Granular activated charcoal (aquarium or activated-carbon type), from a pet/aquarium store or hardware store — improves taste and pulls out some organic chemicals, though it does not remove pathogens on its own",
+      "Coffee filters or a few layers of clean cotton cloth (an old bandana works), from a grocery store — for pre-filtering visible sediment before it hits your main filter",
+      "A turkey baster or a few feet of clear flexible tubing, from a kitchen or hardware store — useful for siphoning the clearest water off the top of a settled container without stirring up sediment"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: Build and Prove a Two-Bucket Field Filter",
+     "body": "This is the classic sand-and-charcoal biofilter, scaled down to something you can build and test in an afternoon — a good way to actually understand why filtration and disinfection are two different jobs.",
+     "steps": [
+      "Take one 5-gallon bucket and drill or melt a single 1/4-inch hole in the center of the bottom — this will be your filter bucket, dripping into a second, un-drilled catch bucket.",
+      "Lay a folded piece of clean cloth or a coffee filter over the drain hole from the inside to keep the finer media from washing straight through.",
+      "Add a 2-inch layer of coarse gravel directly on top of the cloth.",
+      "Add a 2-inch layer of fine gravel above that.",
+      "Add a 4–6 inch layer of washed sand above the gravel.",
+      "Add a 2–3 inch layer of activated charcoal above the sand.",
+      "Cap it with one more 2-inch layer of sand, so the water's first contact is sand, not exposed charcoal dust.",
+      "Let your source water sit undisturbed for 30–60 minutes beforehand so the heaviest sediment settles to the bottom of its container, then pour only the clearer water on top into the filter, slowly, to avoid digging a channel through the media.",
+      "Rest the filter bucket on top of the catch bucket (on bricks or a stand so the drip has room to fall) and let it run — the first liter or two will often still look cloudy; discard it and let the media \"season\" before you trust the output.",
+      "Check clarity by holding a glass of the filtered water against a printed page: if you can read the text clearly through the full glass, the filter is working; if it's still hazy, run it through a second time or rebuild with a deeper sand layer.",
+      "Do not drink the output straight — this filter removes sediment, some organic chemicals, and many protozoa and bacteria, but standard field media does not reliably stop viruses. Boil the filtered water or dose it with chlorine/iodine using the exact ratios above before drinking it."
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fire",
+   "title": "Fire",
+   "category": "Essentials",
+   "summary": "Building and keeping a fire for warmth and signalling.",
+   "sections": [
+    {
+     "heading": "Prepare",
+     "body": "Clear a 1 m circle to bare earth, away from overhanging branches and wind. Gather three grades: tinder (dry grass, bark, lint), kindling (pencil-thin twigs), and fuel (thumb-thick and up). Gather far more than you think you need before lighting."
+    },
+    {
+     "heading": "Light it",
+     "body": "Build a small teepee or lean-to of tinder and kindling. Light from the upwind side. Feed gradually from small to large. Shelter the flame from wind and ground damp with a platform of dry sticks. (Diagram: DerpMeep, CC BY-SA 4.0.)",
+     "image": "campfire.svg"
+    },
+    {
+     "heading": "Keep it",
+     "body": "Bank larger logs around the edge. To preserve coals overnight, cover with ash. Never leave a fire unattended; drown, stir, and feel for heat before leaving."
+    },
+    {
+     "heading": "Best tinder & char cloth",
+     "body": "Great natural tinders: birch bark (burns even when damp — it is oily), fatwood/resin-rich pine, dry grass, cattail fluff, shredded cedar/juniper bark, thistle/milkweed down, and fine wood shavings ('feather sticks'). Make CHAR CLOTH for a spark-catching tinder that lights instantly: put small squares of 100% cotton (old T-shirt) into a metal tin with ONE pin-hole in the lid, set it in the fire; smoke jets from the hole; when the smoke stops, pull it out and let it cool sealed. The black cloth now catches the faintest spark. Keep tinder bone-dry in a pocket or bag."
+    },
+    {
+     "heading": "Friction fire — bow drill",
+     "body": "Materials: a SPINDLE (dry, straight softwood ~20 cm, thumb-thick), a FIREBOARD (same softwood, flat), a BOW (a curved stick with a shoelace/cord), and a SOCKET/bearing block (a stone, hardwood, bone or shell to press the spindle top). Cut a shallow depression in the board and a V-notch into it that reaches the centre. Loop the spindle in the bow-string, press down with the socket, and saw the bow full-length and fast. Dark powder builds in the notch and starts to smoke — that dust is your ember. Gently tip it into a tinder bundle, lift to the wind, and blow steadily until it flames. It is hard work; keep the parts DRY and the technique smooth."
+    },
+    {
+     "heading": "Sparks — ferro rod, flint & steel",
+     "body": "Ferrocerium ('ferro') rod: hold the sharp square spine of a knife still and PULL the rod back hard beneath it into a tinder/char-cloth nest — the shower of ~3000°C sparks lights dry tinder at once. Flint & steel: strike a piece of high-carbon steel (a knife spine, a file) down a sharp edge of flint/quartz/chert so a spark falls onto char cloth; nurse the glowing char into a tinder bundle and blow to flame. A magnifying lens, a clear water-filled bag, or a polished can bottom can focus bright sunlight to ignite dark tinder."
+    },
+    {
+     "heading": "The Chemistry Behind Every Fire You'll Ever Build",
+     "body": "A fire is a chemical reaction, and it needs exactly three things at once — heat, fuel, and oxygen — arranged so each keeps feeding the other two; pull away any one leg of that \"fire triangle\" and the reaction stops, which is the entire logic behind smothering, dousing, and starving a fire out. What actually burns isn't solid wood at all: heat first drives off the wood's moisture, then breaks the wood down through pyrolysis — decomposing cellulose and lignin into flammable volatile gases (mostly carbon monoxide, hydrogen, and various hydrocarbons) that rise off the surface and burn in the visible flame, while the solid material left behind chars into carbon and finally glows as coal. That's why a log doesn't need to be touching a flame to catch — heat radiating onto it is enough to start pyrolysis — and why blowing gently on a young ember (feeding it fresh oxygen) can bring a fire back from the edge of dying without adding any new fuel at all.\n\nWater is the single biggest reason beginner fires fail. Turning a gram of water into steam consumes roughly 2,260 joules — heat that comes straight out of your fire's budget before a single gram of fuel gets a chance to pyrolyze. Damp \"dead and down\" wood might feel dry to the touch and still lose a meaningful fraction of your fire's early heat output just boiling off trapped moisture, which is why standing deadwood (never touching the ground) and the driest, smallest material you can find always beats anything picked up off wet soil.\n\nFlame color is a rough thermometer: a thin blue flame (roughly 1,400°C at its hottest) means clean, complete combustion with plenty of oxygen; a fat yellow-orange flame runs closer to 1,000°C and throws more visible soot — unburned carbon particles glowing from residual heat — because the fuel-to-oxygen ratio has tipped toward too much fuel. Paper's autoignition temperature is commonly cited around 233°C (451°F) — the premise behind the title of Ray Bradbury's Fahrenheit 451 — though the real figure shifts with paper type; most seasoned wood needs somewhere in the 300°C range at the surface before sustained pyrolysis takes over and the fire becomes self-feeding."
+    },
+    {
+     "heading": "Choosing a Fire Lay: Tepee, Log Cabin, Lean-To, Star, and the Dakota Hole",
+     "body": "The shape you build fuel into changes how a fire draws air and how much wood it eats, and picking the wrong lay for the conditions is a common reason a fire that lit fine dies twenty minutes later. A tepee — kindling leaned into a cone around the tinder bundle — draws air up through the open base like a chimney, throws a tall hot flame fast, and is the best choice for getting a stubborn fire established or boiling water quickly, but it's tall and unstable in real wind and burns through kindling fast since it collapses inward as it burns. A log cabin — sticks stacked in alternating square layers around the tinder, roughly like Lincoln Logs — is slower to start because there's less direct airflow to the core, but it burns steady and predictable and leaves a well-formed bed of coals, which makes it the better choice once you've got flame established and want a fire that lasts.\n\nA lean-to uses a single thick support stick angled into the wind with kindling leaned against its downwind side, sheltering the tinder from gusts that would otherwise blow out a young flame — it's the go-to lay specifically for windy conditions. A star fire lays full-length logs out flat like the spokes of a wheel, tips just touching at a small central fire, and is fed simply by pushing the logs inward as the ends burn away — it needs almost no wood processing (no cutting to length), burns efficiently since only the tips are ever alight, and is the traditional choice where wood is scarce or cutting tools are limited.\n\nThe Dakota fire hole is the specialist option: dig two connecting holes a few inches apart — a fire pit and a narrower angled air-intake tunnel meeting it near the bottom — and the pressure difference drives a strong, self-feeding draft up through the fire, similar to a forced-air furnace. Because the flame burns low, contained, and mostly below ground level, it throws very little visible light or smoke and burns hotter and more completely on less wood than an open lay, which is why it's favored for high-wind conditions, cooking (concentrated, controllable heat), or any situation where a low profile matters more than a big cheerful blaze."
+    },
+    {
+     "heading": "Building the Right Fire for the Job: Cooking, Night-Long, and Signal Fires",
+     "body": "A roaring flame is the wrong fire for cooking — flame chars the outside of food long before the inside is done and coats your pot in soot. Real cooking fires want coals: build a modest fire, let it burn down for 20–30 minutes until the flames die back and you're left with a glowing bed, then cook over that, raking coals to the side to control heat the way you'd use burner settings on a stove. A reflector wall — a low stack of green (unseasoned) logs or rocks built close behind the fire — bounces radiant heat forward, warming you and your food more efficiently from a smaller, more fuel-conservative fire. One real hazard worth knowing: never ring a fire with rocks pulled from a streambed or any porous, water-saturated stone. Trapped moisture inside the rock can flash to steam under fire heat and cause the rock to fracture explosively, throwing hot fragments — use dry rocks gathered well away from water, or skip the rock ring entirely.\n\nFor an overnight fire that needs minimal tending while you sleep, the \"long log\" method works well: lay two full, thick logs parallel to each other a few inches apart over a solid bed of coals, so the gap between them channels air upward much like a Dakota hole does underground; the logs slowly burn along their facing edges and can hold usable heat for six to eight hours with only occasional attention.\n\nA signal fire follows an internationally recognized standard for a reason — a single fire just looks like a campsite from the air or a distance, but three fires arranged in a straight line or a triangle, evenly spaced and each large enough to be seen independently, is universally read as a deliberate distress signal. Build and stage all three ahead of time so they can be lit together the moment you hear or see a search aircraft or vessel, rather than scrambling to build fires from scratch after the moment has already passed. By day, throw green boughs or leaves onto the flames to generate thick, visible smoke; by night, keep the flames themselves tall and bright, since smoke is invisible in the dark."
+    },
+    {
+     "heading": "Gear Worth Carrying for Firecraft",
+     "body": "A surprising amount of reliable fire-starting gear fits in a shirt pocket, and most of it is inexpensive and easy to find.",
+     "ingredients": [
+      "A ferrocerium rod (\"ferro rod\") with a separate metal striker, from a camping/outdoor store — throws a shower of 3,000°C+ sparks even when wet, and isn't consumed like a match",
+      "A fixed-blade knife with a sharp, unbeveled 90-degree spine for scraping the ferro rod, from an outdoor/hardware store",
+      "100% cotton fabric scraps (an old t-shirt or bandana works), from home or a fabric/craft store — the raw material for char cloth",
+      "A small metal tin with a tight-fitting lid (an old mint tin is ideal), from any general store — used to char cloth over a fire without it catching full flame",
+      "Waterproof matches and a waterproof match case, from a camping/outdoor store",
+      "A magnesium fire-starter block with a built-in striker, from a camping/outdoor store — shavings scraped off the block burn at roughly 3,000°C and will ignite even damp tinder",
+      "Fatwood sticks or commercial waxed fire-starter cubes, from a camping store — resin-rich or waxed material that lights easily and burns long enough to dry out marginal kindling",
+      "Jute twine or natural-fiber cordage, from a hardware or craft store — teased apart into a fluffy \"bird's nest\" it makes excellent tinder",
+      "A folding saw or small hatchet, from a hardware/outdoor store — for batoning and processing dry standing deadwood into graduated kindling sizes",
+      "Leather work gloves, from a hardware store — worth wearing while processing wood or tending coals"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: A Ferro-Rod Practice Session",
+     "body": "The only way ferro-rod fire lighting becomes reliable under real pressure is repetition in low-stakes conditions — set aside twenty minutes this week and actually run this.",
+     "steps": [
+      "Pick a clear, safe site on bare dirt or gravel, away from overhanging branches and dry grass, with water or a way to fully extinguish nearby.",
+      "Gather three graded piles before you strike a single spark: a fist-sized bundle of fine tinder (dry grass, shredded bark, a cotton ball, jute fluff), a double handful of pencil-thickness kindling, and a similar amount of thumb-to-wrist-thickness sticks.",
+      "Loosely form the fine tinder into a \"bird's nest\" — a rough hollow ball you can hold in one hand — and set it on a flat, dry surface (bark or a rock) in front of you, not directly on damp ground.",
+      "Hold the ferro rod's tip right against the nest, blade spine angled about 30–45 degrees against the rod, and pull the rod backward through the striker in one firm, fast motion (moving the rod, not the striker, gives you more control) to throw sparks directly into the tinder.",
+      "Once you see a spark catch and start to smolder, cup the nest gently and blow a slow, steady stream of breath into it from a few inches away — increase gradually as it responds — until it bursts into open flame.",
+      "Immediately set the burning nest down and build a small tepee of your finest kindling directly over and around it, letting the tepee structure draw air up through the flame.",
+      "Feed progressively larger kindling as the flame strengthens, waiting for each size to catch well before adding the next — adding wood too fast is the single most common way beginners smother a young fire.",
+      "Time yourself from first spark to a self-sustaining kindling fire; note what worked and repeat the drill on a different day with different, harder tinder (after light rain, for instance) to build real confidence.",
+      "When you're done, extinguish completely: drown with water, stir the ashes and coals thoroughly, drown again, and confirm the pile is cool to the back of your hand before leaving it — a fire that still feels warm can still reignite or smolder underground in root systems."
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shelter",
+   "title": "Shelter & Warmth",
+   "category": "Essentials",
+   "summary": "Staying dry, out of wind, and off cold ground.",
+   "sections": [
+    {
+     "heading": "Why shelter first",
+     "body": "In cold or wet conditions exposure can kill in hours — well before thirst or hunger. Get out of wind and rain and OFF the cold ground.",
+     "image": "kb/shelter.jpg"
+    },
+    {
+     "heading": "Insulate down and up",
+     "body": "Ground steals heat fastest. Pile dry leaves, grass, branches or a pack beneath you. Trap air with layers; a debris pile 0.5-1 m thick around and over you holds body heat."
+    },
+    {
+     "heading": "Quick shelters",
+     "body": "Lean a ridgepole against a rock/stump, lay branches along it, pile debris on top. In snow, a tree-well or compacted snow trench blocks wind. Keep the entrance small and downwind."
+    },
+    {
+     "heading": "Stay dry",
+     "body": "Wet clothing loses most of its insulation. Wring out, layer, and avoid sweating — vent before you overheat."
+    },
+    {
+     "heading": "Debris hut — how to build it",
+     "body": "The warmest no-tool shelter. Prop one strong RIDGEPOLE (longer than you are tall) on a stump, rock or forked stick at about hip height, the other end on the ground — like a lean-to spine. Lay RIBS (sticks) closely along both sides of the ridgepole down to the ground to make an A-frame tunnel, just big enough to crawl into (small = warm — your body heats the space). Cover the whole frame with 60 cm or more of leaves, ferns, grass and debris — thick enough that no light shows through. Then STUFF the inside with a deep (30 cm+) bed of dry leaves to insulate you from the cold ground, which steals most of your heat. Plug the entrance with a debris pile once you're in."
+    },
+    {
+     "heading": "The Four Ways You Actually Lose Heat",
+     "body": "Cold doesn't have one mechanism — your body loses heat through four distinct physical processes, and a shelter that blocks only one of them will still let you get dangerously cold. Conduction is direct heat transfer into whatever you're touching, and the ground is the usual culprit: soil and rock conduct heat away from a body far faster than still air does, which is exactly why a sleeping bag with no insulating pad underneath fails in cold weather even if the bag itself is rated well below the air temperature — the compressed insulation under your body weight barely slows conduction into the earth at all. Convection is heat carried away by moving air (or water): wind constantly strips the thin layer of air your body has warmed against your skin and replaces it with cold air, which is the entire physical basis of wind chill, and why a windbreak is as important to survival as a source of heat.\n\nRadiation is the one people forget because it needs no contact and no air at all — your body constantly radiates infrared heat outward, and on a clear night with no cloud cover, a meaningful amount of that heat radiates straight past the atmosphere out toward space, which is also why exposed surfaces can frost over on a clear night even when the recorded air temperature stayed above freezing. This is the physical reason a shelter needs an overhead barrier even when there's no rain in the forecast — without one, you're radiating heat into a very cold sky all night. Evaporation is the fourth and often most underestimated: turning liquid water into vapor costs a large amount of energy, and that energy comes from your body when the water is sweat or rain soaked into your clothing. This is the physics behind the \"cotton kills\" rule in cold-weather survival: cotton holds onto water against your skin and keeps evaporating it for hours, continuously stealing heat, while wool and most synthetics retain a meaningful fraction of their insulating loft even wet and dry out faster."
+    },
+    {
+     "heading": "Choosing Where to Build: Reading the Terrain",
+     "body": "The best-built shelter in the wrong spot can still leave you colder, wetter, or in more danger than a mediocre shelter in a good one. Cold air is denser than warm air and sinks, so it drains downhill and pools in valley bottoms, depressions, and the low point of any slope overnight — a site partway up a gentle slope can measurably outperform a site in the hollow just below it, sometimes by a wide margin, simply from cold-air drainage; the flip side is that fully exposed ridgelines and summits trade that advantage for direct wind exposure, so the sweet spot is usually a bench or terrace partway up, out of both the cold sink and the worst of the wind.\n\nAlways look up before committing to a site: dead branches or entire dead, leaning trees overhead (\"widow makers\") can fall with no warning, especially in wind or after rain loosens root systems, and they've killed people who built directly underneath one. Water is a genuine trade-off — camping near a stream means easy access for drinking and cleaning, but also more insects, more overnight dampness, and in arid terrain a real hazard: dry washes and canyon bottoms can flash flood from rainfall many miles upstream that you never see or hear falling, so a dry streambed that looks like an obviously flat, clear campsite is one of the more dangerous places to actually sleep in flash-flood-prone country. Finally, note the prevailing wind direction and orient your shelter's opening away from it, and give a quick look at the ground itself for game trails (animals will walk through your camp at night) or insect nests before you commit to clearing and building."
+    },
+    {
+     "heading": "Snow Shelters: The Quinzhee and the Trench",
+     "body": "Snow feels like the enemy of warmth, but a well-built snow shelter is one of the best-insulated structures you can build with your hands, because still air trapped inside the bonded snow crystal structure is a genuinely poor heat conductor. A quinzhee is built by piling loose snow into a mound roughly 7–8 feet across and letting it sit undisturbed for at least an hour or two before hollowing it out — that waiting period matters: it lets the snow \"sinter,\" a process where the points of contact between snow crystals partially melt under the mound's own weight and pressure and then refreeze, bonding the pile into a self-supporting dome strong enough to carve out safely. Push a couple dozen sticks about a foot long through the outer surface before you start digging, aimed radially toward the center — when you hit the inside tip of a stick while hollowing, that's your signal to stop digging in that spot, which keeps the finished walls a safe, insulating 12 inches or so thick without accidentally digging through.\n\nA snow trench is the lower-effort alternative: dig a trench roughly as wide as your body and as deep as you can manage, then roof it over with branches, a tarp, snow blocks, or skis, and add loose snow on top of that roof for extra insulation. Either shelter's interior tends to stabilize close to 32°F (0°C) regardless of how much colder it gets outside — but that same airtight insulating quality is a real hazard: carbon dioxide from your own breathing can build up in a sealed shelter, so a snow shelter absolutely needs a small ventilation hole poked through the roof (and checked periodically, since drifting snow can seal it back over), and running any flame or stove inside a poorly ventilated snow shelter risks lethal carbon monoxide buildup — treat that as a hard rule, not a judgment call."
+    },
+    {
+     "heading": "Recognizing Hypothermia Before It's an Emergency",
+     "body": "Hypothermia — a drop in core body temperature below about 95°F (35°C) — rarely announces itself clearly, and the person developing it is often the last one to notice, because impaired judgment is one of the earliest symptoms. Wilderness medicine training uses a simple mnemonic for the early, mild stage: the \"umbles\" — mumbles (slurred, slow speech), fumbles (clumsy hands, dropping things, trouble with zippers or knots), stumbles (unsteady walking, poor coordination), and grumbles (irritability, withdrawal, uncharacteristic apathy or a sudden refusal to keep taking sensible precautions). Anyone showing several of these in cold, wet, or windy conditions should be treated as hypothermic and warmed and dried immediately, not waited out.\n\nAs core temperature drops further into the moderate range (roughly 90–82°F / 32–28°C), confusion deepens and, counterintuitively, shivering — the body's own heat-generating mechanism — can stop altogether as the body's regulatory systems begin failing; the absence of shivering in someone who's clearly cold is a dangerous sign, not a reassuring one. Below about 82°F (28°C), the risk shifts to cardiac arrhythmia and unconsciousness, and a severely hypothermic person can appear clinically dead — no obvious pulse or breathing — while still being viable; the working field axiom in mountain and wilderness medicine is \"nobody is dead until they're warm and dead,\" meaning resuscitation efforts shouldn't be abandoned on a cold patient just because vital signs are hard to find.\n\nField priority is to stop further heat loss before attempting active rewarming: get the person out of wind and wet, insulate them from the ground, and add dry layers, rather than immediately rubbing limbs or applying direct high heat, both of which can push cold blood pooled in the extremities back toward the heart too fast. Handle a severely hypothermic person gently — rough movement or jarring can trigger a fatal heart arrhythmia in a cold heart, a real and documented risk sometimes called rescue collapse, which is why even a well-meaning rescue needs to move a cold casualty carefully rather than quickly."
+    },
+    {
+     "heading": "Gear Worth Carrying for Shelter & Warmth",
+     "body": "Most of a good shelter kit is small, cheap, and multi-purpose — buy it once and it rides in a pack indefinitely.",
+     "ingredients": [
+      "An emergency space blanket (Mylar), from a camping/outdoor store or pharmacy — reflects radiated body heat back at you; genuinely effective for its size and weight",
+      "A lightweight tarp (roughly 8x10 ft, polyester or silnylon, with reinforced corner grommets), from a camping/outdoor or hardware store",
+      "50 feet of paracord or similar nylon cordage, from an outdoor/hardware store",
+      "A bivy sack, or large heavy-duty contractor-grade trash bags as an improvised rain/wind layer, from an outdoor store or hardware store",
+      "A folding saw or small hatchet, from a hardware/outdoor store — for cutting ridge poles and ribbing without exhausting yourself",
+      "A closed-cell foam sleeping pad, from a camping store — insulates against ground conduction, which matters more in cold weather than most people expect",
+      "A sleeping bag rated comfortably below the coldest temperature you realistically expect, from an outdoor store",
+      "A wool or synthetic-fill hat and gloves, from a clothing/outdoor store — the head and extremities lose heat out of proportion to their size",
+      "A basic outdoor thermometer, from a hardware or general store — useful for actually testing and proving out shelter insulation, as below"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: Build and Sleep-Test a Debris Shelter This Weekend",
+     "body": "Reading about insulation is not the same as feeling it work — this turns the physics above into a measurable result you can verify yourself.",
+     "steps": [
+      "In full daylight, pick a site using the terrain criteria above: a bench partway up a slope, not a valley bottom or exposed ridge, checked overhead for dead branches, oriented so the opening faces away from the prevailing wind.",
+      "Find or cut a ridgepole a couple of feet longer than your own height, and prop one end on a sturdy forked branch or low tree fork at roughly waist height, with the other end resting on the ground.",
+      "Lean ribbing sticks against both sides of the ridgepole at a steep angle, spaced a hand's width apart, to form the shelter's skeleton.",
+      "Add a lattice of smaller sticks and twigs crosswise over the ribbing — this is what keeps your insulating debris from sliding straight through the gaps.",
+      "Pile debris (dry leaves, pine needles, dry grass, small brush) over the entire structure to a genuine depth of at least 2–3 feet once compressed — this is the single most common failure point of a first attempt: debris that looks thick when loosely piled compresses down to a few insulating inches, so build it far thicker than feels necessary.",
+      "Stuff a thick layer of the same dry debris inside the shelter as a sleeping \"nest\" you'll actually lie on and pull around yourself, since insulation below and around you matters as much as the roof.",
+      "Run the test: on a mild-but-cool, dry evening (not your first attempt at genuinely dangerous cold), place one thermometer inside the shelter and a second control thermometer in the open air nearby at the same height, both shielded from direct wind, and compare readings after 30–60 minutes — a well-built shelter typically shows a meaningfully warmer reading, which is your proof the design is working rather than just a guess.",
+      "If conditions and preparation allow, sleep-test it for real on a mild night with a backup plan (a car or heated space nearby, someone aware of where you are, and a phone), and use the experience to find and patch drafts, gaps, or thin spots in the debris layer — every real shelter benefits from a second pass once you can feel where the cold is getting in.",
+      "Never treat an unverified shelter as your only line of defense in genuinely hazardous cold — build and test in safe, forgiving conditions first, well before you'd ever need to rely on the skill for real."
+     ]
+    }
+   ]
+  }
+ ]
+}

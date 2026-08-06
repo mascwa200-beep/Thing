@@ -1,0 +1,235 @@
+{
+ "guides": [
+  {
+   "id": "knots",
+   "title": "Knots & Cordage",
+   "category": "Skills",
+   "summary": "The few knots to know cold, and using cordage.",
+   "sections": [
+    {
+     "heading": "Learn these few",
+     "body": "Master a small set you can tie without thinking: the BOWLINE (a fixed loop), the TAUT-LINE HITCH (an adjustable, sliding loop), the CLOVE HITCH (fast to tie onto a post), and the SQUARE (reef) KNOT below (joining two lines of equal thickness).",
+     "image": "reef-knot.jpg"
+    },
+    {
+     "heading": "Bowline",
+     "body": "Makes a loop that will not slip or jam under load — good for rescue, hauling, and rigging. 'The rabbit comes out of the hole, round the tree, and back down the hole.' Form a small loop, pass the working end up through it, around the standing line, and back down through the loop.",
+     "image": "bowline.jpg"
+    },
+    {
+     "heading": "Taut-line hitch",
+     "body": "A loop that grips under tension but slides by hand to tension it — perfect for tent and tarp guy-lines. Wrap the working end twice inside the standing loop, then once more above the coils, and dress it snug (shown here as the midshipman's hitch, its classic form).",
+     "image": "taut-line-hitch.jpg"
+    },
+    {
+     "heading": "Clove hitch",
+     "body": "Turns around a post or pole that lock on themselves; quick to start a lashing or hang a line. It can slip under a changing load, so back it up with a couple of half-hitches for anything that matters.",
+     "image": "clove-hitch.jpg"
+    },
+    {
+     "heading": "Two half-hitches",
+     "body": "The everyday tie-off: pass the working end around the anchor, then make two half-hitches around the standing line. Simple, secure, and easy to untie — good for guylines and securing a load.",
+     "image": "two-half-hitches.jpg"
+    },
+    {
+     "heading": "Sheet bend — join two ropes",
+     "body": "The knot for tying two ropes together, even ones of DIFFERENT thickness (where a reef knot fails). Make a bight in the thicker rope; pass the thinner rope up through it, around the back, and tuck it under itself.",
+     "image": "sheet-bend.jpg"
+    },
+    {
+     "heading": "Figure-eight stopper",
+     "body": "A bulky stopper knot that keeps a rope's end from running back through a hole or pulley — and, unlike an overhand, it never jams so tight you can't untie it. Learn it as the base for many climbing knots.",
+     "image": "figure-eight.jpg"
+    },
+    {
+     "heading": "Timber hitch — drag a log",
+     "body": "The fast way to grip a log or pole to haul or drag it: pass the end around the timber and back around itself three or more times. It holds under a steady pull and falls apart the instant the load comes off.",
+     "image": "timber-hitch.jpg"
+    },
+    {
+     "heading": "Cordage tips",
+     "body": "Paracord's inner strands pull out to make fishing line, snares, or sewing thread — one cord is many tools. Melt or tape cut rope ends so they do not fray. Keep a few metres on your body, not just in the pack."
+    },
+    {
+     "heading": "About these diagrams",
+     "body": "The knot illustrations are public-domain engravings from the 1911 Encyclopædia Britannica — free to use, and they work fully offline."
+    }
+   ]
+  },
+  {
+   "id": "skills-basic-sewing-fabric-repair",
+   "title": "Basic Sewing & Fabric Repair",
+   "category": "Skills",
+   "summary": "This guide covers the hand-sewing skills needed to mend and maintain clothing and fabric without a machine. It walks through choosing needles and thread, tying a secure knot, the essential stitches, and step-by-step repairs including patching holes, fixing a torn seam, sewing on buttons so they stay put, hemming, and darning worn knit fabric.",
+   "sections": [
+    {
+     "heading": "Assembling a Basic Sewing Kit",
+     "body": "Every mended garment starts with having the right tools within reach, and a repair kit does not need to be elaborate to be effective. The core of it is needles and thread, but the supporting cast matters just as much: sharp scissors dedicated only to fabric and thread stay cleaner-cutting far longer than scissors also used on paper or tape, pins hold layers together while you work, and a thimble protects the pad of your finger when you push a needle through denim or multiple layers of cloth. A seam ripper looks like an afterthought until you meet a seam sewn on a machine with a locked stitch, which is nearly impossible to undo cleanly without one. Keep everything in a single box, tin, or zippered pouch so a five-minute repair does not turn into a ten-minute hunt through drawers. Restock thread and buttons as you use them, and store the kit somewhere you will actually see it, such as a hall closet shelf, rather than packed away in an attic bin.",
+     "ingredients": [
+      "Hand-sewing needles in a range of sizes (sharps 5-10 for cottons and shirting, embroidery needles for thicker thread)",
+      "All-purpose polyester or cotton-wrapped polyester thread in black, white, and a couple of neutral colors",
+      "Small, sharp scissors or embroidery snips reserved only for thread and fabric",
+      "Straight pins with glass or plastic heads, and a pincushion or magnetic pin holder",
+      "A metal or leather thimble sized to your middle finger",
+      "A seam ripper for undoing mistakes or opening old seams",
+      "A spare card of buttons in assorted sizes, plus any buttons saved from worn-out garments",
+      "One or two iron-on patches in a neutral color or denim weight",
+      "A small tape measure and tailor's chalk or a fabric marking pencil"
+     ]
+    },
+    {
+     "heading": "Needles and Thread: Matching Tools to Fabric",
+     "body": "Needles are sized by a number system that runs opposite to intuition: a higher number means a finer, thinner needle, while a lower number means a thicker, stronger one. A size 10 sharp is delicate enough for silk or fine cotton lawn without leaving visible holes, while a size 5 or 6 handles denim, canvas, and multiple layers of upholstery fabric. Embroidery needles share the same sizing but have a larger eye to accommodate thicker decorative thread or embroidery floss split into fewer strands. The practical rule for repair work is simple: match the thread's thickness and fiber to the fabric. All-purpose polyester or cotton-wrapped polyester thread works for most woven cottons, linens, and blends. Heavier upholstery or button thread, waxed for extra grip, suits denim, canvas, leather, and stress points like button shanks and coat hems. Delicate silks and fine knits want a lightweight silk or fine cotton thread so the stitching does not overpower or pucker the fabric. When in doubt, pull a thread from the fabric itself or hold spooled thread against the weave; if it visually disappears into the cloth, it is a good match."
+    },
+    {
+     "heading": "Threading a Needle and Tying a Knot That Won't Slip",
+     "body": "Cut a length of thread no longer than about 18 to 24 inches; longer lengths tangle and fray from being pulled through fabric repeatedly. Snip the end at an angle with sharp scissors rather than tearing it, since a clean diagonal cut passes through a needle's eye far more easily than a blunt or frayed one. Hold the needle against a light background, moisten the cut end slightly if needed to compress the fibers, and push it through the eye; a needle threader, a small wire loop tool, helps considerably with fine needles or thick thread. For most hand-sewing you will double the thread, pulling it through until the two ends meet, which gives extra strength and lets you tie both tails in a single knot. The most reliable knot for sewing is a simple double knot at the tail ends, or the quilter's method: wrap the thread around your fingertip twice, roll the loops off your finger and down the thread with your thumb, and pull to seat a tight, compact knot that will not slip back through the fabric."
+    },
+    {
+     "heading": "The Running Stitch: Fast, Temporary, Everyday",
+     "body": "The running stitch is the simplest stitch in hand-sewing and the one most people already know instinctively: the needle passes in and out of the fabric in a straight line, creating a dashed pattern of even stitches and even gaps on both the top and bottom. It is fast, and several stitches can be loaded onto the needle before pulling the thread through, which makes it efficient for long seams, gathering fabric, or basting, meaning temporary stitching that holds pieces in place before a permanent seam is sewn or before a garment is tried on for fit. Because a running stitch is not locked at each stitch, it is not strong on its own for anything that will bear stress or repeated pulling, such as a seam under tension or a hem that gets stepped on. Keep stitches an even one-eighth to one-quarter inch long for a neat, functional line, and reserve this stitch for quick mends, gathering fabric into ruffles, or as the first basting pass before backstitching a permanent seam.",
+     "image": "stitch-running.png"
+    },
+    {
+     "heading": "The Backstitch: Strength Where It Counts",
+     "body": "When a seam needs to hold real strain, the backstitch is the hand-sewing equivalent of a sewing machine's lockstitch, and it is the stitch to reach for on any repair that will be pulled, stretched, or bear weight. Bring the needle up through the fabric, then insert it back down a short distance behind the point where the thread emerged, and bring it back up an equal distance ahead of the original starting point, so each new stitch doubles back over the gap left by the last. The result on the top of the fabric is a continuous, tight line with no gaps, while the underside shows overlapping stitches that lock each segment in place. Because every stitch is anchored by the one before it, a backstitch will not unravel the way a running stitch can if the thread breaks partway along the seam. Use it for closing a torn seam, sewing a patch's outer edge where it will see wear, or any repair on garments, bags, or upholstery that gets regular handling. Keep the stitches small and even, roughly an eighth of an inch, for the cleanest and strongest line, especially on fabrics prone to fraying.",
+     "image": "stitch-backstitch.png"
+    },
+    {
+     "heading": "The Whip Stitch: Finishing Edges and Seams",
+     "body": "The whip stitch is worked over the edge of the fabric rather than through its flat surface, which makes it the natural choice for joining two folded or finished edges, closing the raw edge of a patch, or preventing a cut edge from fraying. Bring the needle up through both layers close to the edge, wrap the thread over the top edge, and bring the needle up again a short, even distance along, so the thread forms a diagonal line of small loops wrapping around the edge with each pass. Keep the stitches close together and consistent in spacing for a tidy finish; wide or uneven whip stitches look messy and leave gaps where fraying can restart. This stitch is especially useful for attaching a patch cut to fit a hole exactly, for joining two pieces of felt or fleece that do not fray, and for finishing the cut edge of woven fabric that has not been serged or otherwise bound. It is not meant to bear heavy strain on its own, so pair it with a backstitched seam on repairs that will be pulled or stretched."
+    },
+    {
+     "heading": "The Blanket Stitch: Durable Decorative Edges",
+     "body": "The blanket stitch does double duty: it finishes a raw or cut edge so it cannot fray, and it does so with a neat, purposeful looking row of upright stitches connected by a bottom thread, which is why it has been the traditional edge finish for wool blankets, felt applique, and buttonholes for centuries. Working from left to right, bring the needle up at the edge, then insert it a short distance in from the edge and slightly to the right, catching the working thread under the needle tip before pulling through, so a loop locks around the edge as you pull the thread snug. Repeated evenly along an edge, the stitches form a row of vertical bars linked by a straight thread along the very edge of the fabric. Because each stitch locks independently rather than relying on the ones beside it, a blanket stitch resists unraveling even if a single stitch is cut or worn through. It suits finishing the edge of a felt patch, repairing the bound edge of a blanket or rug, and reinforcing a buttonhole that has started to fray at the corners.",
+     "image": "stitch-blanket.png"
+    },
+    {
+     "heading": "The Ladder Stitch: Invisible Closures",
+     "body": "Sometimes the goal of a repair is for no one to be able to tell it happened at all, and that is exactly what the ladder stitch, also called the slip stitch when worked this way, is built for. It closes an opening along a folded edge, such as the gap left in a stuffed toy, cushion, or hem after turning fabric right-side out, so the finished seam is nearly invisible from the outside. Fold both raw edges under along the seam line so they meet cleanly, then bring the needle up through the very edge of the fold on one side, cross directly over to the opposite fold, and take a small stitch through just that fold's edge, alternating sides with each pass so the thread zigzags like the rungs of a ladder between the two folds. Pulled snug every few stitches, the folds draw together and the thread all but disappears into the seam line. This is the stitch to use for closing a stuffed animal after restuffing it, finishing a lined jacket's hem, or joining a patch that has been folded under for a clean, non-fraying edge."
+    },
+    {
+     "heading": "Patching a Hole: Woven and Applied Patches",
+     "body": "A hole in woven fabric, such as denim jeans or a canvas jacket, needs backing before it can hold stitches again, since sewing directly across an open gap has nothing to anchor to. Cut a patch of similar-weight fabric, ideally a scrap of matching material or fusible woven interfacing, about half an inch to an inch larger than the hole on every side. Slide it behind the hole from the wrong side of the garment, pin it in place, and secure it first with a wide running stitch or a light fusing with an iron if using fusible interfacing, then close the visible hole with small whip stitches or a backstitch around its perimeter, catching both the torn edge and the patch beneath it. For a faster repair, an iron-on patch bonds to the fabric with heat-activated adhesive on its underside: trim loose threads around the hole first, position the patch so it overlaps the damage generously, and press with a hot, dry iron for the time listed on the patch's packaging, using firm, even pressure rather than sliding the iron around. Stitching around the edge of an iron-on patch afterward, even loosely, adds real durability and stops the corners from peeling up in the wash."
+    },
+    {
+     "heading": "Repairing a Torn Seam",
+     "body": "A seam that has torn open, usually where the original machine stitching has broken along a straight line, is one of the most common and easiest repairs to make well. Turn the garment inside out so you can work from the same side the original seam was sewn on, and press the two torn edges back into their original fold lines with an iron or your fingers so the seam sits the way it is meant to. Starting about half an inch before the tear on the still-intact stitching, backstitch along the exact same line the original seam followed, through both layers of fabric, continuing half an inch past the far end of the tear onto sound stitching again. Overlapping into the intact seam on both ends anchors the new stitching and spreads the stress across a longer run of thread rather than concentrating it at a single weak point. Knot off securely on the inside, then turn the garment right-side out and check that the seam lies flat without puckering before wearing it again."
+    },
+    {
+     "heading": "Sewing On a Button That Won't Fall Off",
+     "body": "Loose buttons are among the most common small repairs, and a button that is sewn correctly, with a small gap of thread beneath it called a shank, will outlast a rushed one sewn flat against the fabric, which strains and pops off again within weeks because there is no room for the buttonhole side of the fabric to fit underneath it. Two-hole and four-hole buttons use the same underlying technique; four-hole buttons are simply sewn in an X or parallel pattern rather than a single pass. Building in the shank gap is the one step that makes the real difference between a button that lasts and one that comes off again almost immediately.",
+     "steps": [
+      "Thread a needle with doubled thread and knot the end securely.",
+      "Mark the button's position and bring the needle up through the fabric from the wrong side, then through one hole of the button.",
+      "Place a toothpick, matchstick, or spare needle flat across the top of the button between the holes to hold slack.",
+      "Sew down through the opposite hole and back up through the first, repeating through all holes six to eight times, sewing over the toothpick each time.",
+      "Remove the toothpick, then bring the needle up between the button and the fabric, beneath the stitches but above the fabric, to create the shank.",
+      "Wind the thread tightly around the stitches under the button five or six times to bundle them into a firm neck.",
+      "Pass the needle through to the wrong side of the fabric and tie off with a knot close to the cloth, then trim the excess thread."
+     ]
+    },
+    {
+     "heading": "Hemming a Garment by Hand",
+     "body": "A hand-sewn hem, worked with a blind hem stitch, holds a folded edge invisibly from the right side of the garment, which is what separates a hem that looks tailored from one with a visible line of stitching around the ankle or wrist. Fold the raw edge under about a quarter inch to enclose it, then fold the whole hem allowance up to the desired length and press both folds flat with an iron, pinning as you go. Working from right to left along the inside of the hem, pick up just one or two threads of the outer garment fabric with the needle, then take a stitch through the folded hem edge about a quarter to half inch further along, alternating between the two so the thread travels in a slight zigzag hidden inside the fold. Keep the stitches loose rather than pulled tight, since an overly taut blind hem will pucker the outside of the fabric and give away the stitching. Measure the hem depth evenly all the way around before pinning, using a tape measure or a hem gauge, so the finished length is level."
+    },
+    {
+     "heading": "Darning: Rebuilding Worn Knit Fabric",
+     "body": "Darning repairs a hole differently from patching because it rebuilds the missing fabric itself rather than covering it, which is why it is the traditional fix for a worn heel or toe in a knit sock, a hole in a sweater elbow, or thin, threadbare spots that have not yet opened into a hole. Work over a darning egg, a smooth rounded form, or improvise with a light bulb or a smooth stone slipped inside the sock to hold the fabric taut and curved while you stitch. Using thread or fine yarn close in weight to the original fabric, lay a series of straight stitches across the hole and well into the sound fabric on either side, running in one direction and leaving small loops at the turns rather than pulling tight, so the darn will stretch with the knit instead of puckering it. Then weave a second layer of stitches at a right angle to the first, passing the needle over and under the original lengthwise threads in an alternating over-one, under-one pattern, exactly like weaving on a small loom, until the woven patch fully covers the worn area and blends into the surrounding knit. A well-made darn is nearly as strong as the original fabric and far more durable than a patch on stretchy material."
+    },
+    {
+     "heading": "Reinforcing Stress Points to Prevent Re-Tearing",
+     "body": "Many repairs fail a second time not because the stitching was wrong, but because the spot that tore was under more mechanical stress than the surrounding fabric to begin with, and a repair that does not account for that will simply tear again in the same place. Pocket corners, the base of a zipper, coat hem edges, button plackets, and the ends of any seam are classic stress points, since they concentrate the pulling force of everything attached to them into a small area. A bar tack, a short, dense cluster of stitches sewn back and forth across a point, spreads that force across many threads instead of one and is the standard reinforcement used at exactly these spots on manufactured clothing, visible as a small rectangular block of tight stitching at the top of a jeans pocket or the end of a fly seam. To add one by hand, take four or five short stitches directly on top of each other at the stress point, then anchor them with a few stitches worked crosswise over the bundle to lock it together. Adding a bar tack at the end of any repaired seam, not only at the point of a fresh tear, is a small extra step that meaningfully extends how long the repair will last."
+    }
+   ],
+   "safetyNote": "Keep needles, pins, and scissors in a closed kit and count pins back into the pincushion when you finish, especially around small children or pets who may find a dropped needle before you do."
+  },
+  {
+   "id": "skills-woodworking-hand-tools",
+   "title": "Woodworking & Hand Tool Basics",
+   "category": "Skills",
+   "summary": "A grounding in traditional hand-tool woodworking: what the core tools actually do, how to read and work with wood grain, the joinery and marking techniques that make joints strong and edges true, and how to finish a piece so it looks good and holds up. No power tools required, just patience and a sharp edge.",
+   "sections": [
+    {
+     "heading": "The Hand Saw and Coping Saw",
+     "body": "Every hand-tool kit starts with saws, and the two you reach for most do very different jobs. A hand saw (sometimes called a panel saw) is the workhorse for straight cuts through boards. Its teeth are set in one of two patterns: rip teeth, filed like tiny chisels to chop along the wood's grain when cutting a board to width, and crosscut teeth, filed at an angle to slice cleanly across the grain when cutting a board to length. Tooth count matters too, measured as TPI, or teeth per inch. A coarse saw around 6 to 8 TPI removes material fast but leaves a rougher edge, while a fine saw around 10 to 15 TPI cuts slower but smoother, useful for fussy joinery work. The coping saw is a completely different tool: a thin, replaceable blade held under tension in a C-shaped frame, designed to cut curves, cut out waste inside a mortise, or shape the profile at the end of a joint. Because its blade can rotate in the frame, you can steer it through tight turns that a hand saw could never follow. Keep both sharp; a dull saw wanders, burns the wood, and makes you work far harder than necessary."
+    },
+    {
+     "heading": "The Chisel: A Tool of Precision",
+     "body": "A bench chisel is a flat steel blade with a beveled cutting edge, mounted in a handle you either push by hand or strike with a mallet. A basic set usually covers a range of widths, commonly 1/4 inch, 1/2 inch, 3/4 inch, and 1 inch, so you can match the tool to the job: a narrow chisel for cleaning out a small mortise, a wide one for trimming a broad shoulder flat. The cutting edge is ground at roughly 25 degrees and then honed to a finer secondary bevel, often around 30 degrees, on a sharpening stone; this two-angle setup balances a keen edge against one that will not chip under use. There are two basic ways to cut with a chisel. Paring is a slow, controlled push cut, bevel either up or down depending on the task, used to shave thin slices and fit a joint precisely. Chopping is a struck cut, the chisel held vertically and driven down with mallet blows, used to remove waste quickly, as when hollowing a mortise. A chisel is only as good as its edge; a sharp one cuts wood fibers cleanly, while a dull one tears and crushes them, leaving a ragged surface no amount of sanding fully repairs.",
+     "image": "woodworking-chisel.jpg"
+    },
+    {
+     "heading": "The Hand Plane: Smoothing and Shaping Wood",
+     "body": "A hand plane flattens, smooths, and thins wood by shaving off controlled ribbons of material with a blade, called the iron, set into a flat sole. Behind the iron sits a chip breaker, a second thin plate that curls the shaving up and away, preventing it from splitting ahead of the cut and tearing the surface. Bench planes come in a few standard lengths, each suited to a stage of work: a jack plane, medium length, does rough initial flattening; a jointer plane, the longest, rides over high spots to true a long edge dead straight, useful when gluing two boards edge to edge; and a smoothing plane, the shortest, takes a very fine final shaving to leave a glassy surface. A separate small tool, the block plane, is held in one hand and is especially good at trimming end grain, where its low blade angle shears through the short, brittle wood fibers instead of splitting them out. The gap in the sole in front of the iron, called the mouth, can often be adjusted narrow for fine work or wider for a heavier cut. A well-tuned, sharp plane produces a continuous, translucent shaving and a surface so smooth it needs little sanding.",
+     "image": "hand-plane-parts.jpg"
+    },
+    {
+     "heading": "The Mallet: The Chisel's Quiet Partner",
+     "body": "A woodworker's mallet looks simple, a wooden head on a handle, but it is purpose-built to work with edge tools rather than against them. Its head is usually beech or another dense hardwood, and its striking face is noticeably larger than a hammer's, which spreads the force of each blow over a wider area. This matters because a steel hammer striking a chisel handle concentrates force into a small point and will eventually split or mushroom the wood or plastic handle; a mallet's broad, relatively soft face delivers the same push more gently and evenly, protecting the tool. Mallets also come with a slight taper or a barrel-shaped head, which lets you strike accurately from a range of angles without twisting your wrist. A separate style, the carver's mallet, has a round head so it always strikes true no matter how it is rotated in the hand, useful when carving where the tool is constantly being repositioned. In practice, a mallet is used to drive a chisel through a chopping cut, to seat joints together during glue-up, and sometimes to persuade a stubborn board into alignment. Choose one with some heft; a mallet that is too light forces you to swing harder and lose control, while a heavier head does the work with a shorter, more accurate tap."
+    },
+    {
+     "heading": "The Marking Gauge and Combination Square",
+     "body": "Accurate joinery depends on tools that scribe lines rather than just draw them. A marking gauge has a small fence that rides along the edge of a board and a pin, or on nicer gauges a small sharpened wheel, set at a fixed distance from that fence. Slide the fence along the wood and the pin scores a fine line parallel to the edge, at a repeatable distance every time, which is exactly what you need to lay out a mortise wall or a tenon shoulder consistently on both faces of a board. A wheel-type gauge, called a cutting gauge when fitted with a small blade instead of a pin, actually severs the surface wood fibers, which helps prevent tear-out when you later chisel along that line. The combination square is the other essential layout tool: a sliding rule fitted with a head that locks at exactly 90 degrees for checking or marking a square line across a board, and at 45 degrees for miters. The head also carries a small built-in level and can be used as a depth gauge, measuring into a hole or a rabbet. Together, these two tools let you transfer a dimension and lay it out with a precision a tape measure and pencil alone cannot match."
+    },
+    {
+     "heading": "Assembling a Starter Hand-Tool Kit",
+     "body": "You do not need a wall of tools to begin building things well; a small, well-chosen kit covers the vast majority of basic projects. Start with the tools that let you cut, join, and shape wood by hand, then add the consumables that hold a project together and finish its surfaces. A modest investment in quality here pays off, since a cheap chisel that will not hold an edge or a saw that wanders off its line will frustrate a beginner far more than having fewer tools. Buy the best you can reasonably afford in the cutting tools, since these depend on precise steel and geometry, and it is fine to be more economical on clamps and consumables, which you can always add to later as projects demand.",
+     "ingredients": [
+      "Hand saw (crosscut pattern, 8 to 10 TPI)",
+      "Bench chisel set (1/4 in, 1/2 in, 3/4 in, 1 in)",
+      "Wooden mallet",
+      "Combination square",
+      "Marking gauge",
+      "Sandpaper assortment (80 through 220 grit)",
+      "Wood glue (PVA type)",
+      "Bar or spring clamps (at least two pairs)"
+     ]
+    },
+    {
+     "heading": "Reading Wood Grain",
+     "body": "Wood grain is the direction and pattern of the fibers that made up the living tree, and every hand tool cuts differently depending on how you approach that direction. Run your hand or a plane along a board one way and the fibers lie down smoothly under the blade; go the other way and the same fibers stand up and get grabbed, splitting out ahead of the cutting edge in ragged little tears called tear-out. This is why woodworkers talk about planing or chiseling with the grain rather than against it. You can often read the direction by looking at the edge of a board, where the growth-ring lines run diagonally like shallow hills; planing from the low side up toward the high side, following the direction those lines point, generally lays the fibers down instead of lifting them. When grain direction is unclear or changes within a single board, as it often does near a knot or where the grain waves, take lighter cuts and pay close attention to the sound and feel of the tool; a clean cut hisses smoothly, while tear-out sounds and feels rougher and leaves a torn, dull patch instead of a shiny, sliced one. Learning to read grain before you cut, rather than after a tool has already torn the surface, is one of the most valuable habits a beginner can build."
+    },
+    {
+     "heading": "Basic Joinery: Butt, Lap, and Mortise-and-Tenon Joints",
+     "body": "Joinery is how separate pieces of wood become one structure, and a few fundamental joints cover most beginner projects. The butt joint is the simplest: two pieces meet square, end to face or edge to edge, with no interlocking shape cut into either piece, held together by glue reinforced with nails, screws, or dowels. It is quick to make but relies entirely on the fastener and glue bond, since there is little mechanical interlock resisting the joint being pulled apart or twisted. A lap joint improves on this by removing half the thickness from each piece where they overlap, so the two parts nest together flush rather than stacking on top of one another; this roughly doubles the glue surface area compared to a butt joint and adds real resistance to twisting, making it a good choice for frames and shelving. The mortise-and-tenon joint is the traditional workhorse of strong furniture joinery: one piece is cut with a rectangular socket, the mortise, and the other is shaped with a matching tongue, the tenon, sized to fit snugly inside it, usually with a shoulder that seats flush against the surrounding wood. Because the tenon is surrounded by wood on multiple faces and glued in, this joint resists both pulling apart and racking far better than a butt joint, which is why it has long been the standard for chair and table legs, doors, and frames that need to survive decades of use.",
+     "image": "mortise-tenon-joint.png"
+    },
+    {
+     "heading": "Measuring and Marking Accurately",
+     "body": "The old woodworker's mantra, measure twice, cut once, exists because a saw cut cannot be undone; a small error in marking becomes a permanent error in the finished piece. Accuracy starts with using one reliable reference for a given measurement rather than mixing tools, since even a small discrepancy between two rulers compounds across several marks. Mark with a sharp pencil for general layout, but switch to a marking knife for lines that will guide a saw or chisel; a knife severs the wood fibers cleanly and leaves a fine groove a chisel or saw can register into, while a pencil line has width and encourages the tool to wander along one edge or the other of the mark rather than a single true point. To mark a line square across a board, hold the combination square's head firmly against the reference edge, press the blade flat against the wood, and pull the knife or pencil along it in a single smooth stroke rather than several short ones, which tend to drift. When a measurement needs to be repeated on multiple pieces, such as several identical shelf lengths, cut one piece first and use it directly as a pattern for marking the rest rather than measuring each one from a tape, since this removes an entire source of accumulated error."
+    },
+    {
+     "heading": "How to Cut a Straight Line With a Hand Saw",
+     "body": "Cutting straight with a hand saw is a skill built from a consistent sequence rather than brute force; forcing the saw only makes it wander and bind.",
+     "steps": [
+      "Clamp the workpiece securely to a bench or sawhorse so it cannot shift or vibrate as you cut.",
+      "Mark the cut line square across the board using a combination square and a marking knife or sharp pencil.",
+      "Position the saw so the blade sits just on the waste side of the line, and align it using the knuckle of your thumb as a guide against the blade to start the kerf.",
+      "Begin with a few short, light pull strokes at a shallow angle to establish a clean starting notch without the saw skipping across the surface.",
+      "Once the kerf is established, lengthen your strokes to use the full length of the blade, letting the saw's weight and its own sharpness do the cutting rather than pressing down.",
+      "Check squareness periodically from the front and side of the cut, adjusting your angle gently if the kerf begins to drift off the line.",
+      "Slow down and support the offcut with your free hand as you near the end of the cut, since the final strokes are the most likely point for the wood to splinter or break away."
+     ]
+    },
+    {
+     "heading": "Using a Chisel Safely and Effectively",
+     "body": "A chisel is essentially a short, extremely sharp blade with no guard, so safe handling is as much a part of using one well as sharpening it is. The single most important habit is to always cut away from your body and away from the hand holding the workpiece; imagine the chisel slipping and make sure that path ends in air, not in your fingers or your leg. Secure the workpiece with a clamp or a bench vise before cutting whenever possible, since a piece that shifts under the blade is both a poor result and a safety risk. For controlled paring cuts, most work is done bevel-down, with the flat back of the chisel riding along the surface you want to remain flat, guiding the tool and preventing it from digging in; the bevel is angled up into the cut, shaving off thin, controlled slices as you push with steady hand pressure. For chopping work, such as removing the bulk of a mortise, hold the chisel vertically, bevel facing the waste, and strike the handle with a mallet in a series of controlled taps rather than a single hard blow, working back a little from your final line and paring to it afterward. Keep both hands behind the cutting edge at all times, and never test a chisel's sharpness by drawing a finger across the edge; sharp tools cut wood cleanly, and they cut skin just as cleanly."
+    },
+    {
+     "heading": "Sanding Progression: Why Grit Order Matters",
+     "body": "Sandpaper is labeled by grit number, a rough measure of how coarse or fine its abrasive particles are; a low number like 60 or 80 is coarse and removes material quickly but leaves visible scratches, while a high number like 220 or 320 is fine and leaves a smooth surface but removes almost nothing. The reason sanding is done in a sequence, typically something like 80, then 120, then 150, then 220, rather than jumping straight to a fine grit, is that each grit's job is to remove the scratches left by the grit before it. A coarse grit levels the surface and flattens tool marks quickly, but its own scratches are deep; skip straight to a fine grit and those deep scratches remain underneath a thin, deceptively smooth-feeling top layer, only to show up clearly once a finish is applied and light catches them at an angle. Working through the full progression, spending only as long at each stage as it takes to remove the previous grit's marks, gets you to a genuinely smooth surface far faster and more reliably than over-sanding at one grit. Always sand in the direction of the wood grain rather than across it, since cross-grain scratches are especially visible under a finish, and wipe or brush away dust between grits so leftover coarse particles do not scratch the finer paper."
+    },
+    {
+     "heading": "Basic Wood Finishing: Oil, Varnish, and Paint",
+     "body": "A finish protects wood from moisture and handling and changes how it looks, and the three broad categories work in very different ways. An oil finish, such as boiled linseed oil or a proprietary tung oil blend, soaks into the wood fibers rather than sitting on top of them, producing a low, natural-looking sheen that highlights the grain; it is easy to apply by wiping it on and off with a cloth, but it offers only modest protection against moisture and wear, and needs to be reapplied periodically as it wears away. A varnish or polyurethane finish instead forms a hard, continuous film on the surface of the wood; brushed or wiped on in thin coats and left to cure between them, it builds a genuine barrier against water, spills, and scratches, and is available in sheens from matte to high gloss, making it a good choice for tabletops and anything that will see heavy use. Paint is the most protective and the least revealing option: an opaque, pigmented film, usually applied over a primer that helps it bond to the wood, that fully hides the grain and color of the wood beneath it in exchange for strong, even protection and a uniform color. Choosing between them comes down to how much you want the wood itself to show and how much wear and moisture the finished piece will need to withstand."
+    },
+    {
+     "heading": "Wood Selection Basics: Softwood, Hardwood, and Moisture Content",
+     "body": "Lumber is broadly divided into softwoods and hardwoods, a botanical distinction based on the tree, not a direct measure of physical hardness. Softwoods come from conifers, trees like pine, spruce, and fir that keep their needles year-round and grow relatively quickly; the wood is generally light, easy to cut and shape by hand, and inexpensive, making pine a favorite for beginner projects and construction framing. Hardwoods come from broadleaf, deciduous trees like oak, maple, and walnut, which typically grow more slowly and produce denser wood, giving species like oak the strength and wear-resistance prized in furniture, flooring, and tool handles, though the botanical category has exceptions, since balsa is technically a hardwood despite being famously soft. Beyond species, every board carries a moisture content, the percentage of water still held in its cell structure, and this matters enormously for stability. Freshly cut, or green, wood is full of moisture and will shrink and can warp, cup, or crack significantly as it dries. Lumber sold for furniture and joinery is seasoned, either air-dried for months or kiln-dried under controlled heat, to bring its moisture content down to a stable range, typically around 6 to 8 percent for interior furniture, before it is milled. Wood continues to expand and contract slightly with seasonal humidity even after seasoning, which is why good joinery accounts for a small amount of ongoing movement rather than locking wood rigidly in every direction."
+    }
+   ],
+   "safetyNote": "Hand tools are edge tools, and most injuries come from a slip, not a deliberate cut: always clamp your workpiece securely before sawing or chiseling, always keep both hands behind the cutting edge and direct every cut away from your body, and wear eye protection when sanding, chiseling, or sawing, since wood chips and dust fly unpredictably. Keep tools sharp, since a dull edge requires more force and is more likely to slip than a sharp one that cuts cleanly under light pressure."
+  }
+ ]
+}

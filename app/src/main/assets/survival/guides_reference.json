@@ -1,0 +1,217 @@
+{
+ "guides": [
+  {
+   "id": "morse",
+   "title": "Morse Code",
+   "category": "Reference",
+   "summary": "Full alphabet, numbers and SOS.",
+   "sections": [
+    {
+     "heading": "Letters",
+     "body": "A ·—  B —···  C —·—·  D —··  E ·  F ··—·  G ——·  H ····  I ··  J ·———  K —·—  L ·—··  M ——  N —·  O ———  P ·——·  Q ——·—  R ·—·  S ···  T —  U ··—  V ···—  W ·——  X —··—  Y —·——  Z ——··",
+     "image": "morse-code.png"
+    },
+    {
+     "heading": "Numbers",
+     "body": "1 ·————  2 ··———  3 ···——  4 ····—  5 ·····  6 —····  7 ——···  8 ———··  9 ————·  0 —————"
+    },
+    {
+     "heading": "Timing & SOS",
+     "body": "A dash is 3x a dot. Gap between symbols = 1 dot; between letters = 3 dots; between words = 7 dots. SOS = · · · — — — · · · sent as one group."
+    },
+    {
+     "heading": "History and Adoption of the Code",
+     "body": "Samuel F. B. Morse — a portrait painter first, telegraph tinkerer second — built the earliest working version of the code with his assistant Alfred Vail between 1837 and 1844, refining it with input from physicist Joseph Henry. On May 24, 1844, Morse tapped out the first public long-distance message over a wire strung between the U.S. Capitol in Washington and a railroad depot in Baltimore: \"WHAT HATH GOD WROUGHT,\" a line from the Book of Numbers (23:23) chosen by Annie Ellsworth, the young daughter of a family friend, in a contest to pick the historic first words. That original code — now called American Morse Code — was quirkier than the one taught today: it used varying dash lengths and internal spacing within some letters (C, O, R, Y, and Z each had a deliberate pause mid-character), which a trained wire operator's ear could handle but which made it miserably ambiguous over the crackling, noisy medium of radio. In 1848 the German engineer Friedrich Clemens Gerke reworked it into a cleaner scheme built on simple, consistent dot-to-dash timing ratios; the International Telegraph Union adopted Gerke's version — what we now call International Morse Code — at a Paris conference in 1865, and the spread of radiotelegraphy carried it into worldwide use over the following half-century."
+    },
+    {
+     "heading": "Prosigns: The Procedural Shorthand Inside the Shorthand",
+     "body": "Procedural signals, called prosigns, are Morse's version of punctuation and formatting marks — but sent as a single run-together unit with no gap between their letters, which is exactly what tells a trained ear \"this is a signal, not two separate letters.\" AR (dit-dah-dit-dah-dit) means \"end of message\" or \"over,\" inviting a reply, and operators still write it as a stylized \"+\" in log books. SK (dit-dit-dit-dah-dit-dit) closes out an entire contact — \"that's it, we're done\" — and by a poignant extension has become the term hams use for a fellow operator who has died: a \"silent key.\" BT (dah-dit-dit-dit-dah) breaks a message into sections, functioning like a paragraph mark and often transcribed as \"=\" in written copy. KN (dah-dit-dah-dit-dit) means \"go ahead, but only you\" — it hands the conversation to one specific station and politely tells everyone else to hold off. AS (dit-dah-dit-dit-dit) means \"wait, stand by.\" And an unbroken run of eight dits signals the universal \"scratch that\" — error, disregard the last word, resending. None of these appear as ordinary letters in a standard alphabet table; they're a small, separate vocabulary every operator has to learn on top of the 26 letters, because a transmission built only from letters and numbers has no way to say \"I'm finished\" or \"that was a mistake.\""
+    },
+    {
+     "heading": "Q-Codes: A Second Layer of Compression",
+     "body": "Morse operators didn't stop at compressing letters into dots and dashes — they also compressed entire sentences into three-letter codes starting with Q, a system formalized for international radiotelegraphy at the 1912 London International Radiotelegraph Convention and expanded over the following decades. QTH means \"my location is...\"; QSL means \"I confirm receipt\" (and gave its name to the physical postcards, called QSL cards, that ham operators still mail each other to confirm a contact); QRZ means \"who is calling me?\"; QRM means interference from other stations or equipment; QRN means interference from natural atmospheric static, essentially distant lightning; QSY means \"I am changing frequency\"; QRT means \"I am shutting down, going off the air\"; and QRP — originally meaning simply \"reduce power\" — became the name of an entire ham radio subculture built around making contacts on five watts or less, sometimes across entire oceans, as a point of pride in operating skill over raw power. A handful of Q-codes exist only in ham radio's informal, expanded usage and never appear in the official maritime or aviation lists, but the working principle stays the same one that drives Morse itself: say the most with the fewest possible symbols, because every symbol costs time, and every second on a crowded, noisy, low-power channel is precious."
+    },
+    {
+     "heading": "Measuring Speed: The PARIS Standard and Farnsworth Timing",
+     "body": "Morse speed is measured in words per minute (WPM), but \"words\" needs a fixed definition since real words vary wildly in length — so the whole industry standardizes on one reference word: PARIS, defined as exactly 50 dot-length time units when sent with standard element ratios (a dah is 3 units long, the gap between elements within a letter is 1 unit, the gap between letters is 3 units, and the gap between words is 7 units). Because \"1 WPM\" is defined as sending the word PARIS once every 60 seconds, the math falls out cleanly: at W words per minute you send 50×W time-units in 60,000 milliseconds, so one unit lasts 1200⁄W milliseconds. At a brisk 20 WPM, that's 1200⁄20 = 60 ms per dit and 180 ms per dah — fast enough that most beginners can no longer consciously count dots and dashes; they have to recognize each letter by its rhythm, like a word rather than a spelling. That's exactly the gap Farnsworth timing is built to close: instead of slowing every element down to a beginner-friendly crawl — which teaches the ear a slow-motion sound it will have to unlearn later — Farnsworth timing keeps each individual letter's dits and dahs at a fast, realistic character speed, often 18–20 WPM, while stretching only the gaps between letters and words. The result is a learner who hears every character at full, real-world speed from day one, with extra thinking time bolted on between them, so speeding up later means shrinking gaps rather than relearning the sound of every letter."
+    },
+    {
+     "heading": "Equipment You'll Actually Need",
+     "body": "You don't need a radio license to start — nearly all of this can be practiced entirely off the air.",
+     "ingredients": [
+      "A code practice oscillator, or a simple 9-volt battery, buzzer, and telegraph key wired together — sold as beginner kits at electronics/hobby stores",
+      "A straight key or iambic paddle plus an electronic keyer, if you want the feel of real hand-sending (available at ham radio retailers or hamfests/swap meets)",
+      "A notepad and pencil for hand-copying practice — writing by hand builds recognition faster than typing",
+      "A smartphone or computer with a Morse trainer app, or any of the free web-based Koch/Farnsworth trainers",
+      "Headphones, ideally closed-back, for late-night or shared-space practice sessions",
+      "A basic shortwave receiver, to eventually listen in on real slow-speed CW nets and aviation NDB idents once you're comfortable",
+      "An amateur radio license and a used HF transceiver, only once you're ready to actually get on the air and make real contacts (available through ham radio clubs, electronics stores, or ham gear resellers)"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: Learning Morse the Way Real Operators Do",
+     "body": "This is the Koch method, developed by German psychologist Ludwig Koch in the 1930s and still the fastest documented way to build genuine head-copy — recognizing code by ear, not by counting dots.",
+     "steps": [
+      "Choose a trainer app or website that supports Koch-method lessons with Farnsworth spacing.",
+      "Set the character speed to 18–20 WPM from your very first session — never start slow, since you'll only have to relearn the sound later.",
+      "Begin with just two characters (traditionally K and M). Listen for 3–5 minutes and hand-write every character you hear.",
+      "Grade your copy against the source text. Once you're catching roughly 90% correctly across a full session, add exactly one new character.",
+      "Keep cycling all characters learned so far, not just the newest one, so old letters stay fresh while the new one embeds.",
+      "Repeat daily, adding one character per session, until you've worked through all 26 letters, 10 digits, and the handful of punctuation marks and prosigns.",
+      "Once everything sits comfortably at 90%+, start shrinking the Farnsworth gaps rather than speeding up the letters themselves — this raises effective WPM without disturbing the sound you've already trained your ear to recognize.",
+      "Graduate to real-world listening: recorded slow-speed CW nets, shortwave time-signal stations, or, if licensed, an on-air slow-speed CW practice net, where actual operators send at a human, imperfect pace."
+     ]
+    },
+    {
+     "heading": "Where Morse Code Still Lives Today",
+     "body": "Morse hasn't been mandatory anywhere in decades — the U.S. dropped the code requirement for every amateur radio license class in 2007, following a 2003 World Radiocommunication Conference decision freeing member nations from the old treaty requirement — but it is very much still alive. Continuous-wave (CW) mode remains one of the most reliable ways to complete a radio contact through weak signals and heavy static, because a trained ear can pull a recognizable dit-dah pattern out of noise that would completely bury a voice signal; that's exactly why QRP operators, chasing contacts on five watts or less, sometimes across entire oceans on power lower than a nightlight draws, overwhelmingly favor CW over voice. Pilots still hear it too: non-directional radio beacons (NDBs) used for aviation navigation identify themselves with a short two- or three-letter Morse ident, so a pilot tuning a beacon can positively confirm, by ear, without any display, that they've dialed in the right station rather than one on a nearby frequency. And Morse has found a genuinely humane second life in assistive technology: for people with severe motor disabilities who can reliably manage only a single switch — a blink, a puff of breath, a small button — Morse input software lets that one switch spell out complete sentences, one dit and dah at a time, restoring a form of independent communication that predates the telephone."
+    },
+    {
+     "heading": "Common Misconceptions Worth Retiring",
+     "body": "SOS is not an acronym. \"Save Our Souls\" and \"Save Our Ship\" are backronyms invented well after the fact; the pattern of three dits, three dahs, three dits was adopted as the international distress signal at the 1906 Berlin International Radiotelegraph Convention, effective 1908, for the plainest of engineering reasons — it's fast to send, has a distinctive rhythm, and is nearly impossible to mistake for noise or a stray letter, not because the three letters stand for anything. Along the same lines, the elements aren't really \"dots\" and \"dashes\" once you're actually using the code — operators call them dits and dahs, because proficiency is fundamentally about recognizing sound and rhythm, not staring at a printed chart and mentally converting each symbol; anyone who tries to count dots in real time at a working speed gets left behind immediately. It's also worth retiring the idea that Morse is a relic with no practical use: as covered above, it's alive in CW radio contacts, aviation beacon identification, and assistive communication technology — quietly persistent precisely because, for a narrow set of jobs (piercing noise, needing only a single switch, working with nothing but a light or a tone), nothing has fully replaced it in over 180 years."
+    }
+   ]
+  },
+  {
+   "id": "nato-phonetic",
+   "title": "NATO Phonetic Alphabet",
+   "category": "Reference",
+   "summary": "Spell clearly over noisy radio/phone.",
+   "sections": [
+    {
+     "heading": "Alphabet",
+     "body": "A Alfa · B Bravo · C Charlie · D Delta · E Echo · F Foxtrot · G Golf · H Hotel · I India · J Juliett · K Kilo · L Lima · M Mike · N November · O Oscar · P Papa · Q Quebec · R Romeo · S Sierra · T Tango · U Uniform · V Victor · W Whiskey · X X-ray · Y Yankee · Z Zulu",
+     "image": "kb/nato-phonetic.png"
+    },
+    {
+     "heading": "Numbers",
+     "body": "Speak digits individually. 'Niner' is used for 9 to avoid confusion with 5. Say 'figures' before a number group if needed."
+    },
+    {
+     "heading": "Origins and the Road to Standardization",
+     "body": "Long before \"Alfa\" and \"Bravo\" existed, Allied forces in the Second World War used the Joint Army/Navy Phonetic Alphabet — \"Able, Baker, Charlie, Dog...\" — a workable wartime compromise between the US and UK. But it had an obvious flaw once the war ended and NATO became a genuinely multinational alliance: it was built entirely around English sounds, and words like \"Able\" or \"Item\" simply don't stay intelligible when spoken by native French, German, Spanish, Turkish, or Portuguese speakers crackling through a noisy radio link. Through the early-to-mid 1950s, the International Civil Aviation Organization (ICAO) and NATO ran real linguistic intelligibility trials — testing candidate words against listeners from many language backgrounds under degraded audio conditions, the exact environment a real distress call or battlefield transmission happens in — to find a set of 26 words that would survive static, weak signals, and heavy accents equally well across as many languages as possible. ICAO formally adopted the resulting alphabet in 1956, with a couple of final tweaks — Nectar was replaced by November, Extra by X-ray — finalized by 1965, and it has been unchanged since. NATO adopted the same list for military use, which is why most people call it the \"NATO phonetic alphabet\" even though its real author is the ICAO/ITU joint spelling-alphabet standard used by nearly every radio service on Earth."
+    },
+    {
+     "heading": "Why These Specific Words? The Design Criteria",
+     "body": "The alphabet's words weren't picked for memorability or personality — they were engineered, the same way an aircraft wing is engineered, against a specific failure mode: a noisy, low-fidelity radio channel carrying a word spoken by someone whose first language isn't English. Every candidate had to clear several hurdles at once. It had to be pronounceable, without excessive distortion, by native speakers of English, French, and Spanish — ICAO's working languages — so a word that only sounds right in an American accent was disqualified outright. It had to be phonetically distinct enough from every other word on the list, and from common short radio phrases, that a partial or noisy reception couldn't be mistaken for a different letter. And it had to carry enough syllables and a clear enough stress pattern to survive being clipped at the start or end, exactly what happens when someone keys a microphone a fraction of a second late or a signal fades mid-word. That's why the list leans on words like \"Whiskey,\" \"Tango,\" and \"Foxtrot\" rather than plain letter-sound words like \"Frank\" or \"Sam\" — the engineered words simply survive degraded transmission and cross-language pronunciation better than ordinary ones do, which is the entire point of a phonetic alphabet in the first place."
+    },
+    {
+     "heading": "Official Pronunciation and Spelling Quirks",
+     "body": "Look closely at the official spellings and two of them look like typos: \"Alfa,\" not \"Alpha,\" and \"Juliett,\" not \"Juliet.\" Neither is a mistake. \"Alfa\" drops the \"ph\" specifically so that French, German, and Scandinavian speakers — who read \"ph\" less consistently as an \"f\" sound than English speakers do — pronounce it correctly on sight rather than guessing. \"Juliett\" carries a doubled final \"t\" because French orthography would otherwise leave the last consonant of \"Juliet\" silent, as it does in the name's ordinary French spelling — doubling the \"t\" forces the \"-ETT\" sound to be voiced no matter what language the reader's spelling instincts come from. ICAO's official reference, the Manual of Radiotelephony, goes further still, prescribing exactly which syllable of each word should carry the vocal stress — operators are trained to say al-FAH, BRAH-voh, CHAR-lee, DELL-tah, and so on all the way through the alphabet, rather than leaving stress placement to whatever sounds natural in the speaker's native accent. The details look pedantic on paper, but they exist for the same reason the whole alphabet exists: a single ambiguous syllable, at the wrong moment, is exactly how \"flight 5\" becomes \"flight 9.\""
+    },
+    {
+     "heading": "Beyond Aviation: Where You'll Actually Hear It",
+     "body": "Civil aviation is where the alphabet is legally mandated — pilots and air traffic controllers use it to read back call signs, runway designators, and clearances precisely because a garbled letter in an aircraft tail number is a genuinely dangerous kind of mistake — but it has spread far past the cockpit. Maritime radio operators use the identical list to spell vessel names and call signs over VHF. Military units use it for call signs, map grid references, and unit designations across every NATO member nation, which is the whole reason it carries the \"NATO\" name in public use. Emergency dispatchers and ham radio operators spell out addresses, license plates, and call signs the same way. And it has quietly become the default choice for entirely civilian, low-stakes situations too: a customer service agent spelling out a confirmation number over a bad phone connection, a pharmacist confirming a prescription name, someone reading their email address aloud to a stranger — anywhere a string of letters has to survive a noisy channel and a listener who might mishear \"B\" for \"D\" or \"M\" for \"N,\" reaching for \"Bravo\" and \"Delta,\" \"Mike\" and \"November,\" resolves the ambiguity instantly."
+    },
+    {
+     "heading": "Cousins and Look-Alikes: Other Spelling Alphabets",
+     "body": "It's easy to conflate the NATO alphabet with several relatives that solve similar problems differently. Many U.S. police and fire dispatch systems still use an older American law-enforcement alphabet inherited from mid-20th-century telephone company usage — Adam, Boy, Charles, David, Edward, Frank, George, Henry, Ida, John, King, Lincoln, Mary, Nora, Ocean, Paul, Queen, Robert, Sam, Tom, Union, Victor, William, X-ray, Young, Zebra — which is why a police scanner can sound subtly different from an aviation frequency even though both are \"just\" spelling out letters. The RAF and civilian aviation of the World Wars used their own earlier phonetic sets, including the \"Able Baker\" alphabet mentioned above, before international standardization arrived. And it's worth explicitly separating phonetic alphabets from \"ten-codes\" (10-4, 10-20, and so on) — ten-codes are operational shorthand for entire phrases like \"received\" or \"location,\" not a system for spelling individual letters, and the two are frequently confused by newcomers listening to a scanner for the first time because both show up in the same public-safety radio traffic."
+    },
+    {
+     "heading": "Equipment You'll Actually Need",
+     "body": "This one barely needs equipment — which is exactly why it's worth actually drilling rather than just reading.",
+     "ingredients": [
+      "A printed or laminated NATO alphabet reference card, small enough for a wallet, glovebox, or radio bag (available at electronics/hobby stores or printable at home)",
+      "A basic two-way radio pair — FRS/GMRS walkie-talkies are enough — to practice reading letters through real radio static rather than clean room air",
+      "A partner willing to sit in another room and copy down what you spell",
+      "A notepad for the listener to write down what they copy, so you can grade accuracy afterward",
+      "A phone or laptop with a white-noise or static-generator app, to simulate a genuinely degraded channel once clean practice gets easy",
+      "A list of tricky real-world strings to spell — license plates, confirmation codes, unusual last names — rather than only ever spelling easy dictionary words"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: A Practice Drill That Actually Sticks",
+     "body": "Do this with a friend over two radios or two phones in separate rooms — silently reading the alphabet off a chart doesn't build the recall speed you need under real pressure.",
+     "steps": [
+      "Write out 10 random strings of 5–6 letters and numbers each (mix in real license plates or confirmation-code formats, not just neat dictionary words).",
+      "Sit in a separate room from your partner, connected by radio or phone, and read each string using only the phonetic words — no shortcuts, no 'regular' letters.",
+      "Have your partner write down exactly what they copy, then compare against your original list and score the errors.",
+      "Repeat the same list a second time immediately, and note which specific letters caused mistakes — those are your weak points, not random bad luck.",
+      "Turn on a white-noise or static app at a moderate level and redo the drill, to rehearse the degraded-channel conditions the alphabet was actually designed for.",
+      "Once you're consistently error-free at moderate noise, speed up your delivery and rerun the whole drill — real radio traffic doesn't wait for you to think.",
+      "Fold the alphabet into ordinary life for a week: spell your own name, street, and email address out loud phonetically whenever you'd normally spell them, until reaching for 'Tango' instead of 'T' stops requiring conscious thought."
+     ]
+    },
+    {
+     "heading": "Common Mistakes and On-Air Etiquette",
+     "body": "The single most common mistake, even among people who know the list cold, is reverting to improvised words under stress — saying \"David\" or \"Denver\" instead of \"Delta\" because it's the first D-word that comes to mind in the moment. It defeats the entire purpose: the other party is trained to expect one specific set of 26 words, and an improvised substitute reintroduces exactly the ambiguity the standard alphabet was built to eliminate. A second common error is speaking too fast or running letters together without a clear pause between them, which is just as bad over a real degraded channel as slurring ordinary words together in speech. There's also an etiquette side that experienced operators internalize but nobody writes down for beginners: phonetic spelling is for genuinely ambiguous or high-stakes strings — call signs, confirmation codes, unusual names — not for every single word in a sentence, and needlessly spelling out something already perfectly clear just clogs a channel other people may urgently need. Finally, proper radio procedure calls for a short verbal flag before switching into spelling mode — something like \"I spell\" — so the listener knows to switch from parsing ordinary speech to parsing individual letters, rather than being caught mid-sentence wondering why you've suddenly started saying \"Whiskey Hotel Alfa Tango\" instead of a real word."
+    },
+    {
+     "heading": "Memory Tricks for Fast Recall",
+     "body": "The fastest path to fluency isn't memorizing the list top-to-bottom like a poem — it's building a strong mental image for each word and then using the alphabet constantly in low-stakes daily situations until retrieval stops being a conscious act at all. Group the words into short vivid phrases that follow a loose story or theme, so the sequence becomes a memory chain rather than 26 unrelated flashcards. Attach each word to its strongest possible mental image rather than its spelling — Whiskey as a glass, Tango as two dancers, Foxtrot as an actual fox — since vivid imagery recalls faster under pressure than abstract letter-word pairs do. Spaced repetition beats cramming badly here: five minutes a day for two weeks embeds the list far more durably than one long session, because the goal is instant, unconscious recall under radio static and adrenaline, not passing a quiz in a quiet room. And the single best-documented trick is simply using it: spell your own name and address out loud phonetically every time the situation would normally call for spelling something, so the alphabet gets rehearsed dozens of times a week in completely ordinary, low-stakes moments instead of only during dedicated study sessions."
+    }
+   ]
+  },
+  {
+   "id": "emergency-frequencies",
+   "title": "Emergency Frequencies",
+   "category": "Reference",
+   "summary": "Common distress and calling channels.",
+   "sections": [
+    {
+     "heading": "Air & sea",
+     "body": "121.5 MHz — international aeronautical emergency. 243.0 MHz — military. VHF marine Channel 16 (156.8 MHz) — international maritime distress/calling. 406 MHz — emergency beacons (EPIRB/PLB), satellite-detected.",
+     "image": "kb/emergency-frequencies.jpg"
+    },
+    {
+     "heading": "Consumer radios",
+     "body": "FRS/GMRS Channel 1 and Channel 9 are common informal calling/emergency channels in North America. PMR446 Channel 1 in Europe. Monitor and call on these if you carry walkie-talkies."
+    },
+    {
+     "heading": "Amateur (ham) calling",
+     "body": "2 m: 146.520 MHz FM simplex calling (US). 70 cm: 446.000 MHz. HF voice calling examples: 7.200, 14.300 MHz. A licence is normally required, but any frequency may be used in a genuine life-threatening emergency."
+    },
+    {
+     "heading": "How These Frequencies Became Standardized",
+     "body": "Distress radio frequencies weren't chosen arbitrarily — most trace back to a specific disaster or a specific engineering compromise. The 500 kHz maritime calling and distress frequency was designated internationally at the 1906 Berlin International Radiotelegraph Convention, the same convention that adopted \"SOS\" as the distress signal, effective 1908, but it took the sinking of the Titanic in 1912 — where nearby ships' radio operators were off duty and missed the distress calls — to force the 1914 SOLAS (Safety of Life at Sea) convention to mandate round-the-clock radio watchkeeping aboard passenger vessels. That Morse-based, human-operator system stood for most of the 20th century until the Global Maritime Distress and Safety System (GMDSS) replaced it between 1992 and 1999, shifting distress alerting to automated satellite links and Digital Selective Calling so a vessel in trouble no longer depends on a nearby ship happening to have an operator awake and listening. Aviation's 121.5 MHz emergency frequency has a similar postwar pedigree, adopted as the international civil \"guard\" frequency monitored by air traffic control and aircraft alike; its military twin, 243.0 MHz, sits at exactly double the frequency — a deliberate harmonic relationship that let early, simple emergency beacon equipment be picked up on both bands by receivers tuned to either one. And the Cospas-Sarsat satellite system, a joint venture begun by the US, Canada, France, and the Soviet Union starting in 1979 and operational by 1982, added a genuinely global safety net: a beacon can now trigger a rescue anywhere on Earth, ocean or wilderness, with no ship or tower in radio range at all, a system credited with tens of thousands of lives saved since it went live."
+    },
+    {
+     "heading": "The Legal Framework: Licensing, and the Genuine Emergency Exception",
+     "body": "Every radio service mentioned in this guide sits under its own regulatory tier, and knowing which tier you're in matters before you key a microphone. In the U.S., amateur (\"ham\") radio requires passing a license exam; Citizens Band (CB) requires no license at all; the Family Radio Service (FRS) is license-free but power-limited; the General Mobile Radio Service (GMRS) requires a license — no test, just a fee, covering an entire household — in exchange for higher power limits and the ability to use repeaters and external antennas; and marine and aviation radio each have their own licensing structures. But every one of these frameworks carries the same override built in for the moment it actually matters: FCC rule 47 CFR §97.405 explicitly permits a licensed amateur station to use any means of radiocommunication at its disposal, on any frequency, when normal channels are unavailable and human life or property is in immediate danger — and more broadly, both U.S. and international radio law, echoed in the ITU Radio Regulations, have long recognized the same overriding principle even for someone without any license at all: a person who keys a radio they aren't licensed to summon help during a genuine, life-threatening emergency, with no other means of getting help available, is acting within the spirit of every emergency-communications rule ever written, not violating it. That exception exists precisely so that \"I don't have the right license\" is never the reason someone hesitates to call for help — but it is not a loophole for routine use, and it evaporates the instant the actual emergency is over."
+    },
+    {
+     "heading": "Distress Call Structure: Mayday, Pan-Pan, and Sécurité",
+     "body": "International voice radio distress procedure, set by the ITU Radio Regulations and mirrored by IMO maritime rules, uses three distinct spoken signals, each borrowed from French and each said three times to cut through noise and make the level of urgency unmistakable from the first syllable. \"MAYDAY\" (from the French m'aider, \"help me\") is reserved for grave and imminent danger to life — a sinking vessel, a plane going down, a person about to die — and takes absolute priority over all other traffic on the channel. \"PAN-PAN\" (from panne, \"breakdown\") signals urgency without immediate mortal danger — a medical situation that needs help but isn't instantly life-threatening, a boat adrift but not sinking. \"SÉCURITÉ\" is reserved for safety information rather than an emergency at all — a navigational hazard, a severe weather warning — broadcast so others can avoid a danger before it becomes one. A proper Mayday call follows a fixed structure for good reason: under real panic, an unstructured call reliably omits the one detail a rescuer needs most. The standard form runs \"MAYDAY MAYDAY MAYDAY, this is [name/call sign] [name/call sign] [name/call sign], position [coordinates or clear description], [nature of the emergency], [number of people aboard/involved], [assistance required], over\" — and rehearsing that exact sequence calmly, before you ever need it, is the single highest-value thing you can practice from this entire guide."
+    },
+    {
+     "heading": "Satellite Distress Beacons: EPIRB, PLB, and ELT",
+     "body": "Three device families exist for the moment when no human is in radio range at all, and they differ mainly in where they're mounted and how they trigger. An EPIRB (Emergency Position-Indicating Radio Beacon) is a maritime device, often designed to float free of a sinking vessel and activate automatically on water contact. A PLB (Personal Locator Beacon) is the individual version — smaller, carried by a hiker, hunter, or backcountry traveler, and always manually triggered, since there's no \"sinking\" event to detect. An ELT (Emergency Locator Transmitter) is built into aircraft and typically triggers automatically off an impact-sensing \"G-switch\" during a crash. All three transmit on the same 406 MHz Cospas-Sarsat satellite frequency, and modern units also encode a unique registered ID and, if built-in GPS has a fix, an actual position — pushing location accuracy from several kilometers under Doppler-shift-only tracking down to roughly 100 meters with GPS encoding, the difference between a search area the size of a small town and a search area the size of a parking lot. Every beacon also broadcasts a separate, older 121.5 MHz homing signal purely for final-approach direction-finding once a search aircraft is already in the area — the satellite network stopped monitoring 121.5 for the initial alert back in 2009, too many false alarms with no ID or position encoded, but the frequency still earns its keep for the last few hundred meters of a real search. None of this works if the beacon isn't registered — in the U.S., NOAA maintains the national registration database, it's free, and it needs to stay current, because in a real activation the very first thing search-and-rescue does is look up who the beacon belongs to and who to call."
+    },
+    {
+     "heading": "Equipment You'll Actually Need",
+     "body": "What you actually need depends heavily on context — a boater, a backcountry hiker, and a storm-prone homeowner each want a different subset of this list.",
+     "ingredients": [
+      "A NOAA Weather Radio receiver with SAME (Specific Area Message Encoding) alerting, so it only sounds an alarm for your own county rather than every county in range (sold at electronics and outdoor-supply stores)",
+      "A basic VHF marine handheld, if you're ever on the water, programmed with channel 16 and your region's working channels",
+      "A pair of FRS/GMRS walkie-talkies for short-range family or group communication (a GMRS license is still required by rule, even though there's no exam)",
+      "A registered PLB (Personal Locator Beacon) for backcountry travel outside cell coverage, or an EPIRB for open-water boating",
+      "An amateur ('ham') radio handheld or mobile transceiver, plus a real license exam, for two-way access to the widest emergency communications network available to civilians",
+      "A basic scanner receiver, which requires no license at all since simply listening is always legal, useful for monitoring local emergency traffic",
+      "A laminated regional emergency-frequency reference card, kept with whichever radio you actually carry"
+     ]
+    },
+    {
+     "heading": "Step-by-Step: Setting Up and Actually Practicing This",
+     "body": "Owning the right radio does nothing if the first time you touch its settings is during a real emergency — set it up and rehearse it now, while nothing is wrong.",
+     "steps": [
+      "Look up your specific region's actual working frequencies (marine working channels, local ham repeater, NOAA Weather Radio transmitter) rather than relying on generic national defaults.",
+      "Program those exact frequencies into whichever radio you own, and label the channels physically or in the radio's memory so you're not hunting for them under pressure.",
+      "Do a routine radio check with a friend or family member on a legal, appropriate channel — confirm both that the equipment works and that you both know how to operate it, not just that it powers on.",
+      "Out loud, alone, practice the full scripted Mayday call structure from the section above until you can say it without looking at notes — position, nature of emergency, people involved, assistance needed, in that order, every time.",
+      "If you own a PLB or EPIRB, register it with your national authority (NOAA in the U.S.) and set a calendar reminder to verify the registration and check the battery-replacement date, typically every 2 years for registration and 5 years for battery.",
+      "Confirm your NOAA Weather Radio receiver is set to your correct county's SAME code, not just the nearest transmitter's default coverage.",
+      "Find your local amateur radio emergency net's schedule (most clubs run a weekly practice net) and simply listen in for a session, to hear what real, unscripted emergency radio traffic actually sounds like before you ever need to use it yourself."
+     ]
+    },
+    {
+     "heading": "Common Misconceptions About Emergency Radio",
+     "body": "A surprising number of widely-believed \"facts\" about emergency radio are outdated or simply wrong. CB channel 9 is not reliably monitored around the clock — it was designated the official emergency/traveler-assistance channel by the FCC in 1977, and volunteer groups like REACT genuinely did monitor it during CB's 1970s–80s heyday, but that volunteer coverage has thinned dramatically since cell phones took over as the default way to call for help, so channel 9 should be treated as a possibility, never an assumption. Cell phones themselves carry their own misconception: they feel like the universal emergency tool, but they depend entirely on functioning cell towers and grid or battery power, precisely the infrastructure most likely to fail in a genuinely serious disaster — radio, especially battery- or hand-crank-powered radio, has no such dependency. FRS and GMRS also get conflated constantly, as if they're the same radios with different stickers: GMRS requires a license, no test but a real fee and rule requirement, in exchange for meaningfully higher power, repeater access, and external antennas, while FRS is license-free specifically because its power and antenna are capped low enough to limit real-world range and interference. And marine channel 16 is often misunderstood as a channel reserved only for boats actually in trouble — it's really the international hailing and safety channel, meant for brief initial contact and distress calls, with the expectation that any non-emergency conversation immediately moves to a working channel so 16 stays clear for the next real emergency."
+    },
+    {
+     "heading": "NOAA Weather Radio and Other Reference Channels",
+     "body": "Beyond the distress and calling frequencies already covered, a handful of standing reference channels round out a genuinely complete picture. NOAA Weather Radio All Hazards broadcasts continuously on seven VHF frequencies between 162.400 and 162.550 MHz, commonly labeled WX1 through WX7 on consumer radios, carrying non-stop weather and hazard information from the National Weather Service; its SAME encoding lets a receiver stay silent until an alert is actually issued for the specific county it's set to, rather than sounding for every warning issued anywhere in radio range. FRS radios default to channel 1 as an informal general calling channel in many user communities, similar in spirit to marine channel 16's role, even though nothing in the rules formally requires it. GMRS repeaters operate on a distinct set of frequencies in the 462–467 MHz range from the simplex-only FRS channels, extending a handheld's practical range from a mile or two to potentially dozens of miles depending on repeater placement and terrain. And the aviation pairing of 121.5 MHz (civil) and 243.0 MHz (military) mentioned earlier is worth remembering as a pair rather than two unrelated numbers — any aircraft, civilian or military, monitoring either frequency is listening for the same emergency traffic, exactly the redundancy the harmonic relationship was designed to guarantee."
+    }
+   ]
+  }
+ ]
+}
