@@ -68,7 +68,7 @@ class RadioService : Service() {
         }
         val open = PendingIntent.getActivity(
             this, 0,
-            Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, Routes.TACNET),
+            Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, Routes.RADIO),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val stop = PendingIntent.getService(
@@ -78,6 +78,8 @@ class RadioService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
+            .setColor(androidx.core.content.ContextCompat.getColor(this, dev.mascwa.pulse.R.color.lcars_condition_routine))
+            .setSubText("RADIO")
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(open)

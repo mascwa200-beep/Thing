@@ -21,13 +21,15 @@ object FeatureCatalog {
         FeatureMeta(Routes.OBJECTIVES, "Objectives", "Track waypoints & calendar missions."),
         FeatureMeta(Routes.COMPASS, "Compass", "Offline heading."),
         FeatureMeta(Routes.SURVIVE, "Survive", "Nearest help, SOS & offline guides."),
-        FeatureMeta(Routes.TACNET, "LCARS", "Radar, telemetry, orbital & space weather."),
+        FeatureMeta(Routes.MENU, "Menu", "Every feature, one tap, plain English."),
         FeatureMeta(Routes.ECONOMY, "Economy", "Inflation, GDP & jobs."),
         FeatureMeta(Routes.FUEL, "Fuel & Energy", "Benchmarks & pump prices."),
         FeatureMeta(Routes.SOCIAL, "Social", "Lemmy, Mastodon & Hacker News."),
         FeatureMeta(Routes.SEARCH, "Search", "Private web search."),
-        FeatureMeta(Routes.SKY, "Sky", "Space weather, orbital & compass."),
         FeatureMeta(Routes.ORBITAL, "Orbital", "ISS, sun, moon & near-Earth objects."),
+        FeatureMeta(Routes.RADIO, "Radio", "Local & internet stations."),
+        FeatureMeta(Routes.NOTES, "Notes", "Quick notes."),
+        FeatureMeta(Routes.DIARY, "Diary", "Your daily log."),
         FeatureMeta(Routes.SETTINGS, "Settings", "Tune LCARS to your taste."),
     )
 

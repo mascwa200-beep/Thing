@@ -80,7 +80,6 @@ class HomeNav(
     val openMarkets: () -> Unit,
     val openWeather: () -> Unit,
     val openEconomy: () -> Unit,
-    val openInflation: () -> Unit,
     val openFuel: () -> Unit,
     val openSettings: () -> Unit,
     val openAssistant: () -> Unit = {},
@@ -130,8 +129,10 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconChip(LcarsIcons.Search, "Search") { nav.openNews() }
-                        IconChip(Icons.Filled.Notifications, "Alerts") { nav.openNews() }
+                        // Fixed mis-wiring: Search opens Search and the bell opens Advisories — the two
+                        // used to both dump you on News.
+                        IconChip(LcarsIcons.Search, "Search") { nav.openRoute(dev.mascwa.pulse.navigation.Routes.SEARCH) }
+                        IconChip(Icons.Filled.Notifications, "Advisories") { nav.openRoute(dev.mascwa.pulse.navigation.Routes.ORACLE) }
                         IconChip(Icons.Filled.Settings, "Settings") { nav.openSettings() }
                     }
                 }

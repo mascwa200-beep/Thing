@@ -10,16 +10,17 @@ object Routes {
     const val WEATHER = "weather"
     const val SETTINGS = "settings"
     const val ECONOMY = "economy"
-    const val INFLATION = "inflation"
     const val FUEL = "fuel"
 
-    // Sky (Phase 1)
-    const val SKY = "sky"
+    // THE flat directory — every feature, one tap, plain English (feature/menu/MenuScreen).
+    const val MENU = "menu"
+
+    // Sky
     const val COMPASS = "compass"
     const val SPACE_WX = "space_wx"
     const val ORBITAL = "orbital"
 
-    // Survive (Phase 2)
+    // Survive
     const val SURVIVE = "survive"
     const val SOS = "sos"
     const val PLACES = "places"
@@ -28,33 +29,37 @@ object Routes {
     const val SAFETY = "safety"
     const val HABITAT = "habitat" // offline animal-habitat / wildlife map
 
-    // Social & search (Phase 3)
+    // Social & search
     const val SOCIAL = "social"
     const val SEARCH = "search"
 
-    // Tacnet (real-time radar + telemetry)
-    const val TACNET = "tacnet"
+    // Live radar + device telemetry
     const val RADAR = "radar"
     const val TELEMETRY = "telemetry"
 
-    // ORACLE — J.A.R.V.I.S.'s cross-signal foresight HUD
+    // Sound
+    const val RADIO = "radio"
+    const val MUSIC = "music"
+
+    // Personal logs
+    const val NOTES = "notes"
+    const val DIARY = "diary"
+
+    // ORACLE — the Computer's cross-signal foresight HUD ("Advisories")
     const val ORACLE = "oracle"
 
-    // J.A.R.V.I.S. Matrix (on-device assistant)
+    // The Computer (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"
     const val JARVIS_APPROVALS = "jarvis_approvals"
     const val JARVIS_MEMORY = "jarvis_memory"
     const val JARVIS_DOSSIER = "jarvis_dossier"
 
-    // 3D cyberpunk navigation map
+    // 3D navigation map
     const val NAV = "nav"
 
-    // Objectives / waypoint tracker (calendar + manual)
+    // Saved places / waypoint tracker (calendar + manual)
     const val OBJECTIVES = "objectives"
-
-    // Objectives — the objective log as its own LCARS feed tab
-    const val QUESTS = "quests"
 
     // Diagnostics
     const val CRASH_LOG = "crash_log"
@@ -73,14 +78,13 @@ data class TopDestination(
     val unselectedIcon: ImageVector,
 )
 
+// Six plain-English tabs, most-used first. Settings lives in MENU (and behind Home's gear) — everything
+// that used to hide inside the old console's nested sub-tabs is now one tap from MENU.
 val TOP_DESTINATIONS = listOf(
     TopDestination(Routes.HOME, "HOME", LcarsIcons.Home, LcarsIcons.Home),
     TopDestination(Routes.NEWS, "NEWS", LcarsIcons.Article, LcarsIcons.Article),
     TopDestination(Routes.MARKETS, "MARKETS", LcarsIcons.ShowChart, LcarsIcons.ShowChart),
-    TopDestination(Routes.WEATHER, "WX", LcarsIcons.WbSunny, LcarsIcons.WbSunny),
+    TopDestination(Routes.WEATHER, "WEATHER", LcarsIcons.WbSunny, LcarsIcons.WbSunny),
     TopDestination(Routes.JARVIS, "COMPUTER", LcarsIcons.AutoAwesome, LcarsIcons.AutoAwesome),
-    // TOOLS is a pseudo-destination: it opens the LCARS feed tabs (FEED_HOME) and highlights on
-    // any feed route — handled specially in PulseApp. TACNET (the LCARS screen) is the feed home.
-    TopDestination(Routes.TACNET, "TOOLS", LcarsIcons.GridView, LcarsIcons.GridView),
-    TopDestination(Routes.SETTINGS, "SYS", LcarsIcons.Settings, LcarsIcons.Settings),
+    TopDestination(Routes.MENU, "MENU", LcarsIcons.GridView, LcarsIcons.GridView),
 )
