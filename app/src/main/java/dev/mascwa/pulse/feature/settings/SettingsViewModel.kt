@@ -306,12 +306,37 @@ class SettingsViewModel(
     }
 
     fun sendTestNotification() {
-        // Use the high-importance breaking channel so it pops as a heads-up.
-        notifier.notifyBreaking(
-            id = 9999,
-            title = "LCARS notifications are working",
-            body = "If you can see this, alerts are enabled. Breaking news, market, weather, sky and safety alerts will appear like this.",
-            route = "home",
+        // Posts a fully-populated sample of THE one LCARS notification on the alerting channel (so it pops
+        // as a heads-up) — this is the on-device render check for the board's custom layout: expand it and
+        // every row's colour-block label + plain text line should sit cleanly, nothing overlapping.
+        val sample = dev.mascwa.pulse.core.telemetry.UnifiedBrief(
+            headline = "LCARS notifications are working",
+            tempLabel = "72°F",
+            rows = listOf(
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.ALERT,
+                    "This is a test — Yellow Alert looks like this",
+                ),
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.NEWS,
+                    "Your top story appears here — Sample Source",
+                ),
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.MARKETS,
+                    "NVDA +4.8% · TSLA -3.2% (+1 more)",
+                ),
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.WEATHER,
+                    "72°F now · Cloudy · High 78 / Low 61",
+                ),
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.AGENDA,
+                    "Dentist in 1h 40m · 3 tasks open · 2 reminders set",
+                ),
+            ),
+            urgency = dev.mascwa.pulse.core.telemetry.BriefUrgency.YELLOW,
+            urgencyKey = "test:${System.currentTimeMillis()}",
         )
+        notifier.notifyBrief(sample, alertNew = true)
     }
 }

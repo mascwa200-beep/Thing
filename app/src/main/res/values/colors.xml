@@ -19,6 +19,12 @@
     <color name="lcars_condition_routine">#FF9C42</color>
     <color name="lcars_condition_yellow">#FFCC42</color>
     <color name="lcars_condition_red">#FF3B30</color>
+    <!-- The one-notification board's per-row tag colours — the real in-app LcarsPalette tokens
+         (accent/amber/sky/violet) so the notification and the app speak the same LCARS dialect. -->
+    <color name="lcars_row_news">#FF9C42</color>
+    <color name="lcars_row_markets">#FFCC99</color>
+    <color name="lcars_row_weather">#9999FF</color>
+    <color name="lcars_row_agenda">#CC99CC</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

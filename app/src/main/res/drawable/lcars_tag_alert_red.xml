@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LCARS tag block: a solid rectangle with the classic rounded-one-end pill cap on the left. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/lcars_condition_red" />
+    <corners android:topLeftRadius="9dp" android:bottomLeftRadius="9dp" />
+</shape>

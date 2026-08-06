@@ -34,6 +34,82 @@ class Notifier(private val context: Context) {
         context, Manifest.permission.POST_NOTIFICATIONS,
     ) == PackageManager.PERMISSION_GRANTED
 
+    /**
+     * THE one notification — posts a [dev.mascwa.pulse.core.telemetry.UnifiedBrief] as the single LCARS
+     * situation board (fixed id [NotifId.BRIEF], replaced in place forever). [alertNew] true routes the
+     * post through the HIGH-importance [NotificationChannels.BRIEF_ALERT] twin so it buzzes exactly once
+     * for a genuinely new urgent item; otherwise the silent [NotificationChannels.BRIEF] channel refreshes
+     * the board without a sound. Rendering: DecoratedCustomViewStyle keeps the system template frame (the
+     * measured, can't-silently-fail part) around LinearLayout-only LCARS RemoteViews; title/text are always
+     * set too, so accessibility/Wear and any render fallback still carry the full content.
+     */
+    fun notifyBrief(brief: dev.mascwa.pulse.core.telemetry.UnifiedBrief, alertNew: Boolean) {
+        if (!canPost()) return
+        val condition = when (brief.urgency) {
+            dev.mascwa.pulse.core.telemetry.BriefUrgency.RED -> AlertCondition.RED
+            dev.mascwa.pulse.core.telemetry.BriefUrgency.YELLOW -> AlertCondition.YELLOW
+            dev.mascwa.pulse.core.telemetry.BriefUrgency.ROUTINE -> AlertCondition.ROUTINE
+        }
+        val alerting = alertNew && condition != AlertCondition.ROUTINE
+        val channel = if (alerting) NotificationChannels.BRIEF_ALERT else NotificationChannels.BRIEF
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_ROUTE, "home")
+        }
+        val pi = PendingIntent.getActivity(
+            context, "brief".hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val fallbackText = brief.rows.joinToString("\n") { it.text }
+        val notification = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(ContextCompat.getColor(context, colorFor(condition)))
+            .setSubText(subtextFor(condition, "Situation Board"))
+            .setContentTitle(brief.headline)
+            .setContentText(brief.rows.getOrNull(1)?.text ?: brief.tempLabel ?: brief.headline)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(LcarsNotificationRenderer.collapsed(context, brief))
+            .setCustomBigContentView(LcarsNotificationRenderer.expanded(context, brief))
+            .setTicker(fallbackText.take(200))
+            .setPriority(if (alerting) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_MIN)
+            .setOnlyAlertOnce(!alerting)
+            .setContentIntent(pi)
+            // The board is the resident situation display — tapping it opens the app WITHOUT dismissing it
+            // (a swipe still dismisses; the next refresh brings it back).
+            .setAutoCancel(false)
+            .build()
+        safeNotify(NotifId.BRIEF, notification)
+    }
+
+    /**
+     * A one-line urgent post through the same single notification id, for callers that can't gather a full
+     * signal snapshot (a network callback, a vitals anomaly). The next routine board refresh replaces it
+     * with the full picture. Callers keep their own once-latches; this always alerts.
+     */
+    fun notifyUrgentLine(headline: String, detail: String, key: String, red: Boolean = false) {
+        val brief = dev.mascwa.pulse.core.telemetry.UnifiedBrief(
+            headline = headline,
+            tempLabel = null,
+            rows = listOf(
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.ALERT,
+                    detail.ifBlank { headline },
+                ),
+            ),
+            urgency = if (red) {
+                dev.mascwa.pulse.core.telemetry.BriefUrgency.RED
+            } else {
+                dev.mascwa.pulse.core.telemetry.BriefUrgency.YELLOW
+            },
+            urgencyKey = key,
+        )
+        notifyBrief(brief, alertNew = true)
+    }
+
+    fun cancelBrief() {
+        runCatching { NotificationManagerCompat.from(context).cancel(NotifId.BRIEF) }
+    }
+
     fun notifyBreaking(id: Int, title: String, body: String, route: String = "news") =
         post(
             NotificationChannels.BREAKING, id, "News Bulletin", title, body, route,
@@ -224,6 +300,8 @@ class Notifier(private val context: Context) {
  * pile-up. Kept in one place so the "latest-only" contract is auditable.
  */
 object NotifId {
+    /** THE one notification — the whole board lives and refreshes under this single id. */
+    const val BRIEF = 2300
     const val BREAKING = 1001
     const val EMERGENCY = 1002
     const val ORACLE = 2100

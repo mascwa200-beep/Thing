@@ -48,6 +48,13 @@
     <string name="channel_security_name">Security Alert</string>
     <string name="channel_security_desc">Device and network security notices.</string>
 
+    <!-- The one-notification board: fixed row labels (black-on-colour LCARS tag blocks) -->
+    <string name="notif_row_alert">ALERT</string>
+    <string name="notif_row_news">NEWS</string>
+    <string name="notif_row_markets">MARKET</string>
+    <string name="notif_row_weather">WEATHER</string>
+    <string name="notif_row_agenda">AGENDA</string>
+
     <!-- Live data-feed widget -->
     <string name="widget_feed_label">LCARS Live Feed</string>
 

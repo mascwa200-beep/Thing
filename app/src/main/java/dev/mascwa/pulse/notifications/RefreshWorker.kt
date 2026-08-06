@@ -478,6 +478,8 @@ class RefreshWorker(
             seenTopUrls = latest.seenTopUrls,
             breakingInterruptLastMs = latest.breakingInterruptLastMs,
             breakingInterruptSeen = latest.breakingInterruptSeen,
+            // BriefEngine owns the one-notification alert dedup key on its own cadence — never clobber it.
+            lastUrgentKey = latest.lastUrgentKey,
         ) else state
         container.diskCache.write("notify_state", merged, NotifyState.serializer())
     }

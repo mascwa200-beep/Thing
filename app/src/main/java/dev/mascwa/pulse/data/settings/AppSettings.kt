@@ -263,6 +263,15 @@ data class NotificationPrefs(
     val quietEndHour: Int = 7,
     /** Absolute percent move on a watch item that triggers an alert. */
     val marketMovePercent: Double = 3.0,
+    // --- The ONE-notification board (additive; the legacy per-category flags above are retired in the
+    // cutover slice). One row toggle per board row + one switch for whether urgent items may buzz. ---
+    val showNewsRow: Boolean = true,
+    val showMarketsRow: Boolean = true,
+    val showWeatherRow: Boolean = true,
+    val showAgendaRow: Boolean = true,
+    /** Whether a NEW urgent item (due reminder, major emergency, security/safety notice) may re-post the
+     *  board with sound and vibration. Off = the board still updates, just always silently. */
+    val urgentAlertsEnabled: Boolean = true,
 )
 
 /**

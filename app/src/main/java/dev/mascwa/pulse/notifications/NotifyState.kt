@@ -21,4 +21,7 @@ data class NotifyState(
     val breakingInterruptLastMs: Long = 0L,
     /** Titles already used for a breaking takeover, so the same major story can't re-interrupt. */
     val breakingInterruptSeen: List<String> = emptyList(),
+    /** The one-notification board: the last urgencyKey that buzzed the alert channel, so the same urgent
+     *  item alerts exactly once and every later refresh stays silent. Owned by BriefEngine. */
+    val lastUrgentKey: String = "",
 )

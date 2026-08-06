@@ -7,6 +7,13 @@ import androidx.core.content.getSystemService
 import dev.mascwa.pulse.R
 
 object NotificationChannels {
+    /** THE one notification (silent in-place refreshes). Distinct new ids so no stale user override
+     *  from a retired channel can resurrect onto them. */
+    const val BRIEF = "channel_brief"
+
+    /** The same one notification re-posted when a NEW urgent item enters — this channel carries the buzz. */
+    const val BRIEF_ALERT = "channel_brief_alert"
+
     const val EMERGENCY = "channel_emergency"
     const val BREAKING = "channel_breaking"
     const val BREAKING_INTERRUPT = "channel_breaking_interrupt"
@@ -24,6 +31,32 @@ object NotificationChannels {
     fun ensure(context: Context) {
         val mgr = context.getSystemService<NotificationManager>() ?: return
         val channels = listOf(
+            // THE ONE NOTIFICATION — the LCARS situation board. Silent, no badge: it refreshes in place
+            // all day; only its BRIEF_ALERT twin below ever buzzes. (Literal strings by design.)
+            NotificationChannel(
+                BRIEF,
+                "Situation Board",
+                NotificationManager.IMPORTANCE_MIN,
+            ).apply {
+                description = "The one LCARS notification: news, markets, weather and your agenda, always current."
+                enableVibration(false)
+                setShowBadge(false)
+            },
+            // The alerting twin: same notification id, used only when something NEW is genuinely urgent
+            // (a due reminder, a major emergency, a security or safety notice) — buzzes once, then the
+            // silent channel takes back over.
+            NotificationChannel(
+                BRIEF_ALERT,
+                "Alert Conditions",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Sound and vibration when something on the board is urgent."
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 180, 400, 180, 650)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(false)
+            },
             // Its own, most-attention-grabbing channel for major "this just in" emergency events — a
             // distinct urgent vibration + light so it reads differently from the general breaking feed.
             NotificationChannel(
