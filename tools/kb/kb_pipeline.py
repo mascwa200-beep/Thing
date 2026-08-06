@@ -25,7 +25,10 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 ASSETS = os.path.join(REPO, "app", "src", "main", "assets", "survival")
 IMAGES = os.path.join(ASSETS, "images")
 INDEX_PATH = os.path.join(ASSETS, "guide_index.json")
+MANIFEST = os.path.join(REPO, "tools", "kb", "topic_manifest.json")
 FULL_PAGE_WORDS = 400
+# Cap guides per shard file so the on-device lazy loader never parses a multi-MB blob to open one guide.
+SHARD_MAX = 25
 
 
 def slug(cat: str) -> str:
@@ -62,23 +65,29 @@ def main() -> None:
         slugs[s] = cat
 
     written = set()
+    file_of_guide: dict[str, str] = {}
     for cat, guides in by_cat.items():
-        p = os.path.join(ASSETS, f"guides_{slug(cat)}.json")
-        with open(p, "w", encoding="utf-8") as fh:
-            json.dump({"guides": guides}, fh, ensure_ascii=False, indent=1)
-            fh.write("\n")
-        written.add(p)
+        for n in range(0, len(guides), SHARD_MAX):
+            chunk = guides[n:n + SHARD_MAX]
+            suffix = "" if n == 0 else f"_{n // SHARD_MAX + 1}"
+            fname = f"guides_{slug(cat)}{suffix}.json"
+            p = os.path.join(ASSETS, fname)
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump({"guides": chunk}, fh, ensure_ascii=False, indent=1)
+                fh.write("\n")
+            written.add(p)
+            for g in chunk:
+                file_of_guide[g["id"]] = fname
     removed = 0
     for f in shard_files:
         if f not in written:
             os.remove(f)
             removed += 1
-    print(f"wrote {len(written)} category shards, removed {removed} stale files")
+    print(f"wrote {len(written)} shard files (<= {SHARD_MAX} guides each), removed {removed} stale files")
 
     # ---- index (kept in lockstep; CI enforces) ----
     index = []
     for cat, guides in sorted(by_cat.items()):
-        fname = f"guides_{slug(cat)}.json"
         for g in guides:
             index.append({
                 "id": g["id"],
@@ -86,7 +95,7 @@ def main() -> None:
                 "category": g["category"],
                 "summary": g["summary"],
                 "headings": [s.get("heading", "") for s in g.get("sections", [])],
-                "file": fname,
+                "file": file_of_guide[g["id"]],
             })
     with open(INDEX_PATH, "w", encoding="utf-8") as fh:
         json.dump({"entries": index}, fh, ensure_ascii=False, indent=1)
@@ -136,6 +145,27 @@ def main() -> None:
         problems.append(f"guide count changed during reshard: {len(all_guides)} -> {len(merged)}")
 
     print(f"TOTAL: {len(merged)} guides · {total_sections} sections · FULL PAGES (>={FULL_PAGE_WORDS}w): {full_pages} / 10,000 target")
+
+    # ---- topic-manifest coverage (the 10,000-topic ledger): auto-link guides to topics by title ----
+    if os.path.exists(MANIFEST):
+        def norm(s: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", s.lower())
+        with open(MANIFEST, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+        by_title = {norm(g["title"]): g["id"] for g in merged}
+        linked = 0
+        for t in manifest["topics"]:
+            if not t.get("guideId"):
+                gid = by_title.get(norm(t["topic"]))
+                if gid:
+                    t["guideId"] = gid
+                    linked += 1
+        if linked:
+            with open(MANIFEST, "w", encoding="utf-8") as fh:
+                json.dump(manifest, fh, ensure_ascii=False, indent=1)
+                fh.write("\n")
+        done = sum(1 for t in manifest["topics"] if t.get("guideId"))
+        print(f"MANIFEST: {done} / {len(manifest['topics'])} topics covered (+{linked} newly linked)")
     if problems:
         print("PROBLEMS:")
         for p in problems[:50]:
