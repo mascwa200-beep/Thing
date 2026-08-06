@@ -110,27 +110,8 @@ object OracleEngine {
         )
     }
 
-    /** Compute the full ranked read (for the surface / ViewModel). */
+    /** Compute the full ranked read (for the Advisories surface / ViewModel). The retired push pass
+     *  (`run`) is gone with the one-notification consolidation — the board carries the world now. */
     suspend fun read(container: AppContainer, settings: AppSettings): List<Insight> =
         Oracle.divine(snapshot(container, settings))
-
-    /**
-     * Background pass: fire a push for the most important interrupt-worthy insight on every eligible run —
-     * no per-insight cooldown. Called from [dev.mascwa.pulse.notifications.RefreshWorker]; gated by the
-     * caller's opt-out + master switch.
-     */
-    suspend fun run(container: AppContainer, settings: AppSettings) {
-        val signals = snapshot(container, settings)
-        val insights = Oracle.divine(signals)
-
-        // The WORLD PULSE — a quiet, always-latest ambient feed of the world woven with your day. It updates
-        // in place every pass (silent MIN channel), so it just reflects the current read (no throttle/dedup).
-        if (settings.notifications.worldPulse) {
-            Oracle.worldPulse(signals, insights)?.let { container.notifier.notifyWorldPulse(it) }
-        }
-
-        if (!settings.notifications.oracleEnabled) return
-        val top = Oracle.pushWorthy(insights).firstOrNull() ?: return
-        container.notifier.notifyOracle(top)
-    }
 }

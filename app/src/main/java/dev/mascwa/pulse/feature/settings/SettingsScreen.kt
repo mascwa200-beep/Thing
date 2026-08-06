@@ -563,59 +563,52 @@ fun SettingsScreen(
                             onClick = { notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                         )
                     }
-                    PrefSwitch("Enable notifications", checked = s.notifications.masterEnabled,
+                    PrefSwitch(
+                        "Enable notifications",
+                        subtitle = "LCARS shows ONE notification — the Situation Board: news, markets, weather and your agenda, always current, updated in place.",
+                        checked = s.notifications.masterEnabled,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(masterEnabled = v)) } })
                     val on = s.notifications.masterEnabled
+                    PrefSwitch("Show news on the board", checked = s.notifications.showNewsRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showNewsRow = v)) } })
+                    PrefSwitch("Show markets on the board", checked = s.notifications.showMarketsRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showMarketsRow = v)) } })
+                    PrefSwitch("Show weather on the board", checked = s.notifications.showWeatherRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showWeatherRow = v)) } })
+                    PrefSwitch("Show your agenda on the board", checked = s.notifications.showAgendaRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showAgendaRow = v)) } })
+                    SingleChoiceRow(
+                        "Market row threshold", s.notifications.marketMovePercent,
+                        listOf(1.0 to "±1%", 2.0 to "±2%", 3.0 to "±3%", 5.0 to "±5%", 10.0 to "±10%"),
+                        enabled = on && s.notifications.showMarketsRow,
+                    ) { p -> vm.update { it.copy(notifications = it.notifications.copy(marketMovePercent = p)) } }
                     PrefSwitch(
-                        "Emergency · This just in",
-                        subtitle = "Major breaking emergencies anywhere (disasters/attacks/crises), the moment they're reported — its own urgent alert.",
-                        checked = s.notifications.emergencyAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(emergencyAlerts = v)) } })
-                    PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                        "Urgent alerts (sound & vibration)",
+                        subtitle = "A due reminder, a major emergency, or a security or danger notice buzzes once. Off = the board still updates, just always silently.",
+                        checked = s.notifications.urgentAlertsEnabled, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(urgentAlertsEnabled = v)) } })
                     PrefSwitch(
-                        "Breaking takeover (full-screen)",
-                        subtitle = "On a MAJOR event (a death, a disaster), force-open a full-screen breaking-news page — trusted free sources, ad-free. Rare + hard-throttled.",
+                        "Breaking news takeover (full screen)",
+                        subtitle = "On a MAJOR event (a death, a disaster), the full-screen breaking-news page opens by itself — trusted free sources, ad-free.",
                         checked = s.notifications.breakingInterrupt, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
-                    PrefSwitch(
-                        "Oracle foresight",
-                        subtitle = "The Computer reads every signal (calendar, location, weather, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
-                        checked = s.notifications.oracleEnabled, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
-                    PrefSwitch(
-                        "World pulse (live feed)",
-                        subtitle = "A quiet, always-latest dashboard notification — the world's state (breaking, markets, space weather) woven with your day (next event). Silent; updates in place, never buzzes.",
-                        checked = s.notifications.worldPulse, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(worldPulse = v)) } })
-                    PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
-                        checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
+                    PrefClickable(
+                        "Allow the takeover over other apps",
+                        subtitle = "Grant \"display over other apps\" so the takeover can open mid-use with no tap. Without it, it takes over the lock screen and shows a tap-to-open banner while the phone is in use.",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${context.packageName}"),
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                    PrefSwitch("Live news polling (~90s, needs the resident Computer)",
+                        checked = s.notifications.liveBreakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
-                    PrefSwitch("Market & price alerts", checked = s.notifications.marketAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
-                    PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(weatherAlerts = v)) } })
-                    PrefSwitch("Space & sky alerts", checked = s.notifications.spaceAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(spaceAlerts = v)) } })
-                    PrefSwitch("Aurora likely (your location)", checked = s.notifications.auroraAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(auroraAlerts = v)) } })
-                    PrefSwitch("Safety / nearby incidents", checked = s.notifications.safetyAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(safetyAlerts = v)) } })
-                    PrefSwitch("Overhead flights (Tacnet)", checked = s.notifications.flightAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
-                    PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
-                    PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(updateChecks = v)) } })
-                    SingleChoiceRow(
-                        "Digest time", s.notifications.digestHour,
-                        (0..23).map { it to "%02d:00".format(it) }, enabled = on && s.notifications.dailyDigest,
-                    ) { h -> vm.update { it.copy(notifications = it.notifications.copy(digestHour = h)) } }
-                    SingleChoiceRow(
-                        "Market alert threshold", s.notifications.marketMovePercent,
-                        listOf(1.0 to "±1%", 2.0 to "±2%", 3.0 to "±3%", 5.0 to "±5%", 10.0 to "±10%"),
-                        enabled = on && s.notifications.marketAlerts,
-                    ) { p -> vm.update { it.copy(notifications = it.notifications.copy(marketMovePercent = p)) } }
                     PrefSwitch("Quiet hours", checked = s.notifications.quietHoursEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(quietHoursEnabled = v)) } })
                     if (s.notifications.quietHoursEnabled) {
@@ -630,7 +623,7 @@ fun SettingsScreen(
                     }
                     PrefClickable(
                         "Send test notification",
-                        subtitle = "Posts a sample alert (grants permission first if needed)",
+                        subtitle = "Posts a sample Situation Board so you can see the LCARS layout (grants permission first if needed)",
                         onClick = {
                             if (notificationsAllowed()) vm.sendTestNotification()
                             else testNotifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)

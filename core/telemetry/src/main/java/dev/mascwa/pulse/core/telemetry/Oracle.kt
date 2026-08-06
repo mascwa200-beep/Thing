@@ -47,10 +47,6 @@ data class OracleEvent(
 /** A market instrument that moved notably today. */
 data class OracleMover(val name: String, val changePct: Double, val onWatchlist: Boolean = false)
 
-/** The live "world pulse" — an intimate cross-signal digest: one [headline] fact + a few supporting [lines]
- *  that fuse the world's state with your own context. Rendered as a single, in-place-updating notification. */
-data class WorldPulse(val headline: String, val lines: List<String>)
-
 /**
  * The full snapshot of everything the device knows right now. Every field is optional/neutral so a rule
  * only fires when its inputs are present — the on-device layer fills in what it can.
@@ -354,43 +350,6 @@ object Oracle {
     /** Insights urgent enough to warrant a proactive push (URGENT or CRITICAL). */
     fun pushWorthy(insights: List<Insight>): List<Insight> =
         insights.filter { it.urgency.weight >= Urgency.URGENT.weight }
-
-    /**
-     * The WORLD PULSE: an ambient, intimate "insider-knowledge" read of everything at once — the world's
-     * state fused with YOUR context into a single glanceable line + a few supporting facts. Distinct from an
-     * [Insight] (one actionable thing): the pulse is the whole board, glanced. Returns null when nothing is
-     * worth surfacing (so the live feed goes quiet rather than posting filler). Pure — CI-tested.
-     */
-    fun worldPulse(s: OracleSignals, insights: List<Insight> = divine(s)): WorldPulse? {
-        val lines = mutableListOf<String>()
-        // A breaking headline is the most "insider" thing the app knows — lead with it.
-        s.emergencyHeadline?.takeIf { it.isNotBlank() }?.let { lines += "🌐 $it" }
-        // The market's sharpest move today (watchlist names flagged — it's personal).
-        s.movers.maxByOrNull { kotlin.math.abs(it.changePct) }?.takeIf { kotlin.math.abs(it.changePct) >= 1.0 }?.let {
-            lines += "📈 ${it.name} ${fmtPct(it.changePct / 100.0)}" + if (it.onWatchlist) " · yours" else ""
-        }
-        // Space weather worth looking up for.
-        s.kpIndex?.takeIf { it >= 5.0 }?.let { lines += "☀ Geomagnetic storm — Kp ${(it * 10).roundToInt() / 10.0}, aurora possible" }
-        // The next thing on your real calendar, if it's close.
-        s.events.filter { it.startMs > s.nowMs }.minByOrNull { it.startMs }
-            ?.takeIf { minutesUntil(it.startMs, s.nowMs) <= 180 }
-            ?.let { lines += "🗓 ${it.title.take(48)} ${startsIn(it.startMs, s.nowMs)}" }
-        // Weather that changes your day.
-        when {
-            (s.precipChancePct ?: 0) >= 60 -> lines += "🌧 ${s.precipChancePct}% rain where you are"
-            (s.tempC ?: 15.0) >= 33 -> lines += "🌡 ${s.tempC!!.roundToInt()}°C — heat"
-            (s.tempC ?: 15.0) <= -5 -> lines += "🌡 ${s.tempC!!.roundToInt()}°C — bitter cold"
-            (s.uvIndex ?: 0.0) >= 8 -> lines += "☀ UV ${s.uvIndex!!.roundToInt()} — burns fast"
-        }
-        // The Oracle's own top read, if it isn't already covered above.
-        insights.firstOrNull()?.let { top ->
-            if (lines.none { it.contains(top.title.take(12), ignoreCase = true) }) lines += "🔮 ${top.title.trimEnd('.')}"
-        }
-        if (lines.isEmpty()) return null
-        // The headline is the single most consequential fact; the rest ride underneath as the feed body.
-        val headline = lines.first().substringAfter(' ').ifBlank { lines.first() }
-        return WorldPulse(headline = headline, lines = lines.take(5))
-    }
 
     // ---- small formatting helpers (pure) ----
     private fun km(m: Double): String = if (m >= 1000) "${(m / 100).roundToInt() / 10.0} km" else "${m.roundToInt()} m"

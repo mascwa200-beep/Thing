@@ -6,9 +6,11 @@ import androidx.work.WorkerParameters
 import dev.mascwa.pulse.PulseApplication
 
 /**
- * Fires a single user-set reminder: posts a notification with the reminder text via [Notifier]. Enqueued
- * by [dev.mascwa.pulse.jarvis.agent.ReminderTool] as a delayed one-time WorkManager job, so it survives
- * app restarts and reboots without needing the exact-alarm permission.
+ * Fires a single user-set reminder at its set moment: republishes the one LCARS board with the reminder
+ * as its ALERT row/headline on the alerting channel (a user-set reminder always buzzes — it's the one
+ * interruption the user explicitly asked for, so it also bypasses quiet hours). Enqueued by
+ * [dev.mascwa.pulse.jarvis.agent.ReminderTool] as a delayed one-time WorkManager job, so it survives app
+ * restarts and reboots without needing the exact-alarm permission.
  */
 class ReminderWorker(
     context: Context,
@@ -16,11 +18,19 @@ class ReminderWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val message = inputData.getString(KEY_MESSAGE).orEmpty().ifBlank { "Reminder, sir." }
-        val id = inputData.getInt(KEY_ID, System.currentTimeMillis().toInt())
-        val notifier = runCatching { (applicationContext as PulseApplication).container.notifier }.getOrNull()
-            ?: Notifier(applicationContext)
-        notifier.notifyReminder(id, "Reminder", message)
+        val message = inputData.getString(KEY_MESSAGE).orEmpty().ifBlank { "Reminder" }
+        runCatching {
+            val container = (applicationContext as PulseApplication).container
+            val settings = container.settingsRepository.current()
+            BriefEngine.publish(applicationContext, container, settings, reminderNow = message)
+        }.onFailure {
+            // Never drop a user-set reminder: even if the full board can't be gathered, post the one line.
+            Notifier(applicationContext).notifyUrgentLine(
+                headline = "Reminder — $message",
+                detail = message,
+                key = "rem:${message.hashCode()}",
+            )
+        }
         return Result.success()
     }
 

@@ -185,6 +185,8 @@ class VitalsTrackingService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(androidx.core.content.ContextCompat.getColor(this, R.color.lcars_condition_routine))
+            .setSubText("VITALS")
             .setContentTitle("Computer Vitals")
             .setContentText(text)
             .setOngoing(true)
@@ -201,25 +203,16 @@ class VitalsTrackingService : Service() {
     }
 
     private fun raiseCheckIn(bpm: Int) {
-        val open = PendingIntent.getActivity(
-            this, 2, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val notification = NotificationCompat.Builder(this, CHANNEL_CHECKIN)
-            .setSmallIcon(R.drawable.ic_stat_pulse)
-            .setContentTitle("Computer · everything OK?")
-            .setContentText("Heart rate jumped to $bpm bpm without movement. Tap if you need help.")
-            .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    "Heart rate jumped to $bpm bpm with no rise in movement. Tap to open the Computer " +
-                        "if you'd like a check-in or to reach an emergency contact.",
-                ),
+        // Rides the one LCARS board's alerting channel (RED — a vitals anomaly is worth interrupting for)
+        // instead of posting its own separate tray notification.
+        runCatching {
+            (application as dev.mascwa.pulse.PulseApplication).container.notifier.notifyUrgentLine(
+                headline = "Everything OK?",
+                detail = "Heart rate jumped to $bpm bpm without movement. Tap if you need help.",
+                key = "vitals:$bpm",
+                red = true,
             )
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(open)
-            .build()
-        notificationManager().notify(CHECKIN_ID, notification)
+        }
     }
 
     private fun notificationManager() =
@@ -235,13 +228,8 @@ class VitalsTrackingService : Service() {
                 },
             )
         }
-        if (nm.getNotificationChannel(CHANNEL_CHECKIN) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_CHECKIN, "Vitals check-in", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Proactive check-in when heart-rate looks anomalous."
-                },
-            )
-        }
+        // The old CHANNEL_CHECKIN ("jarvis_vitals_checkin") is retired — anomaly check-ins now ride the
+        // one LCARS board's alerting channel; NotificationChannels.ensure() deletes the stale channel id.
     }
 
     @SuppressLint("MissingPermission")
@@ -260,9 +248,7 @@ class VitalsTrackingService : Service() {
 
     companion object {
         private const val CHANNEL_ONGOING = "jarvis_vitals_ongoing"
-        private const val CHANNEL_CHECKIN = "jarvis_vitals_checkin"
         private const val NOTIF_ID = 7311
-        private const val CHECKIN_ID = 7312
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.vitals.STOP"
 
         private val HR_SERVICE: UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb")

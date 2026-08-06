@@ -14,8 +14,8 @@ import kotlin.math.roundToInt
  *
  * Pure and deterministic: the caller passes a full [BriefSignals] snapshot (missing signals are null and
  * their rows simply don't render); no Android types, no clock of its own. Deliberately a NEW composer rather
- * than an extension of [Oracle.worldPulse] — that contract is a free-text priority collage, while this one
- * is typed rows + per-row toggles + an urgency output.
+ * than an extension of the retired `Oracle.worldPulse` — that contract was a free-text priority collage,
+ * while this one is typed rows + per-row toggles + an urgency output (worldPulse is deleted; this replaced it).
  */
 
 /** Maps 1:1 onto the app's notification AlertCondition (ROUTINE/YELLOW/RED). */

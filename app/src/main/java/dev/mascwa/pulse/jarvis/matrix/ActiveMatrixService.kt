@@ -172,17 +172,27 @@ class ActiveMatrixService : Service() {
         }
     }
 
-    /** Poll the TOP feed on a short interval and push genuinely new headlines immediately. Cheap and
-     *  guarded: it only fetches when the user has enabled live breaking news and isn't in quiet hours. */
+    /** Poll the news feeds on a short interval and keep the one LCARS board (and the breaking-news
+     *  takeover check) near-real-time. Cheap and guarded: it only fetches when the user has enabled live
+     *  news polling and isn't in quiet hours. */
     private suspend fun liveNewsLoop() {
         while (true) {
             runCatching {
                 val c = container
-                val prefs = c?.settingsRepository?.current()?.notifications
-                if (c != null && prefs != null && prefs.masterEnabled && prefs.breakingNews &&
+                val settings = c?.settingsRepository?.current()
+                val prefs = settings?.notifications
+                if (c != null && settings != null && prefs != null && prefs.masterEnabled &&
                     prefs.liveBreakingNews && !inQuietNow(prefs) && !lowPowerConserve
                 ) {
-                    BreakingNewsPulse.check(c)
+                    // The takeover check force-fetches the feeds (warming the cache) and fires the
+                    // full-screen takeover on a fresh MAJOR event; the board republish then reads warm.
+                    if (prefs.breakingInterrupt) BreakingNewsPulse.check(c)
+                    dev.mascwa.pulse.notifications.BriefEngine.publish(
+                        context = applicationContext,
+                        container = c,
+                        settings = settings,
+                        forceNews = !prefs.breakingInterrupt, // if the pulse didn't fetch, fetch here
+                    )
                 }
             }
             delay(LIVE_NEWS_INTERVAL_MS)
@@ -531,6 +541,8 @@ class ActiveMatrixService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setColor(androidx.core.content.ContextCompat.getColor(this, R.color.lcars_condition_routine))
+            .setSubText("STANDING BY")
             .setContentTitle("Computer · Active Matrix")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
