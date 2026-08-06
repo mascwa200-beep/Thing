@@ -386,9 +386,9 @@ class RefreshWorker(
                 if (lines.isNotEmpty()) {
                     notifier.notifyDigest(
                         id = NotifId.DIGEST,
-                        title = "Your daily Pulse",
+                        title = "Your daily briefing",
                         body = lines.first(),
-                        lines = lines,
+                        moreCount = (lines.size - 1).coerceAtLeast(0),
                     )
                     state = state.copy(lastDigestDay = today)
                 }

@@ -23,25 +23,27 @@
     <string name="offline_cached">Offline — showing cached data</string>
     <string name="empty_generic">Nothing to show yet.</string>
 
-    <!-- Notification channels -->
-    <string name="channel_emergency_name">Emergency · This just in</string>
-    <string name="channel_emergency_desc">Major breaking emergencies anywhere — disasters, attacks, crises — the moment they are reported</string>
-    <string name="channel_breaking_name">Breaking news</string>
-    <string name="channel_breaking_desc">Top headlines as they happen</string>
-    <string name="channel_markets_name">Market &amp; price alerts</string>
-    <string name="channel_markets_desc">Watchlist moves, crypto and fuel thresholds</string>
-    <string name="channel_weather_name">Weather alerts</string>
-    <string name="channel_weather_desc">Severe weather and daily forecast summary</string>
-    <string name="channel_digest_name">Daily digest</string>
-    <string name="channel_digest_desc">A once-a-day roundup across your topics</string>
-    <string name="channel_space_name">Space &amp; sky alerts</string>
-    <string name="channel_space_desc">Geomagnetic storms, aurora chances and close asteroid approaches</string>
-    <string name="channel_safety_name">Nearby safety alerts</string>
-    <string name="channel_safety_desc">Earthquakes, disasters and severe weather near you</string>
-    <string name="channel_flight_name">Overhead flights</string>
-    <string name="channel_flight_desc">Aircraft passing directly overhead, from live ADS-B</string>
-    <string name="channel_reminders_name">Reminders</string>
-    <string name="channel_reminders_desc">Reminders you ask J.A.R.V.I.S. to set</string>
+    <!-- Notification channels — LCARS-plain, Star Trek-flavored where a natural fit, always self-explanatory -->
+    <string name="channel_emergency_name">Emergency Alert</string>
+    <string name="channel_emergency_desc">Major breaking events, sent the moment they happen.</string>
+    <string name="channel_breaking_name">News Bulletin</string>
+    <string name="channel_breaking_desc">Breaking news as it develops.</string>
+    <string name="channel_markets_name">Market Report</string>
+    <string name="channel_markets_desc">Notable moves in markets you follow.</string>
+    <string name="channel_weather_name">Weather Report</string>
+    <string name="channel_weather_desc">Local weather worth knowing about.</string>
+    <string name="channel_digest_name">Ship\'s Log</string>
+    <string name="channel_digest_desc">A quiet daily summary and miscellaneous notes.</string>
+    <string name="channel_space_name">Space Weather</string>
+    <string name="channel_space_desc">Solar storms, aurora, and near-Earth objects.</string>
+    <string name="channel_safety_name">Safety Alert</string>
+    <string name="channel_safety_desc">Nearby incidents worth knowing about.</string>
+    <string name="channel_flight_name">Sensor Contact</string>
+    <string name="channel_flight_desc">A nearby aircraft detected overhead.</string>
+    <string name="channel_reminders_name">Reminder</string>
+    <string name="channel_reminders_desc">Reminders you\'ve set.</string>
+    <string name="channel_security_name">Security Alert</string>
+    <string name="channel_security_desc">Device and network security notices.</string>
 
     <!-- Live data-feed widget -->
     <string name="widget_feed_label">Pulse Live Feed</string>

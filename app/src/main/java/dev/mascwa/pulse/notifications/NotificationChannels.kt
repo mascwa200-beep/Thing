@@ -11,6 +11,7 @@ object NotificationChannels {
     const val BREAKING = "channel_breaking"
     const val BREAKING_INTERRUPT = "channel_breaking_interrupt"
     const val ORACLE = "channel_oracle"
+    const val SECURITY = "channel_security"
     const val MARKETS = "channel_markets"
     const val WEATHER = "channel_weather"
     const val DIGEST = "channel_digest"
@@ -44,28 +45,35 @@ object NotificationChannels {
             ).apply { description = context.getString(R.string.channel_breaking_desc) },
             // The full-screen BREAKING NEWS takeover — its own urgent channel (literal strings to avoid a
             // resource dependency). IMPORTANCE_HIGH is the max a channel can declare; the full-screen intent
-            // is what actually takes over the screen.
+            // is what actually takes over the screen. Always RED ALERT — it only fires on major events.
             NotificationChannel(
                 BREAKING_INTERRUPT,
-                "Breaking news takeover",
+                "Emergency Broadcast",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Force-opens a full-screen breaking-news page on a major event."
+                description = "Takes over the screen for a major event."
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 200, 500)
                 enableLights(true)
                 lightColor = android.graphics.Color.RED
                 setBypassDnd(false)
             },
-            // ORACLE — proactive foresight pushes (J.A.R.V.I.S. surfacing the most important thing now).
+            // ORACLE — the Computer's proactive foresight pushes (cross-signal advisories).
             NotificationChannel(
                 ORACLE,
-                "Oracle foresight",
+                "Computer Advisory",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Proactive, cross-signal heads-ups: leave now, charge now, aurora tonight…"
+                description = "The Computer's best next move for you, based on what it knows."
                 enableVibration(true)
             },
+            // SECURITY — split out of the low-importance DIGEST catch-all: a real security notice deserves
+            // its own channel and a proper importance level, not to be buried with the daily roundup.
+            NotificationChannel(
+                SECURITY,
+                context.getString(R.string.channel_security_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { description = context.getString(R.string.channel_security_desc) },
             NotificationChannel(
                 MARKETS,
                 context.getString(R.string.channel_markets_name),
@@ -101,15 +109,15 @@ object NotificationChannels {
                 context.getString(R.string.channel_reminders_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply { description = context.getString(R.string.channel_reminders_desc) },
-            // The WORLD PULSE — a silent, low-key live feed that stays in the tray and updates in place with
-            // the latest intimate cross-signal read. MIN importance so it never buzzes or heads-up; it's an
-            // ambient dashboard, not an alert. (Literal strings to avoid a resource dependency.)
+            // The SITUATION REPORT — a silent, low-key live feed that stays in the tray and updates in place
+            // with the latest intimate cross-signal read. MIN importance so it never buzzes or heads-up; it's
+            // an ambient dashboard, not an alert. (Literal strings to avoid a resource dependency.)
             NotificationChannel(
                 WORLD_PULSE,
-                "World pulse",
+                "Situation Report",
                 NotificationManager.IMPORTANCE_MIN,
             ).apply {
-                description = "A quiet, always-latest live feed of the world woven with your day."
+                description = "A quiet, always-latest read of the world and your day."
                 enableVibration(false)
                 setShowBadge(false)
             },
