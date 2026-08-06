@@ -11,14 +11,19 @@ const val SUPERGROUP_SCIENCE = "Science"
 const val SUPERGROUP_MEDICAL = "Medical & Wellbeing"
 const val SUPERGROUP_FIELDCRAFT = "Fieldcraft"
 const val SUPERGROUP_TECHNICAL = "Technical & Making"
+const val SUPERGROUP_HUMANITIES = "Humanities"
+const val SUPERGROUP_ARTS = "Arts & Leisure"
+const val SUPERGROUP_WORK = "Work & Money"
 const val SUPERGROUP_REFERENCE = "Reference"
 
 /** Every supergroup, in the display order the browse rail renders them. */
 val SUPERGROUPS: List<String> = listOf(
-    SUPERGROUP_SCIENCE, SUPERGROUP_MEDICAL, SUPERGROUP_FIELDCRAFT, SUPERGROUP_TECHNICAL, SUPERGROUP_REFERENCE,
+    SUPERGROUP_SCIENCE, SUPERGROUP_MEDICAL, SUPERGROUP_FIELDCRAFT, SUPERGROUP_TECHNICAL,
+    SUPERGROUP_HUMANITIES, SUPERGROUP_ARTS, SUPERGROUP_WORK, SUPERGROUP_REFERENCE,
 )
 
-/** Category (as it appears on [Guide.category]) → supergroup. */
+/** Category (as it appears on [Guide.category]) → supergroup. The full 10,000-topic ontology slots every
+ *  topic into one of these categories (tools/kb/topic_manifest.json is the coverage ledger). */
 val CATEGORY_SUPERGROUP: Map<String, String> = mapOf(
     // Science
     "Astronomy" to SUPERGROUP_SCIENCE,
@@ -27,12 +32,15 @@ val CATEGORY_SUPERGROUP: Map<String, String> = mapOf(
     "Physics" to SUPERGROUP_SCIENCE,
     "Earth Science" to SUPERGROUP_SCIENCE,
     "Climate" to SUPERGROUP_SCIENCE,
+    "Mathematics" to SUPERGROUP_SCIENCE,
+    "Energy & Environment" to SUPERGROUP_SCIENCE,
     // Medical & Wellbeing
     "Medical" to SUPERGROUP_MEDICAL,
     "Health" to SUPERGROUP_MEDICAL,
     "Nutrition" to SUPERGROUP_MEDICAL,
     "Psychology" to SUPERGROUP_MEDICAL,
     "Sustenance" to SUPERGROUP_MEDICAL,
+    "Sports & Fitness" to SUPERGROUP_MEDICAL,
     // Fieldcraft
     "Essentials" to SUPERGROUP_FIELDCRAFT,
     "Rescue" to SUPERGROUP_FIELDCRAFT,
@@ -46,9 +54,31 @@ val CATEGORY_SUPERGROUP: Map<String, String> = mapOf(
     // Technical & Making
     "Engineering" to SUPERGROUP_TECHNICAL,
     "Computing" to SUPERGROUP_TECHNICAL,
-    "Mathematics" to SUPERGROUP_TECHNICAL,
     "Making" to SUPERGROUP_TECHNICAL,
+    "Electronics" to SUPERGROUP_TECHNICAL,
+    "Home & Repair" to SUPERGROUP_TECHNICAL,
+    "Agriculture & Gardening" to SUPERGROUP_TECHNICAL,
+    "Vehicles & Transport" to SUPERGROUP_TECHNICAL,
     "Cooking — Food Safety" to SUPERGROUP_TECHNICAL,
+    "Cooking — Techniques" to SUPERGROUP_TECHNICAL,
+    // Humanities
+    "History" to SUPERGROUP_HUMANITIES,
+    "Philosophy" to SUPERGROUP_HUMANITIES,
+    "Religion & Mythology" to SUPERGROUP_HUMANITIES,
+    "Literature & Writing" to SUPERGROUP_HUMANITIES,
+    "Language & Linguistics" to SUPERGROUP_HUMANITIES,
+    "Society & Culture" to SUPERGROUP_HUMANITIES,
+    "Archaeology & Anthropology" to SUPERGROUP_HUMANITIES,
+    "Law & Government" to SUPERGROUP_HUMANITIES,
+    "Education & Learning" to SUPERGROUP_HUMANITIES,
+    // Arts & Leisure
+    "Music" to SUPERGROUP_ARTS,
+    "Visual Arts & Design" to SUPERGROUP_ARTS,
+    "Games & Recreation" to SUPERGROUP_ARTS,
+    "Media & Communication" to SUPERGROUP_ARTS,
+    // Work & Money
+    "Business & Finance" to SUPERGROUP_WORK,
+    "Economics" to SUPERGROUP_WORK,
     // Reference
     "Reference" to SUPERGROUP_REFERENCE,
     "Geography" to SUPERGROUP_REFERENCE,

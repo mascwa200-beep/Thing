@@ -25,6 +25,12 @@ class GuidesJsonValidationTest {
         "Movement", "Navigation", "Nutrition", "Physics", "Preparedness", "Psychology", "Reference", "Rescue",
         "Skills", "Sustenance", "Weather",
         "Cooking — Food Safety",
+        // The 10,000-topic ontology's added categories (tools/kb/topic_manifest.json is the topic ledger).
+        "Energy & Environment", "Sports & Fitness", "Electronics", "Home & Repair", "Agriculture & Gardening",
+        "Vehicles & Transport", "Cooking — Techniques", "History", "Philosophy", "Religion & Mythology",
+        "Literature & Writing", "Language & Linguistics", "Society & Culture", "Archaeology & Anthropology",
+        "Law & Government", "Education & Learning", "Music", "Visual Arts & Design", "Games & Recreation",
+        "Media & Communication", "Business & Finance", "Economics",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
