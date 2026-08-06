@@ -56,6 +56,7 @@ import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.feature.common.CyberChipCut
 import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ExplainerDialog
+import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -330,8 +331,8 @@ private fun shortBiasClause(b: BiasBreakdown): String {
     }
 }
 
-/** How many keyword hits fill the whole bar — a story with this many charged terms (or more) reads as
- *  maximally intense; fewer hits leave visible neutral track, preserving a sense of magnitude rather than
+/** How many keyword hits fill the whole row — a story with this many charged terms (or more) reads as
+ *  maximally intense; fewer hits leave a visible dim block, preserving a sense of magnitude rather than
  *  just direction (1 negative word looks very different from 5). */
 private const val MOOD_BAR_SCALE = 6
 
@@ -348,7 +349,7 @@ private fun MoodDetail(mood: ToneBreakdown, cluster: Int, analysis: NewsAnalysis
             Spacer(Modifier.width(6.dp))
             Text(mood.tone.label, fontFamily = JetBrainsMono, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = toneCol)
         }
-        SegmentedMoodBar(mood, Modifier.padding(top = 5.dp).height(6.dp).fillMaxWidth())
+        MoodBlockRow(mood, Modifier.padding(top = 5.dp).height(6.dp).fillMaxWidth())
         Text(
             "green = upbeat · red = tense · from the coverage's own words",
             fontFamily = JetBrainsMono, fontSize = 7.sp, color = c.faint,
@@ -371,10 +372,15 @@ private fun MoodDetail(mood: ToneBreakdown, cluster: Int, analysis: NewsAnalysis
     }
 }
 
-/** A proportional multi-colour bar — upbeat/tense/negative segments sized by their real hit counts, plus a
- *  neutral remainder — so the bar visually explains itself instead of being an abstract single fill. */
+/** A row of solid LCARS blocks — upbeat/tense/negative segments sized by their real hit counts, plus a
+ *  neutral remainder rendered as a REAL dim block (not empty space) — so the row always visually sums to
+ *  [MOOD_BAR_SCALE] regardless of how many charged keywords actually hit. 1 tense word reads as a small
+ *  sliver next to a wide dim block; 5 tense words fill most of the row — instead of both stretching to fill
+ *  100% width the moment any signal exists, which is what a naively-normalizing bar would do. Built on
+ *  [LcarsFillRow] (this app's blocky-segment LCARS primitive) rather than a smooth proportional bar — same
+ *  green/orange/red read, textured to match the rest of the app's LCARS chrome. */
 @Composable
-private fun SegmentedMoodBar(b: ToneBreakdown, modifier: Modifier) {
+private fun MoodBlockRow(b: ToneBreakdown, modifier: Modifier) {
     val c = Pulse.colors
     val segments = buildList {
         if (b.positive > 0) add(b.positive.toFloat() to Color(0xFF35C46A))
@@ -383,14 +389,8 @@ private fun SegmentedMoodBar(b: ToneBreakdown, modifier: Modifier) {
     }
     val filled = segments.sumOf { it.first.toDouble() }.toFloat()
     val neutralWeight = (MOOD_BAR_SCALE - filled).coerceAtLeast(if (segments.isEmpty()) 1f else 0f)
-    Row(modifier.clip(RoundedCornerShape(3.dp)).background(c.raise)) {
-        segments.forEach { (weight, color) ->
-            Box(Modifier.weight(weight).fillMaxHeight().background(color))
-        }
-        if (neutralWeight > 0f) {
-            Box(Modifier.weight(neutralWeight).fillMaxHeight())
-        }
-    }
+    val blocks = if (neutralWeight > 0f) segments + (neutralWeight to c.raise) else segments
+    LcarsFillRow(blocks, modifier, gap = 1.5.dp)
 }
 
 /** A short, confiding "here's what's actually driving the mood" line — e.g. "4 lines running upbeat, 1
@@ -522,8 +522,8 @@ private fun BuzzBar(level: BuzzLevel, modifier: Modifier) {
     }
 }
 
-/** A proportional multi-colour bar sized against the REAL rated-outlet count (unlike [SegmentedMoodBar]'s
- *  fixed-scale sizing) — an unrated outlet renders as unfilled track, same convention as the mood bar's
+/** A proportional multi-colour bar sized against the REAL rated-outlet count (unlike [MoodBlockRow]'s
+ *  fixed-scale sizing) — an unrated outlet renders as unfilled track, same convention as the mood row's
  *  neutral remainder. */
 @Composable
 private fun BiasBar(b: BiasBreakdown, modifier: Modifier) {
