@@ -246,11 +246,13 @@ fun LcarsStatBlock(label: String, value: String, modifier: Modifier = Modifier, 
  * A row of unequal-, content-driven-width colour-coded blocks summing to exactly fill the container. A plain
  * `Modifier.weight()` `Row` (weight-ratio-driven, not truly content-measured). The caller must give
  * [modifier] an explicit height (e.g. `Modifier.height(8.dp)`) since a bare `Row` has no intrinsic height for
- * `fillMaxHeight()` to fill.
+ * `fillMaxHeight()` to fill. [gap] defaults to `0.dp` — seamless-touching blocks, pixel-identical to this
+ * composable's behaviour before [gap] existed. A positive [gap] renders each weighted block with real
+ * breathing room from its neighbour — a "chicklet"/discrete-segment LCARS read.
  */
 @Composable
-fun LcarsFillRow(segments: List<Pair<Float, Color>>, modifier: Modifier = Modifier) {
-    Row(modifier) {
+fun LcarsFillRow(segments: List<Pair<Float, Color>>, modifier: Modifier = Modifier, gap: Dp = 0.dp) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
         segments.forEach { (weight, color) ->
             if (weight > 0f) {
                 Box(Modifier.weight(weight).fillMaxHeight().background(color))

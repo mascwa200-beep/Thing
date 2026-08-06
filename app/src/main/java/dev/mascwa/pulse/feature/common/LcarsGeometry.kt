@@ -253,12 +253,15 @@ fun LcarsStatBlock(label: String, value: String, modifier: Modifier = Modifier, 
  * "sweeping blocks fitted to the screen" instruction. A plain `Modifier.weight()` `Row` (weight-ratio-driven,
  * not truly content-measured) rather than a custom `Layout` — the simplest implementation that satisfies the
  * ask; worth revisiting with a real custom `Layout` only if this doesn't read convincingly on-device. The
- * caller must give [modifier] an explicit height (e.g. `Modifier.height(8.dp)`) — same convention as the
- * existing `SegmentedMoodBar` — since a bare `Row` has no intrinsic height for `fillMaxHeight()` to fill.
+ * caller must give [modifier] an explicit height (e.g. `Modifier.height(8.dp)`) since a bare `Row` has no
+ * intrinsic height for `fillMaxHeight()` to fill. [gap] defaults to `0.dp` — seamless-touching blocks, pixel-
+ * identical to this composable's behaviour before [gap] existed (the one pre-existing call site,
+ * `GuidesScreen`'s read-progress bar, passes no [gap] and is unaffected). A positive [gap] renders each
+ * weighted block with real breathing room from its neighbour — a "chicklet"/discrete-segment LCARS read.
  */
 @Composable
-fun LcarsFillRow(segments: List<Pair<Float, Color>>, modifier: Modifier = Modifier) {
-    Row(modifier) {
+fun LcarsFillRow(segments: List<Pair<Float, Color>>, modifier: Modifier = Modifier, gap: Dp = 0.dp) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
         segments.forEach { (weight, color) ->
             if (weight > 0f) {
                 Box(Modifier.weight(weight).fillMaxHeight().background(color))

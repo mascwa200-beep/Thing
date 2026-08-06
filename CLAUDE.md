@@ -1989,6 +1989,73 @@ signal domains and reasons ACROSS them to surface (and proactively push) the one
   **Open follow-ups (offered):** a prominent in-app nav button (Home/JARVIS) beyond the shortcut+push; an
   on-device LLM briefing that narrates the top insights; more rules (traffic/commute, sleep-debt, roaming).
 
+### News reaction-strip cleanup + Windows desktop port (Phase A) + Starfleet identity overhaul (Phase 1.1–1.5) + MOOD→blocky-segments (this session, dev branch `claude/loving-edison-bd65oa`)
+**News Slice 3 — reaction-strip cleanup:** the MOOD/COVERAGE/MARKET REACTION strips no longer stack open on
+every card. A single always-visible `InsightsTakeaway` line (mood + bias lean + buzz + market impact, one
+sentence, built by `insightsSummary()`) carries the at-a-glance read; tapping "◢ INSIGHTS" expands the full
+detail. Topic tags stay always-visible. Tapping any strip's header inside the expanded view opens a
+plain-English `ExplainerDialog` (new `NewsExplainers.market()` alongside the existing `mood()`/`bias()`/`buzz()`).
+
+**Windows desktop port — Phase A (foundation):** a new, structurally separate `desktop/` Gradle module
+(Kotlin/JVM + Compose Multiplatform 1.7.3, pinned for this repo's Kotlin 2.0.21 — confirmed against
+JetBrains' own compatibility guide, not assumed) — a window shell, a copy-adapted port of the LCARS
+palette/shape kit (`theme/{Color,Fonts,Theme,LcarsGeometry}.kt`, deliberately duplicated not shared via a
+real multiplatform source set on this first pass, per this repo's own convention going forward), and a
+JSON-file-backed `DesktopSettingsStore` (mirrors the Android app's DataStore-backed stores: in-memory
+authoritative state + Mutex + debounced flush). **Genuinely locally compiled** — this dev environment has
+Java 21 + Gradle 8.14.3 (no Android SDK, but a plain Kotlin/JVM module needs none) — `gradle :desktop:build`
+runs clean, the first locally-provable Kotlin/Compose change in this project's history (every Android change
+is CI-only/on-device-unverified). Hit and fixed two real bugs along the way: a classic Gradle multi-module
+plugin-classpath collision (root `build.gradle.kts` needed `kotlin.jvm`/`compose.multiplatform` also declared
+`apply false`, not just in `desktop/build.gradle.kts`, since `kotlin.jvm`/`kotlin.android` are different
+plugin IDs from the SAME `kotlin-gradle-plugin` jar), and this repo's own documented recurring bug (a literal
+`/*` inside a KDoc line opened a nested comment and ate the rest of the file). **Runtime rendering is NOT
+verified** — Skiko can't get a working GL context in this sandboxed container (reproduced identically across
+4 distinct attempts: default, forced Mesa software rendering, `--no-daemon`, explicit Xvfb `+extension GLX`)
+— same category of gap as "Filament can't render in CI." An adversarial review (which decompiled the actual
+Compose Desktop bytecode and empirically timed the real window-close path under Xvfb, 6 trials) found two
+real concurrency gaps in `DesktopSettingsStore` — both fixed + re-verified via a fresh local build:
+`onCloseRequest` now blocks briefly on save+flush before `exitApplication()` (was racing its unconditional
+`System.exit(0)`, safe today only by ~150ms of empirical margin, not by design — `saveInBackground` removed,
+it lost its only caller); `flush()`'s disk IO now runs inside the store's own mutex (was unguarded,
+unreachable with today's single call site but a real gap before Phase B adds a second one). New
+`.github/workflows/desktop-build.yml` (path-filtered to `desktop/**`, its own concurrency group, never
+touches `android-build.yml`). Also fixed an unrelated real `.gitignore` gap found along the way: `/build/`
+(leading slash) only ever covered the repo-root build dir, never `app/build/`/`core:telemetry/build/`/etc. —
+harmless before (every prior build was CI-only/ephemeral) but a real risk now that a local build genuinely
+runs here; changed to `build/` (matches at any depth). **Not yet started: Phase B** (News — the first full
+vertical, explicitly meant to launch with the already-shipped simplified reaction-strip design above, not
+the old stacked one).
+
+**Starfleet 2260s identity overhaul — Phase 1.1–1.5 shipped:** owner's ask: reskin the whole app as
+Starfleet-2260s-engineered, "money/storage isn't an issue." 1.1 `Theme.kt` unification (Material3
+`colorScheme` now mechanically derived from `lcarsPalette`, no drift possible). 1.2 new launcher icon (an
+original swept-block/elbow LCARS motif, no franchise assets). 1.3 boot sequence retheme (`BootScreen.kt`'s
+copy/wordmark rewritten from "ARGUS DYNAMICS black-ops" to a Starfleet ship-computer-coming-online framing;
+same proven animation machinery, content swap only). 1.4 user-facing rename pass (J.A.R.V.I.S.→"Computer"/
+"COMPUTER" across 17 files' screen titles/notification channels/widget/shortcut labels — deliberately
+leaves the wake-word-literal strings + all real wake-word matching logic untouched, that's Phase 2 work).
+1.5 stray-shape convergence (10 files' local `RoundedCornerShape` panel/button/chip/field shapes migrated
+onto the shared `lcarsBlockShape` primitive — NavScreen/JarvisSetupScreen/HabitatScreen/OracleScreen/
+HomeScreen/DiaryBody/RadioBody/SpotifyBody/BreakingNewsScreen/NotesBody; genuine circles/pill progress-bars
+deliberately left alone, verified by exact-count checks, not eyeballing). Every slice adversarially
+compile-reviewed clean before push. **Not yet started:** 1.6 (icon wave 1 — hand-drawn LCARS glyphs for the
+~20-30 highest-frequency stock Material icons, the largest remaining Phase 1 item), 1.7 (KB storage policy +
+bigger content wave), and all of Phase 2 (J.A.R.V.I.S.→Computer's real persona/voice/visual rework).
+
+**MOOD bar → blocky LCARS segments:** the News tab's smooth proportional `SegmentedMoodBar` is being
+replaced with `LcarsFillRow`-based solid blocks (real gaps between segments, the neutral/unfilled remainder
+rendered as a genuine dim `c.raise` block so magnitude — not just direction — stays visible, not a naive
+auto-normalizing fill). `LcarsFillRow` (in BOTH the Android `feature/common/LcarsGeometry.kt` and the
+desktop-kit mirror) gained an additive `gap: Dp = 0.dp` param, verified non-breaking for its one
+pre-existing caller (`GuidesScreen.kt`'s read-progress bar) and locally rebuilt clean on the desktop side.
+**Decision for desktop Phase B:** when the desktop News screen is eventually built, its MOOD read should
+reuse this same blocky-segment pattern (`LcarsFillRow(..., gap = 1.5.dp)` with the neutral remainder as a
+real segment) rather than a smooth bar — recorded here so this isn't re-litigated later.
+
+⚠️ All of the above's on-device/visual feel (the rename pass, the shape convergence, whether a 1.5dp gap
+reads as distinct blocks vs. noise at a 6dp bar height) is CI-compile-gated only — owner verifies on the Pixel.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
