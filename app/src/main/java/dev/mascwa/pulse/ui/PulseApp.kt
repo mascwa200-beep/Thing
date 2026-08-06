@@ -408,4 +408,5 @@ private val SHORTCUT_ROUTES = setOf(
     Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,
     Routes.OBJECTIVES, Routes.SOCIAL, Routes.SEARCH,
     Routes.ECONOMY, Routes.FUEL, Routes.CRASH_LOG, Routes.SECURITY_AUDIT,
+    Routes.SETTINGS,
 )
