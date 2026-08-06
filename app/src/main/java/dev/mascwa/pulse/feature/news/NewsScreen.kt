@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,7 +69,7 @@ fun NewsScreen(vm: NewsViewModel) {
                                 searchActive = false
                                 searchText = ""
                                 vm.clearSearch()
-                            }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                            }) { Icon(LcarsIcons.ArrowBack, "Back") }
                         },
                         trailingIcon = {
                             if (searchText.isNotEmpty()) {

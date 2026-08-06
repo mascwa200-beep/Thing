@@ -27,7 +27,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -1468,7 +1468,7 @@ private fun SettingsShell(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.accent, modifier = Modifier.size(18.dp))
+                        Icon(LcarsIcons.ArrowBack, "Back", tint = c.accent, modifier = Modifier.size(18.dp))
                         Text(
                             "SETTINGS ▸ ${(selectedCat ?: SettingsCategory.FIRST).title.uppercase()}",
                             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,

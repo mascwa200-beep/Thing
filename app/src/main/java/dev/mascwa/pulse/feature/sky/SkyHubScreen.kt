@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Public
@@ -24,7 +24,7 @@ fun SkyHubScreen(onOpenRoute: (String) -> Unit, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Sky",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         LazyVerticalGrid(

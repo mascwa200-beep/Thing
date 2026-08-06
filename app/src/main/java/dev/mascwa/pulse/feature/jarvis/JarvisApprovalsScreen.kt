@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -45,7 +45,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
     PulseScaffold(
         title = "APPROVALS",
         navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.ink) }
+            IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
         },
     ) { innerPadding ->
         LazyColumn(

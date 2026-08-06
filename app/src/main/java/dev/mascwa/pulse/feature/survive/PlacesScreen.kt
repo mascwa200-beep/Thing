@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
@@ -61,7 +61,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Nearest Help",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
