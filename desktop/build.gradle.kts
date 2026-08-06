@@ -35,9 +35,9 @@ compose.desktop {
         mainClass = "dev.mascwa.pulse.desktop.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
-            packageName = "Pulse"
+            packageName = "LCARS"
             packageVersion = "1.0.0"
-            description = "Pulse — on-device-first companion, desktop edition"
+            description = "LCARS — on-device-first companion, desktop edition"
         }
     }
 }

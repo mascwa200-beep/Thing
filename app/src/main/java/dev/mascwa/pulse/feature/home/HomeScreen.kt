@@ -108,7 +108,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
     )
 
     PulseScaffold(
-        title = "Pulse",
+        title = "LCARS",
         topBarOverride = {
             Column(Modifier.background(c.void).windowInsetsPadding(WindowInsets.statusBars)) {
                 Row(
@@ -118,7 +118,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 ) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         GlitchText(
-                            text = "NIGHTWIRE",
+                            text = "LCARS",
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
                             ),

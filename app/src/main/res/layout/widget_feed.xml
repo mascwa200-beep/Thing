@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="PULSE · LIVE FEED"
+        android:text="LCARS · LIVE FEED"
         android:textColor="#5AD1FF"
         android:textStyle="bold"
         android:textSize="11sp"
@@ -37,7 +37,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
-            android:text="Open Pulse to load the live feed"
+            android:text="Open LCARS to load the live feed"
             android:textColor="#5E708C"
             android:textSize="12sp" />
     </FrameLayout>

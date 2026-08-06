@@ -269,7 +269,7 @@ fun SettingsScreen(
                     )
                     PrefClickable(
                         "GrapheneOS per-app controls",
-                        subtitle = "Network, Sensors & Storage Scopes for Pulse (GrapheneOS-exclusive) live in App info.",
+                        subtitle = "Network, Sensors & Storage Scopes for LCARS (GrapheneOS-exclusive) live in App info.",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
                 }
@@ -288,7 +288,7 @@ fun SettingsScreen(
                 PrefSection("Device-owner controls") {
                     if (!isOwner) {
                         Text(
-                            "These hardware-backed protections need Pulse provisioned as Device Owner (see " +
+                            "These hardware-backed protections need LCARS provisioned as Device Owner (see " +
                                 "“Device owner” above). Until then they're inert.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -398,7 +398,7 @@ fun SettingsScreen(
                         "Exploit protection (Memory Tagging)",
                         value = "App info",
                         subtitle = "GrapheneOS can enable hardware Memory Tagging (MTE) + stricter exploit " +
-                            "protection per app, using the Tensor chip. Toggle it for Pulse in App info → " +
+                            "protection per app, using the Tensor chip. Toggle it for LCARS in App info → " +
                             "GrapheneOS settings. (Better than forcing it in the build — you stay in control.)",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
@@ -413,7 +413,7 @@ fun SettingsScreen(
                         "Sandboxed Google Play",
                         value = if (sandboxedPlay) "Installed ✓" else "Not installed",
                         subtitle = "GrapheneOS runs Play Services as a normal sandboxed app (no privileged " +
-                            "access). Pulse needs none of it — it's purely informational.",
+                            "access). LCARS needs none of it — it's purely informational.",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
                 }
@@ -458,7 +458,7 @@ fun SettingsScreen(
                     PrefClickable(
                         "System accessibility",
                         subtitle = "Font & display size, TalkBack, colour correction, and “remove animations” " +
-                            "(Pulse honours reduce-motion).",
+                            "(LCARS honours reduce-motion).",
                         onClick = { dev.mascwa.pulse.core.util.openAccessibilitySettings(context) },
                     )
                 }
@@ -660,9 +660,9 @@ fun SettingsScreen(
                         "Wi-Fi control",
                         value = if (vm.isDeviceOwner) "Device Owner ✓" else "Not provisioned",
                         subtitle = if (vm.isDeviceOwner)
-                            "Pulse can toggle Wi-Fi. Stays minimal: no wipe/lock/password powers."
+                            "LCARS can toggle Wi-Fi. Stays minimal: no wipe/lock/password powers."
                         else
-                            "To let Pulse actually toggle Wi-Fi, provision it once over adb on a device with no " +
+                            "To let LCARS actually toggle Wi-Fi, provision it once over adb on a device with no " +
                                 "other accounts:\nadb shell dpm set-device-owner " +
                                 "dev.mascwa.pulse.debug/dev.mascwa.pulse.security.PulseDeviceAdminReceiver\n" +
                                 "Until then, the mode just notifies you to toggle Wi-Fi yourself.",
@@ -678,7 +678,7 @@ fun SettingsScreen(
                     )
                     if (s.security.homeSsids.isEmpty()) {
                         Text(
-                            "No home networks set. Add the one you're on at home so Pulse knows when you've left it.",
+                            "No home networks set. Add the one you're on at home so LCARS knows when you've left it.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -694,7 +694,7 @@ fun SettingsScreen(
                     ) { m -> vm.update { it.copy(security = it.security.copy(reprobeMinutes = m)) } }
                     PrefSwitch(
                         "Notify if not provisioned",
-                        "Show a notification when Pulse wants to toggle Wi-Fi but isn't a Device Owner yet.",
+                        "Show a notification when LCARS wants to toggle Wi-Fi but isn't a Device Owner yet.",
                         checked = s.security.notifyWhenUnprovisioned,
                         onChange = { v -> vm.update { it.copy(security = it.security.copy(notifyWhenUnprovisioned = v)) } },
                     )
@@ -1041,7 +1041,7 @@ fun SettingsScreen(
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
                         onClick = { vm.resetToDefaults() })
                     Text(
-                        "Pulse · built exclusively for Pixel 10 Pro XL · all data from free public sources.",
+                        "LCARS · built exclusively for Pixel 10 Pro XL · all data from free public sources.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),

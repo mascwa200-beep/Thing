@@ -47,7 +47,7 @@ class CrashReporter(context: Context) {
             val now = System.currentTimeMillis()
             val trace = StringWriter().also { throwable.printStackTrace(PrintWriter(it)) }.toString()
             val header = buildString {
-                append("Pulse ").append(BuildConfig.VERSION_NAME)
+                append("LCARS ").append(BuildConfig.VERSION_NAME)
                     .append(" (").append(BuildConfig.VERSION_CODE).append(")\n")
                 append("time: ").append(SimpleDateFormat(TIME_FMT, Locale.US).format(Date(now))).append('\n')
                 append("device: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)

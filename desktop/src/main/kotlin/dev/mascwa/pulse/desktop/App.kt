@@ -27,7 +27,7 @@ fun PulseDesktopApp() {
                 Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                LcarsHeaderBar("PULSE // LCARS — DESKTOP", trailing = "FOUNDATION")
+                LcarsHeaderBar("LCARS — DESKTOP", trailing = "FOUNDATION")
                 LcarsFrame(corner = LcarsCorner.TopStart) {
                     Text(
                         "Foundation online — palette, shape kit and settings store are wired. " +

@@ -11,7 +11,7 @@ import dev.mascwa.pulse.navigation.Routes
  */
 object FeatureCatalog {
     val entries: List<FeatureMeta> = listOf(
-        FeatureMeta(Routes.HOME, "Pulse", "Your at-a-glance dashboard."),
+        FeatureMeta(Routes.HOME, "Home", "Your at-a-glance dashboard."),
         FeatureMeta(Routes.NEWS, "News", "Headlines from free, public feeds."),
         FeatureMeta(Routes.MARKETS, "Markets", "Indices, stocks, FX, commodities & crypto."),
         FeatureMeta(Routes.WEATHER, "Weather", "Forecast, feels-like & air quality."),
@@ -28,7 +28,7 @@ object FeatureCatalog {
         FeatureMeta(Routes.SEARCH, "Search", "Private web search."),
         FeatureMeta(Routes.SKY, "Sky", "Space weather, orbital & compass."),
         FeatureMeta(Routes.ORBITAL, "Orbital", "ISS, sun, moon & near-Earth objects."),
-        FeatureMeta(Routes.SETTINGS, "Settings", "Tune Pulse to your taste."),
+        FeatureMeta(Routes.SETTINGS, "Settings", "Tune LCARS to your taste."),
     )
 
     /** Display label for a route key, or the key itself if unknown. */

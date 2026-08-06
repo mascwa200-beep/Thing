@@ -168,7 +168,7 @@ private fun share(context: android.content.Context, text: String) {
     if (text.isBlank()) return
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Pulse crash report")
+        putExtra(Intent.EXTRA_SUBJECT, "LCARS crash report")
         putExtra(Intent.EXTRA_TEXT, text)
     }
     runCatching { context.startActivity(Intent.createChooser(send, "Share crash report")) }

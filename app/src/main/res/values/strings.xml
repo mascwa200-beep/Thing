@@ -1,5 +1,8 @@
 <resources>
-    <string name="app_name">Pulse</string>
+    <!-- The actual Star Trek computer: LCARS — Library Computer Access/Retrieval System. Display name
+         only; applicationId/packages/provider authorities/keystore stay dev.mascwa.pulse (identity,
+         signing, updater and Device-Owner provisioning are bound to them). -->
+    <string name="app_name">LCARS</string>
 
     <!-- Bottom navigation -->
     <string name="nav_home">Home</string>
@@ -46,10 +49,10 @@
     <string name="channel_security_desc">Device and network security notices.</string>
 
     <!-- Live data-feed widget -->
-    <string name="widget_feed_label">Pulse Live Feed</string>
+    <string name="widget_feed_label">LCARS Live Feed</string>
 
     <!-- Compact lock-screen / glanceable widget -->
-    <string name="widget_lock_label">Pulse Lock</string>
+    <string name="widget_lock_label">LCARS Lock</string>
 
     <!-- J.A.R.V.I.S. home-screen widgets -->
     <string name="widget_jarvis_status">J.A.R.V.I.S. Status</string>
@@ -58,12 +61,12 @@
     <string name="widget_jarvis_brief">J.A.R.V.I.S. Brief</string>
 
     <!-- Trusted Network Mode device-admin component -->
-    <string name="device_admin_label">Pulse Trusted Network Mode</string>
-    <string name="device_admin_description">Lets Pulse control the Wi-Fi radio for Trusted Network Mode. Requests no other powers — no wipe, lock or password control.</string>
+    <string name="device_admin_label">LCARS Trusted Network Mode</string>
+    <string name="device_admin_description">Lets LCARS control the Wi-Fi radio for Trusted Network Mode. Requests no other powers — no wipe, lock or password control.</string>
 
     <!-- Device gate -->
     <string name="gate_title">Built for Pixel 10 Pro XL</string>
-    <string name="gate_body">Pulse is an exclusive build for the Google Pixel 10 Pro XL. This device reports a different model, so some layout and features are not guaranteed.</string>
+    <string name="gate_body">LCARS is an exclusive build for the Google Pixel 10 Pro XL. This device reports a different model, so some layout and features are not guaranteed.</string>
     <string name="gate_detected">Detected device: %1$s</string>
     <string name="gate_continue">Continue anyway</string>
     <string name="gate_exit">Exit</string>

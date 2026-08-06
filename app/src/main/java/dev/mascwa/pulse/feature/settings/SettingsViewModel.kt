@@ -309,7 +309,7 @@ class SettingsViewModel(
         // Use the high-importance breaking channel so it pops as a heads-up.
         notifier.notifyBreaking(
             id = 9999,
-            title = "Pulse notifications are working",
+            title = "LCARS notifications are working",
             body = "If you can see this, alerts are enabled. Breaking news, market, weather, sky and safety alerts will appear like this.",
             route = "home",
         )

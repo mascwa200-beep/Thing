@@ -74,7 +74,7 @@ data class TopDestination(
 )
 
 val TOP_DESTINATIONS = listOf(
-    TopDestination(Routes.HOME, "PULSE", LcarsIcons.Home, LcarsIcons.Home),
+    TopDestination(Routes.HOME, "HOME", LcarsIcons.Home, LcarsIcons.Home),
     TopDestination(Routes.NEWS, "NEWS", LcarsIcons.Article, LcarsIcons.Article),
     TopDestination(Routes.MARKETS, "MARKETS", LcarsIcons.ShowChart, LcarsIcons.ShowChart),
     TopDestination(Routes.WEATHER, "WX", LcarsIcons.WbSunny, LcarsIcons.WbSunny),

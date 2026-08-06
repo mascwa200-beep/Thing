@@ -35,7 +35,7 @@ fun main() {
                 }
                 exitApplication()
             },
-            title = "Pulse",
+            title = "LCARS",
             state = state,
         ) {
             PulseDesktopApp()

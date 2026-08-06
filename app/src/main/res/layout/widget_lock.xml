@@ -16,7 +16,7 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:text="PULSE"
+        android:text="LCARS"
         android:textColor="#5AD1FF"
         android:textStyle="bold"
         android:textSize="13sp"

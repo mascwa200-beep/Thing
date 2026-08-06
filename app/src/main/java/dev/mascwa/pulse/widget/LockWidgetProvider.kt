@@ -58,7 +58,7 @@ class LockWidgetProvider : AppWidgetProvider() {
     }
 
     private data class Glance(
-        val header: String = "PULSE",
+        val header: String = "LCARS",
         val objective: String = "",
         val wx: String = "",
         val wx2: String = "",
@@ -133,7 +133,7 @@ class LockWidgetProvider : AppWidgetProvider() {
             DayPart.AFTERNOON -> "GOOD AFTERNOON"
             DayPart.EVENING -> "GOOD EVENING"
             DayPart.NIGHT -> "GOOD NIGHT"
-            null -> "PULSE"
+            null -> "LCARS"
         }
         val date = runCatching { SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date()) }.getOrNull().orEmpty()
         val header = if (date.isNotEmpty()) "$greeting · ${date.uppercase()}" else greeting

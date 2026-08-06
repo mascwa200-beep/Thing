@@ -89,7 +89,7 @@ class SecurityAuditViewModel(
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss z", Locale.US).format(Date())
         val last = if (v.lastScanMs > 0) DateUtils.getRelativeTimeSpanString(v.lastScanMs).toString() else "never"
         val sb = StringBuilder()
-        sb.appendLine("PULSE SECURITY AUDIT — exported $stamp")
+        sb.appendLine("LCARS SECURITY AUDIT — exported $stamp")
         sb.appendLine("Last scan: $last · apps: ${v.appsScanned} · user CAs: ${v.userCaCount} · " +
             "usage access: ${if (v.usageAvailable) "yes" else "no"}")
         sb.appendLine("Findings: ${v.summary.critical} critical · ${v.summary.warning} warning · ${v.summary.info} info")

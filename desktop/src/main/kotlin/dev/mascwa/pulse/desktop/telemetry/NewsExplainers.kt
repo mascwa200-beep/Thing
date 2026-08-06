@@ -57,7 +57,7 @@ object NewsExplainers {
     /** What the BUZZ meter means and its honest limits — it's a local overlap check, not a live count. */
     fun buzz(level: BuzzLevel): Explainer = Explainer(
         "BUZZ — ${level.label.lowercase()}",
-        "This isn't a live count of mentions anywhere — Pulse doesn't send this story to any server to ask. " +
+        "This isn't a live count of mentions anywhere — LCARS doesn't send this story to any server to ask. " +
             "It's a local check: how many of the social posts already loaded this session share this story's " +
             "own topic tags or a trending hashtag. A quiet reading can just mean nobody on those platforms " +
             "happened to post about it recently, not that no one anywhere is talking about it.",
@@ -77,7 +77,7 @@ object NewsExplainers {
         }
         return Explainer(
             headline,
-            "$coverage Pulse matches the headline's own words against a fixed list of ~40 markets and sectors, " +
+            "$coverage LCARS matches the headline's own words against a fixed list of ~40 markets and sectors, " +
                 "then reads whether the wording states or clearly implies a move up or down — the same " +
                 "\"reality moves the market\" read as Trading Places, done with keyword matching, not financial " +
                 "modeling. A ▲/▼ shown WITH a percentage is a real live quote; a bare ▲/▼ is only the heuristic " +

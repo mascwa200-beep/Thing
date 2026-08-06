@@ -57,7 +57,7 @@ fun DeviceGateScreen(
                 modifier = Modifier.padding(top = 16.dp),
             )
             Text(
-                "Pulse is built only for the Google Pixel 10 Pro XL running GrapheneOS. " +
+                "LCARS is built only for the Google Pixel 10 Pro XL running GrapheneOS. " +
                     "On anything else, layout and some hardening features aren't guaranteed.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

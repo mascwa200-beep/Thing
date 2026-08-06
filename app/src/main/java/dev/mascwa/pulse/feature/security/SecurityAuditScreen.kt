@@ -100,7 +100,7 @@ fun SecurityAuditScreen(vm: SecurityAuditViewModel, onBack: () -> Unit) {
                             Text("Grant Usage Access", fontFamily = JetBrainsMono, fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold, color = c.accent)
                             Text(
-                                "Per-app data-usage + exfiltration checks need Usage Access. Tap to grant it to Pulse.",
+                                "Per-app data-usage + exfiltration checks need Usage Access. Tap to grant it to LCARS.",
                                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                             )
                             AuditButton("OPEN USAGE ACCESS", c.accent) {

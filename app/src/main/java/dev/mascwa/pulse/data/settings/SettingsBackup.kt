@@ -65,10 +65,10 @@ object SettingsBackup {
         )
 
     /** Parse a backup file's [text] into settings to apply, merged over [current] (keeps device
-     *  credentials). Throws if the text isn't a Pulse backup. */
+     *  credentials). Throws if the text isn't an LCARS backup. */
     fun decode(text: String, current: AppSettings): AppSettings {
         val env = json.decodeFromString(Envelope.serializer(), text)
-        require(env.app == APP) { "That file isn't a Pulse backup." }
+        require(env.app == APP) { "That file isn't an LCARS backup." }
         return merge(env.settings, current)
     }
 }
