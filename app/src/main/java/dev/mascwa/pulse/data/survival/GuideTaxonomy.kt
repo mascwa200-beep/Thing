@@ -88,5 +88,3 @@ val CATEGORY_SUPERGROUP: Map<String, String> = mapOf(
 const val OTHER = "Other"
 
 fun supergroupOf(category: String): String = CATEGORY_SUPERGROUP[category] ?: OTHER
-
-fun Guide.supergroup(): String = supergroupOf(category)

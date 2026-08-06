@@ -2056,6 +2056,72 @@ real segment) rather than a smooth bar — recorded here so this isn't re-litiga
 ⚠️ All of the above's on-device/visual feel (the rename pass, the shape convergence, whether a 1.5dp gap
 reads as distinct blocks vs. noise at a 6dp bar height) is CI-compile-gated only — owner verifies on the Pixel.
 
+### THE FOUR-PART DIRECTIVE (this session, all shipped on `claude/loving-edison-bd65oa`, PR #425 open)
+Owner (verbatim): *"Rename the app to whatever the actual Star Trek computer was called. Make the
+notifications just one, and make it an LCARS stylized … news/market/weather/temp/agendas notification.
+Ensure that the knowledge library has over 10,000+ full pages … Also, the order of navigation via tabs …
+design it for the lowest common denominator."* Then escalated (verbatim, CURRENT standing directive):
+*"branch into 10,000+ topics with 10,000+ full pages of information, the full scope of the information,
+not a scrap or morsel missed."* Owner also decided via AskUserQuestion: the breaking-news takeover must be
+a REAL takeover ("display the whole ass screen … no matter what is happening on the phone", delete the
+separate THIS-JUST-IN notification), and the LCARS console screen: "Remove it".
+- **Part 1 — app rename → LCARS** (the actual Star Trek computer: Library Computer Access/Retrieval
+  System). Display strings ONLY — `applicationId`/packages/DataStore names/keystore aliases/provisioning
+  (`dev.mascwa.pulse.debug/…PulseDeviceAdminReceiver`) are identity/data contracts and did NOT change.
+- **Part 2 — ONE notification.** Pure `core:telemetry/UnifiedBrief.kt` (+20 JVM tests):
+  `UnifiedBriefComposer.compose(BriefSignals)` → headline + temp chip + ≤5 fixed-order rows
+  (ALERT/NEWS/MARKETS/WEATHER/AGENDA) + `BriefUrgency{ROUTINE,YELLOW,RED}` + a stable `urgencyKey`.
+  ONE fixed id (`NotifId.BRIEF=2300`) posted on TWO channels: silent `channel_brief` (MIN) for refreshes,
+  alerting `channel_brief_alert` (HIGH) only when `urgencyKey` is NEW (persisted `NotifyState.lastUrgentKey`,
+  burned only when it actually alerted) — same-id re-post replaces in place, interruptiveness follows the
+  posting channel. LCARS render via `DecoratedCustomViewStyle` + LinearLayout-only RemoteViews
+  (`notification_lcars[_big].xml`, `LcarsNotificationRenderer`; ImageView rail — bare `<View>` isn't
+  RemoteViews-whitelisted). `BriefEngine.publish(...)` gathers all signals (news/movers/weather/Kp/
+  calendar-on-IO/tasks/reminder-count) and is THE one publish path; `RefreshWorker` rewritten (silent passes
+  → opsNotice/safetyNotice/securityNotice signals feeding the board); 13 old channels deleted via a
+  `RETIRED` list; `Notifier` shrank to canPost/notifyBrief/notifyUrgentLine/cancelBrief/
+  notifyBreakingInterrupt + a first-post sweep keeping only {2300, FGS 7301/7311/4201, takeover 1003}.
+  NotificationPrefs pruned to master + 4 row toggles + threshold + urgent + takeover + quiet hours; Settings
+  section collapsed accordingly + a test button posting a full sample YELLOW board. **Real takeover:**
+  `TakeoverLauncher` — `Settings.canDrawOverlays` → direct `startActivity(BreakingNewsActivity)` (the
+  SYSTEM_ALERT_WINDOW grant exempts background launches; manifest re-gained the permission + a Settings
+  "Allow the takeover over other apps" grant row), else the full-screen-intent fallback. `notifyEmergency`
+  tier deleted. `Oracle.worldPulse` + its tests deleted (subsumed). ⚠️ Board tray render/buzz + the real
+  takeover are owner-verify on the Pixel (test button ships in Settings).
+- **Part 4 — flat navigation.** Bottom nav → HOME·NEWS·MARKETS·WEATHER·COMPUTER·MENU; new
+  `feature/menu/MenuScreen.kt` — a flat plain-English LCARS directory (EMERGENCY first, then GUIDES/MAPS &
+  SKY/SOUND/YOUR THINGS/INTERNET/SYSTEM), every destination one tap, nothing data-conditional. The LCARS
+  console (`PipBoyScreen`) + `FeedTabs`/`FeedTabBar` machinery DELETED; Radio/Music/Notes/Diary became real
+  routes (thin `PulseScaffold` wrappers); quests/sky/tacnet/inflation routes killed (legacy "tacnet"
+  deep-link → MENU). CI broke once — deleting `InflationScreen.kt` took down `InflationBody` which the
+  Markets hub embeds; fixed by restoring `InflationBody.kt` from git history minus the wrapper (cfd4dcd,
+  CI-green) + a full symbol sweep of all 7 deleted files. Home search icon → SEARCH, bell → ORACLE.
+- **Part 3 — KB scale infrastructure + the 10,000 engine.** "Full page" = a section with ≥400 words
+  (whitespace-token count over body+ingredients+steps, algorithm-identical Python/Kotlin — both report 119
+  today over 168 guides / 2,020 sections). Storage: per-category shards sub-sharded at 25 guides/file
+  (`guides_<slug>[_N].json`) + `guide_index.json` (id/title/category/summary/headings/file per guide;
+  deliberately not matching the `guides*.json` glob); `SurvivalContentRepository` = resident `index()` +
+  shard-lazy `guide(id)` (3-shard Mutex LRU) + **streamed `searchBodies()`** (raw-text reject per shard,
+  parse only on hit, discard — memory stays O(one shard) at any corpus size); the old parse-everything
+  `guides()` is GONE (GuidesScreen/SurviveHub search now run on the index + body-match stream).
+  CI: `GuidesJsonValidationTest` gained index-lockstep + a `FULL_PAGE_BASELINE` ratchet (bump upward as
+  waves land, never down) + 49 `knownCategories`. Taxonomy: 27 → **49 categories under 8 supergroups**
+  (added Humanities / Arts & Leisure / Work & Money; `GuideTaxonomy.CATEGORY_SUPERGROUP`, the CI test and
+  `tools/kb/build_manifest.py` KNOWN_CATEGORIES must stay in lockstep). **Ontology-first coverage:**
+  `tools/kb/topic_manifest.json` — an append-only ledger `{id tNNNNN, topic, category, guideId|null}`
+  built by `tools/kb/build_manifest.py <ontology-dir>` from the 22-domain enumeration workflow;
+  `kb_pipeline.py` auto-links bundled guides to topics by normalized title after every wave and prints
+  coverage; drafting waves work through `guideId==null` entries. `tools/kb/merge_expansions.py <wave-dir>`
+  merges Track-A expansion waves (strict-growth + unchanged-headings + image-preservation guards; agents'
+  stray original-copies auto-rejected by zero growth). **The engine is standing, multi-session work**:
+  ~10,000 topics ≈ 60× today's 168 guides (~25M+ words) — dispatch Workflow mega-waves against pending
+  manifest topics, merge via the pipeline, ratchet the baseline, commit per wave, repeat until covered.
+- **Notifier/worker call-site notes:** ActiveMatrixService/VitalsTrackingService/RadioService FGS
+  notifications restyled + kept mandatory; vitals check-in + trusted-network latch → `notifyUrgentLine`;
+  ReminderWorker fires through `BriefEngine.publish(reminderNow=...)` + an urgent line.
+  **Cross-module smart-cast trap** (recurring): a public `val` from `core:telemetry` can't smart-cast in
+  `:app` — hoist to a local `val` first (bit N3's `brief.urgencyKey`).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

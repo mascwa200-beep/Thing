@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.PulseApplication
-import dev.mascwa.pulse.data.survival.Guide
+import dev.mascwa.pulse.data.survival.GuideIndexEntry
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -59,10 +59,11 @@ fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     val context = LocalContext.current
     val container = remember { (context.applicationContext as PulseApplication).container }
-    // Only the bundled guide TITLES/headings are read here (cheap, cached) — not the network-bound screens.
-    var guides by remember { mutableStateOf<List<Guide>>(emptyList()) }
+    // Only the lightweight catalog index is read here (titles/summaries/headings — cheap, cached);
+    // guide bodies and the network-bound screens never load from this search.
+    var guides by remember { mutableStateOf<List<GuideIndexEntry>>(emptyList()) }
     LaunchedEffect(Unit) {
-        guides = runCatching { container.survivalContentRepository.guides() }.getOrDefault(emptyList())
+        guides = runCatching { container.survivalContentRepository.index() }.getOrDefault(emptyList())
     }
     var query by remember { mutableStateOf("") }
     val index = remember(guides) { buildSurviveIndex(guides) }
@@ -160,7 +161,7 @@ private data class SurviveResult(val label: String, val sub: String, val route: 
 
 /** Builds the full index: the six hub destinations plus one entry per bundled offline guide (indexed by
  *  title, category, summary and section headings, so "knot"/"cpr"/"compass"/"morse" all resolve). */
-private fun buildSurviveIndex(guides: List<Guide>): List<SurviveResult> {
+private fun buildSurviveIndex(guides: List<GuideIndexEntry>): List<SurviveResult> {
     val hub = listOf(
         SurviveResult("SOS", "TOOL · strobe · alarm · call · text", Routes.SOS,
             "sos emergency strobe alarm call text help flare signal light distress 911"),
@@ -178,12 +179,11 @@ private fun buildSurviveIndex(guides: List<Guide>): List<SurviveResult> {
             "tool tools torch flashlight strobe alarm morse whistle compass siren beacon"),
     )
     val guideResults = guides.map { g ->
-        val headings = g.sections.joinToString(" ") { it.heading }
         SurviveResult(
             label = g.title,
             sub = "GUIDE · ${g.category}",
             route = "${Routes.SURVIVAL}?guide=${g.id}",
-            keywords = "${g.title} ${g.category} ${g.summary} $headings",
+            keywords = "${g.title} ${g.category} ${g.summary} ${g.headings.joinToString(" ")}",
         )
     }
     return hub + guideResults

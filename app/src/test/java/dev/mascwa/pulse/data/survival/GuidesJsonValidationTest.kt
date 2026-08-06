@@ -9,7 +9,8 @@ import org.junit.Test
 
 /**
  * Validates every bundled `assets/survival/guides*.json` file the same way
- * [SurvivalContentRepository.guides] loads them at runtime — decodes each file independently, then builds
+ * [SurvivalContentRepository.index]/[SurvivalContentRepository.guide] load them at runtime — decodes each
+ * file independently, then builds
  * the full merged catalog and checks the invariants the Knowledge Base authoring pipeline promises. Before
  * this test existed, CI never decoded the guide catalog at all: a malformed JSON asset would have shipped
  * green. Plain JVM test (no Android/Robolectric needed) — [GuideModels] is pure kotlinx.serialization.

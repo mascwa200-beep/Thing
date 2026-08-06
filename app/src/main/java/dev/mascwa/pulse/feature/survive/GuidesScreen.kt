@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,8 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.data.survival.Guide
+import dev.mascwa.pulse.data.survival.GuideIndexEntry
 import dev.mascwa.pulse.data.survival.SUPERGROUPS
-import dev.mascwa.pulse.data.survival.supergroup
 import dev.mascwa.pulse.data.survival.supergroupOf
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFillRow
@@ -57,75 +58,59 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import kotlinx.coroutines.launch
 
-/** A searchable, category-filtered index entry over the whole guide (title + category + summary + every
- *  section heading AND body) so any fact in the knowledge base is findable by full-text search. */
-private data class GuideIndex(val guide: Guide, val blob: String) {
-    /** A crude relevance rank for a query: title/category hits weigh most, headings next, body least. */
-    fun rank(q: String): Int {
-        val g = guide
-        var r = 0
-        if (g.title.contains(q, true)) r += 100
-        if (g.category.contains(q, true)) r += 60
-        if (g.summary.contains(q, true)) r += 40
-        r += g.sections.count { it.heading.contains(q, true) } * 20
-        r += g.sections.count { it.body.contains(q, true) } * 4
-        return r
-    }
+/** Relevance rank over the catalog-index fields: title/category hits weigh most, headings least. Body
+ *  hits arrive separately (the streamed per-shard scan in [GuidesViewModel.bodyMatches]). */
+private fun rank(e: GuideIndexEntry, q: String): Int {
+    var r = 0
+    if (e.title.contains(q, true)) r += 100
+    if (e.category.contains(q, true)) r += 60
+    if (e.summary.contains(q, true)) r += 40
+    r += e.headings.count { it.contains(q, true) } * 20
+    return r
 }
 
 @Composable
 fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuideId: String? = null) {
-    val guides by vm.guides.collectAsStateWithLifecycle()
-    var selected by remember { mutableStateOf<Guide?>(null) }
+    val entries by vm.index.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
+    val bodyMatches by vm.bodyMatches.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var supergroup by remember { mutableStateOf<String?>(null) } // null = every supergroup
     var category by remember { mutableStateOf<String?>(null) } // null = every category within scope
 
-    var openedInitial by remember { mutableStateOf(false) }
-    LaunchedEffect(guides, initialGuideId) {
-        if (!openedInitial && !initialGuideId.isNullOrBlank() && guides.isNotEmpty()) {
-            guides.firstOrNull { it.id == initialGuideId }?.let { selected = it }
+    // rememberSaveable: the reader now lives in the ViewModel (survives rotation), so the one-shot
+    // deep-link open must survive rotation too — else recreation re-fires it and hijacks the reader.
+    var openedInitial by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(entries, initialGuideId) {
+        if (!openedInitial && !initialGuideId.isNullOrBlank() && entries.isNotEmpty()) {
+            if (selected == null && entries.any { it.id == initialGuideId }) vm.open(initialGuideId)
             openedInitial = true
         }
     }
     val c = Pulse.colors
 
-    // Build the full-text index + the two-level taxonomy rail once per catalog change.
-    val index = remember(guides) {
-        guides.map { g ->
-            val blob = buildString {
-                append(g.title); append(' '); append(g.category); append(' '); append(g.summary); append(' ')
-                g.safetyNote?.let { append(it); append(' ') }
-                g.sections.forEach { s ->
-                    append(s.heading); append(' '); append(s.body); append(' ')
-                    s.ingredients?.forEach { append(it); append(' ') }
-                    s.steps?.forEach { append(it); append(' ') }
-                }
-            }.lowercase()
-            GuideIndex(g, blob)
-        }
-    }
-    val categories = remember(guides) { guides.map { it.category }.distinct().sorted() }
+    val categories = remember(entries) { entries.map { it.category }.distinct().sorted() }
     val categoriesInScope = remember(categories, supergroup) {
         if (supergroup == null) categories else categories.filter { supergroupOf(it) == supergroup }
     }
 
     val q = query.trim()
-    val visible = remember(index, q, supergroup, category) {
-        val scoped = index.filter {
-            (supergroup == null || it.guide.supergroup() == supergroup) &&
-                (category == null || it.guide.category == category)
+    val visible = remember(entries, q, supergroup, category, bodyMatches) {
+        val scoped = entries.filter {
+            (supergroup == null || supergroupOf(it.category) == supergroup) &&
+                (category == null || it.category == category)
         }
-        if (q.isBlank()) scoped.map { it.guide }
-        else scoped.filter { it.blob.contains(q.lowercase()) }
-            .sortedByDescending { it.rank(q) }
-            .map { it.guide }
+        if (q.isBlank()) scoped
+        else scoped.map { it to rank(it, q) }
+            .filter { (e, r) -> r > 0 || e.id in bodyMatches }
+            .sortedByDescending { (e, r) -> r + if (e.id in bodyMatches) 4 else 0 }
+            .map { it.first }
     }
 
     PulseScaffold(
         title = selected?.title ?: "Knowledge Base",
         navigationIcon = {
-            IconButton(onClick = { if (selected != null) selected = null else onBack?.invoke() }) {
+            IconButton(onClick = { if (selected != null) vm.closeReader() else onBack?.invoke() }) {
                 Icon(LcarsIcons.ArrowBack, "Back")
             }
         },
@@ -133,10 +118,10 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
         val sel = selected
         if (sel == null) {
             Column(Modifier.padding(innerPadding).fillMaxWidth()) {
-                // Search — full-text across every guide + section body.
+                // Search — instant over the index fields; section bodies stream in per shard behind it.
                 LcarsFrame(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)) {
                     BasicTextField(
-                        value = query, onValueChange = { query = it }, singleLine = true,
+                        value = query, onValueChange = { query = it; vm.search(it) }, singleLine = true,
                         textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
                         cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth(),
                         decorationBox = { inner ->
@@ -181,7 +166,7 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                 ) {
                     item {
                         Text(
-                            "${guides.size} guides · fully offline · search any fact" +
+                            "${entries.size} guides · fully offline · search any fact" +
                                 (if (q.isNotBlank()) "  ·  ${visible.size} match" else ""),
                             fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
@@ -194,7 +179,7 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                         }
                     }
                     itemsIndexed(visible, key = { _, g -> g.id }) { _, g ->
-                        LcarsFrame(Modifier.fillMaxWidth().clickable { selected = g }) {
+                        LcarsFrame(Modifier.fillMaxWidth().clickable { vm.open(g.id) }) {
                             Column {
                                 Text(g.category.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
                                 Text(g.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
