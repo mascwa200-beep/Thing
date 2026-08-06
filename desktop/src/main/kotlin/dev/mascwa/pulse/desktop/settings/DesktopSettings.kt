@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.desktop.settings
 
+import dev.mascwa.pulse.desktop.AppPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,7 +17,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
 /** Everything the desktop shell persists across launches. Deliberately small in Phase A — grows alongside
@@ -119,18 +119,8 @@ class DesktopSettingsStore(
     companion object {
         private const val FLUSH_DELAY_MS = 800L
 
-        /** `%APPDATA%\Pulse\settings.json` on Windows, the XDG data dir on Linux, `~/Library/Application
-         *  Support/Pulse` on macOS — Windows is the shipping target, the other two matter for local
-         *  development and verification (this repo's own dev environment is Linux). */
-        fun defaultSettingsPath(): Path {
-            val os = System.getProperty("os.name").orEmpty().lowercase()
-            val home = System.getProperty("user.home").orEmpty()
-            val base = when {
-                os.contains("win") -> System.getenv("APPDATA")?.takeIf { it.isNotBlank() } ?: "$home/AppData/Roaming"
-                os.contains("mac") -> "$home/Library/Application Support"
-                else -> System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() } ?: "$home/.local/share"
-            }
-            return Paths.get(base, "Pulse", "settings.json")
-        }
+        /** `<AppPaths.dataDir>/settings.json` — the shared per-user Pulse data directory every desktop
+         *  store resolves under (see [dev.mascwa.pulse.desktop.AppPaths] for the OS-specific base). */
+        fun defaultSettingsPath(): Path = AppPaths.dataDir.resolve("settings.json")
     }
 }
