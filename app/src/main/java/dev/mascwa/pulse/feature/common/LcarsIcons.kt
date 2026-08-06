@@ -16,10 +16,10 @@ import androidx.compose.ui.unit.dp
  * sites exactly as it does for a stock icon, so every path below is built with a plain black fill and never
  * needs its own color.
  *
- * Wave 1 (this file): the 7 bottom-nav destination icons plus `ArrowBack` (32 call sites — by a wide margin
- * the single most-used icon in the app). Remaining call-site wiring (swapping `Icons.Filled.X`/
- * `Icons.AutoMirrored.Filled.X` references to these across ~44 files) and further icon waves are follow-up
- * work — this file is additive only, zero existing call sites touched yet.
+ * Wave 1: the 7 bottom-nav destination icons plus `ArrowBack` (32 call sites — by a wide margin the single
+ * most-used icon in the app) — all wired to their call sites. Wave 2 (this addition): the next-highest-
+ * frequency stock icons — `Refresh` (7 sites), `Delete` (5), `PlayArrow` (4), `Search`/`Close` (3 each).
+ * Wave 2's call-site wiring and further icon waves are follow-up work — additive only until wired.
  */
 object LcarsIcons {
 
@@ -163,6 +163,78 @@ object LcarsIcons {
                     lineTo(16f, 22f); lineTo(8f, 22f); lineTo(2f, 16f); lineTo(2f, 8f); close()
                     moveTo(10.5f, 6f); lineTo(13.5f, 6f); lineTo(18f, 10.5f); lineTo(18f, 13.5f)
                     lineTo(13.5f, 18f); lineTo(10.5f, 18f); lineTo(6f, 13.5f); lineTo(6f, 10.5f); close()
+                }
+            }.build()
+    }
+
+    /** Two opposing arrow-shafts (same silhouette as [ArrowBack], mirrored/compressed into a top and bottom
+     *  band) suggesting rotational flow — replaces `Icons.Filled.Refresh` (7 call sites: PipBoyScreen,
+     *  RadarScreen, QuestsScreen, ObjectivesScreen, MarketsScreen, SettingsScreen, WeatherScreen). An angular
+     *  two-arrow cycle instead of Material's curved circular-arrow glyph. */
+    val Refresh: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsRefresh", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    // top band, arrow pointing right
+                    moveTo(21f, 7f); lineTo(13f, 3f); lineTo(13f, 5.5f); lineTo(3f, 5.5f)
+                    lineTo(3f, 8.5f); lineTo(13f, 8.5f); lineTo(13f, 11f); close()
+                    // bottom band, arrow pointing left
+                    moveTo(3f, 17f); lineTo(11f, 13f); lineTo(11f, 15.5f); lineTo(21f, 15.5f)
+                    lineTo(21f, 18.5f); lineTo(11f, 18.5f); lineTo(11f, 21f); close()
+                }
+            }.build()
+    }
+
+    /** A lidded bin silhouette (lid + handle + tapered body) — replaces `Icons.Filled.Delete` (5 call sites,
+     *  all in SettingsScreen). */
+    val Delete: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsDelete", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(9f, 3f); lineTo(15f, 3f); lineTo(15f, 6f); lineTo(9f, 6f); close()
+                    moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 8f); lineTo(4f, 8f); close()
+                    moveTo(6f, 8f); lineTo(18f, 8f); lineTo(17f, 21f); lineTo(7f, 21f); close()
+                }
+            }.build()
+    }
+
+    /** A plain right-pointing triangle — replaces `Icons.Filled.PlayArrow` (4 call sites, all in
+     *  SpotifyBody). Already a straight-line shape in Material's own glyph, so a direct match. */
+    val PlayArrow: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsPlayArrow", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(6f, 4f); lineTo(20f, 12f); lineTo(6f, 20f); close()
+                }
+            }.build()
+    }
+
+    /** An octagonal scan-reticle ("lens", evenodd hole, mirrors [Settings]'s ring technique at smaller
+     *  scale) with a diagonal handle bar — replaces `Icons.Filled.Search` (3 call sites: HomeScreen,
+     *  NewsScreen, WeatherScreen). An angular sci-fi scan reticle instead of Material's round magnifier. */
+    val Search: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsSearch", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK, pathFillType = PathFillType.EvenOdd) {
+                    moveTo(7f, 3f); lineTo(11f, 3f); lineTo(15f, 7f); lineTo(15f, 11f)
+                    lineTo(11f, 15f); lineTo(7f, 15f); lineTo(3f, 11f); lineTo(3f, 7f); close()
+                    moveTo(7.5f, 5f); lineTo(10.5f, 5f); lineTo(13f, 7.5f); lineTo(13f, 10.5f)
+                    lineTo(10.5f, 13f); lineTo(7.5f, 13f); lineTo(5f, 10.5f); lineTo(5f, 7.5f); close()
+                }
+                path(fill = BLACK) {
+                    moveTo(14f, 15f); lineTo(15f, 14f); lineTo(22f, 21f); lineTo(21f, 22f); close()
+                }
+            }.build()
+    }
+
+    /** Two crossing diagonal bars forming an X — replaces `Icons.Filled.Close` (3 call sites:
+     *  DeviceGateScreen, NavScreen, NewsScreen). */
+    val Close: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsClose", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(4f, 6f); lineTo(6f, 4f); lineTo(20f, 18f); lineTo(18f, 20f); close()
+                    moveTo(20f, 6f); lineTo(18f, 4f); lineTo(4f, 18f); lineTo(6f, 20f); close()
                 }
             }.build()
     }
