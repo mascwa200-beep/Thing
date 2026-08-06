@@ -25,3 +25,4 @@ local.defaults.properties
 # user's settings + downloaded model) instead of forcing an uninstall. Debug keys are not
 # secret (well-known password "android"); this is safe to commit.
 !/app/debug.keystore
+tools/kb/.next_wave.json
