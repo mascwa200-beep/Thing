@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +49,7 @@ import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.economy.EconomyBody
 import dev.mascwa.pulse.feature.economy.EconomyViewModel
 import dev.mascwa.pulse.feature.economy.InflationBody
@@ -77,7 +77,7 @@ fun MarketsScreen(
                     MarketsTab.ECONOMY, MarketsTab.INFLATION -> economyVm.refresh()
                     MarketsTab.FUEL -> fuelVm.refresh()
                 }
-            }) { Icon(Icons.Filled.Refresh, "Refresh") }
+            }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {

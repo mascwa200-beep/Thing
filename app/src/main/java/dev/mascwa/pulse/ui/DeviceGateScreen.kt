@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhonelinkLock
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -92,7 +92,7 @@ private fun Requirement(label: String, ok: Boolean, detail: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            if (ok) Icons.Filled.Check else Icons.Filled.Close, null,
+            if (ok) Icons.Filled.Check else LcarsIcons.Close, null,
             modifier = Modifier.size(22.dp),
             tint = if (ok) Color(0xFF39FF14) else MaterialTheme.colorScheme.error,
         )

@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.mascwa.pulse.feature.common.LcarsIcons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -164,7 +163,7 @@ fun PipBoyScreen(
                     PipTab.RADIO -> Unit // the radio has its own tuner controls
                     PipTab.MUSIC -> spotifyVm.refresh()
                 }
-            }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
+            }) { Icon(LcarsIcons.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
         // Re-theme the whole subtree to LCARS so the sections read as one console (also provided

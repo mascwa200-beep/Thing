@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
@@ -54,6 +52,7 @@ import dev.mascwa.pulse.feature.common.CyberHeader
 import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -79,8 +78,8 @@ fun WeatherScreen(vm: WeatherViewModel) {
     PulseScaffold(
         title = data.data?.locationName ?: "Weather",
         actions = {
-            IconButton(onClick = { showSearch = !showSearch }) { Icon(Icons.Filled.Search, "Search location") }
-            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh") }
+            IconButton(onClick = { showSearch = !showSearch }) { Icon(LcarsIcons.Search, "Search location") }
+            IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },
     ) { innerPadding ->
         PullToRefreshBox(

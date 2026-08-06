@@ -30,7 +30,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Remove
@@ -380,7 +379,7 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                         centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
                     }
                     if (activeWaypoint != null) {
-                        MapControlButton(active = false, c = c, icon = Icons.Filled.Close) { vm.clearWaypoint() }
+                        MapControlButton(active = false, c = c, icon = LcarsIcons.Close) { vm.clearWaypoint() }
                     }
                 }
 

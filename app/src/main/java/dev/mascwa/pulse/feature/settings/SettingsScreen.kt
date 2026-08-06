@@ -41,10 +41,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.InstallMobile
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -172,7 +170,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        RoundCyberButton(Icons.Filled.Refresh, "Check for updates") {
+                        RoundCyberButton(LcarsIcons.Refresh, "Check for updates") {
                             android.widget.Toast.makeText(context, "Checking for updates…", android.widget.Toast.LENGTH_SHORT).show()
                             vm.checkForUpdate()
                         }
@@ -776,7 +774,7 @@ fun SettingsScreen(
                         }
                         IconButton(onClick = {
                             vm.update { it.copy(customFeeds = it.customFeeds.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -797,7 +795,7 @@ fun SettingsScreen(
                         Text(kw, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                         IconButton(onClick = {
                             vm.update { it.copy(mutedKeywords = it.mutedKeywords.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -825,7 +823,7 @@ fun SettingsScreen(
                         Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                         IconButton(onClick = {
                             vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -914,7 +912,7 @@ fun SettingsScreen(
                             }
                             IconButton(onClick = {
                                 vm.update { it.copy(emergencyContacts = it.emergencyContacts.filterIndexed { idx, _ -> idx != i }) }
-                            }) { Icon(Icons.Filled.Delete, "Remove") }
+                            }) { Icon(LcarsIcons.Delete, "Remove") }
                         }
                     }
                     AddContactRow { contact ->
@@ -1292,7 +1290,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.watchlistEditor(
                 Text("${item.id} · ${item.type.name.lowercase()}", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = { onRemove(item) }) { Icon(Icons.Filled.Delete, "Remove") }
+            IconButton(onClick = { onRemove(item) }) { Icon(LcarsIcons.Delete, "Remove") }
         }
     }
 }

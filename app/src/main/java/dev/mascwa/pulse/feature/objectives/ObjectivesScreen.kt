@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import dev.mascwa.pulse.feature.common.LcarsIcons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -59,7 +58,7 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
         navigationIcon = {
             IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
         },
-        actions = { IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = c.ink) } },
+        actions = { IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh", tint = c.ink) } },
     ) { innerPadding ->
         ObjectivesPanel(vm, c, Modifier.fillMaxSize().padding(innerPadding))
     }

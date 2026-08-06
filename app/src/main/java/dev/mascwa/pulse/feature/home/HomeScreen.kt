@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +51,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
@@ -130,7 +130,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconChip(Icons.Filled.Search, "Search") { nav.openNews() }
+                        IconChip(LcarsIcons.Search, "Search") { nav.openNews() }
                         IconChip(Icons.Filled.Notifications, "Alerts") { nav.openNews() }
                         IconChip(Icons.Filled.Settings, "Settings") { nav.openSettings() }
                     }

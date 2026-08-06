@@ -18,9 +18,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -312,7 +312,7 @@ private fun ConnectedPlayer(
             ) {
                 TransportButton(Icons.Filled.SkipPrevious, "Previous", c) { vm.previous() }
                 TransportButton(
-                    if (remote.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (remote.isPlaying) Icons.Filled.Pause else LcarsIcons.PlayArrow,
                     "Play/Pause", c, primary = true,
                 ) { vm.togglePlayPause() }
                 TransportButton(Icons.Filled.SkipNext, "Next", c) { vm.next() }
@@ -355,7 +355,7 @@ private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: S
             ) {
                 TransportButton(Icons.Filled.SkipPrevious, "Previous", c) { vm.previous() }
                 TransportButton(
-                    if (playback?.isPlaying == true) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (playback?.isPlaying == true) Icons.Filled.Pause else LcarsIcons.PlayArrow,
                     "Play/Pause", c, primary = true,
                 ) { vm.togglePlayPause() }
                 TransportButton(Icons.Filled.SkipNext, "Next", c) { vm.next() }
@@ -397,7 +397,7 @@ private fun TrackRow(track: SpotifyTrack, c: NightwirePalette, onPlay: () -> Uni
             Text(track.artist, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 1.dp))
         }
-        Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
+        Icon(LcarsIcons.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -414,7 +414,7 @@ private fun PlaylistRow(pl: SpotifyPlaylist, c: NightwirePalette, onPlay: () -> 
             val sub = (if (pl.ownerName.isNotBlank()) "${pl.ownerName} · " else "") + "${pl.trackCount} tracks"
             Text(sub, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
         }
-        Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
+        Icon(LcarsIcons.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
