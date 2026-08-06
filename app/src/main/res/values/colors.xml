@@ -6,13 +6,6 @@
     <color name="nw_void">#000000</color>
     <color name="nw_accent">#2DE2E6</color>
     <color name="ic_launcher_background">#000000</color>
-    <!-- Cyberpunk 2077 notification palette (retired — see lcars_condition_* below; kept until every
-         caller migrates off it) -->
-    <color name="cp_yellow">#FCEE0A</color>
-    <color name="cp_red">#FF2A3C</color>
-    <color name="cp_bg">#0A0D12</color>
-    <color name="cp_ink">#E8FF6A</color>
-    <color name="cp_dim">#8A9BA8</color>
     <!-- LCARS notification alert-condition colours — the Star Trek red-alert/yellow-alert convention.
          lcars_condition_routine matches LcarsPalette.accent exactly (the app's real in-app LCARS orange);
          the other two are purpose-built for glanceable notification-tray legibility at small size. -->

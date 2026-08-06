@@ -228,43 +228,27 @@ data class JarvisSettings(
     val cloudActive get() = cloudEnabled && cloudApiKey.isNotBlank()
 }
 
-/** Notification preferences. */
+/**
+ * Notification preferences — the ONE-notification model: the app posts exactly one LCARS Situation Board
+ * (per-row show toggles + one urgent-buzz switch) plus the full-screen breaking-news takeover. The 13
+ * legacy per-category flags were pruned after the cutover (kotlinx `ignoreUnknownKeys` makes old saved
+ * blobs load cleanly without them).
+ */
 @Serializable
 data class NotificationPrefs(
     val masterEnabled: Boolean = true,
-    val breakingNews: Boolean = true,
-    /** Major "this just in" EMERGENCY events anywhere (disasters/attacks/crises) — its own distinct,
-     *  most-urgent notification type + channel, independent of the general breaking-news feed. */
-    val emergencyAlerts: Boolean = true,
-    /** BREAKING takeover: on a MAJOR event (a death, a disaster), force-open the full-screen cinematic
-     *  breaking-news page (over the lock screen). Rarer + harder-throttled than the emergency alert. Default ON. */
+    /** BREAKING takeover: on a MAJOR event (a death, a disaster), the full-screen breaking-news page opens
+     *  by itself — directly when "display over other apps" is granted, via full-screen intent otherwise. */
     val breakingInterrupt: Boolean = true,
-    /** ORACLE foresight: proactive cross-signal pushes (leave now / charge now / drink / aurora tonight).
-     *  One throttled push per worker pass for the single most important interrupt-worthy insight. Default ON. */
-    val oracleEnabled: Boolean = true,
-    /** WORLD PULSE: a quiet, always-latest live feed — one intimate cross-signal read of the world woven with
-     *  your day, updating in place on a silent MIN-importance channel (never buzzes). Default ON. */
-    val worldPulse: Boolean = true,
-    /** Near-real-time breaking news: poll every ~90s via the resident assistant (more battery/data).
-     *  Only runs while the resident J.A.R.V.I.S. service is on; otherwise news uses the 15-min worker. */
+    /** Near-real-time news polling (~90s) via the resident assistant (more battery/data). Keeps the board
+     *  and the takeover check near-live; otherwise the 15-min worker is the cadence. */
     val liveBreakingNews: Boolean = false,
-    val marketAlerts: Boolean = true,
-    val weatherAlerts: Boolean = true,
-    val spaceAlerts: Boolean = true,
-    val auroraAlerts: Boolean = true,     // NOAA OVATION aurora probability at your location
-    val safetyAlerts: Boolean = true,
-    val flightAlerts: Boolean = false,    // overhead aircraft (opt-in; can be frequent near airports)
-    val dailyDigest: Boolean = true,
-    /** Notify when a newer app build is available to download/install in Settings. */
-    val updateChecks: Boolean = true,
-    val digestHour: Int = 8,            // 0..23 local
     val quietHoursEnabled: Boolean = false,
     val quietStartHour: Int = 22,
     val quietEndHour: Int = 7,
-    /** Absolute percent move on a watch item that triggers an alert. */
+    /** Absolute percent move that puts an instrument on the board's MARKET row. */
     val marketMovePercent: Double = 3.0,
-    // --- The ONE-notification board (additive; the legacy per-category flags above are retired in the
-    // cutover slice). One row toggle per board row + one switch for whether urgent items may buzz. ---
+    // --- The board's rows + its one buzz switch. ---
     val showNewsRow: Boolean = true,
     val showMarketsRow: Boolean = true,
     val showWeatherRow: Boolean = true,
@@ -398,8 +382,6 @@ data class AppSettings(
     // Bookkeeping
     val onboardingComplete: Boolean = false,
     val deviceGateAcknowledged: Boolean = false,
-    /** Highest build number we've already shown an "update available" notification for (dedupe). */
-    val lastUpdateNotifiedCode: Int = 0,
     /** On launch AND on every foreground return, auto-download a GREEN (CI-passed) update newer than
      *  the running build and launch the installer for the user's one-tap confirm. A sideloaded app
      *  can't install fully silently (no device-owner), so the single Android "Update" tap is the floor;

@@ -26,29 +26,9 @@
     <string name="offline_cached">Offline — showing cached data</string>
     <string name="empty_generic">Nothing to show yet.</string>
 
-    <!-- Notification channels — LCARS-plain, Star Trek-flavored where a natural fit, always self-explanatory -->
-    <string name="channel_emergency_name">Emergency Alert</string>
-    <string name="channel_emergency_desc">Major breaking events, sent the moment they happen.</string>
-    <string name="channel_breaking_name">News Bulletin</string>
-    <string name="channel_breaking_desc">Breaking news as it develops.</string>
-    <string name="channel_markets_name">Market Report</string>
-    <string name="channel_markets_desc">Notable moves in markets you follow.</string>
-    <string name="channel_weather_name">Weather Report</string>
-    <string name="channel_weather_desc">Local weather worth knowing about.</string>
-    <string name="channel_digest_name">Ship\'s Log</string>
-    <string name="channel_digest_desc">A quiet daily summary and miscellaneous notes.</string>
-    <string name="channel_space_name">Space Weather</string>
-    <string name="channel_space_desc">Solar storms, aurora, and near-Earth objects.</string>
-    <string name="channel_safety_name">Safety Alert</string>
-    <string name="channel_safety_desc">Nearby incidents worth knowing about.</string>
-    <string name="channel_flight_name">Sensor Contact</string>
-    <string name="channel_flight_desc">A nearby aircraft detected overhead.</string>
-    <string name="channel_reminders_name">Reminder</string>
-    <string name="channel_reminders_desc">Reminders you\'ve set.</string>
-    <string name="channel_security_name">Security Alert</string>
-    <string name="channel_security_desc">Device and network security notices.</string>
-
-    <!-- The one-notification board: fixed row labels (black-on-colour LCARS tag blocks) -->
+    <!-- The one-notification board: fixed row labels (black-on-colour LCARS tag blocks). The retired
+         multi-channel system's channel_* strings are gone with it — the three surviving channels use
+         literal strings in NotificationChannels. -->
     <string name="notif_row_alert">ALERT</string>
     <string name="notif_row_news">NEWS</string>
     <string name="notif_row_markets">MARKET</string>

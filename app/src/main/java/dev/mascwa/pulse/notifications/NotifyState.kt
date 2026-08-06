@@ -2,19 +2,13 @@ package dev.mascwa.pulse.notifications
 
 import kotlinx.serialization.Serializable
 
-/** Persisted bookkeeping so the worker doesn't repeat the same alert. */
+/** Persisted dedup bookkeeping shared by the board/takeover writers (worker, resident poller, BriefEngine).
+ *  The retired per-category day-stamp fields were pruned after the one-notification cutover
+ *  (`ignoreUnknownKeys` makes old blobs load cleanly without them). */
 @Serializable
 data class NotifyState(
     val seenTopUrls: List<String> = emptyList(),
-    val marketAlertDay: String = "",
-    val marketAlertedSymbols: List<String> = emptyList(),
-    val weatherAlertDay: String = "",
-    val lastDigestDay: String = "",
-    val spaceAlertDay: String = "",
-    val auroraAlertDay: String = "",
-    val neoAlertDay: String = "",
     val safetyAlertedIds: List<String> = emptyList(),
-    val flightAlertedIds: List<String> = emptyList(),
     /** Last time (epoch ms) the full-screen BREAKING NEWS takeover fired — an audit timestamp only; the
      *  identity-dedup [breakingInterruptSeen] below is what stops the same story re-interrupting, not a
      *  time-based throttle (removed, owner's explicit choice: max notification frequency). */
