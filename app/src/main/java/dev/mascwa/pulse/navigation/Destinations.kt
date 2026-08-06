@@ -1,21 +1,7 @@
 package dev.mascwa.pulse.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.outlined.Article
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ShowChart
-import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.ui.graphics.vector.ImageVector
+import dev.mascwa.pulse.feature.common.LcarsIcons
 
 object Routes {
     const val HOME = "home"
@@ -77,6 +63,9 @@ object Routes {
     const val SECURITY_AUDIT = "security_audit"
 }
 
+// selectedIcon/unselectedIcon intentionally carry the SAME LcarsIcons glyph — bottom-nav selection
+// state is conveyed entirely by icon color (PulseApp.kt's NavigationBarItemDefaults.colors), not by
+// swapping shapes, so a single hand-drawn glyph per destination covers both states.
 data class TopDestination(
     val route: String,
     val label: String,
@@ -85,13 +74,13 @@ data class TopDestination(
 )
 
 val TOP_DESTINATIONS = listOf(
-    TopDestination(Routes.HOME, "PULSE", Icons.Filled.Home, Icons.Outlined.Home),
-    TopDestination(Routes.NEWS, "NEWS", Icons.Filled.Article, Icons.Outlined.Article),
-    TopDestination(Routes.MARKETS, "MARKETS", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
-    TopDestination(Routes.WEATHER, "WX", Icons.Filled.WbSunny, Icons.Outlined.WbSunny),
-    TopDestination(Routes.JARVIS, "COMPUTER", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
+    TopDestination(Routes.HOME, "PULSE", LcarsIcons.Home, LcarsIcons.Home),
+    TopDestination(Routes.NEWS, "NEWS", LcarsIcons.Article, LcarsIcons.Article),
+    TopDestination(Routes.MARKETS, "MARKETS", LcarsIcons.ShowChart, LcarsIcons.ShowChart),
+    TopDestination(Routes.WEATHER, "WX", LcarsIcons.WbSunny, LcarsIcons.WbSunny),
+    TopDestination(Routes.JARVIS, "COMPUTER", LcarsIcons.AutoAwesome, LcarsIcons.AutoAwesome),
     // TOOLS is a pseudo-destination: it opens the LCARS feed tabs (FEED_HOME) and highlights on
     // any feed route — handled specially in PulseApp. TACNET (the LCARS screen) is the feed home.
-    TopDestination(Routes.TACNET, "TOOLS", Icons.Filled.GridView, Icons.Outlined.GridView),
-    TopDestination(Routes.SETTINGS, "SYS", Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopDestination(Routes.TACNET, "TOOLS", LcarsIcons.GridView, LcarsIcons.GridView),
+    TopDestination(Routes.SETTINGS, "SYS", LcarsIcons.Settings, LcarsIcons.Settings),
 )
