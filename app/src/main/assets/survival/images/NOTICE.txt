@@ -99,6 +99,54 @@ original upload where noted, to keep the bundle size reasonable; artwork itself 
       by Luigi Zanasi — CC BY-SA 2.5, Wikimedia Commons
       https://commons.wikimedia.org/wiki/File:Mortise_and_Tenon.png
 
+Diagrams/photos for 8 previously-unillustrated textbook-expansion guides (Long-Term Food
+Storage, Wild Game Processing, Load Carriage & Backpacking, Group Travel Formations,
+Off-Grid Self-Sufficiency, Community Preparedness, Foodborne Pathogens, Camp Cooking Food
+Safety). Sources are the original Wikimedia Commons "File:" pages (image dimensions
+reduced from the original upload where noted, to keep the bundle size reasonable;
+artwork itself unmodified).
+
+  canning-pressure-canner-poster.jpg — "Home Canning: Vegetables Into The Pressure
+      Canner" (WWII-era USDA Bureau of Human Nutrition and Home Economics poster)
+      Unknown author — Public Domain (U.S. National Archives and Records
+      Administration), Wikimedia Commons (resized from the original)
+      https://commons.wikimedia.org/wiki/File:%22Home_Canning_Vegetables_Into_The_Pressure_Canner%22_-_NARA_-_514520.jpg
+  beef-primal-cuts.svg — "US Beef Cuts" labeled diagram of primal/retail beef cuts, used
+      here as a reference for the primal-cut terminology (round, brisket, shoulder/chuck,
+      rib) the guide draws on when describing game butchery
+      by Ysangkok — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:US_Beef_cuts.svg
+  backpack-fit-hiker.jpg — photo of a hiker wearing a fully loaded backpack with the hip
+      belt and shoulder straps fastened
+      by Henadz Besarab — CC BY-SA 4.0, Wikimedia Commons (resized/re-encoded)
+      https://commons.wikimedia.org/wiki/File:Belarusian_hiker_(Siarhei_Besarab)_with_full_equipment_and_two_backpacks_Minsk_2015.jpg
+  single-file-movement.jpg — "Back view of hunters walking single-file bush paths in
+      Tanzania"
+      by Arnold Tibaijuka — CC BY-SA 4.0, Wikimedia Commons (resized from the original)
+      https://commons.wikimedia.org/wiki/File:Back_view_of_hunters_walking_single-file_bush_paths_in_Tanzania.jpg
+  off-grid-solar-wind-wiring.svg — "Micro Wind and Solar Wiring Diagram", a high-level
+      wiring diagram for an off-grid hybrid wind/PV system
+      by Kjerish — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Micro_Wind_and_Solar_Wiring_Diagram.svg
+  rainwater-harvesting.png — "Simple Diagram to show Rainwater Harvesting", a labeled
+      rooftop catchment/cistern/filter system
+      by Adityamail — CC BY 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Simple_Diagram_to_show_Rainwater_Harvesting.png
+  cert-training.jpg — Community Emergency Response Team (CERT) leader training,
+      FEMA National Emergency Training Center, Emmitsburg, MD, March 2003
+      photo by Jocelyn Augustino/FEMA — Public Domain (U.S. federal government work),
+      Wikimedia Commons (resized from the original)
+      https://commons.wikimedia.org/wiki/File:FEMA_-_7746_-_Photograph_by_Jocelyn_Augustino_taken_on_03-10-2003_in_Maryland.jpg
+  bacterial-growth-curve.svg — bacterial growth curve (lag / exponential / stationary /
+      death phases)
+      by Michał Komorniczak — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Bacterial_growth_en.svg
+  dutch-oven-coals.jpg — Dutch oven cooking over hot coals, with coals banked on the lid
+      for even heat
+      by Virginia State Parks staff — CC BY 2.0, Wikimedia Commons (resized from the
+      original)
+      https://commons.wikimedia.org/wiki/File:Dutch-oven-coals_(8713546457).jpg
+
 CC BY / CC BY-SA works above are unmodified apart from resizing (noted) — no crops,
 recolors, or edits to the artwork itself. Public-domain works need no attribution;
 it is recorded here as good practice, matching the rest of this file.
