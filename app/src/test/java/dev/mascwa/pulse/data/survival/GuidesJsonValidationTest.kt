@@ -210,7 +210,8 @@ class GuidesJsonValidationTest {
 
         /** Expansion is exhausted — every section of every guide already reaches [FULL_PAGE_WORDS], so
          *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
-         *  waves land, never down. */
-        const val FULL_PAGE_BASELINE = 2981
+         *  waves land, never down. `tools/kb/ci_parity_lint.py` prints the value to use; it does not
+         *  edit this file, so the bump is a deliberate manual step after every merge. */
+        const val FULL_PAGE_BASELINE = 4731
     }
 }

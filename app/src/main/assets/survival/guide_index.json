@@ -2653,6 +2653,31 @@
    "file": "guides_earth_science.json"
   },
   {
+   "id": "quartz-and-the-silica-minerals",
+   "title": "Quartz and the Silica Minerals",
+   "category": "Earth Science",
+   "summary": "A comprehensive account of silica in the Earth: the atomic structure of quartz, its polymorphs and cryptocrystalline forms, how and where it grows, how to identify it, what it is used for, and the serious dust hazard of working it.",
+   "headings": [
+    "Silica: The Commonest Substance in the Earth's Crust",
+    "The Silicon-Oxygen Tetrahedron and the Quartz Framework",
+    "Purity, Trace Elements, and the Colours of Quartz",
+    "Alpha and Beta Quartz: The 573 Degree Inversion",
+    "The Silica Polymorphs: Tridymite, Cristobalite, Coesite, Stishovite",
+    "Chalcedony, Agate, Flint and the Cryptocrystalline Silicas",
+    "Opal and the Amorphous Silicas",
+    "Handedness, Twinning, and Piezoelectricity",
+    "Physical and Optical Properties in Practice",
+    "Quartz in Igneous Rocks and Pegmatites",
+    "Hydrothermal Quartz: Veins, Geodes, and Ore Deposits",
+    "Weathering, Sand, and the Sedimentary Cycle",
+    "Metamorphic Quartz and the Record of Deformation",
+    "Identifying Quartz in the Field",
+    "From Flint Knapping to Fused Silica: What Silica Is Used For",
+    "Silica Dust, Silicosis, and the Limits of What We Know"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
    "id": "scarcity-choice-and-opportunity-cost",
    "title": "Scarcity, Choice and Opportunity Cost",
    "category": "Economics",
