@@ -2183,10 +2183,59 @@ AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitH
 - **Honest limit:** away-from-home access needs the GitHub-relay transport. The protocol is
   transport-agnostic, so it slots in behind the same interface if the owner ever wants it.
 
-### KB engine state (task #73, standing)
-**238 guides · 2,902 sections · 1,614 full pages** (was 1,310); manifest **70 / 14,490 topics covered**.
-Wave B1 fully merged. `FULL_PAGE_BASELINE = 1614`. Next wave: `select_wave.py` → drafting fan-out →
-`merge_new_guides.py` → `kb_pipeline.py` (must print CLEAN) → ratchet → one commit.
+### KB engine state (task #73, standing) — UPDATED this session
+
+**238 guides · 2,902 sections · 2,463 full pages** (was 1,614). Manifest **24,917 topics** (was 14,490),
+**49/49 categories populated**, 238 covered. `FULL_PAGE_BASELINE = 2463`. Branch
+`claude/loving-edison-bd65oa`, PR **#426** (PR #425 merged as `28ea05e`).
+
+**THE STRUCTURAL FIX — read this before planning more KB work.** `select_wave.py` only ever emits
+topics that exist in `topic_manifest.json`. **20 of 49 categories had ZERO topics**, so no drafting wave
+could ever commission a guide for them — and they were exactly the practical ones the app exists for
+(Hazards, Rescue, Essentials, Navigation, Movement, Preparedness, Skills, Making, Home & Repair,
+Sustenance, both Cooking, Sports, Games, Business, Economics, Education, Vehicles, Reference,
+Foundations). Root cause: `scratchpad/ontology_args.json` declared 22 enumeration domains and only 16
+produced files; the 6 that credit-failed mapped exactly onto the gap, and `Reference` was in no domain
+at all. Re-enumerated (+10,427 topics). **Every category is now reachable.**
+
+**Three new gates, all committed and each negative-tested against deliberately broken input:**
+- `tools/kb/ci_parity_lint.py` — local twin of `GuidesJsonValidationTest`. `kb_pipeline.py` is NOT a
+  twin: it misses blank `safetyNote`, a `Cooking — <not Food Safety>` guide with no safetyNote, empty or
+  blank ingredients/steps lists, unknown category, and index drift. Every one of those merges clean,
+  rewrites the shipped assets, and fails only in CI. Reads the allowlist straight out of the Kotlin
+  source so it cannot drift; prints the exact `FULL_PAGE_BASELINE` ratchet. Run before every commit.
+- `tools/kb/check_wave.py <dir> expand|new` — pre-merge gate. **`merge_expansions.py` never compares
+  `summary`/`safetyNote`**, so an agent that rebuilds a guide dict instead of mutating the original
+  silently corrupts shipped content and merges clean. This is why every expansion prompt mandates
+  *mutate the loaded dict, never construct a new one*. Run before every merge.
+- `tools/kb/merge_images.py` — the image merge step (didn't exist). Sniffs magic bytes, because a saved
+  404 page named `.png` is the normal way image sourcing fails and nothing downstream would question it.
+
+**Content banked:** expansion waves A1+A2 (73 guides, +224k words) took full pages 1,614 → 2,463. Every
+practical category is now **100% full-paged** — Hazards went 0 → 63 of 63 sections (its longest was
+375 words against a 400 bar). Image wave 1 added 52 PD/CC0/CC-BY/CC-BY-SA diagrams across 26 guides
+(152 → 178 of 238 guides have one); provenance in `images/NOTICE.txt`.
+
+**Reusable wave scripts** (in scratchpad, both carry the args guard):
+`kb_wave_expand.js` (args `{outDir, guides:[{id,category,thin}]}`) and `kb_wave_images.js`
+(args `{outDir, guides:[{id,title,category}]}`). 3 units per agent.
+
+**Honest remaining scope.** Expansion tops out near ~2,900 pages — it can only deepen sections that
+already exist. Past that every page is a new guide at ~450 words, so 10,000 pages ≈ **3.4M more words**,
+tens of hours at this machine's 2-way agent concurrency. Multi-session by nature; the CI-printed count
+is the meter.
+
+**Operational lessons that cost real work this session:**
+1. **Entering plan mode kills in-flight subagents.** It propagates to running agents, which write plan
+   documents instead of doing the work — 15 expansion and 14 ontology agents lost that way.
+   `resumeFromRunId` does NOT recover them: it replays the cached "BLOCKED" result. Only a fresh
+   dispatch works. Don't enter plan mode with waves running.
+2. **Workflow `args` can arrive as a JSON string.** Always
+   `typeof args === 'string' ? JSON.parse(args) : args` — a wave died instantly without it.
+3. **Batching guides per agent is only ~12% faster, not 3×.** It amortizes fixed per-agent cost
+   (1–2 min); the ~5,500 words per guide dominates and is incurred either way.
+4. Never hardcode a wave's `outDir` in a reusable script — a second wave drops patches beside
+   already-merged ones, and `merge_images.py` fatals on a section that already has an image.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
