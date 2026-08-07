@@ -627,3 +627,672 @@ raster is bundled instead, so the labels cannot shift under font substitution.
       resistors and the two-wire differential scheme matter — by Stefan-Xp — CC BY-SA 3.0,
       Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
       https://commons.wikimedia.org/wiki/File:CAN-Bus_Elektrische_Zweidrahtleitung.svg
+
+Diagrams for three previously unillustrated Cooking — Food Safety guides ("Food Safety
+During a Power Outage", "Cooking for High-Risk Eaters" and "Date Labels, Recalls & the
+'Is This Still Good?' Decision Guide"). Sources are the original Wikimedia Commons
+"File:" pages; files renamed on import. Where an SVG original relied on system fonts for
+its labels, the Commons-rendered raster is bundled instead, so the labels cannot shift
+under font substitution.
+
+  cooking-food-safety-power-outage.png — temperature of one kilogram of water against heat
+      added, from −100 °C upward, with the two latent-heat plateaus drawn flat: melting ice
+      absorbs 334 kJ/kg and boiling water 2265 kJ/kg with the temperature not moving at all,
+      while the sloping runs are the ordinary specific heats (2.1 kJ/kg/K for ice, 4.2 for
+      liquid water). This is the whole argument of the freezer section made visible — a
+      packed freezer is a thermal battery whose ice must be melted through before anything
+      inside can rise past 32 °F, which is why a full freezer holds roughly 48 hours and a
+      half-full one roughly 24, and why empty space is wasted capacity rather than neutral
+      — by Cmglee — CC BY-SA 4.0, Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Water_temperature_vs_heat_added.svg
+  cooking-food-safety-power-outage-2.png — the pressure-temperature phase diagram of carbon
+      dioxide, with the solid, liquid, gas and supercritical fields labelled and the triple
+      point marked at about 5.2 bar. Reading across the bottom of the plot at one bar —
+      ordinary room pressure — the path runs straight from the solid field into the gas
+      field without ever crossing the liquid field, which is precisely why dry ice
+      sublimates instead of melting, why it leaves no puddle in a cooler, and why sealing it
+      in an airtight container is dangerous: the solid becomes several hundred times its
+      volume of gas with nowhere to go. The diagram supplies the mechanism the section can
+      only assert — by Rifleman 82 — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Carbon_dioxide_pressure-temperature_phase_diagram-en.svg
+  cooking-food-safety-high-risk-eaters.png — the intracellular life cycle of Listeria
+      monocytogenes: a central cartoon of entry into a host cell (InlA/InlB), escape from
+      the vacuole (LLO and the phospholipases), actin nucleation by ActA, actin-based
+      motility across the cytoplasm and direct spread into the neighbouring cell, ringed by
+      the electron micrographs the cartoon was drawn from. It shows why this organism is the
+      one that ties three of the four high-risk groups together: it travels cell to cell
+      without ever re-entering the extracellular space, so antibody does little and the
+      defence that actually matters is cell-mediated immunity — exactly the defence that
+      chemotherapy, transplant immunosuppression, steroids and uncontrolled HIV degrade, and
+      the same route by which it crosses the placenta — by Daniel A. Portnoy, Victoria
+      Auerbuch and Ian J. Glomski, originally published in the Journal of Cell Biology
+      (2002), doi:10.1083/jcb.200205009 — CC BY-SA 3.0 US, Wikimedia Commons (original
+      upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:J_Cell_Biol_2002_Aug_158(3)_409-14,_Figure_1.png
+  cooking-food-safety-high-risk-eaters-2.png — the life cycle of Toxoplasma gondii, labelled
+      in English: the cat as definitive host shedding oocysts in faeces on one arm, and on
+      the other the tachyzoite-to-bradyzoite conversion that lays down tissue cysts in the
+      brain, liver and muscle of prey and livestock. Both arms are food routes the pregnancy
+      section names — tissue cysts are why undercooked meat matters and why freezing solid
+      at −18 °C for several days lowers the risk, while shed oocysts are why unwashed produce
+      and garden soil matter — and seeing them as one cycle explains why the advice covers
+      two apparently unrelated foods — by LadyofHats (Mariana Ruiz Villarreal) — public
+      domain, Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Toxoplasmosis_life_cycle_en.svg
+  cooking-food-safety-date-labels-recalls.jpg — the USDA Agricultural Marketing Service egg
+      grading chart: nine broken-out eggs photographed from above and again in profile,
+      running high/average/low AA, then A, then B. Read left to right and top to bottom it is
+      a picture of ageing itself — the thick white shrinking and spreading, the yolk
+      flattening from a tight dome to a low disc — which is the point the egg section makes
+      about a floating egg being old rather than spoiled, and about why an older egg behaves
+      badly in poaching while remaining perfectly safe to eat — by the U.S. Department of
+      Agriculture (Agricultural Marketing Service) — public domain (work of the U.S. federal
+      government), Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:AMS_Egg_Grading_Chart_(20170509-AMS-UNK-0001).jpg
+  cooking-food-safety-date-labels-recalls-2.jpg — labelled schematic of Rhizopus, the common
+      black bread mould, showing the sporangium and its sporangiospores held up on a
+      sporangiophore above the surface, and beneath it the stolon running sideways and the
+      rhizoids driven down into the substrate. The split is the entire "cut around it or
+      throw it out" decision in one drawing: the fuzzy patch a person sees is only the
+      spore-bearing structure, while the organism itself is the network below, which is why
+      an inch of margin works in dense hard cheese and fails completely in an aerated loaf
+      — uploaded by Commons user Timleo — public domain (released by the author), Wikimedia
+      Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Structure_of_Rhizopus_spp.-english.JPG
+
+Diagrams for three further previously unillustrated guides — "Kitchen Sanitation &
+Cross-Contamination — the Deep Mechanics" (Cooking — Food Safety), "Induction heating and
+industrial electric heating" (Electronics) and "Population Ecology and Population Growth"
+(Energy & Environment). Sources are the original Wikimedia Commons "File:" pages; files
+renamed on import. Where an SVG original relied on system fonts for its labels, the
+Commons-rendered raster is bundled instead, so the labels cannot shift under font
+substitution.
+
+  cooking-food-safety-sanitation-cross-contamination.png — the four stages of biofilm
+      formation on a surface, drawn in sequence and labelled in English: primary colonisers
+      settling onto a conditioning film, cell division inside a secreted EPS matrix to form
+      microcolonies, secondary colonisers arriving as single cells, coaggregates and groups
+      and coadhering to what is already there, and finally the mature multi-species biofilm
+      sitting under a continuous matrix layer. This is the mechanism the sponge section
+      names but cannot show — the section's claim that biofilm cells are far harder to
+      dislodge or kill than free-floating ones, and that rinsing water "simply flows past
+      them", is legible the moment you can see the cells embedded under a secreted layer
+      rather than sitting loose on the surface; it is also why microwaving re-sorts the
+      population instead of clearing it — by Khushairi Amri Kasim — CC BY-SA 4.0, Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Stages_of_biofilm_formation.svg
+  cooking-food-safety-sanitation-cross-contamination-2.png — "Hand Disinfection": the full
+      rub technique laid out as a ring of drawn steps — palm to palm, palm over back of hand
+      with interlaced fingers, palm to palm interlaced, backs of fingers into opposing palms,
+      each thumb clasped and rotated, and fingertips rotated into the opposing palm — with a
+      stopwatch marking the ≥30 s contact time, the "3×" dose panel, and two red-crossed
+      prohibitions: no rings, and do not re-touch the tap with a clean hand. It is the
+      picture behind the section's instruction to "scrub all surfaces": the diagram exists
+      because the spots people miss are systematic, not random — thumbs, fingertips, backs
+      and nail beds — and because the faucet handle is the exact object the raw-chicken
+      chain runs through — by Guido Hegasy (Commons user Guido4) — CC BY-SA 4.0, Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:04_Hegasy_Hand_Disinfection_Wiki_EN_CCBYSA.png
+  induction-heating-and-industrial-electric-heating.png — skin depth δ plotted against
+      frequency on log-log axes for six materials that actually get induction-heated or built
+      into the coil circuit — aluminium, copper, 410 steel, silicon iron, iron-nickel and
+      Mn-Zn ferrite — spanning 1 Hz to 1 MHz and 1 µm to 100 mm. This is the guide's
+      "reference depth" turned into something you can read off rather than compute: the
+      lines are the δ = √(ρ/πfµ) relation, their common −1/2 slope is why a hundredfold rise
+      in frequency only shrinks the heated shell tenfold, and the wide vertical spread
+      between copper and the ferromagnetic irons at any one frequency is the permeability
+      term — which is exactly why the same coil that surface-hardens steel in a fraction of
+      a millimetre heats an aluminium billet nearly through — by Zureks — CC0 1.0 (public
+      domain dedication), Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Skin_depth_by_Zureks.png
+  induction-heating-and-industrial-electric-heating-2.png — the working geometry of an
+      induction heating head, labelled: a bar work piece lying inside a multi-turn inductor
+      coil, the coil drawn as hollow tube (the water-cooling path) and running out to its
+      connections to the generator. It fixes the one thing the prose has to keep asserting —
+      that nothing touches and nothing burns; the coil carries the current, the work piece
+      carries none from the supply, and the only coupling is the field crossing the gap
+      between them. The gap itself is visible, which is what makes the later argument about
+      coupling distance and coil design concrete — by Pearson Scott Foresman, donated to
+      Wikimedia Commons — public domain (the parent plate File:PSF I-470002.png is released
+      into the public domain; the cropped derivative is additionally tagged CC BY-SA 4.0 by
+      its uploader), Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Induction_Heating_(PSF).png
+  population-ecology-and-population-growth.png — Gause's yeast experiments with logistic
+      curves fitted to them: measured yeast volume against age in hours for Saccharomyces
+      cerevisiae, Schizosaccharomyces kefir and a mixed culture, two runs each, with the
+      fitted curve through every set. It is the logistic model shown as an empirical result
+      rather than an equation — real counts rising almost exponentially, bending over, and
+      flattening onto a ceiling — and, critically, the three curves flatten at three
+      different heights and along three different timescales, which is the section's point
+      that K and r are properties of a particular population in a particular environment,
+      not universal constants — by Yapparina — CC0 1.0 (public domain dedication), Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gause%27s_experiment_and_fitted_logistic_curves.svg
+  population-ecology-and-population-growth-2.png — the five stages of the demographic
+      transition in one plate: crude birth rate and crude death rate per 1,000 plotted
+      through the transition with the gap between them shaded as "natural increase", total
+      population riding underneath, and below the axis a stage-by-stage table of what each
+      rate is doing, ending in a row of population pyramids that change shape from the wide
+      base of stage 1 to the near-column of stages 4 and 5. It carries the whole section:
+      that the population surge is the temporary gap opened when death rates fall before
+      birth rates follow, not a change in fertility alone, and that age structure is the
+      lagging record of that gap — by Max Roser (Our World in Data) — CC BY 4.0, Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Demographic-TransitionOWID.png
+  population-regulation-and-density-dependence.png — G. F. Gause's classic 1930s yeast-culture
+      experiment plotted as data points with logistic curves fitted to them: Saccharomyces
+      cerevisiae, Schizosaccharomyces kefir, and the two grown together as a mixed population,
+      each rising steeply and then flattening onto its own plateau. It is the empirical
+      counterpart of the section's algebra — the S-curve is not a theoretical shape imposed on
+      the data, it is what the data do — and the mixed culture settling below the pure S.
+      cerevisiae ceiling shows in one glance that carrying capacity is a property of the
+      species-and-environment pair rather than a fixed number the habitat holds — by Yapparina
+      — CC0 (public domain dedication), Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gause%27s_experiment_and_fitted_logistic_curves.svg
+  population-regulation-and-density-dependence-2.png — three stacked plots of population growth
+      rate (dN/dt) against abundance (N), for a strong Allee effect, a weak Allee effect, and no
+      Allee effect, each marked with the carrying capacity K. Read top to bottom it is the whole
+      low-density argument: only the strong case dips below zero at small N, giving the critical
+      threshold below which the population shrinks however much room it has — the extinction
+      vortex the section describes — while the weak case merely grows sluggishly and the ordinary
+      density-dependent case grows fastest when rarest — by Uscitizenjason — CC BY-SA 3.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:A_graph_showing_the_difference_between_strong_and_weak_Allee_effects.svg
+  the-engineering-design-process.png — the engineering design process drawn as a closed ring
+      rather than a list: identify the problem or need, define requirements and constraints,
+      brainstorm solutions, evaluate solutions, design and build a prototype, evaluate and test
+      it, communicate results — and the arrow carries straight on round to the start again. The
+      circle is the point the guide keeps making and a numbered sequence cannot show: there is no
+      terminal step, and testing feeds the next definition — by Steve Krause — CC BY-SA 2.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Engineering_design_process.svg
+  the-engineering-design-process-2.png — the systems-engineering "V" model: the left arm descends
+      from concept of operations through requirements and architecture to detailed design, the
+      right arm climbs back up through integration and test, system verification and validation,
+      to operation and maintenance, with time running along the bottom. Its value is the
+      horizontal pairing — each descending definition stage is answered by the ascending stage
+      that proves it — which is exactly the verification-versus-validation distinction ("did we
+      build it right" against "did we build the right thing") in a form the prose can only assert
+      — by Leon Osborne, Jeffrey Brummond, Robert Hart, Mohsen Zarean and Steven Conger for the
+      U.S. Federal Highway Administration (Clarus Concept of Operations, FHWA-JPO-05-072, 2005),
+      redrawn by Commons user Slashme — public domain (work of the U.S. federal government),
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Systems_Engineering_Process_II.svg
+  geography-of-algeria.jpg — shaded-relief physical map of Algeria built from SRTM elevation data,
+      with graticule, drainage and the international boundaries, and no place names to compete
+      with the terrain. Unlabelled is the reason it teaches: the country's four belts are visible
+      as landforms rather than as words — the crumpled Tell ridges and their green coastal fringe,
+      the pale flat High Plateaus behind them, the single long line of the Saharan Atlas closing
+      the steppe off, then the enormous smooth Sahara, and far south the dark dome of the Hoggar
+      with the Tassili n'Ajjer stepping east of it — by Eric Gaba (Wikimedia Commons user Sting)
+      — CC BY-SA 3.0, Wikimedia Commons (reduced in dimensions to 1280px wide; artwork unmodified)
+      https://commons.wikimedia.org/wiki/File:Algeria_relief_location_map.jpg
+  geography-of-algeria-2.png — Algeria coloured by Köppen climate class, with a legend naming the
+      five that occur: warm Mediterranean along the coast, cold and warm semi-arid in a narrow
+      band behind it, cold desert on the high interior, and warm desert over everything else. It
+      makes the section's central asymmetry impossible to miss — the entire humane climate of the
+      country is a thin ribbon along the top edge, and the red that fills the rest of the frame is
+      the same desert class from the Saharan Atlas to the Niger border — by Ali Zifan (enhanced,
+      modified and vectorized; derived from World Köppen Classification.svg) — CC BY-SA 4.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Algeria_map_of_K%C3%B6ppen_climate_classification.svg
+  geography-of-angola.png — a hypsometric topographic map of Angola built with GMT from
+      public-domain GLOBE elevation data: land tinted by height against the metre scale at
+      lower right, rivers in blue, the national and provincial frontier in red, a graticule
+      and a kilometre bar. It is the three-belt structure the section describes, made
+      visible in one look — the thin green ribbon of coastal lowland; the abrupt colour
+      crowding just inland where the Great Escarpment climbs in a few tens of kilometres;
+      the broad orange interior plateau holding 1,000–1,500 m across most of the country;
+      and the white above 2,000 m over the Bié highlands. The Cabinda exclave, cut off
+      north of the Congo, reads at a glance as separate territory — by Sadalmelik — public
+      domain, Wikimedia Commons (Commons' 960px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Angola_Topography.png
+  geography-of-angola-2.png — Köppen-Geiger climate zones across Angola with the major river
+      catchments overlaid as white dashed divides and named: Congo, Cuanza, Zambezi, Cunene,
+      Okavango, Cuvelai. The fill is the climate classification the legend explains, and it
+      is the section's argument in colour — a hot desert (BWh) strip pinned along the
+      south-western shore where the cold Benguela Current suppresses rain, a hot steppe
+      (BSh) band inland of it, tropical savanna (Aw) over the north, and the temperate
+      dry-winter classes (Cwa/Cwb) sitting exactly on the high central plateau, which is why
+      altitude and not latitude sets Angola's temperatures. The basin divides drawn on top
+      show the same rainfall gradient deciding which ocean the water reaches — by Peter in
+      s, after Beck, H. E., Zimmermann, N. E., McVicar, T. R., Vergopolan, N., Berg, A., &
+      Wood, E. F. — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Clima_Angola_Catchments.png
+  geography-of-benin.jpg — the CIA physiography sheet for Benin: shaded relief with named
+      rivers, towns, roads, international boundaries and a scale bar on a Transverse
+      Mercator projection. It carries the section's tour from the coast inland — the
+      sandbar-and-lagoon fringe at the Bight of Benin behind Cotonou and Porto-Novo, the
+      low barre plateaus above it, the one piece of real relief in the country as the
+      Atakora ridge runs north-east through Natitingou with Mont Sokbaro labelled at its
+      658 m (2,159 ft) summit, and the Niger plains falling away to the north-east. The
+      drainage the guide lists is all there to be traced: Ouémé, Zou and Couffo running
+      south, Mékrou, Alibori and Sota north to the Niger — by the Central Intelligence
+      Agency — public domain, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Benin_Physiography.jpg
+  geography-of-benin-2.png — population density by department, five classes from under 50 to
+      over 1,000 people per km². The map exists because the distribution is the whole point
+      of the section and prose can only assert it: every northern department sits in the
+      palest class while the colour steps darker with each department southward, ending in
+      the near-black Littoral around Cotonou at over 1,000 per km². Read top to bottom it
+      also shows why the elongated shape matters — a country roughly 700 km long with its
+      people packed into the last hundred — by Austiger — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 960px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Population_density_of_Benin_departments.png
+  hazards-flood-water-crossing.jpg — a cross-section through a weir or low-head dam with the
+      flow drawn as arrows: water pours over the crest, plunges to the bed, runs downstream
+      along the bottom, and then the surface layer turns and runs back upstream into the
+      face of the dam, closing a loop under the bracket marked "Bereich der Rückströmung"
+      — the zone of reverse flow. This is the drowning machine the section warns about,
+      and the single thing prose struggles to convey: the danger is not the drop but the
+      recirculation below it, which returns a swimmer to the wall no matter how hard they
+      swim away from it, and which is why the escape is to go down and let the bed current
+      carry you out rather than to fight for the surface. The label is German; the arrows
+      need no translation — by Wynyard — CC BY-SA 3.0, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:Wasserwalze.jpg
+  hazards-flood-water-crossing-2.png — the National Weather Service gauge trace for the Blanco
+      River at Wimberley, Texas, through the flash flood of 24 May 2015: stage in feet
+      against date, with the flood-stage bands (Action 10', Minor 13', Moderate 17', Major
+      26') shaded across the plot and the previous record marked at 33.3'. It is the
+      difference between the three flood types in one chart. The river sits flat near 5 ft
+      for four days, then the observed line goes essentially vertical — past every band and
+      seven feet over the record to 40.21 ft — inside a few hours, which is what "flash"
+      means and why no useful warning was possible; the forecast tail then eases back down
+      over the following week at the pace of an ordinary riverine flood, the regime the
+      section says can be predicted days ahead — by the U.S. Geological Survey & the
+      National Oceanic and Atmospheric Administration — public domain, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Blanco_River_May_25,_2015_hydrograph.png
+
+Knowledge-base diagrams for the three Hazards guides "Wildfire Behavior & Evacuation
+Triggers", "Earthquake & Structural Collapse Hazards" and "Hazardous Materials & Chemical
+Spill Awareness" (files live in images/kb/; renamed on import after the guide they
+illustrate). Where the source upload is an SVG the bundled file is Commons' own PNG
+rendering of it at 1280px; JPEG uploads are reduced in dimensions only. The artwork itself
+is unmodified in every case.
+
+  hazards-wildfire-evacuation.png — the fire triangle drawn as three labelled sides, HEAT,
+      OXYGEN and FUEL, enclosing the flame. It earns its place at the head of a wildfire
+      guide because the section's whole argument — that damp fuel steals the heat the fire
+      needs, that a break in any one leg stops combustion, and that every suppression and
+      defensible-space tactic is an attack on one of exactly three sides — is a claim about
+      this figure, and the figure makes the three-way dependency visible at a glance in a
+      way a paragraph naming them in sequence cannot — by Wikimedia Commons user Gustavb —
+      CC BY-SA 3.0, Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Fire_triangle.svg
+  hazards-wildfire-evacuation-2.png — a wind-driven wildfire in plan view, showing the
+      characteristic pear shape: the ignition point at the narrow end marked "fire start",
+      the burnt ground behind, the propagation axis running downwind, the fast bright "head
+      of the fire" at the blunt end and the much slower left and right fronts along the
+      flanks. This is the single most useful picture in a fire-weather section, because
+      the asymmetry it shows is the reason a wind shift is so dangerous — a shift turns a
+      slow flank into a new head — and the reason a bearing from the fire matters more than
+      a distance from it — by Christophe Dang Ngoc Chan, SVG conversion by Commons user
+      JBarta — CC BY-SA 3.0, Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Propagation_model_wildfire_(English).svg
+  hazards-earthquake-structural-collapse.jpg — a corner apartment block in the Marina
+      district of San Francisco after the 1989 Loma Prieta earthquake, its upper storeys
+      structurally intact and barely marked while the open garage-front ground floor beneath
+      them has racked over and buckled, the door panels leaning at an angle and the studs
+      of one bay exposed. It is the textbook soft-storey failure the section describes, and
+      a photograph carries the argument in a way prose cannot: the damage is concentrated
+      entirely at the one level that had the least shear wall, and the mass above simply
+      pivoted on it — by J.K. Nakata, U.S. Geological Survey — public domain (work of the
+      U.S. federal government), Wikimedia Commons (reduced in dimensions to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:LomaPrieta-Marina.jpeg
+  hazards-earthquake-structural-collapse-2.jpg — a timber house in Watsonville shifted
+      bodily off its foundation by the same earthquake, with the bare concrete stem wall and
+      the empty sill line it used to sit on visible alongside it. It illustrates the
+      mitigation section's most concrete recommendation exactly — foundation bolting and
+      cripple-wall bracing for older timber houses — by showing the failure those retrofits
+      exist to prevent, which is not a collapse of the structure but a house sliding off the
+      thing that was holding it — by J.K. Nakata, U.S. Geological Survey — public domain
+      (work of the U.S. federal government), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:089srUSGSoffFoundation.jpg
+  hazards-hazmat-chemical-spill.png — a full key to the NFPA 704 fire diamond: the four
+      coloured quadrants with an arrow into each and, beside them, what every rating means —
+      blue health 0 to 4 from "normal material" to "deadly", red flammability keyed to
+      flash-point temperatures, yellow reactivity from "stable" to "may detonate", and the
+      white quadrant's special symbols OXY, ACID, ALK, CORR, the radiation trefoil and the
+      struck-through W for "use no water". The guide's text walks through precisely this
+      scheme, and the reader who meets a real diamond on a tank needs the numbers decoded,
+      not described — by Marcos Rodríguez Bobadilla — CC BY-SA 4.0, Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:NFPA-704-diamond-standard.svg
+  hazards-hazmat-chemical-spill-2.png — a Gaussian dispersion plume in three dimensions:
+      the release point, the wind arrow, the plume centreline, the cone widening downwind
+      and the bell-shaped concentration profiles drawn across it at successive distances.
+      It is the mechanism behind every rule in the positioning section — why concentration
+      falls off so steeply with range, why a bystander upwind at 200 metres is safer than
+      one two kilometres directly downwind, and why moving crosswind leaves the cone fastest
+      — by Commons user BMacZero, a vector conversion of a diagram by Milton Beychok
+      (Mbeychok) — the SVG is released as public domain and the parent raster is CC BY-SA
+      3.0; both authors are credited here so the attribution holds under either — Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gaussian_Plume_(SVG).svg
+
+Knowledge-base diagrams for the three Health guides "Breastfeeding: A Practical Guide",
+"Breast Health and Self-Examination" and "Postpartum Recovery and Newborn Care" (files live in
+images/kb/; renamed on import after the guide they illustrate). None of these three guides carried
+an image before. Sources are the original Wikimedia Commons "File:" pages; JPEG/PNG uploads are
+reduced in dimensions only where noted, and the artwork itself is unmodified in every case — no
+crops, no recolouring, no relabelling. The four CC BY / CC BY-SA works carry their author credit
+both here and inline in the guide text, as those licences require; the two public-domain National
+Cancer Institute plates need no attribution and record it anyway, matching the rest of this file.
+Every one of these is a labelled clinical or anatomical diagram rather than a photograph of a
+person — a deliberate choice for subject matter of this kind, and the same standard the Sexual
+Health guide's reproductive-anatomy schematics are held to.
+
+  breastfeeding-a-practical-guide.jpg — "Lactating Breast Structure": a lateral schematic cutaway
+      of the lactating breast. The branching duct tree converges on the nipple; the pink alveolar
+      clusters that actually make the milk pack the glandular tissue behind it (the upper lobe
+      labelled "Milk Glands / More Developed", the lower "Lactating"); the yellow fat lies outside
+      them. Two hormone arrows carry the causal story the prose can only assert — oestrogen and
+      progesterone building the glandular structure through pregnancy, prolactin and oxytocin
+      driving production and ejection after the birth. It is the picture that turns "milk is made
+      in the alveoli and drains through the ducts" from a sentence to be taken on trust into
+      something the reader can see — by Rajendra prabhune — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Lactating_Breast_Structure.jpg
+  breastfeeding-a-practical-guide-2.png — "Breastfeeding: Incorrect vs Correct Latch-On": the same
+      infant drawn twice in profile at the breast, side by side. On the left the lower lip is
+      tucked in and the mouth closes near the tip of the nipple; on the right the mouth is open
+      wide, the lower lip flanged outward, the chin pressed into the breast, and far more tissue
+      is drawn in. The deep latch is the most consequential technique in the guide and the hardest
+      thing in it to convey in words: the entire difference is a few millimetres of lip and jaw
+      position, and that difference decides between a comfortable feed that drains the breast and
+      cracked nipples with a baby who stays hungry. Two drawings settle it in a glance — by
+      BruceBlaus — CC BY-SA 4.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breastfeeding_-_Incorrect_vs_Correct_Latch-On.png
+  breast-health-and-self-examination.jpg — the National Cancer Institute plate "Breast and
+      Adjacent Lymph Nodes". Above, the chest with one arm raised and the lymph vessels drawn
+      running up to the labelled nodes in the armpit; below, a cutaway of the breast itself with
+      lobules, lobe, ducts, nipple, areola and fat each labelled and the duct system fanning back
+      from the nipple. It holds the section's whole anatomy in one view, including the point the
+      prose has to keep repeating — that breast tissue and its drainage extend up into the armpit,
+      which is why an examination that stops at the breast is an incomplete one — by Don Bliss
+      (National Cancer Institute) — public domain, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breast_and_adjacent_lymph_nodes.jpg
+  breast-health-and-self-examination-2.jpg — "Breast Cancer: Ductal Carcinoma in Situ": a milk duct
+      drawn as a cut cylinder, the wall of the duct labelled, and DCIS labelled as the mass of
+      abnormal cells filling the lumen and pressed up against that wall without breaking through
+      it. In situ versus invasive is the hinge the whole cancer section turns on, and "confined
+      within the duct" is genuinely hard to picture from the words alone; here the boundary that
+      has not yet been crossed is visible, and with it both why DCIS cannot spread and why it is
+      still treated — by Don Bliss (National Cancer Institute) — public domain, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breast_cancer_ductal_carcinoma_in_situ.jpg
+  postpartum-recovery-and-newborn-care.jpg — "The Newborn Skull", lateral view: the frontal,
+      parietal, occipital and temporal bones drawn as separate plates, the gaps between them
+      labelled as the anterior, posterior, sphenoidal and mastoid fontanelles, with a parietal
+      ossification centre marked. It answers the two things the section raises and prose cannot
+      settle — why a newborn head comes out of the birth canal elongated or lopsided and then
+      rounds within days (the plates are not yet fused and can slide over one another), and where
+      exactly the "soft spots" a new parent is told to watch actually are — by OpenStax College
+      (Anatomy & Physiology, Connexions) — CC BY 3.0, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:905_The_Newborn_Skull.jpg
+  postpartum-recovery-and-newborn-care-2.png — levels of neonatal jaundice: an infant figure
+      banded head to foot into five zones — I the face, II the trunk, III the lower trunk and
+      thighs, IV the arms and lower legs, V the hands and feet — each zone corresponding to a
+      higher bilirubin range, roughly 5-8 mg/dl when only the face is yellow rising to around
+      20 mg/dl by the time it reaches the palms and soles. This is Kramer's rule, and it is
+      precisely the observation the warning-signs section asks a caregiver to make: yellowing that
+      has spread to the arms, legs, palms or soles is not the same finding as a yellow face,
+      because how far down the body the colour has travelled tracks how high the level has climbed
+      — by Manco Capac — CC BY-SA 3.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Neonatal_jaundice.png
+
+Knowledge-base plates and diagrams for the three History-method guides "Primary and Secondary
+Sources in History", "What Is History? Historiography and Method" and "How Historians
+Reconstruct the Past" (files live in images/kb/; renamed on import after the guide they
+illustrate). These are historical plates and scholarly diagrams rather than photographs;
+dimensions are reduced from the original uploads where noted and the artwork itself is
+unmodified in every case.
+
+  primary-and-secondary-sources-in-history.jpg — page 318 of a ninth-century manuscript of
+      the False Decretals, at the exact point where the text of the Donation of Constantine
+      begins: the rubric in red reads "EPA CONSTANTINI IMP · AD SILVESTRVM PAPAM", the
+      "Letter of Emperor Constantine to Pope Sylvester", and a large initial I opens "In
+      nomine sanctae et individuae trinitatis". The guide names this document as the
+      classic case of forgery exposed by source criticism — Lorenzo Valla demolished it in
+      the 1440s on the anachronism of its Latin — and the page shows what the argument was
+      actually made against: not an imperial original but a copy in Carolingian minuscule,
+      written some five centuries after the grant it claims to record, bound inside a
+      collection that is itself a forgery. It is the section's whole point about provenance
+      and the chain of custody made visible in one opening — by the compiler known as
+      Pseudo-Isidore (uploaded to Commons by Stephan Dinkgreve) — public domain (ninth
+      century), Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:The_Donation_of_Constantine,_page_318.jpg
+  primary-and-secondary-sources-in-history-2.jpg — the stemma codicum of Polybius' Histories:
+      a family tree with the lost Archetype at the top branching down through the Excerpta
+      Antiqua and the Constantinian Excerpts to the surviving manuscripts A, B, C, D, E, F,
+      J and the rest, with the Editio Princeps hanging off one branch. External criticism
+      turns on the question the prose can only assert — whether the version in hand is a
+      faithful copy of the original — and the stemma is how that question is answered in
+      practice: it shows that no surviving witness is the original, that the manuscripts
+      are not independent votes but relatives, and that agreement between two copies
+      descended from the same parent counts once, not twice — by Commons user Mellangoose,
+      adapted from J. M. Moore, The Manuscript Tradition of Polybius (Cambridge University
+      Press, 1965) — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Polybius_Stemma_Codicum.jpg
+  what-is-history-historiography-and-method.jpg — Joseph Priestley's "A New Chart of History"
+      (London, 1769), the engraved sheet that made periodization a picture: a time axis
+      running from about 1200 BC to AD 1750 across the top and bottom, and beneath it every
+      region of the world — America, Africa, China, India, Persia, Turkey, Germany, Italy,
+      France, Spain, Great Britain, Poland, Scandinavia — given a horizontal band in which
+      each empire is a bar that begins, widens, shifts and ends. It belongs to the section
+      on periodization because it is an argument in graphic form: the Roman Empire's bar
+      running the width of half the sheet while a dozen smaller states flicker on and off
+      around it shows at once that the divisions of the past are drawn by the chartmaker,
+      that they are drawn differently for every region, and that no single line across the
+      page separates "ancient" from "modern" everywhere at once — by Joseph Priestley —
+      public domain (1769), Wikimedia Commons (Commons' 1920px-wide rendering, chosen over
+      the usual 1280px because the chart's labels are unreadable smaller)
+      https://commons.wikimedia.org/wiki/File:A_New_Chart_of_History.jpg
+  what-is-history-historiography-and-method-2.jpg — Papyrus Oxyrhynchus 16 (Penn Museum
+      E2747), a fragment of Book IV of Thucydides' History of the Peloponnesian War, written
+      in Greek majuscules without word division or punctuation, torn across the middle and
+      missing most of its lower right quarter. The section traces history-writing back to
+      Herodotus and Thucydides; the plate supplies the fact the prose cannot, which is that
+      "Thucydides" reaches us like this — a copy made some four to five hundred years after
+      he wrote, recovered from an Egyptian rubbish mound, with gaps that editors must fill
+      by conjecture. Every claim in the guide about transmission, reconstruction and the
+      limits of historical knowledge is legible in the physical state of this scrap — by an
+      unknown ancient copyist — public domain, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:Papyrus_Oxhyrhynchus_16_-_Thucydides_-_Penn_Museum_E2747.jpg
+  how-historians-reconstruct-the-past.jpg — an engraved script specimen from the Nouveau
+      traité de diplomatique (1750-65), the great Benedictine manual that carried Mabillon's
+      science forward: six lines of Merovingian display capitals, hatched and filigreed,
+      reproducing the opening of a manuscript of Gregory the Great's Homilies on Ezekiel,
+      captioned "Francogallique ou Merovingienne de lettres Capitales en broderie et a
+      filigranes". It illustrates the auxiliary sciences directly. The letters are Latin and
+      almost none of them can be read cold; palaeography is the training that makes them
+      legible, and diplomatics is the discipline that catalogued them by region and century
+      precisely so that a charter's script could be tested against the date it claims — by
+      René-Prosper Tassin and Charles-François Toustain (Commons upload and processing by
+      G. Garitan) — public domain, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Diplomatique_m%C3%A9rovingienne_18533.jpg
+  how-historians-reconstruct-the-past-2.png — "Calibration error and measurement error":
+      radiocarbon age plotted against calendar age over a 400-year stretch of the IntCal
+      curve, with the curve's own uncertainty drawn as dashed envelopes and two worked
+      examples projected through it — a green pair of lines and a red pair, each carrying a
+      measured 14C age with its error bar across to the curve and then down to the calendar
+      range it implies. This is what the section means by dating "within a calculable margin
+      of error", and it shows the part that surprises people: the width of the answer is not
+      fixed by the laboratory but by the local steepness of the curve, so the same precision
+      of measurement yields a tight date on a steep segment and a badly smeared one where
+      the curve flattens or wiggles back on itself — by Mike Christie, from the IntCal13
+      dataset (Reimer et al.) — CC BY-SA 3.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Radiocarbon_calibration_error_and_measurement_error.png
+
+Knowledge-base diagrams for the two Language & Linguistics guides "Phonetics — The Sounds of
+Speech" and "Linguistics — The Scientific Study of Language", and the Law & Government guide
+"Liberalism" (files live in images/kb/; renamed on import after the guide they illustrate). None
+of these three guides carried an image before. Sources are the original Wikimedia Commons "File:"
+pages. Four of the six are Commons' own 1280px-wide raster renderings of the uploaded SVG — taken
+as rasters deliberately, because two of them set IPA and phonetic glyphs in fonts (DejaVu Serif)
+that an Android device will not have, and an on-device SVG renderer would substitute and mangle
+them; the Commons rendering is made with the intended font. The artwork itself is unmodified in
+every case — no crops, no recolouring, no relabelling. The five CC BY-SA works carry their author
+credit both here and inline in the guide text, as that licence requires; the CC0 dedication and
+the public-domain plate need no attribution and record it anyway, matching the rest of this file.
+Every one is a labelled diagram, chart or historical plate rather than a photograph of a person.
+
+  phonetics-the-sounds-of-speech.png — the IPA vowel quadrilateral. The trapezoid is the vowel
+      space itself, drawn as the mouth is: front, central and back across the top, close down to
+      open on the left, with every cardinal vowel of the International Phonetic Alphabet placed
+      at its height-and-backness coordinate and paired left-unrounded / right-rounded at each
+      dot. The section describes vowels as a continuum with no point of contact to name, located
+      only by tongue height, tongue backness and lip posture — three numbers that prose can list
+      but cannot show standing in relation to one another. The chart is that relation: it is the
+      map the words are describing, and it doubles as the key for every IPA vowel symbol used
+      elsewhere in the guide — by Zieben007 — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px
+      rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Ipa-chart-vowels.svg
+  phonetics-the-sounds-of-speech-2.png — the source-filter model: a head in profile with the
+      vocal folds picked out in one colour and labelled "source", and the pharyngeal, oral and
+      nasal cavities above them picked out in another and labelled "filter", with the legend
+      spelling out which is which. This is Fant's 1960 model, which the acoustic section states
+      in words — the folds produce a harmonic-rich buzz, the tract above resonates and reinforces
+      certain harmonics into formants — and the whole argument turns on the tract being a
+      separate thing sitting on top of the source, shaped independently of it. Seeing the two
+      regions coloured apart in one airway makes that separation obvious, and with it why
+      changing the shape of the mouth changes vowel quality without changing the voice's pitch
+      — by Emflazie — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Source-filter_model_diagram.svg
+  linguistics-the-scientific-study-of-language.png — a constituent-structure tree over the
+      sentence "The cat sat on the mat": Sentence branching into Noun Phrase and Predicate /
+      Verb Phrase, the verb phrase branching again into Verb and Prepositional Phrase, that into
+      Preposition and a further Noun Phrase, and each bottom node tied by a line to the actual
+      word beneath it. The syntax section's central claim is that a sentence is not a flat string
+      of words but a hierarchy of nested constituents, and that claim is difficult to hold in the
+      head from a description alone. The tree is the claim made visible in one sentence short
+      enough to read at a glance, including the point the prose has to argue — that "the mat" is
+      a unit inside "on the mat", which is a unit inside the predicate — by Chiswick Chap, after
+      an original by AnonMoos — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px rendering of
+      the SVG)
+      https://commons.wikimedia.org/wiki/File:Constituent_structure_analysis_English_sentence.svg
+  linguistics-the-scientific-study-of-language-2.png — the Indo-European family tree: a single
+      root labelled INDO-EUROPEAN descending through Anatolian, Hellenic, Italic, Celtic,
+      Germanic, Balto-Slavic, Armenian, Tocharian and Indo-Iranian into several hundred named
+      daughter languages, colour-coded by a legend into reconstructed proto-languages, extinct
+      languages and languages still spoken. The historical-linguistics section asserts that
+      English, Hindi, Russian, Persian and most of Europe descend from one unattested ancestor
+      recovered by the comparative method; the tree shows the actual shape of that descent, how
+      deep the nesting goes, and how much of it is dead — the branching structure being exactly
+      what a list of related languages in a sentence cannot convey — by multiple authors, first
+      version by Mandrak — CC BY-SA 3.0, Wikimedia Commons (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:IndoEuropeanTree.svg
+  liberalism.jpg — the 1789 plate of the Déclaration des droits de l'homme et du citoyen,
+      attributed to Jean-Jacques-François Le Barbier: the seventeen articles engrossed in gold on
+      two dark tablets shaped like the tablets of the law, framed by a figure of the Monarchy
+      holding the broken chains of tyranny on one side and the genius of the Nation on the other,
+      under the radiant eye of Reason. The section names this document as one of the two
+      revolutionary statements of natural rights. The plate is the document as its own age
+      presented it, and that presentation is itself the argument the section is making: rights
+      set down in public, numbered, legible to any citizen, and deliberately given the visual
+      authority of scripture and of law rather than of a royal grant — public domain (published
+      1789; photograph of a two-dimensional work in the Musée Carnavalet, Paris), Wikimedia
+      Commons (1280px-wide rendering of the original scan)
+      https://commons.wikimedia.org/wiki/File:Declaration_of_the_Rights_of_Man_and_of_the_Citizen_in_1789.jpg
+  liberalism-2.png — separation of powers and checks and balances, drawn as three circles —
+      Legislature, Executive, Judiciary — each listing its own powers, joined by labelled arrows
+      running both ways between every pair: veto legislation and override vetoes, appoint judges
+      and rule on the constitutionality of laws, confirm and reject appointments. The
+      constitutionalism section states Montesquieu's principle and then makes the subtler point
+      that separation alone is not enough, that the branches must be able to check one another.
+      A list of checks in prose reads as an inventory; the diagram shows it as a closed circuit
+      in which no branch has an unanswered power, which is the whole design — by AboutPolitics
+      — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px rendering)
+      https://commons.wikimedia.org/wiki/File:Separation_of_powers.png
+
+Knowledge-base diagrams for the Law & Government guide "Political Philosophy: The Great
+Questions" and the Literature & Writing guides "Close Reading & Literary Analysis" and "What
+Is Literature? An Introduction to Literary Study" (files live in images/kb/; renamed on import
+after the guide they illustrate). Sources are the original Wikimedia Commons "File:" pages;
+where the upload is an SVG the bundled file is Commons' own 1280px PNG rendering of it, and
+JPEG/PNG uploads are reduced in dimensions only — the artwork itself is unmodified in every
+case. All six are public-domain or CC0 works, so no attribution is legally required;
+authorship and provenance are recorded here as the established practice in this file.
+
+  political-philosophy-the-great-questions.jpg — the title-page engraving to Hobbes's
+      Leviathan (London, 1651): a crowned sovereign rising above the hills with a sword in the
+      right hand and a bishop's crozier in the left, whose torso and arms are composed entirely
+      of hundreds of small human figures, every one of them turned inward and facing him; below
+      the landscape a curtain carries the title, flanked by paired panels that set temporal
+      power against spiritual — castle against church, crown against mitre, cannon against
+      thunderbolts, the weapons of war against the forks of scholastic logic, a battle against
+      a council. The section explains the social contract as a covenant by which a multitude
+      transfers its right of self-government and is thereby made into one artificial person;
+      the plate is that argument drawn rather than stated, and it shows at a glance the thing
+      the prose can only assert, which is that the sovereign is constituted OF the subjects and
+      is not a separate power standing over against them — by Abraham Bosse, engraved to
+      Hobbes's own design — public domain (1651), Wikimedia Commons (Commons' 1280px-wide
+      rendering of the British Museum impression)
+      https://commons.wikimedia.org/wiki/File:Leviathan_frontispiece_cropped_British_Museum.jpg
+  political-philosophy-the-great-questions-2.jpg — two full-height reconstructions of an
+      Athenian kleroterion, the stone allotment machine, in the Ure Museum of Greek Archaeology
+      at Reading: five columns of narrow slots cut down each slab, headed by painted Greek
+      letters (Α Β Γ Δ Ε on one, Ζ Η Θ Ι Κ on the other) that section the citizen body, with the
+      fitting for the randomising tube still visible at the left edge. Candidates' inscribed
+      bronze tickets were slotted into the columns and black and white balls released from the
+      tube then took or rejected an entire row at a time. The section notes only in passing
+      that the Athenians governed "through assembly, lot, and rotation"; this is what "lot"
+      meant in practice, a purpose-built randomiser for public office, and seeing the machine
+      makes the ancient argument between selection by lot and selection by election concrete in
+      a way the word cannot — by Philafrenzy — CC0 1.0 (public domain dedication), Wikimedia
+      Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Reconstructed_Kleroterions_in_the_Ure_Museum.JPG
+  close-reading-literary-analysis.png — a scansion plate: two lines of Pope's Essay on
+      Criticism ("Trust not yourself: but your defects to know, / Make use of ev'ry friend—and
+      ev'ry foe.") marked as a prosodist marks them, with a breve over every unstressed
+      syllable, an acute over every stressed one, and vertical bars dividing each line into its
+      five feet. The section defines stress, foot and meter in words; the plate supplies the
+      notation those words name, and it also settles the point students most often get wrong,
+      because the bars fall where the meter falls and not where the words do — the fourth foot
+      of the first line is "de|fects" and "ev'ry" is split across two feet in the second — by
+      Pearson Scott Foresman — public domain (dedicated worldwide by the author), Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Scansion_(PSF).png
+  close-reading-literary-analysis-2.jpg — an opening (fols. 50v–51r) of a Vatican manuscript
+      of Justinian's Institutes copied about 1320–1335 with the Glossa ordinaria compiled by
+      Accursius. On each leaf a small block of the authoritative text sits in the middle of the
+      page, written large and widely spaced, and is surrounded on all four sides by commentary
+      written much smaller, keyed by letter to the words it explains, with still further notes
+      squeezed down the outer margins in a later hand. The section traces close reading back to
+      the scholarly interpretation of scripture, law and the classics, "where every word of an
+      authoritative text was weighed"; the proportion of gloss to text on this page is that
+      sentence made visible, the commentary covering several times the area of the law it
+      explains — by unknown fourteenth-century scribes; digitised by Universitätsbibliothek
+      Heidelberg from Biblioteca Apostolica Vaticana, Pal. lat. 765 — public domain, Wikimedia
+      Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Vatican,_Biblioteca_Apostolica_Vaticana_Ms_Vatican_Bibliotheca_Palatina_Latin_765_fol_50v-51r_Institutiones_Iustiniani_cum_Glossa_ordinaria_excerpt.jpg
+  what-is-literature-an-introduction-to-literary-study.png — Freytag's pyramid, the shape of
+      the closed dramatic plot, drawn with Freytag's own five terms from Die Technik des Dramas
+      (1863) — introduction, rise, climax, return or fall, catastrophe — rather than the later
+      classroom relabelling of them as exposition, rising action and resolution. The section
+      names Freytag directly and describes the arc in a sentence; the diagram gives the arc its
+      geometry, so that the asymmetry the words hide is plain: the climax sits at the top, and
+      everything after it is descent — by SinjoroFoster — CC0 1.0 (public domain dedication),
+      Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Freytag%27s_Pyramid_with_English_text.svg
+  what-is-literature-an-introduction-to-literary-study-2.png — the sestina's end-word scheme.
+      The six end-words of the first stanza are numbered 1 to 6 down the left, and the order in
+      which each must return in stanzas II to VI is read across the table (6 3 5 4 2 in the
+      first position, 1 6 3 5 4 in the second, and so on down). The spiral drawn over the
+      middle is the rule that generates every one of those rows: retrogradatio cruciata, in
+      which a stanza takes its end-words from the last of the stanza before it, then the first,
+      then the second from last, then the second, winding inward until after six turns the
+      sequence returns to where it began. The section lists the sestina among the fixed forms
+      whose "constraints paradoxically spur invention" but cannot show the constraint; this is
+      it, and it is the reason the form has exactly six stanzas — by ZooFari — public domain
+      (released by the author), Wikimedia Commons (Commons' 1280px PNG rendering of the SVG
+      upload)
+      https://commons.wikimedia.org/wiki/File:Sestina_system.svg

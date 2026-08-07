@@ -157,3 +157,33 @@ silicate-minerals.png  —  SiO4 tetrahedral.svg  —  CC0  —  Hbf878
 silicate-minerals-2.png  —  Silicate structures.png  —  CC BY-SA 3.0  —  Actualist
 automotive-electronics-and-engine-control-units.jpg  —  Rover MEMS 1.6 ECU.jpg  —  CC BY-SA 3.0  —  ColinMB
 automotive-electronics-and-engine-control-units-2.png  —  CAN-Bus Elektrische Zweidrahtleitung.svg  —  CC BY-SA 3.0  —  Stefan-Xp
+cooking-food-safety-power-outage.png  —  Water temperature vs heat added.svg  —  CC BY-SA 4.0  —  Cmglee
+cooking-food-safety-power-outage-2.png  —  Carbon dioxide pressure-temperature phase diagram-en.svg  —  CC0  —  Rifleman 82
+cooking-food-safety-high-risk-eaters.png  —  J Cell Biol 2002 Aug 158(3) 409-14, Figure 1.png  —  CC BY-SA 3.0 US  —  Daniel A. Portnoy, Victoria Auerbuch, Ian J. Glomski (Journal of Cell Biology)
+cooking-food-safety-high-risk-eaters-2.png  —  Toxoplasmosis life cycle en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
+cooking-food-safety-date-labels-recalls.jpg  —  AMS Egg Grading Chart (20170509-AMS-UNK-0001).jpg  —  Public domain  —  USDA Agricultural Marketing Service
+cooking-food-safety-date-labels-recalls-2.jpg  —  Structure of Rhizopus spp.-english.JPG  —  Public domain  —  Timleo
+cooking-food-safety-sanitation-cross-contamination.png  —  Stages of biofilm formation.svg  —  CC BY-SA 4.0  —  Khushairi Amri Kasim
+cooking-food-safety-sanitation-cross-contamination-2.png  —  04 Hegasy Hand Disinfection Wiki EN CCBYSA.png  —  CC BY-SA 4.0  —  Guido Hegasy (Guido4)
+induction-heating-and-industrial-electric-heating.png  —  Skin depth by Zureks.png  —  CC0  —  Zureks
+induction-heating-and-industrial-electric-heating-2.png  —  Induction Heating (PSF).png  —  Public domain (parent PSF plate; derivative also tagged CC BY-SA 4.0)  —  Pearson Scott Foresman
+population-ecology-and-population-growth.png  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
+population-ecology-and-population-growth-2.png  —  Demographic-TransitionOWID.png  —  CC BY 4.0  —  Max Roser (Our World in Data)
+population-regulation-and-density-dependence.png  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
+population-regulation-and-density-dependence-2.png  —  A graph showing the difference between strong and weak Allee effects.svg  —  CC BY-SA 3.0  —  Uscitizenjason
+the-engineering-design-process.png  —  Engineering design process.svg  —  CC BY-SA 2.0  —  Steve Krause
+the-engineering-design-process-2.png  —  Systems Engineering Process II.svg  —  Public domain  —  Leon Osborne, Jeffrey Brummond, Robert Hart, Mohsen Zarean, Steven Conger (FHWA); redrawn by User:Slashme
+geography-of-algeria.jpg  —  Algeria relief location map.jpg  —  CC BY-SA 3.0  —  Eric Gaba (Sting - fr:Sting)
+geography-of-algeria-2.png  —  Algeria map of Köppen climate classification.svg  —  CC BY-SA 4.0  —  Ali Zifan
+hazards-wildfire-evacuation.png  —  Fire triangle.svg  —  CC BY-SA 3.0  —  Gustavb
+hazards-wildfire-evacuation-2.png  —  Propagation model wildfire (English).svg  —  CC BY-SA 3.0  —  Christophe Dang Ngoc Chan, SVG conversion by JBarta
+hazards-earthquake-structural-collapse.jpg  —  LomaPrieta-Marina.jpeg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
+hazards-earthquake-structural-collapse-2.jpg  —  089srUSGSoffFoundation.jpg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
+hazards-hazmat-chemical-spill.png  —  NFPA-704-diamond-standard.svg  —  CC BY-SA 4.0  —  Marcos Rodríguez Bobadilla
+hazards-hazmat-chemical-spill-2.png  —  Gaussian Plume (SVG).svg  —  Public domain (SVG; parent raster CC BY-SA 3.0)  —  BMacZero, after Milton Beychok (Mbeychok)
+phonetics-the-sounds-of-speech.png  —  Ipa-chart-vowels.svg  —  CC BY-SA 4.0  —  Zieben007
+phonetics-the-sounds-of-speech-2.png  —  Source-filter model diagram.svg  —  CC BY-SA 4.0  —  Emflazie
+linguistics-the-scientific-study-of-language.png  —  Constituent structure analysis English sentence.svg  —  CC BY-SA 4.0  —  Chiswick Chap (after AnonMoos)
+linguistics-the-scientific-study-of-language-2.png  —  IndoEuropeanTree.svg  —  CC BY-SA 3.0  —  Multiple authors, first version by Mandrak
+liberalism.jpg  —  Declaration of the Rights of Man and of the Citizen in 1789.jpg  —  Public domain  —  Jean-Jacques-François Le Barbier (attributed); Musée Carnavalet
+liberalism-2.png  —  Separation of powers.png  —  CC0  —  AboutPolitics
