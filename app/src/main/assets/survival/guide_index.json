@@ -1,6 +1,31 @@
 {
  "entries": [
   {
+   "id": "soil-testing-and-interpreting-the-results",
+   "title": "Soil Testing and Interpreting the Results",
+   "category": "Agriculture & Gardening",
+   "summary": "A complete guide to sampling soil, reading a laboratory report, and turning the numbers into decisions, covering pH, cation exchange, macro- and micronutrients, organic matter, texture, salinity and contaminants. It explains the mechanisms behind each measurement, the arithmetic of unit conversion and amendment rates, and how to diagnose results that contradict what the field is doing.",
+   "headings": [
+    "Why Soil Is Tested at All",
+    "What Soil Is Made Of",
+    "Soil pH: The Master Variable",
+    "Cation Exchange Capacity and Base Saturation",
+    "Nitrogen, Phosphorus and Potassium",
+    "Secondary Nutrients and Micronutrients",
+    "Organic Matter, Carbon and Biological Measures",
+    "Texture, Structure and the Physical Tests",
+    "Taking a Sample That Actually Represents the Field",
+    "Extraction Chemistry and Why Laboratories Disagree",
+    "Home Kits, Meters and Field Tests",
+    "Reading the Report: Units and Arithmetic",
+    "Sufficiency Versus Build-and-Maintain",
+    "From Report to Amendment: The Calculations",
+    "Salinity, Sodium and Contaminants",
+    "When the Numbers Look Wrong"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
    "id": "archaeological-excavation-methods-and-techniques",
    "title": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
@@ -84,6 +109,31 @@
     "Interpretation, Predictive Modeling, and Sampling Bias",
     "Ethics, Legislation, and Cultural Heritage Management",
     "Limitations, Misconceptions, and Onward Connections"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "stratigraphy-and-the-harris-matrix",
+   "title": "Stratigraphy and the Harris Matrix",
+   "category": "Archaeology & Anthropology",
+   "summary": "How archaeologists establish the order in which things happened, from the geological laws of superposition through the context-based recording system to the Harris matrix itself. It covers building and checking a matrix, phasing, attaching dates through terminus post quem reasoning, Bayesian modelling, and the method's genuine limits.",
+   "headings": [
+    "Why Sequence Is the Foundation of Archaeology",
+    "The Geological Inheritance",
+    "How Archaeological Layers Differ from Geological Ones",
+    "From Antiquarianism to Method: A Short History",
+    "The Context: The Basic Unit of Excavation",
+    "Deposits and Interfaces",
+    "The Four Laws of Archaeological Stratigraphy",
+    "Edward Harris and the Invention of the Matrix",
+    "The Three Possible Relationships",
+    "Constructing a Matrix Step by Step",
+    "The Mathematics Underneath: Graphs, Loops and Reduction",
+    "Single-Context Recording in Practice",
+    "Phasing, Grouping and the Site Narrative",
+    "Attaching Dates to a Sequence",
+    "Extensions, Software and Bayesian Chronology",
+    "Criticisms, Failure Modes and Limits"
    ],
    "file": "guides_archaeology_and_anthropology.json"
   },
@@ -593,6 +643,56 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "the-sodium-potassium-pump",
+   "title": "The Sodium-Potassium Pump",
+   "category": "Biology",
+   "summary": "A complete account of the sodium-potassium ATPase: the ion gradients it builds, its molecular architecture and the Post-Albers cycle it runs, the energy it consumes, how the body regulates it, and what happens in disease, poisoning and oxygen starvation when it stops.",
+   "headings": [
+    "Why a Single Protein Runs Your Nervous System",
+    "The Ionic Landscape a Cell Maintains",
+    "Jens Christian Skou and the Discovery of an Enzyme That Pumps",
+    "The Architecture of the Protein",
+    "The Post-Albers Cycle: How the Machine Turns",
+    "The Chemistry of Phosphorylation and Why It Stores Energy",
+    "Electrogenicity and the Membrane Potential",
+    "The Metabolic Bill: What the Pump Costs the Body",
+    "Secondary Active Transport: Spending the Gradient",
+    "Cell Volume, Osmosis, and the Pump-Leak Model",
+    "Regulation: Hormones, Kinases, and Rapid Tuning",
+    "Isoforms: Four Alphas, Three Betas, and Tissue Specialization",
+    "Cardiac Glycosides: Foxglove, Digoxin, and a Two-Century-Old Drug",
+    "When the Pump Fails: Genetic Disease",
+    "The Pump in Acute Illness and Critical Care",
+    "The Wider Family, Its Origins, and What Remains Unsettled"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
+   "id": "how-to-validate-a-business-idea",
+   "title": "How to Validate a Business Idea",
+   "category": "Business & Finance",
+   "summary": "A practical, evidence-first method for testing whether a business idea will work before committing money and years to it: finding the assumption that would kill you, running customer interviews and demand experiments that can genuinely fail, proving the unit economics and the channel, and deciding honestly whether to persevere, pivot or stop.",
+   "headings": [
+    "The Expensive Habit of Building First",
+    "What Validation Actually Means, and What It Does Not",
+    "Finding the Assumption That Would Kill You",
+    "The Three Risks: Desirability, Viability, Feasibility",
+    "Customer Discovery Interviews: The Core Skill",
+    "Asking Questions That Yield Truth Instead of Flattery",
+    "Sizing the Market Without Fooling Yourself",
+    "Competition and the Rival You Keep Forgetting",
+    "Smoke Tests, Landing Pages, and Fake Doors",
+    "Concierge and Wizard-of-Oz: Delivering by Hand First",
+    "Pre-selling: The Signal That Outranks Everything Else",
+    "Designing a Real Experiment",
+    "Proving the Money Works: Unit Economics",
+    "Channel Validation: Can You Reach Them Repeatedly?",
+    "Reading Results Honestly: Bias, Noise, and Vanity",
+    "Pivot, Persevere, or Stop"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
    "id": "chem-atoms-elements-periodic-table",
    "title": "Atoms, Elements & the Periodic Table",
    "category": "Chemistry",
@@ -886,6 +986,30 @@
     "Historical Foundations: The Laws of Chemical Combination",
     "Pitfalls, Rounding Traps, and Misconceptions",
     "Where Formula Determination Connects Onward"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
+   "id": "percent-composition-and-chemical-formulas",
+   "title": "Percent Composition and Chemical Formulas",
+   "category": "Chemistry",
+   "summary": "How the mass of a substance reveals the atoms inside it: molar mass, percent composition by mass, the laws of definite and multiple proportions, and the full procedure for turning analytical data into empirical and molecular formulas, with worked examples, combustion analysis, hydrates, and the genuine limits of the method.",
+   "headings": [
+    "The Bridge Between What You Can Weigh and What You Cannot See",
+    "The Mole: Counting Particles by Weighing Them",
+    "Where Atomic Masses Come From, and Why They Are Not Whole Numbers",
+    "Calculating Formula Mass and Molar Mass",
+    "Percent Composition by Mass",
+    "The Laws of Definite and Multiple Proportions",
+    "From Percent Composition to an Empirical Formula",
+    "Worked Examples, Including the Fractional Cases",
+    "Empirical Versus Molecular Formulas",
+    "Combustion Analysis: How the Numbers Are Actually Measured",
+    "Hydrates and Water of Crystallization",
+    "What Different Kinds of Formula Actually Tell You",
+    "When Definite Proportions Fails: Non-Stoichiometric Compounds",
+    "Errors, Rounding Traps, and Significant Figures",
+    "Modern Methods and the Limits of Composition"
    ],
    "file": "guides_chemistry.json"
   },

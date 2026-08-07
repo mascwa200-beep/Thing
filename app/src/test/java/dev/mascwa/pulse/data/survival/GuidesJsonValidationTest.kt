@@ -208,8 +208,9 @@ class GuidesJsonValidationTest {
     private companion object {
         const val FULL_PAGE_WORDS = 400
 
-        /** Expansion complete: every one of the 238 guides' 2,902 sections now reaches [FULL_PAGE_WORDS].
-         *  From here the count only grows with NEW guides. Ratchet up as waves land, never down. */
-        const val FULL_PAGE_BASELINE = 2902
+        /** Expansion is exhausted — every section of every guide already reaches [FULL_PAGE_WORDS], so
+         *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
+         *  waves land, never down. */
+        const val FULL_PAGE_BASELINE = 2981
     }
 }
