@@ -150,3 +150,480 @@ artwork itself unmodified).
 CC BY / CC BY-SA works above are unmodified apart from resizing (noted) — no crops,
 recolors, or edits to the artwork itself. Public-domain works need no attribution;
 it is recorded here as good practice, matching the rest of this file.
+
+Archaeology & Anthropology knowledge-base diagrams (Excavation Methods, Survey &
+Site Prospection, History of Archaeology). Files renamed on import; sources are the
+original Wikimedia Commons "File:" pages (dimensions reduced / re-encoded where noted,
+artwork itself unmodified).
+
+  archaeological-excavation-methods-and-techniques.jpg — labelled archaeological
+      section drawing: numbered layers, cuts and fills through a buried sequence
+      (derived from the Historic England Field Recording Manual)
+      by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Example_section_drawing_to_demonstrate_stratigraphic_relationships.jpg
+  archaeological-excavation-methods-and-techniques-2.png — Harris matrix diagram of
+      that same sequence (contexts 1-19: layers, post pipe, postholes, pit fills, natural),
+      showing how stratigraphic relationships become a single-context sequence
+      by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Example_of_a_simple_stratigraphic_sequence_as_visualised_using_a_Harris_matrix_diagram.png
+  archaeological-survey-and-site-prospection.jpg — lidar hillshade of Vindolanda,
+      Northumberland: the Roman fort and vicus standing out as earthworks in bare-earth
+      terrain data (derived from Environment Agency open data, OGL v3)
+      by Dr John Wells — CC BY 4.0, Wikimedia Commons (re-encoded from the original)
+      https://commons.wikimedia.org/wiki/File:A_lidar_view_of_Vindolanda.jpg
+  archaeological-survey-and-site-prospection-2.jpg — magnetic gradiometer survey plot
+      of a prehistoric campsite (site 3030, Wyoming): five later-excavated fire hearths
+      appear as circular magnetic highs, with a metre grid and a nT colour scale
+      Public domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:3030-mag.jpg
+  history-of-archaeology-as-a-science.jpg — the Hoxne handaxe as engraved for
+      Archaeologia vol. 13 (1800), the first Palaeolithic stone tool ever published and
+      the plate behind the earliest argument for human deep time
+      by John Frere (1740-1807) — Public domain, Wikimedia Commons
+      (resized; the file's transparent background flattened to white)
+      https://commons.wikimedia.org/wiki/File:Archaeologia_Volume_13_D259.png
+  history-of-archaeology-as-a-science-2.png — IntCal13 radiocarbon calibration curve:
+      radiocarbon age plotted against calendar age, showing how far the measured curve
+      departs from the 1:1 line and why raw radiocarbon years must be calibrated
+      by Mike Christie — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Intcal_13_calibration_curve.png
+
+Knowledge-base diagrams for the Archaeology and Biology guides "Introduction to Archaeology
+as a Discipline", "Endocytosis and Exocytosis" and "Ion Channels and Membrane Excitability"
+(files live in images/kb/; renamed on import after the guide they illustrate). Sources are
+the original Wikimedia Commons "File:" pages; where the upload is an SVG the bundled file is
+Commons' own PNG rendering of it, and JPEG/PNG uploads are reduced in dimensions only —
+the artwork itself is unmodified in every case.
+
+  introduction-to-archaeology-as-a-discipline.jpg — "Example section drawing to demonstrate
+      stratigraphic relationships" (an excavation section with layers, cuts, fills and
+      postholes, contexts numbered 1-19; derived from the Historic England Field Recording
+      Manual) — by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Example_section_drawing_to_demonstrate_stratigraphic_relationships.jpg
+  introduction-to-archaeology-as-a-discipline-2.png — "Example of a simple stratigraphic
+      sequence as visualised using a Harris matrix diagram" (the same numbered contexts
+      redrawn as the flow chart of stratigraphic relationships that forms the excavation
+      record) — by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Example_of_a_simple_stratigraphic_sequence_as_visualised_using_a_Harris_matrix_diagram.png
+  endocytosis-and-exocytosis.jpg — "Transport of Molecules Across the Cell Membrane by
+      Endocytosis and Exocytosis" (exocytosis and the three endocytic routes shown side by
+      side across the lipid bilayer) — by Sinigangalang — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Transport_of_Molecules_Across_the_Cell_Membrane_by_Endocytosis_and_Exocytosis_(1).jpg
+  endocytosis-and-exocytosis-2.png — "Endocytosis types", a labelled three-panel comparison
+      of phagocytosis, pinocytosis and receptor-mediated endocytosis (pseudopodium,
+      phagosome, vesicle, receptor, coated pit, coat protein, coated vesicle)
+      by Mariana Ruiz Villarreal (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Endocytosis_types.svg
+  ion-channels-and-membrane-excitability.png — membrane topology of a voltage-gated sodium
+      channel alpha-subunit: domains I-IV, segments S1-S6, the charged S4 voltage sensor,
+      and the selectivity (S), inactivation (I), glycosylation (G) and phosphorylation (P)
+      sites — by John Schmidt — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Alphasubunit_sodium_channel.png
+  ion-channels-and-membrane-excitability-2.png — "Schematic of an action potential":
+      the voltage trace against time with threshold, stimulus, depolarization,
+      repolarization, refractory period, resting state and failed sub-threshold initiations
+      by Chris 73, updated by Diberri, converted to SVG by tiZom — CC BY-SA 3.0,
+      Wikimedia Commons (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Action_potential.svg
+
+Knowledge-base diagrams for the Biology guides "Membrane Transport: Diffusion, Osmosis and
+Active Transport" and "The Cell Membrane and the Fluid Mosaic Model", and the Chemistry guide
+"Dimensional Analysis and Unit Conversion" (files live in images/kb/; renamed on import after
+the guide they illustrate). Every one of these six is a PUBLIC DOMAIN upload, so no attribution
+is legally required; authorship and provenance are recorded here as the established practice.
+Each source upload is an SVG, so the bundled file is Commons' own PNG rendering of it; the
+artwork itself is unmodified in every case.
+
+  membrane-transport-diffusion-osmosis-and-active-transport.png — "Osmotic pressure on blood
+      cells diagram": red blood cells in hypertonic, isotonic and hypotonic solution shown
+      side by side, with the resulting cell shape and the direction of water movement arrowed
+      for each case (crenation, normal biconcave disc, swelling and lysis)
+      by LadyofHats — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Osmotic_pressure_on_blood_cells_diagram.svg
+  membrane-transport-diffusion-osmosis-and-active-transport-2.png — "Scheme sodium-potassium
+      pump": the four stages of the Na+/K+-ATPase cycle across the lipid bilayer, labelled with
+      extracellular and intracellular space, sodium and potassium ions, ATP hydrolysis to
+      ADP + Pi, and the concentration gradient each ion is pumped against
+      by LadyofHats (Mariana Ruiz Villarreal) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Scheme_sodium-potassium_pump-en.svg
+  the-cell-membrane-and-the-fluid-mosaic-model.png — "Phospholipids aqueous solution
+      structures": cross sections of the three structures phospholipids assemble into in water
+      — liposome, micelle and bilayer sheet — with hydrophilic heads drawn as circles and the
+      fatty acyl tails as wavy lines
+      by Mariana Ruiz Villarreal (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' PNG rendering of the source SVG, reduced to 1000px wide and colour-quantized
+      to keep the bundle small)
+      https://commons.wikimedia.org/wiki/File:Phospholipids_aqueous_solution_structures.svg
+  the-cell-membrane-and-the-fluid-mosaic-model-2.png — "Cell membrane detailed diagram": the
+      fully labelled fluid mosaic membrane — phospholipid bilayer with hydrophilic heads and
+      hydrophobic tails, cholesterol, glycolipids, glycoproteins, protein channels, integral,
+      peripheral and surface proteins, alpha-helix proteins and cytoskeletal filaments
+      by Mariana Ruiz (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Cell_membrane_detailed_diagram_en.svg
+  dimensional-analysis-and-unit-conversion.png — the BIPM illustration of the SI: the seven
+      base units (s, kg, m, A, K, mol, cd) in the outer ring, each paired in the inner ring
+      with the defining constant that now fixes it (the caesium transition frequency, the
+      Planck constant, the speed of light, the elementary charge, the Boltzmann constant,
+      the Avogadro constant and the luminous efficacy Kcd)
+      by BIPM (original), rearranged by User:Cmglee — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:SI_Illustration_Base_Units_and_Constants_Colour_Full.svg
+  dimensional-analysis-and-unit-conversion-2.png — drag coefficient Cd of a sphere against
+      Reynolds number Re over six decades, for smooth and rough surfaces: a worked
+      demonstration of what the Buckingham Pi theorem buys you, since a problem in speed,
+      size, density and viscosity collapses onto a single curve in two dimensionless groups
+      by an anonymous NASA author (ed. Nancy Hall), vectorized by User:Kraaiennest, edited by
+      Olivier Cleynen — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Drag_coefficient_on_a_sphere_vs._Reynolds_number_-_main_trends.svg
+
+Knowledge-base diagrams for the Chemistry guides "Empirical and Molecular Formula
+Determination", "Measurement, Units and Significant Figures in Chemistry" and "The Mole
+Concept and Avogadro's Number" (files live in images/kb/; renamed on import after the guide
+they illustrate). Sources are the original Wikimedia Commons "File:" pages; where the upload
+is an SVG the bundled file is Commons' own 1280px PNG rendering of it, and JPEG/PNG uploads
+are reduced in dimensions only — the artwork itself is unmodified in every case.
+
+  empirical-and-molecular-formula-determination.png — "Tipos de fórmulas": the three ways a
+      compound can be written on paper, shown side by side for water and methane — Lewis
+      electron-dot structure, structural (bond-line) formula, and the condensed molecular
+      formula H2O / CH4 — by Science images — CC0 1.0 (public domain dedication),
+      Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Tipos_de_f%C3%B3rmulas.png
+  empirical-and-molecular-formula-determination-2.jpg — "Liebig's Kali-Apparat zu organischen
+      Analysen", the 1837 plate (drawn at natural size) of the five-bulb potash apparatus that
+      made combustion analysis quantitative: the lettered legend identifies the suction and
+      chloride-of-calcium openings (P, O), the large and small bulbs (M, N) and their limbs
+      (m, n), and marks the potash-solution levels before filling, after the leak test, after
+      combustion and after the tube is opened — from Justus Liebig, "Anleitung zur Analyse
+      organischer Körper", 1837 — Public Domain, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Kali-Apparat.jpg
+  measurement-units-and-significant-figures-in-chemistry.png — "Relations between new SI units
+      definitions": the seven SI base units (s, m, kg, A, K, mol, cd) as a dependency graph,
+      each fed by the defining constant that fixes it — the caesium hyperfine frequency, c, h,
+      e, k, the Avogadro constant and K_cd — with arrows showing which units are needed to
+      realise which — by Wikipetzi — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Relations_between_new_SI_units_definitions.png
+  measurement-units-and-significant-figures-in-chemistry-2.png — "Measurement example for
+      significant figures and precision": the same object measured against two rulers, one
+      graduated only in whole units and one finely subdivided, showing why the instrument —
+      not the arithmetic — sets how many digits a reading is entitled to
+      by Chemdiagrams — CC0 1.0 (public domain dedication), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Measurement_example_for_significant_figures_and_precision.png
+  the-mole-concept-and-avogadro-s-number.png — "Mole carbon-12 diagram": one mole shown as the
+      bridge between the weighable and the countable — 12 grams of carbon-12 on one side,
+      6.02214076x10^23 atoms (the Avogadro constant) on the other — by VectorVoyager —
+      CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mole_carbon-12_diagram.svg
+  the-mole-concept-and-avogadro-s-number-2.png — "Mass versus moles of iron vs gold": a worked
+      contrast showing that equal masses are not equal amounts — 1 kg of iron (M = 55.845
+      g/mol) is 17.89 mol while 1 kg of gold (M = 197.0 g/mol) is only 5.08 mol, with n = m/M
+      set out for both — by VectorVoyager — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px
+      PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mass_versus_moles_of_iron_vs_gold.svg
+
+Knowledge-base diagrams for the Climate guides "Carbon Dioxide and the Greenhouse Gases",
+"Arid Climate & Long-Term Drought Adaptation" and "Coastal & Maritime Climate Hazards" (files
+live in images/kb/; renamed on import after the guide they illustrate). Sources are the original
+Wikimedia Commons "File:" pages; where the upload is an SVG the bundled file is Commons' own
+1280px PNG rendering of it, and JPEG/PNG uploads are reduced in dimensions only — the artwork
+itself is unmodified in every case.
+
+  carbon-dioxide-and-the-greenhouse-gases.png — "The Greenhouse Effect": the energy path drawn
+      end to end — incoming solar radiation, the part reflected by the Earth and atmosphere, the
+      part absorbed at the surface, and the infrared the warmed surface re-emits, some escaping
+      to space and some absorbed and re-radiated in all directions by greenhouse-gas molecules,
+      which is what warms the surface and lower atmosphere — by US EPA (2012) — Public Domain,
+      Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Earth%27s_greenhouse_effect_(US_EPA,_2012).png
+  carbon-dioxide-and-the-greenhouse-gases-2.jpg — NASA's 400,000-year carbon-dioxide record:
+      atmospheric CO2 in parts per million against years before present, the long sawtooth of the
+      glacial cycles reconstructed from ice cores joined to the modern instrumental record, with
+      the ceiling that CO2 never crossed for the whole of that span marked and the near-vertical
+      present-day rise above it — by NASA (Vostok ice-core data, J. R. Petit et al.; NOAA Mauna
+      Loa CO2 record) — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:NASA_CO2_Chart.jpg
+  climate-arid-drought.jpg — "Wind tower and qanat cooling": a cutaway of the Persian passive-
+      cooling system, showing wind caught at the tower head and driven down into the building,
+      air drawn in through the qanat shaft and cooled by convection and evaporation over the
+      water flowing in the tunnel, the low-pressure zone that pulls it through the cooled
+      basement, and the exhaust leg back up the tower — no power required — by Williamborg,
+      after M. N. Bahadori, "Passive Cooling Systems in Iranian Architecture", Scientific
+      American, February 1978 — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Wind-Tower-and-Qanat-Cooling-1.jpg
+  climate-arid-drought-2.png — "Cone of depression": why a well can go dry while the aquifer
+      still holds water — a cross-section labelling precipitation, recharge, the water table and
+      the confining unit beneath, with the cone of depression and its drawdown that pumping
+      carves into the water table around the well itself — by Tara Gross (U.S. Geological
+      Survey) — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Cone_of_depression_-_Pumping_a_well_can_cause_water_level_lowering.png
+  climate-coastal-maritime.png — storm-surge cross-section: the three heights kept separate and
+      dimensioned against mean sea level — the 2 ft normal high tide, the 15 ft surge the storm
+      pushes on top of it, and the 17 ft storm tide that is their sum — with a house at the
+      shoreline showing what that total actually reaches — by SuperManu, after the original
+      graphic by Robert Simmon (NASA GSFC) — Public Domain, Wikimedia Commons (Commons' 1280px
+      PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Surge-en.svg
+  climate-coastal-maritime-2.png — "Rip Currents: Break the Grip of the Rip!": the NOAA rip-
+      current safety plan-view — the feeder currents running along the beach, the narrow rip neck
+      carrying water back out through the breakers, and the ESCAPE arrows showing the swim
+      parallel to shore that gets you out of it rather than the losing swim straight back in —
+      by the National Oceanic and Atmospheric Administration — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Ripcurrent.png
+
+Knowledge-base diagrams for the Climate guides "High Altitude: Thin Air, Altitude Illness &
+Acclimatization", "Humid Tropics & Rainforest Survival" and "The Global Carbon Cycle" (files live
+in images/kb/; renamed on import after the guide they illustrate). Sources are the original
+Wikimedia Commons "File:" pages. Where the upload is an SVG the bundled file is a PNG rendering of
+it, and JPEG/PNG uploads are reduced in dimensions only. The artwork itself is unmodified in every
+case; the one file needing more than a straight resize (climate-tropical-rainforest.png) has its
+processing spelled out in its own entry below.
+
+  climate-high-altitude.png — "Expected SpO2 and PaO2 levels at altitude": the three bands this
+      guide works in — high altitude (1,500–3,500 m), very high (3,500–5,500 m) and extreme
+      (5,500–8,850 m) — each given with the arterial oxygen saturation and partial pressure a
+      person should expect there, so a pulse-oximeter reading in the field can be judged against
+      the altitude rather than against sea-level normals
+      by Maryrosegrant — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Expected_SpO2_and_PaO2_levels_at_altitude.png
+  climate-high-altitude-2.png — "Oxygen-Haemoglobin dissociation curves for varying pH":
+      haemoglobin saturation against oxygen partial pressure, drawn for normal blood (pH 7.4) and
+      for the alkalosis and hypocapnia (pH 7.8) that the hypoxic ventilatory response of altitude
+      actually produces, with acidosis (pH 7.0) for contrast — the sigmoid shape is why saturation
+      holds up as partial pressure first falls and then collapses once it drops past the shoulder
+      of the curve
+      by Peter Southwood — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Oxygen-Haemoglobin_dissociation_curves.svg
+  climate-tropical-rainforest.png — "Heat Index": the National Weather Service chart of apparent
+      temperature against air temperature and relative humidity, banded by what that apparent
+      temperature does to people — fatigue, heat exhaustion possible, heat exhaustion likely, heat
+      stroke highly likely. Reading across the humid end of the chart gives this guide's central
+      point directly: a merely warm air temperature becomes an extreme apparent temperature once
+      relative humidity is high — by the National Weather Service, Southern Region Headquarters
+      (NOAA) — Public Domain, Wikimedia Commons
+      Processing note: rendered from the source SVG locally rather than taken from Commons' own
+      PNG. The file positions its axis labels with per-glyph x coordinates, which Commons'
+      rasteriser ignores — its rendering runs the whole relative-humidity scale together into an
+      unreadable "0102030405060708090100". The local rendering honours those coordinates. The
+      result was then flattened onto white (the source has transparent regions) and colour-
+      quantized to keep the bundle small; the artwork itself is unaltered.
+      https://commons.wikimedia.org/wiki/File:Heat_Index.svg
+  climate-tropical-rainforest-2.jpg — "Life Cycle of the Malaria Parasite": the transmission loop
+      drawn in both directions — the mosquito injecting sporozoites when it bites, the human liver
+      stage, the blood-cell cycle, the gametocytes that form, and the mosquito taking those back
+      up at its next blood meal — which is why every layer of the guide's bite defence (permethrin
+      -treated clothing, repellent, treated net) is aimed at that same single event
+      by the National Institutes of Health — Public Domain, Wikimedia Commons
+      (reduced to 1000px wide and re-encoded)
+      https://commons.wikimedia.org/wiki/File:Life_Cycle_of_the_Malaria_Parasite.jpg
+  the-global-carbon-cycle.jpg — "Simplified diagram of the global carbon cycle": reservoir masses
+      in Pg C and annual exchange fluxes in Pg C per year on one figure — atmosphere, vegetation,
+      soils, permafrost, surface and deep ocean, marine biota, sediments and fossil fuels — with
+      black numbers and arrows for the pre-industrial (pre-1750) state, red arrows for the
+      anthropogenic fluxes averaged over 2000–2009, and red reservoir numbers for the cumulative
+      industrial-era change in each pool
+      by Kandasamy S and Nagender Nath B (2016), after the diagram model of Sarmiento and Gruber
+      (2002) with stocks and fluxes reproduced from Ciais et al. (2013) — CC BY 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:Simplified_diagram_of_the_global_carbon_cycle.jpg
+  the-global-carbon-cycle-2.png — "Mauna Loa CO2 monthly mean concentration": the Keeling curve —
+      monthly mean CO2 as a mole fraction in dry air, measured continuously at Mauna Loa from 1958
+      to the present, with an inset of the mean seasonal departure from the yearly average. The
+      two things Keeling's record revealed are on the one figure: the relentless rise, and the
+      annual breathing of the Northern Hemisphere biosphere that rides on top of it
+      by Oeneis (data: Pieter Tans, NOAA/GML and Ralph Keeling, Scripps Institution of
+      Oceanography) — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mauna_Loa_CO2_monthly_mean_concentration.svg
+
+Knowledge-base diagrams for the Climate guide "The Greenhouse Effect Explained" and the Computing
+guides "Ada Lovelace and the First Algorithm" and "Charles Babbage and the Analytical Engine"
+(files live in images/kb/; renamed on import after the guide they illustrate). Sources are the
+original Wikimedia Commons "File:" pages. Where the upload is an SVG the bundled file is Commons'
+own 1280px PNG rendering of it; JPEG/PNG uploads are reduced in dimensions only, and the one GIF
+is the original upload byte-for-byte. The artwork itself is unmodified in every case — no crops,
+no recolouring, no relabelling. The single CC BY work here (the 1840 engine plan) carries its
+photographer's credit both in this file and inline in the guide text, as that licence requires.
+
+  the-greenhouse-effect-explained.jpg — "Earth's energy budget": every radiative and non-radiative
+      flux in the climate system drawn as an arrow and given its ten-year average value in W/m2 —
+      incoming solar 340.4, reflected by clouds and atmosphere 77.0 and by the surface 22.9,
+      absorbed by the surface 163.3, emitted by the surface 398.2, the 40.1 that escapes straight
+      out through the atmospheric window, the 340.3 of back radiation returned to the surface by
+      greenhouse gases, plus thermals 18.4 and latent heat 86.4 — closing on a net absorbed 0.6,
+      which is the imbalance the whole guide is about — by NASA (CERES; Loeb et al., J. Clim.
+      2009; Trenberth et al., BAMS 2009) — Public Domain, Wikimedia Commons (reduced to 1280px
+      wide)
+      https://commons.wikimedia.org/wiki/File:The-NASA-Earth%27s-Energy-Budget-Poster-Radiant-Energy-System-satellite-infrared-radiation-fluxes.jpg
+  the-greenhouse-effect-explained-2.png — "Radiation Transmitted by the Atmosphere": the three
+      panels that explain WHY particular gases matter — the incoming 5525 K solar spectrum and the
+      outgoing 210-310 K thermal spectrum plotted against wavelength with their blackbody curves,
+      the total atmospheric absorption and scattering beneath them, and then the same band
+      structure broken out gas by gas (water vapour, carbon dioxide, oxygen and ozone, methane,
+      nitrous oxide, Rayleigh scattering), showing that greenhouse gases are nearly transparent to
+      sunlight but opaque in the infrared, and where the atmospheric window sits — by Wikkiwonkk,
+      after the original figure by Robert A. Rohde for the Global Warming Art project — CC0 1.0
+      (public domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of the source
+      SVG)
+      https://commons.wikimedia.org/wiki/File:Atmospheric_Transmission-en.svg
+  ada-lovelace-and-the-first-algorithm.jpg — "Diagram for the computation by the Engine of the
+      Numbers of Bernoulli. See Note G": the 1843 table itself — twenty-five numbered operations,
+      each with the operation performed, the variables acted upon, the variables receiving the
+      result, the indication of change in value, the statement of results, and the running
+      contents of the data, working and result variables, ending in the loop instruction "Here
+      follows a repetition of Operations thirteen to twenty-three". This plate is the artefact the
+      whole guide argues about, and it shows what prose cannot: a program with variables,
+      assignment and a loop, written for a machine that did not exist — by Ada Lovelace, in her
+      Notes to Menabrea's "Sketch of the Analytical Engine Invented by Charles Babbage" (1843) —
+      Public Domain, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Diagram_for_the_computation_of_Bernoulli_numbers.jpg
+  ada-lovelace-and-the-first-algorithm-2.jpg — the surviving Analytical Engine trial model
+      (1834-1871) in the Science Museum, London: the only part of the machine Babbage ever had
+      built, showing the stacked racks and figure wheels of the store, the gearing of the mill
+      below them and the drive shafts that would have sequenced them — the physical scale and
+      mechanism behind the abstraction the guide describes — by Daderot — CC0 1.0 (public domain
+      dedication), Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Analytical_engine_trial_model,_Charles_Babbage,_1834-1871_-_Science_Museum,_London_-_DSC05565.jpg
+  charles-babbage-and-the-analytical-engine.jpg — "The General Plan of Mr Babbage's Great
+      Calculating Engine", Plan 25, dated 6 August 1840: Babbage's own general arrangement drawing
+      of the Analytical Engine, with the circular mill at the centre ringed by its figure wheels,
+      the long rack running off to the right into the rows of store columns, and the three card
+      readers labelled separately at the edges — Operation Cards, Variable Cards and Number Cards
+      — together with the stamping-up levers, carriages and counting apparatus. It is the clearest
+      single evidence that the mill/store separation and the punched-card control the guide
+      describes were a worked-out engineering design, not a sketch of an idea — photographed at
+      the Computer History Museum by ArnoldReinhold — CC BY 4.0, Wikimedia Commons (reduced to
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Babbage_Analytical_Engine_Plan_1840_CHM.agr.jpg
+  charles-babbage-and-the-analytical-engine-2.gif — "Portion of Babbage's Difference Engine": the
+      contemporary engraving of the completed demonstration portion, drawn in enough detail to
+      follow the
+      mechanism — the columns of digit wheels carrying the successive differences with their
+      figures (21098, 89012) legible on the rings, the stepped adding sectors and carry levers
+      between the columns, the framing and the "calculation complete" indicator — by Benjamin
+      Herschel Babbage, printed in Harper's New Monthly Magazine — Public Domain, Wikimedia
+      Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Babbage_difference_engine_drawing.gif
+
+Knowledge-base diagrams for the Computing guide "History of Computing: From the Abacus to the
+Microprocessor" and the Earth Science guides "Crystallography and Crystal Systems" and
+"Introduction to Mineralogy" (files live in images/kb/; renamed on import after the guide they
+illustrate). None of these three guides carried an illustration before. Sources are the original
+Wikimedia Commons "File:" pages. Where the upload is an SVG or a WebP the bundled file is the
+raster rendering Commons serves for it; PNG and JPEG uploads are reduced in dimensions, and two
+files were additionally re-encoded to keep the bundle small (noted per entry). The artwork itself
+is unmodified in every case — no crops, no recolouring, no relabelling. The four CC BY / CC BY-SA
+works here carry their author credit in this file, as those licences require.
+
+  history-of-computing-from-the-abacus-to-the-microprocessor.png — "von Neumann Architecture": the
+      block diagram of what the guide's stored-program section argues in words — one memory unit
+      holding instructions and data alike, a central processing unit divided into a control unit
+      and an arithmetic/logic unit, input and output devices either side, and the path between
+      processor and memory drawn in both directions. It is the picture of the 1945 EDVAC report's
+      central claim: because the program lives in the same read-write store as the data, changing
+      the task means loading numbers rather than rewiring the machine, which is exactly what ENIAC
+      could not do — by Kapooht — CC BY-SA 3.0, Wikimedia Commons (Commons' 1280px PNG rendering
+      of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Von_Neumann_Architecture.svg
+  history-of-computing-from-the-abacus-to-the-microprocessor-2.jpg — the development-phase chip
+      layout of the Intel 4004 (1971), the first commercial microprocessor, photographed as a
+      large plot at the Vintage Computer Festival in Berlin: a whole four-bit processor laid out
+      on a single die, with the regular repeating arrays of the register and memory-decode blocks
+      down two sides, the dense irregular control and arithmetic logic through the middle, the row
+      of square bond pads round the edge, and "4004", the intel wordmark and the year "71" drawn
+      into the corners of the mask. The guide's claim that an entire CPU — about 2,300 transistors
+      — had been reduced to one piece of silicon is something prose can only assert; this is the
+      artefact — original photograph by Wolfgang Stief, rectangular derivative by Pittigrilli —
+      CC0 1.0 (public domain dedication), Wikimedia Commons (reduced to 1000px wide and
+      re-encoded)
+      https://commons.wikimedia.org/wiki/File:Chip_layout_from_the_development_phase_of_the_Intel_4004_from_1971,_the_first_microprocessor_of_the_world_(cropped_and_edited_image).jpg
+  crystallography-and-crystal-systems.png — "The 14 Bravais lattices": all fourteen distinct
+      three-dimensional lattices drawn as unit cells and grouped under their seven crystal systems
+      — cubic (P, I, F), tetragonal (P, I), orthorhombic (P, C, I, F), hexagonal (P),
+      trigonal/rhombohedral (R), monoclinic (P, C) and triclinic (P) — with the extra lattice
+      points that centring introduces picked out in red. Two of the guide's sections resolve into
+      this one figure: the systems are the cell shapes, and the fourteen are what the P/I/F/C
+      centrings produce wherever they are neither redundant nor symmetry-lowering, which is why
+      the count falls so unevenly across the systems — by Davis Chow Jun Onn — CC BY-SA 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:The_14_Bravais_lattices.png
+  crystallography-and-crystal-systems-2.png — "Illustration of the Bragg diffraction": the
+      geometry behind n*lambda = 2d*sin(theta) — parallel planes of atoms a distance d apart, a
+      beam striking them at the glancing angle theta and leaving at the same angle, and the extra
+      distance the deeper ray travels marked out as the two d*sin(theta) segments that make up the
+      path difference. The law can be read straight off the drawing: the two reflections emerge in
+      phase, and a diffracted beam appears, only when that extra path is a whole number of
+      wavelengths — by Σ64 — CC BY 3.0, Wikimedia Commons (Commons' 1280px rendering of the
+      1299px upload)
+      https://commons.wikimedia.org/wiki/File:Bragg_diffraction_01.png
+  introduction-to-mineralogy.jpg — "Mohs Hardness Scale": the ten index minerals from talc at one
+      to diamond at ten, set beside the everyday objects that bracket them — fingernail 2.5,
+      copper penny 3.5, knife or glass plate 5.5, steel nail 6.5, masonry drill bit 8.5 — with
+      arrows placing each object at the point on the scale where it stops being able to scratch.
+      This turns the guide's hardness section from a list to be memorised into the field test it
+      actually is: you carry the comparators in your pocket, and what a specimen will and will not
+      scratch brackets it — by the National Park Service — Public Domain, Wikimedia Commons
+      (Commons' PNG rendering of the WebP upload, reduced to 1000px wide and re-encoded)
+      https://commons.wikimedia.org/wiki/File:Mohs_Hardness_Scale.webp
+  introduction-to-mineralogy-2.png — "Bowen's reaction series": the order in which minerals
+      crystallise out of a cooling magma, drawn as the two branches the guide describes — the
+      discontinuous series olivine, pyroxene, amphibole, biotite mica down one side and the
+      continuous plagioclase feldspar series running from calcium-rich to sodium-rich down the
+      other, the two converging on potassium feldspar, muscovite mica and finally quartz — plotted
+      against a relative crystallisation temperature axis from about 1300 °C to 540 °C and against
+      the ultramafic-to-felsic composition scale. It shows at a glance why certain minerals are
+      always found together and others never are — by Chloe Branciforte, in "GEOS: A Physical
+      Geology Lab Manual for California Community Colleges" (Branciforte and Haddad) — CC BY 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:Bowen%27s_reaction_series_diagram.png
+
+Diagrams for the Earth Science guide "Silicate Minerals" and the Electronics guide
+"Automotive electronics and engine control units" (both previously unillustrated).
+Sources are the original Wikimedia Commons "File:" pages; files renamed on import.
+Where an SVG original relied on system fonts for its labels, the Commons-rendered
+raster is bundled instead, so the labels cannot shift under font substitution.
+
+  silicate-minerals.png — the silicon-oxygen tetrahedron, the single unit every silicate
+      is built from, shown twice: at left as a structural formula with the central silicon
+      bonded to four oxygens, wedge-and-dash notation carrying the three-dimensional
+      arrangement off the page; at right as the bare tetrahedron, which is the shorthand
+      the rest of the guide (and all of mineralogy) draws instead of the atoms. Having both
+      side by side is what makes the shorthand readable — "SiO4 tetrahedral.svg"
+      by Hbf878 — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:SiO4_tetrahedral.svg
+  silicate-minerals-2.png — "Ways in which silicate tetrahedrons can join together in
+      silicate minerals": the whole polymerization series in one figure, lettered a-f —
+      the isolated tetrahedron (a), the linked pair sharing one oxygen (b), the six-member
+      ring (c), the single chain (d), the double chain (e) and the continuous sheet (f).
+      This one plate is the structural spine of the entire guide: every class it goes on to
+      describe — neso-, soro-, cyclo-, ino-, phyllo- and tectosilicate — is one of these
+      linkages, and the progression from isolated units to a continuous framework is exactly
+      what the prose can only assert — by Actualist — CC BY-SA 3.0, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Silicate_structures.png
+  automotive-electronics-and-engine-control-units.jpg — two Rover Modular Engine Management
+      System (MEMS) engine control units, one sealed and one with its cover removed: the
+      finned cast-alloy case that sheds heat and survives underbonnet vibration, the single
+      multi-pin connector through which every sensor and actuator in the engine bay is wired,
+      and inside, the populated board itself — the microcontroller and its EPROM, the row of
+      power output stages along the connector edge that actually switch the injectors and
+      coils, and the bulk capacitor on the supply rail. It shows in one frame the split the
+      section describes between a small computing core and the much larger power-handling
+      hardware around it — by ColinMB — CC BY-SA 3.0, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Rover_MEMS_1.6_ECU.jpg
+  automotive-electronics-and-engine-control-units-2.png — CAN bus topology: several control
+      units (SG 1, SG 2 ... SG n) all hanging off one shared differential pair, CAN-Hi and
+      CAN-Low, terminated at each far end by a 120-ohm resistor. It makes concrete the point
+      the section turns on — that a modern car is not point-to-point wiring per function but
+      a small number of modules sharing one twisted pair, which is why the termination
+      resistors and the two-wire differential scheme matter — by Stefan-Xp — CC BY-SA 3.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:CAN-Bus_Elektrische_Zweidrahtleitung.svg

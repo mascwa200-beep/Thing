@@ -135,3 +135,25 @@ chem-states-of-matter-phase-changes.png  —  Phase change - en.svg  —  Public
 chem-kinetics-and-equilibrium.png  —  Enzyme activation energy.png  —  CC BY-SA 3.0  —  G. Andruk
 cs-operating-systems.png  —  Operating system placement.svg  —  CC BY-SA 3.0  —  Golftheman
 cs-cybersecurity-fundamentals.png  —  CIAJMK1209-en.svg  —  CC BY-SA 4.0  —  Michel Bakni
+archaeological-excavation-methods-and-techniques.jpg  —  Example section drawing to demonstrate stratigraphic relationships.jpg  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
+archaeological-excavation-methods-and-techniques-2.png  —  Example of a simple stratigraphic sequence as visualised using a Harris matrix diagram.png  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
+archaeological-survey-and-site-prospection.jpg  —  A lidar view of Vindolanda.jpg  —  CC BY 4.0  —  Dr John Wells
+archaeological-survey-and-site-prospection-2.jpg  —  3030-mag.jpg  —  Public domain
+history-of-archaeology-as-a-science.jpg  —  Archaeologia Volume 13 D259.png  —  Public domain  —  John Frere (1740-1807)
+history-of-archaeology-as-a-science-2.png  —  Intcal 13 calibration curve.png  —  CC BY-SA 3.0  —  Mike Christie
+membrane-transport-diffusion-osmosis-and-active-transport.png  —  Osmotic pressure on blood cells diagram.svg  —  Public domain  —  LadyofHats
+membrane-transport-diffusion-osmosis-and-active-transport-2.png  —  Scheme sodium-potassium pump-en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
+the-cell-membrane-and-the-fluid-mosaic-model.png  —  Phospholipids aqueous solution structures.svg  —  Public domain  —  Mariana Ruiz Villarreal (LadyofHats)
+the-cell-membrane-and-the-fluid-mosaic-model-2.png  —  Cell membrane detailed diagram en.svg  —  Public domain  —  Mariana Ruiz (LadyofHats)
+dimensional-analysis-and-unit-conversion.png  —  SI Illustration Base Units and Constants Colour Full.svg  —  Public domain  —  BIPM (original), rearranged by User:Cmglee
+dimensional-analysis-and-unit-conversion-2.png  —  Drag coefficient on a sphere vs. Reynolds number - main trends.svg  —  Public domain  —  Anonymous NASA author (ed. Nancy Hall), vectorized by User:Kraaiennest, edited by Olivier Cleynen
+carbon-dioxide-and-the-greenhouse-gases.png  —  Earth's greenhouse effect (US EPA, 2012).png  —  Public domain  —  US EPA
+carbon-dioxide-and-the-greenhouse-gases-2.jpg  —  NASA CO2 Chart.jpg  —  Public domain  —  NASA (Vostok ice core data/J.R. Petit et al.; NOAA Mauna Loa CO2 record)
+climate-arid-drought.jpg  —  Wind-Tower-and-Qanat-Cooling-1.jpg  —  Public domain  —  Williamborg
+climate-arid-drought-2.png  —  Cone of depression - Pumping a well can cause water level lowering.png  —  Public domain  —  Tara Gross (U.S. Geological Survey)
+climate-coastal-maritime.png  —  Surge-en.svg  —  Public domain  —  SuperManu, after Robert Simmon (NASA GSFC)
+climate-coastal-maritime-2.png  —  Ripcurrent.png  —  Public domain  —  National Oceanic and Atmospheric Administration
+silicate-minerals.png  —  SiO4 tetrahedral.svg  —  CC0  —  Hbf878
+silicate-minerals-2.png  —  Silicate structures.png  —  CC BY-SA 3.0  —  Actualist
+automotive-electronics-and-engine-control-units.jpg  —  Rover MEMS 1.6 ECU.jpg  —  CC BY-SA 3.0  —  ColinMB
+automotive-electronics-and-engine-control-units-2.png  —  CAN-Bus Elektrische Zweidrahtleitung.svg  —  CC BY-SA 3.0  —  Stefan-Xp
