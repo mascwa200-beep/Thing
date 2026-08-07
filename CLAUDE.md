@@ -2122,6 +2122,72 @@ separate THIS-JUST-IN notification), and the LCARS console screen: "Remove it".
   **Cross-module smart-cast trap** (recurring): a public `val` from `core:telemetry` can't smart-cast in
   `:app` — hoist to a local `val` first (bit N3's `brief.urgencyKey`).
 
+### DESKTOP COMPANION + LAN REMOTE CONTROL — "AnyDesk minus the video" (this session, S1–S7 shipped)
+Owner: *"Focus on making the desktop version with a remote control system for both the mobile and Windows
+to turn on and off whenever, like anydesk but not necessary to make a video portion."* Three binding
+AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitHub relay); command scope =
+**app features only** (no device-policy levers); desktop scope = **remote control + finish News**.
+- **Why LAN-only dodged a trap:** `android-build.yml` triggers on `branches: ["**", "!debug-reports"]`, so a
+  GitHub-relay branch would have fired a full Android build **on every command**.
+- **S1 — pure protocol core (`core:telemetry/RemoteProtocol.kt`, + `RemoteProtocolTest` 26 cases, locally
+  kotlinc+JUnit green):** `RemoteCommand` (14-entry closed enum), `RemoteWire` (length-prefixed
+  `<len>:<value>|` framing — the SAME canonical encoding as `AuditLedger.Canonical`, so "sign what you send"
+  needs no separate canonicalizer; `:core:telemetry` has **no kotlinx.serialization dep**, which is why JSON
+  was not an option), `RemoteCrypto` (HKDF/HMAC/ECDH/AES-256-GCM, per-direction keys, sequence-derived
+  nonces), `Handshake`, `PairingProof`, `LocalNetwork.isLocalAddress`, `SequenceGuard`.
+  **Security shape:** one-time 6-digit code proven by HMAC over the handshake transcript (**the code itself
+  never crosses the wire**) → signed *ephemeral* ECDH (mutual auth + forward secrecy; the long-term Keystore
+  key stays `PURPOSE_SIGN`-only because StrongBox ECDH support varies) → AES-GCM records. Per-command ECDSA
+  deliberately omitted: redundant under GCM and a Keystore signature costs milliseconds.
+  **The load-bearing safety property is the closed allowlist** — the wire format cannot express arbitrary
+  execution. A test (`destructiveCapabilitiesAreNotInTheAllowlist`) asserts wipe/suspend/usb/lock/selfcode/
+  token/key/wifi stay absent, so a future addition trips CI.
+  ⚠️ **RFC 5869 trap hit + fixed:** an empty HKDF salt must become HashLen ZERO BYTES, not an empty HMAC key
+  (JCA throws "Empty key"). Caught only because the core runs locally.
+- **S2/S3 — Android link (`app/.../remote/`, PR on `claude/loving-edison-bd65oa`):** `RemoteIdentity`
+  (StrongBox-first P-256, mirrors `KeystoreLedgerSigner`'s alias/fallback), `RemoteServer` (ServerSocket,
+  one command per connection — no session table to leak, and a half-open socket from a phone that changed
+  networks costs nothing), `RemoteCommandExecutor` (a plain `when` over the enum — reading it IS the complete
+  capability list; every outcome audited through `SecretScrub`), `RemotePeers` (public SPKI only),
+  `RemoteActions`, `RemoteLinkService` (**`connectedDevice`** FGS). Settings → Security & network → "Remote
+  link" (master switch + Pair + paired fingerprints + Unpair all). Default OFF.
+  **Deliberately a dedicated service, not `ActiveMatrixService`** — that one is gated on
+  `jarvis.residentService`, and the link has to be independently switchable (literally the owner's ask).
+  Service running == link listening.
+  **No new secret enters `AppSettings`** (only public keys) → sidesteps `allSecretValues()` /
+  `SettingsBackup.redactSecrets` entirely.
+- **Compile-review findings applied (1 BLOCKER + 6 MAJOR):** `RadioStation` has no `id` (name/band/streamUrl
+  only) and favourites-only lookup could never match on a fresh phone → search `favoriteRadio +
+  DEFAULT_STATIONS`; **`dataSync`→`connectedDevice`** (on targetSdk 35 a `dataSync` FGS **cannot start from
+  BOOT_COMPLETED** and is 6h/24h capped — the boot revival would have silently never worked); `startForeground`
+  hoisted ABOVE the action branch (else `ForegroundServiceDidNotStartInTimeException`); `@Volatile` + a
+  `starting` latch + publish-before-`start()` (a leaked listener socket otherwise); `ACTION_UNPAIR` so
+  revocation reaches the LIVE in-memory peer snapshot; `MAX_CONCURRENT`+throttled refusal auditing (refusals
+  happen pre-auth, so an unthrottled flood = one ledger write per packet); `scope.cancel()` in `stop()`;
+  `synchronized` authorise/consume so two peers can't both burn one code.
+  **`SettingsBackup.merge` now preserves `remote = current.remote`** — paired keys are public, but the list
+  is an **authorization list**, and a restored backup must never silently re-admit an unpaired machine.
+  ⚠️ Also unified `RemotePeers` on `Handshake.b64` (unpadded) instead of `android.util.Base64` (padded) —
+  the two ends never compare these strings today, but one encoding per concept kills a bug class.
+- **S4–S7 — desktop:** `theme/LcarsControls.kt` (the kit had NO clickable primitive but `LcarsChip`),
+  `remote/RemoteProtocol.kt` (**byte-identical mirror below the package line** — verified by diff; the repo's
+  deliberate copy-not-share convention), `DesktopIdentity` (P-256 in PKCS12, hand-rolled X.509 DER),
+  `RemoteClient`, `feature/remote/RemoteScreen` (optimistic toggle → `refreshStatus()` snap-back),
+  the News vertical, and a `windows-latest` `packageMsi` job (jpackage is host-targeted — the ubuntu job
+  cannot produce an MSI).
+- **Verification:** protocol core 26/26 locally green; `gradle :desktop:build` genuinely green (the one real
+  local build in this repo). ⚠️ **End-to-end pairing over real Wi-Fi, the FGS lifecycle, and the StrongBox
+  identity key are owner-verify — two real machines are the only proof.** Owner checklist: Settings → Remote
+  link ON → Pair → read the code + address from the notification → enter on the desktop → toggle something →
+  confirm the audit ledger recorded it.
+- **Honest limit:** away-from-home access needs the GitHub-relay transport. The protocol is
+  transport-agnostic, so it slots in behind the same interface if the owner ever wants it.
+
+### KB engine state (task #73, standing)
+**238 guides · 2,902 sections · 1,614 full pages** (was 1,310); manifest **70 / 14,490 topics covered**.
+Wave B1 fully merged. `FULL_PAGE_BASELINE = 1614`. Next wave: `select_wave.py` → drafting fan-out →
+`merge_new_guides.py` → `kb_pipeline.py` (must print CLEAN) → ratchet → one commit.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
