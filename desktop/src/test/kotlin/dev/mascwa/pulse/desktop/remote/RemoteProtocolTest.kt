@@ -282,11 +282,15 @@ class RemoteProtocolTest {
 
     @Test fun onlyLocalAddressesAreAccepted() {
         for (ok in listOf("192.168.1.10", "10.0.0.5", "172.16.4.4", "172.31.255.254",
-                          "169.254.1.1", "127.0.0.1", "::1", "fe80::1%wlan0")) {
+                          "169.254.1.1", "127.0.0.1", "::1", "fe80::1%wlan0",
+                          // A dual-stack socket reports IPv4 peers in mapped form on many networks.
+                          "::ffff:192.168.1.5", "::FFFF:10.1.2.3")) {
             assertTrue("$ok should be local", LocalNetwork.isLocalAddress(ok))
         }
         for (bad in listOf("8.8.8.8", "172.15.0.1", "172.32.0.1", "1.2.3.4",
-                           "203.0.113.9", "", "not-an-ip", "2001:4860:4860::8888")) {
+                           "203.0.113.9", "", "not-an-ip", "2001:4860:4860::8888",
+                           // Mapped form must not become a bypass for a public address.
+                           "::ffff:8.8.8.8")) {
             assertFalse("$bad should NOT be local", LocalNetwork.isLocalAddress(bad))
         }
     }
