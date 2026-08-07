@@ -107,11 +107,11 @@ class TrustedNetworkMonitor(
         if (config.enabled && config.homeSsids.isNotEmpty() && !hasLocationPermission()) {
             if (!notifiedNoLocation) {
                 usage.log("network", "Trusted Network Mode idle — location permission needed to read your Wi-Fi name")
-                notifier.notifySecurity(
-                    id = 7611,
-                    title = "Trusted Network Mode needs location",
-                    body = "Grant Pulse location access so it can tell your home Wi-Fi from others. Until " +
+                notifier.notifyUrgentLine(
+                    headline = "Trusted Network Mode needs location",
+                    detail = "Grant LCARS location access so it can tell your home Wi-Fi from others. Until " +
                         "then it won't change your Wi-Fi.",
+                    key = "tnm:location",
                 )
                 notifiedNoLocation = true
             }
@@ -142,13 +142,13 @@ class TrustedNetworkMonitor(
             usage.log("network", "Wi-Fi $verb applied (Trusted Network Mode)")
             notifiedUnprovisioned = false
         } else {
-            usage.log("network", "Wi-Fi $verb skipped — Pulse is not a Device Owner")
+            usage.log("network", "Wi-Fi $verb skipped — LCARS is not a Device Owner")
             if (notifyWhenUnprovisioned && !notifiedUnprovisioned) {
-                notifier.notifySecurity(
-                    id = 7610,
-                    title = "Trusted Network Mode needs Device Owner",
-                    body = "Pulse wanted to $verb Wi-Fi but can't toggle the radio until it's provisioned " +
+                notifier.notifyUrgentLine(
+                    headline = "Trusted Network Mode needs Device Owner",
+                    detail = "LCARS wanted to $verb Wi-Fi but can't toggle the radio until it's provisioned " +
                         "as a Device Owner. See Settings → Security for the one-time setup.",
+                    key = "tnm:provision",
                 )
                 notifiedUnprovisioned = true
             }

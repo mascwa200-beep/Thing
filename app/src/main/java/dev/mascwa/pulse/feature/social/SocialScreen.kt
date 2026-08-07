@@ -12,8 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,9 +31,9 @@ import dev.mascwa.pulse.data.social.SocialItem
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.PipChip
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -46,7 +45,7 @@ fun SocialScreen(vm: SocialViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Social",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         SocialBody(vm, Modifier.padding(innerPadding))
@@ -66,7 +65,7 @@ fun SocialBody(vm: SocialViewModel, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SocialTab.entries.forEach { t ->
-                PipChip(t.label, selected = t == tab, onClick = { vm.select(t) })
+                LcarsChip(t.label, selected = t == tab, onClick = { vm.select(t) })
             }
         }
         PullToRefreshBox(isRefreshing = false, onRefresh = { vm.refresh() }) {
@@ -116,16 +115,16 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
             ) {
                 if (async.stale) item { StaleBanner(true) }
                 if (data.tags.isNotEmpty()) {
-                    item { PipHeader("Trending tags") }
+                    item { LcarsHeaderBar("Trending tags") }
                     item {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             data.tags.forEach { tag ->
-                                PipChip("#${tag.name}", selected = false, onClick = { openUrl(context, tag.url) },
+                                LcarsChip("#${tag.name}", selected = false, onClick = { openUrl(context, tag.url) },
                                     modifier = Modifier.padding(bottom = 8.dp))
                             }
                         }
                     }
-                    item { PipHeader("Trending posts") }
+                    item { LcarsHeaderBar("Trending posts") }
                 }
                 items(data.statuses.distinctBy { it.url }, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
             }
@@ -136,7 +135,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
 @Composable
 private fun ItemRow(item: SocialItem, onClick: () -> Unit) {
     val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
+    LcarsFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
         Column {
             Text(item.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
             Text("${item.source} · ${item.meta}", fontFamily = JetBrainsMono, fontSize = 10.sp,

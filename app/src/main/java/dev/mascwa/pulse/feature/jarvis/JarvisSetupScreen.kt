@@ -24,8 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -47,8 +46,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.jarvis.matrix.ActiveMatrixService
 import dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService
 import dev.mascwa.pulse.core.util.openUrl
@@ -139,10 +140,10 @@ fun JarvisSetupScreen(
     ) { granted -> if (granted) enableWakeWord() }
 
     PulseScaffold(
-        title = "J.A.R.V.I.S. SETUP",
+        title = "COMPUTER SETUP",
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.ink)
+                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
             }
         },
     ) { innerPadding ->
@@ -160,8 +161,8 @@ fun JarvisSetupScreen(
                 cloudLabel = if (cloudEnabled && cloudApiKey.isNotBlank()) cloudProvider.label else null,
             )
 
-            // ---- Console controls (moved out of the J.A.R.V.I.S. top bar to declutter it) ----
-            FieldLabel("CONSOLE  ·  J.A.R.V.I.S. controls")
+            // ---- Console controls (moved out of the Computer top bar to declutter it) ----
+            FieldLabel("CONSOLE  ·  Computer controls")
             NeonPanel {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -277,7 +278,7 @@ fun JarvisSetupScreen(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
-            FieldLabel("CHARTER  ·  J.A.R.V.I.S.'s personality, prepended to every prompt")
+            FieldLabel("CHARTER  ·  the Computer's personality, prepended to every prompt")
             MonoFieldArea(
                 charter, vm::onCharterChange,
                 "Leave blank for the built-in persona, or describe the character you want: tone, how it " +
@@ -292,7 +293,7 @@ fun JarvisSetupScreen(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
-            FieldLabel("STATUS-FEED FOCUS  ·  what J.A.R.V.I.S. briefs on the home HUD")
+            FieldLabel("STATUS-FEED FOCUS  ·  what the Computer briefs on the home HUD")
             MonoField(feedTopic, vm::onFeedTopicChange, "a project, a topic, \"device health\"…")
             Text(
                 "Shown as a quick summary on the home status feed — never your chat. Leave blank for just " +
@@ -302,18 +303,18 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "AUTONOMOUS CURIOSITY",
-                subtitle = "Let J.A.R.V.I.S. research your standing interests + his own curiosities in the " +
+                subtitle = "Let the Computer research your standing interests + its own curiosities in the " +
                     "background (~every 4h) and bring you findings with a notification. Needs cloud chat on — " +
                     "it spends your provider credits — so it's off by default. Set standing orders with " +
-                    "\"keep an eye on …\"; he also investigates the device itself.",
+                    "\"keep an eye on …\"; it also investigates the device itself.",
                 enabled = autonomousCuriosity,
                 onToggle = vm::setAutonomousCuriosity,
             )
 
-            FieldLabel("CURIOSITY  ·  J.A.R.V.I.S. attentiveness")
+            FieldLabel("CURIOSITY  ·  Computer attentiveness")
             CuriositySelector(selected = curiosityLevel, onSelect = vm::setCuriosityLevel)
             Text(
-                "J.A.R.V.I.S. always pays close attention and remembers what matters. It asks rarely and " +
+                "The Computer always pays close attention and remembers what matters. It asks rarely and " +
                     "only at natural lulls — one courteous, anticipatory question to confirm something it " +
                     "inferred, reflected back before it's saved (manage facts in MEMORY). Higher = deeper " +
                     "attention and better-timed questions, NOT more of them; the rate is hard-capped. " +
@@ -322,7 +323,7 @@ fun JarvisSetupScreen(
             )
             if (curiosityLevel >= 4) {
                 Text(
-                    "⚠ MAX removes the rate cap — frequent questions that break the J.A.R.V.I.S. character. " +
+                    "⚠ MAX removes the rate cap — frequent questions that break the Computer's character. " +
                         "Use LOW/MED/HIGH for the intended, restrained feel.",
                     fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.magenta,
                 )
@@ -330,7 +331,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "VOICE REPLIES",
-                subtitle = "Speak J.A.R.V.I.S. replies aloud with the device's on-device " +
+                subtitle = "Speak Computer replies aloud with the device's on-device " +
                     "text-to-speech. No cloud voices. Honest no-op if no TTS engine is installed.",
                 enabled = voiceReplies,
                 onToggle = vm::setVoiceReplies,
@@ -338,7 +339,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "ACTIVE-MATRIX",
-                subtitle = "Keep J.A.R.V.I.S. resident in the background and surface proactive, " +
+                subtitle = "Keep the Computer resident in the background and surface proactive, " +
                     "on-device remarks in an ongoing notification.",
                 enabled = resident,
                 onToggle = { on ->
@@ -381,7 +382,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "CONVERSATION MODE",
-                subtitle = "Let J.A.R.V.I.S. decide from the conversation whether to keep talking — it " +
+                subtitle = "Let the Computer decide from the conversation whether to keep talking — it " +
                     "stays listening when it expects a reply and tells you when it's wrapping up. You " +
                     "can stop anytime (\"stop\" / \"that's all\"). Implies follow-up.",
                 enabled = conversationMode,
@@ -408,7 +409,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "GLASSES HUD",
-                subtitle = "Show a glanceable J.A.R.V.I.S. HUD (clock, brief, latest reply) on connected " +
+                subtitle = "Show a glanceable Computer HUD (clock, brief, latest reply) on connected " +
                     "display glasses or an external/wireless screen, while the app is open. Off by default; " +
                     "appears only when an external display is detected.",
                 enabled = glassesHud,
@@ -417,7 +418,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "VITALS · BLE HEART-RATE",
-                subtitle = "Pair a Bluetooth heart-rate strap. J.A.R.V.I.S. checks in if your heart " +
+                subtitle = "Pair a Bluetooth heart-rate strap. The Computer checks in if your heart " +
                     "rate spikes without movement. Honest no-op when no strap is connected.",
                 enabled = vitals,
                 onToggle = { on ->
@@ -434,7 +435,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "AGENT TOOLS",
-                subtitle = "Let J.A.R.V.I.S. use tools — web search/fetch, read-only GitHub repos, " +
+                subtitle = "Let the Computer use tools — web search/fetch, read-only GitHub repos, " +
                     "device state, and durable memory — in a short reasoning loop. Slower, and " +
                     "best-effort on the small on-device model.",
                 enabled = agentTools,
@@ -443,7 +444,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "SELF-EDIT (PROPOSE-ONLY)",
-                subtitle = "Let J.A.R.V.I.S. PROPOSE changes to its own persona, knowledge and tools, " +
+                subtitle = "Let the Computer PROPOSE changes to its own persona, knowledge and tools, " +
                     "plus research. Nothing is applied until you tap APPROVE in the Approvals screen — " +
                     "even web/repo content can never change anything on its own. Requires Agent Tools.",
                 enabled = selfEditEnabled,
@@ -469,7 +470,7 @@ fun JarvisSetupScreen(
 
             SettingToggle(
                 title = "AUTONOMOUS SELF-CODING",
-                subtitle = "One switch, full loop: tell J.A.R.V.I.S. to build a real feature (\"add a … " +
+                subtitle = "One switch, full loop: tell the Computer to build a real feature (\"add a … " +
                     "feature\", \"read your own code\") and it plans the files, opens a PR, lets CI test it, " +
                     "and — once green — merges it; you just install the update. No per-change approval. " +
                     "Needs the write-scoped GitHub token above. Its safety gate, CI and signing stay " +
@@ -479,12 +480,12 @@ fun JarvisSetupScreen(
                 onToggle = vm::setSelfCoding,
             )
 
-            FieldLabel("KNOWLEDGE BASE  ·  on-device docs J.A.R.V.I.S. searches for answers")
+            FieldLabel("KNOWLEDGE BASE  ·  on-device docs the Computer searches for answers")
             NeonPanel {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "$knowledgeDocs docs · $knowledgeChunks chunks indexed. Load reference docs " +
-                            "(e.g. language notes, API docs) and J.A.R.V.I.S. retrieves the relevant " +
+                            "(e.g. language notes, API docs) and the Computer retrieves the relevant " +
                             "bits into its answers. This is retrieval, not training — stays on-device.",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                     )
@@ -609,8 +610,8 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
         MODEL_PRESETS.forEach { preset ->
             Column(
                 Modifier
-                    .border(1.dp, c.lineSoft, RoundedCornerShape(6.dp))
-                    .background(c.muted.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                    .border(1.dp, c.lineSoft, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(c.muted.copy(alpha = 0.05f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onPick(preset.url) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -631,8 +632,8 @@ private fun BackendSelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -679,8 +680,8 @@ private fun CuriositySelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -699,8 +700,8 @@ private fun CloudProviderSelector(selected: CloudProvider, onSelect: (CloudProvi
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(provider) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -720,8 +721,8 @@ private fun MaxTokensSelector(selected: Int, onSelect: (Int) -> Unit) {
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(value) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -740,8 +741,8 @@ private fun ChatFormatSelector(selected: ChatFormat, onSelect: (ChatFormat) -> U
             val tint = if (on) c.accent else c.muted
             Box(
                 Modifier
-                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), RoundedCornerShape(6.dp))
-                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), RoundedCornerShape(6.dp))
+                    .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                    .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(format) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -859,8 +860,8 @@ private fun NeonButton(text: String, enabled: Boolean, color: Color, onClick: ()
     val tint = if (enabled) color else Pulse.colors.muted
     Box(
         Modifier
-            .border(1.dp, tint.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-            .background(tint.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+            .border(1.dp, tint.copy(alpha = 0.6f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(tint.copy(alpha = 0.08f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {

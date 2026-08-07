@@ -22,8 +22,8 @@ object AppShortcuts {
     fun install(context: Context) {
         runCatching {
             val shortcuts = listOf(
-                shortcut(context, "oracle", "Oracle", "J.A.R.V.I.S. Oracle — what matters now", Routes.ORACLE, R.drawable.ic_shortcut_jarvis),
-                shortcut(context, "jarvis", "J.A.R.V.I.S.", "Ask J.A.R.V.I.S.", Routes.JARVIS, R.drawable.ic_shortcut_jarvis),
+                shortcut(context, "oracle", "Oracle", "Computer Oracle — what matters now", Routes.ORACLE, R.drawable.ic_shortcut_jarvis),
+                shortcut(context, "jarvis", "Computer", "Ask the Computer", Routes.JARVIS, R.drawable.ic_shortcut_jarvis),
                 shortcut(context, "markets", "Markets", "Markets", Routes.MARKETS, R.drawable.ic_shortcut_markets),
                 shortcut(context, "nav", "Navigate", "Navigation map", Routes.NAV, R.drawable.ic_shortcut_nav),
                 shortcut(context, "sos", "SOS", "Emergency SOS", Routes.SOS, R.drawable.ic_shortcut_sos),

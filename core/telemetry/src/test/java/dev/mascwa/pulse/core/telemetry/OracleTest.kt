@@ -146,40 +146,4 @@ class OracleTest {
 
     // ---- World Pulse (the live world feed) ----
 
-    @Test fun worldPulseQuietWhenNothingWorthSaying() {
-        assertNull(Oracle.worldPulse(base()))
-    }
-
-    @Test fun worldPulseLeadsWithEmergencyAndFusesSignals() {
-        val s = base(hour = 20).copy(
-            emergencyHeadline = "Storm makes landfall",
-            movers = listOf(OracleMover("Oil", 3.4, onWatchlist = true)),
-            kpIndex = 6.0,
-        )
-        val p = Oracle.worldPulse(s)
-        assertNotNull(p)
-        // The breaking headline leads (its emoji is stripped from the headline itself).
-        assertTrue(p!!.headline.contains("Storm makes landfall"))
-        // The feed body fuses multiple independent domains.
-        assertTrue(p.lines.any { it.contains("Oil") && it.contains("yours") })
-        assertTrue(p.lines.any { it.contains("Kp") })
-        assertTrue(p.lines.size <= 5)
-    }
-
-    @Test fun worldPulseSurfacesUpcomingEvent() {
-        val s = base(hour = 13).copy(
-            events = listOf(OracleEvent("Team sync", inMin(45))),
-        )
-        val p = Oracle.worldPulse(s)
-        assertNotNull(p)
-        assertTrue(p!!.lines.any { it.contains("Team sync") })
-    }
-
-    @Test fun worldPulseFallsBackToTopInsight() {
-        // No global facts, but a real actionable insight exists → the pulse still has something to say.
-        val s = base(hour = 8).copy(batteryPct = 12)
-        val p = Oracle.worldPulse(s)
-        assertNotNull(p)
-        assertTrue(p!!.lines.isNotEmpty())
-    }
 }

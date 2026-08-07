@@ -2,13 +2,15 @@ package dev.mascwa.pulse.data.survival
 
 import java.io.File
 import kotlinx.serialization.json.Json
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
 /**
  * Validates every bundled `assets/survival/guides*.json` file the same way
- * [SurvivalContentRepository.guides] loads them at runtime — decodes each file independently, then builds
+ * [SurvivalContentRepository.index]/[SurvivalContentRepository.guide] load them at runtime — decodes each
+ * file independently, then builds
  * the full merged catalog and checks the invariants the Knowledge Base authoring pipeline promises. Before
  * this test existed, CI never decoded the guide catalog at all: a malformed JSON asset would have shipped
  * green. Plain JVM test (no Android/Robolectric needed) — [GuideModels] is pure kotlinx.serialization.
@@ -24,6 +26,12 @@ class GuidesJsonValidationTest {
         "Movement", "Navigation", "Nutrition", "Physics", "Preparedness", "Psychology", "Reference", "Rescue",
         "Skills", "Sustenance", "Weather",
         "Cooking — Food Safety",
+        // The 10,000-topic ontology's added categories (tools/kb/topic_manifest.json is the topic ledger).
+        "Energy & Environment", "Sports & Fitness", "Electronics", "Home & Repair", "Agriculture & Gardening",
+        "Vehicles & Transport", "Cooking — Techniques", "History", "Philosophy", "Religion & Mythology",
+        "Literature & Writing", "Language & Linguistics", "Society & Culture", "Archaeology & Anthropology",
+        "Law & Government", "Education & Learning", "Music", "Visual Arts & Design", "Games & Recreation",
+        "Media & Communication", "Business & Finance", "Economics",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
@@ -120,5 +128,87 @@ class GuidesJsonValidationTest {
         if (errors.isNotEmpty()) {
             fail("guides*.json validation failed (${errors.size} issue(s)):\n" + errors.joinToString("\n") { "  - $it" })
         }
+    }
+
+    /** Every category in [knownCategories] must have a supergroup mapping in [CATEGORY_SUPERGROUP] — an
+     *  omission would silently drop that category's guides into the [OTHER] fallback bucket in the browse
+     *  rail instead of a real supergroup. */
+    @Test fun everyKnownCategoryHasASupergroup() {
+        val unmapped = knownCategories.filter { it !in CATEGORY_SUPERGROUP }
+        assertTrue(
+            "These categories have no GuideTaxonomy.CATEGORY_SUPERGROUP mapping: $unmapped",
+            unmapped.isEmpty(),
+        )
+    }
+
+    /** `guide_index.json` (the small always-loaded catalog index the lazy loader relies on) must stay in
+     *  lockstep with the shards — editing content without re-running `tools/kb/kb_pipeline.py` fails here
+     *  instead of silently serving a stale index on-device. */
+    @Test fun indexStaysInLockstepWithShards() {
+        val indexFile = File(survivalAssetsDir(), "guide_index.json")
+        assertTrue("guide_index.json missing — run tools/kb/kb_pipeline.py", indexFile.isFile)
+        val index = json.decodeFromString(GuideIndex.serializer(), indexFile.readText()).entries
+        val guidesByFile = guideFiles().associate { f ->
+            f.name to json.decodeFromString(GuideBook.serializer(), f.readText()).guides
+        }
+        val allGuides = guidesByFile.values.flatten()
+        assertEquals(
+            "index entry count != guide count — re-run tools/kb/kb_pipeline.py",
+            allGuides.size, index.size,
+        )
+        val byId = allGuides.associateBy { it.id }
+        val errors = mutableListOf<String>()
+        for (e in index) {
+            val g = byId[e.id]
+            if (g == null) {
+                errors += "index entry '${e.id}' has no matching guide"
+                continue
+            }
+            if (e.title != g.title || e.category != g.category || e.summary != g.summary) {
+                errors += "index entry '${e.id}' drifted from its guide (title/category/summary)"
+            }
+            if (e.headings != g.sections.map { it.heading }) {
+                errors += "index entry '${e.id}' headings drifted from its guide's sections"
+            }
+            val shard = guidesByFile[e.file]
+            if (shard == null || shard.none { it.id == e.id }) {
+                errors += "index entry '${e.id}' points at '${e.file}' which doesn't contain it"
+            }
+        }
+        if (errors.isNotEmpty()) {
+            fail("guide_index.json is out of lockstep (${errors.size} issue(s)) — re-run tools/kb/kb_pipeline.py:\n" +
+                errors.joinToString("\n") { "  - $it" })
+        }
+    }
+
+    /** The Knowledge Base's official growth metric: a FULL PAGE = one section whose body+ingredients+steps
+     *  reach [FULL_PAGE_WORDS] words (about one printed page). The standing target is 10,000+; this only
+     *  ever ratchets UP — bump [FULL_PAGE_BASELINE] as content waves land, never down. */
+    @Test fun fullPageCountNeverRegresses() {
+        val guides = guideFiles().flatMap { f ->
+            json.decodeFromString(GuideBook.serializer(), f.readText()).guides
+        }
+        val fullPages = guides.sumOf { g -> g.sections.count { sectionWords(it) >= FULL_PAGE_WORDS } }
+        println("KB FULL PAGES (>=$FULL_PAGE_WORDS words): $fullPages / 10,000 target")
+        assertTrue(
+            "Full-page count regressed: $fullPages < $FULL_PAGE_BASELINE — Knowledge Base content must only grow",
+            fullPages >= FULL_PAGE_BASELINE,
+        )
+    }
+
+    /** Whitespace-token count over body + ingredients + steps — kept algorithm-identical to
+     *  tools/kb/kb_pipeline.py's `section_words` so the two report the same number. */
+    private fun sectionWords(s: GuideSection): Int {
+        var text = s.body
+        s.ingredients?.let { text += " " + it.joinToString(" ") }
+        s.steps?.let { text += " " + it.joinToString(" ") }
+        return text.split(Regex("\\s+")).count { it.isNotBlank() }
+    }
+
+    private companion object {
+        const val FULL_PAGE_WORDS = 400
+
+        /** Measured after Wave B1 complete (238 guides · 2,902 sections). Ratchet upward as waves land. */
+        const val FULL_PAGE_BASELINE = 1614
     }
 }

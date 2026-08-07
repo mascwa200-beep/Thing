@@ -54,10 +54,33 @@ object NewsExplainers {
     /** What the BUZZ meter means and its honest limits — it's a local overlap check, not a live count. */
     fun buzz(level: BuzzLevel): Explainer = Explainer(
         "BUZZ — ${level.label.lowercase()}",
-        "This isn't a live count of mentions anywhere — Pulse doesn't send this story to any server to ask. " +
+        "This isn't a live count of mentions anywhere — LCARS doesn't send this story to any server to ask. " +
             "It's a local check: how many of the Lemmy / Hacker News / Mastodon posts already loaded in your " +
             "SOCIAL tabs this session share this story's own topic tags or a trending hashtag. A quiet reading " +
             "can just mean nobody on those three platforms happened to post about it recently, not that no " +
             "one anywhere is talking about it.",
     )
+
+    /** What the MARKET REACTION strip means and its honest limits — a headline-reading heuristic, not advice. */
+    fun market(impact: ImpactLevel, links: List<MarketLink>): Explainer {
+        val coverage = if (links.isEmpty()) {
+            "No market ties were found in this story's own wording."
+        } else {
+            "This story's wording ties to: ${links.joinToString(", ") { it.market }}."
+        }
+        val headline = if (impact == ImpactLevel.NONE) {
+            "MARKET REACTION — what this measures"
+        } else {
+            "MARKET REACTION — ${impact.label.lowercase()} impact"
+        }
+        return Explainer(
+            headline,
+            "$coverage LCARS matches the headline's own words against a fixed list of ~40 markets and sectors, " +
+                "then reads whether the wording states or clearly implies a move up or down — the same " +
+                "\"reality moves the market\" read as Trading Places, done with keyword matching, not financial " +
+                "modeling. A ▲/▼ shown WITH a percentage is a real live quote; a bare ▲/▼ is only the heuristic " +
+                "direction. This is not financial advice — treat it as \"markets worth watching,\" never a " +
+                "signal to act on.",
+        )
+    }
 }

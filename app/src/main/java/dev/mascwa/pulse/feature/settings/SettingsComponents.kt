@@ -83,6 +83,34 @@ fun PrefSlider(
     }
 }
 
+/**
+ * A read-only row. Same layout as [PrefClickable] without the tap target, for facts the user needs to see
+ * but cannot act on — a dead `onClick = { }` invites a tap that does nothing, which reads as broken.
+ */
+@Composable
+fun PrefInfo(
+    title: String,
+    value: String? = null,
+    subtitle: String? = null,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (value != null) {
+            Text(value, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @Composable
 fun PrefClickable(
     title: String,

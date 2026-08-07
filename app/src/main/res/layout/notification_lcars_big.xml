@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one LCARS notification, expanded: an orange LCARS rail, then up to five rows — each a fixed-width
+     colour-block label column + one weighted, ellipsized plain-text line. Vertical LinearLayout of
+     horizontal LinearLayouts: overlap is impossible by construction. Unused rows are GONE-hidden by
+     LcarsNotificationRenderer, mirroring widget_lock.xml's proven pattern. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lcars_big_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- ImageView (unambiguously @RemoteView-whitelisted) rather than a bare View — a plain View has no
+         in-repo RemoteViews precedent and sits outside the documented supported-class list. -->
+    <ImageView
+        android:id="@+id/lcars_rule"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:layout_marginBottom="6dp"
+        android:importantForAccessibility="no"
+        android:background="@color/lcars_row_news" />
+
+    <LinearLayout
+        android:id="@+id/lcars_row1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/lcars_row1_tag"
+            android:layout_width="74dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:background="@drawable/lcars_tag_news" />
+        <TextView
+            android:id="@+id/lcars_row1_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/lcars_row2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/lcars_row2_tag"
+            android:layout_width="74dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:background="@drawable/lcars_tag_news" />
+        <TextView
+            android:id="@+id/lcars_row2_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/lcars_row3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/lcars_row3_tag"
+            android:layout_width="74dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:background="@drawable/lcars_tag_markets" />
+        <TextView
+            android:id="@+id/lcars_row3_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/lcars_row4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/lcars_row4_tag"
+            android:layout_width="74dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:background="@drawable/lcars_tag_weather" />
+        <TextView
+            android:id="@+id/lcars_row4_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/lcars_row5"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+        <TextView
+            android:id="@+id/lcars_row5_tag"
+            android:layout_width="74dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:background="@drawable/lcars_tag_agenda" />
+        <TextView
+            android:id="@+id/lcars_row5_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Compat.Notification" />
+    </LinearLayout>
+</LinearLayout>

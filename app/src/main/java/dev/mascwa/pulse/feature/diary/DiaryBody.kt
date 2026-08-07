@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -34,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.diary.DiaryEntry
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -56,8 +57,8 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- NEW ENTRY ----
-        PipHeader("New Entry")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("New Entry")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 DiaryField(title, { title = it }, "Title (optional)", c)
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -73,7 +74,7 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
                 }
                 Box(
                     Modifier.padding(top = 12.dp)
-                        .border(1.dp, c.accent, RoundedCornerShape(6.dp))
+                        .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                         .clickable {
                             if (title.isNotBlank() || body.isNotBlank()) {
                                 vm.add(title, body, mood)
@@ -97,11 +98,11 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
             )
         } else {
-            PipHeader("Journal", trailing = entries.size.toString())
+            LcarsHeaderBar("Journal", trailing = entries.size.toString())
             entries.forEach { entry -> EntryRow(entry, c) { vm.delete(entry.id) } }
             Box(
                 Modifier.padding(top = 14.dp, bottom = 28.dp)
-                    .border(1.dp, c.line, RoundedCornerShape(6.dp))
+                    .border(1.dp, c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { vm.clear() }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
@@ -144,9 +145,9 @@ private fun EntryRow(entry: DiaryEntry, c: NightwirePalette, onDelete: () -> Uni
 @Composable
 private fun MoodChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(6.dp))
+        Modifier.clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .background(if (selected) c.accent.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (selected) c.accent else c.line, RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) c.accent else c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .clickable { onClick() }
             .padding(horizontal = 11.dp, vertical = 6.dp),
     ) {
@@ -160,7 +161,7 @@ private fun MoodChip(label: String, selected: Boolean, c: NightwirePalette, onCl
 private fun DiaryField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette, single: Boolean = true) {
     Box(
         Modifier.fillMaxWidth()
-            .border(1.dp, c.line, RoundedCornerShape(4.dp))
+            .border(1.dp, c.line, lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart))
             .padding(horizontal = 10.dp, vertical = 9.dp),
     ) {
         if (value.isEmpty()) {

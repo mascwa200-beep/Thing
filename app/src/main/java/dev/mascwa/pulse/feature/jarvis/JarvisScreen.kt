@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AttachFile
@@ -110,10 +110,10 @@ fun JarvisScreen(
     }
 
     PulseScaffold(
-        title = "J.A.R.V.I.S.",
+        title = "COMPUTER",
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.ink)
+                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
             }
         },
         actions = {
@@ -129,7 +129,7 @@ fun JarvisScreen(
             }
             // Everything else (Approvals, Memory, Lockdown, Clear chat) now lives in Setup.
             IconButton(onClick = onOpenSetup) {
-                Icon(Icons.Filled.Tune, contentDescription = "J.A.R.V.I.S. settings", tint = c.sky)
+                Icon(Icons.Filled.Tune, contentDescription = "Computer settings", tint = c.sky)
             }
         },
     ) { innerPadding ->
@@ -154,11 +154,11 @@ fun JarvisScreen(
                         modifier = Modifier.size(208.dp),
                     )
                     Text(
-                        "J.A.R.V.I.S.",
+                        "COMPUTER",
                         fontFamily = JetBrainsMono, fontSize = 22.sp, letterSpacing = 9.sp, color = c.sky,
                     )
                     Text(
-                        "STARK HUD INTERFACE · ONLINE",
+                        "LCARS INTERFACE · ONLINE",
                         fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 3.sp, color = c.muted,
                     )
                 }
@@ -269,7 +269,7 @@ private fun StatusLine(state: EngineState, cloud: String?) {
         HudReactor(color = c.sky, accent = c.accent, active = live, modifier = Modifier.size(34.dp))
         Column {
             Text(
-                "J.A.R.V.I.S. // STARK HUD",
+                "COMPUTER // LCARS",
                 fontFamily = JetBrainsMono, fontSize = 7.sp, letterSpacing = 2.sp,
                 color = c.sky.copy(alpha = 0.65f),
             )
@@ -302,7 +302,7 @@ private fun Bubble(text: String, isUser: Boolean) {
         ) {
             Column {
                 Text(
-                    if (isUser) "YOU" else "J.A.R.V.I.S.",
+                    if (isUser) "YOU" else "COMPUTER",
                     fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.sp,
                     color = if (isUser) c.accent else c.sky,
                 )

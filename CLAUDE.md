@@ -1989,6 +1989,205 @@ signal domains and reasons ACROSS them to surface (and proactively push) the one
   **Open follow-ups (offered):** a prominent in-app nav button (Home/JARVIS) beyond the shortcut+push; an
   on-device LLM briefing that narrates the top insights; more rules (traffic/commute, sleep-debt, roaming).
 
+### News reaction-strip cleanup + Windows desktop port (Phase A) + Starfleet identity overhaul (Phase 1.1–1.5) + MOOD→blocky-segments (this session, dev branch `claude/loving-edison-bd65oa`)
+**News Slice 3 — reaction-strip cleanup:** the MOOD/COVERAGE/MARKET REACTION strips no longer stack open on
+every card. A single always-visible `InsightsTakeaway` line (mood + bias lean + buzz + market impact, one
+sentence, built by `insightsSummary()`) carries the at-a-glance read; tapping "◢ INSIGHTS" expands the full
+detail. Topic tags stay always-visible. Tapping any strip's header inside the expanded view opens a
+plain-English `ExplainerDialog` (new `NewsExplainers.market()` alongside the existing `mood()`/`bias()`/`buzz()`).
+
+**Windows desktop port — Phase A (foundation):** a new, structurally separate `desktop/` Gradle module
+(Kotlin/JVM + Compose Multiplatform 1.7.3, pinned for this repo's Kotlin 2.0.21 — confirmed against
+JetBrains' own compatibility guide, not assumed) — a window shell, a copy-adapted port of the LCARS
+palette/shape kit (`theme/{Color,Fonts,Theme,LcarsGeometry}.kt`, deliberately duplicated not shared via a
+real multiplatform source set on this first pass, per this repo's own convention going forward), and a
+JSON-file-backed `DesktopSettingsStore` (mirrors the Android app's DataStore-backed stores: in-memory
+authoritative state + Mutex + debounced flush). **Genuinely locally compiled** — this dev environment has
+Java 21 + Gradle 8.14.3 (no Android SDK, but a plain Kotlin/JVM module needs none) — `gradle :desktop:build`
+runs clean, the first locally-provable Kotlin/Compose change in this project's history (every Android change
+is CI-only/on-device-unverified). Hit and fixed two real bugs along the way: a classic Gradle multi-module
+plugin-classpath collision (root `build.gradle.kts` needed `kotlin.jvm`/`compose.multiplatform` also declared
+`apply false`, not just in `desktop/build.gradle.kts`, since `kotlin.jvm`/`kotlin.android` are different
+plugin IDs from the SAME `kotlin-gradle-plugin` jar), and this repo's own documented recurring bug (a literal
+`/*` inside a KDoc line opened a nested comment and ate the rest of the file). **Runtime rendering is NOT
+verified** — Skiko can't get a working GL context in this sandboxed container (reproduced identically across
+4 distinct attempts: default, forced Mesa software rendering, `--no-daemon`, explicit Xvfb `+extension GLX`)
+— same category of gap as "Filament can't render in CI." An adversarial review (which decompiled the actual
+Compose Desktop bytecode and empirically timed the real window-close path under Xvfb, 6 trials) found two
+real concurrency gaps in `DesktopSettingsStore` — both fixed + re-verified via a fresh local build:
+`onCloseRequest` now blocks briefly on save+flush before `exitApplication()` (was racing its unconditional
+`System.exit(0)`, safe today only by ~150ms of empirical margin, not by design — `saveInBackground` removed,
+it lost its only caller); `flush()`'s disk IO now runs inside the store's own mutex (was unguarded,
+unreachable with today's single call site but a real gap before Phase B adds a second one). New
+`.github/workflows/desktop-build.yml` (path-filtered to `desktop/**`, its own concurrency group, never
+touches `android-build.yml`). Also fixed an unrelated real `.gitignore` gap found along the way: `/build/`
+(leading slash) only ever covered the repo-root build dir, never `app/build/`/`core:telemetry/build/`/etc. —
+harmless before (every prior build was CI-only/ephemeral) but a real risk now that a local build genuinely
+runs here; changed to `build/` (matches at any depth). **Not yet started: Phase B** (News — the first full
+vertical, explicitly meant to launch with the already-shipped simplified reaction-strip design above, not
+the old stacked one).
+
+**Starfleet 2260s identity overhaul — Phase 1.1–1.5 shipped:** owner's ask: reskin the whole app as
+Starfleet-2260s-engineered, "money/storage isn't an issue." 1.1 `Theme.kt` unification (Material3
+`colorScheme` now mechanically derived from `lcarsPalette`, no drift possible). 1.2 new launcher icon (an
+original swept-block/elbow LCARS motif, no franchise assets). 1.3 boot sequence retheme (`BootScreen.kt`'s
+copy/wordmark rewritten from "ARGUS DYNAMICS black-ops" to a Starfleet ship-computer-coming-online framing;
+same proven animation machinery, content swap only). 1.4 user-facing rename pass (J.A.R.V.I.S.→"Computer"/
+"COMPUTER" across 17 files' screen titles/notification channels/widget/shortcut labels — deliberately
+leaves the wake-word-literal strings + all real wake-word matching logic untouched, that's Phase 2 work).
+1.5 stray-shape convergence (10 files' local `RoundedCornerShape` panel/button/chip/field shapes migrated
+onto the shared `lcarsBlockShape` primitive — NavScreen/JarvisSetupScreen/HabitatScreen/OracleScreen/
+HomeScreen/DiaryBody/RadioBody/SpotifyBody/BreakingNewsScreen/NotesBody; genuine circles/pill progress-bars
+deliberately left alone, verified by exact-count checks, not eyeballing). Every slice adversarially
+compile-reviewed clean before push. **Not yet started:** 1.6 (icon wave 1 — hand-drawn LCARS glyphs for the
+~20-30 highest-frequency stock Material icons, the largest remaining Phase 1 item), 1.7 (KB storage policy +
+bigger content wave), and all of Phase 2 (J.A.R.V.I.S.→Computer's real persona/voice/visual rework).
+
+**MOOD bar → blocky LCARS segments:** the News tab's smooth proportional `SegmentedMoodBar` is being
+replaced with `LcarsFillRow`-based solid blocks (real gaps between segments, the neutral/unfilled remainder
+rendered as a genuine dim `c.raise` block so magnitude — not just direction — stays visible, not a naive
+auto-normalizing fill). `LcarsFillRow` (in BOTH the Android `feature/common/LcarsGeometry.kt` and the
+desktop-kit mirror) gained an additive `gap: Dp = 0.dp` param, verified non-breaking for its one
+pre-existing caller (`GuidesScreen.kt`'s read-progress bar) and locally rebuilt clean on the desktop side.
+**Decision for desktop Phase B:** when the desktop News screen is eventually built, its MOOD read should
+reuse this same blocky-segment pattern (`LcarsFillRow(..., gap = 1.5.dp)` with the neutral remainder as a
+real segment) rather than a smooth bar — recorded here so this isn't re-litigated later.
+
+⚠️ All of the above's on-device/visual feel (the rename pass, the shape convergence, whether a 1.5dp gap
+reads as distinct blocks vs. noise at a 6dp bar height) is CI-compile-gated only — owner verifies on the Pixel.
+
+### THE FOUR-PART DIRECTIVE (this session, all shipped on `claude/loving-edison-bd65oa`, PR #425 open)
+Owner (verbatim): *"Rename the app to whatever the actual Star Trek computer was called. Make the
+notifications just one, and make it an LCARS stylized … news/market/weather/temp/agendas notification.
+Ensure that the knowledge library has over 10,000+ full pages … Also, the order of navigation via tabs …
+design it for the lowest common denominator."* Then escalated (verbatim, CURRENT standing directive):
+*"branch into 10,000+ topics with 10,000+ full pages of information, the full scope of the information,
+not a scrap or morsel missed."* Owner also decided via AskUserQuestion: the breaking-news takeover must be
+a REAL takeover ("display the whole ass screen … no matter what is happening on the phone", delete the
+separate THIS-JUST-IN notification), and the LCARS console screen: "Remove it".
+- **Part 1 — app rename → LCARS** (the actual Star Trek computer: Library Computer Access/Retrieval
+  System). Display strings ONLY — `applicationId`/packages/DataStore names/keystore aliases/provisioning
+  (`dev.mascwa.pulse.debug/…PulseDeviceAdminReceiver`) are identity/data contracts and did NOT change.
+- **Part 2 — ONE notification.** Pure `core:telemetry/UnifiedBrief.kt` (+20 JVM tests):
+  `UnifiedBriefComposer.compose(BriefSignals)` → headline + temp chip + ≤5 fixed-order rows
+  (ALERT/NEWS/MARKETS/WEATHER/AGENDA) + `BriefUrgency{ROUTINE,YELLOW,RED}` + a stable `urgencyKey`.
+  ONE fixed id (`NotifId.BRIEF=2300`) posted on TWO channels: silent `channel_brief` (MIN) for refreshes,
+  alerting `channel_brief_alert` (HIGH) only when `urgencyKey` is NEW (persisted `NotifyState.lastUrgentKey`,
+  burned only when it actually alerted) — same-id re-post replaces in place, interruptiveness follows the
+  posting channel. LCARS render via `DecoratedCustomViewStyle` + LinearLayout-only RemoteViews
+  (`notification_lcars[_big].xml`, `LcarsNotificationRenderer`; ImageView rail — bare `<View>` isn't
+  RemoteViews-whitelisted). `BriefEngine.publish(...)` gathers all signals (news/movers/weather/Kp/
+  calendar-on-IO/tasks/reminder-count) and is THE one publish path; `RefreshWorker` rewritten (silent passes
+  → opsNotice/safetyNotice/securityNotice signals feeding the board); 13 old channels deleted via a
+  `RETIRED` list; `Notifier` shrank to canPost/notifyBrief/notifyUrgentLine/cancelBrief/
+  notifyBreakingInterrupt + a first-post sweep keeping only {2300, FGS 7301/7311/4201, takeover 1003}.
+  NotificationPrefs pruned to master + 4 row toggles + threshold + urgent + takeover + quiet hours; Settings
+  section collapsed accordingly + a test button posting a full sample YELLOW board. **Real takeover:**
+  `TakeoverLauncher` — `Settings.canDrawOverlays` → direct `startActivity(BreakingNewsActivity)` (the
+  SYSTEM_ALERT_WINDOW grant exempts background launches; manifest re-gained the permission + a Settings
+  "Allow the takeover over other apps" grant row), else the full-screen-intent fallback. `notifyEmergency`
+  tier deleted. `Oracle.worldPulse` + its tests deleted (subsumed). ⚠️ Board tray render/buzz + the real
+  takeover are owner-verify on the Pixel (test button ships in Settings).
+- **Part 4 — flat navigation.** Bottom nav → HOME·NEWS·MARKETS·WEATHER·COMPUTER·MENU; new
+  `feature/menu/MenuScreen.kt` — a flat plain-English LCARS directory (EMERGENCY first, then GUIDES/MAPS &
+  SKY/SOUND/YOUR THINGS/INTERNET/SYSTEM), every destination one tap, nothing data-conditional. The LCARS
+  console (`PipBoyScreen`) + `FeedTabs`/`FeedTabBar` machinery DELETED; Radio/Music/Notes/Diary became real
+  routes (thin `PulseScaffold` wrappers); quests/sky/tacnet/inflation routes killed (legacy "tacnet"
+  deep-link → MENU). CI broke once — deleting `InflationScreen.kt` took down `InflationBody` which the
+  Markets hub embeds; fixed by restoring `InflationBody.kt` from git history minus the wrapper (cfd4dcd,
+  CI-green) + a full symbol sweep of all 7 deleted files. Home search icon → SEARCH, bell → ORACLE.
+- **Part 3 — KB scale infrastructure + the 10,000 engine.** "Full page" = a section with ≥400 words
+  (whitespace-token count over body+ingredients+steps, algorithm-identical Python/Kotlin — both report 119
+  today over 168 guides / 2,020 sections). Storage: per-category shards sub-sharded at 25 guides/file
+  (`guides_<slug>[_N].json`) + `guide_index.json` (id/title/category/summary/headings/file per guide;
+  deliberately not matching the `guides*.json` glob); `SurvivalContentRepository` = resident `index()` +
+  shard-lazy `guide(id)` (3-shard Mutex LRU) + **streamed `searchBodies()`** (raw-text reject per shard,
+  parse only on hit, discard — memory stays O(one shard) at any corpus size); the old parse-everything
+  `guides()` is GONE (GuidesScreen/SurviveHub search now run on the index + body-match stream).
+  CI: `GuidesJsonValidationTest` gained index-lockstep + a `FULL_PAGE_BASELINE` ratchet (bump upward as
+  waves land, never down) + 49 `knownCategories`. Taxonomy: 27 → **49 categories under 8 supergroups**
+  (added Humanities / Arts & Leisure / Work & Money; `GuideTaxonomy.CATEGORY_SUPERGROUP`, the CI test and
+  `tools/kb/build_manifest.py` KNOWN_CATEGORIES must stay in lockstep). **Ontology-first coverage:**
+  `tools/kb/topic_manifest.json` — an append-only ledger `{id tNNNNN, topic, category, guideId|null}`
+  built by `tools/kb/build_manifest.py <ontology-dir>` from the 22-domain enumeration workflow;
+  `kb_pipeline.py` auto-links bundled guides to topics by normalized title after every wave and prints
+  coverage; drafting waves work through `guideId==null` entries. `tools/kb/merge_expansions.py <wave-dir>`
+  merges Track-A expansion waves (strict-growth + unchanged-headings + image-preservation guards; agents'
+  stray original-copies auto-rejected by zero growth). **The engine is standing, multi-session work**:
+  ~10,000 topics ≈ 60× today's 168 guides (~25M+ words) — dispatch Workflow mega-waves against pending
+  manifest topics, merge via the pipeline, ratchet the baseline, commit per wave, repeat until covered.
+- **Notifier/worker call-site notes:** ActiveMatrixService/VitalsTrackingService/RadioService FGS
+  notifications restyled + kept mandatory; vitals check-in + trusted-network latch → `notifyUrgentLine`;
+  ReminderWorker fires through `BriefEngine.publish(reminderNow=...)` + an urgent line.
+  **Cross-module smart-cast trap** (recurring): a public `val` from `core:telemetry` can't smart-cast in
+  `:app` — hoist to a local `val` first (bit N3's `brief.urgencyKey`).
+
+### DESKTOP COMPANION + LAN REMOTE CONTROL — "AnyDesk minus the video" (this session, S1–S7 shipped)
+Owner: *"Focus on making the desktop version with a remote control system for both the mobile and Windows
+to turn on and off whenever, like anydesk but not necessary to make a video portion."* Three binding
+AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitHub relay); command scope =
+**app features only** (no device-policy levers); desktop scope = **remote control + finish News**.
+- **Why LAN-only dodged a trap:** `android-build.yml` triggers on `branches: ["**", "!debug-reports"]`, so a
+  GitHub-relay branch would have fired a full Android build **on every command**.
+- **S1 — pure protocol core (`core:telemetry/RemoteProtocol.kt`, + `RemoteProtocolTest` 26 cases, locally
+  kotlinc+JUnit green):** `RemoteCommand` (14-entry closed enum), `RemoteWire` (length-prefixed
+  `<len>:<value>|` framing — the SAME canonical encoding as `AuditLedger.Canonical`, so "sign what you send"
+  needs no separate canonicalizer; `:core:telemetry` has **no kotlinx.serialization dep**, which is why JSON
+  was not an option), `RemoteCrypto` (HKDF/HMAC/ECDH/AES-256-GCM, per-direction keys, sequence-derived
+  nonces), `Handshake`, `PairingProof`, `LocalNetwork.isLocalAddress`, `SequenceGuard`.
+  **Security shape:** one-time 6-digit code proven by HMAC over the handshake transcript (**the code itself
+  never crosses the wire**) → signed *ephemeral* ECDH (mutual auth + forward secrecy; the long-term Keystore
+  key stays `PURPOSE_SIGN`-only because StrongBox ECDH support varies) → AES-GCM records. Per-command ECDSA
+  deliberately omitted: redundant under GCM and a Keystore signature costs milliseconds.
+  **The load-bearing safety property is the closed allowlist** — the wire format cannot express arbitrary
+  execution. A test (`destructiveCapabilitiesAreNotInTheAllowlist`) asserts wipe/suspend/usb/lock/selfcode/
+  token/key/wifi stay absent, so a future addition trips CI.
+  ⚠️ **RFC 5869 trap hit + fixed:** an empty HKDF salt must become HashLen ZERO BYTES, not an empty HMAC key
+  (JCA throws "Empty key"). Caught only because the core runs locally.
+- **S2/S3 — Android link (`app/.../remote/`, PR on `claude/loving-edison-bd65oa`):** `RemoteIdentity`
+  (StrongBox-first P-256, mirrors `KeystoreLedgerSigner`'s alias/fallback), `RemoteServer` (ServerSocket,
+  one command per connection — no session table to leak, and a half-open socket from a phone that changed
+  networks costs nothing), `RemoteCommandExecutor` (a plain `when` over the enum — reading it IS the complete
+  capability list; every outcome audited through `SecretScrub`), `RemotePeers` (public SPKI only),
+  `RemoteActions`, `RemoteLinkService` (**`connectedDevice`** FGS). Settings → Security & network → "Remote
+  link" (master switch + Pair + paired fingerprints + Unpair all). Default OFF.
+  **Deliberately a dedicated service, not `ActiveMatrixService`** — that one is gated on
+  `jarvis.residentService`, and the link has to be independently switchable (literally the owner's ask).
+  Service running == link listening.
+  **No new secret enters `AppSettings`** (only public keys) → sidesteps `allSecretValues()` /
+  `SettingsBackup.redactSecrets` entirely.
+- **Compile-review findings applied (1 BLOCKER + 6 MAJOR):** `RadioStation` has no `id` (name/band/streamUrl
+  only) and favourites-only lookup could never match on a fresh phone → search `favoriteRadio +
+  DEFAULT_STATIONS`; **`dataSync`→`connectedDevice`** (on targetSdk 35 a `dataSync` FGS **cannot start from
+  BOOT_COMPLETED** and is 6h/24h capped — the boot revival would have silently never worked); `startForeground`
+  hoisted ABOVE the action branch (else `ForegroundServiceDidNotStartInTimeException`); `@Volatile` + a
+  `starting` latch + publish-before-`start()` (a leaked listener socket otherwise); `ACTION_UNPAIR` so
+  revocation reaches the LIVE in-memory peer snapshot; `MAX_CONCURRENT`+throttled refusal auditing (refusals
+  happen pre-auth, so an unthrottled flood = one ledger write per packet); `scope.cancel()` in `stop()`;
+  `synchronized` authorise/consume so two peers can't both burn one code.
+  **`SettingsBackup.merge` now preserves `remote = current.remote`** — paired keys are public, but the list
+  is an **authorization list**, and a restored backup must never silently re-admit an unpaired machine.
+  ⚠️ Also unified `RemotePeers` on `Handshake.b64` (unpadded) instead of `android.util.Base64` (padded) —
+  the two ends never compare these strings today, but one encoding per concept kills a bug class.
+- **S4–S7 — desktop:** `theme/LcarsControls.kt` (the kit had NO clickable primitive but `LcarsChip`),
+  `remote/RemoteProtocol.kt` (**byte-identical mirror below the package line** — verified by diff; the repo's
+  deliberate copy-not-share convention), `DesktopIdentity` (P-256 in PKCS12, hand-rolled X.509 DER),
+  `RemoteClient`, `feature/remote/RemoteScreen` (optimistic toggle → `refreshStatus()` snap-back),
+  the News vertical, and a `windows-latest` `packageMsi` job (jpackage is host-targeted — the ubuntu job
+  cannot produce an MSI).
+- **Verification:** protocol core 26/26 locally green; `gradle :desktop:build` genuinely green (the one real
+  local build in this repo). ⚠️ **End-to-end pairing over real Wi-Fi, the FGS lifecycle, and the StrongBox
+  identity key are owner-verify — two real machines are the only proof.** Owner checklist: Settings → Remote
+  link ON → Pair → read the code + address from the notification → enter on the desktop → toggle something →
+  confirm the audit ledger recorded it.
+- **Honest limit:** away-from-home access needs the GitHub-relay transport. The protocol is
+  transport-agnostic, so it slots in behind the same interface if the owner ever wants it.
+
+### KB engine state (task #73, standing)
+**238 guides · 2,902 sections · 1,614 full pages** (was 1,310); manifest **70 / 14,490 topics covered**.
+Wave B1 fully merged. `FULL_PAGE_BASELINE = 1614`. Next wave: `select_wave.py` → drafting fan-out →
+`merge_new_guides.py` → `kb_pipeline.py` (must print CLEAN) → ratchet → one commit.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

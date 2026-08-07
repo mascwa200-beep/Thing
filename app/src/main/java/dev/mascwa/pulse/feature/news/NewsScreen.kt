@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,12 +66,12 @@ fun NewsScreen(vm: NewsViewModel) {
                                 searchActive = false
                                 searchText = ""
                                 vm.clearSearch()
-                            }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                            }) { Icon(LcarsIcons.ArrowBack, "Back") }
                         },
                         trailingIcon = {
                             if (searchText.isNotEmpty()) {
                                 IconButton(onClick = { searchText = "" }) {
-                                    Icon(Icons.Filled.Close, "Clear")
+                                    Icon(LcarsIcons.Close, "Clear")
                                 }
                             }
                         },
@@ -95,7 +92,7 @@ fun NewsScreen(vm: NewsViewModel) {
                         title = { Text(if (state.searchMode) "Results: ${state.query}" else "News") },
                         actions = {
                             IconButton(onClick = { searchActive = true }) {
-                                Icon(Icons.Filled.Search, "Search")
+                                Icon(LcarsIcons.Search, "Search")
                             }
                         },
                     )
@@ -144,6 +141,8 @@ fun NewsScreen(vm: NewsViewModel) {
                                 onNeedsAnalysis = vm::ensureAnalyzed,
                                 coverage = coverageByUrl[article.url],
                                 onNeedsCoverage = vm::ensureCoverage,
+                                socialTitles = state.socialTitles,
+                                trendTagNames = state.trendTagNames,
                             )
                         }
                     }

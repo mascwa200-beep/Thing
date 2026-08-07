@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
@@ -39,9 +39,9 @@ import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.places.PlaceCategory
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.PipChip
-import dev.mascwa.pulse.feature.common.PipFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
@@ -61,7 +61,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Nearest Help",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
@@ -71,7 +71,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PlaceCategory.entries.forEach { cat ->
-                    PipChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
+                    LcarsChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
                 }
             }
             val res = state.result
@@ -113,7 +113,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
 @Composable
 private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
     val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(place.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
@@ -134,7 +134,7 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
 @Composable
 private fun PermissionPrompt(onGrant: () -> Unit) {
     val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth().padding(16.dp)) {
+    LcarsFrame(Modifier.fillMaxWidth().padding(16.dp)) {
         Column {
             Text("Location needed", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink)
             Text("Grant location to find the nearest hospitals, shelters and more.",

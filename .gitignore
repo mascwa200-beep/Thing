@@ -1,9 +1,16 @@
 *.iml
 .gradle/
+# Gradle's own Kotlin-compiler-daemon/session working directory at the repo root — same root cause as the
+# build/ rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
+.kotlin/
 /local.properties
 /.idea/
 .DS_Store
-/build/
+# No leading slash — matches every module's build/ dir (app/build/, core/telemetry/build/,
+# desktop/build/, …), not just one at the repo root. Never actually bit anything before this
+# session because every prior build ran on an ephemeral CI runner; now that a local Kotlin/JVM
+# build (:desktop) genuinely runs here too, an unscoped rule is the correct fix, not a one-off.
+build/
 /captures/
 .externalNativeBuild/
 .cxx/
@@ -18,3 +25,4 @@ local.defaults.properties
 # user's settings + downloaded model) instead of forcing an uninstall. Debug keys are not
 # secret (well-known password "android"); this is safe to commit.
 !/app/debug.keystore
+tools/kb/.next_wave.json

@@ -11,7 +11,6 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import dev.mascwa.pulse.navigation.LocalFeedTabs
 
 /**
  * Standard per-screen scaffold. The host (PulseApp) owns the bottom navigation
@@ -33,22 +32,14 @@ fun PulseScaffold(
         modifier = if (scrollBehavior != null)
             modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else modifier,
         topBar = {
-            androidx.compose.foundation.layout.Column {
-                val feedTabs = LocalFeedTabs.current
-                when {
-                    topBarOverride != null -> topBarOverride()
-                    // Feed screens get the LCARS header so the whole TOOLS top chrome
-                    // (header + tabs) reads as one CRT terminal panel, not a Material bar over a green strip.
-                    feedTabs != null -> PipBoyHeader(title, navigationIcon, actions)
-                    else -> TopAppBar(
-                        title = { Text(title) },
-                        navigationIcon = navigationIcon,
-                        actions = actions,
-                        scrollBehavior = scrollBehavior,
-                    )
-                }
-                // LCARS feed tabs — only on feed screens (LocalFeedTabs set by PulseApp).
-                feedTabs?.let { FeedTabBar(it) }
+            when {
+                topBarOverride != null -> topBarOverride()
+                else -> TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = navigationIcon,
+                    actions = actions,
+                    scrollBehavior = scrollBehavior,
+                )
             }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),

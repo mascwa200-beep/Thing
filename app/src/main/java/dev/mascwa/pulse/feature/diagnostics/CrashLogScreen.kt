@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
@@ -51,7 +51,7 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
         title = "CRASH LOG",
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = c.ink)
+                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
             }
         },
         actions = {
@@ -168,7 +168,7 @@ private fun share(context: android.content.Context, text: String) {
     if (text.isBlank()) return
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Pulse crash report")
+        putExtra(Intent.EXTRA_SUBJECT, "LCARS crash report")
         putExtra(Intent.EXTRA_TEXT, text)
     }
     runCatching { context.startActivity(Intent.createChooser(send, "Share crash report")) }

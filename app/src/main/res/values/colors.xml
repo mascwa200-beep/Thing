@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- NIGHTWIRE shell colours (Compose drives the live palette at runtime). -->
-    <color name="nw_void">#05070D</color>
+    <!-- NIGHTWIRE shell colours (Compose drives the live palette at runtime). Matches lcarsPalette.void
+         exactly (pure black) so the earliest-visible frame (window/splash background, launcher icon) is
+         consistent with the in-app LCARS palette, not the retired cyberpunk one. -->
+    <color name="nw_void">#000000</color>
     <color name="nw_accent">#2DE2E6</color>
-    <color name="ic_launcher_background">#05070D</color>
-    <!-- Cyberpunk 2077 notification palette -->
-    <color name="cp_yellow">#FCEE0A</color>
-    <color name="cp_red">#FF2A3C</color>
-    <color name="cp_bg">#0A0D12</color>
-    <color name="cp_ink">#E8FF6A</color>
-    <color name="cp_dim">#8A9BA8</color>
+    <color name="ic_launcher_background">#000000</color>
+    <!-- LCARS notification alert-condition colours — the Star Trek red-alert/yellow-alert convention.
+         lcars_condition_routine matches LcarsPalette.accent exactly (the app's real in-app LCARS orange);
+         the other two are purpose-built for glanceable notification-tray legibility at small size. -->
+    <color name="lcars_condition_routine">#FF9C42</color>
+    <color name="lcars_condition_yellow">#FFCC42</color>
+    <color name="lcars_condition_red">#FF3B30</color>
+    <!-- The one-notification board's per-row tag colours — the real in-app LcarsPalette tokens
+         (accent/amber/sky/violet) so the notification and the app speak the same LCARS dialect. -->
+    <color name="lcars_row_news">#FF9C42</color>
+    <color name="lcars_row_markets">#FFCC99</color>
+    <color name="lcars_row_weather">#9999FF</color>
+    <color name="lcars_row_agenda">#CC99CC</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +47,8 @@ import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.breaking.BreakingCoverage
 import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.Article
+import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import java.text.SimpleDateFormat
@@ -201,7 +202,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
         fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
         color = if (selected) Color.White else INK2,
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart))
             .background(if (selected) RED else PANEL)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -212,7 +213,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun CoverageRow(a: Article, trusted: Boolean, onOpenUrl: (String) -> Unit) {
     Column(
         Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
             .background(PANEL)
             .clickable { if (a.url.isNotBlank()) onOpenUrl(a.url) }
             .padding(12.dp),
@@ -221,7 +222,7 @@ private fun CoverageRow(a: Article, trusted: Boolean, onOpenUrl: (String) -> Uni
             if (trusted) {
                 Text("✔ TRUSTED", fontFamily = JetBrainsMono, fontSize = 7.sp, fontWeight = FontWeight.Bold,
                     color = Color(0xFF35C46A),
-                    modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFF35C46A).copy(alpha = 0.14f))
+                    modifier = Modifier.clip(lcarsBlockShape(sweep = 3.dp, corner = LcarsCorner.TopStart)).background(Color(0xFF35C46A).copy(alpha = 0.14f))
                         .padding(horizontal = 4.dp, vertical = 1.dp))
                 Spacer(Modifier.width(6.dp))
             }
@@ -259,7 +260,7 @@ private fun SourcesList(d: BreakingCoverage, onOpenUrl: (String) -> Unit) {
         items(ordered, key = { it }) { src ->
             val lead = leadBySource[src]
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(PANEL)
+                Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)).background(PANEL)
                     .clickable { lead?.url?.takeIf { it.isNotBlank() }?.let(onOpenUrl) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,

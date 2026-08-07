@@ -25,9 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,11 +76,11 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
         title = "RADSCOPE",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                Icon(LcarsIcons.ArrowBack, "Back")
             }
         },
         actions = {
-            IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = Pip.bright) }
+            IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh", tint = Pip.bright) }
         },
     ) { innerPadding ->
         RadarBody(vm, Modifier.padding(innerPadding))

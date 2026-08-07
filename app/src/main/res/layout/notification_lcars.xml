@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one LCARS notification, collapsed: [tag block] headline [temp chip]. LinearLayout-only with
+     weighted + ellipsized text, so nothing can ever overlap; the tag drawable/text and temp visibility
+     are set by LcarsNotificationRenderer. Body text uses the system notification text appearance so
+     day/night theming stays the OS's job; tag text is black-on-colour, theme-independent. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lcars_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <TextView
+        android:id="@+id/lcars_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="56dp"
+        android:gravity="center"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:maxLines="1"
+        android:textColor="#000000"
+        android:textStyle="bold"
+        android:textSize="10sp"
+        android:letterSpacing="0.08"
+        android:background="@drawable/lcars_tag_news"
+        android:text="@string/notif_row_news" />
+
+    <TextView
+        android:id="@+id/lcars_headline"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Title" />
+
+    <TextView
+        android:id="@+id/lcars_temp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:maxLines="1"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:textColor="@color/lcars_row_news" />
+</LinearLayout>

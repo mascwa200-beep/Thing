@@ -16,26 +16,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.LocalHospital
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Sos
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -70,43 +61,15 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 12.dp),
             ) {
-                item { PipHubTile("SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, { onOpenRoute(Routes.SOS) }, accent = c.magenta) }
-                item { PipHubTile("Compass", "Heading & true north", Icons.Filled.Explore, { onOpenRoute(Routes.COMPASS) }, accent = c.positive) }
-                item { PipHubTile("Survival Guides", "First aid, water, fire, signalling", Icons.AutoMirrored.Filled.MenuBook, { onOpenRoute(Routes.SURVIVAL) }, accent = c.positive) }
-                item { PipHubTile("Tools", "SOS strobe, alarm, morse", Icons.Filled.Bolt, { onOpenRoute(Routes.TOOLS) }, accent = c.positive) }
-                item { PipHubTile("Nearest Help", "Last cached hospitals & shelters", Icons.Filled.LocalHospital, { onOpenRoute(Routes.PLACES) }) }
-                item { PipHubTile("Nearby Safety", "Last cached hazards", Icons.Filled.Warning, { onOpenRoute(Routes.SAFETY) }, accent = c.amber) }
+                items(offlineSurviveTiles(), key = { it.route }) { tile ->
+                    SurviveTileCard(tile, onOpenRoute)
+                }
             }
             Text(
                 "▸ ENTER APP ANYWAY",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp,
                 color = c.muted,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp).clickable { onDismiss() }.padding(vertical = 10.dp),
-            )
-        }
-    }
-}
-
-/** A flat corner-bracketed LCARS tile (matches the Survive hub): accent icon, title, subtitle. */
-@Composable
-private fun PipHubTile(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    accent: Color = Pulse.colors.accent,
-) {
-    val c = Pulse.colors
-    PipFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = accent) {
-        Column {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(22.dp))
-            Text(
-                title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                color = c.ink, modifier = Modifier.padding(top = 10.dp),
-            )
-            Text(
-                subtitle, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }

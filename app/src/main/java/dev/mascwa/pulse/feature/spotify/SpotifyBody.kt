@@ -14,14 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,8 +53,10 @@ import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -68,10 +69,11 @@ private val Amber = Color(0xFFE0B341)
 @Composable
 private fun AlbumArt(url: String?, bitmap: android.graphics.Bitmap?, c: NightwirePalette, side: Dp) {
     if (url == null && bitmap == null) return
+    val shape = lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)
     Box(
-        Modifier.size(side).clip(RoundedCornerShape(4.dp))
+        Modifier.size(side).clip(shape)
             .background(c.accent.copy(alpha = 0.06f))
-            .border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(4.dp)),
+            .border(1.dp, c.accent.copy(alpha = 0.5f), shape),
     ) {
         if (bitmap != null) {
             Image(bitmap.asImageBitmap(), "Album art", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -132,7 +134,7 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- PLAYER (App Remote — the real in-app player) ----
-        PipHeader(
+        LcarsHeaderBar(
             "Player",
             trailing = when {
                 remote.connected -> "CONNECTED"
@@ -159,8 +161,8 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
         // ---- ACCOUNT (Web API: search + devices) ----
         if (!auth.linked) {
-            PipHeader("Account")
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsHeaderBar("Account")
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text(
                         "Link a Spotify account to search the catalogue and choose Connect devices.",
@@ -177,13 +179,13 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
         } else {
             // When the App Remote player isn't connected, show what's on a Web-API Connect device.
             if (!remote.connected) {
-                PipHeader("Now Playing", trailing = auth.displayName.ifBlank { "LINKED" })
+                LcarsHeaderBar("Now Playing", trailing = auth.displayName.ifBlank { "LINKED" })
                 WebNowPlaying(playback, c, vm)
             }
 
             // ---- SEARCH ----
-            PipHeader("Search")
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsHeaderBar("Search")
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     SpotifyField(query, { query = it }, "Search tracks…", c)
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -214,18 +216,18 @@ fun SpotifyBody(vm: SpotifyViewModel, modifier: Modifier = Modifier) {
 
             // ---- YOUR PLAYLISTS ----
             if (playlists.isNotEmpty()) {
-                PipHeader("Your Playlists", trailing = playlists.size.toString())
+                LcarsHeaderBar("Your Playlists", trailing = playlists.size.toString())
                 playlists.forEach { pl -> PlaylistRow(pl, c) { vm.playPlaylist(pl) } }
             }
 
             // ---- RECENTLY PLAYED ----
             if (recent.isNotEmpty()) {
-                PipHeader("Recently Played")
+                LcarsHeaderBar("Recently Played")
                 recent.forEach { track -> TrackRow(track, c) { vm.play(track) } }
             }
 
             // ---- DEVICES ----
-            PipHeader("Devices", trailing = devices.size.toString())
+            LcarsHeaderBar("Devices", trailing = devices.size.toString())
             if (devices.isEmpty()) {
                 StatusLine("No devices. Open Spotify on a phone/desktop/speaker to make one available.", c)
             } else {
@@ -263,7 +265,7 @@ private fun AppPlayerCard(
 ) {
     if (remote.connected) return
     val failed = remote.error != null
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             if (failed) {
                 Text("⚠ ${remote.error}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = Amber)
@@ -290,7 +292,7 @@ private fun ConnectedPlayer(
     vm: SpotifyViewModel,
     onDisconnect: () -> Unit,
 ) {
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AlbumArt(null, remote.artBitmap, c, 60.dp)
@@ -310,7 +312,7 @@ private fun ConnectedPlayer(
             ) {
                 TransportButton(Icons.Filled.SkipPrevious, "Previous", c) { vm.previous() }
                 TransportButton(
-                    if (remote.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (remote.isPlaying) Icons.Filled.Pause else LcarsIcons.PlayArrow,
                     "Play/Pause", c, primary = true,
                 ) { vm.togglePlayPause() }
                 TransportButton(Icons.Filled.SkipNext, "Next", c) { vm.next() }
@@ -325,7 +327,7 @@ private fun ConnectedPlayer(
 /** Web-API now-playing (a Connect device), shown when the App Remote player isn't connected. */
 @Composable
 private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: SpotifyViewModel) {
-    PipFrame(Modifier.fillMaxWidth()) {
+    LcarsFrame(Modifier.fillMaxWidth()) {
         Column {
             if (playback == null) {
                 Text(
@@ -353,7 +355,7 @@ private fun WebNowPlaying(playback: SpotifyPlayback?, c: NightwirePalette, vm: S
             ) {
                 TransportButton(Icons.Filled.SkipPrevious, "Previous", c) { vm.previous() }
                 TransportButton(
-                    if (playback?.isPlaying == true) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (playback?.isPlaying == true) Icons.Filled.Pause else LcarsIcons.PlayArrow,
                     "Play/Pause", c, primary = true,
                 ) { vm.togglePlayPause() }
                 TransportButton(Icons.Filled.SkipNext, "Next", c) { vm.next() }
@@ -395,7 +397,7 @@ private fun TrackRow(track: SpotifyTrack, c: NightwirePalette, onPlay: () -> Uni
             Text(track.artist, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 1.dp))
         }
-        Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
+        Icon(LcarsIcons.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -412,7 +414,7 @@ private fun PlaylistRow(pl: SpotifyPlaylist, c: NightwirePalette, onPlay: () -> 
             val sub = (if (pl.ownerName.isNotBlank()) "${pl.ownerName} · " else "") + "${pl.trackCount} tracks"
             Text(sub, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
         }
-        Icon(Icons.Filled.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
+        Icon(LcarsIcons.PlayArrow, "Play", tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -441,8 +443,9 @@ private fun StatusLine(text: String, c: NightwirePalette) {
 
 @Composable
 private fun PipButton(label: String, c: NightwirePalette, modifier: Modifier, onClick: () -> Unit) {
+    val shape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)
     Box(
-        modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, c.accent, RoundedCornerShape(6.dp))
+        modifier.clip(shape).border(1.dp, c.accent, shape)
             .clickable { onClick() }.padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -454,7 +457,7 @@ private fun PipButton(label: String, c: NightwirePalette, modifier: Modifier, on
 @Composable
 private fun SpotifyField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette) {
     Box(
-        Modifier.fillMaxWidth().border(1.dp, c.line, RoundedCornerShape(4.dp)).padding(horizontal = 10.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth().border(1.dp, c.line, lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)).padding(horizontal = 10.dp, vertical = 9.dp),
     ) {
         if (value.isEmpty()) Text(placeholder, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
         BasicTextField(

@@ -29,6 +29,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Full-screen takeovers that show over the lock screen (e.g. the BREAKING NEWS interrupt). -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- "Display over other apps": grants the background-activity-launch exemption the REAL breaking-news
+         takeover uses to open its full-screen page mid-use with no tap (TakeoverLauncher). User-granted
+         via the system screen (Settings → Notifications offers the shortcut); without it the takeover
+         falls back to the full-screen-intent notification above. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- On-device security auditor (read-only, local-only): enumerate installed apps + their permissions
          (QUERY_ALL_PACKAGES) and read per-app data usage (PACKAGE_USAGE_STATS, granted by the user via
@@ -278,6 +283,17 @@
         <!-- Optional BLE heart-rate vitals monitor (opt-in). -->
         <service
             android:name=".jarvis.vitals.VitalsTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!--
+            LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the
+            service must never be startable by another app on the device. Its inbound surface is the TCP
+            socket it opens, which is guarded by pairing + signatures + a private-address check, not by
+            Android's component permissions.
+        -->
+        <service
+            android:name=".remote.RemoteLinkService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

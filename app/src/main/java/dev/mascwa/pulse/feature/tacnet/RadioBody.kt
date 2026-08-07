@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,8 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.radio.RadioStation
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.feature.common.LcarsHeaderBar
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -96,8 +97,8 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
-        PipHeader("Tuner")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Tuner")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val label = when (state.status) {
@@ -152,8 +153,8 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- SEARCH any station ----
-        PipHeader("Search")
-        PipFrame(Modifier.fillMaxWidth()) {
+        LcarsHeaderBar("Search")
+        LcarsFrame(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("⌕", fontFamily = JetBrainsMono, fontSize = 16.sp, color = c.accent)
                 BasicTextField(
@@ -194,12 +195,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 
         // ---- FAVOURITES (starred; persisted) ----
         if (favorites.isNotEmpty()) {
-            PipHeader("Favourites")
+            LcarsHeaderBar("Favourites")
             StationStrip(favorites, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
         }
 
         // ---- LOCAL signals (geo-sourced, on-demand) ----
-        PipHeader("Local Signals", trailing = localPlace?.takeIf { localStatus == RadioViewModel.LocalStatus.READY })
+        LcarsHeaderBar("Local Signals", trailing = localPlace?.takeIf { localStatus == RadioViewModel.LocalStatus.READY })
         LocalStatusLine(
             status = localStatus,
             count = localStations.size,
@@ -212,7 +213,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- WORLD (browse the planet's stations by country) ----
-        PipHeader("World")
+        LcarsHeaderBar("World")
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 2.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -235,7 +236,7 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
         }
 
         // ---- CURATED streams (always available) ----
-        PipHeader("Stations")
+        LcarsHeaderBar("Stations")
         StationStrip(vm.curatedStations, state, c, favUrls, nowPlaying, vm::toggleFavorite) { vm.toggle(context, it) }
 
         Text(
@@ -251,11 +252,12 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 /** An LCARS country selector pill for the WORLD browse — bright/filled when selected. */
 @Composable
 private fun CountryChip(label: String, selected: Boolean, c: NightwirePalette, onClick: () -> Unit) {
+    val shape = lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)
     Box(
         Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(shape)
             .background(if (selected) c.accent.copy(alpha = 0.18f) else Color.Transparent)
-            .border(1.dp, if (selected) c.accent else c.line, RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) c.accent else c.line, shape)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
@@ -300,9 +302,9 @@ private fun SleepTimerRow(active: Int?, c: NightwirePalette, onSelect: (Int?) ->
                 color = if (on) c.void else c.ink2,
                 modifier = Modifier
                     .padding(start = 6.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .background(if (on) c.accent else c.panel)
-                    .border(1.dp, if (on) c.accent else c.line, RoundedCornerShape(6.dp))
+                    .border(1.dp, if (on) c.accent else c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
                     .clickable { onSelect(mins) }
                     .padding(horizontal = 9.dp, vertical = 4.dp),
             )

@@ -11,24 +11,26 @@ import dev.mascwa.pulse.navigation.Routes
  */
 object FeatureCatalog {
     val entries: List<FeatureMeta> = listOf(
-        FeatureMeta(Routes.HOME, "Pulse", "Your at-a-glance dashboard."),
+        FeatureMeta(Routes.HOME, "Home", "Your at-a-glance dashboard."),
         FeatureMeta(Routes.NEWS, "News", "Headlines from free, public feeds."),
         FeatureMeta(Routes.MARKETS, "Markets", "Indices, stocks, FX, commodities & crypto."),
         FeatureMeta(Routes.WEATHER, "Weather", "Forecast, feels-like & air quality."),
-        FeatureMeta(Routes.JARVIS, "J.A.R.V.I.S.", "Your private, on-device assistant — ask it anything."),
+        FeatureMeta(Routes.JARVIS, "Computer", "Your private, on-device assistant — ask it anything."),
         FeatureMeta(Routes.SPACE_WX, "Space Weather", "Aurora odds, Kp & solar storms."),
         FeatureMeta(Routes.NAV, "Nav", "A 3D, heading-up cyber-map with a trail."),
         FeatureMeta(Routes.OBJECTIVES, "Objectives", "Track waypoints & calendar missions."),
         FeatureMeta(Routes.COMPASS, "Compass", "Offline heading."),
         FeatureMeta(Routes.SURVIVE, "Survive", "Nearest help, SOS & offline guides."),
-        FeatureMeta(Routes.TACNET, "LCARS", "Radar, telemetry, orbital & space weather."),
+        FeatureMeta(Routes.MENU, "Menu", "Every feature, one tap, plain English."),
         FeatureMeta(Routes.ECONOMY, "Economy", "Inflation, GDP & jobs."),
         FeatureMeta(Routes.FUEL, "Fuel & Energy", "Benchmarks & pump prices."),
         FeatureMeta(Routes.SOCIAL, "Social", "Lemmy, Mastodon & Hacker News."),
         FeatureMeta(Routes.SEARCH, "Search", "Private web search."),
-        FeatureMeta(Routes.SKY, "Sky", "Space weather, orbital & compass."),
         FeatureMeta(Routes.ORBITAL, "Orbital", "ISS, sun, moon & near-Earth objects."),
-        FeatureMeta(Routes.SETTINGS, "Settings", "Tune Pulse to your taste."),
+        FeatureMeta(Routes.RADIO, "Radio", "Local & internet stations."),
+        FeatureMeta(Routes.NOTES, "Notes", "Quick notes."),
+        FeatureMeta(Routes.DIARY, "Diary", "Your daily log."),
+        FeatureMeta(Routes.SETTINGS, "Settings", "Tune LCARS to your taste."),
     )
 
     /** Display label for a route key, or the key itself if unknown. */

@@ -112,7 +112,7 @@ private class FeedFactory(private val context: Context) : RemoteViewsService.Rem
                     .forEach { a -> out += FeedRow("NEWS · ${a.source.uppercase()}".take(28), a.title, INK) }
             }
 
-            if (out.isEmpty()) out += FeedRow("PULSE", "Open Pulse to load the live feed", INK)
+            if (out.isEmpty()) out += FeedRow("LCARS", "Open LCARS to load the live feed", INK)
             out
         }
     }

@@ -3,15 +3,16 @@ package dev.mascwa.pulse.feature.tacnet
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,51 +21,51 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import dev.mascwa.pulse.data.sensors.Telemetry
-import dev.mascwa.pulse.feature.common.PipFrame
-import dev.mascwa.pulse.feature.common.PipHeader
+import dev.mascwa.pulse.data.weather.DeviceLocation
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
-import kotlin.math.min
+import java.util.Calendar
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 @Composable
 fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
-        title = "Telemetry",
+        title = "Diagnostics",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         TelemetryBody(vm, Modifier.padding(innerPadding))
@@ -94,8 +95,11 @@ private fun TelemetryLifecycle(vm: TelemetryViewModel) {
 }
 
 /**
- * The STATS ▸ STATUS body — the pure device readout (operator portrait, condition, stress, advisories, and
- * the raw vitals / sensors / system / position panels). Scaffold-free.
+ * The STATS ▸ STATUS body — rebuilt from scratch as a "DIAGNOSTIC GRID": an asymmetric bank of solid
+ * colour-washed cells (the real Okudagram idiom — filled blocks, not bordered cards), status-banded
+ * nominal/caution/critical, topped by a single state-word masthead and closed by one ticking alert line
+ * instead of a stacked advisory list. Every real sensor reading the earlier panel-based layout showed still
+ * surfaces here — only the structure and every composable drawing it are new. Scaffold-free.
  */
 @Composable
 fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
@@ -103,7 +107,6 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
     val t by vm.telemetry.collectAsStateWithLifecycle()
     val gps by vm.gps.collectAsStateWithLifecycle()
     val portraitUri by vm.portraitUri.collectAsStateWithLifecycle()
-    val c = Pulse.colors
     val context = LocalContext.current
 
     val pickPortrait = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -119,354 +122,290 @@ fun TelemetryBody(vm: TelemetryViewModel, modifier: Modifier = Modifier) {
         modifier.padding(horizontal = 16.dp).fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-        PipHeader("Operator")
-        OperatorPortrait(portraitUri, c) {
-            runCatching { pickPortrait.launch(arrayOf("image/*")) }
+        Spacer(Modifier.height(6.dp))
+        DiagnosticMasthead(t, portraitUri) { runCatching { pickPortrait.launch(arrayOf("image/*")) } }
+
+        Spacer(Modifier.height(3.dp))
+        ReactorCell(t, Modifier.fillMaxWidth().height(112.dp))
+
+        Spacer(Modifier.height(3.dp))
+        Row(Modifier.fillMaxWidth().height(88.dp)) {
+            MemoryCell(t, Modifier.weight(0.55f).fillMaxHeight())
+            Spacer(Modifier.width(3.dp))
+            UplinkCell(t, Modifier.weight(0.45f).fillMaxHeight())
         }
 
-        PipHeader("Condition")
-        ConditionPanel(t, c)
+        Spacer(Modifier.height(3.dp))
+        SensorArrayCell(t, Modifier.fillMaxWidth())
 
-        PipHeader("Stress")
-        StressPanel(t, c)
+        Spacer(Modifier.height(3.dp))
+        PositionCell(gps, Modifier.fillMaxWidth().height(84.dp))
 
-        PipHeader("Advisories")
-        AdvisoriesPanel(t, gps != null, c)
-
-        PipHeader("Vitals")
-        PipFrame(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SegmentGauge("Battery", batteryText(t), (t.batteryPct ?: 0) / 100f, if (t.charging) c.positive else c.accent)
-                SegmentGauge("Memory", "${t.memUsedMb} / ${t.memTotalMb} MB",
-                    if (t.memTotalMb > 0) t.memUsedMb.toFloat() / t.memTotalMb else 0f, c.violet)
-                SegmentGauge("Ambient light", t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—",
-                    min(1f, (t.lightLux ?: 0f) / 2000f), c.amber)
-                SegmentGauge("Magnetic field", t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—",
-                    min(1f, (t.magneticUt ?: 0f) / 100f), c.sky)
-                SegmentGauge("G-force", t.accelG?.let { "%.2f g".format(it) } ?: "—",
-                    min(1f, (t.accelG ?: 0f) / 2f), c.magenta)
-            }
-        }
-
-        PipHeader("Sensors")
-        PipFrame(Modifier.fillMaxWidth()) {
-            Column {
-                TelemetryStatRow("Pressure", t.pressureHpa?.let { "%.1f hPa".format(it) } ?: if (t.hasBarometer) "…" else "no sensor")
-                TelemetryStatRow("Baro altitude", t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—")
-                TelemetryStatRow("Tilt (pitch)", t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                TelemetryStatRow("Tilt (roll)", t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—")
-                TelemetryStatRow("Rotation rate", t.gyroDps?.let { "${it.roundToInt()} °/s" } ?: "—")
-            }
-        }
-
-        PipHeader("System")
-        PipFrame(Modifier.fillMaxWidth()) {
-            Column {
-                TelemetryStatRow("Battery temp", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—")
-                TelemetryStatRow("Power", if (t.charging) "Charging" else "On battery")
-                TelemetryStatRow("Network", t.netType)
-                TelemetryStatRow("Signal", t.netSignal)
-                TelemetryStatRow("Memory used", "${t.memUsedMb} MB")
-            }
-        }
-
-        PipHeader("Position")
-        PipFrame(Modifier.fillMaxWidth()) {
-            val loc = gps
-            if (loc != null) {
-                Column {
-                    TelemetryStatRow("Latitude", "%.5f".format(loc.latitude))
-                    TelemetryStatRow("Longitude", "%.5f".format(loc.longitude))
-                    TelemetryStatRow("Place", loc.name)
-                }
-            } else {
-                Text(
-                    "No GPS fix yet — grant location and ensure GPS is on. Works without internet.",
-                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
-                )
-            }
-        }
+        AlertLine(activeFlags(t, gps != null))
 
         Text(
-            "All values read directly from on-device sensors and the OS — no network required.",
-            fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-            modifier = Modifier.padding(top = 14.dp, bottom = 24.dp),
+            "ALL READINGS SOURCED DIRECTLY FROM ON-DEVICE SENSORS AND OS STATE — NO NETWORK REQUIRED.",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pulse.colors.faint,
+            modifier = Modifier.padding(top = 18.dp, bottom = 24.dp),
         )
     }
 }
 
-private fun batteryText(t: Telemetry): String {
-    val pct = t.batteryPct?.let { "$it%" } ?: "—"
-    return if (t.charging) "$pct ⚡" else pct
+// ---- Banding: every cell is scored 0..1 from real device state and washed nominal/caution/critical. ----
+
+private enum class DiagBand { NOMINAL, CAUTION, CRITICAL }
+
+private fun DiagBand.wash(c: NightwirePalette): Color = when (this) {
+    DiagBand.NOMINAL -> c.positive
+    DiagBand.CAUTION -> c.amber
+    DiagBand.CRITICAL -> c.negative
 }
 
-// ---- CONDITION: an original operator-silhouette figure whose body regions tint by live device health. ----
+private fun bandFor(score: Float): DiagBand = when {
+    score >= 0.66f -> DiagBand.NOMINAL
+    score >= 0.33f -> DiagBand.CAUTION
+    else -> DiagBand.CRITICAL
+}
 
-private fun powerScore(t: Telemetry): Float = if (t.charging) 1f else (t.batteryPct ?: 100) / 100f
-private fun memoryScore(t: Telemetry): Float =
+private fun reserveScore(t: Telemetry): Float = if (t.charging) 1f else (t.batteryPct ?: 100) / 100f
+private fun headroomScore(t: Telemetry): Float =
     if (t.memTotalMb > 0) (1f - t.memUsedMb.toFloat() / t.memTotalMb).coerceIn(0f, 1f) else 1f
-private fun thermalScore(t: Telemetry): Float =
+private fun coreTempScore(t: Telemetry): Float =
     t.batteryTempC?.let { (1f - (it - 25f) / 25f).coerceIn(0f, 1f) } ?: 1f
+private fun linkScore(t: Telemetry): Float = if (t.netType == "OFFLINE") 0.2f else 1f
 
-private fun condColor(c: NightwirePalette, score: Float): Color = when {
-    score >= 0.66f -> c.positive
-    score >= 0.33f -> c.amber
-    else -> c.negative
-}
+private fun formatClock(now: Calendar): String =
+    "%02d:%02d:%02d".format(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), now.get(Calendar.SECOND))
 
-/** The STATUS condition readout: a tinted humanoid figure + an INTEGRITY score and per-system breakdown. */
 @Composable
-private fun ConditionPanel(t: Telemetry, c: NightwirePalette) {
-    val power = powerScore(t)
-    val memory = memoryScore(t)
-    val thermal = thermalScore(t)
-    val overall = (power + memory + thermal) / 3f
-    val overallColor = condColor(c, overall)
-    val label = when {
-        overall >= 0.66f -> "NOMINAL"
-        overall >= 0.33f -> "DEGRADED"
-        else -> "CRITICAL"
-    }
-    PipFrame(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ConditionFigure(
-                Modifier.size(width = 78.dp, height = 116.dp),
-                head = condColor(c, thermal),
-                torso = condColor(c, memory),
-                limbs = overallColor,
-                legs = condColor(c, power),
-            )
-            Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                Text("INTEGRITY ${(overall * 100).roundToInt()}%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp, color = overallColor)
-                Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.5.sp, color = c.muted,
-                    modifier = Modifier.padding(bottom = 6.dp))
-                CondRow("PWR", batteryText(t), condColor(c, power), c)
-                CondRow("MEM", "${(memory * 100).roundToInt()}% free", condColor(c, memory), c)
-                CondRow("THRM", t.batteryTempC?.let { "%.1f °C".format(it) } ?: "—", condColor(c, thermal), c)
-            }
+private fun tickingClock(): String {
+    var text by remember { mutableStateOf(formatClock(Calendar.getInstance())) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            text = formatClock(Calendar.getInstance())
         }
     }
+    return text
 }
 
-/** A per-system condition row: a status dot + label + value. */
+// ---- Masthead: one state word + a live clock + a crew-card ID thumbnail, on a solid banded strip. ----
+
 @Composable
-private fun CondRow(label: String, value: String, dot: Color, c: NightwirePalette) {
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(dot))
-        Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.muted,
-            modifier = Modifier.padding(start = 7.dp))
-        Spacer(Modifier.weight(1f))
-        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
-    }
-}
-
-/** An original, generic operator silhouette (NOT a trademarked character) — head/torso/arms/legs drawn
- *  procedurally, each region tinted by its subsystem's health. Filled at low alpha + a bright outline. */
-@Composable
-private fun ConditionFigure(modifier: Modifier, head: Color, torso: Color, limbs: Color, legs: Color) {
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val cx = w / 2f
-        val sw = 3.dp.toPx()
-        val a = 0.22f
-
-        // Head.
-        val headR = h * 0.095f
-        val headC = Offset(cx, h * 0.12f)
-        drawCircle(head.copy(alpha = a), headR, headC)
-        drawCircle(head, headR, headC, style = Stroke(sw))
-
-        // Torso (a tapered trunk).
-        val tTop = h * 0.25f
-        val tBot = h * 0.58f
-        val half = w * 0.17f
-        val torsoPath = Path().apply {
-            moveTo(cx - half, tTop)
-            lineTo(cx + half, tTop)
-            lineTo(cx + half * 0.78f, tBot)
-            lineTo(cx - half * 0.78f, tBot)
-            close()
-        }
-        drawPath(torsoPath, torso.copy(alpha = a))
-        drawPath(torsoPath, torso, style = Stroke(sw))
-
-        // Arms from the shoulders.
-        val shoulderY = tTop + h * 0.015f
-        drawLine(limbs, Offset(cx - half, shoulderY), Offset(cx - half * 1.85f, h * 0.52f), sw, StrokeCap.Round)
-        drawLine(limbs, Offset(cx + half, shoulderY), Offset(cx + half * 1.85f, h * 0.52f), sw, StrokeCap.Round)
-
-        // Legs from the hips.
-        drawLine(legs, Offset(cx - half * 0.55f, tBot), Offset(cx - half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
-        drawLine(legs, Offset(cx + half * 0.55f, tBot), Offset(cx + half * 0.75f, h * 0.96f), sw, StrokeCap.Round)
-    }
-}
-
-/** A VITALS gauge: a banded label/value header over a notched, segment-lit bar (segmented rather than
- *  smooth, for LCARS-style at-a-glance legibility). */
-@Composable
-private fun SegmentGauge(label: String, value: String, fraction: Float, color: Color) {
+private fun DiagnosticMasthead(t: Telemetry, portraitUri: String, onPickPortrait: () -> Unit) {
     val c = Pulse.colors
-    val frac = fraction.coerceIn(0f, 1f)
-    Box(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(3.dp))
-            .background(c.accent.copy(alpha = 0.07f))
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+    val overall = (reserveScore(t) + headroomScore(t) + coreTempScore(t) + linkScore(t)) / 4f
+    val band = bandFor(overall)
+    val fill = band.wash(c)
+    val stateWord = when (band) {
+        DiagBand.NOMINAL -> "NOMINAL"
+        DiagBand.CAUTION -> "CAUTION"
+        DiagBand.CRITICAL -> "CRITICAL"
+    }
+    val clock = tickingClock()
+    val shape = lcarsBlockShape(sweep = 34.dp, corner = LcarsCorner.TopStart)
+
+    Row(
+        Modifier.fillMaxWidth().height(96.dp)
+            .clip(shape)
+            .background(fill)
+            .padding(start = 24.dp, end = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.8.sp, color = c.ink2)
-                Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
-            }
-            Canvas(Modifier.fillMaxWidth().height(8.dp).padding(top = 4.dp)) {
-                val segs = 24
-                val gap = 2f
-                val segW = (size.width - gap * (segs - 1)) / segs
-                val lit = (frac * segs).roundToInt()
-                val dim = c.lineSoft.copy(alpha = 0.35f)
-                for (i in 0 until segs) {
-                    drawRect(
-                        if (i < lit) color else dim,
-                        topLeft = Offset(i * (segW + gap), 0f),
-                        size = Size(segW, size.height),
-                    )
-                }
-            }
+        Column(Modifier.weight(1f)) {
+            Text("SHIP STATUS", fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 3.sp, color = c.void.copy(alpha = 0.62f))
+            Text(stateWord, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = 1.sp, color = c.void)
+            Text(clock, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.void.copy(alpha = 0.75f), modifier = Modifier.padding(top = 2.dp))
         }
+        CrewCardThumb(portraitUri, onPickPortrait)
     }
 }
 
-/** A SENSORS/SYSTEM/POSITION readout row (shared [PipDataRow]). */
 @Composable
-private fun TelemetryStatRow(label: String, value: String) {
-    dev.mascwa.pulse.feature.common.PipDataRow(label, value)
-}
-
-/** The operator portrait: tap to pick an image — it persists and renders in true color inside the LCARS
- *  frame; empty shows the upload prompt. */
-@Composable
-private fun OperatorPortrait(uri: String, c: NightwirePalette, onPick: () -> Unit) {
-    PipFrame(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (uri.isBlank()) {
-                Box(
-                    Modifier.fillMaxWidth().height(150.dp)
-                        .border(1.dp, c.line, RoundedCornerShape(4.dp))
-                        .clickable { onPick() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("CLICK TO UPLOAD AN IMAGE", fontFamily = JetBrainsMono, fontSize = 11.sp,
-                        letterSpacing = 1.sp, color = c.muted)
-                }
-            } else {
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Operator portrait",
-                    modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(4.dp)).clickable { onPick() },
-                    contentScale = ContentScale.Crop,
-                )
-            }
-            Text(
-                "OPERATOR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                fontSize = 14.sp, letterSpacing = 1.5.sp, color = c.ink, modifier = Modifier.padding(top = 12.dp),
+private fun CrewCardThumb(uri: String, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.BottomEnd)
+    Box(
+        Modifier.size(56.dp)
+            .clip(shape)
+            .background(c.void)
+            .border(2.dp, c.ink, shape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (uri.isBlank()) {
+            Text("ID", fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.sp, color = c.ink)
+        } else {
+            AsyncImage(
+                model = uri, contentDescription = "Operator ID",
+                modifier = Modifier.fillMaxWidth().fillMaxHeight().clip(shape),
+                contentScale = ContentScale.Crop,
             )
         }
     }
 }
 
-/** The STRESS readout: live system load — memory pressure plus thermal load above nominal — as a direct
- *  0–100% gauge; TOLERANCE = free headroom. */
+// ---- The cell family: solid colour-washed blocks, dark text — the "filled block" LCARS idiom. ----
+
 @Composable
-private fun StressPanel(t: Telemetry, c: NightwirePalette) {
-    val memPct = if (t.memTotalMb > 0) ((t.memUsedMb * 100) / t.memTotalMb).toInt() else 0
-    val temp = t.batteryTempC ?: 25f
-    val stress = ((memPct * 5 + (maxOf(0f, temp - 25f) * 20f).toInt()) / 10).coerceIn(0, 100)
-    val tolerance = (100 - memPct).coerceIn(0, 100)
-    PipFrame(Modifier.fillMaxWidth()) {
-        Column {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("TOLERANCE $tolerance%", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
-                Text("STRESS $stress%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
+private fun DiagCell(
+    label: String,
+    band: DiagBand,
+    corner: LcarsCorner,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = Pulse.colors
+    val fill = band.wash(c)
+    val shape = lcarsBlockShape(sweep = 22.dp, corner = corner)
+    Column(
+        modifier
+            .clip(shape)
+            .background(fill)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(label.uppercase(), fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.8.sp, color = c.void.copy(alpha = 0.6f))
+        Spacer(Modifier.height(5.dp))
+        content()
+    }
+}
+
+@Composable
+private fun ReactorCell(t: Telemetry, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val band = bandFor(reserveScore(t))
+    val pctText = t.batteryPct?.let { "$it" } ?: "—"
+    val tempText = t.batteryTempC?.let { "%.1f°C CELL TEMP".format(it) } ?: "CELL TEMP —"
+    DiagCell("Power Cell", band, LcarsCorner.TopStart, modifier) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(pctText, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 42.sp, color = c.void, lineHeight = 42.sp)
+            Text("%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = c.void.copy(alpha = 0.72f),
+                modifier = Modifier.padding(start = 3.dp, bottom = 5.dp))
+            if (t.charging) {
+                Text("⚡ CHARGING", fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = c.void,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 9.dp))
             }
-            StressGauge(stress, c, Modifier.fillMaxWidth().padding(top = 12.dp))
         }
+        Text(tempText, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.void.copy(alpha = 0.68f),
+            modifier = Modifier.padding(top = 3.dp))
     }
 }
 
-/** The STRESS gauge: a tick scale 0…100% with an arrow pointer at the current reading. */
 @Composable
-private fun StressGauge(stress: Int, c: NightwirePalette, modifier: Modifier) {
-    Canvas(modifier.height(34.dp)) {
-        val w = size.width
-        val y = size.height * 0.62f
-        drawLine(c.accent.copy(alpha = 0.5f), Offset(0f, y), Offset(w, y), 1.5.dp.toPx())
-        for (i in 0..10) {
-            val x = (w * i / 10f).coerceIn(0.5f, w - 0.5f)
-            val tall = i % 5 == 0
-            drawLine(c.accent.copy(alpha = if (tall) 0.7f else 0.4f), Offset(x, y), Offset(x, y - if (tall) 11f else 6f), 1.dp.toPx())
-        }
-        val px = (w * (stress / 100f)).coerceIn(0f, w)
-        val arrow = Path().apply {
-            moveTo(px, y - 3f)
-            lineTo(px - 7f, y + 11f)
-            lineTo(px + 7f, y + 11f)
-            close()
-        }
-        drawPath(arrow, c.accent)
+private fun MemoryCell(t: Telemetry, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val band = bandFor(headroomScore(t))
+    val usedPct = if (t.memTotalMb > 0) ((t.memUsedMb * 100) / t.memTotalMb).toInt() else 0
+    DiagCell("Memory", band, LcarsCorner.TopStart, modifier) {
+        Text("$usedPct%", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = c.void)
+        Text("${t.memUsedMb} / ${t.memTotalMb} MB", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.void.copy(alpha = 0.68f),
+            modifier = Modifier.padding(top = 2.dp))
     }
 }
 
-/** A system advisory derived from live device state. */
-private data class Advisory(val tag: String, val name: String, val desc: String, val good: Boolean)
+@Composable
+private fun UplinkCell(t: Telemetry, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val band = bandFor(linkScore(t))
+    val label = if (t.netType == "OFFLINE") "NO LINK" else t.netType
+    DiagCell("Uplink", band, LcarsCorner.TopEnd, modifier) {
+        Text(label, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 19.sp, color = c.void, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(t.netSignal, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.void.copy(alpha = 0.68f),
+            modifier = Modifier.padding(top = 2.dp))
+    }
+}
 
-/** Active advisories — real device/app state surfaced as short flags: charging, low power, thermal,
- *  data link, GPS. */
-private fun activeAdvisories(t: Telemetry, hasGps: Boolean): List<Advisory> {
-    val out = ArrayList<Advisory>()
-    val bat = t.batteryPct ?: 0
-    if (t.charging) out += Advisory("⚡", "CHARGING", "Power cell recharging", true)
-    if (!t.charging && bat in 1..20) out += Advisory("▼", "LOW POWER", "Reserves critical — conserve energy", false)
+@Composable
+private fun SensorArrayCell(t: Telemetry, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val band = if (t.hasBarometer) DiagBand.NOMINAL else DiagBand.CAUTION
+    val readings = listOf(
+        "PRESS" to (t.pressureHpa?.let { "%.0f hPa".format(it) } ?: "—"),
+        "ALT" to (t.pressureAltitudeM?.let { "${it.roundToInt()} m" } ?: "—"),
+        "PITCH" to (t.tiltPitchDeg?.let { "${it.roundToInt()}°" } ?: "—"),
+        "ROLL" to (t.tiltRollDeg?.let { "${it.roundToInt()}°" } ?: "—"),
+        "MAG" to (t.magneticUt?.let { "${it.roundToInt()} µT" } ?: "—"),
+        "LIGHT" to (t.lightLux?.let { "${it.roundToInt()} lx" } ?: "—"),
+    )
+    DiagCell("Sensor Array", band, LcarsCorner.BottomStart, modifier) {
+        readings.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                row.forEach { (key, value) ->
+                    Column {
+                        Text(key, fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = c.void.copy(alpha = 0.55f))
+                        Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.void,
+                            modifier = Modifier.padding(top = 1.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PositionCell(gps: DeviceLocation?, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val band = if (gps != null) DiagBand.NOMINAL else DiagBand.CAUTION
+    DiagCell("Position Fix", band, LcarsCorner.BottomEnd, modifier) {
+        if (gps != null) {
+            Text(gps.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.void,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("%.5f, %.5f".format(gps.latitude, gps.longitude), fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = c.void.copy(alpha = 0.68f), modifier = Modifier.padding(top = 2.dp))
+        } else {
+            Text("NO FIX", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.void)
+            Text("awaiting GPS lock", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.void.copy(alpha = 0.68f),
+                modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+// ---- The alert strip: one ticking line — the classic LCARS single-alert convention — not a stacked list. ----
+
+private fun activeFlags(t: Telemetry, hasGps: Boolean): List<Pair<String, Boolean>> {
+    val out = ArrayList<Pair<String, Boolean>>()
+    val bat = t.batteryPct ?: 100
+    if (!t.charging && bat in 1..20) out += ("POWER RESERVE CRITICAL — $bat% REMAINING" to true)
     val temp = t.batteryTempC
-    if (temp != null && temp >= 40f) out += Advisory("△", "OVERHEATING", "Core temperature elevated", false)
-    if (t.netType.isNotBlank()) out += Advisory("≋", "${t.netType.uppercase()} LINK", "Data uplink established", true)
-    else out += Advisory("⊘", "OFFLINE", "No uplink — running on local cache", false)
-    if (hasGps) out += Advisory("◎", "GPS LOCK", "Position fix acquired", true)
+    if (temp != null && temp >= 40f) out += ("CORE TEMPERATURE ELEVATED — %.1f°C".format(temp) to true)
+    if (t.netType == "OFFLINE") out += ("NO DATA UPLINK — RUNNING ON LOCAL CACHE" to false)
+    if (!hasGps) out += ("NO POSITION FIX — AWAITING GPS LOCK" to false)
     return out
 }
 
-/** The ADVISORIES readout: active device state as short system flags. */
 @Composable
-private fun AdvisoriesPanel(t: Telemetry, hasGps: Boolean, c: NightwirePalette) {
-    val advisories = activeAdvisories(t, hasGps)
-    PipFrame(Modifier.fillMaxWidth()) {
-        if (advisories.isEmpty()) {
-            Text("No active advisories.", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-        } else {
-            Column { advisories.forEach { AdvisoryRow(it, c) } }
+private fun AlertLine(flags: List<Pair<String, Boolean>>) {
+    val c = Pulse.colors
+    if (flags.isEmpty()) {
+        Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
+            Text(
+                "ALL SYSTEMS NOMINAL — NO ACTIVE ALERTS", fontFamily = JetBrainsMono, fontSize = 10.sp,
+                letterSpacing = 1.sp, color = c.muted, modifier = Modifier.padding(start = 9.dp),
+            )
+        }
+        return
+    }
+    var index by remember(flags) { mutableStateOf(0) }
+    LaunchedEffect(flags) {
+        while (true) {
+            delay(3200)
+            index = (index + 1) % flags.size
         }
     }
-}
-
-/** One advisory row: a tag glyph, the advisory name (bold) and a short description, banded. */
-@Composable
-private fun AdvisoryRow(e: Advisory, c: NightwirePalette) {
+    val (message, urgent) = flags[index % flags.size]
+    val tone = if (urgent) c.negative else c.amber
     Row(
-        Modifier.fillMaxWidth()
-            .drawBehind {
-                drawRect(c.accent.copy(alpha = 0.08f))
-                drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
-            }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(top = 18.dp)
+            .background(tone.copy(alpha = 0.14f))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(e.tag, fontFamily = JetBrainsMono, fontSize = 14.sp, color = if (e.good) c.accent else c.amber,
-            modifier = Modifier.width(26.dp))
-        Column(Modifier.weight(1f)) {
-            Text(e.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                color = if (e.good) c.ink else c.amber, letterSpacing = 0.8.sp)
-            Text(e.desc, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 1.dp))
-        }
+        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(tone))
+        Text(
+            "ALERT · $message", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+            letterSpacing = 0.6.sp, color = tone, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 9.dp),
+        )
     }
 }

@@ -192,7 +192,7 @@ object SpotifyAppRemoteController {
     private fun Throwable.toFriendly(): String = when (this) {
         is CouldNotFindSpotifyApp -> "Spotify isn't installed — install it to use the in-app player."
         is NotLoggedInException -> "Open Spotify and log in, then tap Reconnect."
-        is UserNotAuthorizedException -> "Authorize Pulse in Spotify to connect (you only do this once)."
+        is UserNotAuthorizedException -> "Authorize this app in Spotify to connect (you only do this once)."
         else -> message ?: this::class.java.simpleName
     }
 }

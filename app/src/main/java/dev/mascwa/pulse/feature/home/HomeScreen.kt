@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,8 +50,11 @@ import dev.mascwa.pulse.data.weather.WeatherCode
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.cyberTag
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.mascwa.pulse.feature.common.SectionBar
@@ -78,7 +80,6 @@ class HomeNav(
     val openMarkets: () -> Unit,
     val openWeather: () -> Unit,
     val openEconomy: () -> Unit,
-    val openInflation: () -> Unit,
     val openFuel: () -> Unit,
     val openSettings: () -> Unit,
     val openAssistant: () -> Unit = {},
@@ -106,7 +107,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
     )
 
     PulseScaffold(
-        title = "Pulse",
+        title = "LCARS",
         topBarOverride = {
             Column(Modifier.background(c.void).windowInsetsPadding(WindowInsets.statusBars)) {
                 Row(
@@ -116,7 +117,7 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 ) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         GlitchText(
-                            text = "NIGHTWIRE",
+                            text = "LCARS",
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
                             ),
@@ -128,8 +129,10 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconChip(Icons.Filled.Search, "Search") { nav.openNews() }
-                        IconChip(Icons.Filled.Notifications, "Alerts") { nav.openNews() }
+                        // Fixed mis-wiring: Search opens Search and the bell opens Advisories — the two
+                        // used to both dump you on News.
+                        IconChip(LcarsIcons.Search, "Search") { nav.openRoute(dev.mascwa.pulse.navigation.Routes.SEARCH) }
+                        IconChip(Icons.Filled.Notifications, "Advisories") { nav.openRoute(dev.mascwa.pulse.navigation.Routes.ORACLE) }
                         IconChip(Icons.Filled.Settings, "Settings") { nav.openSettings() }
                     }
                 }
@@ -262,7 +265,7 @@ private fun IconChip(icon: androidx.compose.ui.graphics.vector.ImageVector, cd: 
     Box(
         Modifier
             .size(34.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart))
             .background(c.panel)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
@@ -298,7 +301,7 @@ private fun AssistantCard(status: String, pendingCode: Int, onOpen: () -> Unit) 
             Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(c.positive))
             Column(Modifier.padding(start = 10.dp).weight(1f)) {
                 Text(
-                    "J.A.R.V.I.S.",
+                    "COMPUTER",
                     fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 2.sp,
                     fontWeight = FontWeight.Bold, color = c.accent,
                 )
@@ -383,9 +386,10 @@ private fun ForYouCard(
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
-    // The J.A.R.V.I.S. feed is the one cyan "Stark HUD" island on the crimson home — a professional,
-    // non-chat status briefing. It NEVER surfaces chat content: only operational awareness — usage-based
-    // educated guesses, the user's chosen monitoring focus, and APK/internal diagnostics.
+    // The J.A.R.V.I.S. card reads the palette's `sky` accent slot — its own distinguishing hue within the
+    // one app-wide LCARS palette, not a separate hardcoded colour — for a professional, non-chat status
+    // briefing. It NEVER surfaces chat content: only operational awareness — usage-based educated guesses,
+    // the user's chosen monitoring focus, and APK/internal diagnostics.
     val hud = c.sky
     val topic = LocalJarvisFeedTopic.current
     NeonPanel(
@@ -395,7 +399,7 @@ private fun ForYouCard(
         padding = PaddingValues(0.dp),
     ) {
         Column(Modifier.fillMaxWidth()) {
-            // J.A.R.V.I.S. HUD header (cyan, Stark-style).
+            // Computer HUD header — its own distinguishing hue within the one app-wide LCARS palette.
             Row(
                 Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -403,7 +407,7 @@ private fun ForYouCard(
             ) {
                 Text("◆", fontFamily = JetBrainsMono, fontSize = 11.sp, color = hud)
                 DecryptText(
-                    text = "J.A.R.V.I.S.",
+                    text = "COMPUTER",
                     fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
                     letterSpacing = 3.sp, color = hud,
                 )
@@ -474,7 +478,7 @@ private fun BreakingHero(article: Article, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(top = 14.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart))
             .background(
                 Brush.linearGradient(listOf(c.magenta.copy(alpha = 0.18f), c.accent.copy(alpha = 0.12f), c.panel)),
             )
@@ -508,7 +512,7 @@ private fun BreakingHero(article: Article, onClick: () -> Unit) {
 private fun Tag(text: String, color: androidx.compose.ui.graphics.Color, filled: Boolean) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(5.dp))
+            .clip(lcarsBlockShape(sweep = 5.dp, corner = LcarsCorner.TopStart))
             .background(if (filled) color else color.copy(alpha = 0.12f))
             .padding(horizontal = 7.dp, vertical = 3.dp),
     ) {

@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,8 +37,8 @@ import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.Objective
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.ObjectiveSource
-import dev.mascwa.pulse.feature.common.PipChip
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -57,9 +55,9 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
     PulseScaffold(
         title = "OBJECTIVES",
         navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.ink) }
+            IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
         },
-        actions = { IconButton(onClick = { vm.refresh() }) { Icon(Icons.Filled.Refresh, "Refresh", tint = c.ink) } },
+        actions = { IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh", tint = c.ink) } },
     ) { innerPadding ->
         ObjectivesPanel(vm, c, Modifier.fillMaxSize().padding(innerPadding))
     }
@@ -91,7 +89,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
     ) {
         if (needsPerm) {
             item {
-                PipFrame(Modifier.fillMaxWidth(), accent = c.amber) {
+                LcarsFrame(Modifier.fillMaxWidth(), accent = c.amber) {
                     Column {
                         Text("LINK CALENDAR", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                         Text(
@@ -110,7 +108,7 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
 
         // Manual add.
         item {
-            PipFrame(Modifier.fillMaxWidth()) {
+            LcarsFrame(Modifier.fillMaxWidth()) {
                 Column {
                     Text("ADD WAYPOINT", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
                     OutlinedTextField(
@@ -125,8 +123,8 @@ fun ObjectivesPanel(vm: ObjectivesViewModel, c: NightwirePalette, modifier: Modi
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        PipChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
-                        PipChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
+                        LcarsChip("Main", kind == ObjectiveKind.MAIN, onClick = { kind = ObjectiveKind.MAIN })
+                        LcarsChip("Side", kind == ObjectiveKind.SIDE, onClick = { kind = ObjectiveKind.SIDE })
                     }
                     Text(
                         "◢ ADD",

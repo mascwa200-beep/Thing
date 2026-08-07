@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,14 +35,17 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * The NIGHTWIRE Cyberpunk-2077 panel silhouette — a chamfered (cut-corner) box: the top-end and
- * bottom-start corners are sliced off on a diagonal, the signature CP2077 HUD parallelogram-notch.
- * Shared by every core surface so the whole app reads as one angular terminal.
+ * The app's one panel silhouette — a swept LCARS block (one corner rounded large, the rest sharp), same
+ * shape family [LcarsFrame] uses. Was the chamfered CP2077 parallelogram-notch (`CutCornerShape`); every
+ * caller of [NeonPanel]/[HubTile] picks up the new geometry for free from this single definition, no
+ * per-screen edits needed. The names ("Cyber…") are legacy — kept so this doesn't ripple into a mass
+ * rename across every remaining caller.
  */
-val CyberCut = CutCornerShape(topStart = 0.dp, topEnd = 11.dp, bottomEnd = 0.dp, bottomStart = 11.dp)
+val CyberCut: Shape = lcarsBlockShape(sweep = 28.dp, corner = LcarsCorner.TopStart)
 
-/** A tighter chamfer for chips / small controls. */
-val CyberChipCut = CutCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomEnd = 0.dp, bottomStart = 8.dp)
+/** The chip/small-control shape — a stepped notch, matching [LcarsChip]'s exact silhouette so the two chip
+ *  composables render identically shaped. */
+val CyberChipCut: Shape = CutCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 0.dp, bottomStart = 10.dp)
 
 /** Draws Cyberpunk-style L-shaped HUD corner brackets inside a draw scope. */
 fun DrawScope.hudCorners(color: Color, lenPx: Float, strokePx: Float, marginPx: Float) {
@@ -103,8 +107,8 @@ fun SectionBar(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Sharp angular accent marker (a thin skewed blade) — CP2077, not a rounded bar.
-            Box(Modifier.width(4.dp).height(15.dp).clip(CutCornerShape(topStart = 0.dp, topEnd = 4.dp, bottomEnd = 0.dp, bottomStart = 4.dp)).background(c.accent))
+            // A small swept-corner accent blade, matching the app-wide LCARS block silhouette.
+            Box(Modifier.width(4.dp).height(15.dp).clip(lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)).background(c.accent))
             dev.mascwa.pulse.ui.effects.DecryptText(
                 title.uppercase(),
                 fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold,

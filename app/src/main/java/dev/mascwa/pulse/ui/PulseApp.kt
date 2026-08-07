@@ -29,12 +29,10 @@ import dev.mascwa.pulse.feature.compass.CompassScreen
 import dev.mascwa.pulse.feature.compass.CompassViewModel
 import dev.mascwa.pulse.feature.economy.EconomyScreen
 import dev.mascwa.pulse.feature.economy.EconomyViewModel
-import dev.mascwa.pulse.feature.economy.InflationScreen
 import dev.mascwa.pulse.feature.fuel.FuelScreen
 import dev.mascwa.pulse.feature.fuel.FuelViewModel
 import dev.mascwa.pulse.feature.sky.OrbitalScreen
 import dev.mascwa.pulse.feature.sky.OrbitalViewModel
-import dev.mascwa.pulse.feature.sky.SkyHubScreen
 import dev.mascwa.pulse.feature.sky.SpaceWeatherScreen
 import dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel
 import dev.mascwa.pulse.feature.sos.SosScreen
@@ -85,20 +83,10 @@ fun PulseApp(
         }
     }
 
-    // LCARS feed tabs: tapping a tab replaces the current feed (shallow back stack).
-    val openTab: (String) -> Unit = { route ->
-        if (route != currentRoute) navController.navigate(route) {
-            launchSingleTop = true
-            currentRoute?.let { popUpTo(it) { inclusive = true } }
-        }
-    }
-    // The TOOLS bottom-nav returns to the last feed viewed.
-    var lastFeed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(dev.mascwa.pulse.navigation.FEED_HOME) }
-    androidx.compose.runtime.LaunchedEffect(currentRoute) {
-        if (currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES) lastFeed = currentRoute
-    }
-
-    val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
+    // LCARS is the app's one palette now — the bottom nav bar (rendered outside the NavHost's own
+    // provider below) reads it directly rather than the ambient default so it doesn't fall back to the
+    // pre-LCARS cyberpunk chrome.
+    val nw = dev.mascwa.pulse.ui.theme.lcarsPalette
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -109,13 +97,10 @@ fun PulseApp(
                 tonalElevation = 0.dp,
             ) {
                 TOP_DESTINATIONS.forEach { dest ->
-                    // TOOLS now opens the LCARS feed tabs; it highlights on any feed route.
-                    val isTools = dest.route == Routes.TACNET
-                    val selected = if (isTools) currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
-                        else currentRoute == dest.route
+                    val selected = currentRoute == dest.route
                     NavigationBarItem(
                         selected = selected,
-                        onClick = { navigateTopLevel(if (isTools) lastFeed else dest.route) },
+                        onClick = { navigateTopLevel(dest.route) },
                         icon = {
                             Icon(
                                 if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -142,15 +127,10 @@ fun PulseApp(
             }
         },
     ) { innerPadding ->
-        val isFeed = currentRoute != null && currentRoute in dev.mascwa.pulse.navigation.FEED_ROUTES
-        val feedCtx = if (isFeed) dev.mascwa.pulse.navigation.FeedTabState(currentRoute, openTab) else null
-        // The whole TOOLS section wears the LCARS palette; everything else keeps the NIGHTWIRE theme.
-        // Provided once around the NavHost so feed screens re-theme with no per-screen edits (the
-        // bottom nav stays base — it reads `nw` captured above the provider).
-        val feedPalette = if (isFeed) dev.mascwa.pulse.ui.theme.lcarsPalette else nw
+        // LCARS is the app's one palette — provided once around the whole NavHost so every route
+        // re-themes with no per-screen edits.
         androidx.compose.runtime.CompositionLocalProvider(
-            dev.mascwa.pulse.navigation.LocalFeedTabs provides feedCtx,
-            dev.mascwa.pulse.ui.theme.LocalNightwire provides feedPalette,
+            dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
         ) {
         NavHost(
             navController = navController,
@@ -166,7 +146,6 @@ fun PulseApp(
                         openMarkets = { navigateTopLevel(Routes.MARKETS) },
                         openWeather = { navigateTopLevel(Routes.WEATHER) },
                         openEconomy = { navController.navigate(Routes.ECONOMY) { launchSingleTop = true } },
-                        openInflation = { navController.navigate(Routes.INFLATION) { launchSingleTop = true } },
                         openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
                         openSettings = { navigateTopLevel(Routes.SETTINGS) },
                         openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
@@ -205,22 +184,26 @@ fun PulseApp(
                 val vm: EconomyViewModel = viewModel(factory = factory)
                 EconomyScreen(vm, onBack = { navController.popBackStack() })
             }
-            composable(Routes.INFLATION) {
-                val vm: EconomyViewModel = viewModel(factory = factory)
-                InflationScreen(vm, onBack = { navController.popBackStack() })
-            }
             composable(Routes.FUEL) {
                 val vm: FuelViewModel = viewModel(factory = factory)
                 FuelScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Sky + hubs (Phase 1) ----
             val openRoute: (String) -> Unit = { route ->
                 navController.navigate(route) { launchSingleTop = true }
             }
-            composable(Routes.SKY) {
-                SkyHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
+
+            // ---- THE MENU — the flat directory: every feature, one tap, plain English ----
+            composable(Routes.MENU) {
+                dev.mascwa.pulse.feature.menu.MenuScreen(
+                    onOpen = { route ->
+                        if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
+                        else navController.navigate(route) { launchSingleTop = true }
+                    },
+                )
             }
+
+            // ---- Sky ----
             composable(Routes.COMPASS) {
                 val vm: CompassViewModel = viewModel(factory = factory)
                 CompassScreen(vm, onBack = { navController.popBackStack() })
@@ -236,11 +219,11 @@ fun PulseApp(
 
             // ---- Survive (Phase 2) — all in the LCARS palette (matches TOOLS/QUESTS) ----
             composable(Routes.SURVIVE) {
-                Lcars { SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() }) }
+                SurviveHubScreen(onOpenRoute = openRoute, onBack = { navController.popBackStack() })
             }
             composable(Routes.PLACES) {
                 val vm: PlacesViewModel = viewModel(factory = factory)
-                Lcars { PlacesScreen(vm, onBack = { navController.popBackStack() }) }
+                PlacesScreen(vm, onBack = { navController.popBackStack() })
             }
             // Optional ?guide= arg lets a notification (e.g. a survival tip about knots) open straight to a
             // specific guide; a plain "survival" navigation matches with guide=null and shows the list.
@@ -250,58 +233,36 @@ fun PulseApp(
             ) { backStackEntry ->
                 val vm: GuidesViewModel = viewModel(factory = factory)
                 val guideId = backStackEntry.arguments?.getString("guide")
-                Lcars { GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId) }
+                GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId)
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
-                Lcars { ToolsScreen(vm, onBack = { navController.popBackStack() }) }
+                ToolsScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SOS) {
                 val vm: SosViewModel = viewModel(factory = factory)
-                Lcars { SosScreen(vm, onBack = { navController.popBackStack() }) }
+                SosScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SAFETY) {
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.safety.SafetyScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.HABITAT) {
                 val vm: dev.mascwa.pulse.feature.survive.HabitatViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.survive.HabitatScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Social & search (Phase 3) — LCARS palette ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                Lcars { dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() }) }
+                dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Tacnet (real-time radar + telemetry) ----
-            composable(Routes.TACNET) {
-                val radarVm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
-                val telemetryVm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
-                val orbitalVm: dev.mascwa.pulse.feature.sky.OrbitalViewModel = viewModel(factory = factory)
-                val spaceWxVm: dev.mascwa.pulse.feature.sky.SpaceWeatherViewModel = viewModel(factory = factory)
-                val radioVm: dev.mascwa.pulse.feature.tacnet.RadioViewModel = viewModel(factory = factory)
-                val notesVm: dev.mascwa.pulse.feature.notes.NotesViewModel = viewModel(factory = factory)
-                val diaryVm: dev.mascwa.pulse.feature.diary.DiaryViewModel = viewModel(factory = factory)
-                val tasksVm: dev.mascwa.pulse.feature.tasks.TasksViewModel = viewModel(factory = factory)
-                val objectivesVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
-                val navVm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
-                val spotifyVm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel = viewModel(factory = factory)
-                val socialVm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                val searchVm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.tacnet.PipBoyScreen(
-                    radarVm, telemetryVm, orbitalVm, spaceWxVm, radioVm, notesVm, diaryVm, tasksVm, objectivesVm, navVm, spotifyVm,
-                    socialVm, searchVm,
-                    // The folded-in SURVIVE hub tiles deep-link to the survival tools (SOS/PLACES/…).
-                    onOpenRoute = { route -> navController.navigate(route) { launchSingleTop = true } },
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                )
-            }
+            // ---- Live radar + device telemetry (standalone, one tap from MENU) ----
             composable(Routes.RADAR) {
                 val vm: dev.mascwa.pulse.feature.tacnet.RadarViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.tacnet.RadarScreen(vm, onBack = { navController.popBackStack() })
@@ -309,6 +270,26 @@ fun PulseApp(
             composable(Routes.TELEMETRY) {
                 val vm: dev.mascwa.pulse.feature.tacnet.TelemetryViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.tacnet.TelemetryScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Sound (standalone, one tap from MENU) ----
+            composable(Routes.RADIO) {
+                val vm: dev.mascwa.pulse.feature.tacnet.RadioViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.tacnet.RadioScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.MUSIC) {
+                val vm: dev.mascwa.pulse.feature.spotify.SpotifyViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.spotify.MusicScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            // ---- Personal logs (standalone, one tap from MENU) ----
+            composable(Routes.NOTES) {
+                val vm: dev.mascwa.pulse.feature.notes.NotesViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.notes.NotesScreen(vm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.DIARY) {
+                val vm: dev.mascwa.pulse.feature.diary.DiaryViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.diary.DiaryScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
@@ -365,16 +346,10 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.nav.NavScreen(vm, objVm, onBack = { navController.popBackStack() })
             }
 
-            // ---- Objectives / waypoint tracker ----
+            // ---- Saved places / waypoint tracker ----
             composable(Routes.OBJECTIVES) {
                 val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.objectives.ObjectivesScreen(vm, onBack = { navController.popBackStack() })
-            }
-
-            // ---- Objectives — the objective log as its own LCARS feed tab ----
-            composable(Routes.QUESTS) {
-                val vm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.objectives.QuestsScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Diagnostics ----
@@ -407,17 +382,11 @@ fun PulseApp(
         if (!startRoute.isNullOrBlank()) {
             if (startRoute != Routes.HOME) {
                 when {
-                    // A "tacnet?tab=SPECIAL"-style deep-link opens the LCARS console (a top destination) AND selects
-                    // a specific sub-tab: stash the tab for PipBoyScreen, then navigate to the top destination
-                    // (query args can't ride a top-level nav, so the holder carries it).
-                    startRoute.substringBefore('?') == Routes.TACNET && startRoute.contains("tab=") -> {
-                        dev.mascwa.pulse.feature.tacnet.PipBoyDeepLink.target.value =
-                            startRoute.substringAfter("tab=").substringBefore('&')
-                        navigateTopLevel(Routes.TACNET)
-                    }
+                    // Legacy "tacnet" deep-links (old shortcuts/notifications) land on the MENU directory.
+                    startRoute.substringBefore('?') == "tacnet" -> navigateTopLevel(Routes.MENU)
                     TOP_DESTINATIONS.any { it.route == startRoute } -> navigateTopLevel(startRoute)
                     // Launcher shortcuts + notification deep-links can target non-top routes (NAV, SOS,
-                    // QUESTS, or an argumented one like "survival?guide=fire" — match on the base route).
+                    // or an argumented one like "survival?guide=fire" — match on the base route).
                     startRoute.substringBefore('?') in SHORTCUT_ROUTES ->
                         runCatching { navController.navigate(startRoute) { launchSingleTop = true } }
                 }
@@ -429,18 +398,15 @@ fun PulseApp(
 }
 
 /** Non-top routes reachable directly from a launcher shortcut or a notification deep-link — each opens
- *  straight to the page it's about (see AppShortcuts + Notifier). */
+ *  straight to the page it's about (see AppShortcuts + Notifier). Everything the MENU lists is here, so
+ *  any surface can deep-link any feature. */
 private val SHORTCUT_ROUTES = setOf(
-    Routes.NAV, Routes.SOS, Routes.QUESTS, Routes.SURVIVAL,
+    Routes.NAV, Routes.SOS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
+    Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
+    Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
+    Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,
+    Routes.OBJECTIVES, Routes.SOCIAL, Routes.SEARCH,
+    Routes.ECONOMY, Routes.FUEL, Routes.CRASH_LOG, Routes.SECURITY_AUDIT,
+    Routes.SETTINGS,
 )
-
-/** Renders [content] in the LCARS palette — used to put the SURVIVE/SOCIAL/SEARCH feeds (and their
- *  sub-screens) in the same look as the TOOLS and QUESTS tabs. */
-@Composable
-private fun Lcars(content: @Composable () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(
-        dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
-        content = content,
-    )
-}

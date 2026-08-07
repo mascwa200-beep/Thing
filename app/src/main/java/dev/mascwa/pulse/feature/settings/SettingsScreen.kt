@@ -27,13 +27,13 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.feature.common.PipFrame
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -41,10 +41,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.InstallMobile
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -75,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.installApk
+import dev.mascwa.pulse.remote.RemoteLinkService
+import dev.mascwa.pulse.remote.RemotePeers
 import dev.mascwa.pulse.feature.settings.SettingsViewModel.UpdateUi
 import dev.mascwa.pulse.data.settings.CustomFeed
 import dev.mascwa.pulse.data.settings.HomeSection
@@ -172,7 +172,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        RoundCyberButton(Icons.Filled.Refresh, "Check for updates") {
+                        RoundCyberButton(LcarsIcons.Refresh, "Check for updates") {
                             android.widget.Toast.makeText(context, "Checking for updates…", android.widget.Toast.LENGTH_SHORT).show()
                             vm.checkForUpdate()
                         }
@@ -271,7 +271,7 @@ fun SettingsScreen(
                     )
                     PrefClickable(
                         "GrapheneOS per-app controls",
-                        subtitle = "Network, Sensors & Storage Scopes for Pulse (GrapheneOS-exclusive) live in App info.",
+                        subtitle = "Network, Sensors & Storage Scopes for LCARS (GrapheneOS-exclusive) live in App info.",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
                 }
@@ -290,7 +290,7 @@ fun SettingsScreen(
                 PrefSection("Device-owner controls") {
                     if (!isOwner) {
                         Text(
-                            "These hardware-backed protections need Pulse provisioned as Device Owner (see " +
+                            "These hardware-backed protections need LCARS provisioned as Device Owner (see " +
                                 "“Device owner” above). Until then they're inert.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -400,7 +400,7 @@ fun SettingsScreen(
                         "Exploit protection (Memory Tagging)",
                         value = "App info",
                         subtitle = "GrapheneOS can enable hardware Memory Tagging (MTE) + stricter exploit " +
-                            "protection per app, using the Tensor chip. Toggle it for Pulse in App info → " +
+                            "protection per app, using the Tensor chip. Toggle it for LCARS in App info → " +
                             "GrapheneOS settings. (Better than forcing it in the build — you stay in control.)",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
@@ -415,7 +415,7 @@ fun SettingsScreen(
                         "Sandboxed Google Play",
                         value = if (sandboxedPlay) "Installed ✓" else "Not installed",
                         subtitle = "GrapheneOS runs Play Services as a normal sandboxed app (no privileged " +
-                            "access). Pulse needs none of it — it's purely informational.",
+                            "access). LCARS needs none of it — it's purely informational.",
                         onClick = { dev.mascwa.pulse.core.util.openAppInfo(context) },
                     )
                 }
@@ -460,7 +460,7 @@ fun SettingsScreen(
                     PrefClickable(
                         "System accessibility",
                         subtitle = "Font & display size, TalkBack, colour correction, and “remove animations” " +
-                            "(Pulse honours reduce-motion).",
+                            "(LCARS honours reduce-motion).",
                         onClick = { dev.mascwa.pulse.core.util.openAccessibilitySettings(context) },
                     )
                 }
@@ -565,59 +565,52 @@ fun SettingsScreen(
                             onClick = { notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
                         )
                     }
-                    PrefSwitch("Enable notifications", checked = s.notifications.masterEnabled,
+                    PrefSwitch(
+                        "Enable notifications",
+                        subtitle = "LCARS shows ONE notification — the Situation Board: news, markets, weather and your agenda, always current, updated in place.",
+                        checked = s.notifications.masterEnabled,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(masterEnabled = v)) } })
                     val on = s.notifications.masterEnabled
+                    PrefSwitch("Show news on the board", checked = s.notifications.showNewsRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showNewsRow = v)) } })
+                    PrefSwitch("Show markets on the board", checked = s.notifications.showMarketsRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showMarketsRow = v)) } })
+                    PrefSwitch("Show weather on the board", checked = s.notifications.showWeatherRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showWeatherRow = v)) } })
+                    PrefSwitch("Show your agenda on the board", checked = s.notifications.showAgendaRow, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(showAgendaRow = v)) } })
+                    SingleChoiceRow(
+                        "Market row threshold", s.notifications.marketMovePercent,
+                        listOf(1.0 to "±1%", 2.0 to "±2%", 3.0 to "±3%", 5.0 to "±5%", 10.0 to "±10%"),
+                        enabled = on && s.notifications.showMarketsRow,
+                    ) { p -> vm.update { it.copy(notifications = it.notifications.copy(marketMovePercent = p)) } }
                     PrefSwitch(
-                        "Emergency · This just in",
-                        subtitle = "Major breaking emergencies anywhere (disasters/attacks/crises), the moment they're reported — its own urgent alert.",
-                        checked = s.notifications.emergencyAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(emergencyAlerts = v)) } })
-                    PrefSwitch("Breaking news", checked = s.notifications.breakingNews, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingNews = v)) } })
+                        "Urgent alerts (sound & vibration)",
+                        subtitle = "A due reminder, a major emergency, or a security or danger notice buzzes once. Off = the board still updates, just always silently.",
+                        checked = s.notifications.urgentAlertsEnabled, enabled = on,
+                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(urgentAlertsEnabled = v)) } })
                     PrefSwitch(
-                        "Breaking takeover (full-screen)",
-                        subtitle = "On a MAJOR event (a death, a disaster), force-open a full-screen breaking-news page — trusted free sources, ad-free. Rare + hard-throttled.",
+                        "Breaking news takeover (full screen)",
+                        subtitle = "On a MAJOR event (a death, a disaster), the full-screen breaking-news page opens by itself — trusted free sources, ad-free.",
                         checked = s.notifications.breakingInterrupt, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
-                    PrefSwitch(
-                        "Oracle foresight",
-                        subtitle = "J.A.R.V.I.S. reads every signal (calendar, location, weather, markets…) and proactively surfaces the one thing that matters — leave now, charge now, aurora tonight.",
-                        checked = s.notifications.oracleEnabled, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(oracleEnabled = v)) } })
-                    PrefSwitch(
-                        "World pulse (live feed)",
-                        subtitle = "A quiet, always-latest dashboard notification — the world's state (breaking, markets, space weather) woven with your day (next event). Silent; updates in place, never buzzes.",
-                        checked = s.notifications.worldPulse, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(worldPulse = v)) } })
-                    PrefSwitch("Live breaking news (~90s, needs resident J.A.R.V.I.S.)",
-                        checked = s.notifications.liveBreakingNews, enabled = on && s.notifications.breakingNews,
+                    PrefClickable(
+                        "Allow the takeover over other apps",
+                        subtitle = "Grant \"display over other apps\" so the takeover can open mid-use with no tap. Without it, it takes over the lock screen and shows a tap-to-open banner while the phone is in use.",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${context.packageName}"),
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                    PrefSwitch("Live news polling (~90s, needs the resident Computer)",
+                        checked = s.notifications.liveBreakingNews, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(liveBreakingNews = v)) } })
-                    PrefSwitch("Market & price alerts", checked = s.notifications.marketAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(marketAlerts = v)) } })
-                    PrefSwitch("Weather alerts", checked = s.notifications.weatherAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(weatherAlerts = v)) } })
-                    PrefSwitch("Space & sky alerts", checked = s.notifications.spaceAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(spaceAlerts = v)) } })
-                    PrefSwitch("Aurora likely (your location)", checked = s.notifications.auroraAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(auroraAlerts = v)) } })
-                    PrefSwitch("Safety / nearby incidents", checked = s.notifications.safetyAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(safetyAlerts = v)) } })
-                    PrefSwitch("Overhead flights (Tacnet)", checked = s.notifications.flightAlerts, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(flightAlerts = v)) } })
-                    PrefSwitch("Daily digest", checked = s.notifications.dailyDigest, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(dailyDigest = v)) } })
-                    PrefSwitch("App update alerts", checked = s.notifications.updateChecks, enabled = on,
-                        onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(updateChecks = v)) } })
-                    SingleChoiceRow(
-                        "Digest time", s.notifications.digestHour,
-                        (0..23).map { it to "%02d:00".format(it) }, enabled = on && s.notifications.dailyDigest,
-                    ) { h -> vm.update { it.copy(notifications = it.notifications.copy(digestHour = h)) } }
-                    SingleChoiceRow(
-                        "Market alert threshold", s.notifications.marketMovePercent,
-                        listOf(1.0 to "±1%", 2.0 to "±2%", 3.0 to "±3%", 5.0 to "±5%", 10.0 to "±10%"),
-                        enabled = on && s.notifications.marketAlerts,
-                    ) { p -> vm.update { it.copy(notifications = it.notifications.copy(marketMovePercent = p)) } }
                     PrefSwitch("Quiet hours", checked = s.notifications.quietHoursEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(quietHoursEnabled = v)) } })
                     if (s.notifications.quietHoursEnabled) {
@@ -632,7 +625,7 @@ fun SettingsScreen(
                     }
                     PrefClickable(
                         "Send test notification",
-                        subtitle = "Posts a sample alert (grants permission first if needed)",
+                        subtitle = "Posts a sample Situation Board so you can see the LCARS layout (grants permission first if needed)",
                         onClick = {
                             if (notificationsAllowed()) vm.sendTestNotification()
                             else testNotifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -642,6 +635,58 @@ fun SettingsScreen(
             }
 
             // ----- Security & network (Trusted Network Mode + encryption) -----
+            if (vis(SettingsCategory.SECURITY, "remote link desktop computer pair lan wifi control anydesk")) item {
+                PrefSection("Remote link") {
+                    PrefSwitch(
+                        "Remote link",
+                        "Let a paired computer on the same Wi-Fi switch app features on and off. Off by " +
+                            "default; while it's on, an ongoing notification shows the phone is listening.",
+                        checked = s.remote.enabled,
+                        onChange = { v ->
+                            vm.update { it.copy(remote = it.remote.copy(enabled = v)) }
+                            if (v) RemoteLinkService.start(context) else RemoteLinkService.stop(context)
+                        },
+                    )
+                    PrefClickable(
+                        "Pair a computer",
+                        subtitle = if (!s.remote.enabled) {
+                            "Switch the link on first."
+                        } else {
+                            "Shows a six-digit code and this phone's address in the notification for two " +
+                                "minutes. Enter both on the desktop app."
+                        },
+                        onClick = { if (s.remote.enabled) RemoteLinkService.requestPairing(context) },
+                    )
+                    PrefInfo(
+                        "Paired computers",
+                        value = if (s.remote.pairedKeys.isEmpty()) "None" else "${s.remote.pairedKeys.size}",
+                        subtitle = buildString {
+                            append(
+                                "Only these can send commands. Nothing sensitive is exposed — no wipe, " +
+                                    "no app locking, no keys, and every command is written to the audit ledger.",
+                            )
+                            // Show WHICH machines. The desktop displays the same four bytes for its own
+                            // identity, so an unexpected entry here is visible rather than just a count.
+                            val marks = s.remote.pairedKeys.mapNotNull(RemotePeers::fingerprintOf)
+                            if (marks.isNotEmpty()) append("\nPaired: ${marks.joinToString("  ")}")
+                        },
+                    )
+                    if (s.remote.pairedKeys.isNotEmpty()) {
+                        PrefClickable(
+                            "Unpair all computers",
+                            subtitle = "They'll each have to pair again before anything can reach this phone.",
+                            onClick = {
+                                vm.unpairAllComputers()
+                                // Also revoke on the RUNNING listener — it holds an in-memory snapshot, so
+                                // clearing the setting alone would leave every paired machine with command
+                                // access until the service next restarted.
+                                RemoteLinkService.requestUnpairAll(context)
+                            },
+                        )
+                    }
+                }
+            }
+
             if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {
                 PrefSection("Security & network") {
                     PrefClickable(
@@ -662,9 +707,9 @@ fun SettingsScreen(
                         "Wi-Fi control",
                         value = if (vm.isDeviceOwner) "Device Owner ✓" else "Not provisioned",
                         subtitle = if (vm.isDeviceOwner)
-                            "Pulse can toggle Wi-Fi. Stays minimal: no wipe/lock/password powers."
+                            "LCARS can toggle Wi-Fi. Stays minimal: no wipe/lock/password powers."
                         else
-                            "To let Pulse actually toggle Wi-Fi, provision it once over adb on a device with no " +
+                            "To let LCARS actually toggle Wi-Fi, provision it once over adb on a device with no " +
                                 "other accounts:\nadb shell dpm set-device-owner " +
                                 "dev.mascwa.pulse.debug/dev.mascwa.pulse.security.PulseDeviceAdminReceiver\n" +
                                 "Until then, the mode just notifies you to toggle Wi-Fi yourself.",
@@ -680,7 +725,7 @@ fun SettingsScreen(
                     )
                     if (s.security.homeSsids.isEmpty()) {
                         Text(
-                            "No home networks set. Add the one you're on at home so Pulse knows when you've left it.",
+                            "No home networks set. Add the one you're on at home so LCARS knows when you've left it.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -696,7 +741,7 @@ fun SettingsScreen(
                     ) { m -> vm.update { it.copy(security = it.security.copy(reprobeMinutes = m)) } }
                     PrefSwitch(
                         "Notify if not provisioned",
-                        "Show a notification when Pulse wants to toggle Wi-Fi but isn't a Device Owner yet.",
+                        "Show a notification when LCARS wants to toggle Wi-Fi but isn't a Device Owner yet.",
                         checked = s.security.notifyWhenUnprovisioned,
                         onChange = { v -> vm.update { it.copy(security = it.security.copy(notifyWhenUnprovisioned = v)) } },
                     )
@@ -776,7 +821,7 @@ fun SettingsScreen(
                         }
                         IconButton(onClick = {
                             vm.update { it.copy(customFeeds = it.customFeeds.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -797,7 +842,7 @@ fun SettingsScreen(
                         Text(kw, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                         IconButton(onClick = {
                             vm.update { it.copy(mutedKeywords = it.mutedKeywords.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -825,7 +870,7 @@ fun SettingsScreen(
                         Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                         IconButton(onClick = {
                             vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(Icons.Filled.Delete, "Remove") }
+                        }) { Icon(LcarsIcons.Delete, "Remove") }
                     }
                 }
                 item {
@@ -914,7 +959,7 @@ fun SettingsScreen(
                             }
                             IconButton(onClick = {
                                 vm.update { it.copy(emergencyContacts = it.emergencyContacts.filterIndexed { idx, _ -> idx != i }) }
-                            }) { Icon(Icons.Filled.Delete, "Remove") }
+                            }) { Icon(LcarsIcons.Delete, "Remove") }
                         }
                     }
                     AddContactRow { contact ->
@@ -976,13 +1021,13 @@ fun SettingsScreen(
                     PrefClickable(
                         "Clear usage data",
                         subtitle = "Forget the on-device usage history & real-time activity log that power " +
-                            "J.A.R.V.I.S.'s tailored tips and self-awareness. Never leaves your device.",
+                            "the Computer's tailored tips and self-awareness. Never leaves your device.",
                         onClick = { vm.clearUsageData() },
                     )
                     PrefClickable(
                         "Reset learned reflexes",
                         subtitle = "Wipe the virtual cerebellum — the practiced skills & reliability " +
-                            "J.A.R.V.I.S. has learned from its own actions. It relearns from scratch.",
+                            "the Computer has learned from its own actions. It relearns from scratch.",
                         onClick = { vm.resetReflexes() },
                     )
                     PrefClickable(
@@ -1043,7 +1088,7 @@ fun SettingsScreen(
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
                         onClick = { vm.resetToDefaults() })
                     Text(
-                        "Pulse · built exclusively for Pixel 10 Pro XL · all data from free public sources.",
+                        "LCARS · built exclusively for Pixel 10 Pro XL · all data from free public sources.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),
@@ -1292,7 +1337,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.watchlistEditor(
                 Text("${item.id} · ${item.type.name.lowercase()}", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = { onRemove(item) }) { Icon(Icons.Filled.Delete, "Remove") }
+            IconButton(onClick = { onRemove(item) }) { Icon(LcarsIcons.Delete, "Remove") }
         }
     }
 }
@@ -1468,7 +1513,7 @@ private fun SettingsShell(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.accent, modifier = Modifier.size(18.dp))
+                        Icon(LcarsIcons.ArrowBack, "Back", tint = c.accent, modifier = Modifier.size(18.dp))
                         Text(
                             "SETTINGS ▸ ${(selectedCat ?: SettingsCategory.FIRST).title.uppercase()}",
                             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
@@ -1487,7 +1532,7 @@ private fun SettingsShell(
 @Composable
 private fun SettingsSearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
-    dev.mascwa.pulse.feature.common.PipFrame(modifier.fillMaxWidth()) {
+    dev.mascwa.pulse.feature.common.LcarsFrame(modifier.fillMaxWidth()) {
         androidx.compose.foundation.text.BasicTextField(
             value = query, onValueChange = onQuery, singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),

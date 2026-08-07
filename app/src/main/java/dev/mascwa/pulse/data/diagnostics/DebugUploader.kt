@@ -93,7 +93,7 @@ class DebugUploader(
         val graphene = runCatching { GrapheneOs.detect(appContext) }.getOrNull()
         val gate = runCatching { DeviceGate.evaluate() }.getOrNull()
         val raw = buildString {
-            append("# Pulse debug report — ").append(kind).append("\n\n")
+            append("# LCARS debug report — ").append(kind).append("\n\n")
             append("- when: ").append(TS.format(Date(now))).append('\n')
             append("- build: ").append(BuildConfig.VERSION_NAME).append(" (#").append(BuildConfig.VERSION_CODE).append(")\n")
             append("- device: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)

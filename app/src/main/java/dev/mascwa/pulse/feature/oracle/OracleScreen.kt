@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -33,8 +31,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Insight
 import dev.mascwa.pulse.core.telemetry.Urgency
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.PulseScaffold
+import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -52,7 +52,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
     PulseScaffold(
         title = "Oracle",
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
@@ -96,7 +96,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
 private fun BriefingCard(briefing: String, onRefresh: () -> Unit) {
     val c = Pulse.colors
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.accent.copy(alpha = 0.08f))
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)).background(c.accent.copy(alpha = 0.08f))
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -104,7 +104,7 @@ private fun BriefingCard(briefing: String, onRefresh: () -> Unit) {
                 letterSpacing = 2.sp, color = c.accent)
             Spacer(Modifier.weight(1f))
             Text("↻ REFRESH", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onRefresh)
+                modifier = Modifier.clip(lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)).clickable(onClick = onRefresh)
                     .padding(horizontal = 8.dp, vertical = 4.dp))
         }
         Text(
@@ -120,7 +120,7 @@ private fun FocusCard(ins: Insight, onOpenRoute: (String) -> Unit) {
     val c = Pulse.colors
     val col = urgencyColor(ins.urgency)
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
             .background(col.copy(alpha = 0.12f))
             .clickable(enabled = ins.actionRoute != null) { ins.actionRoute?.let(onOpenRoute) }
             .padding(14.dp),
@@ -144,11 +144,11 @@ private fun InsightCard(ins: Insight, onOpenRoute: (String) -> Unit) {
     val c = Pulse.colors
     val col = urgencyColor(ins.urgency)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(c.raise.copy(alpha = 0.5f))
+        Modifier.fillMaxWidth().clip(lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart)).background(c.raise.copy(alpha = 0.5f))
             .clickable(enabled = ins.actionRoute != null) { ins.actionRoute?.let(onOpenRoute) }
             .padding(10.dp),
     ) {
-        Box(Modifier.width(3.dp).height(38.dp).clip(RoundedCornerShape(2.dp)).background(col))
+        Box(Modifier.width(3.dp).height(38.dp).clip(lcarsBlockShape(sweep = 2.dp, corner = LcarsCorner.TopStart)).background(col))
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Text("${ins.kind.name} · ${ins.urgency.name}", fontFamily = JetBrainsMono, fontSize = 8.sp,
                 letterSpacing = 0.8.sp, color = col)
