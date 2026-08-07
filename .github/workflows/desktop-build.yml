@@ -63,7 +63,9 @@ jobs:
 
       - name: Package MSI
         # jpackage is host-targeted: this step is the only way an .msi ever gets produced.
-        run: ./gradlew :desktop:packageMsi --stacktrace --no-daemon
+        # gradlew.bat, NOT ./gradlew — this runner defaults to PowerShell, which cannot execute the
+        # extension-less shell script (nothing in PATHEXT matches it), so `./gradlew` fails outright.
+        run: .\gradlew.bat :desktop:packageMsi --stacktrace --no-daemon
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
