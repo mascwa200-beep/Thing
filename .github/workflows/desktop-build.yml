@@ -63,8 +63,8 @@ jobs:
 
       - name: Package MSI
         # jpackage is host-targeted: this step is the only way an .msi ever gets produced.
-        # gradlew.bat, NOT ./gradlew — this runner defaults to PowerShell, which cannot execute the
-        # extension-less shell script (nothing in PATHEXT matches it), so `./gradlew` fails outright.
+        # gradlew.bat is the native Windows launcher. `./gradlew` also works here (verified on a real
+        # windows-latest runner), so this is a clarity choice, not a fix for a breakage.
         run: .\gradlew.bat :desktop:packageMsi --stacktrace --no-daemon
 
       - name: Upload installer
