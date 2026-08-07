@@ -145307,6 +145307,4200 @@
    "topic": "Reading Weather Signs Without Forecasts",
    "category": "Preparedness",
    "guideId": null
+  },
+  {
+   "id": "t24219",
+   "topic": "How a Two-Stroke Engine Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24220",
+   "topic": "The Otto Cycle Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24221",
+   "topic": "The Diesel Cycle Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24222",
+   "topic": "The Atkinson and Miller Engine Cycles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24223",
+   "topic": "Engine Compression Ratio and Its Effects",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24224",
+   "topic": "Thermal Efficiency of Combustion Engines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24225",
+   "topic": "Volumetric Efficiency and Engine Breathing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24226",
+   "topic": "Engine Displacement and Bore Stroke Ratio",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24227",
+   "topic": "Torque and Horsepower in Engines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24228",
+   "topic": "Reading an Engine Dyno Power Curve",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24229",
+   "topic": "Engine Block Design and Materials",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24230",
+   "topic": "Cylinder Head Design and Combustion Chambers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24231",
+   "topic": "Crankshaft Design Balance and Bearings",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24232",
+   "topic": "Connecting Rods and Piston Assemblies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24233",
+   "topic": "Piston Rings and Cylinder Sealing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24234",
+   "topic": "Engine Bearings and Bearing Clearance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24235",
+   "topic": "Flywheels and Engine Rotating Inertia",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24236",
+   "topic": "Engine Firing Order and Balance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24237",
+   "topic": "Inline Four Engine Design and Character",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24238",
+   "topic": "V6 and V8 Engine Layouts Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24239",
+   "topic": "Flat and Boxer Engine Configurations",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24240",
+   "topic": "V12 and Large Multi-Cylinder Engines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24241",
+   "topic": "How Camshafts Control Valve Timing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24242",
+   "topic": "Overhead Cam Versus Pushrod Valvetrains",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24243",
+   "topic": "Valve Springs Lifters and Followers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24244",
+   "topic": "Variable Valve Timing Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24245",
+   "topic": "Timing Belts Chains and Gear Drives",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24246",
+   "topic": "Setting Valve Clearance and Shim Adjustment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24247",
+   "topic": "Cylinder Head Porting and Flow Bench Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24248",
+   "topic": "Head Gaskets Failure Modes and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24249",
+   "topic": "How a Turbocharger Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24250",
+   "topic": "Turbo Lag Wastegates and Boost Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24251",
+   "topic": "Variable Geometry Turbochargers Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24252",
+   "topic": "How a Supercharger Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24253",
+   "topic": "Intercoolers and Charge Air Cooling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24254",
+   "topic": "Twin-Turbo and Compound Boosting Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24255",
+   "topic": "Boost Pressure Tuning and Safe Limits",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24256",
+   "topic": "How Diesel Compression Ignition Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24257",
+   "topic": "Common Rail Diesel Injection Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24258",
+   "topic": "Diesel Glow Plugs and Cold Starting",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24259",
+   "topic": "Diesel Particulate Filters and Regeneration",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24260",
+   "topic": "Selective Catalytic Reduction and AdBlue",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24261",
+   "topic": "Exhaust Gas Recirculation Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24262",
+   "topic": "How the Wankel Rotary Engine Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24263",
+   "topic": "Gas Turbine Engines in Ground Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24264",
+   "topic": "Opposed Piston and Radial Engines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24265",
+   "topic": "Small Engines for Garden Machinery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24266",
+   "topic": "Model and Miniature Engine Principles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24267",
+   "topic": "Engine Rebuilding Step by Step",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24268",
+   "topic": "Engine Machining Boring and Honing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24269",
+   "topic": "Measuring Engine Wear With Micrometers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24270",
+   "topic": "Diagnosing Engine Knock and Detonation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24271",
+   "topic": "Pre-Ignition Versus Detonation Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24272",
+   "topic": "Engine Blow-By and Crankcase Ventilation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24273",
+   "topic": "Positive Crankcase Ventilation Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24274",
+   "topic": "Engine Break-In Procedures Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24275",
+   "topic": "Catalytic Converters and How They Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24276",
+   "topic": "Automotive Emissions Standards Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24277",
+   "topic": "Lambda Sensors and Closed Loop Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24278",
+   "topic": "Engine Mounts and Vibration Isolation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24279",
+   "topic": "Dry Sump Versus Wet Sump Lubrication",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24280",
+   "topic": "Engine Downsizing and Modern Efficiency",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24281",
+   "topic": "Cylinder Deactivation Technology Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24282",
+   "topic": "Stop-Start Systems in Modern Cars",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24283",
+   "topic": "How a Carburettor Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24284",
+   "topic": "Carburettor Tuning and Jetting",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24285",
+   "topic": "Rebuilding and Cleaning a Carburettor",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24286",
+   "topic": "Mechanical Fuel Pumps and Fuel Delivery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24287",
+   "topic": "Electronic Port Fuel Injection Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24288",
+   "topic": "Gasoline Direct Injection Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24289",
+   "topic": "Fuel Injectors Cleaning and Testing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24290",
+   "topic": "Fuel Rails Regulators and Pressure Testing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24291",
+   "topic": "In-Tank Fuel Pumps and Fuel Filters",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24292",
+   "topic": "Air Fuel Ratio and Stoichiometry",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24293",
+   "topic": "Wideband Oxygen Sensors and Tuning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24294",
+   "topic": "Petrol Chemistry Octane and Knock Resistance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24295",
+   "topic": "Diesel Fuel Cetane and Cold Flow",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24296",
+   "topic": "Fuel Additives What Works and What Does Not",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24297",
+   "topic": "Storing Fuel Safely and Fuel Ageing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24298",
+   "topic": "Water and Contamination in Fuel Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24299",
+   "topic": "How Spark Ignition Systems Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24300",
+   "topic": "Spark Plugs Heat Range and Reading",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24301",
+   "topic": "Ignition Coils and Coil-On-Plug Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24302",
+   "topic": "Distributors Points and Condensers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24303",
+   "topic": "Setting Ignition Timing With a Timing Light",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24304",
+   "topic": "Knock Sensors and Timing Retard",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24305",
+   "topic": "Intake Manifold Design and Runner Length",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24306",
+   "topic": "Air Filters Types and Maintenance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24307",
+   "topic": "Throttle Bodies and Drive-By-Wire Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24308",
+   "topic": "Idle Air Control and Idle Problems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24309",
+   "topic": "Exhaust Manifolds and Header Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24310",
+   "topic": "Mufflers Resonators and Exhaust Noise",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24311",
+   "topic": "Exhaust Backpressure Myths and Facts",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24312",
+   "topic": "Running an Engine on LPG or Autogas",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24313",
+   "topic": "Compressed Natural Gas Vehicle Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24314",
+   "topic": "Hydrogen Combustion Engines Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24315",
+   "topic": "Ethanol Blends and Flex Fuel Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24316",
+   "topic": "Biodiesel Production and Vehicle Use",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24317",
+   "topic": "Vegetable Oil and Waste Oil Conversions",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24318",
+   "topic": "Engine Control Units and How They Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24319",
+   "topic": "Reading and Editing an Engine Map",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24320",
+   "topic": "Volumetric Efficiency Tables in Tuning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24321",
+   "topic": "Fuel Trims Short Term and Long Term",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24322",
+   "topic": "Speed Density Versus Mass Airflow Metering",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24323",
+   "topic": "Mass Air Flow Sensors and Cleaning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24324",
+   "topic": "Manifold Absolute Pressure Sensors Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24325",
+   "topic": "Cold Start Enrichment and Warm-Up Strategy",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24326",
+   "topic": "Limp Mode and Engine Protection Strategies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24327",
+   "topic": "How a Clutch Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24328",
+   "topic": "Diagnosing and Replacing a Worn Clutch",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24329",
+   "topic": "Dual Mass Flywheels Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24330",
+   "topic": "How a Torque Converter Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24331",
+   "topic": "Manual Gearbox Design and Operation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24332",
+   "topic": "Synchromesh and Gear Selection Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24333",
+   "topic": "Sequential and Dog Box Gearboxes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24334",
+   "topic": "How an Automatic Transmission Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24335",
+   "topic": "Planetary Gearsets in Automatics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24336",
+   "topic": "Dual Clutch Transmissions Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24337",
+   "topic": "Continuously Variable Transmissions Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24338",
+   "topic": "Automated Manual Transmissions Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24339",
+   "topic": "Transmission Fluid Types and Servicing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24340",
+   "topic": "Diagnosing Transmission Slip and Shudder",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24341",
+   "topic": "How a Differential Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24342",
+   "topic": "Limited Slip Differentials Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24343",
+   "topic": "Locking Differentials and Traction Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24344",
+   "topic": "Final Drive Ratios and Gearing Choice",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24345",
+   "topic": "Setting Up a Ring and Pinion Gearset",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24346",
+   "topic": "Driveshafts Propshafts and Balance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24347",
+   "topic": "Constant Velocity Joints and Boots",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24348",
+   "topic": "Universal Joints and Driveline Angles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24349",
+   "topic": "Front Wheel Drive Layout Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24350",
+   "topic": "Rear Wheel Drive Layout Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24351",
+   "topic": "All Wheel Drive Systems Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24352",
+   "topic": "Part-Time Four Wheel Drive and Transfer Cases",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24353",
+   "topic": "Torque Vectoring Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24354",
+   "topic": "Gear Ratio Mathematics for Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24355",
+   "topic": "Driveline Vibration Diagnosis",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24356",
+   "topic": "Transaxles and Mid-Engine Layouts",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24357",
+   "topic": "Chain and Belt Final Drives",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24358",
+   "topic": "Hub Reduction and Portal Axles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24359",
+   "topic": "How an Electric Vehicle Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24360",
+   "topic": "Lithium-Ion Battery Chemistry Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24361",
+   "topic": "Battery Cells Modules and Pack Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24362",
+   "topic": "Lithium Iron Phosphate Versus NMC Cells",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24363",
+   "topic": "Solid State Batteries for Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24364",
+   "topic": "Battery Management Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24365",
+   "topic": "State of Charge and State of Health",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24366",
+   "topic": "EV Battery Degradation and Longevity",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24367",
+   "topic": "Battery Cell Balancing Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24368",
+   "topic": "EV Battery Thermal Management Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24369",
+   "topic": "Battery Pack Safety and Thermal Runaway",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24370",
+   "topic": "Recycling and Second Life EV Batteries",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24371",
+   "topic": "Permanent Magnet Motors in Electric Cars",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24372",
+   "topic": "Induction Motors for Vehicle Traction",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24373",
+   "topic": "Switched Reluctance and Axial Flux Motors",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24374",
+   "topic": "Traction Inverters and Power Electronics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24375",
+   "topic": "DC-DC Converters in Electric Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24376",
+   "topic": "Motor Control and Field Oriented Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24377",
+   "topic": "How EV Charging Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24378",
+   "topic": "AC Versus DC Fast Charging Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24379",
+   "topic": "EV Charging Connectors and Standards",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24380",
+   "topic": "Home EV Charger Installation Basics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24381",
+   "topic": "Public Charging Networks and Payment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24382",
+   "topic": "Charging Curves and Fast Charge Tapering",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24383",
+   "topic": "Vehicle to Grid and Vehicle to Load",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24384",
+   "topic": "EV Range Estimation and Real World Range",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24385",
+   "topic": "Cold Weather Effects on EV Range",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24386",
+   "topic": "How Hybrid Vehicles Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24387",
+   "topic": "Series Versus Parallel Hybrid Architectures",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24388",
+   "topic": "Power-Split Hybrid Transmissions Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24389",
+   "topic": "Mild Hybrids and 48 Volt Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24390",
+   "topic": "Plug-In Hybrid Vehicles Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24391",
+   "topic": "Regenerative Braking Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24392",
+   "topic": "One Pedal Driving and Blended Braking",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24393",
+   "topic": "Energy Management in Hybrid Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24394",
+   "topic": "High Voltage Safety for EV Technicians",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24395",
+   "topic": "Servicing and Isolating a High Voltage Pack",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24396",
+   "topic": "Diagnosing Electric Vehicle Faults",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24397",
+   "topic": "Hydrogen Fuel Cell Vehicles Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24398",
+   "topic": "Hydrogen Storage and Refuelling Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24399",
+   "topic": "Comparing Electric and Combustion Efficiency",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24400",
+   "topic": "Electric Vehicle Heat Pumps and Cabin Heating",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24401",
+   "topic": "Converting a Classic Car to Electric Drive",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24402",
+   "topic": "Electric Motor Cooling and Continuous Power",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24403",
+   "topic": "How Disc Brakes Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24404",
+   "topic": "How Drum Brakes Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24405",
+   "topic": "Brake Pad Compounds and Selection",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24406",
+   "topic": "Brake Discs Warping Wear and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24407",
+   "topic": "Brake Hydraulics Master Cylinders and Lines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24408",
+   "topic": "Bleeding Brakes Correctly",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24409",
+   "topic": "Brake Calipers Seizure and Overhaul",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24410",
+   "topic": "Anti-Lock Braking Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24411",
+   "topic": "Electronic Stability Control Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24412",
+   "topic": "Brake Boosters and Vacuum Assistance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24413",
+   "topic": "Handbrakes and Electronic Parking Brakes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24414",
+   "topic": "Brake Fade Causes and Prevention",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24415",
+   "topic": "Brake Balance and Proportioning Valves",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24416",
+   "topic": "Diagnosing Brake Noise and Judder",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24417",
+   "topic": "Suspension Geometry Camber Caster Toe",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24418",
+   "topic": "MacPherson Strut Suspension Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24419",
+   "topic": "Double Wishbone Suspension Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24420",
+   "topic": "Multi-Link Suspension Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24421",
+   "topic": "Live Axle and Leaf Spring Suspension",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24422",
+   "topic": "Torsion Beam and Semi-Trailing Arm Setups",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24423",
+   "topic": "Coil Springs Rates and Selection",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24424",
+   "topic": "How Shock Absorbers Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24425",
+   "topic": "Adjustable Dampers and Coilover Setup",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24426",
+   "topic": "Anti-Roll Bars and Roll Stiffness",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24427",
+   "topic": "Air Suspension Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24428",
+   "topic": "Adaptive and Magnetorheological Dampers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24429",
+   "topic": "Bushes Ball Joints and Suspension Wear",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24430",
+   "topic": "Diagnosing Suspension Knocks and Clunks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24431",
+   "topic": "Rack and Pinion Steering Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24432",
+   "topic": "Recirculating Ball Steering Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24433",
+   "topic": "Hydraulic Power Steering Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24434",
+   "topic": "Electric Power Steering Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24435",
+   "topic": "Steering Column Design and Safety",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24436",
+   "topic": "Wheel Alignment Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24437",
+   "topic": "Four Wheel Steering Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24438",
+   "topic": "Steering Geometry Ackermann and Bump Steer",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24439",
+   "topic": "Tyre Construction and Anatomy",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24440",
+   "topic": "Reading a Tyre Sidewall Code",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24441",
+   "topic": "Tyre Compounds and Grip Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24442",
+   "topic": "Summer Winter and All-Season Tyres",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24443",
+   "topic": "Run-Flat Tyres and Emergency Spares",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24444",
+   "topic": "Tyre Pressure Effects on Handling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24445",
+   "topic": "Tyre Pressure Monitoring Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24446",
+   "topic": "Tyre Wear Patterns and What They Mean",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24447",
+   "topic": "Repairing a Punctured Tyre Safely",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24448",
+   "topic": "Tyre Ageing Storage and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24449",
+   "topic": "Wheel Materials Forged Cast and Steel",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24450",
+   "topic": "Wheel Sizing Offset and Fitment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24451",
+   "topic": "Wheel Balancing and Vibration Cures",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24452",
+   "topic": "Wheel Bearings Types and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24453",
+   "topic": "Wheel Nuts Torque and Thread Care",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24454",
+   "topic": "Vehicle Weight Transfer Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24455",
+   "topic": "Understeer and Oversteer Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24456",
+   "topic": "The Tyre Friction Circle Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24457",
+   "topic": "Centre of Gravity and Rollover Resistance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24458",
+   "topic": "Suspension Tuning for Road and Track",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24459",
+   "topic": "Ride Comfort Versus Handling Trade-Offs",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24460",
+   "topic": "How an Engine Cooling System Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24461",
+   "topic": "Radiators Design Cleaning and Repair",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24462",
+   "topic": "Water Pumps and Coolant Circulation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24463",
+   "topic": "Thermostats and Engine Warm-Up",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24464",
+   "topic": "Cooling Fans Electric and Viscous",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24465",
+   "topic": "Coolant Chemistry and Antifreeze Types",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24466",
+   "topic": "Flushing and Bleeding a Cooling System",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24467",
+   "topic": "Diagnosing Engine Overheating",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24468",
+   "topic": "Head Gasket Failure Symptoms and Testing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24469",
+   "topic": "Oil Coolers and Transmission Coolers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24470",
+   "topic": "Engine Oil Viscosity Grades Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24471",
+   "topic": "Mineral Synthetic and Blended Oils",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24472",
+   "topic": "Engine Oil Additive Packages Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24473",
+   "topic": "Oil Specifications API ACEA and OEM",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24474",
+   "topic": "How to Change Engine Oil and Filter",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24475",
+   "topic": "Oil Analysis and What It Reveals",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24476",
+   "topic": "Oil Pumps Pressure and Relief Valves",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24477",
+   "topic": "Diagnosing Low Oil Pressure",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24478",
+   "topic": "Oil Consumption Causes and Cures",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24479",
+   "topic": "Oil Leaks Finding and Fixing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24480",
+   "topic": "Grease Types and Chassis Lubrication",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24481",
+   "topic": "Gear Oil and Differential Fluid Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24482",
+   "topic": "Brake Fluid Types and Moisture Absorption",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24483",
+   "topic": "Power Steering Fluid and Servicing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24484",
+   "topic": "How Automotive Air Conditioning Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24485",
+   "topic": "Air Conditioning Refrigerants and Regulations",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24486",
+   "topic": "Diagnosing and Recharging Car Air Conditioning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24487",
+   "topic": "Cabin Air Filters and Ventilation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24488",
+   "topic": "Vehicle Heater Cores and Heating Faults",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24489",
+   "topic": "How a Car Electrical System Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24490",
+   "topic": "Lead Acid Car Batteries Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24491",
+   "topic": "Testing and Charging a Car Battery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24492",
+   "topic": "AGM and Lithium Starter Batteries",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24493",
+   "topic": "How an Alternator Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24494",
+   "topic": "Diagnosing Charging System Faults",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24495",
+   "topic": "Starter Motors and Solenoids Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24496",
+   "topic": "Diagnosing a No-Start Condition",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24497",
+   "topic": "Automotive Wiring Harness Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24498",
+   "topic": "Reading an Automotive Wiring Diagram",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24499",
+   "topic": "Fuses Relays and Circuit Protection",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24500",
+   "topic": "Voltage Drop Testing Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24501",
+   "topic": "Finding and Fixing Bad Earth Connections",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24502",
+   "topic": "Automotive Connectors and Weatherproofing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24503",
+   "topic": "Soldering and Crimping Vehicle Wiring",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24504",
+   "topic": "Tracing Parasitic Battery Drain",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24505",
+   "topic": "Automotive Lighting Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24506",
+   "topic": "Halogen HID and LED Headlights Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24507",
+   "topic": "Headlight Aiming and Beam Patterns",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24508",
+   "topic": "Auxiliary Lighting and Wiring Relays",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24509",
+   "topic": "How CAN Bus Works in Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24510",
+   "topic": "LIN FlexRay and Automotive Ethernet",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24511",
+   "topic": "Vehicle Body Control Modules Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24512",
+   "topic": "Automotive Sensors and How They Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24513",
+   "topic": "Actuators Solenoids and Stepper Motors",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24514",
+   "topic": "Immobilisers Transponders and Key Coding",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24515",
+   "topic": "Keyless Entry and Relay Attack Security",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24516",
+   "topic": "Car Alarms and Vehicle Security Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24517",
+   "topic": "Car Audio System Design and Installation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24518",
+   "topic": "Infotainment Systems and Smartphone Integration",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24519",
+   "topic": "Vehicle Telematics and Fleet Tracking",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24520",
+   "topic": "Dash Cameras Choosing and Installing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24521",
+   "topic": "How Cruise Control Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24522",
+   "topic": "Adaptive Cruise Control and Radar Sensing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24523",
+   "topic": "Lane Keeping and Lane Departure Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24524",
+   "topic": "Automatic Emergency Braking Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24525",
+   "topic": "Parking Sensors and Camera Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24526",
+   "topic": "Lidar Radar and Camera Sensor Fusion",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24527",
+   "topic": "Levels of Driving Automation Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24528",
+   "topic": "Self-Driving Cars How They Perceive Roads",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24529",
+   "topic": "Blind Spot Monitoring Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24530",
+   "topic": "Vehicle Cybersecurity and Remote Attacks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24531",
+   "topic": "Auxiliary Power Sockets and Inverters",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24532",
+   "topic": "Trailer Wiring and Towing Electrics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24533",
+   "topic": "How OBD-II Diagnostics Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24534",
+   "topic": "Reading and Clearing Fault Codes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24535",
+   "topic": "Understanding OBD-II Freeze Frame Data",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24536",
+   "topic": "Live Data Streams and PID Interpretation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24537",
+   "topic": "Choosing an Automotive Scan Tool",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24538",
+   "topic": "Mode 6 Diagnostics and Readiness Monitors",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24539",
+   "topic": "Systematic Fault Finding Method",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24540",
+   "topic": "Using a Multimeter on Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24541",
+   "topic": "Using an Automotive Oscilloscope",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24542",
+   "topic": "Smoke Testing for Vacuum and EVAP Leaks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24543",
+   "topic": "Compression Testing an Engine",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24544",
+   "topic": "Cylinder Leak-Down Testing Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24545",
+   "topic": "Fuel Pressure Testing Procedures",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24546",
+   "topic": "Diagnosing a Misfire",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24547",
+   "topic": "Diagnosing Rough Idle and Stalling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24548",
+   "topic": "Diagnosing Poor Fuel Economy",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24549",
+   "topic": "Diagnosing Loss of Power Under Load",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24550",
+   "topic": "Diagnosing Warning Lights on the Dashboard",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24551",
+   "topic": "Noise Vibration and Harshness Diagnosis",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24552",
+   "topic": "Locating Squeaks Rattles and Wind Noise",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24553",
+   "topic": "Routine Car Service Schedule Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24554",
+   "topic": "Weekly Vehicle Checks Every Driver Should Do",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24555",
+   "topic": "Seasonal Vehicle Preparation Checklist",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24556",
+   "topic": "Preparing a Vehicle for Long Storage",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24557",
+   "topic": "Vehicle Inspection and Roadworthiness Tests",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24558",
+   "topic": "Pre-Purchase Used Car Inspection",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24559",
+   "topic": "Checking Vehicle History and Provenance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24560",
+   "topic": "Home Workshop Setup and Essential Tools",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24561",
+   "topic": "Safely Jacking and Supporting a Vehicle",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24562",
+   "topic": "Torque Wrenches and Correct Fastener Torque",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24563",
+   "topic": "Threadlockers Seals and Gasket Sealants",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24564",
+   "topic": "Automotive Fasteners Threads and Grades",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24565",
+   "topic": "Workshop Safety and Hazardous Materials",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24566",
+   "topic": "Disposing of Oil Coolant and Batteries",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24567",
+   "topic": "Keeping Vehicle Maintenance Records",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24568",
+   "topic": "Understanding a Repair Quote and Labour Times",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24569",
+   "topic": "Sourcing Parts OEM Aftermarket and Used",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24570",
+   "topic": "Unibody Versus Body-On-Frame Construction",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24571",
+   "topic": "Spaceframe and Tubular Chassis Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24572",
+   "topic": "Crumple Zones and Structural Crash Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24573",
+   "topic": "Automotive Steels Aluminium and Composites",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24574",
+   "topic": "How Car Bodies Rust",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24575",
+   "topic": "Rust Repair Cutting and Welding Panels",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24576",
+   "topic": "Rustproofing and Cavity Wax Treatment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24577",
+   "topic": "Underbody Protection and Sealants",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24578",
+   "topic": "Automotive Paint Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24579",
+   "topic": "Preparing a Surface for Paint",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24580",
+   "topic": "Spray Painting Technique and Equipment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24581",
+   "topic": "Colour Matching and Blending Paint",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24582",
+   "topic": "Polishing Compounding and Paint Correction",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24583",
+   "topic": "Ceramic Coatings and Paint Protection Film",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24584",
+   "topic": "Car Washing and Detailing Method",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24585",
+   "topic": "Removing Dents and Paintless Dent Repair",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24586",
+   "topic": "Panel Beating and Metal Shaping Basics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24587",
+   "topic": "MIG TIG and Spot Welding for Bodywork",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24588",
+   "topic": "Body Filler Use and Misuse",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24589",
+   "topic": "Replacing Windscreens and Auto Glass",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24590",
+   "topic": "Door Seals Weatherstrips and Water Leaks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24591",
+   "topic": "Vehicle Interior Trim and Upholstery Repair",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24592",
+   "topic": "Automotive Carpet Sound Deadening and NVH",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24593",
+   "topic": "Vehicle Aerodynamics and Drag Coefficient",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24594",
+   "topic": "Downforce Spoilers and Diffusers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24595",
+   "topic": "Underbody Airflow and Cooling Drag",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24596",
+   "topic": "Planning a Classic Car Restoration",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24597",
+   "topic": "Barn Find Assessment and Recommissioning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24598",
+   "topic": "Sourcing Parts for Classic Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24599",
+   "topic": "Concours Versus Driver Quality Restoration",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24600",
+   "topic": "Preserving Original Patina and Documentation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24601",
+   "topic": "Storing a Classic Car Long Term",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24602",
+   "topic": "How a Motorcycle Engine Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24603",
+   "topic": "Motorcycle Engine Layouts Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24604",
+   "topic": "Motorcycle Transmissions and Wet Clutches",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24605",
+   "topic": "Motorcycle Final Drive Chain Belt and Shaft",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24606",
+   "topic": "Chain Maintenance Adjustment and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24607",
+   "topic": "Motorcycle Frame Types and Geometry",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24608",
+   "topic": "Motorcycle Telescopic Forks Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24609",
+   "topic": "Motorcycle Rear Suspension and Linkages",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24610",
+   "topic": "Setting Motorcycle Suspension Sag",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24611",
+   "topic": "Motorcycle Brakes and Combined Braking",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24612",
+   "topic": "Motorcycle Tyres Profiles and Warm-Up",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24613",
+   "topic": "Countersteering and Motorcycle Cornering",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24614",
+   "topic": "Motorcycle Braking Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24615",
+   "topic": "Riding in Rain Wind and Poor Grip",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24616",
+   "topic": "Motorcycle Helmets Standards and Fit",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24617",
+   "topic": "Protective Riding Gear Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24618",
+   "topic": "Group Riding and Road Positioning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24619",
+   "topic": "Motorcycle Pre-Ride Safety Checks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24620",
+   "topic": "Motorcycle Servicing and Valve Checks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24621",
+   "topic": "Winterising and Storing a Motorcycle",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24622",
+   "topic": "Carburettor Versus Injection on Motorcycles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24623",
+   "topic": "Motorcycle Categories and Riding Styles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24624",
+   "topic": "Adventure and Dual Sport Motorcycles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24625",
+   "topic": "Scooters and Mopeds Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24626",
+   "topic": "All-Terrain Vehicles and Side-By-Sides",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24627",
+   "topic": "Trikes Sidecars and Three-Wheelers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24628",
+   "topic": "History of the Motorcycle",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24629",
+   "topic": "Motorcycle Racing Disciplines Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24630",
+   "topic": "How a Bicycle Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24631",
+   "topic": "Bicycle Frame Materials Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24632",
+   "topic": "Bicycle Frame Geometry Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24633",
+   "topic": "Road Gravel and Mountain Bikes Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24634",
+   "topic": "Bicycle Drivetrain and Gearing Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24635",
+   "topic": "Derailleurs Adjustment and Indexing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24636",
+   "topic": "Internal Gear Hubs and Belt Drives",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24637",
+   "topic": "Bicycle Chain Wear and Replacement",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24638",
+   "topic": "Bicycle Bottom Brackets and Cranks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24639",
+   "topic": "Rim Brakes Versus Disc Brakes on Bikes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24640",
+   "topic": "Bleeding Hydraulic Bicycle Brakes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24641",
+   "topic": "Bicycle Wheel Building and Truing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24642",
+   "topic": "Bicycle Tyres Tubes and Tubeless Setup",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24643",
+   "topic": "Fixing a Bicycle Puncture",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24644",
+   "topic": "Bicycle Headsets Stems and Handlebars",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24645",
+   "topic": "Bicycle Bearings Cleaning and Greasing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24646",
+   "topic": "Bicycle Maintenance Schedule",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24647",
+   "topic": "Roadside Bicycle Repairs and Tool Kit",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24648",
+   "topic": "How Electric Bikes Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24649",
+   "topic": "E-Bike Motors Hub Versus Mid-Drive",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24650",
+   "topic": "E-Bike Batteries Range and Care",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24651",
+   "topic": "E-Bike Classes and Legal Limits",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24652",
+   "topic": "Converting a Bicycle to Electric Power",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24653",
+   "topic": "Bike Fitting and Riding Position",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24654",
+   "topic": "Efficient Pedalling and Cadence",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24655",
+   "topic": "Cycling Safely in Traffic",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24656",
+   "topic": "Bicycle Touring and Bikepacking Setup",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24657",
+   "topic": "Cargo Bikes and Family Cycling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24658",
+   "topic": "Bicycle Locks and Theft Prevention",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24659",
+   "topic": "Electric Scooters How They Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24660",
+   "topic": "Personal Mobility Devices and Regulation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24661",
+   "topic": "History of the Bicycle",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24662",
+   "topic": "Boat Hull Types and Their Behaviour",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24663",
+   "topic": "Displacement Planing and Semi-Displacement Hulls",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24664",
+   "topic": "Catamarans Trimarans and Multihulls",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24665",
+   "topic": "Hull Speed and Marine Hydrodynamics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24666",
+   "topic": "Boat Stability and Righting Moment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24667",
+   "topic": "Marine Propellers Pitch and Cavitation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24668",
+   "topic": "How Outboard Motors Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24669",
+   "topic": "Outboard Maintenance and Winterising",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24670",
+   "topic": "Inboard Engines and Shaft Drives",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24671",
+   "topic": "Sterndrive and Jet Drive Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24672",
+   "topic": "Marine Diesel Engines Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24673",
+   "topic": "Marine Engine Cooling Raw and Closed Circuit",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24674",
+   "topic": "Ship Propulsion and Large Marine Engines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24675",
+   "topic": "Sailboat Rigs and Sail Plans",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24676",
+   "topic": "How Sails Generate Drive",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24677",
+   "topic": "Points of Sail and Basic Sailing Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24678",
+   "topic": "Reefing and Heavy Weather Sailing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24679",
+   "topic": "Anchoring and Mooring Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24680",
+   "topic": "Knots and Ropework for Boats",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24681",
+   "topic": "Marine Electrical Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24682",
+   "topic": "Boat Batteries Charging and Shore Power",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24683",
+   "topic": "Galvanic Corrosion and Sacrificial Anodes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24684",
+   "topic": "Marine Navigation Charts and Plotting",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24685",
+   "topic": "Marine GPS Radar and AIS Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24686",
+   "topic": "Tides Currents and Passage Planning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24687",
+   "topic": "Collision Regulations and Rules of the Road",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24688",
+   "topic": "Marine VHF Radio and Distress Calls",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24689",
+   "topic": "Life Jackets and Marine Safety Equipment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24690",
+   "topic": "Man Overboard Recovery Procedures",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24691",
+   "topic": "Boat Hull Maintenance and Antifouling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24692",
+   "topic": "Winterising and Storing a Boat",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24693",
+   "topic": "Trailering and Launching a Boat",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24694",
+   "topic": "Small Boat Handling and Docking",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24695",
+   "topic": "Kayaks Canoes and Paddle Craft",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24696",
+   "topic": "Types of Cargo Ship Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24697",
+   "topic": "Container Shipping and Port Operations",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24698",
+   "topic": "Submarines and Underwater Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24699",
+   "topic": "History of Ships and Seafaring",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24700",
+   "topic": "Lighthouses Buoys and Navigation Marks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24701",
+   "topic": "How an Aeroplane Flies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24702",
+   "topic": "Lift Drag Thrust and Weight Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24703",
+   "topic": "Aerofoil Shapes and Angle of Attack",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24704",
+   "topic": "Stalls Spins and Recovery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24705",
+   "topic": "Wing Design Sweep Aspect Ratio and Flaps",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24706",
+   "topic": "Aircraft Stability and Control Surfaces",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24707",
+   "topic": "Aircraft Weight and Balance Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24708",
+   "topic": "Aircraft Performance and Takeoff Distance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24709",
+   "topic": "Piston Aircraft Engines Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24710",
+   "topic": "Aircraft Propellers and Pitch Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24711",
+   "topic": "How a Jet Engine Works",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24712",
+   "topic": "Turbofan Turboprop and Turboshaft Compared",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24713",
+   "topic": "Afterburners and Supersonic Propulsion",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24714",
+   "topic": "Aircraft Fuel Systems and Management",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24715",
+   "topic": "Aircraft Hydraulic and Pneumatic Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24716",
+   "topic": "Aircraft Electrical and Ice Protection Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24717",
+   "topic": "Cabin Pressurisation and Oxygen Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24718",
+   "topic": "Fly-By-Wire Flight Control Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24719",
+   "topic": "Aircraft Instruments and the Six Pack",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24720",
+   "topic": "Pitot Static Systems and Airspeed",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24721",
+   "topic": "Aircraft Radio Navigation Aids",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24722",
+   "topic": "Instrument Flight Rules Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24723",
+   "topic": "Autopilots and Flight Management Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24724",
+   "topic": "How a Helicopter Flies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24725",
+   "topic": "Helicopter Rotor Systems and Controls",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24726",
+   "topic": "Autorotation and Helicopter Emergencies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24727",
+   "topic": "Tiltrotors and Vertical Takeoff Aircraft",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24728",
+   "topic": "Air Traffic Control Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24729",
+   "topic": "Airport Layout Runways and Markings",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24730",
+   "topic": "Flight Planning and Aviation Weather",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24731",
+   "topic": "Reading Aviation Weather Reports",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24732",
+   "topic": "Aviation Radio Phraseology Basics",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24733",
+   "topic": "Aviation Safety Systems and Accident Investigation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24734",
+   "topic": "Human Factors in Aviation Safety",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24735",
+   "topic": "Learning to Fly and Pilot Licences",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24736",
+   "topic": "Gliding and Soaring Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24737",
+   "topic": "Hot Air Balloons and Airships",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24738",
+   "topic": "Drones and Unmanned Aircraft Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24739",
+   "topic": "Rockets and Launch Vehicles Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24740",
+   "topic": "History of Powered Flight",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24741",
+   "topic": "History of Commercial Airlines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24742",
+   "topic": "How Railways Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24743",
+   "topic": "Railway Track Construction and Ballast",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24744",
+   "topic": "Rail Gauge and Why It Varies",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24745",
+   "topic": "Points Switches and Crossings Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24746",
+   "topic": "Wheel Rail Contact and Adhesion",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24747",
+   "topic": "How Steam Locomotives Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24748",
+   "topic": "Diesel-Electric Locomotives Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24749",
+   "topic": "Electric Locomotives and Overhead Lines",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24750",
+   "topic": "Third Rail Electrification Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24751",
+   "topic": "Railway Rolling Stock and Carriage Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24752",
+   "topic": "Train Couplings and Buffers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24753",
+   "topic": "Railway Air Brakes Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24754",
+   "topic": "Bogies Suspension and Ride Quality",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24755",
+   "topic": "Railway Signalling Principles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24756",
+   "topic": "Interlocking and Block Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24757",
+   "topic": "Automatic Train Protection Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24758",
+   "topic": "Level Crossings and Their Safety",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24759",
+   "topic": "High Speed Rail Engineering",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24760",
+   "topic": "Maglev and Experimental Rail Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24761",
+   "topic": "Metro and Underground Railway Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24762",
+   "topic": "Trams and Light Rail Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24763",
+   "topic": "Funiculars Rack Railways and Cable Cars",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24764",
+   "topic": "Rail Freight Operations Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24765",
+   "topic": "Marshalling Yards and Train Formation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24766",
+   "topic": "Railway Timetabling and Capacity",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24767",
+   "topic": "Railway Stations and Passenger Flow",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24768",
+   "topic": "Tunnels Bridges and Rail Infrastructure",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24769",
+   "topic": "Railway Maintenance and Track Renewal",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24770",
+   "topic": "History of the Railways",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24771",
+   "topic": "Heritage Railways and Preservation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24772",
+   "topic": "Model Railways and Scale Modelling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24773",
+   "topic": "How Heavy Trucks Are Built",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24774",
+   "topic": "Heavy Duty Diesel Engines Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24775",
+   "topic": "Truck Transmissions and Range Splitters",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24776",
+   "topic": "Air Brake Systems on Heavy Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24777",
+   "topic": "Retarders and Engine Braking Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24778",
+   "topic": "Truck Suspension and Air Bags",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24779",
+   "topic": "Articulated Lorries and Fifth Wheel Coupling",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24780",
+   "topic": "Trailer Types and Their Uses",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24781",
+   "topic": "Load Securing and Weight Distribution",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24782",
+   "topic": "Axle Weights and Legal Load Limits",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24783",
+   "topic": "Tachographs and Drivers Hours Rules",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24784",
+   "topic": "Truck Driver Daily Walkaround Checks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24785",
+   "topic": "Refrigerated Transport and Cold Chain",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24786",
+   "topic": "Tankers and Hazardous Goods Transport",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24787",
+   "topic": "Buses and Coaches Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24788",
+   "topic": "Bus Accessibility and Passenger Safety",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24789",
+   "topic": "School Buses and Special Passenger Transport",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24790",
+   "topic": "How Tractors Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24791",
+   "topic": "Tractor Power Take-Off and Three Point Linkage",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24792",
+   "topic": "Combine Harvesters Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24793",
+   "topic": "Ploughs Seed Drills and Tillage Implements",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24794",
+   "topic": "Sprayers Spreaders and Precision Agriculture",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24795",
+   "topic": "Agricultural Machinery Maintenance",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24796",
+   "topic": "Farm Machinery Safety",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24797",
+   "topic": "How Excavators Work",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24798",
+   "topic": "Wheel Loaders Bulldozers and Earthmoving",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24799",
+   "topic": "Cranes Types and Lifting Principles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24800",
+   "topic": "Telehandlers and Rough Terrain Forklifts",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24801",
+   "topic": "Forklifts and Warehouse Handling Equipment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24802",
+   "topic": "Road Building and Paving Machinery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24803",
+   "topic": "Hydraulic Systems in Heavy Machinery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24804",
+   "topic": "Hydraulic Pumps Valves and Cylinders",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24805",
+   "topic": "Troubleshooting Hydraulic System Faults",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24806",
+   "topic": "Tracked Versus Wheeled Machine Undercarriages",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24807",
+   "topic": "Fire Appliances and Emergency Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24808",
+   "topic": "Ambulances and Patient Transport Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24809",
+   "topic": "Military Vehicles and Armoured Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24810",
+   "topic": "Snowploughs and Winter Service Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24811",
+   "topic": "Refuse Collection Vehicles Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24812",
+   "topic": "Recovery Trucks and Vehicle Transporters",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24813",
+   "topic": "Learning to Drive a Manual Car",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24814",
+   "topic": "Smooth Driving and Vehicle Sympathy",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24815",
+   "topic": "Observation and Hazard Perception",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24816",
+   "topic": "Road Positioning and Lane Discipline",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24817",
+   "topic": "Safe Following Distance and Reaction Time",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24818",
+   "topic": "Overtaking Safely on the Road",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24819",
+   "topic": "Motorway and Freeway Driving Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24820",
+   "topic": "Roundabouts and Complex Junctions",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24821",
+   "topic": "Night Driving and Glare Management",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24822",
+   "topic": "Driving in Fog Rain and Standing Water",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24823",
+   "topic": "Winter Driving on Snow and Ice",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24824",
+   "topic": "Snow Chains Winter Tyres and Traction Aids",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24825",
+   "topic": "Skid Control and Recovery",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24826",
+   "topic": "Emergency Braking and Avoidance Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24827",
+   "topic": "Green Laning and Trail Etiquette",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24828",
+   "topic": "Sand Mud and Water Crossing Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24829",
+   "topic": "Recovering a Stuck Vehicle Safely",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24830",
+   "topic": "Winching Techniques and Equipment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24831",
+   "topic": "Towing a Trailer Safely",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24832",
+   "topic": "Trailer Reversing and Manoeuvring",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24833",
+   "topic": "Caravan Towing and Stability Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24834",
+   "topic": "Towing Weights and Legal Limits",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24835",
+   "topic": "Jump Starting a Vehicle Safely",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24836",
+   "topic": "Changing a Wheel at the Roadside",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24837",
+   "topic": "What to Carry in a Vehicle Emergency Kit",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24838",
+   "topic": "Breaking Down Safely on a Motorway",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24839",
+   "topic": "Roadside Repairs That Get You Home",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24840",
+   "topic": "Fuel Efficient Driving Technique",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24841",
+   "topic": "Eco Driving and Reducing Emissions",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24842",
+   "topic": "Driver Fatigue and Alertness",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24843",
+   "topic": "Distracted Driving and Phone Use",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24844",
+   "topic": "Alcohol Drugs and Driving Impairment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24845",
+   "topic": "Defensive Driving Principles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24846",
+   "topic": "Crash Dynamics and Energy Absorption",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24847",
+   "topic": "Seat Belts and How They Save Lives",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24848",
+   "topic": "Airbags and Supplemental Restraint Systems",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24849",
+   "topic": "Child Car Seats and Correct Fitting",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24850",
+   "topic": "Vehicle Crash Testing and Safety Ratings",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24851",
+   "topic": "Pedestrian Protection in Vehicle Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24852",
+   "topic": "Whiplash Injuries and Head Restraints",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24853",
+   "topic": "What to Do After a Road Collision",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24854",
+   "topic": "Road Traffic Collision Investigation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24855",
+   "topic": "Road Design and Geometric Alignment",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24856",
+   "topic": "Road Surfaces and Pavement Engineering",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24857",
+   "topic": "Traffic Signs Signals and Markings",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24858",
+   "topic": "Traffic Signal Timing and Junction Control",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24859",
+   "topic": "Traffic Flow Theory and Congestion",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24860",
+   "topic": "Roundabout and Intersection Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24861",
+   "topic": "Speed Limits and Speed Management",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24862",
+   "topic": "Traffic Calming and Street Design",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24863",
+   "topic": "Road Safety Engineering and Black Spots",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24864",
+   "topic": "Motorway Design and Junction Layouts",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24865",
+   "topic": "Bridges and Tunnels for Road Transport",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24866",
+   "topic": "Parking Design and Management",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24867",
+   "topic": "Cycle Infrastructure and Protected Lanes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24868",
+   "topic": "Pedestrian Infrastructure and Walkability",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24869",
+   "topic": "Freight Logistics and Supply Chains",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24870",
+   "topic": "Warehousing and Distribution Centres",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24871",
+   "topic": "Last Mile Delivery Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24872",
+   "topic": "Intermodal Freight and Containerisation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24873",
+   "topic": "Fleet Management and Vehicle Telemetry",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24874",
+   "topic": "Route Optimisation and Vehicle Routing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24875",
+   "topic": "Cold Chain Logistics Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24876",
+   "topic": "Air Freight and Express Parcel Networks",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24877",
+   "topic": "Pipelines as a Transport Mode",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24878",
+   "topic": "Public Transport Network Planning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24879",
+   "topic": "Bus Rapid Transit Systems Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24880",
+   "topic": "Transit Fare Systems and Ticketing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24881",
+   "topic": "Timetabling and Service Frequency Planning",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24882",
+   "topic": "Park and Ride and Multimodal Interchange",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24883",
+   "topic": "Accessible Transport for Disabled Passengers",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24884",
+   "topic": "Ride Hailing and Shared Mobility",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24885",
+   "topic": "Car Sharing and Vehicle Subscription Models",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24886",
+   "topic": "Mobility as a Service Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24887",
+   "topic": "Transport Demand Management Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24888",
+   "topic": "Congestion Charging and Road Pricing",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24889",
+   "topic": "Low Emission Zones and Vehicle Restrictions",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24890",
+   "topic": "Transport Emissions and Air Quality",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24891",
+   "topic": "Life Cycle Emissions of Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24892",
+   "topic": "Vehicle Recycling and End of Life",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24893",
+   "topic": "Vehicle Taxation and Ownership Costs",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24894",
+   "topic": "Depreciation and Total Cost of Ownership",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24895",
+   "topic": "Buying a Used Car Wisely",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24896",
+   "topic": "Vehicle Insurance Explained",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24897",
+   "topic": "Vehicle Registration Titles and Documents",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24898",
+   "topic": "Car Leasing and Finance Options",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24899",
+   "topic": "How Cars Are Manufactured",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24900",
+   "topic": "Automotive Assembly Line Production",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24901",
+   "topic": "Automotive Design and Prototyping Process",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24902",
+   "topic": "Vehicle Type Approval and Homologation",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24903",
+   "topic": "Race Car Setup Fundamentals",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24904",
+   "topic": "Rally Driving Technique and Pace Notes",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24905",
+   "topic": "Karting and Entry Level Motorsport",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24906",
+   "topic": "Racing Safety Equipment and Roll Cages",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24907",
+   "topic": "Track Days and Circuit Driving Etiquette",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24908",
+   "topic": "History of the Motor Car",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24909",
+   "topic": "History of Mass Vehicle Production",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24910",
+   "topic": "History of Roads and Highway Building",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24911",
+   "topic": "History of Public Transport in Cities",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24912",
+   "topic": "History of Electric Vehicles",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24913",
+   "topic": "Famous Engine Designs and Their Legacy",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24914",
+   "topic": "Concept Cars and Automotive Futurism",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24915",
+   "topic": "Autonomous Vehicles and Future Transport",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24916",
+   "topic": "Urban Air Mobility and Flying Cars",
+   "category": "Vehicles & Transport",
+   "guideId": null
+  },
+  {
+   "id": "t24917",
+   "topic": "Hyperloop and Experimental Transport Concepts",
+   "category": "Vehicles & Transport",
+   "guideId": null
   }
  ]
 }
