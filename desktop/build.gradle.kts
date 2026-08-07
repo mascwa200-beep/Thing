@@ -38,6 +38,23 @@ compose.desktop {
             packageName = "LCARS"
             packageVersion = "1.0.0"
             description = "LCARS — on-device-first companion, desktop edition"
+            vendor = "LCARS"
+
+            // The desktop talks to the phone over a TCP socket and parses XML feeds, so the runtime image
+            // needs the networking, crypto and XML modules. jpackage's jlink step strips anything not
+            // listed, and a missing module surfaces only at runtime on a real Windows box — where it would
+            // be a crash, not a build failure. Listing them explicitly is what keeps that from happening.
+            modules("java.naming", "java.security.jgss", "java.xml", "jdk.crypto.ec", "java.instrument")
+
+            windows {
+                // A stable UUID is what lets an installer UPGRADE an existing install instead of sitting
+                // alongside it as a second copy. jpackage invents a fresh one per build without this, so
+                // omitting it quietly breaks every future update.
+                upgradeUuid = "6f3a1c48-9b2e-4d77-a1f0-2c5b8e94d310"
+                menuGroup = "LCARS"
+                shortcut = true
+                dirChooser = true
+            }
         }
     }
 }

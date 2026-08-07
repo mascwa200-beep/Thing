@@ -38,7 +38,7 @@ fun main() {
             title = "LCARS",
             state = state,
         ) {
-            PulseDesktopApp()
+            PulseDesktopApp(settingsStore)
         }
     }
 }

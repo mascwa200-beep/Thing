@@ -19,6 +19,23 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
+/**
+ * A phone this desktop has paired with.
+ *
+ * [identitySpki] is the phone's **public** key, Base64-encoded — deliberately the only credential-shaped
+ * thing stored, and it is not secret. Nothing here can authenticate as the phone or the desktop, so this
+ * file leaking costs privacy about which devices exist, not control of them. The desktop's own private key
+ * lives in a separate PKCS12 (see `DesktopIdentity`), and the pairing code is never persisted at all.
+ */
+@Serializable
+data class PairedPhone(
+    val name: String,
+    val host: String,
+    val port: Int,
+    val identitySpki: String,
+    val pairedAtMs: Long = 0,
+)
+
 /** Everything the desktop shell persists across launches. Deliberately small in Phase A — grows alongside
  *  each ported vertical (News, Markets, …), mirroring how the Android app's own `AppSettings` blob grew
  *  feature by feature rather than being pre-designed all at once. */
@@ -26,6 +43,12 @@ import java.nio.file.StandardCopyOption
 data class DesktopSettings(
     val windowWidth: Int = 1280,
     val windowHeight: Int = 800,
+    /** Paired phones, most recently paired last. Empty until the user completes a pairing. */
+    val pairedPhones: List<PairedPhone> = emptyList(),
+    /** Last address typed into the pairing field, so the box is not blank every launch. */
+    val lastRemoteHost: String = "",
+    /** News category last viewed, so the app reopens where it was left. */
+    val newsCategory: String = "TOP",
 )
 
 private val defaultJson = Json {
