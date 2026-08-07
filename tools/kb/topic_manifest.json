@@ -34,19 +34,19 @@
    "id": "t00006",
    "topic": "The Cell Nucleus and Nuclear Envelope",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-cell-nucleus-and-nuclear-envelope"
   },
   {
    "id": "t00007",
    "topic": "The Nucleolus and Ribosome Assembly",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-nucleolus-and-ribosome-assembly"
   },
   {
    "id": "t00008",
    "topic": "Mitochondria: The Cell's Powerhouses",
    "category": "Biology",
-   "guideId": null
+   "guideId": "mitochondria-the-cell-s-powerhouses"
   },
   {
    "id": "t00009",
@@ -3004,13 +3004,13 @@
    "id": "t00501",
    "topic": "Life Tables and Survivorship Curves",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "life-tables-and-survivorship-curves"
   },
   {
    "id": "t00502",
    "topic": "Carrying Capacity and Limits to Growth",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "carrying-capacity-and-limits-to-growth"
   },
   {
    "id": "t00503",
@@ -4294,19 +4294,19 @@
    "id": "t00716",
    "topic": "Solution Stoichiometry and Titration Calculations",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "solution-stoichiometry-and-titration-calculations"
   },
   {
    "id": "t00717",
    "topic": "The Gas Laws and the Ideal Gas Equation",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "the-gas-laws-and-the-ideal-gas-equation"
   },
   {
    "id": "t00718",
    "topic": "Real Gases and the van der Waals Equation",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "real-gases-and-the-van-der-waals-equation"
   },
   {
    "id": "t00719",
@@ -7606,19 +7606,19 @@
    "id": "t01268",
    "topic": "Alan Turing and the Foundations of Computer Science",
    "category": "Computing",
-   "guideId": null
+   "guideId": "alan-turing-and-the-foundations-of-computer-science"
   },
   {
    "id": "t01269",
    "topic": "The ENIAC and the First Electronic Computers",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-eniac-and-the-first-electronic-computers"
   },
   {
    "id": "t01270",
    "topic": "The Transistor and the Birth of Modern Electronics",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-transistor-and-the-birth-of-modern-electronics"
   },
   {
    "id": "t01271",
@@ -11716,7 +11716,7 @@
    "id": "t01953",
    "topic": "Carbonate, Oxide and Sulfide Minerals",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "carbonate-oxide-and-sulfide-minerals"
   },
   {
    "id": "t01954",
@@ -11728,7 +11728,7 @@
    "id": "t01955",
    "topic": "The Feldspar Group",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "the-feldspar-group"
   },
   {
    "id": "t01956",
@@ -12766,13 +12766,13 @@
    "id": "t02128",
    "topic": "The Stratosphere and the Ozone Layer",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-stratosphere-and-the-ozone-layer"
   },
   {
    "id": "t02129",
    "topic": "The Mesosphere and Thermosphere",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-mesosphere-and-thermosphere"
   },
   {
    "id": "t02130",
@@ -13144,19 +13144,19 @@
    "id": "t02191",
    "topic": "Global Warming — Causes and Evidence",
    "category": "Climate",
-   "guideId": null
+   "guideId": "global-warming-causes-and-evidence"
   },
   {
    "id": "t02192",
    "topic": "Climate Feedback Loops",
    "category": "Climate",
-   "guideId": null
+   "guideId": "climate-feedback-loops"
   },
   {
    "id": "t02193",
    "topic": "Climate Models and Projections",
    "category": "Climate",
-   "guideId": null
+   "guideId": "climate-models-and-projections"
   },
   {
    "id": "t02194",
@@ -14980,7 +14980,7 @@
    "id": "t02497",
    "topic": "History of engineering",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "history-of-engineering"
   },
   {
    "id": "t02498",
@@ -14992,7 +14992,7 @@
    "id": "t02499",
    "topic": "Engineering ethics and professional responsibility",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "engineering-ethics-and-professional-responsibility"
   },
   {
    "id": "t02500",
@@ -16432,7 +16432,7 @@
    "id": "t02739",
    "topic": "Avionics and flight instruments",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "avionics-and-flight-instruments"
   },
   {
    "id": "t02740",
@@ -16984,7 +16984,7 @@
    "id": "t02831",
    "topic": "AC circuit analysis: impedance, phasors and resonance",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "ac-circuit-analysis-impedance-phasors-and-resonance"
   },
   {
    "id": "t02832",
@@ -18232,13 +18232,13 @@
    "id": "t03039",
    "topic": "Geography of Botswana",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-botswana"
   },
   {
    "id": "t03040",
    "topic": "Geography of Burkina Faso",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-burkina-faso"
   },
   {
    "id": "t03041",
@@ -23302,19 +23302,19 @@
    "id": "t03884",
    "topic": "Radiocarbon Dating",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "radiocarbon-dating"
   },
   {
    "id": "t03885",
    "topic": "Dendrochronology (Tree-Ring Dating)",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "dendrochronology-tree-ring-dating"
   },
   {
    "id": "t03886",
    "topic": "Potassium-Argon and Argon-Argon Dating",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "potassium-argon-and-argon-argon-dating"
   },
   {
    "id": "t03887",
@@ -24262,13 +24262,13 @@
    "id": "t04044",
    "topic": "The Philosophy of History",
    "category": "History",
-   "guideId": null
+   "guideId": "the-philosophy-of-history"
   },
   {
    "id": "t04045",
    "topic": "Oral History as a Method",
    "category": "History",
-   "guideId": null
+   "guideId": "oral-history-as-a-method"
   },
   {
    "id": "t04046",
@@ -29962,13 +29962,13 @@
    "id": "t04994",
    "topic": "Narratology — How Stories Are Told",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "narratology-how-stories-are-told"
   },
   {
    "id": "t04995",
    "topic": "Genre Theory & the Classification of Literature",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "genre-theory-the-classification-of-literature"
   },
   {
    "id": "t04996",
@@ -32152,13 +32152,13 @@
    "id": "t05359",
    "topic": "Phonology — Sound Systems & Patterns",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "phonology-sound-systems-patterns"
   },
   {
    "id": "t05360",
    "topic": "Prosody, Stress & Intonation",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "prosody-stress-intonation"
   },
   {
    "id": "t05361",
@@ -33328,13 +33328,13 @@
    "id": "t05555",
    "topic": "Fractions and Rational Arithmetic",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "fractions-and-rational-arithmetic"
   },
   {
    "id": "t05556",
    "topic": "Decimals and Decimal Arithmetic",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "decimals-and-decimal-arithmetic"
   },
   {
    "id": "t05557",
@@ -36418,13 +36418,13 @@
    "id": "t06070",
    "topic": "The Coronary Circulation",
    "category": "Medical",
-   "guideId": null
+   "guideId": "the-coronary-circulation"
   },
   {
    "id": "t06071",
    "topic": "Arteries, Veins and Capillaries: Vascular Anatomy",
    "category": "Medical",
-   "guideId": null
+   "guideId": "arteries-veins-and-capillaries-vascular-anatomy"
   },
   {
    "id": "t06072",
@@ -38794,13 +38794,13 @@
    "id": "t06466",
    "topic": "Understanding Your Menstrual Cycle",
    "category": "Health",
-   "guideId": null
+   "guideId": "understanding-your-menstrual-cycle"
   },
   {
    "id": "t06467",
    "topic": "Planning a Healthy Pregnancy",
    "category": "Health",
-   "guideId": null
+   "guideId": "planning-a-healthy-pregnancy"
   },
   {
    "id": "t06468",
@@ -39670,7 +39670,7 @@
    "id": "t06612",
    "topic": "Anxiety Disorders: An Overview",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "anxiety-disorders-an-overview"
   },
   {
    "id": "t06613",
@@ -39682,7 +39682,7 @@
    "id": "t06614",
    "topic": "Panic Disorder and Panic Attacks",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "panic-disorder-and-panic-attacks"
   },
   {
    "id": "t06615",
@@ -40414,13 +40414,13 @@
    "id": "t06736",
    "topic": "The B Vitamins and Their Functions",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "the-b-vitamins-and-their-functions"
   },
   {
    "id": "t06737",
    "topic": "Minerals: Iron, Calcium, Zinc and Magnesium",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "minerals-iron-calcium-zinc-and-magnesium"
   },
   {
    "id": "t06738",
@@ -41662,13 +41662,13 @@
    "id": "t06944",
    "topic": "Music Notation Software and Engraving",
    "category": "Music",
-   "guideId": null
+   "guideId": "music-notation-software-and-engraving"
   },
   {
    "id": "t06945",
    "topic": "Pitch, Frequency and the Harmonic Series",
    "category": "Music",
-   "guideId": null
+   "guideId": "pitch-frequency-and-the-harmonic-series"
   },
   {
    "id": "t06946",
@@ -44344,13 +44344,13 @@
    "id": "t07391",
    "topic": "Ethics and Moral Philosophy — An Introduction",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "ethics-and-moral-philosophy-an-introduction"
   },
   {
    "id": "t07392",
    "topic": "Aesthetics — The Philosophy of Art and Beauty",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "aesthetics-the-philosophy-of-art-and-beauty"
   },
   {
    "id": "t07393",
@@ -45724,13 +45724,13 @@
    "id": "t07621",
    "topic": "The Psychology of Religion",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "the-psychology-of-religion"
   },
   {
    "id": "t07622",
    "topic": "The Origins of Religion — Evolutionary and Cognitive Perspectives",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "the-origins-of-religion-evolutionary-and-cognitive-perspecti"
   },
   {
    "id": "t07623",
@@ -47356,13 +47356,13 @@
    "id": "t07893",
    "topic": "Critical Theory & the Frankfurt School",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "critical-theory-the-frankfurt-school"
   },
   {
    "id": "t07894",
    "topic": "Social Constructionism",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "social-constructionism"
   },
   {
    "id": "t07895",
@@ -48868,13 +48868,13 @@
    "id": "t08145",
    "topic": "Conservatism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "conservatism"
   },
   {
    "id": "t08146",
    "topic": "Socialism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "socialism"
   },
   {
    "id": "t08147",
@@ -50584,19 +50584,19 @@
    "id": "t08431",
    "topic": "Soil Texture, Structure and Tilth",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "soil-texture-structure-and-tilth"
   },
   {
    "id": "t08432",
    "topic": "Managing Soil pH: Liming and Acidifying",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "managing-soil-ph-liming-and-acidifying"
   },
   {
    "id": "t08433",
    "topic": "Building and Maintaining Soil Organic Matter",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "building-and-maintaining-soil-organic-matter"
   },
   {
    "id": "t08434",
@@ -53302,13 +53302,13 @@
    "id": "t08884",
    "topic": "Prehistoric Art: Cave Paintings and the Origins of Image-Making",
    "category": "Visual Arts & Design",
-   "guideId": null
+   "guideId": "prehistoric-art-cave-paintings-and-the-origins-of-image-maki"
   },
   {
    "id": "t08885",
    "topic": "Rock Art and Petroglyphs Around the World",
    "category": "Visual Arts & Design",
-   "guideId": null
+   "guideId": "rock-art-and-petroglyphs-around-the-world"
   },
   {
    "id": "t08886",
@@ -55120,13 +55120,13 @@
    "id": "t09187",
    "topic": "The Invention of Cinema and the Silent Film Era",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "the-invention-of-cinema-and-the-silent-film-era"
   },
   {
    "id": "t09188",
    "topic": "Charlie Chaplin and Silent Comedy",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "charlie-chaplin-and-silent-comedy"
   },
   {
    "id": "t09189",
@@ -81292,13 +81292,13 @@
    "id": "t13549",
    "topic": "Kinematics: Describing Motion",
    "category": "Physics",
-   "guideId": null
+   "guideId": "kinematics-describing-motion"
   },
   {
    "id": "t13550",
    "topic": "Projectile Motion and Trajectories",
    "category": "Physics",
-   "guideId": null
+   "guideId": "projectile-motion-and-trajectories"
   },
   {
    "id": "t13551",
@@ -82798,19 +82798,19 @@
    "id": "t13800",
    "topic": "A History of Astronomy",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "a-history-of-astronomy"
   },
   {
    "id": "t13801",
    "topic": "Archaeoastronomy: Ancient Skywatchers",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "archaeoastronomy-ancient-skywatchers"
   },
   {
    "id": "t13802",
    "topic": "Ptolemy and Geocentric Astronomy",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "ptolemy-and-geocentric-astronomy"
   },
   {
    "id": "t13803",
@@ -87952,13 +87952,13 @@
    "id": "t14659",
    "topic": "The SI Base Units and Their Definitions",
    "category": "Reference",
-   "guideId": null
+   "guideId": "the-si-base-units-and-their-definitions"
   },
   {
    "id": "t14660",
    "topic": "SI Derived Units and Coherent Combinations",
    "category": "Reference",
-   "guideId": null
+   "guideId": "si-derived-units-and-coherent-combinations"
   },
   {
    "id": "t14661",
@@ -90196,13 +90196,13 @@
    "id": "t15033",
    "topic": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "diagnosing-before-replacing-a-repair-method"
   },
   {
    "id": "t15034",
    "topic": "Building a Basic Home Repair Tool Kit",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "building-a-basic-home-repair-tool-kit"
   },
   {
    "id": "t15035",
@@ -94528,13 +94528,13 @@
    "id": "t15755",
    "topic": "Reading Wood Grain, Figure and Runout",
    "category": "Making",
-   "guideId": null
+   "guideId": "reading-wood-grain-figure-and-runout"
   },
   {
    "id": "t15756",
    "topic": "Choosing Hardwoods for Furniture Projects",
    "category": "Making",
-   "guideId": null
+   "guideId": "choosing-hardwoods-for-furniture-projects"
   },
   {
    "id": "t15757",
@@ -98818,19 +98818,19 @@
    "id": "t16470",
    "topic": "Conducting Primary Market Research",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "conducting-primary-market-research"
   },
   {
    "id": "t16471",
    "topic": "Using Secondary Market Research Sources",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "using-secondary-market-research-sources"
   },
   {
    "id": "t16472",
    "topic": "Sizing a Market Opportunity",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "sizing-a-market-opportunity"
   },
   {
    "id": "t16473",
@@ -104590,19 +104590,19 @@
    "id": "t17432",
    "topic": "Scarcity, Choice and Opportunity Cost",
    "category": "Economics",
-   "guideId": null
+   "guideId": "scarcity-choice-and-opportunity-cost"
   },
   {
    "id": "t17433",
    "topic": "The Production Possibilities Frontier",
    "category": "Economics",
-   "guideId": null
+   "guideId": "the-production-possibilities-frontier"
   },
   {
    "id": "t17434",
    "topic": "How Markets Coordinate Without a Planner",
    "category": "Economics",
-   "guideId": null
+   "guideId": "how-markets-coordinate-without-a-planner"
   },
   {
    "id": "t17435",
@@ -107470,13 +107470,13 @@
    "id": "t17912",
    "topic": "How Human Memory Works: Encoding to Retrieval",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "how-human-memory-works-encoding-to-retrieval"
   },
   {
    "id": "t17913",
    "topic": "Working Memory and Its Hard Limits",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "working-memory-and-its-hard-limits"
   },
   {
    "id": "t17914",
@@ -110338,19 +110338,19 @@
    "id": "t18390",
    "topic": "How Bacteria Grow in Food",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "how-bacteria-grow-in-food"
   },
   {
    "id": "t18391",
    "topic": "The Bacterial Growth Curve Explained",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "the-bacterial-growth-curve-explained"
   },
   {
    "id": "t18392",
    "topic": "FAT TOM: The Six Conditions for Growth",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "fat-tom-the-six-conditions-for-growth"
   },
   {
    "id": "t18393",
@@ -112918,13 +112918,13 @@
    "id": "t18820",
    "topic": "Foraging Safety and the Universal Rules",
    "category": "Sustenance",
-   "guideId": null
+   "guideId": "foraging-safety-and-the-universal-rules"
   },
   {
    "id": "t18821",
    "topic": "Positive Identification Before Any Wild Food",
    "category": "Sustenance",
-   "guideId": null
+   "guideId": "positive-identification-before-any-wild-food"
   },
   {
    "id": "t18822",
@@ -116770,19 +116770,19 @@
    "id": "t19462",
    "topic": "How Heat Moves in the Kitchen",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "how-heat-moves-in-the-kitchen"
   },
   {
    "id": "t19463",
    "topic": "Conduction, Convection and Radiant Heat",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "conduction-convection-and-radiant-heat"
   },
   {
    "id": "t19464",
    "topic": "Induction Cooking: How the Field Heats Steel",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "induction-cooking-how-the-field-heats-steel"
   },
   {
    "id": "t19465",
@@ -120310,13 +120310,13 @@
    "id": "t20052",
    "topic": "Abstract Strategy Games and Their Families",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "abstract-strategy-games-and-their-families"
   },
   {
    "id": "t20053",
    "topic": "Chaturanga: The Indian Origin of Chess",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "chaturanga-the-indian-origin-of-chess"
   },
   {
    "id": "t20054",
@@ -124702,13 +124702,13 @@
    "id": "t20784",
    "topic": "Knot Anatomy: Bight, Loop, Standing End",
    "category": "Skills",
-   "guideId": null
+   "guideId": "knot-anatomy-bight-loop-standing-end"
   },
   {
    "id": "t20785",
    "topic": "The Overhand Knot and Its Variations",
    "category": "Skills",
-   "guideId": null
+   "guideId": "the-overhand-knot-and-its-variations"
   },
   {
    "id": "t20786",
@@ -128698,13 +128698,13 @@
    "id": "t21450",
    "topic": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
-   "guideId": null
+   "guideId": "association-football-rules-and-positions"
   },
   {
    "id": "t21451",
    "topic": "How Offside Works in Football",
    "category": "Sports & Fitness",
-   "guideId": null
+   "guideId": "how-offside-works-in-football"
   },
   {
    "id": "t21452",
@@ -133666,13 +133666,13 @@
    "id": "t22278",
    "topic": "Choosing a Safe Shelter Site",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "choosing-a-safe-shelter-site"
   },
   {
    "id": "t22279",
    "topic": "Reading Overhead Hazards Before You Camp",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "reading-overhead-hazards-before-you-camp"
   },
   {
    "id": "t22280",
@@ -134800,13 +134800,13 @@
    "id": "t22467",
    "topic": "The Survival Rule of Threes",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "the-survival-rule-of-threes"
   },
   {
    "id": "t22468",
    "topic": "Ordering Survival Priorities Correctly",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "ordering-survival-priorities-correctly"
   },
   {
    "id": "t22469",
@@ -135952,13 +135952,13 @@
    "id": "t22659",
    "topic": "Flash Flood Formation and Warning Signs",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "flash-flood-formation-and-warning-signs"
   },
   {
    "id": "t22660",
    "topic": "Riverine Flooding and Floodplain Dynamics",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "riverine-flooding-and-floodplain-dynamics"
   },
   {
    "id": "t22661",
@@ -137776,13 +137776,13 @@
    "id": "t22963",
    "topic": "Incident Command System for Rescue",
    "category": "Rescue",
-   "guideId": null
+   "guideId": "incident-command-system-for-rescue"
   },
   {
    "id": "t22964",
    "topic": "Unified Command in Multi Agency Rescue",
    "category": "Rescue",
-   "guideId": null
+   "guideId": "unified-command-in-multi-agency-rescue"
   },
   {
    "id": "t22965",
@@ -139594,13 +139594,13 @@
    "id": "t23266",
    "topic": "How Topographic Map Series Are Organised",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "how-topographic-map-series-are-organised"
   },
   {
    "id": "t23267",
    "topic": "Map Scale and What It Really Means",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "map-scale-and-what-it-really-means"
   },
   {
    "id": "t23268",
@@ -140998,13 +140998,13 @@
    "id": "t23500",
    "topic": "Efficient Walking Technique on the Trail",
    "category": "Movement",
-   "guideId": null
+   "guideId": "efficient-walking-technique-on-the-trail"
   },
   {
    "id": "t23501",
    "topic": "The Rest Step for Sustained Climbing",
    "category": "Movement",
-   "guideId": null
+   "guideId": "the-rest-step-for-sustained-climbing"
   },
   {
    "id": "t23502",
@@ -142390,13 +142390,13 @@
    "id": "t23732",
    "topic": "Building a Household Hazard Risk Assessment",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "building-a-household-hazard-risk-assessment"
   },
   {
    "id": "t23733",
    "topic": "Ranking Local Hazards by Likelihood and Impact",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "ranking-local-hazards-by-likelihood-and-impact"
   },
   {
    "id": "t23734",
@@ -145312,13 +145312,13 @@
    "id": "t24219",
    "topic": "How a Two-Stroke Engine Works",
    "category": "Vehicles & Transport",
-   "guideId": null
+   "guideId": "how-a-two-stroke-engine-works"
   },
   {
    "id": "t24220",
    "topic": "The Otto Cycle Explained",
    "category": "Vehicles & Transport",
-   "guideId": null
+   "guideId": "the-otto-cycle-explained"
   },
   {
    "id": "t24221",

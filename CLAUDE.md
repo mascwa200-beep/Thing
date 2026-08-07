@@ -2185,9 +2185,13 @@ AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitH
 
 ### KB engine state (task #73, standing) — UPDATED this session
 
-**238 guides · 2,902 sections · 2,463 full pages** (was 1,614). Manifest **24,917 topics** (was 14,490),
-**49/49 categories populated**, 238 covered. `FULL_PAGE_BASELINE = 2463`. Branch
+**353 guides · 4,730 sections · 4,730 full pages** (was 1,614 at session start). Manifest **24,917
+topics** (was 14,490), **49/49 categories populated**, 353 covered. `FULL_PAGE_BASELINE = 4730`. Branch
 `claude/loving-edison-bd65oa`, PR **#426** (PR #425 merged as `28ea05e`).
+
+**Sections and full pages are now the same number.** Every section of every guide clears the 400-word
+bar, so the expansion track is exhausted — it could only ever deepen sections that already existed.
+From here the count grows one-for-one with new guides, at ~13-15 pages each.
 
 **THE STRUCTURAL FIX — read this before planning more KB work.** `select_wave.py` only ever emits
 topics that exist in `topic_manifest.json`. **20 of 49 categories had ZERO topics**, so no drafting wave
@@ -2211,19 +2215,23 @@ at all. Re-enumerated (+10,427 topics). **Every category is now reachable.**
 - `tools/kb/merge_images.py` — the image merge step (didn't exist). Sniffs magic bytes, because a saved
   404 page named `.png` is the normal way image sourcing fails and nothing downstream would question it.
 
-**Content banked:** expansion waves A1+A2 (73 guides, +224k words) took full pages 1,614 → 2,463. Every
-practical category is now **100% full-paged** — Hazards went 0 → 63 of 63 sections (its longest was
-375 words against a 400 bar). Image wave 1 added 52 PD/CC0/CC-BY/CC-BY-SA diagrams across 26 guides
-(152 → 178 of 238 guides have one); provenance in `images/NOTICE.txt`.
+**Content banked:** expansion waves A1+A2 (73 guides, +224k words) took full pages 1,614 → 2,463, then
+A3 finished the job at 2,902 — every practical category 100% full-paged (Hazards went 0 → 63 of 63; its
+longest section had been 375 words against a 400 bar). Image waves 1–3 put a diagram in **all 238**
+guides that existed at the time (was 152), PD/CC0/CC-BY/CC-BY-SA only, provenance in
+`images/NOTICE.txt`. Then breadth waves B2–B4 added **115 new guides** (~865k words), 2,902 → 4,730.
+Those 115 have no diagram yet — the next image wave has a clear target list.
 
-**Reusable wave scripts** (in scratchpad, both carry the args guard):
-`kb_wave_expand.js` (args `{outDir, guides:[{id,category,thin}]}`) and `kb_wave_images.js`
-(args `{outDir, guides:[{id,title,category}]}`). 3 units per agent.
+**Reusable wave scripts** (in scratchpad, all three carry the args-string guard):
+`kb_wave_new.js` (args `{outDir, topics:[{id,topic,category}]}`) — Track B breadth, 14-16 sections at
+440-520 words each; `kb_wave_expand.js` (`{outDir, guides:[{id,category,thin}]}`); `kb_wave_images.js`
+(`{outDir, guides:[{id,title,category}]}`). 3 units per agent.
 
-**Honest remaining scope.** Expansion tops out near ~2,900 pages — it can only deepen sections that
-already exist. Past that every page is a new guide at ~450 words, so 10,000 pages ≈ **3.4M more words**,
-tens of hours at this machine's 2-way agent concurrency. Multi-session by nature; the CI-printed count
-is the meter.
+**Honest remaining scope.** 10,000 pages needs roughly **400 more guides ≈ 2.8M words**. A 55-topic wave
+(19 agents) runs ~3 h and yields ~+740 pages, so ~7 more waves. Run **two waves in parallel** — the
+concurrency cap is per-workflow, and these agents are API-bound rather than CPU-bound, so two workflows
+genuinely double throughput on this 4-core box instead of queueing against each other. Multi-session by
+nature; the CI-printed count is the meter.
 
 **Operational lessons that cost real work this session:**
 1. **Entering plan mode kills in-flight subagents.** It propagates to running agents, which write plan
@@ -2236,6 +2244,12 @@ is the meter.
    (1–2 min); the ~5,500 words per guide dominates and is incurred either way.
 4. Never hardcode a wave's `outDir` in a reusable script — a second wave drops patches beside
    already-merged ones, and `merge_images.py` fatals on a section that already has an image.
+5. **`select_wave.py` skips ids already bundled, not ids already in flight.** To queue a second wave
+   alongside a running one, select `2n` and take the tail — the selection is deterministic, so the
+   head is exactly the in-flight wave.
+6. Guard the invariant, not the headline number. A wave arrived with two sections at 397 and 375
+   words; merging as-is would still have raised the total while quietly breaking "zero sections under
+   400". Extend them instead.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
