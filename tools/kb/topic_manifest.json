@@ -86939,6 +86939,1014 @@
    "topic": "Human Factors and Ergonomics",
    "category": "Psychology",
    "guideId": null
+  },
+  {
+   "id": "t14491",
+   "topic": "A Tour of the Solar System",
+   "category": "Astronomy",
+   "guideId": "astro-solar-system-tour"
+  },
+  {
+   "id": "t14492",
+   "topic": "Stars — Birth, Life and Death",
+   "category": "Astronomy",
+   "guideId": "astro-stellar-life-cycles"
+  },
+  {
+   "id": "t14493",
+   "topic": "Galaxies, the Universe and Cosmology",
+   "category": "Astronomy",
+   "guideId": "astro-galaxies-and-cosmology"
+  },
+  {
+   "id": "t14494",
+   "topic": "Navigating by the Stars",
+   "category": "Astronomy",
+   "guideId": "astro-celestial-navigation"
+  },
+  {
+   "id": "t14495",
+   "topic": "Telescopes and How to Observe the Sky",
+   "category": "Astronomy",
+   "guideId": "astro-telescopes-and-observing"
+  },
+  {
+   "id": "t14496",
+   "topic": "Exoplanets and the Search for Other Worlds",
+   "category": "Astronomy",
+   "guideId": "astro-exoplanets-search-for-other-worlds"
+  },
+  {
+   "id": "t14497",
+   "topic": "Rockets and Orbital Mechanics: How to Actually Get to Space and Stay There",
+   "category": "Astronomy",
+   "guideId": "astro-rockets-and-orbital-mechanics"
+  },
+  {
+   "id": "t14498",
+   "topic": "The Moon Up Close: Formation, Phases, Tides, and Geology",
+   "category": "Astronomy",
+   "guideId": "astro-the-moon-up-close"
+  },
+  {
+   "id": "t14499",
+   "topic": "The Sun: Our Star, Its Power, and Its Weather",
+   "category": "Astronomy",
+   "guideId": "astro-the-sun-our-star"
+  },
+  {
+   "id": "t14500",
+   "topic": "Asteroids, Comets & Meteors",
+   "category": "Astronomy",
+   "guideId": "astro-asteroids-comets-meteors"
+  },
+  {
+   "id": "t14501",
+   "topic": "The Cell & How It Works",
+   "category": "Biology",
+   "guideId": "bio-the-cell"
+  },
+  {
+   "id": "t14502",
+   "topic": "DNA, Genes & Heredity",
+   "category": "Biology",
+   "guideId": "bio-dna-genes-heredity"
+  },
+  {
+   "id": "t14503",
+   "topic": "Human Body Systems — A Complete Overview",
+   "category": "Biology",
+   "guideId": "bio-human-body-systems"
+  },
+  {
+   "id": "t14504",
+   "topic": "Microbes, Viruses & the Immune System",
+   "category": "Biology",
+   "guideId": "bio-microbes-viruses-immunity"
+  },
+  {
+   "id": "t14505",
+   "topic": "Ecology, Ecosystems & the Web of Life",
+   "category": "Biology",
+   "guideId": "bio-ecology-ecosystems"
+  },
+  {
+   "id": "t14506",
+   "topic": "Evolution & Natural Selection: Mechanisms, Evidence, and Worked Examples",
+   "category": "Biology",
+   "guideId": "bio-evolution-natural-selection"
+  },
+  {
+   "id": "t14507",
+   "topic": "Plant Biology: Photosynthesis, Anatomy, Growth & Reproduction",
+   "category": "Biology",
+   "guideId": "bio-plant-biology"
+  },
+  {
+   "id": "t14508",
+   "topic": "Animal Behavior & Ethology: Instinct, Learning, Communication, and How to Observe It",
+   "category": "Biology",
+   "guideId": "bio-animal-behavior-ethology"
+  },
+  {
+   "id": "t14509",
+   "topic": "Classification of Life: Taxonomy and the Tree of All Living Things",
+   "category": "Biology",
+   "guideId": "bio-classification-of-life"
+  },
+  {
+   "id": "t14510",
+   "topic": "Metabolism & Cellular Respiration",
+   "category": "Biology",
+   "guideId": "bio-metabolism-cellular-respiration"
+  },
+  {
+   "id": "t14511",
+   "topic": "Atoms, Elements & the Periodic Table",
+   "category": "Chemistry",
+   "guideId": "chem-atoms-elements-periodic-table"
+  },
+  {
+   "id": "t14512",
+   "topic": "Chemical Bonds & How Molecules Form",
+   "category": "Chemistry",
+   "guideId": "chem-chemical-bonds-molecules"
+  },
+  {
+   "id": "t14513",
+   "topic": "Chemical Reactions, Equations & Stoichiometry",
+   "category": "Chemistry",
+   "guideId": "chem-reactions-equations-stoichiometry"
+  },
+  {
+   "id": "t14514",
+   "topic": "Acids, Bases, pH & Buffers",
+   "category": "Chemistry",
+   "guideId": "chem-acids-bases-ph-buffers"
+  },
+  {
+   "id": "t14515",
+   "topic": "Everyday & Survival Chemistry — Soap, Bleach, Batteries & Fertilizer",
+   "category": "Chemistry",
+   "guideId": "chem-everyday-survival-chemistry"
+  },
+  {
+   "id": "t14516",
+   "topic": "Organic Chemistry Basics — Carbon's Bonding, Functional Groups & Naming",
+   "category": "Chemistry",
+   "guideId": "chem-organic-chemistry-basics"
+  },
+  {
+   "id": "t14517",
+   "topic": "Thermochemistry — Energy, Enthalpy & Calorimetry in Chemical Reactions",
+   "category": "Chemistry",
+   "guideId": "chem-thermochemistry-energy-reactions"
+  },
+  {
+   "id": "t14518",
+   "topic": "Electrochemistry & Redox Reactions — Electron Transfer, Half-Reactions & Batteries",
+   "category": "Chemistry",
+   "guideId": "chem-electrochemistry-redox-reactions"
+  },
+  {
+   "id": "t14519",
+   "topic": "States of Matter & Phase Changes",
+   "category": "Chemistry",
+   "guideId": "chem-states-of-matter-phase-changes"
+  },
+  {
+   "id": "t14520",
+   "topic": "Chemical Kinetics & Equilibrium — Reaction Rates and the Balance Point",
+   "category": "Chemistry",
+   "guideId": "chem-kinetics-and-equilibrium"
+  },
+  {
+   "id": "t14521",
+   "topic": "Cold & Hypothermia",
+   "category": "Climate",
+   "guideId": "cold"
+  },
+  {
+   "id": "t14522",
+   "topic": "Heat & Desert",
+   "category": "Climate",
+   "guideId": "heat"
+  },
+  {
+   "id": "t14523",
+   "topic": "High Altitude: Thin Air, Altitude Illness & Acclimatization",
+   "category": "Climate",
+   "guideId": "climate-high-altitude"
+  },
+  {
+   "id": "t14524",
+   "topic": "Humid Tropics & Rainforest Survival",
+   "category": "Climate",
+   "guideId": "climate-tropical-rainforest"
+  },
+  {
+   "id": "t14525",
+   "topic": "Coastal & Maritime Climate Hazards",
+   "category": "Climate",
+   "guideId": "climate-coastal-maritime"
+  },
+  {
+   "id": "t14526",
+   "topic": "Arid Climate & Long-Term Drought Adaptation",
+   "category": "Climate",
+   "guideId": "climate-arid-drought"
+  },
+  {
+   "id": "t14527",
+   "topic": "How a Computer Works: Bits, Logic Gates & the CPU",
+   "category": "Computing",
+   "guideId": "cs-how-computers-work"
+  },
+  {
+   "id": "t14528",
+   "topic": "Algorithms & Thinking Like a Programmer",
+   "category": "Computing",
+   "guideId": "cs-algorithms"
+  },
+  {
+   "id": "t14529",
+   "topic": "Encoding, Data & Compression",
+   "category": "Computing",
+   "guideId": "cs-encoding-compression"
+  },
+  {
+   "id": "t14530",
+   "topic": "Cryptography & Keeping Secrets",
+   "category": "Computing",
+   "guideId": "cs-cryptography"
+  },
+  {
+   "id": "t14531",
+   "topic": "Formal Logic & Clear Reasoning",
+   "category": "Computing",
+   "guideId": "cs-formal-logic"
+  },
+  {
+   "id": "t14532",
+   "topic": "Networking: How the Internet Actually Moves Your Data",
+   "category": "Computing",
+   "guideId": "cs-networking-internet"
+  },
+  {
+   "id": "t14533",
+   "topic": "Databases: Organizing, Storing, and Querying the World's Data",
+   "category": "Computing",
+   "guideId": "cs-databases-relational"
+  },
+  {
+   "id": "t14534",
+   "topic": "Artificial Intelligence & Machine Learning: What a Model Actually Is",
+   "category": "Computing",
+   "guideId": "cs-ai-machine-learning-basics"
+  },
+  {
+   "id": "t14535",
+   "topic": "Operating Systems: How Your Device Manages Itself",
+   "category": "Computing",
+   "guideId": "cs-operating-systems"
+  },
+  {
+   "id": "t14536",
+   "topic": "Cybersecurity Fundamentals: Staying Safe in a Connected World",
+   "category": "Computing",
+   "guideId": "cs-cybersecurity-fundamentals"
+  },
+  {
+   "id": "t14537",
+   "topic": "Food Safety & Kitchen Safety Fundamentals",
+   "category": "Cooking — Food Safety",
+   "guideId": "cook-food-safety-fundamentals"
+  },
+  {
+   "id": "t14538",
+   "topic": "Foodborne Illness: Know Your Pathogen",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-foodborne-illness-pathogens"
+  },
+  {
+   "id": "t14539",
+   "topic": "Camp & Outdoor Cooking Food Safety",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-camping-outdoor-cooking"
+  },
+  {
+   "id": "t14540",
+   "topic": "Food Safety During a Power Outage",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-power-outage"
+  },
+  {
+   "id": "t14541",
+   "topic": "Cooking for High-Risk Eaters: Pregnancy, Infants, Elders & the Immunocompromised",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-high-risk-eaters"
+  },
+  {
+   "id": "t14542",
+   "topic": "Date Labels, Recalls & the 'Is This Still Good?' Decision Guide",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-date-labels-recalls"
+  },
+  {
+   "id": "t14543",
+   "topic": "Kitchen Sanitation & Cross-Contamination — the Deep Mechanics",
+   "category": "Cooking — Food Safety",
+   "guideId": "cooking-food-safety-sanitation-cross-contamination"
+  },
+  {
+   "id": "t14544",
+   "topic": "Rocks, Minerals & the Rock Cycle",
+   "category": "Earth Science",
+   "guideId": "earth-rocks-minerals-rock-cycle"
+  },
+  {
+   "id": "t14545",
+   "topic": "Plate Tectonics, Earthquakes & Volcanoes",
+   "category": "Earth Science",
+   "guideId": "earth-plate-tectonics-earthquakes-volcanoes"
+  },
+  {
+   "id": "t14546",
+   "topic": "The Water Cycle & Hydrology",
+   "category": "Earth Science",
+   "guideId": "earth-water-cycle-hydrology"
+  },
+  {
+   "id": "t14547",
+   "topic": "Soil — How It Forms and Feeds Us",
+   "category": "Earth Science",
+   "guideId": "earth-soil-formation-and-fertility"
+  },
+  {
+   "id": "t14548",
+   "topic": "Reading the Landscape & Geology in the Field",
+   "category": "Earth Science",
+   "guideId": "earth-reading-the-landscape-field-geology"
+  },
+  {
+   "id": "t14549",
+   "topic": "Earth's Climate System — The Planetary Heat Engine",
+   "category": "Earth Science",
+   "guideId": "earth-climate-system"
+  },
+  {
+   "id": "t14550",
+   "topic": "Glaciers, Ice Ages & the Cryosphere — Reading Earth's Frozen Archive",
+   "category": "Earth Science",
+   "guideId": "earth-glaciers-ice-ages-cryosphere"
+  },
+  {
+   "id": "t14551",
+   "topic": "Oceans in Motion — Currents, Tides & the Chemistry of Seawater",
+   "category": "Earth Science",
+   "guideId": "earth-oceans-currents-tides-chemistry"
+  },
+  {
+   "id": "t14552",
+   "topic": "Electricity & Circuits From Scratch",
+   "category": "Engineering",
+   "guideId": "eng-electricity-and-circuits-from-scratch"
+  },
+  {
+   "id": "t14553",
+   "topic": "Ohm's & Kirchhoff's Laws With Worked Examples",
+   "category": "Engineering",
+   "guideId": "eng-ohms-and-kirchhoffs-laws"
+  },
+  {
+   "id": "t14554",
+   "topic": "Components: Resistors, Capacitors, Diodes & Transistors",
+   "category": "Engineering",
+   "guideId": "eng-electronic-components"
+  },
+  {
+   "id": "t14555",
+   "topic": "Power, Batteries & Solar Systems",
+   "category": "Engineering",
+   "guideId": "eng-power-batteries-and-solar"
+  },
+  {
+   "id": "t14556",
+   "topic": "Simple Machines & Structural Engineering Basics",
+   "category": "Engineering",
+   "guideId": "eng-simple-machines-and-structures"
+  },
+  {
+   "id": "t14557",
+   "topic": "Materials Science: Metals, Polymers, Ceramics & Composites",
+   "category": "Engineering",
+   "guideId": "eng-materials-science-metals-polymers-ceramics"
+  },
+  {
+   "id": "t14558",
+   "topic": "Fluid Mechanics & Hydraulics: Pressure, Flow, Bernoulli & Pumps",
+   "category": "Engineering",
+   "guideId": "eng-fluid-mechanics-and-hydraulics"
+  },
+  {
+   "id": "t14559",
+   "topic": "Control Systems & Feedback: The Loop Behind Thermostats, Cruise Control & Autopilots",
+   "category": "Engineering",
+   "guideId": "eng-control-systems-and-feedback"
+  },
+  {
+   "id": "t14560",
+   "topic": "Water",
+   "category": "Essentials",
+   "guideId": "water"
+  },
+  {
+   "id": "t14561",
+   "topic": "Fire",
+   "category": "Essentials",
+   "guideId": "fire"
+  },
+  {
+   "id": "t14562",
+   "topic": "Shelter & Warmth",
+   "category": "Essentials",
+   "guideId": "shelter"
+  },
+  {
+   "id": "t14563",
+   "topic": "Survival Mindset",
+   "category": "Foundations",
+   "guideId": "mindset"
+  },
+  {
+   "id": "t14564",
+   "topic": "Risk Assessment & Decision-Making Under Pressure",
+   "category": "Foundations",
+   "guideId": "found-risk-assessment-decision-making"
+  },
+  {
+   "id": "t14565",
+   "topic": "Situational Awareness — Reading a Room, a Street, and a Crowd",
+   "category": "Foundations",
+   "guideId": "found-situational-awareness"
+  },
+  {
+   "id": "t14566",
+   "topic": "The World's Biomes & Regions",
+   "category": "Geography",
+   "guideId": "geo-biomes-and-regions"
+  },
+  {
+   "id": "t14567",
+   "topic": "Map Reading, Coordinates & Scale",
+   "category": "Geography",
+   "guideId": "geo-map-reading-coordinates-scale"
+  },
+  {
+   "id": "t14568",
+   "topic": "The Globe — Time Zones, Latitude & Longitude",
+   "category": "Geography",
+   "guideId": "geo-globe-time-zones-lat-long"
+  },
+  {
+   "id": "t14569",
+   "topic": "Natural Resources & Where They Come From",
+   "category": "Geography",
+   "guideId": "geo-natural-resources"
+  },
+  {
+   "id": "t14570",
+   "topic": "Rivers, Mountains & How Landscapes Shape Life",
+   "category": "Geography",
+   "guideId": "geo-rivers-mountains-landscapes"
+  },
+  {
+   "id": "t14571",
+   "topic": "Population & Human Geography",
+   "category": "Geography",
+   "guideId": "geo-population-human-geography"
+  },
+  {
+   "id": "t14572",
+   "topic": "Climate Zones & the Köppen System",
+   "category": "Geography",
+   "guideId": "geo-koppen-climate-classification"
+  },
+  {
+   "id": "t14573",
+   "topic": "Cartography & Map Projections",
+   "category": "Geography",
+   "guideId": "geo-cartography-map-projections"
+  },
+  {
+   "id": "t14574",
+   "topic": "Weather Hazards",
+   "category": "Hazards",
+   "guideId": "weather-hazards"
+  },
+  {
+   "id": "t14575",
+   "topic": "Wildlife & Insects",
+   "category": "Hazards",
+   "guideId": "wildlife"
+  },
+  {
+   "id": "t14576",
+   "topic": "Flash Floods & Safe Water-Crossing Decisions",
+   "category": "Hazards",
+   "guideId": "hazards-flood-water-crossing"
+  },
+  {
+   "id": "t14577",
+   "topic": "Wildfire Behavior & Evacuation Triggers",
+   "category": "Hazards",
+   "guideId": "hazards-wildfire-evacuation"
+  },
+  {
+   "id": "t14578",
+   "topic": "Earthquake & Structural Collapse Hazards",
+   "category": "Hazards",
+   "guideId": "hazards-earthquake-structural-collapse"
+  },
+  {
+   "id": "t14579",
+   "topic": "Hazardous Materials & Chemical Spill Awareness",
+   "category": "Hazards",
+   "guideId": "hazards-hazmat-chemical-spill"
+  },
+  {
+   "id": "t14580",
+   "topic": "Sexual Health",
+   "category": "Health",
+   "guideId": "sexual-health"
+  },
+  {
+   "id": "t14581",
+   "topic": "Sleep: The Biology of Rest and Why It Matters",
+   "category": "Health",
+   "guideId": "health-sleep-biology-of-rest"
+  },
+  {
+   "id": "t14582",
+   "topic": "Vaccines & Immunization: How Vaccines Work and Why They Matter",
+   "category": "Health",
+   "guideId": "health-vaccines-and-immunization"
+  },
+  {
+   "id": "t14583",
+   "topic": "Making Soap: Saponification, Lye Math & Safety",
+   "category": "Making",
+   "guideId": "make-soap-saponification-lye-math"
+  },
+  {
+   "id": "t14584",
+   "topic": "Disinfectants & Water Chemistry: Chlorine & Iodine Doses",
+   "category": "Making",
+   "guideId": "make-disinfectants-water-chemistry"
+  },
+  {
+   "id": "t14585",
+   "topic": "Distillation, Extraction & Purifying Liquids",
+   "category": "Making",
+   "guideId": "make-distillation-extraction-purifying"
+  },
+  {
+   "id": "t14586",
+   "topic": "Adhesives, Inks, Dyes & Useful Compounds",
+   "category": "Making",
+   "guideId": "make-adhesives-inks-dyes-compounds"
+  },
+  {
+   "id": "t14587",
+   "topic": "Metalworking & Forging: Heat, Metals & Tools",
+   "category": "Making",
+   "guideId": "make-metalworking-forging-heat-tools"
+  },
+  {
+   "id": "t14588",
+   "topic": "Number Sense & Arithmetic",
+   "category": "Mathematics",
+   "guideId": "math-number-sense-arithmetic"
+  },
+  {
+   "id": "t14589",
+   "topic": "Algebra — The Language of Math",
+   "category": "Mathematics",
+   "guideId": "math-algebra-language-of-math"
+  },
+  {
+   "id": "t14590",
+   "topic": "Geometry & Measurement",
+   "category": "Mathematics",
+   "guideId": "math-geometry-measurement"
+  },
+  {
+   "id": "t14591",
+   "topic": "Trigonometry",
+   "category": "Mathematics",
+   "guideId": "math-trigonometry"
+  },
+  {
+   "id": "t14592",
+   "topic": "Probability & Statistics You Can Use",
+   "category": "Mathematics",
+   "guideId": "math-probability-statistics"
+  },
+  {
+   "id": "t14593",
+   "topic": "Calculus — The Mathematics of Change",
+   "category": "Mathematics",
+   "guideId": "math-calculus-first-principles"
+  },
+  {
+   "id": "t14594",
+   "topic": "Linear Algebra — Vectors, Matrices, and the Geometry of Transformation",
+   "category": "Mathematics",
+   "guideId": "math-linear-algebra-vectors-matrices"
+  },
+  {
+   "id": "t14595",
+   "topic": "Number Theory — Primes, Modular Arithmetic, and the Math Behind Digital Secrecy",
+   "category": "Mathematics",
+   "guideId": "math-number-theory-primes-cryptography"
+  },
+  {
+   "id": "t14596",
+   "topic": "First Aid",
+   "category": "Medical",
+   "guideId": "first-aid"
+  },
+  {
+   "id": "t14597",
+   "topic": "Health & Hygiene",
+   "category": "Medical",
+   "guideId": "hygiene"
+  },
+  {
+   "id": "t14598",
+   "topic": "Human Anatomy by System",
+   "category": "Medical",
+   "guideId": "med-anatomy-by-system"
+  },
+  {
+   "id": "t14599",
+   "topic": "Taking Vital Signs & Assessing a Patient",
+   "category": "Medical",
+   "guideId": "med-vital-signs-assessment"
+  },
+  {
+   "id": "t14600",
+   "topic": "Common Illnesses & Red Flags to Act On",
+   "category": "Medical",
+   "guideId": "med-common-illnesses-red-flags"
+  },
+  {
+   "id": "t14601",
+   "topic": "Deep Wound Care, Bleeding Control & Infection",
+   "category": "Medical",
+   "guideId": "med-wound-care-bleeding-infection"
+  },
+  {
+   "id": "t14602",
+   "topic": "Medicines 101 — How Common Drug Classes Work",
+   "category": "Medical",
+   "guideId": "med-drug-classes-101"
+  },
+  {
+   "id": "t14603",
+   "topic": "Pediatric and Elderly Care: Why Age Changes the Rules",
+   "category": "Medical",
+   "guideId": "med-pediatric-elderly-care-differences"
+  },
+  {
+   "id": "t14604",
+   "topic": "Chronic Disease Management at Home: Diabetes, Hypertension & Asthma",
+   "category": "Medical",
+   "guideId": "med-chronic-disease-management-home"
+  },
+  {
+   "id": "t14605",
+   "topic": "Poisoning and Overdose: Recognition, Response, and When to Call Whom",
+   "category": "Medical",
+   "guideId": "med-poisoning-overdose-response"
+  },
+  {
+   "id": "t14606",
+   "topic": "Terrain & Travel",
+   "category": "Movement",
+   "guideId": "terrain"
+  },
+  {
+   "id": "t14607",
+   "topic": "Load Carriage & Backpacking Technique",
+   "category": "Movement",
+   "guideId": "movement-load-carriage-backpacking-technique"
+  },
+  {
+   "id": "t14608",
+   "topic": "Moving as a Group: Formations, Contact & Communication",
+   "category": "Movement",
+   "guideId": "movement-group-travel-formations"
+  },
+  {
+   "id": "t14609",
+   "topic": "Finding Direction",
+   "category": "Navigation",
+   "guideId": "navigation"
+  },
+  {
+   "id": "t14610",
+   "topic": "Topographic Maps & Terrain Reading",
+   "category": "Navigation",
+   "guideId": "nav-topographic-maps-terrain-reading"
+  },
+  {
+   "id": "t14611",
+   "topic": "Modern GPS, GNSS & Digital Navigation",
+   "category": "Navigation",
+   "guideId": "nav-gps-gnss-digital-navigation"
+  },
+  {
+   "id": "t14612",
+   "topic": "Macronutrients, Micronutrients & How the Body Uses Them",
+   "category": "Nutrition",
+   "guideId": "food-macronutrients-micronutrients-metabolism"
+  },
+  {
+   "id": "t14613",
+   "topic": "Food Preservation — Canning, Drying, Salting & Curing",
+   "category": "Nutrition",
+   "guideId": "food-preservation-canning-drying-salting-curing"
+  },
+  {
+   "id": "t14614",
+   "topic": "The Science of Fermentation — Bread, Alcohol, Yogurt & Kraut",
+   "category": "Nutrition",
+   "guideId": "food-fermentation-science"
+  },
+  {
+   "id": "t14615",
+   "topic": "Cooking Chemistry — Heat, the Maillard Reaction & Emulsions",
+   "category": "Nutrition",
+   "guideId": "food-cooking-chemistry-heat-maillard-emulsions"
+  },
+  {
+   "id": "t14616",
+   "topic": "Building a Complete Diet From Limited Food",
+   "category": "Nutrition",
+   "guideId": "food-complete-diet-from-limited-food"
+  },
+  {
+   "id": "t14617",
+   "topic": "Sports & Performance Nutrition — Fueling, Hydration and Recovery",
+   "category": "Nutrition",
+   "guideId": "food-sports-performance-nutrition"
+  },
+  {
+   "id": "t14618",
+   "topic": "Special Diets Done Right — Vegetarian, Vegan, Gluten-Free & Allergy-Safe Eating",
+   "category": "Nutrition",
+   "guideId": "food-special-diets-without-gaps"
+  },
+  {
+   "id": "t14619",
+   "topic": "Reading Nutrition Labels & Making Sense of Diet Claims",
+   "category": "Nutrition",
+   "guideId": "food-reading-nutrition-labels-claims"
+  },
+  {
+   "id": "t14620",
+   "topic": "Motion, Forces & Newton's Laws",
+   "category": "Physics",
+   "guideId": "phys-motion-forces-newtons-laws"
+  },
+  {
+   "id": "t14621",
+   "topic": "Energy, Work, Power & Simple Machines",
+   "category": "Physics",
+   "guideId": "phys-energy-work-power-machines"
+  },
+  {
+   "id": "t14622",
+   "topic": "Electricity & Magnetism",
+   "category": "Physics",
+   "guideId": "phys-electricity-and-magnetism"
+  },
+  {
+   "id": "t14623",
+   "topic": "Heat & Thermodynamics",
+   "category": "Physics",
+   "guideId": "phys-heat-and-thermodynamics"
+  },
+  {
+   "id": "t14624",
+   "topic": "Waves, Sound, Light & Optics",
+   "category": "Physics",
+   "guideId": "phys-waves-sound-light-optics"
+  },
+  {
+   "id": "t14625",
+   "topic": "Modern Physics: Special Relativity & Quantum Mechanics, Worked With Real Numbers",
+   "category": "Physics",
+   "guideId": "phys-modern-physics-relativity-quantum"
+  },
+  {
+   "id": "t14626",
+   "topic": "Fluid Statics & Buoyancy: Pressure at Depth, Archimedes, and Why Things Float",
+   "category": "Physics",
+   "guideId": "phys-fluid-statics-buoyancy"
+  },
+  {
+   "id": "t14627",
+   "topic": "Nuclear Physics: Radioactivity, Half-Life, Fission & Fusion",
+   "category": "Physics",
+   "guideId": "phys-nuclear-physics-radioactivity"
+  },
+  {
+   "id": "t14628",
+   "topic": "Disaster Preparedness",
+   "category": "Preparedness",
+   "guideId": "urban"
+  },
+  {
+   "id": "t14629",
+   "topic": "Long-Term Off-Grid Self-Sufficiency Basics",
+   "category": "Preparedness",
+   "guideId": "preparedness-off-grid-self-sufficiency"
+  },
+  {
+   "id": "t14630",
+   "topic": "Neighborhood & Community Preparedness",
+   "category": "Preparedness",
+   "guideId": "preparedness-community-neighborhood-preparedness"
+  },
+  {
+   "id": "t14631",
+   "topic": "How the Brain, Memory & Attention Work",
+   "category": "Psychology",
+   "guideId": "psy-brain-memory-attention"
+  },
+  {
+   "id": "t14632",
+   "topic": "Stress, Fear & Psychological First Aid",
+   "category": "Psychology",
+   "guideId": "psy-stress-fear-first-aid"
+  },
+  {
+   "id": "t14633",
+   "topic": "How to Learn Anything — Study & Memory Techniques",
+   "category": "Psychology",
+   "guideId": "psy-learn-anything-study"
+  },
+  {
+   "id": "t14634",
+   "topic": "Cognitive Biases & Making Better Decisions",
+   "category": "Psychology",
+   "guideId": "psy-cognitive-biases-decisions"
+  },
+  {
+   "id": "t14635",
+   "topic": "Communication, Persuasion & Negotiation",
+   "category": "Psychology",
+   "guideId": "psy-communication-persuasion-negotiation"
+  },
+  {
+   "id": "t14636",
+   "topic": "Personality & Individual Differences: The Big Five and the Roots of Temperament",
+   "category": "Psychology",
+   "guideId": "psy-personality-individual-differences"
+  },
+  {
+   "id": "t14637",
+   "topic": "Motivation & Habit Formation: Why Willpower Alone Fails and What Actually Works",
+   "category": "Psychology",
+   "guideId": "psy-motivation-habit-formation"
+  },
+  {
+   "id": "t14638",
+   "topic": "Child Development: How Kids' Minds Actually Grow, Stage by Stage",
+   "category": "Psychology",
+   "guideId": "psy-child-development-stages"
+  },
+  {
+   "id": "t14639",
+   "topic": "Morse Code",
+   "category": "Reference",
+   "guideId": "morse"
+  },
+  {
+   "id": "t14640",
+   "topic": "NATO Phonetic Alphabet",
+   "category": "Reference",
+   "guideId": "nato-phonetic"
+  },
+  {
+   "id": "t14641",
+   "topic": "Emergency Frequencies",
+   "category": "Reference",
+   "guideId": "emergency-frequencies"
+  },
+  {
+   "id": "t14642",
+   "topic": "Signalling for Rescue",
+   "category": "Rescue",
+   "guideId": "signaling"
+  },
+  {
+   "id": "t14643",
+   "topic": "Calling for Help",
+   "category": "Rescue",
+   "guideId": "emergency-comms"
+  },
+  {
+   "id": "t14644",
+   "topic": "Water Rescue Basics: Reach, Throw, Row, Go",
+   "category": "Rescue",
+   "guideId": "rescue-water-rescue-basics"
+  },
+  {
+   "id": "t14645",
+   "topic": "Working With Search & Rescue: Stay Put, Get Found, Survive the Wait",
+   "category": "Rescue",
+   "guideId": "rescue-search-and-rescue-coordination"
+  },
+  {
+   "id": "t14646",
+   "topic": "Improvised Rescue Rigging: Mechanical Advantage for Non-Technical Rescuers",
+   "category": "Rescue",
+   "guideId": "rescue-improvised-rope-rigging"
+  },
+  {
+   "id": "t14647",
+   "topic": "Structural Collapse: Self-Rescue, Void Awareness, and Helping Without Becoming a Casualty",
+   "category": "Rescue",
+   "guideId": "rescue-structural-collapse-self-rescue"
+  },
+  {
+   "id": "t14648",
+   "topic": "Knots & Cordage",
+   "category": "Skills",
+   "guideId": "knots"
+  },
+  {
+   "id": "t14649",
+   "topic": "Basic Sewing & Fabric Repair",
+   "category": "Skills",
+   "guideId": "skills-basic-sewing-fabric-repair"
+  },
+  {
+   "id": "t14650",
+   "topic": "Woodworking & Hand Tool Basics",
+   "category": "Skills",
+   "guideId": "skills-woodworking-hand-tools"
+  },
+  {
+   "id": "t14651",
+   "topic": "Food & Foraging",
+   "category": "Sustenance",
+   "guideId": "food"
+  },
+  {
+   "id": "t14652",
+   "topic": "Long-Term Food Storage & Preservation",
+   "category": "Sustenance",
+   "guideId": "sustenance-long-term-food-storage-preservation"
+  },
+  {
+   "id": "t14653",
+   "topic": "Processing Wild Game: Field Dressing, Butchery, and Safe Handling",
+   "category": "Sustenance",
+   "guideId": "sustenance-wild-game-processing-butchering"
+  },
+  {
+   "id": "t14654",
+   "topic": "Reading the Sky: Clouds and What They Mean",
+   "category": "Weather",
+   "guideId": "wx-reading-the-sky-clouds"
+  },
+  {
+   "id": "t14655",
+   "topic": "Forecasting Weather Without Instruments",
+   "category": "Weather",
+   "guideId": "wx-forecasting-without-instruments"
+  },
+  {
+   "id": "t14656",
+   "topic": "Severe Weather: Storms, Tornadoes and Hurricanes",
+   "category": "Weather",
+   "guideId": "wx-severe-weather-storms-tornadoes-hurricanes"
+  },
+  {
+   "id": "t14657",
+   "topic": "Temperature, Humidity, Pressure and the Atmosphere",
+   "category": "Weather",
+   "guideId": "wx-atmosphere-temperature-humidity-pressure"
+  },
+  {
+   "id": "t14658",
+   "topic": "Seasons, Microclimates and Local Weather",
+   "category": "Weather",
+   "guideId": "wx-seasons-microclimates-local-weather"
   }
  ]
 }
