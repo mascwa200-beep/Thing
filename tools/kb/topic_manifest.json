@@ -16,13 +16,13 @@
    "id": "t00003",
    "topic": "Endocytosis and Exocytosis",
    "category": "Biology",
-   "guideId": null
+   "guideId": "endocytosis-and-exocytosis"
   },
   {
    "id": "t00004",
    "topic": "Ion Channels and Membrane Excitability",
    "category": "Biology",
-   "guideId": null
+   "guideId": "ion-channels-and-membrane-excitability"
   },
   {
    "id": "t00005",
@@ -4276,13 +4276,13 @@
    "id": "t00713",
    "topic": "Dimensional Analysis and Unit Conversion",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "dimensional-analysis-and-unit-conversion"
   },
   {
    "id": "t00714",
    "topic": "Empirical and Molecular Formula Determination",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "empirical-and-molecular-formula-determination"
   },
   {
    "id": "t00715",
@@ -7600,7 +7600,7 @@
    "id": "t01267",
    "topic": "Ada Lovelace and the First Algorithm",
    "category": "Computing",
-   "guideId": null
+   "guideId": "ada-lovelace-and-the-first-algorithm"
   },
   {
    "id": "t01268",
@@ -11710,7 +11710,7 @@
    "id": "t01952",
    "topic": "Silicate Minerals",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "silicate-minerals"
   },
   {
    "id": "t01953",
@@ -12754,13 +12754,13 @@
    "id": "t02126",
    "topic": "The Composition of the Atmosphere",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-composition-of-the-atmosphere"
   },
   {
    "id": "t02127",
    "topic": "The Troposphere and Where Weather Happens",
    "category": "Weather",
-   "guideId": null
+   "guideId": "the-troposphere-and-where-weather-happens"
   },
   {
    "id": "t02128",
@@ -13138,7 +13138,7 @@
    "id": "t02190",
    "topic": "The Global Carbon Cycle",
    "category": "Climate",
-   "guideId": null
+   "guideId": "the-global-carbon-cycle"
   },
   {
    "id": "t02191",
@@ -18226,7 +18226,7 @@
    "id": "t03038",
    "topic": "Geography of Benin",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-benin"
   },
   {
    "id": "t03039",
@@ -23290,7 +23290,7 @@
    "id": "t03882",
    "topic": "Archaeological Survey and Site Prospection",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "archaeological-survey-and-site-prospection"
   },
   {
    "id": "t03883",
@@ -24256,7 +24256,7 @@
    "id": "t04043",
    "topic": "How Historians Reconstruct the Past",
    "category": "History",
-   "guideId": null
+   "guideId": "how-historians-reconstruct-the-past"
   },
   {
    "id": "t04044",
@@ -29956,7 +29956,7 @@
    "id": "t04993",
    "topic": "Close Reading & Literary Analysis",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "close-reading-literary-analysis"
   },
   {
    "id": "t04994",
@@ -32146,7 +32146,7 @@
    "id": "t05358",
    "topic": "Phonetics — The Sounds of Speech",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "phonetics-the-sounds-of-speech"
   },
   {
    "id": "t05359",
@@ -33322,7 +33322,7 @@
    "id": "t05554",
    "topic": "Multiplication and Division: Algorithms and Strategies",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "multiplication-and-division-algorithms-and-strategies"
   },
   {
    "id": "t05555",
@@ -36412,7 +36412,7 @@
    "id": "t06069",
    "topic": "Blood Pressure Regulation and the Baroreflex",
    "category": "Medical",
-   "guideId": null
+   "guideId": "blood-pressure-regulation-and-the-baroreflex"
   },
   {
    "id": "t06070",
@@ -38788,7 +38788,7 @@
    "id": "t06465",
    "topic": "Breast Health and Self-Examination",
    "category": "Health",
-   "guideId": null
+   "guideId": "breast-health-and-self-examination"
   },
   {
    "id": "t06466",
@@ -39676,7 +39676,7 @@
    "id": "t06613",
    "topic": "Generalized Anxiety Disorder",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "generalized-anxiety-disorder"
   },
   {
    "id": "t06614",
@@ -40408,7 +40408,7 @@
    "id": "t06735",
    "topic": "Vitamin C and Scurvy",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "vitamin-c-and-scurvy"
   },
   {
    "id": "t06736",
@@ -41656,7 +41656,7 @@
    "id": "t06943",
    "topic": "Tablature, Chord Charts and Lead Sheets",
    "category": "Music",
-   "guideId": null
+   "guideId": "tablature-chord-charts-and-lead-sheets"
   },
   {
    "id": "t06944",
@@ -44338,7 +44338,7 @@
    "id": "t07390",
    "topic": "Epistemology — The Theory of Knowledge",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "epistemology-the-theory-of-knowledge"
   },
   {
    "id": "t07391",
@@ -45718,7 +45718,7 @@
    "id": "t07620",
    "topic": "The Anthropology and Sociology of Religion",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "the-anthropology-and-sociology-of-religion"
   },
   {
    "id": "t07621",
@@ -47350,7 +47350,7 @@
    "id": "t07892",
    "topic": "Functionalism, Conflict Theory & Symbolic Interactionism",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "functionalism-conflict-theory-symbolic-interactionism"
   },
   {
    "id": "t07893",
@@ -48862,7 +48862,7 @@
    "id": "t08144",
    "topic": "Liberalism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "liberalism"
   },
   {
    "id": "t08145",

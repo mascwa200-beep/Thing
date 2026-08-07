@@ -66,6 +66,28 @@
    "file": "guides_archaeology_and_anthropology.json"
   },
   {
+   "id": "archaeological-survey-and-site-prospection",
+   "title": "Archaeological Survey and Site Prospection",
+   "category": "Archaeology & Anthropology",
+   "summary": "A comprehensive account of how archaeologists locate, map, and characterize past human activity across a landscape without digging, spanning fieldwalking, aerial and satellite imaging, lidar, geophysics, and the reasoning that turns scattered clues into interpreted sites.",
+   "headings": [
+    "What Survey Is and Why It Matters",
+    "The History and Development of Survey Methods",
+    "Research Design and Sampling Strategy",
+    "Pedestrian Survey and Fieldwalking",
+    "Aerial and Satellite Reconnaissance",
+    "Lidar and Photogrammetry",
+    "Geophysical Prospection: Magnetometry",
+    "Geophysical Prospection: Resistivity and Ground-Penetrating Radar",
+    "Geochemical, Auger, and Coring Methods",
+    "Recording, Georeferencing, and Data Integration",
+    "Interpretation, Predictive Modeling, and Sampling Bias",
+    "Ethics, Legislation, and Cultural Heritage Management",
+    "Limitations, Misconceptions, and Onward Connections"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
    "id": "astro-solar-system-tour",
    "title": "A Tour of the Solar System",
    "category": "Astronomy",
@@ -528,6 +550,49 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "endocytosis-and-exocytosis",
+   "title": "Endocytosis and Exocytosis",
+   "category": "Biology",
+   "summary": "A comprehensive guide to how cells move bulk material across their membranes: the vesicle-based processes of endocytosis (importing) and exocytosis (exporting), their molecular machinery, their many variants, their roles in physiology and immunity, and how they fail in disease.",
+   "headings": [
+    "The Problem of Bulk Transport Across Membranes",
+    "Membranes, Vesicles, and the Endomembrane System",
+    "Endocytosis: An Overview of the Import Pathways",
+    "Phagocytosis: Cellular Eating",
+    "Pinocytosis and Fluid-Phase Uptake",
+    "Receptor-Mediated Endocytosis and Clathrin-Coated Pits",
+    "Clathrin-Independent and Caveolae-Dependent Routes",
+    "The Endosomal System and Cargo Sorting",
+    "Exocytosis: Constitutive and Regulated Secretion",
+    "SNARE Proteins and the Machinery of Membrane Fusion",
+    "Physiological Roles and Whole-Body Significance",
+    "Regulation, Disease, and Misconceptions"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
+   "id": "ion-channels-and-membrane-excitability",
+   "title": "Ion Channels and Membrane Excitability",
+   "category": "Biology",
+   "summary": "A thorough explanation of how ion channels in the cell membrane generate electrical signals, covering the physics of membrane potentials, the structure and gating of channels, the action potential, synaptic transmission, and the diseases and drugs that act on these proteins.",
+   "headings": [
+    "The Membrane and the Electrochemical Foundations of Excitability",
+    "The Resting Membrane Potential and Equilibrium Potentials",
+    "What Ion Channels Are: Pore, Selectivity, and Structure",
+    "Gating Mechanisms: Voltage, Ligand, and Mechanical",
+    "Voltage-Gated Sodium Channels and the Action Potential Upstroke",
+    "Voltage-Gated Potassium Channels and Repolarization",
+    "The Hodgkin-Huxley Model and Quantitative Excitability",
+    "Calcium Channels and the Coupling of Electricity to Chemistry",
+    "Ligand-Gated Channels and Synaptic Transmission",
+    "Other Channel Families: Leak, Chloride, TRP, and Pacemaker Channels",
+    "Propagation, Myelination, and Saltatory Conduction",
+    "Channelopathies, Toxins, and Pharmacology",
+    "Methods, Misconceptions, and Onward Connections"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
    "id": "chem-atoms-elements-periodic-table",
    "title": "Atoms, Elements & the Periodic Table",
    "category": "Chemistry",
@@ -782,6 +847,49 @@
    "file": "guides_chemistry.json"
   },
   {
+   "id": "dimensional-analysis-and-unit-conversion",
+   "title": "Dimensional Analysis and Unit Conversion",
+   "category": "Chemistry",
+   "summary": "A comprehensive guide to reasoning with physical quantities: how units and dimensions work, the SI system, the factor-label method for converting units, using dimensional homogeneity to check and derive equations, and the applications, significant-figure rules, and common pitfalls that make dimensional analysis one of the most reliable tools in science.",
+   "headings": [
+    "What a Physical Quantity Really Is",
+    "The International System of Units and Its Base Quantities",
+    "Derived Units, Prefixes, and Scientific Notation",
+    "The Principle of Dimensional Homogeneity",
+    "Conversion Factors and the Factor-Label Method",
+    "Worked Examples of Single and Multi-Step Conversions",
+    "Converting Compound and Derived Units",
+    "Dimensional Analysis as a Problem-Solving Check",
+    "Deriving Relationships: Rayleigh's Method and the Buckingham Pi Theorem",
+    "Chemistry Applications: The Mole, Molar Mass, and Stoichiometry",
+    "Significant Figures, Precision, and Error in Conversions",
+    "Common Pitfalls, Misconceptions, and Where the Method Leads"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
+   "id": "empirical-and-molecular-formula-determination",
+   "title": "Empirical and Molecular Formula Determination",
+   "category": "Chemistry",
+   "summary": "A complete guide to finding the chemical formula of a substance from experimental data, covering the mole and molar mass, percent composition, the arithmetic of empirical and molecular formulas, combustion analysis, methods for measuring molar mass, hydrates, and the historical laws that make it all possible.",
+   "headings": [
+    "Chemical Formulas and What They Represent",
+    "The Mole, Molar Mass, and Avogadro's Number",
+    "Percent Composition by Mass",
+    "From Composition to the Empirical Formula",
+    "From Empirical Formula to Molecular Formula",
+    "Combustion Analysis of Organic Compounds",
+    "Measuring Molar Mass Experimentally",
+    "Hydrates and Formulas from Mass Loss on Heating",
+    "Worked Problems and Numerical Techniques",
+    "Ionic Compounds, Formula Units, and Nonstoichiometry",
+    "Historical Foundations: The Laws of Chemical Combination",
+    "Pitfalls, Rounding Traps, and Misconceptions",
+    "Where Formula Determination Connects Onward"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -943,6 +1051,28 @@
     "Consequences of an Enhanced Effect",
     "Common Misconceptions",
     "Connections: Other Planets, Models, and Mitigation"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "the-global-carbon-cycle",
+   "title": "The Global Carbon Cycle",
+   "category": "Climate",
+   "summary": "How carbon moves between the atmosphere, oceans, living organisms, soils, and rocks on timescales from seconds to hundreds of millions of years, and how human activity is now reshaping those flows.",
+   "headings": [
+    "Reservoirs and Fluxes: The Architecture of the Cycle",
+    "Carbon the Element: Chemistry That Makes the Cycle Possible",
+    "The Fast Biological Cycle: Photosynthesis and Respiration",
+    "The Ocean Reservoir: Solubility and Biological Pumps",
+    "The Slow Geological Cycle: Weathering, Sediments, and Volcanoes",
+    "Soils, Peat, and Permafrost: The Terrestrial Carbon Store",
+    "The Atmosphere and Its Measurement: The Keeling Curve",
+    "Isotopes: Fingerprinting Carbon's Origin and Age",
+    "Feedbacks: What Amplifies and What Restrains",
+    "The Human Perturbation: Fossil Fuels and Land-Use Change",
+    "The Global Carbon Budget and the Airborne Fraction",
+    "Sinks, Removal, and the Frontier of Managing Carbon",
+    "Deep Time: The Carbon Cycle Across Earth's History"
    ],
    "file": "guides_climate.json"
   },
@@ -1201,6 +1331,27 @@
     "Integrated Circuits and the Third Generation",
     "The Microprocessor",
     "Legacy, Themes, and What Came After"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
+   "id": "ada-lovelace-and-the-first-algorithm",
+   "title": "Ada Lovelace and the First Algorithm",
+   "category": "Computing",
+   "summary": "The life and work of Augusta Ada King, Countess of Lovelace, her collaboration with Charles Babbage on the Analytical Engine, the algorithm published in her 1843 Notes, and the honest debate over what her achievement really was.",
+   "headings": [
+    "Who Ada Lovelace Was: Life and Family",
+    "A Mathematical Education in the 1830s",
+    "Charles Babbage and the Difference Engine",
+    "The Analytical Engine: A General-Purpose Machine",
+    "The Meeting of Minds and the Turin Lectures",
+    "The Notes: Structure and Significance",
+    "Note G and the Bernoulli Number Algorithm",
+    "What First Programmer Means: The Debate",
+    "Beyond Number-Crunching: The Generalist Vision",
+    "The Question of Machine Creativity",
+    "Legacy, Rediscovery, and the Language Ada",
+    "Separating Myth from Documented Fact"
    ],
    "file": "guides_computing.json"
   },
@@ -1554,6 +1705,28 @@
     "Identifying Minerals in Hand Specimen",
     "Minerals, Rocks, and the Rock Cycle",
     "Uses of Minerals and the Frontiers of Mineralogy"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
+   "id": "silicate-minerals",
+   "title": "Silicate Minerals",
+   "category": "Earth Science",
+   "summary": "The largest and most important class of minerals, built from silicon-oxygen tetrahedra, covering their structure, classification into six groups, crystal chemistry, identification, and their central role in rocks, soils, industry, and geological hazards.",
+   "headings": [
+    "What Minerals Are and Why Silicates Dominate",
+    "The Silicon-Oxygen Tetrahedron: The Fundamental Unit",
+    "Polymerization: How Tetrahedra Link",
+    "Nesosilicates and Sorosilicates: Isolated and Paired Tetrahedra",
+    "Cyclosilicates: The Ring Silicates",
+    "Inosilicates: The Chain Silicates",
+    "Phyllosilicates: The Sheet Silicates",
+    "Tectosilicates: The Framework Silicates",
+    "Crystal Chemistry: Substitution and Solid Solution",
+    "Identifying Silicate Minerals: Physical Properties",
+    "Silicates in Rocks and the Rock Cycle",
+    "Weathering, Soils, and Economic Importance",
+    "Health, Hazards, and Responsible Handling"
    ],
    "file": "guides_earth_science.json"
   },
@@ -2167,6 +2340,27 @@
    "file": "guides_geography.json"
   },
   {
+   "id": "geography-of-benin",
+   "title": "Geography of Benin",
+   "category": "Geography",
+   "summary": "A comprehensive survey of the physical and human geography of Benin in West Africa — its location and borders, landforms and geology, rivers, climate, ecosystems, wildlife, population, cities, economy, and environmental challenges.",
+   "headings": [
+    "Location, Size, and Shape",
+    "Borders and Territorial Extent",
+    "Relief: The Great Natural Regions",
+    "Geology, Minerals, and Soils",
+    "Rivers, Lakes, and Drainage",
+    "Climate and Seasons",
+    "Vegetation and Ecological Zones",
+    "Wildlife and Protected Areas",
+    "Population, Peoples, and Settlement",
+    "Cities and the Urban Network",
+    "Economic Geography",
+    "Environmental Challenges and the Road Ahead"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
    "id": "weather-hazards",
    "title": "Weather Hazards",
    "category": "Hazards",
@@ -2396,6 +2590,27 @@
    "file": "guides_health.json"
   },
   {
+   "id": "breast-health-and-self-examination",
+   "title": "Breast Health and Self-Examination",
+   "category": "Health",
+   "summary": "A thorough, practical guide to breast anatomy, normal changes across life, how to know your own breasts and perform a self-examination, the warning signs that need medical attention, common benign conditions, breast cancer, risk reduction, and clinical screening.",
+   "headings": [
+    "Why Breast Health Matters",
+    "The Structure of the Breast",
+    "Normal Change Across the Life Cycle",
+    "Breast Self-Awareness: Knowing Your Normal",
+    "How to Perform a Breast Self-Examination",
+    "Warning Signs That Warrant Attention",
+    "Common Benign Breast Conditions",
+    "Understanding Breast Cancer",
+    "Risk Factors and Risk Reduction",
+    "Clinical Screening and Imaging",
+    "From Finding to Diagnosis",
+    "Breast Health for Everyone and Onward Connections"
+   ],
+   "file": "guides_health.json"
+  },
+  {
    "id": "primary-and-secondary-sources-in-history",
    "title": "Primary and Secondary Sources in History",
    "category": "History",
@@ -2438,6 +2653,49 @@
     "Memory, Public History, and the Uses of the Past"
    ],
    "file": "guides_history.json"
+  },
+  {
+   "id": "how-historians-reconstruct-the-past",
+   "title": "How Historians Reconstruct the Past",
+   "category": "History",
+   "summary": "An explanation of the methods historians use to turn surviving traces into knowledge of the past — the kinds of evidence, source criticism, dating, the auxiliary and scientific disciplines, the recovery of ordinary lives, interpretation and causation, and the debates that shape the field.",
+   "headings": [
+    "History, the Past, and Historiography",
+    "The Raw Material: Primary and Secondary Sources",
+    "The Many Kinds of Evidence",
+    "Source Criticism: Testing the Evidence",
+    "Corroboration and Weighing Conflicting Accounts",
+    "Chronology: Placing Events in Time",
+    "The Auxiliary Sciences of History",
+    "Bringing Science to the Past",
+    "Recovering the Voiceless: Oral History and Material Culture",
+    "Interpretation, Causation, and Narrative",
+    "Bias, Silence, and Contested History",
+    "Schools of Thought and the Future of the Discipline"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "phonetics-the-sounds-of-speech",
+   "title": "Phonetics — The Sounds of Speech",
+   "category": "Language & Linguistics",
+   "summary": "Phonetics is the scientific study of the sounds of human speech: how they are produced, transmitted as sound waves, and heard. This guide surveys articulation, acoustics, perception, transcription in the International Phonetic Alphabet, and how sounds behave in running speech.",
+   "headings": [
+    "What Phonetics Studies",
+    "The Three Branches and the Speech Chain",
+    "Airstream Mechanisms and the Vocal Tract",
+    "Voicing and Phonation",
+    "Places of Articulation",
+    "Manners of Articulation",
+    "Vowels and the Vowel Space",
+    "The International Phonetic Alphabet",
+    "Suprasegmentals: Stress, Length, Tone, and Intonation",
+    "Acoustic Phonetics: Waves, Formants, and Spectrograms",
+    "Auditory Phonetics and Speech Perception",
+    "Coarticulation and Connected Speech",
+    "Applications, Pitfalls, and Connections"
+   ],
+   "file": "guides_language_and_linguistics.json"
   },
   {
    "id": "linguistics-the-scientific-study-of-language",
@@ -2483,6 +2741,28 @@
    "file": "guides_language_and_linguistics.json"
   },
   {
+   "id": "liberalism",
+   "title": "Liberalism",
+   "category": "Law & Government",
+   "summary": "Liberalism is the political tradition built on individual liberty, rights, limited government, and equality before the law. This guide traces its origins, thinkers, principles, major branches, relationship to democracy and markets, its critics, and its condition today.",
+   "headings": [
+    "What Liberalism Is",
+    "Historical Origins",
+    "Key Thinkers",
+    "Core Principles",
+    "Classical Liberalism",
+    "The Liberal State and Constitutionalism",
+    "Economic Liberalism and Markets",
+    "Social and Welfare Liberalism",
+    "Liberalism and Democracy",
+    "Neoliberalism and the Market Turn",
+    "Rawls, Political Liberalism, and Global Varieties",
+    "Critiques of Liberalism",
+    "Liberalism Today and Where It Connects"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
    "id": "political-philosophy-the-great-questions",
    "title": "Political Philosophy: The Great Questions",
    "category": "Law & Government",
@@ -2524,6 +2804,28 @@
     "Enduring Debates, Pitfalls, and Connections"
    ],
    "file": "guides_law_and_government.json"
+  },
+  {
+   "id": "close-reading-literary-analysis",
+   "title": "Close Reading & Literary Analysis",
+   "category": "Literature & Writing",
+   "summary": "Close reading is the disciplined study of a text's language and form to understand how it makes meaning. This guide covers the practice's history, the features of language a reader learns to notice, and how observations become interpretive arguments.",
+   "headings": [
+    "What Close Reading Is",
+    "History and Traditions",
+    "Preparing to Read: Attention and Annotation",
+    "Diction and Word Choice",
+    "Imagery and Figurative Language",
+    "Sound, Rhythm, and Meter",
+    "Syntax and Grammar",
+    "Structure and Form",
+    "Tone, Voice, and Point of View",
+    "Theme and Meaning",
+    "From Observation to Argument",
+    "Critical Lenses and Theoretical Approaches",
+    "Common Pitfalls and Where It Connects"
+   ],
+   "file": "guides_literature_and_writing.json"
   },
   {
    "id": "literary-theory-the-schools-of-criticism",
@@ -2667,6 +2969,28 @@
     "Reading Grain Structure: Why Hammering Direction Matters"
    ],
    "file": "guides_making.json"
+  },
+  {
+   "id": "multiplication-and-division-algorithms-and-strategies",
+   "title": "Multiplication and Division: Algorithms and Strategies",
+   "category": "Mathematics",
+   "summary": "A comprehensive guide to what multiplication and division mean, why the standard and alternative algorithms work, and the mental strategies, extensions to fractions, decimals and negatives, and connections onward to algebra and computing.",
+   "headings": [
+    "What Multiplication and Division Mean",
+    "Properties, Facts, and Learning the Times Tables",
+    "Place Value: Why the Algorithms Work",
+    "The Standard Multiplication Algorithm",
+    "Alternative Multiplication Algorithms",
+    "Mental Multiplication Strategies",
+    "Division Meaning and the Long Division Algorithm",
+    "Alternative Division Methods",
+    "Remainders, Divisibility, and Interpreting Quotients",
+    "Multiplying and Dividing Fractions, Decimals, and Negatives",
+    "Estimation, Checking, and Catching Errors",
+    "Historical Algorithms and Connections Onward",
+    "Common Misconceptions and Pitfalls"
+   ],
+   "file": "guides_mathematics.json"
   },
   {
    "id": "addition-and-subtraction-algorithms-and-strategies",
@@ -2881,6 +3205,28 @@
     "Step-by-Step: Build a Real Modular Cipher, Then Sieve and Break Numbers Apart Yourself"
    ],
    "file": "guides_mathematics.json"
+  },
+  {
+   "id": "blood-pressure-regulation-and-the-baroreflex",
+   "title": "Blood Pressure Regulation and the Baroreflex",
+   "category": "Medical",
+   "summary": "A comprehensive account of what arterial blood pressure is, the physical factors that set it, and how the body regulates it over seconds, minutes and days, centred on the baroreflex and extending to the hormonal and renal systems and their clinical failures.",
+   "headings": [
+    "What Blood Pressure Is",
+    "The Physical Determinants: Flow, Resistance, and Cardiac Output",
+    "The Timescales of Regulation",
+    "The Baroreceptors: Where Pressure Is Sensed",
+    "Central Integration in the Brainstem",
+    "The Efferent Response: Sympathetic and Parasympathetic Action",
+    "The Baroreflex in Action: Standing and Bleeding",
+    "Baroreflex Sensitivity and Resetting",
+    "Chemoreceptors and Other Rapid Reflexes",
+    "Medium-Term Control: Hormones and Fluid",
+    "Long-Term Control: The Kidney and Pressure Natriuresis",
+    "Clinical Failures: Hypertension, Fainting, and Baroreflex Failure",
+    "Misconceptions and Connections Onward"
+   ],
+   "file": "guides_medical.json"
   },
   {
    "id": "the-cardiac-conduction-system-and-the-heartbeat",
@@ -3204,6 +3550,28 @@
    "file": "guides_movement.json"
   },
   {
+   "id": "tablature-chord-charts-and-lead-sheets",
+   "title": "Tablature, Chord Charts and Lead Sheets",
+   "category": "Music",
+   "summary": "A comprehensive guide to the three great shorthand notations of popular and folk music: tablature, which shows where to put your fingers; chord charts and diagrams, which name and shape harmony; and lead sheets, which carry a whole song on one page as melody, chords and lyrics.",
+   "headings": [
+    "Three Shorthands and Why They Exist",
+    "A Brief Anchor in Standard Notation",
+    "Tablature Fundamentals",
+    "Reading Rhythm and Technique in Tab",
+    "Tablature for Other Instruments",
+    "Chord Names and Symbols",
+    "Chord Charts and Chord Diagrams",
+    "The Nashville Number System",
+    "Lead Sheets and Fake Books",
+    "Slash Notation and Reading a Chart in Performance",
+    "Comparing the Three: What Each Captures and Loses",
+    "History, Software, and Connections Onward",
+    "Common Mistakes and Misconceptions"
+   ],
+   "file": "guides_music.json"
+  },
+  {
    "id": "music-notation-reading-and-writing-the-staff",
    "title": "Music Notation: Reading and Writing the Staff",
    "category": "Music",
@@ -3312,6 +3680,28 @@
     "GPS as a Tool, Not a Replacement for Map and Compass"
    ],
    "file": "guides_navigation.json"
+  },
+  {
+   "id": "vitamin-c-and-scurvy",
+   "title": "Vitamin C and Scurvy",
+   "category": "Nutrition",
+   "summary": "A complete account of vitamin C (ascorbic acid) and the deficiency disease scurvy, covering the molecule's chemistry and biological roles, why humans depend on dietary intake, the history of the disease and its cure, its pathology and clinical course, diagnosis, dietary requirements, treatment, and modern controversies.",
+   "headings": [
+    "What Scurvy Is: A Disease of Deficiency",
+    "The Chemistry of Ascorbic Acid",
+    "Biological Functions: Collagen and Beyond",
+    "Why Humans Cannot Make Their Own Vitamin C",
+    "History: From the Age of Sail to James Lind",
+    "The Isolation of Vitamin C",
+    "How Deficiency Produces Disease: Pathophysiology",
+    "Clinical Signs, Symptoms, and Stages",
+    "Diagnosis and Laboratory Assessment",
+    "Dietary Sources and Requirements",
+    "Treatment and Prevention",
+    "Toxicity, Megadoses, and the Pauling Controversy",
+    "Special Populations, Modern Relevance, and Connections"
+   ],
+   "file": "guides_nutrition.json"
   },
   {
    "id": "vitamin-d-and-sunlight",
@@ -3525,6 +3915,27 @@
     "Step-by-step: audit your own pantry"
    ],
    "file": "guides_nutrition.json"
+  },
+  {
+   "id": "epistemology-the-theory-of-knowledge",
+   "title": "Epistemology — The Theory of Knowledge",
+   "category": "Philosophy",
+   "summary": "A comprehensive introduction to epistemology, the philosophical study of knowledge: what knowledge is, where it comes from, how beliefs are justified, the major theories and debates, the challenge of skepticism, and the modern branches that extend the field.",
+   "headings": [
+    "What Epistemology Is: The Study of Knowledge",
+    "Knowledge as Justified True Belief",
+    "The Gettier Problem and the Analysis of Knowledge",
+    "The Sources of Knowledge",
+    "The Structure of Justification",
+    "Internalism, Externalism, and Reliabilism",
+    "Rationalism, Empiricism, and the A Priori",
+    "Skepticism and the Problem of the External World",
+    "Theories of Truth",
+    "Social Epistemology, Testimony, and Disagreement",
+    "Naturalized, Virtue, and Formal Epistemology",
+    "Misconceptions and Where Epistemology Connects Onward"
+   ],
+   "file": "guides_philosophy.json"
   },
   {
    "id": "metaphysics-the-study-of-what-exists",
@@ -3809,6 +4220,27 @@
    "file": "guides_preparedness.json"
   },
   {
+   "id": "generalized-anxiety-disorder",
+   "title": "Generalized Anxiety Disorder",
+   "category": "Psychology",
+   "summary": "A thorough overview of generalized anxiety disorder (GAD): what it is, how it is diagnosed and distinguished from ordinary worry, its epidemiology, biological and psychological causes, assessment, evidence-based psychological and drug treatments, course and self-management, and common misconceptions.",
+   "headings": [
+    "What Generalized Anxiety Disorder Is",
+    "Diagnostic Criteria and Classification",
+    "Epidemiology, Onset, and Course",
+    "Symptoms and Clinical Presentation",
+    "The Neurobiology of Anxiety",
+    "Genetics, Temperament, and Environmental Risk",
+    "Psychological Models of Worry",
+    "Differential Diagnosis and Comorbidity",
+    "Assessment and Screening",
+    "Psychological Treatments",
+    "Pharmacological Treatments",
+    "Course, Self-Management, Misconceptions, and Connections"
+   ],
+   "file": "guides_psychology.json"
+  },
+  {
    "id": "depression-understanding-and-treating-it",
    "title": "Depression: Understanding and Treating It",
    "category": "Psychology",
@@ -4064,6 +4496,28 @@
    "file": "guides_reference.json"
   },
   {
+   "id": "the-anthropology-and-sociology-of-religion",
+   "title": "The Anthropology and Sociology of Religion",
+   "category": "Religion & Mythology",
+   "summary": "How the social sciences study religion as human behaviour and social fact: the founding theorists, the major schools of anthropology and sociology, and the methods, findings, and debates that shape the field.",
+   "headings": [
+    "Defining Religion: The Problem of a Universal Category",
+    "The Birth of a Social Science of Religion",
+    "Emile Durkheim: The Sacred, the Profane, and Collective Effervescence",
+    "Max Weber: Meaning, Charisma, and Rationalization",
+    "Karl Marx: Ideology, Alienation, and Critique",
+    "Malinowski, Radcliffe-Brown, and Functionalist Anthropology",
+    "Symbolic and Interpretive Anthropology: Geertz, Turner, Douglas",
+    "Ritual and Rites of Passage: van Gennep and Liminality",
+    "Myth, Cosmology, and Systems of Classification",
+    "Magic, Witchcraft, Oracles, and Divination",
+    "Secularization, Rational Choice, and Religious Economies",
+    "Lived Religion, New Religious Movements, and Global Flows",
+    "Methods, Ethics, and Enduring Debates"
+   ],
+   "file": "guides_religion_and_mythology.json"
+  },
+  {
    "id": "comparative-religion-patterns-across-faiths",
    "title": "Comparative Religion — Patterns Across Faiths",
    "category": "Religion & Mythology",
@@ -4293,6 +4747,28 @@
    "file": "guides_skills.json"
   },
   {
+   "id": "functionalism-conflict-theory-symbolic-interactionism",
+   "title": "Functionalism, Conflict Theory & Symbolic Interactionism",
+   "category": "Society & Culture",
+   "summary": "A guided tour of sociology's three major theoretical paradigms: their origins, key thinkers, core concepts, how each explains the same social facts differently, and the criticisms and syntheses that shape the discipline today.",
+   "headings": [
+    "Why Sociology Has Competing Paradigms",
+    "Roots: The Organic Analogy and the Birth of Social Theory",
+    "Functionalism: Durkheim, Solidarity, and Social Facts",
+    "Structural Functionalism: Parsons and the AGIL Scheme",
+    "Merton's Middle-Range Functionalism: Manifest and Latent Functions",
+    "Conflict Theory: Marx, Class, and Material Contradiction",
+    "Weber and the Critical Tradition: Power Beyond Class",
+    "Contemporary Conflict Perspectives: Dahrendorf, Collins, Gender, and Race",
+    "Symbolic Interactionism: Mead, the Self, and Shared Meaning",
+    "The Chicago School, Blumer, and Goffman's Dramaturgy",
+    "Levels of Analysis: Micro, Macro, and Attempts at Synthesis",
+    "Applying the Three Lenses: A Worked Comparison",
+    "Criticisms, Misconceptions, and Where the Field Is Going"
+   ],
+   "file": "guides_society_and_culture.json"
+  },
+  {
    "id": "classical-social-theory-marx-durkheim-weber",
    "title": "Classical Social Theory: Marx, Durkheim & Weber",
    "category": "Society & Culture",
@@ -4401,6 +4877,50 @@
     "Realistic Expectations and When to Seek Help"
    ],
    "file": "guides_sustenance.json"
+  },
+  {
+   "id": "the-composition-of-the-atmosphere",
+   "title": "The Composition of the Atmosphere",
+   "category": "Weather",
+   "summary": "A thorough account of what Earth's atmosphere is made of, from the major and trace gases to water vapour and aerosols, how it is layered, how it formed, and how humans are changing it.",
+   "headings": [
+    "What the Atmosphere Is",
+    "The Major Permanent Gases",
+    "Water Vapour: The Great Variable",
+    "Carbon Dioxide and the Carbon Cycle",
+    "Trace Greenhouse Gases and Ozone",
+    "Aerosols and Particulates",
+    "The Vertical Structure of the Atmosphere",
+    "The Ozone Layer",
+    "The Homosphere, Heterosphere, and Ionosphere",
+    "How the Atmosphere Formed and Evolved",
+    "Pressure, Density, and the Gas Laws",
+    "Human Alteration of Atmospheric Composition",
+    "Measuring the Atmosphere and Connections Onward"
+   ],
+   "file": "guides_weather.json"
+  },
+  {
+   "id": "the-troposphere-and-where-weather-happens",
+   "title": "The Troposphere and Where Weather Happens",
+   "category": "Weather",
+   "summary": "A thorough tour of the lowest layer of the atmosphere: its structure, composition, temperature and pressure profiles, energy budget, and the physics of moisture, convection, wind, fronts, and clouds that make it the theatre of nearly all weather.",
+   "headings": [
+    "The Atmosphere in Layers: Locating the Troposphere",
+    "Composition and Mass: What the Troposphere Is Made Of",
+    "The Vertical Temperature Profile and the Environmental Lapse Rate",
+    "Pressure, Density, and Hydrostatic Balance",
+    "The Energy Budget: Why the Troposphere Is Heated From Below",
+    "Water Vapor, Humidity, and Latent Heat",
+    "Adiabatic Processes and the Dry and Moist Lapse Rates",
+    "Atmospheric Stability, Convection, and Cloud Formation",
+    "Winds, the Coriolis Effect, and the General Circulation",
+    "Jet Streams, Air Masses, and Fronts",
+    "Clouds, Precipitation, and the Water Cycle",
+    "The Planetary Boundary Layer and Surface Weather",
+    "Measuring, Forecasting, and the Troposphere in the Climate System"
+   ],
+   "file": "guides_weather.json"
   },
   {
    "id": "the-structure-and-layers-of-the-atmosphere",
