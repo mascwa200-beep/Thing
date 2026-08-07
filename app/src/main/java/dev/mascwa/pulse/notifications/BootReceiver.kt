@@ -41,6 +41,12 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(context) }
                 }
+                // Same rule for the remote link: revived only if the user left it switched on, so a
+                // reboot doesn't quietly leave the desk computer unable to reach the phone. Turning the
+                // switch off keeps it off.
+                if (settings.remote.enabled) {
+                    runCatching { dev.mascwa.pulse.remote.RemoteLinkService.start(context) }
+                }
             } finally {
                 pending.finish()
             }

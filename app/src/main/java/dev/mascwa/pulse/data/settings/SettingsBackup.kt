@@ -46,7 +46,7 @@ object SettingsBackup {
     )
 
     /** Lay a restored backup over the device's CURRENT settings, preserving the device's existing
-     *  credentials (the backup never carries them). */
+     *  credentials (the backup never carries them) and its remote-link pairings. */
     fun merge(restored: AppSettings, current: AppSettings): AppSettings = restored.copy(
         apiKeys = current.apiKeys,
         jarvis = restored.jarvis.copy(
@@ -55,6 +55,10 @@ object SettingsBackup {
             cloudApiKey = current.jarvis.cloudApiKey,
         ),
         spotify = current.spotify,
+        // Paired computers are public keys, not secrets — but the list is an AUTHORIZATION list, and
+        // restoring an old backup must never silently re-admit a machine the user deliberately unpaired.
+        // The device's own current pairings are the only truth about what may reach it.
+        remote = current.remote,
     )
 
     /** Serialize a redacted backup of [current] settings, stamped [nowMs]. */

@@ -281,6 +281,27 @@ data class SecuritySettings(
     val httpsOnly: Boolean = false,
 )
 
+/**
+ * The LAN remote link — letting a paired desktop switch app features on and off from the same Wi-Fi.
+ *
+ * Default **OFF**: the link only listens while the user has explicitly turned it on, which is exactly what
+ * "on and off whenever" means here. Nothing in this group is a secret: [pairedKeys] holds the *public*
+ * keys of paired computers, so it deliberately does not need adding to `allSecretValues()` /
+ * `SettingsBackup.redactSecrets`. This phone's own private key lives in the Keystore and never appears in
+ * settings, and the pairing code is never persisted at all.
+ */
+@Serializable
+data class RemoteSettings(
+    /** Master switch. Off = no listening socket exists at all. */
+    val enabled: Boolean = false,
+    /** Port to listen on; must match what the desktop dials. */
+    val port: Int = 8765,
+    /** Base64 X.509/SPKI public keys of paired computers. Public data, not credentials. */
+    val pairedKeys: List<String> = emptyList(),
+    /** Friendly name this phone reports to the desktop. Blank = use the device model. */
+    val deviceLabel: String = "",
+)
+
 /** The full, single source of truth for user configuration. */
 @Serializable
 data class AppSettings(
@@ -372,6 +393,9 @@ data class AppSettings(
 
     // Network security / privacy (Trusted Network Mode + at-rest/HTTPS encryption controls)
     val security: SecuritySettings = SecuritySettings(),
+
+    // LAN remote control from a paired desktop
+    val remote: RemoteSettings = RemoteSettings(),
 
     // On-device assistant
     val jarvis: JarvisSettings = JarvisSettings(),

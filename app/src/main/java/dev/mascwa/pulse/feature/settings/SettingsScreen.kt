@@ -73,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.installApk
+import dev.mascwa.pulse.remote.RemoteLinkService
+import dev.mascwa.pulse.remote.RemotePeers
 import dev.mascwa.pulse.feature.settings.SettingsViewModel.UpdateUi
 import dev.mascwa.pulse.data.settings.CustomFeed
 import dev.mascwa.pulse.data.settings.HomeSection
@@ -633,6 +635,58 @@ fun SettingsScreen(
             }
 
             // ----- Security & network (Trusted Network Mode + encryption) -----
+            if (vis(SettingsCategory.SECURITY, "remote link desktop computer pair lan wifi control anydesk")) item {
+                PrefSection("Remote link") {
+                    PrefSwitch(
+                        "Remote link",
+                        "Let a paired computer on the same Wi-Fi switch app features on and off. Off by " +
+                            "default; while it's on, an ongoing notification shows the phone is listening.",
+                        checked = s.remote.enabled,
+                        onChange = { v ->
+                            vm.update { it.copy(remote = it.remote.copy(enabled = v)) }
+                            if (v) RemoteLinkService.start(context) else RemoteLinkService.stop(context)
+                        },
+                    )
+                    PrefClickable(
+                        "Pair a computer",
+                        subtitle = if (!s.remote.enabled) {
+                            "Switch the link on first."
+                        } else {
+                            "Shows a six-digit code and this phone's address in the notification for two " +
+                                "minutes. Enter both on the desktop app."
+                        },
+                        onClick = { if (s.remote.enabled) RemoteLinkService.requestPairing(context) },
+                    )
+                    PrefInfo(
+                        "Paired computers",
+                        value = if (s.remote.pairedKeys.isEmpty()) "None" else "${s.remote.pairedKeys.size}",
+                        subtitle = buildString {
+                            append(
+                                "Only these can send commands. Nothing sensitive is exposed — no wipe, " +
+                                    "no app locking, no keys, and every command is written to the audit ledger.",
+                            )
+                            // Show WHICH machines. The desktop displays the same four bytes for its own
+                            // identity, so an unexpected entry here is visible rather than just a count.
+                            val marks = s.remote.pairedKeys.mapNotNull(RemotePeers::fingerprintOf)
+                            if (marks.isNotEmpty()) append("\nPaired: ${marks.joinToString("  ")}")
+                        },
+                    )
+                    if (s.remote.pairedKeys.isNotEmpty()) {
+                        PrefClickable(
+                            "Unpair all computers",
+                            subtitle = "They'll each have to pair again before anything can reach this phone.",
+                            onClick = {
+                                vm.unpairAllComputers()
+                                // Also revoke on the RUNNING listener — it holds an in-memory snapshot, so
+                                // clearing the setting alone would leave every paired machine with command
+                                // access until the service next restarted.
+                                RemoteLinkService.requestUnpairAll(context)
+                            },
+                        )
+                    }
+                }
+            }
+
             if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {
                 PrefSection("Security & network") {
                     PrefClickable(

@@ -165,7 +165,7 @@ class Notifier(private val context: Context) {
     /**
      * One-time per process: clear every legacy/stale notification the retired multi-channel system may
      * have left in the tray after the update (including randomly-id'd old reminders), keeping only the
-     * board, the takeover, and the three mandatory foreground-service notifications.
+     * board, the takeover, and the four mandatory foreground-service notifications.
      */
     private fun sweepLegacyOnce() {
         if (swept) return
@@ -177,6 +177,7 @@ class Notifier(private val context: Context) {
                 dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID,
                 7301, // ActiveMatrixService ongoing
                 7311, // VitalsTrackingService ongoing
+                7321, // RemoteLinkService ongoing — also carries the live pairing code
                 4201, // RadioService playback
             )
             nm.activeNotifications.filter { it.id !in keep }.forEach { nm.cancel(it.tag, it.id) }

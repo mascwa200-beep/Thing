@@ -106,6 +106,28 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Clear the persisted list of paired computers, and record the revocation in the audit ledger — an
+     * unpairing is exactly the sort of event worth being able to prove happened.
+     *
+     * This is only the PERSISTED half. A running link holds its peers as an in-memory snapshot, so the
+     * caller must also tell the service to drop them
+     * ([dev.mascwa.pulse.remote.RemoteLinkService.requestUnpairAll]); otherwise every paired machine keeps
+     * command access until the service next restarts.
+     */
+    fun unpairAllComputers() {
+        viewModelScope.launch {
+            runCatching {
+                repo.update { it.copy(remote = it.remote.copy(pairedKeys = emptyList())) }
+                auditLedger.record(
+                    dev.mascwa.pulse.core.telemetry.AuditEventType.SECURITY,
+                    "remote.unpaired.all",
+                    "",
+                )
+            }
+        }
+    }
+
     /** Have J.A.R.V.I.S. draft a change for [goal] and stage it for approval. [path] is optional — leave
      *  it blank and J.A.R.V.I.S. picks the file itself; approve the staged change to open the PR. */
     fun proposeSelfChange(goal: String, path: String) {

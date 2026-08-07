@@ -110,6 +110,11 @@ class MainActivity : ComponentActivity() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }
                 }
+                // Same treatment for the remote link, so the desk computer can reach the phone again after
+                // a cold launch without anyone having to re-flip the switch.
+                if (settings.remote.enabled) {
+                    runCatching { dev.mascwa.pulse.remote.RemoteLinkService.start(this@MainActivity) }
+                }
             }
         }
         // Upload any crash reports recorded since last launch (scrubbed → debug-reports branch). Done off

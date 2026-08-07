@@ -286,6 +286,17 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <!--
+            LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the
+            service must never be startable by another app on the device. Its inbound surface is the TCP
+            socket it opens, which is guarded by pairing + signatures + a private-address check, not by
+            Android's component permissions.
+        -->
+        <service
+            android:name=".remote.RemoteLinkService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
         <!-- PIP-BOY radio playback — keeps the stream alive when the app is backgrounded. -->
         <service
             android:name=".feature.tacnet.RadioService"

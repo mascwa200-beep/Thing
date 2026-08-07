@@ -417,7 +417,13 @@ object PairingProof {
  */
 object LocalNetwork {
     fun isLocalAddress(hostAddress: String): Boolean {
-        val h = hostAddress.substringBefore('%')  // strip IPv6 zone index
+        var h = hostAddress.substringBefore('%')  // strip IPv6 zone index
+        // A dual-stack listening socket often reports an IPv4 peer in IPv4-mapped form
+        // ("::ffff:192.168.1.5"). Unwrapping it first means an ordinary IPv4 client on an
+        // IPv6-preferring network isn't refused as "outside the local network".
+        if (h.startsWith("::ffff:", ignoreCase = true) && h.count { it == '.' } == 3) {
+            h = h.substring(7)
+        }
         if (h == "::1" || h.startsWith("127.")) return true
         if (h.startsWith("fe80:", ignoreCase = true) || h.startsWith("fc", ignoreCase = true) ||
             h.startsWith("fd", ignoreCase = true)
