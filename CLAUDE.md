@@ -2185,9 +2185,11 @@ AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitH
 
 ### KB engine state (task #73, standing) — UPDATED this session
 
-**353 guides · 4,730 sections · 4,730 full pages** (was 1,614 at session start). Manifest **24,917
-topics** (was 14,490), **49/49 categories populated**, 353 covered. `FULL_PAGE_BASELINE = 4730`. Branch
-`claude/loving-edison-bd65oa`, PR **#426** (PR #425 merged as `28ea05e`).
+**396 guides · 5,406 sections · 5,406 full pages** (was 1,614 at session start). Manifest **24,917
+topics** (was 14,490), **49/49 categories populated**, 396 covered. `FULL_PAGE_BASELINE = 5406`. Branch
+`claude/loving-edison-bd65oa`, PR **#426** (PR #425 merged as `28ea05e`). Waves B2–B6 added 158 new
+guides total; B5/B6 were cut short by the weekly usage limit and their 43 completed guides salvaged
+(see the limit note below — waves resume after Aug 12, 4pm UTC).
 
 **Sections and full pages are now the same number.** Every section of every guide clears the 400-word
 bar, so the expansion track is exhausted — it could only ever deepen sections that already existed.
@@ -2227,8 +2229,8 @@ Those 115 have no diagram yet — the next image wave has a clear target list.
 440-520 words each; `kb_wave_expand.js` (`{outDir, guides:[{id,category,thin}]}`); `kb_wave_images.js`
 (`{outDir, guides:[{id,title,category}]}`). 3 units per agent.
 
-**Honest remaining scope.** 10,000 pages needs roughly **400 more guides ≈ 2.8M words**. A 55-topic wave
-(19 agents) runs ~3 h and yields ~+740 pages, so ~7 more waves. Run **two waves in parallel** — the
+**Honest remaining scope.** 10,000 pages needs roughly **340 more guides ≈ 2.4M words**. A 55-topic wave
+(19 agents) runs ~3 h and yields ~+740 pages, so ~6 more waves. Run **two waves in parallel** — the
 concurrency cap is per-workflow, and these agents are API-bound rather than CPU-bound, so two workflows
 genuinely double throughput on this 4-core box instead of queueing against each other. Multi-session by
 nature; the CI-printed count is the meter.

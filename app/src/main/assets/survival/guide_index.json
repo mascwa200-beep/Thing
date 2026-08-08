@@ -101,6 +101,31 @@
    "file": "guides_agriculture_and_gardening.json"
   },
   {
+   "id": "cover-crops-and-green-manures",
+   "title": "Cover Crops and Green Manures",
+   "category": "Agriculture & Gardening",
+   "summary": "A comprehensive guide to growing plants for the soil rather than for harvest: what cover crops and green manures do, the biology and chemistry behind nitrogen fixation and residue breakdown, the major species and how to choose among them, and how to sow, terminate and troubleshoot a stand at any scale.",
+   "headings": [
+    "What Cover Crops and Green Manures Actually Are",
+    "The Specific Problems a Cover Crop Solves",
+    "Nitrogen Fixation: Making Fertiliser from Air",
+    "Roots, Carbon and the Building of Soil Structure",
+    "Catch Crops and Nutrient Scavenging",
+    "The Legumes: Clovers, Vetches, Peas and Beans",
+    "The Grasses and Cereals: Rye, Oats, Barley and Ryegrass",
+    "Brassicas and Other Broadleaves",
+    "Mixtures, Cocktails and Designing a Stand",
+    "Establishing the Stand: Rates, Dates, Depth and Method",
+    "Termination: Killing the Cover at the Right Moment",
+    "Decomposition, the Carbon to Nitrogen Ratio and Nitrogen Release",
+    "Weeds, Pests, Diseases and Nematodes",
+    "Cover Crops in the Small Garden and Allotment",
+    "Failure Modes, Costs and Honest Limits",
+    "Measuring Results and Adapting Over Seasons"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
    "id": "archaeological-excavation-methods-and-techniques",
    "title": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
@@ -284,6 +309,31 @@
     "Landmark Results in Human Origins",
     "Failure Modes and How They Are Recognised",
     "Limits, Cross-Checks, and What to Do When Dates Disagree"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "thermoluminescence-and-optically-stimulated-luminescence-dat",
+   "title": "Thermoluminescence and Optically Stimulated Luminescence Dating",
+   "category": "Archaeology & Anthropology",
+   "summary": "How luminescence dating works: the trapped-charge physics inside quartz and feldspar grains, how a buried sample accumulates radiation dose, and how archaeologists convert that dose into an age for fired pottery, burnt flint and buried sediment, together with the field, laboratory and statistical practice and the ways the method fails.",
+   "headings": [
+    "What Luminescence Dating Measures",
+    "The Physics of Trapped Charge",
+    "The Natural Radiation Environment",
+    "The Age Equation",
+    "Thermoluminescence: Reading the Glow Curve",
+    "Optically Stimulated Luminescence: Light as the Trigger",
+    "Quartz and Feldspar: The Two Workhorse Minerals",
+    "Zeroing: What Event Is Actually Being Dated",
+    "Collecting a Sample in the Field",
+    "Laboratory Preparation of the Mineral",
+    "Measuring the Equivalent Dose: the SAR Protocol",
+    "Determining the Dose Rate",
+    "Single Grains and the Statistics of Scatter",
+    "What Can Be Dated, and Over What Range",
+    "How Luminescence Ages Go Wrong",
+    "Origins, Landmark Results and Current Directions"
    ],
    "file": "guides_archaeology_and_anthropology.json"
   },
@@ -572,6 +622,31 @@
     "Transmission and Reform: Baghdad, Maragha, and Copernicus",
     "Working With the System: Reading a Ptolemaic Prediction",
     "How the System Ended, and What Its Failure Teaches"
+   ],
+   "file": "guides_astronomy.json"
+  },
+  {
+   "id": "islamic-and-medieval-astronomy",
+   "title": "Islamic and Medieval Astronomy",
+   "category": "Astronomy",
+   "summary": "A survey of astronomy between the eighth and sixteenth centuries: how Greek, Indian and Persian learning was absorbed and transformed in the Islamic world, the instruments, tables, observatories and planetary models that resulted, the parallel Latin tradition, and what this long period actually contributed to the science that followed.",
+   "headings": [
+    "Why the Medieval Centuries Matter",
+    "The Inheritance: Greek, Indian and Persian Sources",
+    "Translation, Patronage and the House of Wisdom",
+    "The Ptolemaic System and Its Machinery",
+    "The Zij: Astronomical Tables as the Central Genre",
+    "The Astrolabe and How It Was Used",
+    "Quadrants, Armillary Spheres and Giant Instruments",
+    "Observatories as Institutions",
+    "Doubts About Ptolemy",
+    "The Maragha Solutions: the Tusi Couple and Its Relatives",
+    "Religious Practice as an Engine of Precision",
+    "Observation, Star Catalogues and the Names We Still Use",
+    "Astronomy in the Latin West",
+    "Astrology, Cosmology and the Boundaries of the Subject",
+    "The Question of Copernicus",
+    "Decline, Limits and a Fair Assessment"
    ],
    "file": "guides_astronomy.json"
   },
@@ -968,6 +1043,31 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "chloroplasts-and-plastids",
+   "title": "Chloroplasts and Plastids",
+   "category": "Biology",
+   "summary": "A full account of plastids, the family of organelles that includes the chloroplast: where they came from, how they are built and governed, how photosynthesis actually works inside them, and what happens when they fail.",
+   "headings": [
+    "What Plastids Are and Why They Matter",
+    "The Endosymbiotic Origin of Plastids",
+    "Plastid Anatomy: Envelope, Stroma, and Thylakoids",
+    "The Plastid Genome and Its Reduced Gene Set",
+    "Protein Import and Retrograde Signalling: How the Nucleus Governs the Plastid",
+    "Pigments and the Light-Harvesting Antenna",
+    "The Light Reactions and the Splitting of Water",
+    "Chemiosmosis, ATP Synthase, and the Proton Motive Force",
+    "The Calvin-Benson Cycle and Rubisco",
+    "Photorespiration and the C4 and CAM Workarounds",
+    "The Plastid as a Biosynthetic Factory Beyond Photosynthesis",
+    "The Plastid Family: Proplastids, Chromoplasts, Amyloplasts, and the Rest",
+    "Division, Movement, and Inheritance",
+    "Photoprotection, Photoinhibition, and Self-Repair",
+    "Working With Chloroplasts: Isolation and the Hill Reaction",
+    "When Plastids Fail: Disorders, Limits, and Open Questions"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
    "id": "how-to-validate-a-business-idea",
    "title": "How to Validate a Business Idea",
    "category": "Business & Finance",
@@ -1062,6 +1162,31 @@
     "Building and Maintaining the Research File",
     "Failure Modes and How Estimates Go Wrong",
     "Legal, Licensing and Ethical Limits"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "customer-discovery-interviews",
+   "title": "Customer Discovery Interviews",
+   "category": "Business & Finance",
+   "summary": "A complete practical method for interviewing potential customers to find out whether a problem is real before building anything: how to recruit, what to ask, how to avoid the biases that make interviews lie, and how to turn transcripts into decisions.",
+   "headings": [
+    "What Customer Discovery Is and Why Most Products Fail Without It",
+    "The Mom Test: Why Interviews Lie and How to Stop Them",
+    "Framing the Hypothesis and Choosing a Segment",
+    "Recruiting: Finding People Who Will Actually Talk to You",
+    "Structuring the Conversation: The Discovery Script",
+    "Question Craft: Open, Neutral, and Grounded in the Past",
+    "Jobs to Be Done and the Switch Interview",
+    "Running the Interview: Logistics and Procedure",
+    "Reading the Signal: Pain, Workarounds, and Commitment",
+    "The Biases That Corrupt Discovery, and Their Countermeasures",
+    "Synthesis: Turning Transcripts Into Patterns",
+    "How Many Interviews, and When to Stop",
+    "Business Buyers Versus Consumers: Two Different Games",
+    "Ethics, Consent, and Handling What People Tell You",
+    "From Findings to Decisions: Persevere, Pivot, or Stop",
+    "Failure Modes and How to Recover From Them"
    ],
    "file": "guides_business_and_finance.json"
   },
@@ -1462,6 +1587,31 @@
    "file": "guides_chemistry.json"
   },
   {
+   "id": "kinetic-molecular-theory-of-gases",
+   "title": "Kinetic Molecular Theory of Gases",
+   "category": "Chemistry",
+   "summary": "How the observable behaviour of gases - pressure, temperature, diffusion, viscosity - follows from molecules in ceaseless random motion, with the derivations, the speed distributions, the real-gas corrections, and where the model breaks down.",
+   "headings": [
+    "The Central Idea and Why It Was Revolutionary",
+    "The Postulates of the Ideal Gas Model",
+    "Deriving Pressure From Molecular Impacts",
+    "Temperature, Equipartition, and Degrees of Freedom",
+    "The Maxwell-Boltzmann Distribution of Molecular Speeds",
+    "Recovering the Empirical Gas Laws",
+    "Collision Frequency and the Mean Free Path",
+    "Effusion, Diffusion, and Graham's Law",
+    "Viscosity and Thermal Conductivity: Transport by Molecular Traffic",
+    "Where the Ideal Model Fails: Real Gas Behaviour",
+    "The Van der Waals Equation and Its Successors",
+    "Critical Points, Liquefaction, and the Joule-Thomson Effect",
+    "Brownian Motion and the Proof That Molecules Exist",
+    "Entropy, Irreversibility, and Boltzmann's Bridge",
+    "Demonstrating Graham's Law: The Diffusion Tube",
+    "The Limits of the Model and What Lies Beyond It"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -1720,6 +1870,56 @@
     "The Track Record: What Models Got Right and What They Missed",
     "Tipping Points and Deep Uncertainty: The Limits of the Method",
     "Reading a Projection Responsibly: A Practical Checklist"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "climate-sensitivity-and-radiative-forcing",
+   "title": "Climate Sensitivity and Radiative Forcing",
+   "category": "Climate",
+   "summary": "How physicists measure the push humans apply to the climate system, in watts per square metre, and how much warming that push eventually produces. Covers the energy budget, the greenhouse mechanism, every major feedback, the three definitions of sensitivity, the evidence from instruments, paleoclimate and models, and why the remaining uncertainty is dominated by clouds.",
+   "headings": [
+    "Why One Number Frames the Whole Climate Problem",
+    "The Planet's Energy Budget",
+    "Radiative Forcing: The Watt-per-Square-Metre Yardstick",
+    "How Trace Gases Trap Heat",
+    "The Logarithmic Law and the Doubling Convention",
+    "The Other Forcing Agents",
+    "The Planck Response: The Restoring Force",
+    "Water Vapour and the Lapse Rate",
+    "Surface Albedo and the Cryosphere",
+    "Clouds: The Dominant Uncertainty",
+    "Three Different Sensitivities, Often Confused",
+    "Estimating Sensitivity from the Instrumental Record",
+    "Evidence from the Deep Past",
+    "Models, Emergent Constraints and the 2020 Synthesis",
+    "The Pattern Effect and Why Sensitivity Is Not Constant",
+    "Failure Modes, Limits and What the Uncertainty Means"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "paleoclimatology-reading-past-climates",
+   "title": "Paleoclimatology — Reading Past Climates",
+   "category": "Climate",
+   "summary": "How scientists reconstruct the Earth's climate before thermometers existed, using ice cores, ocean sediments, tree rings, cave deposits and corals. Covers the physics of each proxy, how records are dated, what the deep past reveals, and where reconstructions go wrong.",
+   "headings": [
+    "Why the Climate of the Past Is Worth Knowing",
+    "The Central Problem: Proxies Are Not Thermometers",
+    "Stable Isotopes: The Master Key",
+    "Ice Cores: Layered Snow and Trapped Air",
+    "Ocean Sediment Cores and the Foraminifera",
+    "Tree Rings and the Discipline of Dendroclimatology",
+    "Caves, Corals, Lakes and Pollen: The Continental and Tropical Archives",
+    "Building a Chronology: Dating the Archive",
+    "Orbital Forcing and the Rhythm of the Ice Ages",
+    "Greenhouse Gases Through Time",
+    "Deep Time: Hothouses, Icehouses and Catastrophes",
+    "Abrupt Change: The Most Unsettling Discovery",
+    "The Holocene and the Last Two Thousand Years",
+    "Reading a Record in Practice",
+    "Failure Modes and How Reconstructions Go Wrong",
+    "Limits, Open Questions and What the Record Can and Cannot Tell You"
    ],
    "file": "guides_climate.json"
   },
@@ -2077,6 +2277,56 @@
    "file": "guides_computing.json"
   },
   {
+   "id": "the-integrated-circuit-and-moore-s-law",
+   "title": "The Integrated Circuit and Moore's Law",
+   "category": "Computing",
+   "summary": "How the silicon chip works and how it came to double in complexity every two years for half a century. Covers the transistor and CMOS logic, photolithography and the full fabrication flow, what Moore and Dennard actually claimed, why the free lunch ended, and the physical and economic limits now reshaping the industry.",
+   "headings": [
+    "The Central Artefact of the Modern World",
+    "Before the Chip: Tubes, Transistors and the Tyranny of Numbers",
+    "Kilby, Noyce and the Planar Process",
+    "Silicon, Doping and the Junction",
+    "The MOSFET: The Switch Everything Is Built From",
+    "From Switch to Logic: How CMOS Works",
+    "Photolithography: Printing With Light",
+    "The Full Fabrication Flow",
+    "What Gordon Moore Actually Said",
+    "Dennard Scaling: The Physics That Made Shrinking Free",
+    "The Power Wall and the Turn to Parallelism",
+    "Going Vertical: FinFET, Gate-All-Around and the Node-Name Fiction",
+    "The Economics: Rock's Law, Masks and Yield",
+    "Designing a Chip: EDA, IP and Tape-Out",
+    "Chiplets, Packaging and More Than Moore",
+    "Limits, Failure Modes and What Comes Next"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
+   "id": "the-microprocessor-revolution",
+   "title": "The Microprocessor Revolution",
+   "category": "Computing",
+   "summary": "How the computer's central processor collapsed onto a single silicon chip, and what followed: the physics of transistors, the machines and companies that defined each generation, Moore's law and its end, and the architectural ideas that keep processors getting faster.",
+   "headings": [
+    "What a Microprocessor Is, and Why It Mattered",
+    "Before the Chip: Valves, Transistors and the Minicomputer",
+    "The Integrated Circuit and the Planar Process",
+    "1971: The Intel 4004 and the Single-Chip Processor",
+    "Inside a Processor: Fetch, Decode, Execute",
+    "The Eight-Bit Era and the Birth of Personal Computing",
+    "Sixteen and Thirty-Two Bits: The Architectures That Stuck",
+    "Moore's Law and Dennard Scaling",
+    "RISC, CISC and the Argument About Instruction Sets",
+    "Pipelining, Caches and Out-of-Order Execution",
+    "The Clock Wall and the Turn to Multiple Cores",
+    "Embedded Processors, Microcontrollers and the Mobile Era",
+    "How a Chip Is Actually Manufactured",
+    "Graphics Processors, Accelerators and the End of One Chip for Everything",
+    "Failure Modes: Defects, Bugs, Wear and Security",
+    "Limits, Honest Uncertainty and What Comes Next"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
    "id": "cook-food-safety-fundamentals",
    "title": "Food Safety & Kitchen Safety Fundamentals",
    "category": "Cooking — Food Safety",
@@ -2293,6 +2543,56 @@
    "file": "guides_cooking_food_safety.json"
   },
   {
+   "id": "water-activity-and-food-spoilage",
+   "title": "Water Activity and Food Spoilage",
+   "category": "Cooking — Food Safety",
+   "summary": "Why the availability of water, not the amount of it, decides whether food spoils or keeps. Covers the physics of water activity, the growth thresholds of every important spoilage organism and pathogen, how drying, salting, sugaring and freezing actually work, and how to control and verify water activity in a real kitchen.",
+   "headings": [
+    "Why Wetness Is the Wrong Question",
+    "What Water Activity Actually Measures",
+    "Bound and Free Water",
+    "The Thresholds: Who Grows at What",
+    "Measuring Water Activity",
+    "Sorption Isotherms and Hysteresis",
+    "Salt, Sugar and Other Humectants",
+    "Drying: Removing the Water Outright",
+    "Salting and Curing",
+    "Sugar Preservation: Jams, Syrups and Honey",
+    "Freezing and Why Frozen Is Not Sterile",
+    "Hurdles: Combining Barriers Instead of Maximising One",
+    "Chemical Spoilage: Why Drier Is Not Always Better",
+    "Glass Transition, Texture and Moisture Migration",
+    "Controlling Water Activity in a Real Kitchen",
+    "Failure Modes and What to Do About Them"
+   ],
+   "file": "guides_cooking_food_safety.json"
+  },
+  {
+   "id": "water-activity-thresholds-for-pathogens",
+   "title": "Water Activity Thresholds for Pathogens",
+   "category": "Cooking — Food Safety",
+   "summary": "Water activity is the single number that decides whether a food can support microbial growth. This covers what it physically is, how it is measured, the minimum value each foodborne pathogen needs, how to formulate and dry below those limits, and why dry food still causes outbreaks.",
+   "headings": [
+    "What Water Activity Is, and Why It Decides Whether Food Is Safe",
+    "The Physics: Vapour Pressure, Not Wetness",
+    "Why Water Activity and Moisture Content Are Different Numbers",
+    "Measuring Water Activity: Instruments and Calibration",
+    "How Low Water Activity Actually Stops a Microbe",
+    "The Bacterial Thresholds, Organism by Organism",
+    "Staphylococcus aureus: The Organism That Sets the Rule",
+    "Moulds, Mycotoxins and the Absolute Floor at 0.60",
+    "Yeasts, Osmophiles and the Spoilage Organisms Nobody Plans For",
+    "Hurdle Technology: Water Activity Never Works Alone",
+    "The Regulatory Lines: 0.85, 0.88 and the Interaction Tables",
+    "Formulating to a Target: Humectants and a Worked Calculation",
+    "Process Control in Practice: Drying, Curing and Validation",
+    "Survival Without Growth: Why Dry Food Still Poisons People",
+    "Failure Modes: Case Hardening, Drift, Migration and Bad Measurements",
+    "Limits, Uncertainty and What to Do When It Goes Wrong"
+   ],
+   "file": "guides_cooking_food_safety.json"
+  },
+  {
    "id": "conduction-convection-and-radiant-heat",
    "title": "Conduction, Convection and Radiant Heat",
    "category": "Cooking — Techniques",
@@ -2364,6 +2664,56 @@
     "Variants: Portable, Commercial, Wok, All-Metal and Hybrid",
     "Failure Modes, Error Codes and Troubleshooting",
     "Limits, Trade-Offs and When Induction Is the Wrong Tool"
+   ],
+   "file": "guides_cooking_techniques.json"
+  },
+  {
+   "id": "infrared-and-radiant-heat-in-cooking",
+   "title": "Infrared and Radiant Heat in Cooking",
+   "category": "Cooking — Techniques",
+   "summary": "A complete account of how radiant heat cooks food: the physics of thermal infrared, how it is absorbed by and penetrates different foods, and how to control it on grills, under broilers, in ovens, over open fires and in solar cookers.",
+   "headings": [
+    "Why Radiant Heat Is Its Own Kind of Cooking",
+    "The Physics: Planck, Stefan-Boltzmann and Wien",
+    "How Infrared Meets Food: Absorption and Penetration Depth",
+    "Emissivity, View Factor and the Geometry of Exposure",
+    "Telling Radiation Apart From Conduction and Convection",
+    "Grilling Over Coals: Managing a Radiant Bed",
+    "Broilers, Salamanders and Overhead Radiant Cooking",
+    "Ovens as Radiant Cavities: Walls, Pans and Position",
+    "Wood-Fired Ovens, Tandoors and Masonry Radiance",
+    "Spit-Roasting, Reflector Ovens and Cooking Beside a Fire",
+    "Browning Chemistry: Why Radiant Heat Tastes Different",
+    "Measuring and Calibrating Radiant Heat in a Real Kitchen",
+    "Modern Infrared Equipment: Ceramic, Quartz, Halogen and What Microwaves Are Not",
+    "Solar Cooking and Off-Grid Radiant Technique",
+    "Failure Modes and How to Diagnose Them",
+    "Limits, Open Questions and Building Real Skill"
+   ],
+   "file": "guides_cooking_techniques.json"
+  },
+  {
+   "id": "dry-heat-versus-moist-heat-methods",
+   "title": "Dry Heat Versus Moist Heat Methods",
+   "category": "Cooking — Techniques",
+   "summary": "A complete account of the two great families of cooking method — dry heat, which lets a surface climb past the boiling point of water and brown, and moist heat, which pins the food at or below about 100 °C and works by dissolving and softening. It covers the physics of heat transfer, the chemistry each family unlocks, every major technique in both, the combination methods that bridge them, and how to choose correctly for a given ingredient.",
+   "headings": [
+    "Why One Distinction Organizes the Whole Kitchen",
+    "Conduction, Convection and Radiation: How Heat Actually Arrives",
+    "The Hundred-Degree Ceiling and Why Water Rules Everything",
+    "Browning: The Maillard Reaction and Caramelization",
+    "What Heat Does to Protein, Collagen and Fat",
+    "Starch, Pectin and the Plant Side of the Question",
+    "Roasting and Baking: Dry Heat in Still or Moving Air",
+    "Grilling, Broiling and the Radiant Extreme",
+    "Sautéing, Pan-Frying and Searing on Metal",
+    "Deep-Frying: A Dry Method Conducted in Liquid",
+    "Boiling, Simmering and Poaching: The Moist Spectrum",
+    "Steaming, Pressure Cooking and Sous Vide",
+    "Combination Methods: Braising, Stewing and Pot-Roasting",
+    "Matching the Method to the Ingredient, and the Kit It Needs",
+    "Doneness, Time-at-Temperature and Food Safety",
+    "Failure Modes, Hard Limits and How to Recover"
    ],
    "file": "guides_cooking_techniques.json"
   },
@@ -2678,6 +3028,31 @@
    "file": "guides_earth_science.json"
   },
   {
+   "id": "the-mica-group",
+   "title": "The Mica Group",
+   "category": "Earth Science",
+   "summary": "A full account of the mica group of sheet silicates — their layered crystal structure and the interlayer bond that produces perfect cleavage, the chemistry that splits them into dioctahedral and trioctahedral families, every significant species from muscovite and biotite to lepidolite and the brittle micas, and where they form, how to identify them, what they are used for and how they weather away.",
+   "headings": [
+    "What the Micas Are and Why They Matter",
+    "The Two-to-One Layer: Tetrahedral and Octahedral Sheets",
+    "The Interlayer Cation and the Origin of Perfect Cleavage",
+    "Dioctahedral and Trioctahedral: The Group's Great Divide",
+    "Muscovite: The Common Light Mica",
+    "Biotite, Phlogopite, Annite and the Dark Micas",
+    "Lepidolite and the Lithium Micas",
+    "Paragonite, Glauconite, Celadonite and the Brittle Micas",
+    "Polytypism: The Many Ways to Stack the Same Layer",
+    "Identifying a Mica in the Field and Under the Microscope",
+    "Micas in Igneous Rocks and Pegmatites",
+    "Metamorphic Micas: Index Minerals, Fabric and Deep Time",
+    "Weathering, Soils and the Clays That Micas Become",
+    "What Mica Is Used For",
+    "Mining, Grades and a Difficult Supply Chain",
+    "Where Mica Causes Trouble, and What Remains Unsettled"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
    "id": "scarcity-choice-and-opportunity-cost",
    "title": "Scarcity, Choice and Opportunity Cost",
    "category": "Economics",
@@ -2753,6 +3128,56 @@
    "file": "guides_economics.json"
   },
   {
+   "id": "thinking-at-the-margin",
+   "title": "Thinking at the Margin",
+   "category": "Economics",
+   "summary": "An explanation of marginal analysis: the habit of evaluating decisions by the effect of one more or one less unit rather than by totals or averages. It covers the underlying mathematics, the history of the marginal revolution, and how the idea is applied and misapplied in business, policy and everyday life.",
+   "headings": [
+    "The Central Idea: One More, One Less",
+    "Total, Average and Marginal: Three Different Numbers",
+    "Diminishing Marginal Utility and Why It Is So Reliable",
+    "The Marginal Revolution of the 1870s",
+    "Marginal Cost and the Decision to Produce",
+    "The Equimarginal Principle: Allocating a Limited Budget",
+    "Sunk Costs: Why the Past Has No Margin",
+    "Opportunity Cost: What Every Margin Is Measured Against",
+    "The Calculus of the Margin, With a Worked Example",
+    "Marginal Tax Rates and the Cliffs Hidden in Policy",
+    "Marginal Reasoning in Policy: Pollution, Safety and Lives",
+    "Lumpy Choices: When the Margin Is Not Small",
+    "Marginal Thinking in Ordinary Life",
+    "Where Marginal Thinking Breaks Down",
+    "How to Actually Run a Marginal Analysis",
+    "Common Errors and a Short Diagnostic"
+   ],
+   "file": "guides_economics.json"
+  },
+  {
+   "id": "the-law-of-demand-and-the-demand-curve",
+   "title": "The Law of Demand and the Demand Curve",
+   "category": "Economics",
+   "summary": "A complete treatment of the most-used relationship in economics: why buyers purchase less as price rises, how that relationship is drawn as a demand curve, what makes the curve move as opposed to moving along it, how responsiveness is measured with elasticity, and where the whole framework is genuinely reliable, genuinely contested, and genuinely wrong.",
+   "headings": [
+    "Why Demand Is Where Economics Starts",
+    "Stating the Law of Demand Precisely",
+    "The Demand Schedule and the Curve: A Worked Example",
+    "The Substitution Effect: The Engine of the Downward Slope",
+    "The Income Effect and Why It Can Point Either Way",
+    "Diminishing Marginal Utility and the Older Explanation",
+    "Movement Along the Curve Versus a Shift of the Curve",
+    "What Actually Shifts a Demand Curve",
+    "From Individual to Market Demand",
+    "Measuring Responsiveness: Price Elasticity of Demand",
+    "What Makes Demand Elastic, and What Elasticity Does to Revenue",
+    "Willingness to Pay and Consumer Surplus",
+    "Demand Meeting Supply: Equilibrium and Price Controls",
+    "Estimating Demand from Real Data",
+    "Apparent Exceptions: Giffen, Veblen and Speculation",
+    "Where the Model Breaks Down, and How to Use It Anyway"
+   ],
+   "file": "guides_economics.json"
+  },
+  {
    "id": "how-human-memory-works-encoding-to-retrieval",
    "title": "How Human Memory Works: Encoding to Retrieval",
    "category": "Education & Learning",
@@ -2799,6 +3224,55 @@
     "Failure Modes: Overload, Interruption, Stress and Sleep",
     "Can It Be Trained? A Cautionary Tale",
     "Working With the Limit: Practical Countermeasures"
+   ],
+   "file": "guides_education_and_learning.json"
+  },
+  {
+   "id": "long-term-memory-episodic-and-semantic",
+   "title": "Long-Term Memory: Episodic and Semantic",
+   "category": "Education & Learning",
+   "summary": "How human long-term memory divides into memory for personally experienced events and memory for general knowledge, how each is encoded, consolidated, retrieved and forgotten, and what this implies for studying, testing, and understanding memory failure.",
+   "headings": [
+    "Two Ways of Knowing the Past",
+    "The Architecture: Where Long-Term Memory Sits",
+    "Episodic Memory: Reliving Rather Than Knowing",
+    "Semantic Memory: The Structure of General Knowledge",
+    "Encoding: Why Some Experiences Stick and Most Do Not",
+    "Consolidation: How a Trace Becomes Permanent",
+    "Retrieval: Memory as a Cue-Driven Process",
+    "The Brain Systems Behind Each Kind of Memory",
+    "From Episode to Fact: Semanticisation and Development",
+    "Forgetting: Its Mechanisms and Its Uses",
+    "Distortion: Why Confident Memories Can Be Wrong",
+    "What Actually Works for Building Durable Memory",
+    "Mnemonics and Deliberate Memory Systems",
+    "When Memory Fails: Amnesia, Ageing and Disease",
+    "Open Questions and Honest Uncertainties"
+   ],
+   "file": "guides_education_and_learning.json"
+  },
+  {
+   "id": "procedural-memory-and-skill-automaticity",
+   "title": "Procedural Memory and Skill Automaticity",
+   "category": "Education & Learning",
+   "summary": "How the brain learns to do things rather than to recall them: the separate memory system behind riding a bicycle, touch typing and surgery, the neural machinery that supports it, the stages by which effortful action becomes automatic, and the practice conditions that build durable skill.",
+   "headings": [
+    "Knowing How Versus Knowing That",
+    "The Evidence From Amnesia: How the Split Was Discovered",
+    "The Neural Machinery: Basal Ganglia, Cerebellum and Cortex",
+    "Synapses, Dopamine and the Cellular Record of Practice",
+    "Fitts and Posner: The Three Stages of Skill Acquisition",
+    "The Power Law of Practice and What It Predicts",
+    "Chunking: How Many Small Actions Become One",
+    "What Automaticity Actually Is, and How It Is Measured",
+    "Attention, Working Memory and the Cost of Thinking About It",
+    "Motor Programs, Schemas and Internal Models",
+    "Consolidation, Sleep and Offline Gains",
+    "Designing Practice: Spacing, Interleaving and Desirable Difficulty",
+    "Feedback: How Much, How Precise, How Often",
+    "Building a Skill Deliberately: A Working Procedure",
+    "Retention, Decay and Refreshing an Unused Skill",
+    "When It Goes Wrong: Plateaus, Choking, Bad Habits and the Yips"
    ],
    "file": "guides_education_and_learning.json"
   },
@@ -2898,6 +3372,56 @@
    "file": "guides_electronics.json"
   },
   {
+   "id": "three-phase-power-systems",
+   "title": "Three-phase power systems",
+   "category": "Electronics",
+   "summary": "How three-phase electricity works: why three conductors carrying sine waves 120 degrees apart deliver smooth constant power, how wye and delta connections, transformers, motors and protection schemes are built on that idea, and how three-phase systems are measured, operated and diagnosed when they fail.",
+   "headings": [
+    "Why the World Runs on Three Phases",
+    "Sinusoids, Phasors and the 120-Degree Displacement",
+    "The Rotating Magnetic Field and the Birth of the System",
+    "Wye and Delta: The Two Ways to Connect Three Windings",
+    "The Square Root of Three and How to Use It",
+    "Power, Power Factor and Why Instantaneous Power Is Constant",
+    "Generators: How Three-Phase Electricity Is Made",
+    "Three-Phase Transformers and Vector Groups",
+    "The Induction Motor: The System's Reason for Existing",
+    "Distribution Architecture, Neutrals and Earthing",
+    "Unbalance and the Method of Symmetrical Components",
+    "Harmonics and the Triplen Neutral Problem",
+    "Measuring Three-Phase Power in Practice",
+    "Faults, Fault Levels and Protection",
+    "Characteristic Failure Modes and How They Present",
+    "Working Safely and Systematic Troubleshooting"
+   ],
+   "file": "guides_electronics.json"
+  },
+  {
+   "id": "generators-and-alternators",
+   "title": "Generators and alternators",
+   "category": "Electronics",
+   "summary": "How rotating machines turn mechanical power into electricity: Faraday induction, the synchronous alternator and its excitation system, car alternators, DC dynamos, induction generators, voltage and frequency control, paralleling, and the practical business of running, rating and repairing them.",
+   "headings": [
+    "What a Generator Is and Why Almost All Electricity Comes From One",
+    "Faraday's Law: The Physics That Makes It Work",
+    "From a Spinning Loop to a Machine: Slip Rings and Commutators",
+    "Inside the Machine: Stator, Rotor, Air Gap and Iron",
+    "The Synchronous Alternator: Rotating Field, Three Phases, Fixed Frequency",
+    "Excitation: Where the Rotor's Magnetism Comes From",
+    "The Automotive Alternator: Claw Poles, Diodes and a Regulator",
+    "DC Generators and Dynamos: Commutation and Its Limits",
+    "Induction and Doubly-Fed Generators: Machines Without a DC Field",
+    "Armature Reaction, Synchronous Reactance and Voltage Regulation",
+    "Real Power, Reactive Power and the Load Angle",
+    "Synchronising and Running Machines in Parallel",
+    "Prime Movers, Governors and What Sets the Frequency",
+    "Ratings, Losses, Cooling and Efficiency",
+    "Installing and Commissioning a Set: A Working Procedure",
+    "Faults, Diagnosis and What Goes Wrong"
+   ],
+   "file": "guides_electronics.json"
+  },
+  {
    "id": "population-ecology-and-population-growth",
    "title": "Population Ecology and Population Growth",
    "category": "Energy & Environment",
@@ -2988,6 +3512,56 @@
     "Energy, Net Energy and the Rebound Effect",
     "The Concrete Constraints: Soil, Water, Nitrogen, Phosphorus",
     "Where the Argument Genuinely Stands"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
+   "id": "r-and-k-selection-and-life-history-strategies",
+   "title": "r- and K-Selection and Life-History Strategies",
+   "category": "Energy & Environment",
+   "summary": "How evolution shapes the schedule of birth, growth, reproduction and death: the classic r- and K-selection framework, the trade-offs and demographic mathematics beneath it, why ecologists largely replaced it with modern life-history theory, and how these ideas are used in conservation, fisheries and pest management.",
+   "headings": [
+    "The Question Life-History Theory Asks",
+    "Trade-Offs: Why No Organism Can Do Everything",
+    "MacArthur, Wilson and the Origin of r and K",
+    "The Logistic Equation and What r and K Actually Mean",
+    "The r-Selected Syndrome and Where It Is Found",
+    "The K-Selected Syndrome and the Logic of Slowness",
+    "Density Dependence, Survivorship Curves and Demography",
+    "Breeding Once or Many Times: Semelparity and Iteroparity",
+    "Offspring Size Against Offspring Number",
+    "Age at Maturity and the Cost of Reproduction",
+    "Ageing as a Life-History Trait",
+    "Why r/K Fell Out of Favour",
+    "What Replaced It: The Fast-Slow Continuum and CSR",
+    "Bet-Hedging in Unpredictable Environments",
+    "Applications: Fisheries, Conservation and Pest Management",
+    "Limits, Misuse and How to Reason Carefully"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
+   "id": "community-ecology",
+   "title": "Community Ecology",
+   "category": "Energy & Environment",
+   "summary": "How species living in the same place interact and why some coexist while others do not: niches, competition, predation, mutualism, food webs, succession, diversity patterns, disturbance and coexistence theory, and how the science is applied to invasions, restoration and conservation.",
+   "headings": [
+    "What Community Ecology Studies and Why It Matters",
+    "Describing a Community: Richness, Evenness and Diversity",
+    "The Niche: What a Species Does and Where It Can Live",
+    "Competition, Exclusion and How Species Divide Resources",
+    "Predation, Herbivory and the Dynamics They Generate",
+    "Keystone Species and Trophic Cascades",
+    "Mutualism, Facilitation and the Positive Interactions",
+    "Food Webs, Trophic Levels and the Flow of Energy",
+    "Succession: How Communities Change Over Time",
+    "Why Diversity Varies: Latitude, Area and Islands",
+    "Disturbance, Patch Dynamics and Intermediate Disturbance",
+    "Neutral Theory and Modern Coexistence Theory",
+    "Metacommunities: Communities Connected Across Space",
+    "Applied Community Ecology: Invasions, Restoration and Management",
+    "Studying a Community: Sampling and Survey in Practice",
+    "Limits, Failure Modes and What the Field Cannot Yet Do"
    ],
    "file": "guides_energy_and_environment.json"
   },
@@ -3229,6 +3803,56 @@
    "file": "guides_engineering.json"
   },
   {
+   "id": "systems-engineering",
+   "title": "Systems engineering",
+   "category": "Engineering",
+   "summary": "The discipline of designing and managing complex systems as wholes: how requirements, architecture, interfaces, trade studies, verification and risk management fit together across a project lifecycle, where the practice came from, and the characteristic ways large technical programmes fail.",
+   "headings": [
+    "What Systems Engineering Is and Why It Exists",
+    "Emergence, Boundaries and What Makes a System",
+    "Where the Discipline Came From",
+    "The Lifecycle and the Vee Model",
+    "Stakeholders, Needs and the Concept of Operations",
+    "Requirements: The Craft of Saying What Is Needed",
+    "Traceability, Baselines and Requirements Management",
+    "Functional Analysis and Architecture",
+    "Trade Studies and Structured Decision-Making",
+    "Model-Based Systems Engineering",
+    "Interfaces and Configuration Management",
+    "Verification and Validation",
+    "Integration, Test and the Route to Service",
+    "Risk, Margin and Technical Budgets",
+    "Specialty Disciplines: Reliability, Safety and Human Factors",
+    "How It Fails, and What to Do About It"
+   ],
+   "file": "guides_engineering.json"
+  },
+  {
+   "id": "engineering-project-management",
+   "title": "Engineering project management",
+   "category": "Engineering",
+   "summary": "How engineering projects are planned, scheduled, costed, controlled and delivered: the constraint set, requirements, work breakdown, critical-path and earned-value methods, risk and change control, contracting and organisation, and the failure modes that sink real projects.",
+   "headings": [
+    "What engineering project management is, and why it is a distinct discipline",
+    "The constraint set: beyond the iron triangle",
+    "Life cycle, phases and the logic of stage gates",
+    "Requirements: where most projects are decided",
+    "Work breakdown structure: decomposing the job",
+    "Scheduling: networks, the critical path and float",
+    "Duration estimating, PERT and the arithmetic of uncertainty",
+    "Resources, levelling, and why adding people can slow a project",
+    "Cost estimating, contingency and reference-class forecasting",
+    "Earned value: measuring progress in money",
+    "Risk management: identification, analysis and response",
+    "Change control, configuration management and interfaces",
+    "Procurement, contracts and the incentives they create",
+    "Organising the work: team structures and delivery methods",
+    "Verification, validation, commissioning and handover",
+    "How projects fail, and how to recover one"
+   ],
+   "file": "guides_engineering.json"
+  },
+  {
    "id": "water",
    "title": "Water",
    "category": "Essentials",
@@ -3335,6 +3959,56 @@
     "Power Lines, Structures, and the Lightning Question",
     "Regional Cases: Beetle Kill, Palms, Deserts and the Tropics",
     "When You Cannot Move: Failure Modes and Damage Limitation"
+   ],
+   "file": "guides_essentials.json"
+  },
+  {
+   "id": "cold-air-drainage-and-valley-bottoms",
+   "title": "Cold Air Drainage and Valley Bottoms",
+   "category": "Essentials",
+   "summary": "Why the bottom of a valley is reliably the coldest, dampest and most polluted ground in the landscape, how cold air is manufactured by radiative cooling and then flows downhill under gravity, and how to read terrain, choose a campsite, protect a crop and stay out of the trouble that pooled cold air causes.",
+   "headings": [
+    "The Coldest Ground for Miles Is Usually the Flattest",
+    "Radiative Cooling: How the Ground Manufactures Cold Air",
+    "Why Cold Air Sinks: Density, Buoyancy and Gravity",
+    "Katabatic Flow: The Mechanics of Air Running Downhill",
+    "The Thermal Belt: The Warm Band on the Hillside",
+    "Temperature Inversions and How Deep They Get",
+    "Frost Hollows, Sinkholes and the Extremes of Cold Pooling",
+    "Reading Terrain to Predict Where Cold Air Will Sit",
+    "The Landscape Tells You: Vegetation, Frost Lines and Mist",
+    "The Weather That Makes or Breaks a Cold Pool",
+    "Choosing Where to Sleep: Practical Campsite Selection",
+    "Frost Protection in Farming and Horticulture",
+    "Trapped Air: Fog, Smoke and the Valleys That Killed People",
+    "Heavier-Than-Air Gases and the Same Terrain Trap",
+    "Measuring and Forecasting a Cold Pool Yourself",
+    "Where the Rules Break and What to Do When They Do"
+   ],
+   "file": "guides_essentials.json"
+  },
+  {
+   "id": "drainage-and-runoff-in-camp-selection",
+   "title": "Drainage and Runoff in Camp Selection",
+   "category": "Essentials",
+   "summary": "How to read ground, soil and weather for where water will go, and choose and prepare a campsite that stays dry and safe: infiltration and runoff mechanics, flash-flood and meltwater hazards, site survey procedure, shelter siting, and what to do when a camp starts flooding at night.",
+   "headings": [
+    "Why the ground decides the night",
+    "Where rain actually goes: interception, infiltration and runoff",
+    "Reading terrain: catchments, contours and convergence",
+    "Soil, texture and the ground you cannot see",
+    "How much water: intensity, duration and simple runoff arithmetic",
+    "Flash floods and dry channels: the hazard that kills",
+    "Reading the evidence: vegetation, sediment and ground signs",
+    "A ten-minute site survey",
+    "Choosing the microsite: high and dry, but not too high",
+    "Preparing the ground and pitching for water",
+    "Diverting runoff: berms, drainage and the trenching question",
+    "Snow, frozen ground and meltwater",
+    "Water that arrives from elsewhere: rivers, lakes and coasts",
+    "Hard ground, human ground and vehicle camps",
+    "Keeping water clean: hygiene, greywater and latrine siting",
+    "When it goes wrong at two in the morning"
    ],
    "file": "guides_essentials.json"
   },
@@ -3455,6 +4129,56 @@
    "file": "guides_foundations.json"
   },
   {
+   "id": "the-stop-protocol-for-sudden-emergencies",
+   "title": "The STOP Protocol for Sudden Emergencies",
+   "category": "Foundations",
+   "summary": "The four-step discipline behind the letters STOP - stop, think, observe, plan - what acute stress does to the body and mind that makes such a protocol necessary, how to run each step properly, and when stopping is exactly the wrong thing to do.",
+   "headings": [
+    "Four Letters Against the Worst Ten Minutes",
+    "What Acute Stress Does to the Body in the First Seconds",
+    "What Acute Stress Does to Thinking",
+    "The Ten-Eighty-Ten Pattern and Why Most People Do Nothing",
+    "S is for Stop: Interrupting the Action Loop",
+    "T is for Think: Deliberate Reasoning Instead of Reflex",
+    "O is for Observe: Building an Accurate Picture",
+    "P is for Plan: Choosing Something You Can Actually Do",
+    "The Loop: Why STOP Is Cyclical, Not a One-Off",
+    "Where STOP Came From and the Family of Variants",
+    "When Not to Stop: The Immediate-Action Exceptions",
+    "Bringing Your Own Physiology Back Under Control",
+    "Training It So That It Actually Fires Under Load",
+    "Running the Protocol as a Group",
+    "The Protocol Applied: Four Short Worked Cases",
+    "Failure Modes, Limits and What to Do When It Goes Wrong"
+   ],
+   "file": "guides_foundations.json"
+  },
+  {
+   "id": "the-five-cs-of-survivability",
+   "title": "The Five Cs of Survivability",
+   "category": "Foundations",
+   "summary": "The cutting tool, combustion device, cover, container and cordage: why these five items anchor a survival kit, how each one works physically, how to choose, use and maintain them, the extended ten-C list, and the framework's real limits.",
+   "headings": [
+    "What the five Cs are, and where the list came from",
+    "Why these five: the selection principle and the priorities behind it",
+    "The cutting tool: what makes a knife work",
+    "Using and maintaining a cutting tool",
+    "Combustion: the physics of getting a fire started",
+    "Combustion devices compared: what to carry and why",
+    "Cover: how the body loses heat and how cover stops it",
+    "Building cover: tarps, natural shelter and ground insulation",
+    "Container: water, boiling and why it must be metal",
+    "Choosing a container, and the alternatives to boiling",
+    "Cordage: materials, strength and what it is for",
+    "Making cordage, and what to use it for",
+    "The extended ten Cs",
+    "How the five work as a system",
+    "Assembling a real kit",
+    "Limits, criticisms and what the framework leaves out"
+   ],
+   "file": "guides_foundations.json"
+  },
+  {
    "id": "abstract-strategy-games-and-their-families",
    "title": "Abstract Strategy Games and Their Families",
    "category": "Games & Recreation",
@@ -3501,6 +4225,56 @@
     "Strategy in the Ancestral Game",
     "Playing Chaturanga Today: A Practical Reconstruction",
     "What We Still Do Not Know"
+   ],
+   "file": "guides_games_and_recreation.json"
+  },
+  {
+   "id": "shatranj-and-the-medieval-chess-ancestors",
+   "title": "Shatranj and the Medieval Chess Ancestors",
+   "category": "Games & Recreation",
+   "summary": "The chess played across the Islamic world and medieval Europe for nearly a thousand years before the queen and bishop were given their modern powers: its pieces and rules, its openings, endgames and masters, how it travelled, and how to play it today with an ordinary chess set.",
+   "headings": [
+    "The Thousand-Year Game Nobody Plays Any More",
+    "Chaturanga: The Four-Limbed Army of Northern India",
+    "Chatrang and Shatranj: The Persian Bridge",
+    "The Board, the Array and the Look of the Pieces",
+    "The Pieces and Exactly How They Moved",
+    "The Elephant Problem: A Piece Trapped on Eight Squares",
+    "Winning, Losing and the Peculiar Bare King",
+    "Ta'biyat: Opening Formations Reached Without Contact",
+    "The Middlegame and Endgame: A Game of Slow Manoeuvre",
+    "Mansubat: The First Chess Problems",
+    "The Masters: al-Adli, ar-Razi, as-Suli and al-Lajlaj",
+    "Grades, Odds and the Culture of Play",
+    "Into Europe: Routes, Names and Creative Misunderstanding",
+    "The Reform of 1475 and the Sudden Death of Shatranj",
+    "Living Relatives: The Branches That Never Reformed",
+    "Playing Shatranj Today: Setup, House Rules and Common Errors"
+   ],
+   "file": "guides_games_and_recreation.json"
+  },
+  {
+   "id": "shogi-japanese-chess-and-the-drop-rule",
+   "title": "Shogi: Japanese Chess and the Drop Rule",
+   "category": "Games & Recreation",
+   "summary": "A complete introduction to shogi, the Japanese member of the chess family: the board and pieces, how promotion works, and above all the drop rule that returns captured pieces to play and makes the game unlike any other chess variant. Covers openings, castles, endgame technique, notation, handicaps, history and the errors beginners reliably make.",
+   "headings": [
+    "What Shogi Is, and the One Rule That Makes It Different",
+    "The Board, the Set, and the Opening Array",
+    "How the Pieces Move: The Sliders and the King",
+    "How the Pieces Move: Generals, Knight and Pawn",
+    "Promotion: The Zone, the Choice, and the Forced Cases",
+    "The Drop Rule in Detail",
+    "The Three Drop Restrictions",
+    "How Games End: Mate, Resignation, Repetition and Impasse",
+    "Reading and Recording Games: Notation",
+    "Material Values and the Economics of Exchange",
+    "Castles: How a Shogi King Is Made Safe",
+    "Openings: The Static Rook and Ranging Rook Divide",
+    "The Middlegame: How a Castle Is Broken",
+    "The Endgame: Tsume Shogi and the Mating Race",
+    "Origins, Handicaps, and the Modern Professional Game",
+    "Common Errors, Limits, and What To Do When It Goes Wrong"
    ],
    "file": "guides_games_and_recreation.json"
   },
@@ -3783,6 +4557,56 @@
    "file": "guides_geography.json"
   },
   {
+   "id": "geography-of-burundi",
+   "title": "Geography of Burundi",
+   "category": "Geography",
+   "summary": "A full account of the physical and human geography of Burundi: its position in the East African Rift, its highlands, lakes and rivers, its climate, soils and vegetation, and how one of the most densely settled countries in Africa lives with that landscape.",
+   "headings": [
+    "A Small Country at the Continent's Hinge",
+    "Position, Boundaries and Territorial Extent",
+    "Geological Foundations and the East African Rift",
+    "Relief, the Congo-Nile Divide and the Natural Regions",
+    "The Imbo Plain and the Rusizi Valley",
+    "Lake Tanganyika",
+    "Rivers, Drainage and the Sources of the Nile",
+    "Climate: Tropical Latitude, Temperate Altitude",
+    "Soils, Fertility and the Erosion Problem",
+    "Vegetation, Forests and Protected Areas",
+    "Wildlife and the Albertine Rift Biodiversity Hotspot",
+    "Population Distribution, Density and Settlement",
+    "Agriculture, Land Use and the Farming Calendar",
+    "Minerals, Energy and Water Resources",
+    "Natural Hazards: Flood, Landslide, Drought and Earthquake",
+    "Living With the Geography: Constraints, Change and Prospects"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
+   "id": "geography-of-cabo-verde",
+   "title": "Geography of Cabo Verde",
+   "category": "Geography",
+   "summary": "A full geographical account of the Cabo Verde archipelago: its position off West Africa, the mantle plume and ocean swell that built it, the volcanic and erosional landforms of each island, its Sahelian climate and chronic water scarcity, and how drought, emigration, hazards and the sea have shaped where and how people live.",
+   "headings": [
+    "Where Cabo Verde Is, and Why the Position Governs Everything",
+    "The Archipelago: Ten Islands in Two Groups",
+    "Deep Foundations: The Cape Verde Rise and the Mantle Plume",
+    "Volcanic Construction and the Age Gradient Across the Islands",
+    "Fogo, Chã das Caldeiras, and Life Inside an Active Volcano",
+    "Giant Flank Collapse and the Evidence on Santiago",
+    "Relief and Landforms, Island by Island",
+    "Climate: The Sahel at Sea",
+    "Water: An Archipelago With No Rivers",
+    "Drought, Famine, and the Geography of Departure",
+    "Soils, Vegetation Zones, and Endemic Life",
+    "The Sea: Currents, Fronts, and a Country That Is Mostly Ocean",
+    "Natural Hazards and Their Geography",
+    "Settlement, Cities, and Moving Between Islands",
+    "Land Use, Resources, and the Modern Economy",
+    "Limits, Uncertainties, and Living Within the Constraints"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
    "id": "weather-hazards",
    "title": "Weather Hazards",
    "category": "Hazards",
@@ -3946,6 +4770,56 @@
     "How Human Activity Changes Flood Risk",
     "Practical Response: Before, During and After a River Flood",
     "Failure Modes, Limits and Common Misconceptions"
+   ],
+   "file": "guides_hazards.json"
+  },
+  {
+   "id": "urban-flooding-and-storm-drain-failure",
+   "title": "Urban Flooding and Storm Drain Failure",
+   "category": "Hazards",
+   "summary": "How cities flood: the hydrology of paved ground, the design and failure modes of storm drainage, and what to do before, during and after urban flooding, including the specific dangers of moving water, vehicles, basements and contaminated floodwater.",
+   "headings": [
+    "Why Cities Flood Differently From Countryside",
+    "The Hydrology of Paved Ground",
+    "How a Storm Drainage System Is Meant to Work",
+    "Combined Sewers, Separate Sewers and Why It Matters",
+    "Why Drains Fail: The Common Mechanisms",
+    "Pluvial, Fluvial and Coastal Flooding",
+    "The Physics of Moving Water and the Human Body",
+    "Basements, Underpasses and Underground Spaces",
+    "Warning Signs and Reading a Developing Event",
+    "Preparing a Property Before the Rain",
+    "What To Do While the Water Is Rising",
+    "Vehicles and Floodwater: The Decision That Kills Most People",
+    "After the Water Goes Down: Contamination, Drying and Health",
+    "Clearing and Maintaining Drains Safely",
+    "Designing Flooding Out: Sustainable Drainage and Sponge Cities",
+    "Limits, Failure Modes and When It Goes Wrong"
+   ],
+   "file": "guides_hazards.json"
+  },
+  {
+   "id": "coastal-storm-surge-mechanics",
+   "title": "Coastal Storm Surge Mechanics",
+   "category": "Hazards",
+   "summary": "How storms push seawater onto land: the physics of wind stress, pressure and waves, why shallow shelves and funnelling bays amplify surge, how tides, rivers and sea-level rise compound it, and how surge is forecast, mapped, defended against and survived.",
+   "headings": [
+    "What Storm Surge Is, and Why It Is the Thing That Kills",
+    "The Three Forces That Raise the Water",
+    "Why Bathymetry Decides Almost Everything",
+    "Storm Size, Speed and Why Category Is the Wrong Number",
+    "Rotation, the Right-Front Quadrant, and Where the Water Goes",
+    "Funnels, Bays and Resonance: Local Amplification",
+    "Tides, Rivers, and Compound Flooding",
+    "Waves on Top: Setup, Runup and Overtopping",
+    "Extratropical Surges and the North Sea Model",
+    "Meteotsunamis: The Surge That Is Not a Surge",
+    "Measuring and Forecasting Surge",
+    "Maps, Warnings, and the Communication Problem",
+    "What the Water Actually Does to People and Buildings",
+    "Defences: Hard Engineering, Soft Engineering and Where Each Fails",
+    "Sea-Level Rise and the Shifting Baseline",
+    "Failure Modes and What To Do When the Water Comes"
    ],
    "file": "guides_hazards.json"
   },
@@ -4133,6 +5007,56 @@
    "file": "guides_health.json"
   },
   {
+   "id": "testicular-self-examination-and-health",
+   "title": "Testicular Self-Examination and Health",
+   "category": "Health",
+   "summary": "How to examine the testicles, what normal anatomy feels like, and what the common lumps, pains and swellings mean, including testicular cancer, torsion and infection, and when a symptom is an emergency rather than something to watch.",
+   "headings": [
+    "Why This Is Worth Knowing",
+    "The Anatomy You Are Feeling",
+    "How To Examine Yourself",
+    "What Normal Feels Like, and What Does Not",
+    "Testicular Cancer: What It Is and Who Gets It",
+    "Diagnosis, Staging and Tumour Markers",
+    "Treatment and Outcomes for Testicular Cancer",
+    "Testicular Torsion: The True Emergency",
+    "Common Benign Lumps and Swellings",
+    "Infections: Epididymitis, Orchitis and Their Causes",
+    "Trauma, Everyday Injury and Protection",
+    "Pain Without a Lump: Causes and Approach",
+    "The Testicle's Two Jobs: Sperm and Hormones",
+    "Development, Childhood and the Undescended Testis",
+    "Delay, Embarrassment and Actually Getting Seen",
+    "Limits, Uncertainty and When To Act"
+   ],
+   "file": "guides_health.json"
+  },
+  {
+   "id": "male-infertility",
+   "title": "Male Infertility",
+   "category": "Health",
+   "summary": "How sperm are made, transported and delivered, why that process fails, and how male infertility is investigated and treated: semen analysis and what its numbers mean, hormonal, testicular, genetic and obstructive causes, lifestyle and toxic exposures, and the full range of medical, surgical and assisted-reproduction options along with their honest success rates and limits.",
+   "headings": [
+    "What Male Infertility Is and How Common It Is",
+    "The Anatomy of Male Reproduction",
+    "Spermatogenesis: How Sperm Are Made",
+    "The Hormonal Control Loop",
+    "Transport, Maturation and Ejaculation",
+    "Semen Analysis and What the Numbers Mean",
+    "Pre-testicular Causes: When the Signal Fails",
+    "Testicular Causes: When the Factory Fails",
+    "Genetic and Chromosomal Causes",
+    "Post-testicular Causes: Obstruction and Delivery Failure",
+    "Lifestyle, Heat, Environment and Oxidative Stress",
+    "Medications, Drugs and Iatrogenic Damage",
+    "The Clinical Evaluation, Step by Step",
+    "Treatment: Medical and Surgical",
+    "Assisted Reproduction and Surgical Sperm Retrieval",
+    "Prognosis, Unexplained Cases and What to Do When Nothing Works"
+   ],
+   "file": "guides_health.json"
+  },
+  {
    "id": "primary-and-secondary-sources-in-history",
    "title": "Primary and Secondary Sources in History",
    "category": "History",
@@ -4247,6 +5171,56 @@
    "file": "guides_history.json"
   },
   {
+   "id": "world-history-and-the-comparative-approach",
+   "title": "World History and the Comparative Approach",
+   "category": "History",
+   "summary": "How historians study the human past at the scale of the whole world, and how they compare societies rigorously. Covers the origins of the field, the logic and pitfalls of comparison, the major debates such as the Great Divergence, and a practical method for doing it well.",
+   "headings": [
+    "What World History Is, and What Problem It Solves",
+    "Before the Discipline: Universal Chronicles and Their Assumptions",
+    "The Nineteenth Century: Stages, Progress, and the Eurocentric Turn",
+    "Civilisations as Units: Spengler, Toynbee, and the Morphological Tradition",
+    "World-Systems, Dependency, and the Economic Reframing",
+    "The Logic of Comparison: Mill's Methods and Their Limits",
+    "Choosing Units, and Galton's Problem",
+    "Scales of Analysis: From the Village to Deep Time",
+    "Comparison Versus Connection: Two Ways to Be Global",
+    "A Worked Case: The Great Divergence Debate",
+    "Sources and the Problem of Asymmetric Archives",
+    "Counting the Past: Quantitative World History and Its Uncertainties",
+    "Environment, Disease, and Ecology as Comparative Frames",
+    "Periodisation: Cutting Time Without Cheating",
+    "Failure Modes: How Comparative Arguments Go Wrong",
+    "Doing It: A Working Method for a Comparative Study"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "big-history-from-the-big-bang-to-the-present",
+   "title": "Big History: From the Big Bang to the Present",
+   "category": "History",
+   "summary": "A single connected account of the past 13.8 billion years, from the Big Bang through the formation of stars, elements, planets and life to agriculture, cities and the industrial world, organised around the thresholds at which genuinely new kinds of complexity appeared and the energy flows that sustain them.",
+   "headings": [
+    "What Big History Is and Why Scale Changes the Story",
+    "The Big Bang and the First Second",
+    "Making the First Atoms and the Oldest Light",
+    "The First Stars and the Architecture of Galaxies",
+    "Stellar Nucleosynthesis: Where the Elements Came From",
+    "The Solar System, the Earth and the Moon",
+    "The Origin of Life",
+    "Photosynthesis, Oxygen and the Transformation of a Planet",
+    "Complex Cells, Multicellularity and the Cambrian Explosion",
+    "Life on Land, Mass Extinction and the Rise of Mammals",
+    "Human Origins: Upright Walking, Big Brains and Fire",
+    "Collective Learning and the Palaeolithic World",
+    "Agriculture and the Holocene Bargain",
+    "Cities, States, Writing and Empires",
+    "The Modern Revolution: Global Exchange, Science and Fossil Fuels",
+    "The Anthropocene, the Limits of the Story and the Deep Future"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
@@ -4295,6 +5269,56 @@
     "Common Mistakes and Knowing When to Stop"
    ],
    "file": "guides_home_and_repair.json"
+  },
+  {
+   "id": "hand-saws-and-how-to-cut-straight",
+   "title": "Hand Saws and How to Cut Straight",
+   "category": "Home & Repair",
+   "summary": "How a saw tooth actually severs wood, what separates rip from crosscut filing, how to choose among panel saws, backsaws, Japanese pull saws and the specialist patterns, and the marking, stance and stroke that produce a straight square cut, together with sharpening and the diagnosis of every common way a cut goes wrong.",
+   "headings": [
+    "Why the Hand Saw Still Earns Its Place",
+    "How a Saw Tooth Actually Cuts",
+    "Rip and Crosscut Filing in Detail",
+    "Set, Kerf and Why the Blade Does Not Jam",
+    "Tooth Pitch: Points Per Inch and What to Choose",
+    "The Western Panel Saw and Full-Size Handsaw",
+    "Backsaws: Tenon, Carcass and Dovetail",
+    "Japanese Pull Saws",
+    "Specialist Saws and What Each Is For",
+    "Choosing a Saw and Assembling a Working Kit",
+    "Marking Out: The Layout That Makes a Straight Cut Possible",
+    "Stance, Grip and Starting the Cut",
+    "Sawing to the Line and Steering a Cut Back",
+    "Sharpening: Jointing, Shaping, Setting and Filing",
+    "Diagnosing a Cut That Went Wrong",
+    "Care, Storage and Building the Skill"
+   ],
+   "file": "guides_home_and_repair.json"
+  },
+  {
+   "id": "syntax-how-sentences-work",
+   "title": "Syntax — How Sentences Work",
+   "category": "Language & Linguistics",
+   "summary": "A complete account of sentence structure: how words group into phrases, how phrases nest into hierarchical trees, how verbs demand their arguments, why word order differs across languages, how questions and passives displace material, and what the constraints on all of this reveal about the human language faculty.",
+   "headings": [
+    "What Syntax Is and Why It Matters",
+    "Constituents — Finding the Groups Inside a Sentence",
+    "Phrases and Heads — the Architecture Every Phrase Shares",
+    "Trees, Hierarchy and Structural Ambiguity",
+    "Subjects, Objects and Grammatical Functions",
+    "Verbs and Their Arguments — Valency and Theta Roles",
+    "Word Order — Typology and the Head Parameter",
+    "Movement — Why Words Turn Up Far From Where They Belong",
+    "Agreement, Concord and Features",
+    "Clauses Inside Clauses — Subordination, Coordination and Recursion",
+    "Binding — Who Can Refer to Whom",
+    "Islands — The Limits on What Can Be Extracted",
+    "Rival Frameworks — Different Ways to Draw the Same Facts",
+    "Parsing — Computing Structure in Minds and Machines",
+    "Acquisition, Variation and Change",
+    "Prescription, Description and Diagnosing a Sentence That Has Gone Wrong"
+   ],
+   "file": "guides_language_and_linguistics.json"
   },
   {
    "id": "phonology-sound-systems-patterns",
@@ -4412,6 +5436,31 @@
    "file": "guides_language_and_linguistics.json"
   },
   {
+   "id": "marxism-communism",
+   "title": "Marxism & Communism",
+   "category": "Law & Government",
+   "summary": "A full account of Marxist theory and communist practice: the philosophy of history, the economics of value and crisis, the theory of class and the state, the major branches from Leninism to Western Marxism, the regimes built in its name, and the strongest criticisms made of it.",
+   "headings": [
+    "Why This Subject Matters and What It Actually Claims",
+    "Marx and Engels: The Lives Behind the Texts",
+    "Historical Materialism: Base, Superstructure and Modes of Production",
+    "The Labour Theory of Value and the Origin of Surplus",
+    "Capital, Accumulation and the Dynamics of Crisis",
+    "Alienation, Commodity Fetishism and Ideology",
+    "Class, the State and the Question of Revolution",
+    "What Communism Was Supposed to Be",
+    "The Great Split: Revisionism, Social Democracy and 1914",
+    "Leninism: The Vanguard Party, Imperialism and 1917",
+    "Stalinism and the Command Economy in Practice",
+    "Maoism, Peasant Revolution and the Global South",
+    "Western Marxism and the Critical Tradition",
+    "The Serious Criticisms: Economics, Calculation and Prediction",
+    "The Human Record and the Argument About Necessity",
+    "Collapse, Survival, and What Remains of the Tradition"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
    "id": "conservatism",
    "title": "Conservatism",
    "category": "Law & Government",
@@ -4525,6 +5574,19 @@
     "Enduring Debates, Pitfalls, and Connections"
    ],
    "file": "guides_law_and_government.json"
+  },
+  {
+   "id": "comparative-world-literature",
+   "title": "Comparative & World Literature",
+   "category": "Literature & Writing",
+   "summary": "How literature is studied across languages, cultures and centuries: the history of the discipline, the problem of translation, the great traditions of the world, how forms and stories travel, and a practical method for reading two works from different worlds against each other.",
+   "headings": [
+    "What Comparative Literature Is and Why It Exists",
+    "Weltliteratur: How the Discipline Came Into Being",
+    "Translation: The Central Problem and Its Practical Consequences",
+    "Influence, Reception and Intertextuality"
+   ],
+   "file": "guides_literature_and_writing.json"
   },
   {
    "id": "narratology-how-stories-are-told",

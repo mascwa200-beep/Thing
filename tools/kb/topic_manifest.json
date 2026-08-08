@@ -52,7 +52,7 @@
    "id": "t00009",
    "topic": "Chloroplasts and Plastids",
    "category": "Biology",
-   "guideId": null
+   "guideId": "chloroplasts-and-plastids"
   },
   {
    "id": "t00010",
@@ -3016,13 +3016,13 @@
    "id": "t00503",
    "topic": "r- and K-Selection and Life-History Strategies",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "r-and-k-selection-and-life-history-strategies"
   },
   {
    "id": "t00504",
    "topic": "Community Ecology",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "community-ecology"
   },
   {
    "id": "t00505",
@@ -4312,7 +4312,7 @@
    "id": "t00719",
    "topic": "Kinetic Molecular Theory of Gases",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "kinetic-molecular-theory-of-gases"
   },
   {
    "id": "t00720",
@@ -7624,13 +7624,13 @@
    "id": "t01271",
    "topic": "The Integrated Circuit and Moore's Law",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-integrated-circuit-and-moore-s-law"
   },
   {
    "id": "t01272",
    "topic": "The Microprocessor Revolution",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-microprocessor-revolution"
   },
   {
    "id": "t01273",
@@ -11734,7 +11734,7 @@
    "id": "t01956",
    "topic": "The Mica Group",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "the-mica-group"
   },
   {
    "id": "t01957",
@@ -13162,13 +13162,13 @@
    "id": "t02194",
    "topic": "Climate Sensitivity and Radiative Forcing",
    "category": "Climate",
-   "guideId": null
+   "guideId": "climate-sensitivity-and-radiative-forcing"
   },
   {
    "id": "t02195",
    "topic": "Paleoclimatology — Reading Past Climates",
    "category": "Climate",
-   "guideId": null
+   "guideId": "paleoclimatology-reading-past-climates"
   },
   {
    "id": "t02196",
@@ -14998,13 +14998,13 @@
    "id": "t02500",
    "topic": "Systems engineering",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "systems-engineering"
   },
   {
    "id": "t02501",
    "topic": "Engineering project management",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "engineering-project-management"
   },
   {
    "id": "t02502",
@@ -16990,13 +16990,13 @@
    "id": "t02832",
    "topic": "Three-phase power systems",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "three-phase-power-systems"
   },
   {
    "id": "t02833",
    "topic": "Generators and alternators",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "generators-and-alternators"
   },
   {
    "id": "t02834",
@@ -18244,13 +18244,13 @@
    "id": "t03041",
    "topic": "Geography of Burundi",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-burundi"
   },
   {
    "id": "t03042",
    "topic": "Geography of Cabo Verde",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-cabo-verde"
   },
   {
    "id": "t03043",
@@ -23320,7 +23320,7 @@
    "id": "t03887",
    "topic": "Thermoluminescence and Optically Stimulated Luminescence Dating",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "thermoluminescence-and-optically-stimulated-luminescence-dat"
   },
   {
    "id": "t03888",
@@ -24274,13 +24274,13 @@
    "id": "t04046",
    "topic": "World History and the Comparative Approach",
    "category": "History",
-   "guideId": null
+   "guideId": "world-history-and-the-comparative-approach"
   },
   {
    "id": "t04047",
    "topic": "Big History: From the Big Bang to the Present",
    "category": "History",
-   "guideId": null
+   "guideId": "big-history-from-the-big-bang-to-the-present"
   },
   {
    "id": "t04048",
@@ -29974,7 +29974,7 @@
    "id": "t04996",
    "topic": "Comparative & World Literature",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "comparative-world-literature"
   },
   {
    "id": "t04997",
@@ -32170,7 +32170,7 @@
    "id": "t05362",
    "topic": "Syntax — How Sentences Work",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "syntax-how-sentences-work"
   },
   {
    "id": "t05363",
@@ -38806,13 +38806,13 @@
    "id": "t06468",
    "topic": "Testicular Self-Examination and Health",
    "category": "Health",
-   "guideId": null
+   "guideId": "testicular-self-examination-and-health"
   },
   {
    "id": "t06469",
    "topic": "Male Infertility",
    "category": "Health",
-   "guideId": null
+   "guideId": "male-infertility"
   },
   {
    "id": "t06470",
@@ -48880,7 +48880,7 @@
    "id": "t08147",
    "topic": "Marxism & Communism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "marxism-communism"
   },
   {
    "id": "t08148",
@@ -50602,7 +50602,7 @@
    "id": "t08434",
    "topic": "Cover Crops and Green Manures",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "cover-crops-and-green-manures"
   },
   {
    "id": "t08435",
@@ -82816,7 +82816,7 @@
    "id": "t13803",
    "topic": "Islamic and Medieval Astronomy",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "islamic-and-medieval-astronomy"
   },
   {
    "id": "t13804",
@@ -90214,7 +90214,7 @@
    "id": "t15036",
    "topic": "Hand Saws and How to Cut Straight",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "hand-saws-and-how-to-cut-straight"
   },
   {
    "id": "t15037",
@@ -98836,7 +98836,7 @@
    "id": "t16473",
    "topic": "Customer Discovery Interviews",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "customer-discovery-interviews"
   },
   {
    "id": "t16474",
@@ -104608,13 +104608,13 @@
    "id": "t17435",
    "topic": "Thinking at the Margin",
    "category": "Economics",
-   "guideId": null
+   "guideId": "thinking-at-the-margin"
   },
   {
    "id": "t17436",
    "topic": "The Law of Demand and the Demand Curve",
    "category": "Economics",
-   "guideId": null
+   "guideId": "the-law-of-demand-and-the-demand-curve"
   },
   {
    "id": "t17437",
@@ -107482,13 +107482,13 @@
    "id": "t17914",
    "topic": "Long-Term Memory: Episodic and Semantic",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "long-term-memory-episodic-and-semantic"
   },
   {
    "id": "t17915",
    "topic": "Procedural Memory and Skill Automaticity",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "procedural-memory-and-skill-automaticity"
   },
   {
    "id": "t17916",
@@ -110356,13 +110356,13 @@
    "id": "t18393",
    "topic": "Water Activity and Food Spoilage",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "water-activity-and-food-spoilage"
   },
   {
    "id": "t18394",
    "topic": "Water Activity Thresholds for Pathogens",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "water-activity-thresholds-for-pathogens"
   },
   {
    "id": "t18395",
@@ -116788,13 +116788,13 @@
    "id": "t19465",
    "topic": "Infrared and Radiant Heat in Cooking",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "infrared-and-radiant-heat-in-cooking"
   },
   {
    "id": "t19466",
    "topic": "Dry Heat Versus Moist Heat Methods",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "dry-heat-versus-moist-heat-methods"
   },
   {
    "id": "t19467",
@@ -120322,13 +120322,13 @@
    "id": "t20054",
    "topic": "Shatranj and the Medieval Chess Ancestors",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "shatranj-and-the-medieval-chess-ancestors"
   },
   {
    "id": "t20055",
    "topic": "Shogi: Japanese Chess and the Drop Rule",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "shogi-japanese-chess-and-the-drop-rule"
   },
   {
    "id": "t20056",
@@ -133678,13 +133678,13 @@
    "id": "t22280",
    "topic": "Cold Air Drainage and Valley Bottoms",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "cold-air-drainage-and-valley-bottoms"
   },
   {
    "id": "t22281",
    "topic": "Drainage and Runoff in Camp Selection",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "drainage-and-runoff-in-camp-selection"
   },
   {
    "id": "t22282",
@@ -134812,13 +134812,13 @@
    "id": "t22469",
    "topic": "The STOP Protocol for Sudden Emergencies",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "the-stop-protocol-for-sudden-emergencies"
   },
   {
    "id": "t22470",
    "topic": "The Five Cs of Survivability",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "the-five-cs-of-survivability"
   },
   {
    "id": "t22471",
@@ -135964,13 +135964,13 @@
    "id": "t22661",
    "topic": "Urban Flooding and Storm Drain Failure",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "urban-flooding-and-storm-drain-failure"
   },
   {
    "id": "t22662",
    "topic": "Coastal Storm Surge Mechanics",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "coastal-storm-surge-mechanics"
   },
   {
    "id": "t22663",
