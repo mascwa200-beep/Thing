@@ -157,7 +157,11 @@ class NewsViewModel(
      */
     fun ensureAnalyzed(article: Article) {
         val url = article.url
-        if (analysisStore.get(url) != null) return
+        // A cached entry from an older prompt-spec generation is treated as absent: the story gets
+        // re-analyzed once into the current register and overwrites in place (bounded by the same
+        // cap/semaphore/failed-set as a first analysis).
+        val cached = analysisStore.get(url)
+        if (cached != null && cached.version >= NewsAnalysisEngine.CURRENT_VERSION) return
         if (analysisStore.hasFailed(url)) return
         if (!analyzing.add(url)) return
         viewModelScope.launch {

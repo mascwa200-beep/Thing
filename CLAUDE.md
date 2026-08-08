@@ -2251,6 +2251,33 @@ nature; the CI-printed count is the meter.
    words; merging as-is would still have raised the total while quietly breaking "zero sections under
    400". Extend them instead.
 
+### "MARKET REACTION + IMPACT" desk-note card (owner spec, this session)
+Owner sent an exact prompt spec (with a screenshot of the old card mis-firing "miners feel it first"
+copy under a politics story): the card under each story is titled **MARKET REACTION + IMPACT** and its
+body is a **180-240-word clinical desk note** — instruments moved → transmission mechanism (desks,
+probability paths, second-order flows) → positioning backdrop → one concrete catalyst; continuous
+paragraph, no fluff phrases, no moralizing, **never invent a numerical print** (directional language
+where no public print exists). Implemented as a register change inside the EXISTING analysis pipeline
+(no new subsystem): `NewsAnalysisEngine.SYSTEM_PROMPT`'s MARKET line now carries the spec (the model
+may cite ONLY the live basket quotes passed in KNOWN MARKET FACTS — the app has no tick feed; the note
+is emitted as one paragraph on the single `MARKET:` line so the line-parser stands); `parse` MARKET
+bound 600→2,400 chars (other lines keep the sentence cap), moved to the companion as `internal` +
+covered by `NewsAnalysisParseTest` (5 JVM cases, arithmetic twin-validated). `NewsAnalysis.version`
+(defaulted 1) + `CURRENT_VERSION=2`: `ensureAnalyzed` treats an older-generation cache entry as absent,
+so a story re-analyzes ONCE into the new register — "at most once ever" became "at most once per spec
+generation". UI: strip header/dialog → "MARKET REACTION + IMPACT", desk note gets `lineHeight=15.sp`;
+heuristic fallback path untouched (no cloud → the old one-liners). `NewsExplainers.market()` honestly
+states the note is model reasoning from the shown quotes, not a market-data feed (desktop mirror got
+the title; it has no analysis engine). ⚠️ On-device-unverified: the live desk-note generation + length
+on the Pixel (needs the cloud key); a register sample was delivered in chat for owner veto.
+
+### ⚠️ WEEKLY USAGE LIMIT hit mid-KB-waves (resets Aug 12, 4pm UTC)
+Waves B5/B6 died on the limit (B6 6/19 agents done; B5 killed by a container restart mid-run). Their
+completed guides on disk were salvaged and merged (see the KB state section — the numbers there are
+post-salvage). **Subagent fan-outs are blocked until the reset; the main loop still works.** After the
+reset: resume the paired-wave loop (`select_wave.py 110` → split head/tail → two concurrent Workflows
+→ gate → commit) — the un-drafted B5/B6 topics re-emit automatically since they never got bundled.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

@@ -190,7 +190,7 @@ fun ArticleCard(
                             links, pulse, analysis,
                             onExplain = {
                                 explainerRequest =
-                                    ExplainerRequest("MARKET REACTION", listOf(NewsExplainers.market(impact, links)))
+                                    ExplainerRequest("MARKET REACTION + IMPACT", listOf(NewsExplainers.market(impact, links)))
                             },
                         )
                     }
@@ -545,11 +545,11 @@ private fun BiasBar(b: BiasBreakdown, modifier: Modifier) {
     }
 }
 
-/** The MARKET REACTION strip beneath a story's summary — the (legal) *Trading Places* read: which markets
- *  this news moves, which way, LIVE if we have a quote, and WHY. A framed readout: header · market chips ·
- *  a plain-English causal line — the cloud [analysis]'s MARKET line when cached (it already explains the
- *  "how big a deal" read in plain words, so the old unlabeled strength dots are dropped), the heuristic
- *  prose otherwise. The whole block is one tap target for the [onExplain] methodology dialog. */
+/** The MARKET REACTION + IMPACT strip beneath a story's summary. A framed readout: header · market chips
+ *  (LIVE % where we have a quote) · the body — when the cloud [analysis] is cached, its MARKET line is the
+ *  owner-specified 180-240-word clinical desk note (instruments moved → transmission mechanism →
+ *  positioning backdrop → one catalyst); otherwise the heuristic *Trading Places* one-liners. The whole
+ *  block is one tap target for the [onExplain] methodology dialog. */
 @Composable
 private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>, analysis: NewsAnalysis?, onExplain: () -> Unit) {
     val c = Pulse.colors
@@ -566,7 +566,7 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>, ana
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "◢ MARKET REACTION",
+                "◢ MARKET REACTION + IMPACT",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
                 fontWeight = FontWeight.Bold, color = c.accent,
             )
@@ -586,13 +586,13 @@ private fun MarketStrip(links: List<MarketLink>, pulse: Map<String, Double>, ana
                 links.forEach { link -> MarketChip(link, pulse[link.market]) }
             }
         }
-        // The causal read — the cloud synthesis in plain words when cached, "what reality is doing to this
-        // market" (Trading Places framing) heuristic prose otherwise.
+        // The body — the cached cloud desk note (a ~200-word continuous paragraph, so it gets a reading
+        // line-height), else the heuristic "what reality is doing to this market" one-liner.
         val head = analysis?.marketLine ?: NewsMarketLink.headline(links)
         if (head.isNotBlank()) {
             Text(
                 head,
-                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink2,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 15.sp, color = c.ink2,
                 modifier = Modifier.padding(top = 7.dp),
             )
         }

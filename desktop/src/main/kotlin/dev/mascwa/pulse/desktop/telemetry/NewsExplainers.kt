@@ -63,7 +63,9 @@ object NewsExplainers {
             "happened to post about it recently, not that no one anywhere is talking about it.",
     )
 
-    /** What the MARKET REACTION strip means and its honest limits — a headline-reading heuristic, not advice. */
+    /** What the MARKET REACTION + IMPACT strip means and its honest limits — a headline-reading heuristic,
+     *  not advice. (The desktop has no cloud analysis engine, so unlike the Android copy this stays purely
+     *  heuristic — same card title on both platforms, honest about the thinner desktop read.) */
     fun market(impact: ImpactLevel, links: List<MarketLink>): Explainer {
         val coverage = if (links.isEmpty()) {
             "No market ties were found in this story's own wording."
@@ -71,9 +73,9 @@ object NewsExplainers {
             "This story's wording ties to: ${links.joinToString(", ") { it.market }}."
         }
         val headline = if (impact == ImpactLevel.NONE) {
-            "MARKET REACTION — what this measures"
+            "MARKET REACTION + IMPACT — what this measures"
         } else {
-            "MARKET REACTION — ${impact.label.lowercase()} impact"
+            "MARKET REACTION + IMPACT — ${impact.label.lowercase()} impact"
         }
         return Explainer(
             headline,
