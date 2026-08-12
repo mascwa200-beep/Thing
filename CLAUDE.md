@@ -2291,6 +2291,22 @@ on the Pixel (needs the cloud key); a register sample was delivered in chat for 
   `/opt/gradle-8.14.3/lib/annotations-24.0.1.jar` on the compiler's `-cp` and full local
   kotlinc+JUnit runs work. ⚠️ On-device-unverified: the live tape fetch + the grounded note (the
   container's Yahoo ban made symbol-level verification impossible here; the Pixel's own IP is clean).
+- **v3 hardening — a 16-agent adversarial review confirmed 13 real defects in the first tape cut; all
+  fixed:** (1) **gate ordering** — the tape's 9 gated Yahoo fetches ran BEFORE analyze()'s cloud gates,
+  so cloud-off devices paid the full burst for a null result → `wiresTape` is now a **provider lambda
+  the engine invokes only after its gates pass**. (2) **fresh-story permanent miss** — analysis fires
+  minutes after publish, when the wires window doesn't exist yet, and cached forever at v3 → a
+  **one-shot maturity re-analysis** (`TAPE_MATURITY_MS` 100 min): an entry generated inside the story's
+  first 100 min is re-analyzed once after the window elapses; bounded because the second pass's
+  generatedAtMs sits past maturity. (3) **reopen falsehood** — a 45-min print gap on a thin instrument
+  mid-session was asserted as "venue closed" → `Move` now carries `baselineGapMinutes`/
+  `endOffsetMinutes` and every tape line states its own measured span ("wire-3m -> wire+88m" / "last
+  print 23h05m BEFORE the wire"), never a venue-hours claim; prompt vocabulary matches. (4) negative
+  caching (3-min TTL) + per-symbol Mutex in-flight dedup in `intradayBars` so an outage isn't hammered
+  36-requests-per-article and concurrent analyses coalesce. (5) zero-value bars filtered (a 0.0 print
+  is a feed artifact and poisons pct). (6) the pre-existing default-locale `"%.1f".format` in the
+  prompt's live-pulse figures → Locale.US (comma-decimal devices fed the model "1,3"). Core re-run
+  locally after the rewrite: 10/10 green.
 
 ### ⚠️ WEEKLY USAGE LIMIT hit mid-KB-waves (resets Aug 12, 4pm UTC)
 Waves B5/B6 died on the limit (B6 6/19 agents done; B5 killed by a container restart mid-run). Their

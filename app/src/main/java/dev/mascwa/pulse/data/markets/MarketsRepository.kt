@@ -13,7 +13,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.contentOrNull
@@ -131,43 +133,61 @@ class MarketsRepository(
     }
 
     /** In-memory 5-minute-bar series per Yahoo symbol for the news desk-note tape — see [intradayBars].
-     *  Keyed by raw Yahoo symbol; value = (fetchedAtMs, bars). Bars don't change retroactively, so a short
-     *  TTL only exists to pick up NEW bars; a burst of story analyses reuses one fetch per instrument. */
-    private val intradayCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<MarketBar>>>()
+     *  Keyed by raw Yahoo symbol; value = (fetchedAtMs, barsOrNull). A null series is a NEGATIVE entry —
+     *  a failed fetch remembered for [INTRADAY_NEGATIVE_TTL_MS], so an outage (the documented Yahoo
+     *  429/anti-bot ban) doesn't get hammered with 9 symbols × 4 retries per newly-viewed article,
+     *  which would sustain exactly the throttle it's failing on. */
+    private val intradayCache =
+        java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<MarketBar>?>>()
+
+    /** One fetch per symbol at a time: the two analyses [dev.mascwa.pulse.feature.news.NewsViewModel]'s
+     *  semaphore allows concurrently must coalesce onto one network round-trip, not race it. */
+    private val intradayLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     /**
      * 5-minute intraday bars (5 days back) for an ALREADY-Yahoo symbol (`ES=F`, `^TNX`, `HYG`…) — the raw
      * series the MARKET REACTION + IMPACT desk note measures its wires-window moves from
      * ([dev.mascwa.pulse.core.telemetry.MarketWindow]). Same endpoint family, [yahooGate] throttle,
      * [YAHOO_UA] and [retrying] backoff as every other Yahoo fetch in this repository — one gate per host,
-     * or Yahoo's anti-bot wall 429s the burst (the documented watchlist lesson). Null on total failure:
-     * the caller drops that tape line rather than inventing one.
+     * or Yahoo's anti-bot wall 429s the burst (the documented watchlist lesson). Null on failure (fresh
+     * negative entries included): the caller drops that tape line rather than inventing one.
      */
     suspend fun intradayBars(yahooSymbol: String): List<MarketBar>? {
-        val now = System.currentTimeMillis()
-        intradayCache[yahooSymbol]?.let { (at, bars) -> if (now - at < INTRADAY_TTL_MS) return bars }
-        val fetched = retrying {
-            val sym = URLEncoder.encode(yahooSymbol, "UTF-8")
-            val url = "https://query1.finance.yahoo.com/v8/finance/chart/$sym?interval=5m&range=5d"
-            val text = yahooGate.withPermit { http.getString(url, mapOf("User-Agent" to YAHOO_UA)) }
-            withContext(Dispatchers.IO) {
-                val result = http.json.parseToJsonElement(text).jsonObject["chart"]?.jsonObject
-                    ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject
-                    ?: error("no chart result for $yahooSymbol")
-                val ts = result["timestamp"]?.jsonArray ?: error("no timestamps for $yahooSymbol")
-                val closes = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
-                    ?.firstOrNull()?.jsonObject?.get("close")?.jsonArray
-                    ?: error("no closes for $yahooSymbol")
-                // Yahoo interleaves nulls into the close series (no trade in that bar) — skip those bars.
-                ts.indices.mapNotNull { i ->
-                    val t = ts[i].jsonPrimitive.longOrNull ?: return@mapNotNull null
-                    val v = closes.getOrNull(i)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
-                    MarketBar(t * 1000L, v)
-                }.ifEmpty { error("empty series for $yahooSymbol") }
+        cachedIntraday(yahooSymbol)?.let { return it.second }
+        val lock = intradayLocks.computeIfAbsent(yahooSymbol) { Mutex() }
+        return lock.withLock {
+            // Re-check under the lock: a concurrent caller may have just completed this symbol's fetch.
+            cachedIntraday(yahooSymbol)?.let { return@withLock it.second }
+            val fetched = retrying {
+                val sym = URLEncoder.encode(yahooSymbol, "UTF-8")
+                val url = "https://query1.finance.yahoo.com/v8/finance/chart/$sym?interval=5m&range=5d"
+                val text = yahooGate.withPermit { http.getString(url, mapOf("User-Agent" to YAHOO_UA)) }
+                withContext(Dispatchers.IO) {
+                    val result = http.json.parseToJsonElement(text).jsonObject["chart"]?.jsonObject
+                        ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject
+                        ?: error("no chart result for $yahooSymbol")
+                    val ts = result["timestamp"]?.jsonArray ?: error("no timestamps for $yahooSymbol")
+                    val closes = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
+                        ?.firstOrNull()?.jsonObject?.get("close")?.jsonArray
+                        ?: error("no closes for $yahooSymbol")
+                    // Yahoo interleaves nulls into the close series (no trade in that bar) — skip those.
+                    ts.indices.mapNotNull { i ->
+                        val t = ts[i].jsonPrimitive.longOrNull ?: return@mapNotNull null
+                        val v = closes.getOrNull(i)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+                        MarketBar(t * 1000L, v)
+                    }.ifEmpty { error("empty series for $yahooSymbol") }
+                }
             }
-        } ?: return null
-        intradayCache[yahooSymbol] = now to fetched
-        return fetched
+            intradayCache[yahooSymbol] = System.currentTimeMillis() to fetched
+            fetched
+        }
+    }
+
+    /** The cache entry for [yahooSymbol] if still fresh under its regime's TTL (success vs negative). */
+    private fun cachedIntraday(yahooSymbol: String): Pair<Long, List<MarketBar>?>? {
+        val entry = intradayCache[yahooSymbol] ?: return null
+        val ttl = if (entry.second != null) INTRADAY_TTL_MS else INTRADAY_NEGATIVE_TTL_MS
+        return entry.takeIf { System.currentTimeMillis() - it.first < ttl }
     }
 
     /** Run [block], retrying with jittered exponential backoff up to [YAHOO_ATTEMPTS] times. Returns null
@@ -274,6 +294,9 @@ class MarketsRepository(
         /** Intraday-bar reuse window: bars never change retroactively, so this only bounds how stale the
          *  NEWEST bars can be while a burst of story analyses shares one fetch per instrument. */
         const val INTRADAY_TTL_MS = 10 * 60 * 1000L
+        /** How long a FAILED intraday fetch is remembered before a retry is allowed — long enough that an
+         *  outage isn't re-hammered per article, short enough to recover promptly. */
+        const val INTRADAY_NEGATIVE_TTL_MS = 3 * 60 * 1000L
         const val YAHOO_UA =
             "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/120.0.0.0 Mobile Safari/537.36"

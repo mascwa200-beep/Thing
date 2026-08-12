@@ -9,9 +9,10 @@ import org.junit.Test
 
 /**
  * [MarketWindow] is what turns "the first 30-90 minutes after the story crossed the wires" from a
- * phrase in a prompt into a measurement — these cases pin the live-window vs reopen split, the
- * boundary inclusivity, and every null (dropped-tape-line) path, so the desk note can never be fed a
- * move the series doesn't actually contain.
+ * phrase in a prompt into a measurement — these cases pin the live vs gapped/reopen split, the
+ * boundary inclusivity, the span bookkeeping ([MarketWindow.Move.baselineGapMinutes] /
+ * [MarketWindow.Move.endOffsetMinutes] — what the tape line prints), and every null
+ * (dropped-tape-line) path, so the desk note can never be fed a move the series doesn't contain.
  */
 class MarketWindowTest {
 
@@ -32,7 +33,8 @@ class MarketWindowTest {
         assertEquals(103.0, m.fromValue, 1e-9)
         // publish+90m = t0+107m -> last bar inside is t0+105m = bar 21 (value 121)
         assertEquals(121.0, m.toValue, 1e-9)
-        assertEquals(90, m.minutes) // t0+15m -> t0+105m
+        assertEquals(2, m.baselineGapMinutes)  // baseline printed 2m before the wire
+        assertEquals(88, m.endOffsetMinutes)   // window ends 88m after the wire (t0+105m vs t0+17m)
     }
 
     @Test
@@ -41,6 +43,7 @@ class MarketWindowTest {
         val m = MarketWindow.windowMove(bars, publishMs = t0 + 20 * min)
         assertNotNull(m)
         assertEquals(104.0, m!!.fromValue, 1e-9) // the t0+20m bar itself
+        assertEquals(0, m.baselineGapMinutes)
     }
 
     @Test
@@ -55,7 +58,7 @@ class MarketWindowTest {
     }
 
     @Test
-    fun closedVenueFallsBackToTheReopenReadAgainstPriorClose() {
+    fun staleBaselineFallsBackToTheGappedReadAgainstThePriorPrint() {
         // A Friday session, a weekend gap, a Monday session.
         val friday = session(12) // t0 .. t0+55m, last value 111
         val mondayStart = t0 + 48 * 60 * min
@@ -68,7 +71,8 @@ class MarketWindowTest {
         // reopen bar = mondayStart; window end = mondayStart+90m lands exactly ON a bar -> included
         // by <= (unlike the live-window test, whose publish+90m falls between bars): bar 18, value 218.
         assertEquals(218.0, m.toValue, 1e-9)
-        assertEquals(90, m.minutes)
+        assertEquals(23 * 60 + 5, m.baselineGapMinutes)      // last print 23h05m before the wire
+        assertEquals(24 * 60 + 90, m.endOffsetMinutes)       // window ends 24h+90m after the wire
     }
 
     @Test
@@ -80,21 +84,23 @@ class MarketWindowTest {
         assertTrue(m!!.reopen)
         assertEquals(111.0, m.fromValue, 1e-9)
         assertEquals(205.0, m.toValue, 1e-9)
-        assertEquals(0, m.minutes)
+        assertEquals(24 * 60, m.endOffsetMinutes) // that one print came 24h after the wire
     }
 
     @Test
-    fun closedVenueWithNoReopenYetIsNull() {
+    fun staleBaselineWithNoLaterPrintIsNull() {
         val friday = session(12)
         assertNull(MarketWindow.windowMove(friday, publishMs = t0 + 24 * 60 * min))
     }
 
     @Test
-    fun nonFiniteBarsAndUnsortedInputAreHandled() {
-        val bars = session(40).shuffled() + listOf(MarketBar(t0 + 2 * min, Double.NaN))
+    fun nonFiniteAndZeroBarsAndUnsortedInputAreHandled() {
+        val bars = session(40).shuffled() +
+            listOf(MarketBar(t0 + 2 * min, Double.NaN), MarketBar(t0 + 16 * min, 0.0))
         val m = MarketWindow.windowMove(bars, publishMs = t0 + 17 * min)
         assertNotNull(m)
-        assertEquals(103.0, m!!.fromValue, 1e-9) // the NaN bar never becomes the baseline
+        // Neither the NaN bar nor the 0.0 feed artifact (which would poison pct) becomes the baseline.
+        assertEquals(103.0, m!!.fromValue, 1e-9)
     }
 
     @Test
@@ -105,7 +111,10 @@ class MarketWindowTest {
 
     @Test
     fun pctAndDeltaReadTheMoveCorrectly() {
-        val m = MarketWindow.Move(fromValue = 4.281, toValue = 4.265, minutes = 90, reopen = false)
+        val m = MarketWindow.Move(
+            fromValue = 4.281, toValue = 4.265,
+            baselineGapMinutes = 2, endOffsetMinutes = 88, reopen = false,
+        )
         assertEquals(-0.016, m.delta, 1e-9) // -1.6bp when the unit is percent
         assertEquals(-0.3737, m.pct, 5e-4)
     }

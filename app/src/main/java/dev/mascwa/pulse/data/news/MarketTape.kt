@@ -66,13 +66,21 @@ class MarketTape(private val markets: MarketsRepository) {
         } else {
             String.format(Locale.US, "%+.2f%%", m.pct)
         }
+        // Each line states its own MEASURED span relative to the wire — never an assertion about venue
+        // hours. A stale starting print says exactly how stale ("last print Xm before the wire"): a
+        // weekend gap and a thin instrument's mid-session silence read the same, which is the truth.
         val span = if (m.reopen) {
-            "venue closed at publish — next session's reopen vs the prior close (${m.minutes}m traded)"
+            "last print ${dur(m.baselineGapMinutes)} BEFORE the wire (market not printing at publish) -> " +
+                "first traded window after, ending ${dur(m.endOffsetMinutes)} past the wire"
         } else {
-            "over the ${m.minutes}m after the wire"
+            "wire-${m.baselineGapMinutes}m -> wire+${m.endOffsetMinutes}m"
         }
-        return "${inst.label} (${inst.symbol}): ${num(m.fromValue)} -> ${num(m.toValue)} ($change) $span"
+        return "${inst.label} (${inst.symbol}): ${num(m.fromValue)} -> ${num(m.toValue)} ($change), $span"
     }
+
+    private fun dur(minutes: Int): String =
+        if (minutes >= 120) "${minutes / 60}h${(minutes % 60).let { if (it > 0) "${it}m" else "" }}"
+        else "${minutes}m"
 
     private fun num(v: Double): String = when {
         kotlin.math.abs(v) >= 1000 -> String.format(Locale.US, "%.1f", v)

@@ -61,15 +61,18 @@ class NewsAnalysisEngine(
         category: String,
         links: List<MarketLink>,
         livePulse: Map<String, Double>,
-        wiresTape: String? = null,
+        // A PROVIDER, not a value: the wires tape costs ~9 gated Yahoo fetches, so it must only be
+        // computed once the free gates below have passed — a cloud-off device must never pay it.
+        wiresTape: suspend () -> String? = { null },
     ): NewsAnalysis? = runCatching {
         val s = settings.current()
         if (!s.jarvis.cloudActive) return@runCatching null
         engine.ensureReady()
         if (engine.state.value !is EngineState.Ready) return@runCatching null
 
+        val tape = runCatching { wiresTape() }.getOrNull()
         val raw = engine.generate(
-            buildPrompt(title, summary, source, category, links, livePulse, wiresTape),
+            buildPrompt(title, summary, source, category, links, livePulse, tape),
             emptyList(),
             SYSTEM_PROMPT,
         ).toList().joinToString("").trim()
@@ -90,8 +93,9 @@ class NewsAnalysisEngine(
         } else {
             links.joinToString("; ") { l ->
                 val live = livePulse[l.market]?.let {
-                    val sign = if (it >= 0.0) "+" else ""
-                    " (today: $sign${"%.1f".format(it)}%)"
+                    // Locale.US: this string feeds a prompt whose numbers the model may quote verbatim —
+                    // a comma-decimal device locale must not turn 1.3% into "1,3".
+                    " (today: ${String.format(java.util.Locale.US, "%+.1f", it)}%)"
                 } ?: ""
                 "${l.market} likely ${l.impact.name}$live — ${l.why}"
             }
@@ -104,8 +108,9 @@ class NewsAnalysisEngine(
             appendLine("SOURCE: $source · CATEGORY: $category")
             appendLine("KNOWN MARKET FACTS: $marketFacts")
             if (wiresTape != null) {
-                appendLine("WIRES-WINDOW TAPE — the macro complex's MEASURED moves in the ~90 minutes")
-                appendLine("after this story crossed the wires, computed from real 5-minute bars:")
+                appendLine("WIRES-WINDOW TAPE — the macro complex's MEASURED moves around this story's")
+                appendLine("publish time, computed from real 5-minute bars. Each line states its own span")
+                appendLine("relative to the wire (e.g. wire-3m -> wire+88m):")
                 appendLine(wiresTape)
             } else {
                 appendLine("WIRES-WINDOW TAPE: unavailable for this story — no measured window moves exist.")
@@ -157,17 +162,20 @@ class NewsAnalysisEngine(
             style a senior multi-asset or rates strategist uses to brief a portfolio manager. Dense,
             mechanistic, cause-and-effect — do not rehash the story, do not moralize, no generic
             commentary. Cover, in this exact order with zero deviation: (1) the specific instruments and
-            asset classes that moved on this story — lead with the WIRES-WINDOW TAPE, which is the MEASURED
-            move of each macro instrument in the ~90 minutes after this story crossed the wires, computed
-            from real 5-minute bars: cite its figures directly, and where a tape line is marked as a reopen
-            say the venue was closed when the story hit and frame the figure as the next session's reaction,
-            not a live response. A tape move is what happened DURING that window, not necessarily BECAUSE of
-            this story — attribute causation only where the story is plausibly the driver, and say when the
-            window move likely belongs to the broader session instead. The tape plus KNOWN MARKET FACTS are
-            the ONLY prints that exist; cite those exact figures and no others — NEVER invent a numerical
-            print; describe anything they don't cover directionally and logically. If the tape is
-            unavailable, every magnitude stays directional. If the story plausibly moved nothing, state that
-            plainly and explain why it does not transmit. (2) The transmission
+            asset classes that moved on this story — lead with the WIRES-WINDOW TAPE, the MEASURED move of
+            each macro instrument around this story's publish time, computed from real 5-minute bars. Cite
+            its figures directly, respecting each line's OWN stated span: a "wire-Xm -> wire+Ym" line is
+            the live reaction window; a line saying the last print came LONG before the wire means the
+            market was not printing when the story hit (closed, or simply not trading) — frame that figure
+            as the subsequent reaction across the stated gap, never as a live response, and treat a span
+            much wider than ~90 minutes with proportionate caution. A tape move is what happened DURING
+            its span, not necessarily BECAUSE of this story — attribute causation only where the story is
+            plausibly the driver, and say when the move likely belongs to the broader session instead. The
+            tape plus KNOWN MARKET FACTS are the ONLY prints that exist; cite those exact figures and no
+            others — NEVER invent a numerical print; describe anything they don't cover directionally and
+            logically. If the tape is unavailable, every magnitude stays directional. If the story
+            plausibly moved nothing, state that plainly and explain why it does not transmit. (2) The
+            transmission
             mechanism in precise language: how the relevant desks (rates, equity risk, systematic/macro,
             credit, FX) interpret the news; which probability or expected cash-flow path the market is
             adjusting (policy odds, regulatory risk, earnings trajectory, supply/demand balance,
