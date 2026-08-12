@@ -2272,6 +2272,25 @@ heuristic fallback path untouched (no cloud → the old one-liners). `NewsExplai
 states the note is model reasoning from the shown quotes, not a market-data feed (desktop mirror got
 the title; it has no analysis engine). ⚠️ On-device-unverified: the live desk-note generation + length
 on the Pixel (needs the cloud key); a register sample was delivered in chat for owner veto.
+- **v3 — the WIRES-WINDOW TAPE (owner: "take this seriously"):** the note's part (1) is now MEASURED,
+  not reconstructed. Pure `core:telemetry/MarketWindow.kt` (+ 10-case test, **locally compiled AND
+  executed green**): last print at/before publish → last print inside publish+90m; a >45-min-stale
+  baseline flips to the flagged **reopen** regime (venue closed at publish → next session's window vs
+  prior close); every unmeasurable case → null (dropped line, never an estimate).
+  `MarketsRepository.intradayBars(symbol)` fetches `interval=5m&range=5d` through the SAME
+  `yahooGate`/`retrying`/UA as all Yahoo traffic (one gate per host — re-proven: an 11-request burst
+  got this container's proxy IP durably banned), 10-min per-symbol cache. `data/news/MarketTape.kt`
+  measures the macro complex (ES=F · NQ=F · ^TNX · 2YY=F · DX-Y.NYB · ^VIX · GC=F · CL=F · HYG; a
+  wrong symbol = a dropped line) and formats Locale.US lines with a `<30` sanity guard before any bp
+  annotation. `NewsAnalysisEngine` v3 (`CURRENT_VERSION=3`): the tape block is in the prompt, the
+  MARKET spec now says cite tape+facts figures ONLY, frame reopen lines as next-session reactions, and
+  attribute causation honestly (a window move is DURING, not necessarily BECAUSE). Tape computed
+  best-effort in `ensureAnalyzed` (`MarketTape` built inside NewsViewModel from its existing
+  `markets` dep — zero factory churn). **Local-verification recipe fix recorded:** the long-documented
+  "standalone kotlinc IR-lowering crash (env artifact)" was a wrong jar path — put
+  `/opt/gradle-8.14.3/lib/annotations-24.0.1.jar` on the compiler's `-cp` and full local
+  kotlinc+JUnit runs work. ⚠️ On-device-unverified: the live tape fetch + the grounded note (the
+  container's Yahoo ban made symbol-level verification impossible here; the Pixel's own IP is clean).
 
 ### ⚠️ WEEKLY USAGE LIMIT hit mid-KB-waves (resets Aug 12, 4pm UTC)
 Waves B5/B6 died on the limit (B6 6/19 agents done; B5 killed by a container restart mid-run). Their

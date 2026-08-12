@@ -11,6 +11,7 @@ import dev.mascwa.pulse.core.util.toUserMessage
 import dev.mascwa.pulse.data.breaking.BreakingCoverage
 import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.Article
+import dev.mascwa.pulse.data.news.MarketTape
 import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.data.news.NewsAnalysisEngine
 import dev.mascwa.pulse.data.news.NewsAnalysisStore
@@ -68,6 +69,11 @@ class NewsViewModel(
 
     private val _state = MutableStateFlow(NewsUiState())
     val state: StateFlow<NewsUiState> = _state.asStateFlow()
+
+    /** Measures the macro complex's real 5-minute-bar moves after a story's publish time — the desk
+     *  note's factual grounding. Built here rather than injected: it needs only [markets], which this
+     *  ViewModel already holds. */
+    private val marketTape = MarketTape(markets)
 
     // In-memory cache so switching tabs is instant.
     private val cache = mutableMapOf<String, Async<List<Article>>>()
@@ -169,6 +175,9 @@ class NewsViewModel(
                 analysisSemaphore.withPermit {
                     val links = NewsMarketLink.linksFor(article.title, article.summary, article.category)
                     val pulse = _state.value.marketPulse
+                    // The measured wires-window tape — real 5m-bar moves after this story's publish
+                    // time. Best-effort: null just means the desk note stays directional-only.
+                    val tape = runCatching { marketTape.wiresWindow(article.publishedEpochMs) }.getOrNull()
                     val result = analysisEngine.analyze(
                         title = article.title,
                         summary = article.summary,
@@ -176,6 +185,7 @@ class NewsViewModel(
                         category = article.category,
                         links = links,
                         livePulse = pulse,
+                        wiresTape = tape,
                     )
                     if (result != null) analysisStore.record(url, result) else analysisStore.markFailed(url)
                 }

@@ -35,9 +35,11 @@ data class NewsAnalysis(
  *
  * The MARKET line is the owner-specified "MARKET REACTION + IMPACT" desk note — a 180-240-word clinical
  * brief in a senior multi-asset strategist's register (instruments moved → transmission mechanism →
- * positioning backdrop → one concrete catalyst). It is grounded in the already-computed [MarketLink] facts
- * and live basket quotes (the ONLY numerical prints the model may cite; everything else must stay
- * directional — the app has no tick feed, and an invented print is worse than none). The WIDER line is
+ * positioning backdrop → one concrete catalyst). It is grounded in the measured WIRES-WINDOW TAPE (the
+ * macro complex's real 5-minute-bar moves after the story's publish time — [MarketTape]) plus the
+ * already-computed [MarketLink] facts and live basket quotes; those are the ONLY numerical prints the
+ * model may cite, everything else must stay directional — an invented print is worse than none. The WIDER
+ * line is
  * explicitly asked to REASON, hedged, rather than assert specifics: this app has no live feed for
  * internet/social sentiment, political leaning, or conflict status, so that angle has to come from the
  * model's own trained reasoning, prompted to stay honest about what's inference versus fact.
@@ -59,14 +61,18 @@ class NewsAnalysisEngine(
         category: String,
         links: List<MarketLink>,
         livePulse: Map<String, Double>,
+        wiresTape: String? = null,
     ): NewsAnalysis? = runCatching {
         val s = settings.current()
         if (!s.jarvis.cloudActive) return@runCatching null
         engine.ensureReady()
         if (engine.state.value !is EngineState.Ready) return@runCatching null
 
-        val raw = engine.generate(buildPrompt(title, summary, source, category, links, livePulse), emptyList(), SYSTEM_PROMPT)
-            .toList().joinToString("").trim()
+        val raw = engine.generate(
+            buildPrompt(title, summary, source, category, links, livePulse, wiresTape),
+            emptyList(),
+            SYSTEM_PROMPT,
+        ).toList().joinToString("").trim()
         parse(raw)
     }.getOrNull()
 
@@ -77,6 +83,7 @@ class NewsAnalysisEngine(
         category: String,
         links: List<MarketLink>,
         livePulse: Map<String, Double>,
+        wiresTape: String?,
     ): String {
         val marketFacts = if (links.isEmpty()) {
             "No specific markets are clearly implicated by this story."
@@ -96,6 +103,13 @@ class NewsAnalysisEngine(
             if (summary.isNotBlank()) appendLine("SUMMARY: $summary")
             appendLine("SOURCE: $source · CATEGORY: $category")
             appendLine("KNOWN MARKET FACTS: $marketFacts")
+            if (wiresTape != null) {
+                appendLine("WIRES-WINDOW TAPE — the macro complex's MEASURED moves in the ~90 minutes")
+                appendLine("after this story crossed the wires, computed from real 5-minute bars:")
+                appendLine(wiresTape)
+            } else {
+                appendLine("WIRES-WINDOW TAPE: unavailable for this story — no measured window moves exist.")
+            }
             appendLine("AUTO-TAGGED TOPICS/REGIONS: $tagLine")
         }
     }
@@ -105,8 +119,9 @@ class NewsAnalysisEngine(
          *  cached [NewsAnalysis] with an older [NewsAnalysis.version] is treated as absent by the caller
          *  and re-analyzed ONCE into the new register (the "at most once ever" cost invariant becomes
          *  "at most once per spec generation", which is the intended spend). v2: the MARKET line became
-         *  the owner-specified 180-240-word clinical desk note. */
-        const val CURRENT_VERSION = 2
+         *  the owner-specified 180-240-word clinical desk note. v3: the note is grounded in the measured
+         *  WIRES-WINDOW TAPE (real 5-minute-bar moves after the story's publish time). */
+        const val CURRENT_VERSION = 3
 
         /** 240 words of desk note ≈ 1,700 chars; headroom for long words, still rejects runaway output. */
         private const val MARKET_MAX_CHARS = 2400
@@ -142,12 +157,17 @@ class NewsAnalysisEngine(
             style a senior multi-asset or rates strategist uses to brief a portfolio manager. Dense,
             mechanistic, cause-and-effect — do not rehash the story, do not moralize, no generic
             commentary. Cover, in this exact order with zero deviation: (1) the specific instruments and
-            asset classes that moved (or plausibly moved) on this story — equity index futures, sector
-            baskets, single names if material, Treasury yields, the dollar, volatility, commodity futures,
-            credit spreads — with direction and relative size. The ONLY live prints that exist are the ones
-            in KNOWN MARKET FACTS; you may cite those exact figures and no others — NEVER invent a
-            numerical print; describe everything else directionally and logically. If the story plausibly
-            moved nothing, state that plainly and explain why it does not transmit. (2) The transmission
+            asset classes that moved on this story — lead with the WIRES-WINDOW TAPE, which is the MEASURED
+            move of each macro instrument in the ~90 minutes after this story crossed the wires, computed
+            from real 5-minute bars: cite its figures directly, and where a tape line is marked as a reopen
+            say the venue was closed when the story hit and frame the figure as the next session's reaction,
+            not a live response. A tape move is what happened DURING that window, not necessarily BECAUSE of
+            this story — attribute causation only where the story is plausibly the driver, and say when the
+            window move likely belongs to the broader session instead. The tape plus KNOWN MARKET FACTS are
+            the ONLY prints that exist; cite those exact figures and no others — NEVER invent a numerical
+            print; describe anything they don't cover directionally and logically. If the tape is
+            unavailable, every magnitude stays directional. If the story plausibly moved nothing, state that
+            plainly and explain why it does not transmit. (2) The transmission
             mechanism in precise language: how the relevant desks (rates, equity risk, systematic/macro,
             credit, FX) interpret the news; which probability or expected cash-flow path the market is
             adjusting (policy odds, regulatory risk, earnings trajectory, supply/demand balance,
