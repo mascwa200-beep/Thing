@@ -186,6 +186,15 @@ dependencies {
     implementation(libs.vosk.android)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
 
+    // Sensorium's on-device classifiers: YAMNet soundscape (tasks-audio) + EfficientNet scene
+    // (tasks-vision), frames sampled via CameraX on a headless lifecycle (no -view: no preview
+    // exists anywhere). Models are fetched once at runtime, never bundled — see AmbientSamplers.
+    implementation(libs.mediapipe.tasks.audio)
+    implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+
     // 3D vector map engine (open-source, no Google); vector tiles from keyless OpenFreeMap.
     implementation(libs.maplibre.android)
 

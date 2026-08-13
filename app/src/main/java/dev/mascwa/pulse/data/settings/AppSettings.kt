@@ -282,6 +282,29 @@ data class SecuritySettings(
 )
 
 /**
+ * Sensorium — ambient environment sensing. Default ON per the owner's explicit adaptive-24/7 choice:
+ * the fusion core (barometer/light/motion/magnetometer/radio density) runs whenever the service does,
+ * mic and camera sips arm on the next app-open (Android's while-in-use law) and are individually
+ * toggleable. Everything is classify-then-discard: raw audio/frames never persist, never leave the
+ * device — only text labels and numbers reach the rest of the app.
+ */
+@Serializable
+data class SensingSettings(
+    /** Master switch for the whole subsystem (the service exists only while this is on). */
+    val enabled: Boolean = true,
+    /** Ambient mic sips (YAMNet soundscape labels + safety-sound events). */
+    val micSensing: Boolean = true,
+    /** Ambient camera sips (EfficientNet scene labels; adaptive bursts). */
+    val cameraSensing: Boolean = true,
+    /** WiFi/BT scan bursts for crowd-density signals (needs Location for WiFi counts). */
+    val radioSensing: Boolean = true,
+    /** Record notable events into the episodic memory stream. */
+    val rememberEvents: Boolean = true,
+    /** Battery %, discharging, below which the whole stack stands down (heartbeat only). */
+    val standDownBatteryPct: Int = 9,
+)
+
+/**
  * The LAN remote link — letting a paired desktop switch app features on and off from the same Wi-Fi.
  *
  * Default **OFF**: the link only listens while the user has explicitly turned it on, which is exactly what
@@ -393,6 +416,9 @@ data class AppSettings(
 
     // Network security / privacy (Trusted Network Mode + at-rest/HTTPS encryption controls)
     val security: SecuritySettings = SecuritySettings(),
+
+    // Sensorium: ambient environment sensing (mic/camera/sensor fusion)
+    val sensing: SensingSettings = SensingSettings(),
 
     // LAN remote control from a paired desktop
     val remote: RemoteSettings = RemoteSettings(),
