@@ -383,6 +383,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
+            dev.mascwa.pulse.jarvis.agent.EnvironmentTool(sensoriumEngine, sensoriumStore),
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),

@@ -88,6 +88,11 @@ data class OracleSignals(
     // Usage rhythm — the feature you usually open around now (route) + its label
     val habitualRoute: String? = null,
     val habitualLabel: String? = null,
+    // Sensorium — the ambient environment read ("Indoors · still · quiet · lit · alone"), the top
+    // learned-normal deviation ("noise unusually loud for 03:00 on a weekday"), and the storm signal
+    val envDescription: String? = null,
+    val envAnomaly: String? = null,
+    val pressureFallingFast: Boolean = false,
 ) {
     val minutesNow: Int get() = minuteOfDay
     val isNight: Boolean get() = hourOfDay >= 22 || hourOfDay < 6
@@ -322,10 +327,40 @@ object Oracle {
         )
     }
 
+    /** A storm front read from the phone's own barometer — hyper-local, works offline, and often
+     *  ahead of a forecast refresh. Fired only on the fast fall (the Sensorium's PLUNGING band). */
+    private fun stormFront(s: OracleSignals): Insight? {
+        if (!s.pressureFallingFast) return null
+        return Insight(
+            id = "storm_front", kind = InsightKind.PREPARATION, urgency = Urgency.IMPORTANT,
+            title = "Pressure is plunging — weather's turning",
+            detail = "The phone's own barometer reads a fast 3-hour fall, the classic storm-front " +
+                "signature. If you're heading out, take the layer/umbrella now.",
+            score = Urgency.IMPORTANT.weight * 1000.0 + 30,
+            actionRoute = "weather",
+            sources = listOf("sensorium", "weather"),
+        )
+    }
+
+    /** The learned-normal deviation, surfaced as an ambient awareness line ("unusually loud for
+     *  03:00 on a weekday"). Never urgent by itself — the Sensorium raises true ALERT events on its
+     *  own path; this is the Oracle knowing the room feels different. */
+    private fun envAnomaly(s: OracleSignals): Insight? {
+        val anomaly = s.envAnomaly ?: return null
+        return Insight(
+            id = "env_anomaly", kind = InsightKind.ANOMALY, urgency = Urgency.NOTABLE,
+            title = "Your environment is off its normal",
+            detail = anomaly.replaceFirstChar { it.uppercase() } + ".",
+            score = Urgency.NOTABLE.weight * 1000.0 + 5,
+            actionRoute = "sensorium",
+            sources = listOf("sensorium"),
+        )
+    }
+
     private val RULES: List<(OracleSignals) -> Insight?> = listOf(
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
-        ::windDown, ::habitPrefetch, ::interestPulse,
+        ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
     )
 
     /**

@@ -8,6 +8,7 @@ import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.OracleEvent
 import dev.mascwa.pulse.core.telemetry.OracleMover
 import dev.mascwa.pulse.core.telemetry.OracleSignals
+import dev.mascwa.pulse.core.telemetry.PressureTrend
 import dev.mascwa.pulse.core.telemetry.ProfileCategory
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.UsageInsights
@@ -98,15 +99,36 @@ object OracleEngine {
             UsageInsights.featureForHour(container.usageRepository.snapshot(), hour)
         }.getOrNull()
 
+        // Sensorium: the live environment read + the top learned-normal deviation + the storm signal.
+        // movement comes from the fusion EWMA; awayFromHome comes from the Trusted-Network home-SSID
+        // concept (the app's only honest "home" definition — never the INDOOR/OUTDOOR scene guess),
+        // and stays null when no home SSID is configured or the SSID is unreadable.
+        val sensed = runCatching { container.sensoriumEngine.reading.value }.getOrNull()
+        val topAnomaly = runCatching {
+            container.sensoriumEngine.anomalies.value.firstOrNull()?.let { "${it.metric} ${it.text}" }
+        }.getOrNull()
+        val movement = runCatching { container.sensorFusion.snapshot.value.movement }.getOrDefault(0f)
+        val plunging = sensed?.pressureTrend == PressureTrend.PLUNGING
+        val awayFromHome = runCatching {
+            val home = settings.security.homeSsids
+            if (home.isEmpty()) null
+            else container.wifiPolicyController.currentSsid()
+                ?.let { ssid -> home.none { it.equals(ssid, ignoreCase = true) } }
+        }.getOrNull()
+
         return OracleSignals(
             nowMs = now, hourOfDay = hour, minuteOfDay = minute, dayOfWeek = dow,
             lat = loc?.latitude, lon = loc?.longitude, placeName = loc?.name, speedMps = loc?.speedMps,
+            movement = movement, awayFromHome = awayFromHome,
             events = events, pendingTasks = pendingTasks, interests = interests,
             tempC = tempC, precipChancePct = precip, uvIndex = uv,
             movers = movers, emergencyHeadline = emergency, kpIndex = kp,
             batteryPct = dc?.batteryPct?.takeIf { it >= 0 }, charging = dc?.isCharging ?: false,
             storageFreePct = storageFreePct, onCellular = dc?.let { it.network == NetworkKind.CELLULAR },
             habitualRoute = feat?.key, habitualLabel = feat?.let { FeatureCatalog.labelFor(it.key) },
+            envDescription = sensed?.describe(),
+            envAnomaly = topAnomaly,
+            pressureFallingFast = plunging,
         )
     }
 
