@@ -2315,6 +2315,60 @@ post-salvage). **Subagent fan-outs are blocked until the reset; the main loop st
 reset: resume the paired-wave loop (`select_wave.py 110` → split head/tail → two concurrent Workflows
 → gate → commit) — the un-drafted B5/B6 topics re-emit automatically since they never got bundled.
 
+### SENSORIUM — ambient environment sensing, rebuilt overpowered (this session, S1–S6)
+Owner: *"look through my camera and all the sensors and stuff… make it super overpowered and clinically
+insanely creative."* Recon verdict: the life-sim perception stack was FULLY deleted with the game
+(`b9ba600`) — the older perception/ambient-sensing prose above describes subsystems that no longer
+exist; **Sensorium supersedes all of it.** Owner chose (AskUserQuestion): **Adaptive 24/7** posture +
+surfaced **Everywhere**. Built as 6 CI-green slices:
+- **S1 pure cores (31 tests, locally kotlinc+JUnit green):** `core:telemetry/Sensorium.kt` (SenseFrame
+  → EnvReading: setting/motion/social/noise/light/pressure-trend + describe(); carries the recorded
+  fixes — movement = EWMA(|accelG−1|), VEHICLE requires motion; + the **throttle ladder**
+  NOMINAL/SETTLED/CONSERVE/STANDDOWN with battery hysteresis as a pure function),
+  `SensoriumBaseline.kt` (**learned normality**: per hour×weekday/weekend EWMA mean+deviation baselines
+  → plain-English anomalies "unusually loud for 03:00 on a weekday"; young cells refuse to judge),
+  `SensoriumEvents.kt` (safety sounds at a strict floor [smoke/CO alarm, glass, gunshot → ALERT],
+  notable sounds [siren/doorbell/knock/dog/baby/thunder], pressure plunges, light transitions,
+  magnetic spikes framed honestly).
+- **S2 deps/manifest/settings:** MediaPipe tasks-audio+vision 0.10.21 + CameraX 1.4.1 restored (models
+  fetched at runtime, same URLs/filenames as before so cached copies reuse; proguard already keeps
+  `com.google.mediapipe.**` — matters now R8 is ON); `CAMERA`+`FOREGROUND_SERVICE_CAMERA` back;
+  `SensingSettings` (default ON per owner posture; mic/camera/radio/remember sub-toggles).
+- **S3 samplers (dumb by design; engine owns cadence):** `data/sensing/AmbientAudioSampler` (per-sip
+  open→classify→release, mic genuinely free between sips; yields to console capture),
+  `AmbientCameraSampler` (headless LifecycleRegistry back-camera bursts, camera fully closed after),
+  `SensorFusionController` (NORMAL-rate batched sensors + movement EWMA + 3h barometer ring + WiFi
+  cached-scan counts + 12s BLE bursts w/ one empty filter [screen-off suppression] + per-burst unique
+  counts only [MAC randomization]).
+- **S4 engine/store/service:** `SensoriumEngine` (per-heartbeat step: due samplers → fuse → learn →
+  events w/ per-key cooldowns; camera trigger-ramps on loud/light-jump/motion-after-stillness; ALERTs
+  → `notifyUrgentLine` red + a camera look; notable events → episodic memories ≤10/day; **GPS never
+  polled**), `SensoriumStore` (baseline + 48h event log; house pattern; serialization DTOs app-side),
+  `SensoriumService` — **the upgradeable FGS**: background starts = specialUse only (never attempts
+  mic/cam types — Android 14+ throws); MainActivity onCreate+onStart re-arm with `|microphone|camera`
+  which then persist in background; stepwise degradation; START_STICKY (deliberate divergence — the
+  type-free core is worth resurrecting); BootReceiver standby start + RefreshWorker self-heal placed
+  BEFORE the notification gates.
+- **S5 scanner:** `feature/sensorium/` — live reading + facet breakdown (seen/heard/inferred labelled
+  honestly) + anomaly panel + learned-normal line + instrument strip + 48h event log + ARM (requests
+  perms; the screen IS the foreground context that can arm) + LOOK NOW. `Routes.SENSORIUM`, MENU →
+  YOUR THINGS → "Environment Scanner", Settings section under SECURITY (whose keywords advertised
+  "ambient camera mic" with nothing behind them).
+- **S6 intelligence:** `composePersona` carries the one-line ambient read every turn (use naturally,
+  don't recite); `environment` JarvisTool; ORACLE gains envDescription/envAnomaly/pressureFallingFast
+  + **revives the dead `movement`/`awayFromHome` inputs** (windDown could NEVER fire; focusMoment's
+  "settled" was constant-true; awayFromHome = Trusted-Network home-SSID, never the scene guess) + 2
+  new rules (stormFront from the phone's own barometer; envAnomaly ambient awareness). OracleTest
+  13→16, locally green.
+- **Privacy invariant:** classify-then-discard — raw audio/frames never persisted or transmitted; only
+  text labels + numbers leave the samplers; the GrapheneOS indicators lighting during sips is the OS
+  working as designed. **Honest platform limits:** mic/camera arm only from a foreground app-open
+  (then persist); WiFi counts null without Location; GrapheneOS may refuse screen-off camera (marked
+  UNAVAILABLE, never faked); ~5-10%/day battery at defaults, self-throttling below.
+- ⚠️ **Owner-verify on the Pixel (CI compile-gates only):** the service arming flow (open app → EARS/
+  EYES ARMED in the scanner), the GrapheneOS indicator behaviour, a clap/alarm-sound ALERT test, the
+  learned-normal line appearing after a day or two, battery drain at L0, and the boot-revival path.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
