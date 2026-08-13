@@ -295,6 +295,26 @@ class AppContainer(private val appContext: Context) {
     val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {
         dev.mascwa.pulse.jarvis.voice.VoskSpeech(appContext)
     }
+
+    // ---- Sensorium: ambient environment sensing (classify-then-discard; labels only) ----
+
+    /** The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic. */
+    val ambientAudioSampler: dev.mascwa.pulse.data.sensing.AmbientAudioSampler by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientAudioSampler(
+            appContext, http, micBusy = { voskSpeech.consoleActive.value },
+        )
+    }
+
+    /** The Sensorium's eyes — one headless back-camera EfficientNet burst at a time. */
+    val ambientCameraSampler: dev.mascwa.pulse.data.sensing.AmbientCameraSampler by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientCameraSampler(appContext, http)
+    }
+
+    /** The Sensorium's continuous type-free senses (motion EWMA, light, barometer trend, magnetics,
+     *  proximity) + on-demand WiFi/BLE density bursts. */
+    val sensorFusion: dev.mascwa.pulse.data.sensing.SensorFusionController by lazy {
+        dev.mascwa.pulse.data.sensing.SensorFusionController(appContext)
+    }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
      *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
     val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {
