@@ -64,7 +64,7 @@
    "id": "t00011",
    "topic": "The Golgi Apparatus and Protein Trafficking",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-golgi-apparatus-and-protein-trafficking"
   },
   {
    "id": "t00012",
@@ -3040,13 +3040,13 @@
    "id": "t00507",
    "topic": "Trophic Levels and Food Webs",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "trophic-levels-and-food-webs"
   },
   {
    "id": "t00508",
    "topic": "Energy Pyramids and Ecological Efficiency",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "energy-pyramids-and-ecological-efficiency"
   },
   {
    "id": "t00509",
@@ -4324,7 +4324,7 @@
    "id": "t00721",
    "topic": "Solutions, Solubility and Concentration",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "solutions-solubility-and-concentration"
   },
   {
    "id": "t00722",
@@ -7648,13 +7648,13 @@
    "id": "t01275",
    "topic": "History of Video Game Consoles",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-video-game-consoles"
   },
   {
    "id": "t01276",
    "topic": "History of the Internet and ARPANET",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-the-internet-and-arpanet"
   },
   {
    "id": "t01277",
@@ -11752,13 +11752,13 @@
    "id": "t01959",
    "topic": "Gemstones and Gemology",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "gemstones-and-gemology"
   },
   {
    "id": "t01960",
    "topic": "Diamond — Formation, Properties and Mining",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "diamond-formation-properties-and-mining"
   },
   {
    "id": "t01961",
@@ -13186,13 +13186,13 @@
    "id": "t02198",
    "topic": "Glacial-Interglacial Cycles",
    "category": "Climate",
-   "guideId": null
+   "guideId": "glacial-interglacial-cycles"
   },
   {
    "id": "t02199",
    "topic": "Sea Level Rise and Its Causes",
    "category": "Climate",
-   "guideId": null
+   "guideId": "sea-level-rise-and-its-causes"
   },
   {
    "id": "t02200",
@@ -15022,13 +15022,13 @@
    "id": "t02504",
    "topic": "Computer-aided design (CAD)",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "computer-aided-design-cad"
   },
   {
    "id": "t02505",
    "topic": "Geometric dimensioning and tolerancing",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "geometric-dimensioning-and-tolerancing"
   },
   {
    "id": "t02506",
@@ -17014,13 +17014,13 @@
    "id": "t02836",
    "topic": "Power distribution and substations",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "power-distribution-and-substations"
   },
   {
    "id": "t02837",
    "topic": "The electrical grid and how it is operated",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "the-electrical-grid-and-how-it-is-operated"
   },
   {
    "id": "t02838",
@@ -18256,7 +18256,7 @@
    "id": "t03043",
    "topic": "Geography of Cameroon",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-cameroon"
   },
   {
    "id": "t03044",
@@ -18268,7 +18268,7 @@
    "id": "t03045",
    "topic": "Geography of Chad",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-chad"
   },
   {
    "id": "t03046",
@@ -23332,7 +23332,7 @@
    "id": "t03889",
    "topic": "Seriation and Typology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "seriation-and-typology"
   },
   {
    "id": "t03890",
@@ -24286,7 +24286,7 @@
    "id": "t04048",
    "topic": "Periodization: How We Divide the Past",
    "category": "History",
-   "guideId": null
+   "guideId": "periodization-how-we-divide-the-past"
   },
   {
    "id": "t04049",
@@ -24298,7 +24298,7 @@
    "id": "t04050",
    "topic": "Historical Geography",
    "category": "History",
-   "guideId": null
+   "guideId": "historical-geography"
   },
   {
    "id": "t04051",
@@ -29980,13 +29980,13 @@
    "id": "t04997",
    "topic": "Literary Translation — Art, Theory & Famous Cases",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "literary-translation-art-theory-famous-cases"
   },
   {
    "id": "t04998",
    "topic": "Textual Criticism & Scholarly Editing",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "textual-criticism-scholarly-editing"
   },
   {
    "id": "t04999",
@@ -32164,7 +32164,7 @@
    "id": "t05361",
    "topic": "Morphology — How Words Are Built",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "morphology-how-words-are-built"
   },
   {
    "id": "t05362",
@@ -32176,7 +32176,7 @@
    "id": "t05363",
    "topic": "Grammatical Categories — Case, Gender, Number & Agreement",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "grammatical-categories-case-gender-number-agreement"
   },
   {
    "id": "t05364",
@@ -33340,13 +33340,13 @@
    "id": "t05557",
    "topic": "Percentages and Percent Problems",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "percentages-and-percent-problems"
   },
   {
    "id": "t05558",
    "topic": "Ratios, Rates and Proportional Reasoning",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "ratios-rates-and-proportional-reasoning"
   },
   {
    "id": "t05559",
@@ -36436,7 +36436,7 @@
    "id": "t06073",
    "topic": "Blood: Plasma, Cells and What It Carries",
    "category": "Medical",
-   "guideId": null
+   "guideId": "blood-plasma-cells-and-what-it-carries"
   },
   {
    "id": "t06074",
@@ -38818,7 +38818,7 @@
    "id": "t06470",
    "topic": "Low Testosterone",
    "category": "Health",
-   "guideId": null
+   "guideId": "low-testosterone"
   },
   {
    "id": "t06471",
@@ -38902,7 +38902,7 @@
    "id": "t06484",
    "topic": "Child Growth and Developmental Milestones",
    "category": "Health",
-   "guideId": null
+   "guideId": "child-growth-and-developmental-milestones"
   },
   {
    "id": "t06485",
@@ -40432,7 +40432,7 @@
    "id": "t06739",
    "topic": "Dietary Fats: Saturated, Unsaturated and Trans Fats",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "dietary-fats-saturated-unsaturated-and-trans-fats"
   },
   {
    "id": "t06740",
@@ -41680,7 +41680,7 @@
    "id": "t06947",
    "topic": "The Modes: From Church Modes to Modern Music",
    "category": "Music",
-   "guideId": null
+   "guideId": "the-modes-from-church-modes-to-modern-music"
   },
   {
    "id": "t06948",
@@ -44362,7 +44362,7 @@
    "id": "t07394",
    "topic": "Comparative Philosophy — East and West in Dialogue",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "comparative-philosophy-east-and-west-in-dialogue"
   },
   {
    "id": "t07395",
@@ -48886,13 +48886,13 @@
    "id": "t08148",
    "topic": "Fascism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "fascism"
   },
   {
    "id": "t08149",
    "topic": "Green Politics & Political Environmentalism",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "green-politics-political-environmentalism"
   },
   {
    "id": "t08150",
@@ -50614,7 +50614,7 @@
    "id": "t08436",
    "topic": "No-Till and Reduced-Tillage Farming",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "no-till-and-reduced-tillage-farming"
   },
   {
    "id": "t08437",
@@ -55132,13 +55132,13 @@
    "id": "t09189",
    "topic": "Early Film Movements: German Expressionism and Soviet Montage",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "early-film-movements-german-expressionism-and-soviet-montage"
   },
   {
    "id": "t09190",
    "topic": "The Hollywood Studio System and the Golden Age of Film",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "the-hollywood-studio-system-and-the-golden-age-of-film"
   },
   {
    "id": "t09191",
@@ -81310,7 +81310,7 @@
    "id": "t13552",
    "topic": "Torque and Rotational Equilibrium",
    "category": "Physics",
-   "guideId": null
+   "guideId": "torque-and-rotational-equilibrium"
   },
   {
    "id": "t13553",
@@ -82828,7 +82828,7 @@
    "id": "t13805",
    "topic": "The Discovery of Uranus and Neptune",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "the-discovery-of-uranus-and-neptune"
   },
   {
    "id": "t13806",
@@ -87970,7 +87970,7 @@
    "id": "t14662",
    "topic": "Writing Unit Symbols and Numbers Correctly",
    "category": "Reference",
-   "guideId": null
+   "guideId": "writing-unit-symbols-and-numbers-correctly"
   },
   {
    "id": "t14663",
@@ -90208,7 +90208,7 @@
    "id": "t15035",
    "topic": "Choosing and Using a Cordless Drill Driver",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "choosing-and-using-a-cordless-drill-driver"
   },
   {
    "id": "t15036",
@@ -90226,7 +90226,7 @@
    "id": "t15038",
    "topic": "Using a Jigsaw for Curves and Cutouts",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "using-a-jigsaw-for-curves-and-cutouts"
   },
   {
    "id": "t15039",
@@ -94540,13 +94540,13 @@
    "id": "t15757",
    "topic": "Softwoods and Their Workshop Uses",
    "category": "Making",
-   "guideId": null
+   "guideId": "softwoods-and-their-workshop-uses"
   },
   {
    "id": "t15758",
    "topic": "Timber Defects: Knots, Shakes and Checks",
    "category": "Making",
-   "guideId": null
+   "guideId": "timber-defects-knots-shakes-and-checks"
   },
   {
    "id": "t15759",
@@ -98848,7 +98848,7 @@
    "id": "t16475",
    "topic": "Testing Demand Before You Build",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "testing-demand-before-you-build"
   },
   {
    "id": "t16476",
@@ -104632,13 +104632,13 @@
    "id": "t17439",
    "topic": "Shifts Versus Movements Along a Curve",
    "category": "Economics",
-   "guideId": null
+   "guideId": "shifts-versus-movements-along-a-curve"
   },
   {
    "id": "t17440",
    "topic": "Comparative Statics in Supply and Demand",
    "category": "Economics",
-   "guideId": null
+   "guideId": "comparative-statics-in-supply-and-demand"
   },
   {
    "id": "t17441",
@@ -107506,13 +107506,13 @@
    "id": "t17918",
    "topic": "Proactive and Retroactive Interference",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "proactive-and-retroactive-interference"
   },
   {
    "id": "t17919",
    "topic": "Retrieval Cues and Context-Dependent Memory",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "retrieval-cues-and-context-dependent-memory"
   },
   {
    "id": "t17920",
@@ -110380,13 +110380,13 @@
    "id": "t18397",
    "topic": "Bacterial Spores and Why They Survive Cooking",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "bacterial-spores-and-why-they-survive-cooking"
   },
   {
    "id": "t18398",
    "topic": "D-Values, Z-Values and Log Reduction",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "d-values-z-values-and-log-reduction"
   },
   {
    "id": "t18399",
@@ -116812,13 +116812,13 @@
    "id": "t19469",
    "topic": "Carryover Cooking and Resting Meat",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "carryover-cooking-and-resting-meat"
   },
   {
    "id": "t19470",
    "topic": "Reading and Calibrating Kitchen Thermometers",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "reading-and-calibrating-kitchen-thermometers"
   },
   {
    "id": "t19471",
@@ -120334,7 +120334,7 @@
    "id": "t20056",
    "topic": "Shogi Openings: Static and Ranging Rook",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "shogi-openings-static-and-ranging-rook"
   },
   {
    "id": "t20057",
@@ -120346,7 +120346,7 @@
    "id": "t20058",
    "topic": "Xiangqi: Chinese Chess Explained",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "xiangqi-chinese-chess-explained"
   },
   {
    "id": "t20059",
@@ -133702,13 +133702,13 @@
    "id": "t22284",
    "topic": "Sizing a Shelter to Your Body",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "sizing-a-shelter-to-your-body"
   },
   {
    "id": "t22285",
    "topic": "Water Proximity Versus Camp Safety",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "water-proximity-versus-camp-safety"
   },
   {
    "id": "t22286",
@@ -134836,13 +134836,13 @@
    "id": "t22473",
    "topic": "Immediate Actions in the First Hour",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "immediate-actions-in-the-first-hour"
   },
   {
    "id": "t22474",
    "topic": "Survival Mode Versus Mission Mode",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "survival-mode-versus-mission-mode"
   },
   {
    "id": "t22475",
@@ -135976,7 +135976,7 @@
    "id": "t22663",
    "topic": "Dam Failure Modes and Inundation Zones",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "dam-failure-modes-and-inundation-zones"
   },
   {
    "id": "t22664",
@@ -135988,7 +135988,7 @@
    "id": "t22665",
    "topic": "Ice Jam Flooding on Northern Rivers",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "ice-jam-flooding-on-northern-rivers"
   },
   {
    "id": "t22666",
@@ -139612,7 +139612,7 @@
    "id": "t23269",
    "topic": "Reading the Margin of a Topographic Map",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "reading-the-margin-of-a-topographic-map"
   },
   {
    "id": "t23270",
@@ -141016,7 +141016,7 @@
    "id": "t23503",
    "topic": "Descending Steep Trails Without Injury",
    "category": "Movement",
-   "guideId": null
+   "guideId": "descending-steep-trails-without-injury"
   },
   {
    "id": "t23504",
@@ -142408,7 +142408,7 @@
    "id": "t23735",
    "topic": "Mapping Hazards Around Your Home Address",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "mapping-hazards-around-your-home-address"
   },
   {
    "id": "t23736",
