@@ -125,7 +125,7 @@ class SensoriumService : Service() {
                 level = Sensorium.level(
                     previous = level,
                     batteryPct = device.batteryPct,
-                    charging = device.charging,
+                    charging = device.isCharging,
                     powerSave = pm.isPowerSaveMode,
                     screenOffMinutes = screenOffMin,
                     movement = c.sensorFusion.snapshot.value.movement,
