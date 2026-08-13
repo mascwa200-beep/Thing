@@ -58,7 +58,7 @@
    "id": "t00010",
    "topic": "The Endoplasmic Reticulum",
    "category": "Biology",
-   "guideId": null
+   "guideId": "the-endoplasmic-reticulum"
   },
   {
    "id": "t00011",
@@ -3028,13 +3028,13 @@
    "id": "t00505",
    "topic": "Ecosystem Ecology and Energy Flow",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "ecosystem-ecology-and-energy-flow"
   },
   {
    "id": "t00506",
    "topic": "Landscape Ecology",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "landscape-ecology"
   },
   {
    "id": "t00507",
@@ -4318,7 +4318,7 @@
    "id": "t00720",
    "topic": "Partial Pressures and Dalton's Law",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "partial-pressures-and-dalton-s-law"
   },
   {
    "id": "t00721",
@@ -7636,13 +7636,13 @@
    "id": "t01273",
    "topic": "History of the Personal Computer",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-the-personal-computer"
   },
   {
    "id": "t01274",
    "topic": "The Home Computer Era",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-home-computer-era"
   },
   {
    "id": "t01275",
@@ -11740,13 +11740,13 @@
    "id": "t01957",
    "topic": "Clay Minerals and Their Uses",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "clay-minerals-and-their-uses"
   },
   {
    "id": "t01958",
    "topic": "Native Elements — Gold, Copper and Sulfur",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "native-elements-gold-copper-and-sulfur"
   },
   {
    "id": "t01959",
@@ -13174,13 +13174,13 @@
    "id": "t02196",
    "topic": "Ice Cores and the Climate Record",
    "category": "Climate",
-   "guideId": null
+   "guideId": "ice-cores-and-the-climate-record"
   },
   {
    "id": "t02197",
    "topic": "Milankovitch Cycles and Orbital Forcing",
    "category": "Climate",
-   "guideId": null
+   "guideId": "milankovitch-cycles-and-orbital-forcing"
   },
   {
    "id": "t02198",
@@ -15010,13 +15010,13 @@
    "id": "t02502",
    "topic": "Engineering economics and cost estimating",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "engineering-economics-and-cost-estimating"
   },
   {
    "id": "t02503",
    "topic": "Engineering drawing and technical drafting",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "engineering-drawing-and-technical-drafting"
   },
   {
    "id": "t02504",
@@ -17002,13 +17002,13 @@
    "id": "t02834",
    "topic": "Transformers",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "transformers"
   },
   {
    "id": "t02835",
    "topic": "Electric power transmission",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "electric-power-transmission"
   },
   {
    "id": "t02836",
@@ -18262,7 +18262,7 @@
    "id": "t03044",
    "topic": "Geography of the Central African Republic",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-the-central-african-republic"
   },
   {
    "id": "t03045",
@@ -23326,7 +23326,7 @@
    "id": "t03888",
    "topic": "Relative Dating Methods in Archaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "relative-dating-methods-in-archaeology"
   },
   {
    "id": "t03889",
@@ -24292,7 +24292,7 @@
    "id": "t04049",
    "topic": "The History of Timekeeping and Calendars",
    "category": "History",
-   "guideId": null
+   "guideId": "the-history-of-timekeeping-and-calendars"
   },
   {
    "id": "t04050",
@@ -38824,7 +38824,7 @@
    "id": "t06471",
    "topic": "Prostate Health and Screening",
    "category": "Health",
-   "guideId": null
+   "guideId": "prostate-health-and-screening"
   },
   {
    "id": "t06472",
@@ -50608,7 +50608,7 @@
    "id": "t08435",
    "topic": "Crop Rotation Planning and Systems",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "crop-rotation-planning-and-systems"
   },
   {
    "id": "t08436",
@@ -82822,7 +82822,7 @@
    "id": "t13804",
    "topic": "The Copernican Revolution",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "the-copernican-revolution"
   },
   {
    "id": "t13805",
@@ -90220,7 +90220,7 @@
    "id": "t15037",
    "topic": "Circular Saw Setup and Safe Technique",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "circular-saw-setup-and-safe-technique"
   },
   {
    "id": "t15038",
@@ -98842,7 +98842,7 @@
    "id": "t16474",
    "topic": "Building a Minimum Viable Product",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "building-a-minimum-viable-product"
   },
   {
    "id": "t16475",
@@ -104620,13 +104620,13 @@
    "id": "t17437",
    "topic": "The Law of Supply and the Supply Curve",
    "category": "Economics",
-   "guideId": null
+   "guideId": "the-law-of-supply-and-the-supply-curve"
   },
   {
    "id": "t17438",
    "topic": "Market Equilibrium and How Prices Clear",
    "category": "Economics",
-   "guideId": null
+   "guideId": "market-equilibrium-and-how-prices-clear"
   },
   {
    "id": "t17439",
@@ -107494,13 +107494,13 @@
    "id": "t17916",
    "topic": "Memory Consolidation During Sleep",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "memory-consolidation-during-sleep"
   },
   {
    "id": "t17917",
    "topic": "The Forgetting Curve and Memory Decay",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "the-forgetting-curve-and-memory-decay"
   },
   {
    "id": "t17918",
@@ -110368,13 +110368,13 @@
    "id": "t18395",
    "topic": "pH and Acidity in Food Safety",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "ph-and-acidity-in-food-safety"
   },
   {
    "id": "t18396",
    "topic": "Acidified Foods and Safe pH Limits",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "acidified-foods-and-safe-ph-limits"
   },
   {
    "id": "t18397",
@@ -116800,13 +116800,13 @@
    "id": "t19467",
    "topic": "The Fifteen Classical Cooking Methods Compared",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "the-fifteen-classical-cooking-methods-compared"
   },
   {
    "id": "t19468",
    "topic": "Thermal Mass and Pan Recovery Time",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "thermal-mass-and-pan-recovery-time"
   },
   {
    "id": "t19469",
@@ -120340,7 +120340,7 @@
    "id": "t20057",
    "topic": "Tsume Shogi and Japanese Chess Problems",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "tsume-shogi-and-japanese-chess-problems"
   },
   {
    "id": "t20058",
@@ -133690,13 +133690,13 @@
    "id": "t22282",
    "topic": "Using Terrain for Wind Protection",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "using-terrain-for-wind-protection"
   },
   {
    "id": "t22283",
    "topic": "Slope Aspect and Solar Warmth",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "slope-aspect-and-solar-warmth"
   },
   {
    "id": "t22284",
@@ -134824,13 +134824,13 @@
    "id": "t22471",
    "topic": "The Ten Cs Kit Doctrine",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "the-ten-cs-kit-doctrine"
   },
   {
    "id": "t22472",
    "topic": "Adapting Survival Priorities to Environment",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "adapting-survival-priorities-to-environment"
   },
   {
    "id": "t22473",
@@ -135982,7 +135982,7 @@
    "id": "t22664",
    "topic": "Levee Breach Behavior and Warning Time",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "levee-breach-behavior-and-warning-time"
   },
   {
    "id": "t22665",
