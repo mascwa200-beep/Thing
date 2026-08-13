@@ -68,10 +68,8 @@ class SensoriumService : Service() {
             return START_NOT_STICKY
         }
         val c = container ?: run { stopSelf(); return START_NOT_STICKY }
-        if (!c.settingsRepository.current().sensing.enabled) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        // The enabled-toggle is enforced by every caller AND by the loop's first iteration (settings
+        // reads are suspend, so a disabled sticky-restart runs one instant heartbeat and stops).
 
         val foregroundLaunch = intent?.getBooleanExtra(EXTRA_FOREGROUND, false) == true
         val wantMic = foregroundLaunch && hasPermission(Manifest.permission.RECORD_AUDIO)

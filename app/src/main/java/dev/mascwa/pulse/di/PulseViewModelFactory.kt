@@ -109,6 +109,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
                 dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sensorium.SensoriumViewModel::class.java) ->
+                dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T
