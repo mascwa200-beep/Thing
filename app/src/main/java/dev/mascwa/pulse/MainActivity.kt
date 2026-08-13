@@ -110,6 +110,14 @@ class MainActivity : ComponentActivity() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(this@MainActivity) }
                 }
+                // Sensorium: a FOREGROUND launch is the one context that can arm the mic/camera FGS
+                // types (Android's while-in-use law) — re-call on every activity start so a service
+                // that booted on the standby path upgrades to fully armed the moment the app opens.
+                if (settings.sensing.enabled) {
+                    runCatching {
+                        dev.mascwa.pulse.data.sensing.SensoriumService.start(this@MainActivity, foregroundLaunch = true)
+                    }
+                }
                 // Same treatment for the remote link, so the desk computer can reach the phone again after
                 // a cold launch without anyone having to re-flip the switch.
                 if (settings.remote.enabled) {
@@ -233,6 +241,15 @@ class MainActivity : ComponentActivity() {
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Catch a build that turned green while the app was backgrounded — prompt the install on return.
         maybeAutoUpdate()
+        // Sensorium arming: every return to foreground is a legal moment to (re)arm the mic/camera
+        // FGS types — a service revived on the standby path since the last open upgrades right here.
+        lifecycleScope.launch {
+            runCatching {
+                if (app.container.settingsRepository.current().sensing.enabled) {
+                    dev.mascwa.pulse.data.sensing.SensoriumService.start(this@MainActivity, foregroundLaunch = true)
+                }
+            }
+        }
     }
 
     override fun onStop() {
@@ -250,6 +267,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
             runCatching { app.container.securityAuditStore.flushNow() }
+            runCatching { app.container.sensoriumStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

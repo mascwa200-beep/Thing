@@ -30,6 +30,15 @@ class RefreshWorker(
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
 
+        // Sensorium self-heal — BEFORE the notification gates (service liveness isn't a notification
+        // preference). A background FGS start can be refused by the OS; then the next app-open arms
+        // it ("Unrestricted battery" is the owner-setup step that makes this reliably succeed).
+        if (settings.sensing.enabled) {
+            runCatching {
+                dev.mascwa.pulse.data.sensing.SensoriumService.start(applicationContext, foregroundLaunch = false)
+            }
+        }
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 

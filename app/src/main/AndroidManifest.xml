@@ -295,6 +295,19 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <!-- Sensorium ambient environment sensing. The UPGRADEABLE service: background starts use
+             specialUse only (dataSync is the API 31-33 fallback); a foreground app-open re-invokes
+             startForeground adding microphone|camera, which then persist for the service's life.
+             Classify-then-discard — labels only, nothing raw persisted or transmitted. -->
+        <service
+            android:name=".data.sensing.SensoriumService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|dataSync|microphone|camera">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="ambient_environment_sensing" />
+        </service>
+
         <!--
             LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the
             service must never be startable by another app on the device. Its inbound surface is the TCP

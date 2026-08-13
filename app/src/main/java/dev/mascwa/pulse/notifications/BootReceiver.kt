@@ -41,6 +41,11 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings.jarvis.vitalsTracking) {
                     runCatching { dev.mascwa.pulse.jarvis.vitals.VitalsTrackingService.start(context) }
                 }
+                // Sensorium standby: from boot only the special-use type is legal, so this start runs
+                // the type-free core (sensors/radio/baseline); mic/camera arm on the next app-open.
+                if (settings.sensing.enabled) {
+                    runCatching { dev.mascwa.pulse.data.sensing.SensoriumService.start(context, foregroundLaunch = false) }
+                }
                 // Same rule for the remote link: revived only if the user left it switched on, so a
                 // reboot doesn't quietly leave the desk computer unable to reach the phone. Turning the
                 // switch off keeps it off.

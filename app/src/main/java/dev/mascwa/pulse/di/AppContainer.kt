@@ -315,6 +315,21 @@ class AppContainer(private val appContext: Context) {
     val sensorFusion: dev.mascwa.pulse.data.sensing.SensorFusionController by lazy {
         dev.mascwa.pulse.data.sensing.SensorFusionController(appContext)
     }
+
+    /** Learned normality + the 48 h event log (baseline must survive restarts or anomaly detection
+     *  restarts amnesiac). */
+    val sensoriumStore: dev.mascwa.pulse.data.sensing.SensoriumStore by lazy {
+        dev.mascwa.pulse.data.sensing.SensoriumStore(appContext, json)
+    }
+
+    /** The Sensorium's conductor: fuses sampler output each heartbeat, learns the baseline, extracts
+     *  events, dispatches alerts/memories. Driven by [dev.mascwa.pulse.data.sensing.SensoriumService]. */
+    val sensoriumEngine: dev.mascwa.pulse.data.sensing.SensoriumEngine by lazy {
+        dev.mascwa.pulse.data.sensing.SensoriumEngine(
+            sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
+            memoryStream, notifier, settingsRepository,
+        )
+    }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
      *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
     val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {
