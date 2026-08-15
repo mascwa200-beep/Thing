@@ -265,6 +265,36 @@ object WeatherComfort {
         return fog
     }
 
+    /**
+     * The same reading as [headline], compressed to a fragment for a dense surface.
+     *
+     * A notification row joins its parts with separators and has one line to work with, so the
+     * advice sentence has to go; what survives is the number and the word for how bad it is. Heat
+     * outranks cold because a person can be in both ranges in one day only by travelling.
+     *
+     * Null whenever neither index applies, which is most of the year — the caller adds nothing
+     * rather than padding the row.
+     */
+    fun compactFeelsLike(
+        temperatureC: Double?,
+        humidityPercent: Double?,
+        windKmh: Double?,
+        unitSymbol: String = "°C",
+    ): String? {
+        if (temperatureC == null) return null
+        val heat = humidityPercent?.let { heatIndexC(temperatureC, it) }
+        val risk = heatRisk(heat)
+        if (heat != null && risk != HeatRisk.NONE) {
+            return "Feels ${display(heat, unitSymbol)} — ${risk.label.lowercase()}"
+        }
+        val chill = windKmh?.let { windChillC(temperatureC, it) }
+        // A degree or two below the air is not worth the space; the wind has to be doing real work.
+        if (chill != null && chill <= temperatureC - 3.0) {
+            return "Feels ${display(chill, unitSymbol)} in wind"
+        }
+        return null
+    }
+
     /** Celsius in, whatever the user reads out — the indices are defined in Celsius. */
     private fun display(valueC: Double, unitSymbol: String): String {
         val v = if (unitSymbol.contains("F")) valueC * 9.0 / 5.0 + 32.0 else valueC
