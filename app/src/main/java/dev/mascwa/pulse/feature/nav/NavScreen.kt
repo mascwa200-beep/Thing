@@ -153,8 +153,13 @@ private const val QUAKE_SOURCE = "nav-quake"
 private const val QUAKE_LAYER = "nav-quake-heat"
 private const val TRACK_SOURCE = "nav-track"
 private const val TRACK_LAYER = "nav-track-line"
+private const val MEASURE_SOURCE = "nav-measure"
+private const val MEASURE_LINE_LAYER = "nav-measure-line"
+private const val MEASURE_DOT_LAYER = "nav-measure-dot"
 /** The trail behind you: a cool violet, distinct from the gold route ahead of you. */
 private val TRACK_LINE = Color(0xFFB061FF)
+/** The measuring line: a hot magenta that belongs to no other layer. */
+private val MEASURE_LINE = Color(0xFFFF3864)
 /** TileJSON version every hand-built TileSet declares; the spec requires the field. */
 private const val TILEJSON_VERSION = "2.2.0"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
@@ -231,6 +236,10 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val profile by vm.profile.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
     var posFormat by remember { mutableStateOf(PositionFormat.DECIMAL) }
+    // Measuring is a mode rather than a gesture: while it is on, a tap adds a corner to the chain
+    // instead of selecting whatever happens to be under your finger.
+    var measuring by remember { mutableStateOf(false) }
+    var measurePoints by remember { mutableStateOf(listOf<Pair<Double, Double>>()) }
     var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -277,6 +286,10 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) follow = false
             }
             ml.addOnMapClickListener { latLng ->
+                if (measuring) {
+                    measurePoints = measurePoints + (latLng.latitude to latLng.longitude)
+                    return@addOnMapClickListener true
+                }
                 val pt = ml.projection.toScreenLocation(latLng)
                 // Objective icons are the user's own pins — they take tap priority over POIs.
                 val objId = ml.queryRenderedFeatures(pt, OBJECTIVE_LAYER).firstOrNull()?.getStringProperty("id")
@@ -404,6 +417,11 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(quakes, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(QUAKE_SOURCE)?.setGeoJson(quakeGeoJson(quakes))
+    }
+
+    LaunchedEffect(measurePoints, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(MEASURE_SOURCE)?.setGeoJson(measureGeoJson(measurePoints))
     }
 
     LaunchedEffect(trackPoints, map, styleReady) {
@@ -550,6 +568,12 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     }
                     MapControlButton(active = night, c = c, label = "☾") { vm.setNight(!night) }
                     MapControlButton(active = layersOpen, c = c, label = "▤") { layersOpen = !layersOpen }
+                    MapControlButton(active = measuring, c = c, label = "⇔") {
+                        measuring = !measuring
+                        // Leaving the mode clears the chain: a measurement left lying on the map
+                        // after you have moved on is just clutter you have to remember to dismiss.
+                        if (!measuring) measurePoints = emptyList()
+                    }
                     if (activeWaypoint != null) {
                         MapControlButton(active = false, c = c, icon = LcarsIcons.Close) { vm.clearWaypoint() }
                     }
@@ -560,6 +584,14 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (measuring) {
+                        MeasureReadout(
+                            points = measurePoints,
+                            c = c,
+                            onUndo = { measurePoints = measurePoints.dropLast(1) },
+                            onClear = { measurePoints = emptyList() },
+                        )
+                    }
                     // What the road ahead climbs, once the route and its heights are known.
                     profile?.let { ElevationProfile(profile = it, c = c) }
                     // Live navigation readout — distance + driving ETA + turn arrow to the active objective.
@@ -654,6 +686,7 @@ private fun installNavStyle(ml: MapLibreMap, c: NightwirePalette, onReady: () ->
         addNightLayer(style)
         addSeismicLayer(style)
         addTrackLayer(style)
+        addMeasureLayer(style)
         addRouteLayer(style)
         addPoiLayer(style, c)
         addIncidentLayer(style, c)
@@ -1057,6 +1090,56 @@ private fun applyRain(style: Style, frame: RainViewerRepository.RadarFrame?) {
     // Above the ground, below the things you navigate by: rain should not hide your own route.
     if (style.getLayer(ROUTE_CASING_LAYER) != null) style.addLayerBelow(rain, ROUTE_CASING_LAYER)
     else style.addLayer(rain)
+}
+
+/**
+ * The measuring line: a chain of tapped points with a dot at each corner.
+ *
+ * Drawn above everything else this screen owns, because while you are measuring it is the thing
+ * you are looking at.
+ */
+private fun addMeasureLayer(style: Style) {
+    if (style.getSource(MEASURE_SOURCE) != null) return
+    style.addSource(GeoJsonSource(MEASURE_SOURCE))
+    style.addLayer(
+        LineLayer(MEASURE_LINE_LAYER, MEASURE_SOURCE).withProperties(
+            PropertyFactory.lineColor(MEASURE_LINE.toArgb()),
+            PropertyFactory.lineWidth(2.5f),
+            PropertyFactory.lineDasharray(arrayOf(2.5f, 1.5f)),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+        ),
+    )
+    style.addLayer(
+        CircleLayer(MEASURE_DOT_LAYER, MEASURE_SOURCE).withProperties(
+            PropertyFactory.circleRadius(4.5f),
+            PropertyFactory.circleColor(MEASURE_LINE.toArgb()),
+            PropertyFactory.circleStrokeWidth(1.5f),
+            PropertyFactory.circleStrokeColor(LAND.toArgb()),
+        ),
+    )
+}
+
+/**
+ * The measuring chain as both a line and its corner points.
+ *
+ * A LineString alone would draw the line with nothing at the corners, and a circle layer over a
+ * LineString draws nothing at all — a circle layer needs point geometry. So the collection carries
+ * both, and each layer picks up the geometry it can render.
+ */
+private fun measureGeoJson(points: List<Pair<Double, Double>>): String {
+    if (points.isEmpty()) return EMPTY_FC
+    val features = StringBuilder()
+    points.forEachIndexed { i, (lat, lon) ->
+        if (i > 0) features.append(',')
+        features.append("{\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Point\"," +
+            "\"coordinates\":[").append(lon).append(',').append(lat).append("]}}")
+    }
+    if (points.size >= 2) {
+        val line = points.joinToString(",") { (lat, lon) -> "[$lon,$lat]" }
+        features.append(",{\"type\":\"Feature\",\"properties\":{},\"geometry\":" +
+            "{\"type\":\"LineString\",\"coordinates\":[$line]}}")
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
 
 /**
@@ -1467,7 +1550,14 @@ private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePa
                     color = c.ink, maxLines = 1,
                 )
                 Text(
-                    readout.distanceText + " · " + (readout.etaText ?: "direct"),
+                    // The arrow says which way to turn; this says how far round. Both come from
+                    // NavGuidance, which has been able to phrase it since it was written and was
+                    // only ever asked for the glyph.
+                    buildList {
+                        add(readout.distanceText)
+                        add(readout.etaText ?: "direct")
+                        NavGuidance.turnHint(readout.bearingDeg, heading.toDouble())?.let { add(it) }
+                    }.joinToString(" · "),
                     fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.sky,
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -2044,6 +2134,73 @@ private fun ElevationProfile(profile: RouteElevation, c: NightwirePalette) {
             valueFormat = { "${it.roundToInt()}" },
             xFormat = { Geo.formatDistance(it.toDouble()) },
         )
+    }
+}
+
+/**
+ * The measuring readout: how long the chain is, and which way its ends lie.
+ *
+ * Distances are great-circle, so a chain drawn across a continent is the real distance rather than
+ * the length of the line as projected on screen — which at high latitudes are very different
+ * numbers.
+ */
+@Composable
+private fun MeasureReadout(
+    points: List<Pair<Double, Double>>,
+    c: NightwirePalette,
+    onUndo: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
+    val total = remember(points) {
+        var sum = 0.0
+        for (i in 1 until points.size) {
+            sum += Geodesy.distanceMeters(
+                points[i - 1].first, points[i - 1].second, points[i].first, points[i].second,
+            )
+        }
+        sum
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.panel.copy(alpha = 0.93f))
+            .border(1.dp, MEASURE_LINE.copy(alpha = 0.8f), shape)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("MEASURE", fontFamily = ChakraPetch, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MEASURE_LINE)
+            Text(
+                when {
+                    points.isEmpty() -> "Tap the map to start"
+                    points.size == 1 -> "Tap again to measure from here"
+                    else -> {
+                        val bearing = Geodesy.initialBearing(
+                            points.first().first, points.first().second,
+                            points.last().first, points.last().second,
+                        )
+                        "${Geo.formatDistance(total)} · ${bearing.roundToInt()}° ${Geodesy.cardinal(bearing)} · " +
+                            "${points.size - 1} leg${if (points.size == 2) "" else "s"}"
+                    }
+                },
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        if (points.isNotEmpty()) {
+            Text(
+                "UNDO",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                modifier = Modifier.clickable(onClick = onUndo).padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+            Text(
+                "CLEAR",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
     }
 }
 
