@@ -91,7 +91,6 @@ fun PulseApp(
             dev.mascwa.pulse.feature.common.LcarsNavBar(
                 TOP_DESTINATIONS.map { dest ->
                     dev.mascwa.pulse.feature.common.LcarsNavItem(
-                        key = dest.route,
                         label = dest.label,
                         icon = if (currentRoute == dest.route) dest.selectedIcon else dest.unselectedIcon,
                         selected = currentRoute == dest.route,

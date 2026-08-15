@@ -583,7 +583,6 @@ fun LcarsSegmentBar(
  * not depend on the app's route table.
  */
 data class LcarsNavItem(
-    val key: String,
     val label: String,
     val icon: ImageVector,
     val selected: Boolean,
@@ -636,7 +635,9 @@ fun LcarsNavBar(
         )
         items.forEachIndexed { i, item ->
             val last = i == items.lastIndex
-            val tint = if (item.selected) c.accent else blocks[(i + 2) % blocks.size]
+            // Offset into the palette so the first tab is not the same orange as the corner stub
+            // beside it — two identical blocks touching read as one wide block.
+            val tint = if (item.selected) c.accent else blocks[(i + HUE_OFFSET) % blocks.size]
             Column(
                 Modifier
                     .weight(1f)
@@ -680,5 +681,6 @@ fun LcarsNavBar(
     }
 }
 
+private const val HUE_OFFSET = 2
 private val NavBarHeight = 52.dp
 private val NavIconSize = 17.dp
