@@ -28,6 +28,18 @@ object WeatherComfort {
     const val HEAT_INDEX_MIN_F = 80.0
 
     /**
+     * The top of the published heat-index chart, in Fahrenheit.
+     *
+     * The Rothfusz regression is a curve fit, and pushed past the table it was fitted to it keeps
+     * climbing: 41 °C at 70% humidity comes out as an apparent 77 °C. That combination is barely
+     * physical — its dew point exceeds anything reliably recorded on Earth — but a sensor glitch
+     * or a bad parse can produce it, and "feels like 77 °C" printed on a card is worse than useless.
+     * Clamped here, which changes nothing inside the chart and keeps the top band honest: past this
+     * point the answer is "off the scale", not a number.
+     */
+    const val HEAT_INDEX_MAX_F = 137.0
+
+    /**
      * Apparent temperature in heat, degrees Celsius, or null when it is not hot enough to matter.
      *
      * The NWS Rothfusz regression, including both of its documented corrections: very dry air is
@@ -53,7 +65,7 @@ object WeatherComfort {
         } else if (r > 85.0 && t in 80.0..87.0) {
             hi += ((r - 85.0) / 10.0) * ((87.0 - t) / 5.0)
         }
-        return (hi - 32.0) * 5.0 / 9.0
+        return (hi.coerceAtMost(HEAT_INDEX_MAX_F) - 32.0) * 5.0 / 9.0
     }
 
     /** How dangerous the heat is, on the NWS bands. */

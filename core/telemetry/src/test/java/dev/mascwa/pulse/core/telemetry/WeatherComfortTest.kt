@@ -173,4 +173,16 @@ class WeatherComfortTest {
         // Fahrenheit readers get Fahrenheit.
         assertTrue(WeatherComfort.headline(35.0, 70.0, 5.0, unitSymbol = "°F")!!.contains("°F"))
     }
+
+    @Test fun theHeatIndexIsClampedToTheTopOfThePublishedChart() {
+        // The Rothfusz regression is a curve fit and keeps climbing outside the table it was fitted
+        // to: 41 C at 70% humidity comes out of the raw polynomial as an apparent 77 C. That input
+        // is barely physical, but a bad parse or a stuck sensor can produce it, and printing "feels
+        // like 77" would be worse than saying nothing. 137 F is the top of the NWS chart.
+        val saturated = WeatherComfort.heatIndexC(41.0, 70.0)!!
+        assertEquals((WeatherComfort.HEAT_INDEX_MAX_F - 32.0) * 5.0 / 9.0, saturated, 1e-9)
+        assertEquals(WeatherComfort.HeatRisk.EXTREME_DANGER, WeatherComfort.heatRisk(saturated))
+        // Inside the chart nothing moves: this is the value the earlier tests already pin.
+        assertEquals(40.6754, WeatherComfort.heatIndexC(35.0, 50.0)!!, 0.001)
+    }
 }

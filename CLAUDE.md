@@ -2504,6 +2504,72 @@ the breadcrumb trail. CI green through `4a5735b` (run 1537); the rest was pushed
   landuse into the base colour; `nav3d` only tilts; declination computed at altitude 0.0 (verified
   real, judged cosmetic — the WMM barely moves over normal altitudes); no `onSaveInstanceState`.
 
+### WEATHER — rebuilt to the MAPS & SKY standard (this session, PR #427)
+
+MAPS & SKY was merged (`e4db2b6`, PR #426); owner then said *"keep going autonomously"* and chose,
+via AskUserQuestion, **full rebuild** for WEATHER and **"keep building, I'll verify in batches"**
+for the on-device backlog. The credit directive still overrides ultracode: **zero subagent spend
+this whole run** — every check was local kotlinc + JUnit, a live endpoint probe, or CI.
+
+**The tab was asking for eleven fields and being handed far more, for free.** One probe showed the
+same round trip already returns wind gusts, dew point, visibility, CAPE, hourly UV and apparent
+temperature, precipitation hours, sunshine and daylight duration and the snow/shower split — and,
+on the air endpoint, every pollutant the two indices are computed from plus pollen. All of it was
+being parsed away. That, not a redesign, is what made the rebuild worth doing.
+
+Shipped as six commits, each CI-gated: `79d1ddb` comfort core, `cf8c679` canonical units,
+`7edf0cb` sub-tab shell, `88f31d9` NOW, `6b0e3a5` air-quality core + data, `b720e3b` charts + AIR,
+`2f8534e` LCARS chrome.
+
+- **`WeatherComfort`** (16 tests) — NWS heat index with both corrections, JAG/TI wind chill,
+  Magnus-Tetens dew point, humidex, Beaufort, fog/frost, UV burn time, CAPE. **Every index returns
+  null outside the range it is fitted for**, and that gating is the feature: a mild, clear, still
+  day shows the plain temperature and nothing else, by design and not by omission.
+- **`WeatherUnits`** (8 tests) — the indices are defined in Celsius and km/h; the fields arrive in
+  whatever unit the user reads. Converted once in `loadForecast` where the settings enums are in
+  hand, carried as canonical companions beside the display values, which are untouched because
+  half a dozen consumers read them. **⚠️ `visibility` switches to FEET under an imperial request** —
+  25240.0 metric against 82808.4 imperial for the same place and moment, exactly 3.28084 apart —
+  which the provider's own documentation denies. Pinned by a test.
+- **`AirQualityGuide`** (9 tests) — each pollutant against its WHO 2021 guideline as a **ratio**,
+  and the driver is the one furthest above **its own** line. 60 µg/m³ of ozone is an ordinary
+  afternoon and 60 of PM2.5 is smoke; carbon monoxide is numerically enormous and unremarkable, and
+  a concentration-sorted list would name it every time. Each pollutant carries the **averaging
+  period** its guideline is stated over, because ozone's is an 8-hour daily maximum where the rest
+  are 24-hour. **Pollen is null outside Europe** — probed, not assumed — so absent species are
+  dropped rather than carried as noughts that would read as a measurement. Both index scales are
+  computed everywhere and disagree (London 30/29, New York 39/69 at the same moment).
+- **Four sub-tabs** NOW · HOURS · DAYS · AIR on the Markets pattern. Only the rail is fixed; the
+  shared chrome is a `LazyListScope.weatherHeader` extension each body calls, so it scrolls exactly
+  as the single page did and the location picker stays reachable from all four.
+- **Charts** reuse `LcarsTimeChart`: air against apparent temperature (the gap *is* the reading),
+  gusts over mean wind, UV pinned by its bands so a winter reading sits flat rather than stretched,
+  the week's range, sunshine against the daylight envelope, and hours of rain as a histogram.
+
+**Bugs found by running things, not by reading them:**
+- **`kotlin.math.round` is `Math.rint`** — banker's rounding. 1.45 km printed "1.4" while 1.55
+  printed "1.6", a displayed number changing direction with the parity of the digit before it.
+  Half-up now, both ties pinned.
+- **Four test expectations I had guessed wrong where the CODE was right** — humidex break-even,
+  heat index at 35 °C/50%, and a geodesic degree (I reached for the WGS-84 meridional 11,057 m;
+  `Geodesy` is spherical haversine, 11,119.5 m). Anchor to the table the regression *defines*. I
+  also dropped a wind-chill "published table" assertion I could not source rather than dress a
+  recollection as validation.
+- **43 default-locale `format` calls swept — no bug found.** All compute both sides in one call.
+  Deliberately did not churn 43 call sites to make a point.
+
+**Verification worth reusing:** after shipping, both built URLs were probed live and every charted
+field confirmed non-null (168/168 hourly, 7/7 daily), then the **real cores were run over the real
+response** — a throwaway `main` on the compiler classpath printing exactly what each card will say.
+That is much stronger than a unit test and costs nothing. London came back "Feels like 27 °C —
+caution", dew point Comfortable, gusts force 4, and AIR naming ozone at 76% of guideline.
+
+⚠️ **Render is owner-verify on the Pixel** — sub-tab switching, chart density at phone width, the
+second stat row's legibility, and the pollutant bars. CI compiles; it does not draw.
+
+**Open:** `SourceNote`, `LoadingState` and `ErrorState` still read `MaterialTheme` — shared
+composables whose call sites reach well beyond this screen, so left alone deliberately.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
