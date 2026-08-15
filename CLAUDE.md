@@ -2369,6 +2369,66 @@ surfaced **Everywhere**. Built as 6 CI-green slices:
   EYES ARMED in the scanner), the GrapheneOS indicator behaviour, a clap/alarm-sound ALERT test, the
   learned-normal line appearing after a day or two, battery drain at L0, and the boot-revival path.
 
+### MAPS & SKY overhaul — owner directive, in progress (this session, PR #426)
+Owner (with a MENU screenshot): *"Make each tab in Maps & Sky have each of it's internal features and
+visuals and information broadened and more of it with different types too. Just the tabs in Maps & Sky.
+It must be on the level of borderline creative obsession on the cusp of insanity."* Then, binding:
+*"keep going autonomously normally while ensuring enough credits to spare as to not hit the weekly
+limiter."* The KB wave engine is **PARKED** under that constraint (~5M subagent tokens a round — it is
+what tripped the limit four times); resuming it is an explicit owner call.
+
+**Operating mode that came out of it: zero subagent spend.** Every verification this run was free —
+local kotlinc + JUnit, live `curl` probes, and CI itself. The planned per-slice compile reviews were
+skipped deliberately: CI is a free compile gate, and every runtime bug worth catching was found by
+*running* code locally, which a review would not have done better.
+
+**Local verification recipe (proven, zero cost)** — `scratchpad/sky/run.sh`. kotlinc via
+`/opt/gradle-8.14.3/lib/kotlin-compiler-embeddable-2.0.21.jar` with `kotlin-stdlib` + `trove4j` +
+`annotations-24.0.1` + `kotlinx-coroutines-core-jvm` on the **compiler's own `-cp`** (the long-blamed
+"IR-lowering crash" was only ever a missing jar), JUnit 4.13.2 + hamcrest from the Gradle cache.
+Reference libraries installed locally and free: `pip install sgp4 skyfield` (+ DE421, which must go in
+the scratchpad — `*.bsp` is now gitignored after a 17 MB kernel landed in the repo root).
+
+**New pure cores, all locally executed** — `Geodesy` (great-circle + UTM/MGRS), `SolarActivity`,
+`HfPropagation`, `Sgp4` + `Tle` (WGS-72, matched to the Vallado reference, worst error 7 mm),
+`Ephemeris` (Meeus 47.A/B, checked against JPL DE421), `SatellitePasses`, `Cpa`. Plus the LCARS
+instrument kit (`feature/common/LcarsCharts.kt`: time chart, gauge, histogram, alt-az sky plot, meter).
+
+**Shipped and CI-green:** the **space-weather console** (`b33897f`, run 1526) — six instruments
+NOW · SUN · AURORA · STORMS · **RADIO** · ALERTS over the full SWPC suite that was being fetched and
+discarded; the X-ray chart is a log axis labelled with the class letters, because flare classes are
+decades. The **observatory** (`a06ac39`) — TONIGHT · SATELLITES · SKY CHART · SUN & MOON · ASTEROIDS ·
+LAUNCHES, with real pass prediction. `TleRepository` (Celestrak, 12 h cache, 2 h floor honoured even on
+a forced refresh) and `LaunchRepository` (Launch Library, keyless).
+
+**Bugs found by running things, each worth recording:**
+- **A pass search took 77 seconds on one satellite.** Benchmarking the real catalogue before wiring it
+  to a screen: 78 s over 175 objects, of which **77.1 s was COSMOS 1867** against a 4 ms median. A
+  satellite already up when the window opens has no rise, but the rise time kept its `0L` sentinel and
+  the next descent was paired with it — a pass from **1970 to now**, ~59 M sampling iterations. The ISS
+  *masked* it: propagating an ISS element set back 56 years fails, so the existing "only whole passes
+  are reported" test **passed for the wrong reason**. 78,494 ms → 807 ms. Lesson: a green test is not
+  evidence the guarded behaviour works.
+- **`HfPropagation.summary` contradicted `mufDisplay`** — one returned null with no solar data, the
+  other quoted a MUF off the quiet-Sun floor, and they render two lines apart.
+- **Tonight's geometry used UTC midnight**, so "today's sunset" was the wrong day away from Greenwich.
+- **The sky chart pinned the Sun due north** (the VM carried only its altitude).
+- **Default-locale `format`** in `Explainers.trimNum`, the quake label and the radar cache key — the
+  recurring trap; these strings are numbers, so Locale.US.
+- **SWPC deleted `products/solar-wind/` entirely**, so speed and Bz had been showing em dashes on the
+  device. Replaced by the propagated geospace product; background payload also cut ~596 KB → ~50 KB.
+
+**Honest scope cut:** the planned WINDS ALOFT sub-tab is **not buildable**. Probed both feeds live —
+**0 of 124 aircraft** carry `wd`/`ws`/`oat`/`tat` (they need Comm-B decoding no public aggregator
+exposes). Better find in its place: adsb.fi serves `ownOp`/`desc`/`year`, so the bundled airline table
+is largely unnecessary. The radar model now carries ~40 fields instead of 13 (autopilot intent, the
+feed's own emergency word, signal quality, mlat/tisb provenance, dbFlags, on-ground).
+
+⚠️ **Everything visual is owner-verify on the Pixel** — CI compile-gates only. Remaining: #89 radar
+sub-tabs, #90/#91 the map (basemap switcher, raster/hillshade/heatmap, instruments, and a long list of
+real defects catalogued in the plan file). **MapLibre has no true 3D terrain mesh at any version through
+13.5.0 — hillshade only; do not promise a mesh.**
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
