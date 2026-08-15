@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -77,6 +79,7 @@ import dev.mascwa.pulse.data.safety.Incident
 import dev.mascwa.pulse.data.safety.IncidentType
 import dev.mascwa.pulse.data.safety.Severity
 import dev.mascwa.pulse.data.weather.DeviceLocation
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.telemetry.Terminator
 import dev.mascwa.pulse.feature.common.LcarsCorner
@@ -217,6 +220,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val quakes by vm.quakes.collectAsState()
     val selectedIncident by vm.selectedIncident.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
+    var posFormat by remember { mutableStateOf(PositionFormat.DECIMAL) }
     var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -485,6 +489,18 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     metersPerPixel = scaleMpp,
                     c = c,
                     modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 168.dp),
+                )
+
+                // Where you are, in whichever notation you last asked for.
+                PositionReadout(
+                    location = location,
+                    format = posFormat,
+                    c = c,
+                    onCycle = {
+                        val all = PositionFormat.entries
+                        posFormat = all[(all.indexOf(posFormat) + 1) % all.size]
+                    },
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 212.dp),
                 )
 
                 // Search bar — geocode a place, drop a waypoint, fly there.
@@ -1834,6 +1850,70 @@ private fun minutesAgo(epochMs: Long): String {
     }
 }
 
+/**
+ * Where you are, in the notation you asked for.
+ *
+ * Decimal degrees are what a phone shows and what a URL wants; degrees-minutes-seconds is what a
+ * paper chart is ruled in; MGRS is what you read over a radio, because a grid reference survives
+ * being spoken and a string of decimals does not. Tapping cycles between them.
+ */
+@Composable
+private fun PositionReadout(
+    location: DeviceLocation?,
+    format: PositionFormat,
+    c: NightwirePalette,
+    onCycle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (location == null) return
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
+    val text = when (format) {
+        PositionFormat.DECIMAL ->
+            "%.5f, %.5f".format(java.util.Locale.US, location.latitude, location.longitude)
+        PositionFormat.DMS ->
+            "${dms(location.latitude, "N", "S")}  ${dms(location.longitude, "E", "W")}"
+        // Null outside the UTM bands, which is the polar regions -- say so rather than print a
+        // grid reference that does not exist there.
+        PositionFormat.MGRS ->
+            Geodesy.toMgrs(location.latitude, location.longitude) ?: "OUTSIDE THE UTM GRID"
+    }
+    Column(
+        modifier
+            .clip(shape)
+            .background(c.panel.copy(alpha = 0.9f))
+            .border(1.dp, c.accent.copy(alpha = 0.5f), shape)
+            .clickable(onClick = onCycle)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Text(format.label, fontFamily = ChakraPetch, fontSize = 8.sp, color = c.accent)
+        Text(text, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink)
+    }
+}
+
+/** Which notation the position readout is showing. */
+private enum class PositionFormat(val label: String) {
+    DECIMAL("LAT / LON"),
+    DMS("DEG MIN SEC"),
+    MGRS("MGRS"),
+}
+
+/**
+ * One axis in degrees, minutes and seconds, with the hemisphere letter.
+ *
+ * Rounded to tenths of an arc-second *first*, then split. Splitting first and rounding each part
+ * afterwards is the obvious way to write this and it prints things like `179°59'60.0"`, because
+ * 59.96 seconds rounds up to a full minute that has nowhere to go.
+ */
+private fun dms(value: Double, positive: String, negative: String): String {
+    val sign = if (value < 0) negative else positive
+    val tenths = Math.round(kotlin.math.abs(value) * 36_000.0)
+    val sec = (tenths % 600L) / 10.0
+    val totalMinutes = tenths / 600L
+    return "%d°%02d'%04.1f\"%s".format(
+        java.util.Locale.US, totalMinutes / 60L, totalMinutes % 60L, sec, sign,
+    )
+}
+
 /** A one-line map notice (scan outcome), tapped to dismiss. */
 @Composable
 private fun NavNotice(message: String, isError: Boolean, c: NightwirePalette, onDismiss: () -> Unit) {
@@ -1908,6 +1988,20 @@ private fun rememberMapViewWithLifecycle(): MapView {
     val mapView = remember {
         MapLibre.getInstance(context)
         MapView(context).apply { onCreate(null) }
+    }
+    // A map holds tile bitmaps, and the renderer will happily keep them until the system kills the
+    // process for it. MapView has an onLowMemory that nothing was calling: the Activity callback it
+    // normally rides on never reaches a view hosted inside a composable, so it is subscribed here.
+    DisposableEffect(mapView) {
+        val callbacks = object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) mapView.onLowMemory()
+            }
+            override fun onLowMemory() = mapView.onLowMemory()
+            override fun onConfigurationChanged(newConfig: Configuration) {}
+        }
+        context.registerComponentCallbacks(callbacks)
+        onDispose { context.unregisterComponentCallbacks(callbacks) }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, mapView) {
