@@ -179,6 +179,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.places.RoutingRepository(http)
     }
 
+    /** The breadcrumb trail behind you on the NAV map (on-device only, never transmitted). */
+    val trackStore: dev.mascwa.pulse.data.nav.TrackStore by lazy {
+        dev.mascwa.pulse.data.nav.TrackStore(context, json)
+    }
+
     /** Live precipitation-radar frames for the NAV map's rain overlay (keyless). */
     val rainViewerRepository: dev.mascwa.pulse.data.maps.RainViewerRepository by lazy {
         dev.mascwa.pulse.data.maps.RainViewerRepository(http)

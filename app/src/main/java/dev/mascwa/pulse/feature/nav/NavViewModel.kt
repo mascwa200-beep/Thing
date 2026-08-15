@@ -3,11 +3,13 @@ package dev.mascwa.pulse.feature.nav
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.RouteProgress
+import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.maps.MapLayerCatalog
 import dev.mascwa.pulse.data.maps.RainViewerRepository
+import dev.mascwa.pulse.data.nav.TrackStore
 import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
@@ -74,6 +76,7 @@ class NavViewModel(
     private val routing: RoutingRepository,
     private val rainViewer: RainViewerRepository,
     private val radar: RadarRepository,
+    private val trackStore: TrackStore,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -131,6 +134,16 @@ class NavViewModel(
     private val _quakes = MutableStateFlow<List<Contact>>(emptyList())
     val quakes: StateFlow<List<Contact>> = _quakes.asStateFlow()
     private var radarJob: Job? = null
+
+    /** The breadcrumb trail: where you have actually been, drawn behind you. */
+    val trackPoints: StateFlow<List<TrackLog.TrackPoint>> = trackStore.pointsFlow
+    val trackRecording: StateFlow<Boolean> = trackStore.recording
+
+    fun setTrackRecording(on: Boolean) = trackStore.setRecording(on)
+
+    fun clearTrack() {
+        viewModelScope.launch { runCatching { trackStore.clear() } }
+    }
 
     /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
     private val _selectedPoi = MutableStateFlow<Place?>(null)
@@ -534,6 +547,8 @@ class NavViewModel(
 
     fun start() {
         compass.start()
+        // Draw whatever is already on disk straight away, rather than only after the next fix.
+        trackStore.prime()
         if (pollJob?.isActive != true) {
             pollJob = viewModelScope.launch {
                 while (isActive) {
@@ -541,6 +556,14 @@ class NavViewModel(
                         runCatching { locationProvider.current() }.getOrNull()?.let { loc ->
                             _location.value = loc
                             compass.setLocation(loc.latitude, loc.longitude, 0.0)
+                            // Offered on every fix; the store keeps the ones worth keeping.
+                            trackStore.record(
+                                lat = loc.latitude,
+                                lon = loc.longitude,
+                                atMs = System.currentTimeMillis(),
+                                altitudeM = loc.altitudeM,
+                                accuracyM = loc.accuracyM?.toDouble(),
+                            )
                         }
                     }
                     delay(2500)

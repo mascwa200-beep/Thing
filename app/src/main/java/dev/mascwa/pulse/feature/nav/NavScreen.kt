@@ -82,6 +82,7 @@ import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.telemetry.Terminator
+import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -148,6 +149,10 @@ private const val TRAFFIC_LAYER = "nav-traffic-sym"
 private const val TRAFFIC_ICON = "nav-plane"
 private const val QUAKE_SOURCE = "nav-quake"
 private const val QUAKE_LAYER = "nav-quake-heat"
+private const val TRACK_SOURCE = "nav-track"
+private const val TRACK_LAYER = "nav-track-line"
+/** The trail behind you: a cool violet, distinct from the gold route ahead of you. */
+private val TRACK_LINE = Color(0xFFB061FF)
 /** TileJSON version every hand-built TileSet declares; the spec requires the field. */
 private const val TILEJSON_VERSION = "2.2.0"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
@@ -219,6 +224,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val aircraft by vm.aircraft.collectAsState()
     val quakes by vm.quakes.collectAsState()
     val selectedIncident by vm.selectedIncident.collectAsState()
+    val trackPoints by vm.trackPoints.collectAsState()
+    val trackRecording by vm.trackRecording.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
     var posFormat by remember { mutableStateOf(PositionFormat.DECIMAL) }
     var query by remember { mutableStateOf("") }
@@ -394,6 +401,11 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(quakes, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(QUAKE_SOURCE)?.setGeoJson(quakeGeoJson(quakes))
+    }
+
+    LaunchedEffect(trackPoints, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(TRACK_SOURCE)?.setGeoJson(trackGeoJson(trackPoints))
     }
 
     // Redraw the day/night terminator while it is lit. It slides west a quarter of a degree per
@@ -586,6 +598,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             aircraftCount = aircraft.size,
                             seismic = seismicOn,
                             night = night,
+                            trackRecording = trackRecording,
+                            trackPoints = trackPoints,
                             c = c,
                             onBasemap = vm::setBasemap,
                             onRelief = vm::setRelief,
@@ -593,6 +607,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             onTraffic = vm::setTraffic,
                             onSeismic = vm::setSeismic,
                             onNight = vm::setNight,
+                            onTrackRecording = vm::setTrackRecording,
+                            onClearTrack = vm::clearTrack,
                         )
                     }
                     scanNotice?.let { notice ->
@@ -632,6 +648,7 @@ private fun installNavStyle(ml: MapLibreMap, c: NightwirePalette, onReady: () ->
         addRasterLayers(style)
         addNightLayer(style)
         addSeismicLayer(style)
+        addTrackLayer(style)
         addRouteLayer(style)
         addPoiLayer(style, c)
         addIncidentLayer(style, c)
@@ -1035,6 +1052,37 @@ private fun applyRain(style: Style, frame: RainViewerRepository.RadarFrame?) {
     // Above the ground, below the things you navigate by: rain should not hide your own route.
     if (style.getLayer(ROUTE_CASING_LAYER) != null) style.addLayerBelow(rain, ROUTE_CASING_LAYER)
     else style.addLayer(rain)
+}
+
+/**
+ * The breadcrumb trail: where you have been, as opposed to where you are going.
+ *
+ * Deliberately a different colour and thinner than the route line — one is a record and the other
+ * is an instruction, and confusing them on a map you are navigating by would be bad.
+ */
+private fun addTrackLayer(style: Style) {
+    if (style.getSource(TRACK_SOURCE) != null) return
+    style.addSource(GeoJsonSource(TRACK_SOURCE))
+    style.addLayer(
+        LineLayer(TRACK_LAYER, TRACK_SOURCE).withProperties(
+            PropertyFactory.lineColor(TRACK_LINE.toArgb()),
+            PropertyFactory.lineWidth(3f),
+            PropertyFactory.lineOpacity(0.75f),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        ),
+    )
+}
+
+private fun trackGeoJson(points: List<TrackLog.TrackPoint>): String {
+    if (points.size < 2) return EMPTY_FC
+    val sb = StringBuilder()
+    points.forEachIndexed { i, p ->
+        if (i > 0) sb.append(',')
+        sb.append('[').append(p.longitudeDeg).append(',').append(p.latitudeDeg).append(']')
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":" +
+        "{\"type\":\"LineString\",\"coordinates\":[$sb]},\"properties\":{}}]}"
 }
 
 /**
@@ -1732,6 +1780,8 @@ private fun LayersPanel(
     aircraftCount: Int,
     seismic: Boolean,
     night: Boolean,
+    trackRecording: Boolean,
+    trackPoints: List<TrackLog.TrackPoint>,
     c: NightwirePalette,
     onBasemap: (MapLayerCatalog.Basemap) -> Unit,
     onRelief: (Boolean) -> Unit,
@@ -1739,6 +1789,8 @@ private fun LayersPanel(
     onTraffic: (Boolean) -> Unit,
     onSeismic: (Boolean) -> Unit,
     onNight: (Boolean) -> Unit,
+    onTrackRecording: (Boolean) -> Unit,
+    onClearTrack: () -> Unit,
 ) {
     val shape = lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart)
     Column(
@@ -1803,6 +1855,24 @@ private fun LayersPanel(
             LayerChip("RELIEF", "Hillshaded terrain", relief, c) { onRelief(!relief) }
             LayerChip("NIGHT", "Where the Sun has set", night, c) { onNight(!night) }
         }
+
+        Text(
+            "TRACK",
+            fontFamily = ChakraPetch, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.accent,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LayerChip(
+                label = if (trackRecording) "RECORDING" else "RECORD",
+                detail = trackSummary(trackPoints),
+                on = trackRecording,
+                c = c,
+                onClick = { onTrackRecording(!trackRecording) },
+            )
+            if (trackPoints.isNotEmpty()) {
+                LayerChip("ERASE", "Forget the trail", false, c, onClick = onClearTrack)
+            }
+        }
         val credits = buildList {
             if (rain) add(MapLayerCatalog.RAIN_ATTRIBUTION)
             if (relief) add(MapLayerCatalog.TERRAIN_DEM_ATTRIBUTION)
@@ -1837,6 +1907,19 @@ private fun LayerChip(
         )
         Text(detail, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
     }
+}
+
+/** How far the trail has come, and how long it took. */
+private fun trackSummary(points: List<TrackLog.TrackPoint>): String {
+    if (points.size < 2) return "Nothing recorded yet"
+    val distance = Geo.formatDistance(TrackLog.distanceMeters(points))
+    val minutes = (TrackLog.durationMs(points) / 60_000L).toInt()
+    val climb = TrackLog.ascentMeters(points).roundToInt()
+    return buildList {
+        add(distance)
+        if (minutes >= 1) add(if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min")
+        if (climb >= 10) add("↑${climb} m")
+    }.joinToString(" · ")
 }
 
 /** "4 min ago" / "just now" — a frame's age, in the plainest words available. */
