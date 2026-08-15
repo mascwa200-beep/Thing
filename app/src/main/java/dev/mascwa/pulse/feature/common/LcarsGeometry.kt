@@ -11,12 +11,15 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -386,7 +389,16 @@ fun LcarsScreenFrame(
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
-    Column(modifier.fillMaxSize().background(c.void)) {
+    // The status bar is this frame's to consume. `PulseApp`'s outer Scaffold sets
+    // contentWindowInsets to zero, so the NavHost gets no top padding and each screen's own top bar
+    // has always owned it — Home's custom bar applies exactly this by hand. Miss it and all 35
+    // headers slide under the clock while compiling perfectly.
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(c.void)
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
         Row(
             Modifier.fillMaxWidth().height(HeaderHeight),
             horizontalArrangement = Arrangement.spacedBy(RailGutter),

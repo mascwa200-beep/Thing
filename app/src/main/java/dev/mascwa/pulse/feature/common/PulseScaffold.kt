@@ -1,48 +1,88 @@
 package dev.mascwa.pulse.feature.common
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
+import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * Standard per-screen scaffold. The host (PulseApp) owns the bottom navigation
- * bar and pads the NavHost above it, so screens disable their own bottom inset
- * and only the [TopAppBar] consumes the status-bar inset.
+ * Standard per-screen chrome — now the LCARS frame rather than a Material top bar.
+ *
+ * This is the highest-leverage file in the app's appearance: thirty-five screens route through it,
+ * and until now every one of them was topped by a stock `TopAppBar`. The palette had been authentic
+ * for a while and the app still read as a dark application with square corners, because nothing
+ * drew the L-shaped chrome that makes LCARS recognisable at arm's length.
+ *
+ * **The signature is unchanged on purpose.** No call site moves, which is what makes a change this
+ * wide verifiable: a compile error or a missing screen is the entire failure surface.
+ *
+ * The rail earns its width rather than merely decorating. Its top block holds [navigationIcon], so
+ * the back control grows from a 24dp glyph to a 56×54 corner — and the thirty-odd screens that each
+ * hand-roll their own back arrow can be swept later without touching this file again.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PulseScaffold(
     title: String,
     modifier: Modifier = Modifier,
-    scrollBehavior: TopAppBarScrollBehavior? = null,
+    /**
+     * Accepted and ignored.
+     *
+     * Kept only so the thirty-five call sites stay untouched. A repo-wide search found **no screen
+     * that passes it** — the collapsing-toolbar behaviour it configures has never been used, so
+     * there is nothing here to reproduce. Delete the parameter once the call sites are swept.
+     */
+    @Suppress("UNUSED_PARAMETER") scrollBehavior: TopAppBarScrollBehavior? = null,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     topBarOverride: (@Composable () -> Unit)? = null,
+    /** False for a full-bleed screen — a map — where the horizontal room genuinely cannot be spared. */
+    rail: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    Scaffold(
-        modifier = if (scrollBehavior != null)
-            modifier.nestedScroll(scrollBehavior.nestedScrollConnection) else modifier,
-        topBar = {
-            when {
-                topBarOverride != null -> topBarOverride()
-                else -> TopAppBar(
-                    title = { Text(title) },
-                    navigationIcon = navigationIcon,
-                    actions = actions,
-                    scrollBehavior = scrollBehavior,
-                )
-            }
-        },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        content = content,
-    )
+    if (topBarOverride != null) {
+        // Two screens draw their own masthead (Home and News). They short-circuit the frame exactly
+        // as they short-circuited the TopAppBar, including owning their own status-bar inset.
+        LcarsBareFrame(modifier, topBarOverride, content)
+        return
+    }
+    LcarsScreenFrame(
+        title = title,
+        modifier = modifier,
+        // The route-stable seed for the rail's colours and codes. Using the title means a screen's
+        // rail is fixed for as long as its name is, which is the stability those codes need.
+        seed = title,
+        navigationIcon = navigationIcon,
+        actions = actions,
+        rail = rail,
+    ) {
+        // The frame owns its own insets and the host Scaffold already pads above the bottom nav, so
+        // there is no inner padding left to hand down.
+        content(PaddingValues(0.dp))
+    }
+}
+
+/**
+ * The escape hatch: a screen that draws its own masthead.
+ *
+ * Deliberately does **not** apply the status-bar inset. Both overriding screens already apply it
+ * themselves — `HomeScreen` calls `windowInsetsPadding(WindowInsets.statusBars)` on its own bar —
+ * and padding it twice would leave a visible gap under the clock.
+ */
+@Composable
+private fun LcarsBareFrame(
+    modifier: Modifier,
+    topBar: @Composable () -> Unit,
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    Column(modifier.fillMaxSize().background(Pulse.colors.void)) {
+        topBar()
+        Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
+    }
 }
