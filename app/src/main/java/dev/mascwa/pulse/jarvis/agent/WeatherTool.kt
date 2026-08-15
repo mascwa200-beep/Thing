@@ -79,10 +79,12 @@ class WeatherTool(
                     AirQualityGuide.assess(AirQualityGuide.Pollutant.NITROGEN_DIOXIDE, aq.nitrogenDioxide),
                     AirQualityGuide.assess(AirQualityGuide.Pollutant.SULPHUR_DIOXIDE, aq.sulphurDioxide),
                 )
+                // Half again over the guideline before it earns a sentence here. The WHO 2021
+                // figures are strict enough that ordinary city air sits a little above them, and a
+                // conversational answer that mentions the air every single day is one nobody reads.
+                // The AIR tab carries the full picture at any level.
                 val driver = AirQualityGuide.dominant(readings)
-                if (driver != null && driver.band != AirQualityGuide.Band.WELL_UNDER &&
-                    driver.band != AirQualityGuide.Band.WITHIN
-                ) {
+                if (driver != null && driver.ratio >= 1.5) {
                     append(" ").append(AirQualityGuide.summary(readings))
                 }
             }
