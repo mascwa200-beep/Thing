@@ -212,6 +212,6 @@ class GuidesJsonValidationTest {
          *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
          *  waves land, never down. `tools/kb/ci_parity_lint.py` prints the value to use; it does not
          *  edit this file, so the bump is a deliberate manual step after every merge. */
-        const val FULL_PAGE_BASELINE = 6959
+        const val FULL_PAGE_BASELINE = 7128
     }
 }

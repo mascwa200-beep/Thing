@@ -176,6 +176,31 @@
    "file": "guides_agriculture_and_gardening.json"
   },
   {
+   "id": "tillage-systems-and-field-preparation",
+   "title": "Tillage Systems and Field Preparation",
+   "category": "Agriculture & Gardening",
+   "summary": "How and why soil is worked before planting: the mechanics of plows, harrows, and planters; conventional, reduced, and no-till systems; timing, compaction, erosion, and soil biology; and field and garden preparation from tractor scale down to the spade.",
+   "headings": [
+    "Why Tillage Matters",
+    "The Soil Beneath the Tool: Texture, Structure, and Tilth",
+    "From Digging Stick to Steel Plow: A Short History",
+    "The Moldboard Plow and Full Inversion",
+    "Secondary Tillage: Discs, Harrows, Cultivators, and Packers",
+    "Conventional Tillage as a Complete System",
+    "Chisel Plows, Mulch Tillage, and the Reduced-Till Middle Ground",
+    "No-Till: The Case for Never Turning the Soil",
+    "Strip-Till, Ridge-Till, and Vertical Tillage",
+    "Timing and Moisture: Working Soil in the Friable Window",
+    "Compaction, Plow Pans, and Subsoiling",
+    "Erosion, Residue Cover, and Conservation",
+    "Life Underground: Soil Biology and Organic Matter Under Tillage",
+    "Preparing Ground by Hand: Beds, Broadforks, and Double Digging",
+    "Choosing a System: Economics, Climate, and Context",
+    "When It Goes Wrong: Failure Modes and Corrections"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
    "id": "archaeological-excavation-methods-and-techniques",
    "title": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
@@ -433,6 +458,31 @@
     "A Proof in Stone: The New England Gravestone Experiment",
     "Anchoring the Sequence: Direction, Cross-Dating, and Absolute Time",
     "Assumptions, Failure Modes, and the Method's Honest Limits"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "remote-sensing-and-aerial-archaeology",
+   "title": "Remote Sensing and Aerial Archaeology",
+   "category": "Archaeology & Anthropology",
+   "summary": "How archaeologists find and map the buried past without digging: cropmarks and shadow sites, aerial photography, LiDAR, multispectral and radar imaging from satellites, and ground-based geophysics, together with the interpretation, ethics, and pitfalls of seeing archaeology from above.",
+   "headings": [
+    "Seeing the Past from Above",
+    "The Birth of Aerial Archaeology",
+    "How Buried Features Reach the Surface: The Cropmark Mechanism",
+    "Shadow Sites, Soilmarks, and the Marks of Frost and Snow",
+    "Platforms: Balloons, Biplanes, Drones, and Orbits",
+    "The Photograph as Instrument: Obliques, Verticals, and Photogrammetry",
+    "LiDAR: Stripping the Forest with Light",
+    "Reading the Bare Earth: LiDAR Visualization and Analysis",
+    "Beyond Visible Light: Multispectral, Hyperspectral, and Thermal Imaging",
+    "Radar from Orbit: Seeing Through Sand and Mapping the Ground's Shape",
+    "Geophysics on the Ground I: Magnetometry",
+    "Geophysics on the Ground II: Radar, Resistance, and Induction",
+    "From Anomaly to Archaeology: Interpretation, GIS, and Ground-Truthing",
+    "Planning a Drone Survey of a Suspected Site",
+    "Ethics, Looting, and the Politics of Seeing",
+    "Limits, Pitfalls, and What to Do When the Ground Disagrees"
    ],
    "file": "guides_archaeology_and_anthropology.json"
   },
@@ -1267,6 +1317,31 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "vesicle-transport-and-the-secretory-pathway",
+   "title": "Vesicle Transport and the Secretory Pathway",
+   "category": "Biology",
+   "summary": "How eukaryotic cells package proteins and lipids into membrane vesicles and move them between compartments, from synthesis in the endoplasmic reticulum through the Golgi apparatus to the cell surface, lysosomes, and beyond.",
+   "headings": [
+    "Why Cells Need an Internal Shipping System",
+    "A Map of the Endomembrane System",
+    "Discovering the Pathway: Palade, Pulse-Chase, and Yeast Genetics",
+    "Entering the Pathway: Signal Sequences and Translocation into the ER",
+    "Folding, Modification, and Quality Control in the ER",
+    "Leaving the ER: COPII Coats and Cargo Selection",
+    "Going Backward on Purpose: COPI and Retrograde Transport",
+    "The Golgi Apparatus: Architecture and the Maturation Question",
+    "Glycosylation: The Sugar Code Built in the Golgi",
+    "Address Labels and Docking: Rab GTPases and Tethers",
+    "Membrane Fusion: SNARE Proteins and the Energy Problem",
+    "Regulated Secretion: Granules, Insulin, and the Synapse",
+    "Coming Back In: Clathrin-Mediated Endocytosis",
+    "Sorting to the Lysosome: The Mannose-6-Phosphate System",
+    "Going the Distance: Motors, Microtubules, and Polarized Delivery",
+    "When Trafficking Fails: Disease, Sabotage, and Open Questions"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
    "id": "how-to-validate-a-business-idea",
    "title": "How to Validate a Business Idea",
    "category": "Business & Finance",
@@ -1435,6 +1510,30 @@
     "Biases and Self-Deception: The Enemy Is in the Mirror",
     "A Two-Week Demand Test, Step by Step",
     "Where Demand Tests Mislead: Limits of the Method"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "testing-a-business-idea-with-preorders",
+   "title": "Testing a Business Idea With Preorders",
+   "category": "Business & Finance",
+   "summary": "How to validate a product or business idea by asking customers to pay before you build, covering test design, pricing, landing pages, payment and legal mechanics, crowdfunding, traffic, interpreting results, and delivering or refunding honestly.",
+   "headings": [
+    "Why Preorders Beat Every Other Validation Signal",
+    "The Hierarchy of Evidence: From Compliments to Cash",
+    "Where Preorders Fit, and When Not to Use Them",
+    "Designing the Test: Hypothesis, Offer, and Pass-Fail Criteria",
+    "Pricing the Preorder: Discounts, Deposits, and Anchors",
+    "Anatomy of a Preorder Page That Tells the Truth",
+    "Payment Mechanics: Charging Now, Later, or Holding a Card",
+    "The Legal and Ethical Side of Selling What Does Not Exist",
+    "Crowdfunding Platforms as Preorder Engines",
+    "Getting Traffic: Channels, Costs, and Sample Quality",
+    "Reading the Numbers: Conversion, Cost, and Statistical Honesty",
+    "The Qualitative Layer: Interviewing Buyers and Refusers",
+    "A Worked Playbook: Running a Six-Week Preorder Test",
+    "After the Test: Go, Pivot, Refund, and Delivering the Promise",
+    "Failure Modes: How Preorder Tests Mislead and Collapse"
    ],
    "file": "guides_business_and_finance.json"
   },
@@ -1910,6 +2009,30 @@
    "file": "guides_chemistry.json"
   },
   {
+   "id": "colligative-properties-of-solutions",
+   "title": "Colligative Properties of Solutions",
+   "category": "Chemistry",
+   "summary": "Why dissolving anything in a liquid lowers its vapor pressure, raises its boiling point, depresses its freezing point, and generates osmotic pressure, with the equations, worked examples, real-world applications, and the limits of the ideal-solution laws.",
+   "headings": [
+    "Properties That Count Particles, Not Kinds",
+    "Measuring Concentration: Molality, Mole Fraction, and Why Not Molarity",
+    "Vapor Pressure Lowering and Raoult's Law",
+    "The Thermodynamic Engine: Entropy and Chemical Potential",
+    "Boiling Point Elevation",
+    "Freezing Point Depression",
+    "Electrolytes and the van't Hoff Factor",
+    "Osmosis and Osmotic Pressure",
+    "Weighing Molecules: Molar Mass from Colligative Measurements",
+    "Worked Examples: The Four Calculations End to End",
+    "Real Solutions: Activity, Ionic Atmospheres, and Honest Corrections",
+    "Reverse Osmosis: Squeezing Fresh Water from the Sea",
+    "Colligative Chemistry in Medicine and the Clinic",
+    "Kitchens, Highways, and Wild Organisms",
+    "Limits, Misconceptions, and Troubleshooting"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -2317,6 +2440,29 @@
     "Holding the Line: Defences, Accommodation and Nature",
     "Moving Back: Retreat, Relocation and Hard Choices",
     "Misconceptions, Open Questions and How to Use the Science"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "the-antarctic-and-greenland-ice-sheets",
+   "title": "The Antarctic and Greenland Ice Sheets",
+   "category": "Climate",
+   "summary": "How the two great ice sheets formed, how they flow, gain, and lose mass, and what their measured decline means for sea level, ocean circulation, and the climate record they preserve.",
+   "headings": [
+    "Why the Ice Sheets Matter",
+    "From Snowflake to Ice Sheet: How They Form",
+    "Greenland: Anatomy of the Northern Ice Sheet",
+    "Antarctica: Two Ice Sheets on One Continent",
+    "How Ice Flows: The Physics of Motion",
+    "The Mass Budget: How Gain and Loss Are Tallied",
+    "Surface Melt on Greenland: Albedo, Lakes, and Moulins",
+    "The Ocean Attacks from Below: Ice Shelves and Basal Melt",
+    "Marine Ice Sheet Instability: The West Antarctic Problem",
+    "Ice Shelf Collapse: The Larsen Lesson",
+    "Weighing Giants: How We Measure Ice Sheet Change",
+    "Ice Cores: Reading the Archive",
+    "Sea Level: Projections, Thresholds, and Commitment",
+    "Limits of Knowledge and What to Watch"
    ],
    "file": "guides_climate.json"
   },
@@ -2825,6 +2971,30 @@
    "file": "guides_computing.json"
   },
   {
+   "id": "history-of-programming-languages",
+   "title": "History of Programming Languages",
+   "category": "Computing",
+   "summary": "The story of programming languages from Ada Lovelace and machine code through FORTRAN, LISP, ALGOL, C, and the object-oriented and functional revolutions to the modern era of memory-safe, web-native languages, and the recurring forces that decide which languages live and die.",
+   "headings": [
+    "Why the History of Languages Matters",
+    "Before Software: Looms, Engines, and the First Algorithm",
+    "Assembly, Autocodes, and the Dream of Automatic Programming",
+    "FORTRAN: Proof That Compilers Could Compete",
+    "LISP: Computing with Symbols",
+    "COBOL and the Business of Data",
+    "ALGOL: The Language That Shaped Languages",
+    "The 1960s Ferment: BASIC, PL/I, APL, and Simula's Objects",
+    "Structured Programming, Pascal, and C",
+    "Smalltalk, C++, and the Object-Oriented Wave",
+    "Functional and Logic Programming: ML, Prolog, and Haskell",
+    "Scripting and the Web: Perl, Python, Java, and JavaScript",
+    "The Managed Era and the Concurrency Reckoning",
+    "The Safety Turn: Rust, Swift, Kotlin, and TypeScript",
+    "Why Languages Live and Die: Patterns and Lessons"
+   ],
+   "file": "guides_computing.json"
+  },
+  {
    "id": "cook-food-safety-fundamentals",
    "title": "Food Safety & Kitchen Safety Fundamentals",
    "category": "Cooking — Food Safety",
@@ -3191,6 +3361,29 @@
    "file": "guides_cooking_food_safety.json"
   },
   {
+   "id": "foodborne-infection-versus-intoxication",
+   "title": "Foodborne Infection Versus Intoxication",
+   "category": "Cooking — Food Safety",
+   "summary": "Why some foodborne illnesses come from live organisms multiplying inside you and others from poisons formed in the food before you ate it, how to tell them apart by onset and symptoms, the major bacterial, viral, and chemical culprits, and which kitchen defenses work against each mechanism.",
+   "headings": [
+    "Two Roads to the Same Misery",
+    "The Mechanism: Organisms Versus Poisons",
+    "Onset Time: The First Diagnostic Clue",
+    "Staphylococcus aureus: The Classic Preformed Toxin",
+    "Bacillus cereus: One Bacterium, Two Diseases",
+    "Botulism: The Rare Catastrophe",
+    "Salmonella: The Archetypal Infection",
+    "Campylobacter: The Quiet Leader with a Neurological Shadow",
+    "Escherichia coli and the Shiga Toxin Emergency",
+    "Listeria: The Cold-Growing Killer",
+    "Clostridium perfringens: The Buffet Bug and the Cooling Rules",
+    "Viruses and Parasites: Infections That Never Grow in Food",
+    "Marine and Chemical Intoxications: When No Microbe Is Alive",
+    "Prevention Logic, Red Flags, and What to Do When It Goes Wrong"
+   ],
+   "file": "guides_cooking_food_safety.json"
+  },
+  {
    "id": "conduction-convection-and-radiant-heat",
    "title": "Conduction, Convection and Radiant Heat",
    "category": "Cooking — Techniques",
@@ -3409,6 +3602,31 @@
     "Taking a True Reading in Real Food",
     "The Food-Safety Numbers and Where They Come From",
     "Failure Modes, Maintenance and Long-Term Care"
+   ],
+   "file": "guides_cooking_techniques.json"
+  },
+  {
+   "id": "protein-denaturation-and-doneness-temperatures",
+   "title": "Protein Denaturation and Doneness Temperatures",
+   "category": "Cooking — Techniques",
+   "summary": "How heat transforms the proteins in meat, eggs, dairy, and seafood, and the specific internal temperatures at which each food reaches culinary and safe doneness. Covers denaturation chemistry, collagen conversion, carryover heat, pasteurization time-and-temperature thinking, sous vide, and accurate thermometer technique.",
+   "headings": [
+    "Why Doneness Is a Temperature, Not a Time",
+    "What a Protein Is: From Amino Acid Chain to Folded Machine",
+    "Denaturation: What Heat Actually Does to a Protein",
+    "From Unfolding to Coagulation: Gels, Curds, and Squeezed Sponges",
+    "The Meat Temperature Ladder: Myosin, Collagen, and Actin",
+    "Collagen and Connective Tissue: The Long Road to Gelatin",
+    "Juiciness and Water: Why Overcooked Meat Is Dry",
+    "Eggs: The Kitchen's Most Precise Protein Laboratory",
+    "Milk and Dairy Proteins: Casein, Whey, Skins, and Curdles",
+    "Fish and Shellfish: Fragile Proteins with Narrow Windows",
+    "Carryover Cooking and the Thermal Gradient",
+    "Time at Temperature: Pasteurization and Safe Doneness",
+    "Sous Vide and Low-Temperature Precision",
+    "Resting, Slicing, and Serving Temperature",
+    "Measuring Temperature: Thermometers and Technique",
+    "Failure Modes, Rescues, and the Doneness Reference Table"
    ],
    "file": "guides_cooking_techniques.json"
   },
@@ -3849,6 +4067,31 @@
    "file": "guides_earth_science.json"
   },
   {
+   "id": "emerald-and-the-beryl-family",
+   "title": "Emerald and the Beryl Family",
+   "category": "Earth Science",
+   "summary": "The mineral beryl and its gem varieties, emerald, aquamarine, morganite, heliodor, goshenite, and red beryl: crystal structure and chemistry, how trace elements create each color, the pegmatite and tectonic geology that forms the deposits, and the practical craft of identifying, treating, valuing, and caring for the stones.",
+   "headings": [
+    "One Mineral, Many Gems: Orienting the Beryl Family",
+    "The Chemistry and Architecture of Beryl",
+    "Beryllium: The Scarce Element Behind the Mineral",
+    "How a Colorless Mineral Gains Its Colors",
+    "Emerald: Chromium Green and the Vanadium Debate",
+    "Aquamarine and the Maxixe Problem",
+    "Morganite, Heliodor, Goshenite, and Red Beryl",
+    "Pegmatites: Where Most Beryl Grows",
+    "The Emerald Paradox and Schist-Type Deposits",
+    "Colombia's Black-Shale Emeralds: The Great Exception",
+    "A World Tour: Sources, History, and Modern Supply",
+    "Reading the Interior: Inclusions, Jardin, and Origin",
+    "Identifying Beryl: Properties, Tests, and Lookalikes",
+    "Treatments: Oil, Resin, and the Ethics of Disclosure",
+    "Synthetic Beryl: Flux, Hydrothermal, and How They Are Caught",
+    "Cutting, Care, Value, and the Famous Stones"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
    "id": "scarcity-choice-and-opportunity-cost",
    "title": "Scarcity, Choice and Opportunity Cost",
    "category": "Economics",
@@ -4069,6 +4312,31 @@
     "Comparative Statics in the Wild: Case Studies",
     "The Formal Method: Calculus, Stability and the Correspondence Principle",
     "Limits, Failure Modes and How to Use the Method Honestly"
+   ],
+   "file": "guides_economics.json"
+  },
+  {
+   "id": "price-elasticity-of-demand",
+   "title": "Price Elasticity of Demand",
+   "category": "Economics",
+   "summary": "How economists measure the responsiveness of quantity demanded to price, from the basic formula and midpoint method through revenue analysis, determinants, real-world elasticity estimates, and applications in business pricing, taxation, and public policy. Includes how elasticities are estimated in practice and the edge cases where the framework bends or breaks.",
+   "headings": [
+    "The Measure of Responsiveness: Why Elasticity Matters",
+    "The Definition and the Formula",
+    "Midpoints, Points, and a Little Calculus",
+    "The Vocabulary: From Perfectly Inelastic to Perfectly Elastic",
+    "Slope Is Not Elasticity: Lessons of the Linear Demand Curve",
+    "Elasticity and Total Revenue: The Seller's Compass",
+    "What Makes Demand Elastic: Substitutes and Necessity",
+    "Budget Share, Time Horizon, and Market Definition",
+    "Sister Measures: Income and Cross-Price Elasticity",
+    "What the Numbers Actually Are: A Field Guide to Real Elasticities",
+    "Elasticity in Business: Pricing, Discrimination, and Markup",
+    "Elasticity and Taxation: Incidence and Deadweight Loss",
+    "Elasticity in Public Policy: Harvests, Cartels, Drugs, and Wages",
+    "Measuring Elasticity: Data, Identification, and Experiments",
+    "Edge Cases and Exceptions: Giffen Goods, Veblen Goods, and Zero Prices",
+    "When Elasticity Thinking Goes Wrong: Failure Modes and Good Practice"
    ],
    "file": "guides_economics.json"
   },
