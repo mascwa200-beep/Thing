@@ -10,6 +10,7 @@ import dev.mascwa.pulse.data.markets.MarketsRepository
 import dev.mascwa.pulse.data.emergency.EmergencyService
 import dev.mascwa.pulse.data.news.NewsRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sensors.SurvivalTools
@@ -162,6 +163,7 @@ class AppContainer(private val appContext: Context) {
     val orbitalRepository: OrbitalRepository by lazy {
         OrbitalRepository(http, diskCache, settingsRepository)
     }
+    val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
