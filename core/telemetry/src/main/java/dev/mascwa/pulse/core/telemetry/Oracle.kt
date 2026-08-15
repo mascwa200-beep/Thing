@@ -26,6 +26,16 @@ enum class Urgency(val weight: Int) { AMBIENT(1), NOTABLE(2), IMPORTANT(3), URGE
 /** One thing the Oracle wants you to know or do, with why it fired (for transparency) and how to act on it. */
 data class Insight(
     val id: String,               // stable key (for dedup + notification throttle)
+    /**
+     * Which RULE produced this, for learning. Defaults to [id] because most rules already use a
+     * fixed one; the five whose ids carry an instance (`leave_<hash>`, `market_<hash>`, `habit_…`,
+     * `interest_<hash>`, `prep_<hash>`) set it explicitly.
+     *
+     * ⚠️ Deliberately not derived by taking the id's prefix. That looks tidy and is wrong: it would
+     * collide `wind_chill` with `wind_down`, quietly pooling two unrelated rules' hit rates into one
+     * statistic. See [OracleMemory].
+     */
+    val family: String = id,
     val kind: InsightKind,
     val urgency: Urgency,
     val title: String,            // the headline
@@ -141,7 +151,7 @@ object Oracle {
         val when0 = if (leaveInMin <= 1) "now" else "in ${leaveInMin.roundToInt()} min"
         val umbrella = if (wet) " Take an umbrella." else ""
         return Insight(
-            id = "leave_${ev.title.hashCode()}",
+            id = "leave_${ev.title.hashCode()}", family = "leave",
             kind = InsightKind.PREPARATION, urgency = urgency,
             title = "Leave $when0 for \"${ev.title}\"",
             detail = "${km(dist)} away (~${travel.roundToInt()} min ${if (driving) "driving" else "on foot"}); starts ${startsIn(ev.startMs, s.nowMs)}.$umbrella",
@@ -212,7 +222,7 @@ object Oracle {
         val up = mover.changePct >= 0
         val urgency = if (watch != null && abs(mover.changePct) >= 6.0) Urgency.IMPORTANT else Urgency.NOTABLE
         return Insight(
-            id = "market_${mover.name.hashCode()}", kind = InsightKind.OPPORTUNITY, urgency = urgency,
+            id = "market_${mover.name.hashCode()}", family = "market", kind = InsightKind.OPPORTUNITY, urgency = urgency,
             title = "${mover.name} ${if (up) "▲" else "▼"} ${fmtPct(mover.changePct)}",
             detail = (if (watch != null) "On your watchlist. " else "") + "A ${if (up) "sharp gain" else "sharp drop"} today${if (watch == null) " (broad market)" else ""}.",
             score = urgency.weight * 1000.0 + abs(mover.changePct),
@@ -294,7 +304,7 @@ object Oracle {
         val route = s.habitualRoute ?: return null
         val label = s.habitualLabel ?: return null
         return Insight(
-            id = "habit_$route", kind = InsightKind.PREDICTION, urgency = Urgency.AMBIENT,
+            id = "habit_$route", family = "habit", kind = InsightKind.PREDICTION, urgency = Urgency.AMBIENT,
             title = "You usually check $label about now",
             detail = "Ready when you are — it's teed up.",
             score = Urgency.AMBIENT.weight * 1000.0 + 5,
@@ -310,7 +320,7 @@ object Oracle {
             ?: return null
         if (abs(hit.changePct) < 2.0) return null
         return Insight(
-            id = "interest_${hit.name.hashCode()}", kind = InsightKind.INSIGHT, urgency = Urgency.AMBIENT,
+            id = "interest_${hit.name.hashCode()}", family = "interest", kind = InsightKind.INSIGHT, urgency = Urgency.AMBIENT,
             title = "${hit.name} is moving (${fmtPct(hit.changePct)})",
             detail = "Something you follow is on the move today.",
             score = Urgency.AMBIENT.weight * 1000.0 + abs(hit.changePct),
@@ -324,7 +334,7 @@ object Oracle {
         // Only if there's nothing already firing a "leave now" (no location, or you're basically there).
         if (ev.hasLocation && (ev.distanceM ?: 0.0) > 300) return null
         return Insight(
-            id = "prep_${ev.title.hashCode()}", kind = InsightKind.PREPARATION, urgency = Urgency.IMPORTANT,
+            id = "prep_${ev.title.hashCode()}", family = "prep", kind = InsightKind.PREPARATION, urgency = Urgency.IMPORTANT,
             title = "\"${ev.title}\" ${startsIn(ev.startMs, s.nowMs)}",
             detail = "Coming up. Gather what you need and get set.",
             score = Urgency.IMPORTANT.weight * 1000.0 + (30 - minutesUntil(ev.startMs, s.nowMs)),

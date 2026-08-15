@@ -63,6 +63,15 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item { BriefingCard(state.briefing, onRefresh = { vm.refresh() }) }
+                    if (state.learned.isNotBlank()) {
+                        item {
+                            Text(
+                                "⌁ " + state.learned,
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
                     val list = state.insights
                     if (list.isEmpty()) {
                         item {

@@ -40,6 +40,7 @@ class SettingsViewModel(
     private val wifi: dev.mascwa.pulse.security.WifiPolicyController,
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
+    private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
 ) : ViewModel() {
 
     private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
@@ -294,6 +295,11 @@ class SettingsViewModel(
     /** Forget the tracked task board (the user's ongoing & completed tasks/goals). */
     fun clearTasks() {
         viewModelScope.launch { tasks.clear() }
+    }
+
+    /** Forget which advisories the user acts on — every Oracle rule back to equal footing. */
+    fun clearOracleLearning() {
+        viewModelScope.launch { oracleLearning.clear() }
     }
 
     /** Forget the episodic memory stream (timestamped observations & reflections). */

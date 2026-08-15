@@ -298,6 +298,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.interestStore.flushNow() }
             runCatching { app.container.findingStore.flushNow() }
             runCatching { app.container.securityAuditStore.flushNow() }
+            runCatching { app.container.oracleLearningStore.flushNow() }
             runCatching { app.container.sensoriumStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {

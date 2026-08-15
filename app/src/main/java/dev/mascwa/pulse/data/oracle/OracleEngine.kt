@@ -6,6 +6,7 @@ import dev.mascwa.pulse.core.telemetry.Insight
 import dev.mascwa.pulse.core.telemetry.NetworkKind
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.OracleEvent
+import dev.mascwa.pulse.core.telemetry.OracleMemory
 import dev.mascwa.pulse.core.telemetry.OracleMover
 import dev.mascwa.pulse.core.telemetry.OracleSignals
 import dev.mascwa.pulse.core.telemetry.PressureTrend
@@ -143,8 +144,35 @@ object OracleEngine {
         )
     }
 
-    /** Compute the full ranked read (for the Advisories surface / ViewModel). The retired push pass
-     *  (`run`) is gone with the one-notification consolidation — the board carries the world now. */
-    suspend fun read(container: AppContainer, settings: AppSettings): List<Insight> =
-        Oracle.divine(snapshot(container, settings))
+    /**
+     * The full ranked read, re-ranked by what has actually helped.
+     *
+     * The pure engine's urgency × timeliness × relevance is a good prior that knows nothing about
+     * this particular person; [OracleLearningStore] supplies the correction from the app's own visit
+     * log. It closes the loop as a side effect of reading: settle the previous read against where
+     * the user went, then record this one.
+     *
+     * Best-effort — if learning fails for any reason the caller still gets the engine's own ranking,
+     * which is what it got before any of this existed.
+     */
+    suspend fun read(container: AppContainer, settings: AppSettings): List<Insight> {
+        val signals = snapshot(container, settings)
+        val raw = Oracle.divine(signals)
+        return runCatching {
+            val store = container.oracleLearningStore
+            val visits = container.usageRepository.recentActivity(VISIT_LOOKBACK)
+                .filter { it.category == "nav" }
+                .map { OracleMemory.Visit(it.label, it.epochMs) }
+            store.settleAndRecord(raw, visits, signals.habitualRoute, signals.nowMs)
+            store.reweight(raw)
+        }.getOrDefault(raw)
+    }
+
+    /**
+     * How far back to read the visit log when attributing.
+     *
+     * The attribution window is half an hour, so this only has to be deep enough that a busy half
+     * hour of navigation cannot push the relevant visit off the end of the buffer.
+     */
+    private const val VISIT_LOOKBACK = 120
 }

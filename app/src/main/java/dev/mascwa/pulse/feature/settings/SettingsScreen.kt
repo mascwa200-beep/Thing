@@ -1097,6 +1097,12 @@ fun SettingsScreen(
                         s.jarvis.reflectionEnabled,
                     ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
                     PrefClickable(
+                        "Clear what the Oracle learned",
+                        subtitle = "Forget which advisories you act on. The Oracle keeps a tally per rule " +
+                            "and ranks by it; clearing puts every rule back on equal footing. On-device only.",
+                        onClick = { vm.clearOracleLearning() },
+                    )
+                    PrefClickable(
                         "Clear episodic memory",
                         subtitle = "Forget the timestamped moments the computer remembers from your " +
                             "conversations (recalled by recency, importance & relevance). On-device only.",
