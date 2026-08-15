@@ -66,6 +66,8 @@ import dev.mascwa.pulse.feature.common.Sparkline
 import dev.mascwa.pulse.ui.effects.rememberHaptics
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -584,17 +586,69 @@ private fun ContactDetail(ct: Contact) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            // The feed's own emergency word, which the squawk does not carry. A medical flight or
+            // a fuel emergency is broadcast here and nowhere else.
+            ct.declaredEmergency?.let { declared ->
+                Text(
+                    "DECLARED — ${declaredMeaning(declared)}",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.alert,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 DetailRow("Distance", Geo.formatDistance(ct.distanceMeters))
                 DetailRow("Bearing", "${Geo.cardinal(ct.bearingDeg)} ${ct.bearingDeg.roundToInt()}°")
-                ct.altitudeM?.let { DetailRow("Altitude", "${(it / 0.3048).roundToInt()} ft") }
+                if (ct.onGround) {
+                    DetailRow("Altitude", "on the ground")
+                } else {
+                    ct.altitudeM?.let { DetailRow("Altitude", "${(it / 0.3048).roundToInt()} ft") }
+                }
+                // GPS altitude only when it differs enough from the barometric one to be worth
+                // saying — otherwise it is two lines showing the same number.
+                ct.altitudeGeomM?.let { geom ->
+                    val baro = ct.altitudeM
+                    if (baro == null || abs(geom - baro) > 30.0) {
+                        DetailRow("Altitude (GPS)", "${(geom / 0.3048).roundToInt()} ft")
+                    }
+                }
                 ct.groundSpeedKmh?.let { DetailRow("Ground speed", "${it.roundToInt()} km/h") }
-                ct.verticalRateFpm?.let { DetailRow("Vertical rate", "%+d fpm".format(it)) }
-                ct.trackDeg?.let { DetailRow("Heading", "${it.roundToInt()}°") }
+                ct.verticalRateFpm?.let { DetailRow("Vertical rate", fmtInt("%+d fpm", it)) }
+                ct.trackDeg?.let { DetailRow("Track", "${it.roundToInt()}°") }
+                // Track is the path over the ground; true heading is where the nose points. They
+                // differ by the wind, so a gap between them is the crosswind made visible.
+                ct.trueHeadingDeg?.let { DetailRow("Nose heading", "${it.roundToInt()}°") }
                 ct.squawk?.let { DetailRow("Squawk", it) }
-                ct.category?.let { DetailRow("Category", it) }
-                if (ct.detail.isNotBlank()) DetailRow("Ident", ct.detail)
-                if (ct.military) DetailRow("Flag", "Military / state")
+                if (ct.ident) DetailRow("Ident", "pressed — identifying to ATC")
+                // Prefer the plain-English label, fall back to the raw code rather than nothing.
+                val typeText = ct.categoryLabel ?: ct.category
+                if (typeText != null) DetailRow("Type", typeText)
+                val identity = ct.identityLine.ifBlank { ct.detail }
+                if (identity.isNotBlank()) DetailRow("Aircraft", identity)
+
+                // What it is about to do, rather than what it is doing.
+                ct.selectedAltitudeFt?.let { DetailRow("Selected altitude", "$it ft") }
+                ct.selectedHeadingDeg?.let { DetailRow("Selected heading", "${it.roundToInt()}°") }
+                ct.navModes.takeIf { it.isNotEmpty() }?.let {
+                    DetailRow("Autopilot", it.joinToString(", "))
+                }
+                ct.qnhHpa?.let { DetailRow("Altimeter set", "${it.roundToInt()} hPa") }
+
+                // How much to trust the symbol on the scope.
+                if (ct.positionIsEstimated) {
+                    DetailRow("Position", "estimated (${ct.sourceType})")
+                }
+                if (ct.coasting) {
+                    ct.seenPosSec?.let { DetailRow("Last fix", "${it.roundToInt()}s ago — coasting") }
+                }
+                ct.rssiDb?.let { DetailRow("Signal", fmtDouble("%.1f dBFS", it)) }
+
+                val flags = listOfNotNull(
+                    "Military / state".takeIf { ct.military },
+                    "Notable".takeIf { ct.interesting },
+                    "Rotating address".takeIf { ct.pia },
+                    "Limited display".takeIf { ct.ladd },
+                )
+                if (flags.isNotEmpty()) DetailRow("Flags", flags.joinToString(" · "))
             }
         }
     }
@@ -607,6 +661,22 @@ private fun DetailRow(label: String, value: String) {
         Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.glow)
     }
 }
+
+/** The feed's emergency vocabulary, spelled out. */
+private fun declaredMeaning(word: String): String = when (word) {
+    "general" -> "general emergency"
+    "lifeguard" -> "lifeguard / medical flight"
+    "minfuel" -> "minimum fuel"
+    "nordo" -> "no radio"
+    "unlawful" -> "unlawful interference"
+    "downed" -> "downed aircraft"
+    else -> word
+}
+
+/** Locale.US: these are numbers, and some locales render digits differently. */
+private fun fmtInt(pattern: String, value: Int): String = String.format(Locale.US, pattern, value)
+
+private fun fmtDouble(pattern: String, value: Double): String = String.format(Locale.US, pattern, value)
 
 private fun squawkMeaning(squawk: String?): String = when (squawk) {
     "7500" -> "unlawful interference (hijack)"
