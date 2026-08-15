@@ -61,6 +61,12 @@ data class BriefSignals(
     val precipPct: Int? = null,
     val uvIndex: Double? = null,
     val severeWeather: Boolean = false,
+    // Canonical (Celsius, km/h) companions of the display values above. The comfort indices are
+    // defined in those units and nothing else, and the board carries a temperature every time it
+    // posts — so what that temperature actually does to a person belongs on the same row.
+    val tempC: Double? = null,
+    val humidityPct: Double? = null,
+    val windKmh: Double? = null,
     val kpIndex: Double? = null,
     // Agenda.
     val nextEventTitle: String? = null,
@@ -178,6 +184,10 @@ object UnifiedBriefComposer {
         val now = s.tempNow ?: return ""
         val parts = mutableListOf("${now.roundToInt()}${s.tempUnit} now")
         s.conditionText?.takeIf { it.isNotBlank() }?.let { parts += it }
+        // Heat and cold the thermometer understates, right after the condition and before the
+        // forecast. severeWeather covers storm codes; this covers the days that hurt without one.
+        WeatherComfort.compactFeelsLike(s.tempC, s.humidityPct, s.windKmh, s.tempUnit)
+            ?.let { parts += it }
         if (s.tempHi != null && s.tempLo != null) {
             parts += "High ${s.tempHi.roundToInt()} / Low ${s.tempLo.roundToInt()}"
         }

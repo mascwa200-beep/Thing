@@ -87,10 +87,18 @@ object BriefEngine {
         var precipPct: Int? = null
         var uvIndex: Double? = null
         var severe = false
+        // Canonical companions, so the row can say what the temperature does rather than only what
+        // it reads. Converted upstream at the one point the unit setting is known.
+        var tempC: Double? = null
+        var humidityPct: Double? = null
+        var windKmh: Double? = null
         runCatching {
             val w = resolveWeather(container, settings) ?: return@runCatching
             tempUnit = w.tempUnitSymbol
             tempNow = w.current?.temperature
+            tempC = w.current?.temperatureC
+            humidityPct = w.current?.humidity
+            windKmh = w.current?.windKmh
             conditionText = w.current?.let { WeatherCode.describe(it.weatherCode) }
             w.daily.firstOrNull()?.let { d ->
                 tempHi = d.tempMax
@@ -132,6 +140,9 @@ object BriefEngine {
                 precipPct = precipPct,
                 uvIndex = uvIndex,
                 severeWeather = severe,
+                tempC = tempC,
+                humidityPct = humidityPct,
+                windKmh = windKmh,
                 kpIndex = kp,
                 nextEventTitle = event?.title,
                 nextEventStartMs = event?.startMs,

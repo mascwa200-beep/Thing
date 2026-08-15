@@ -185,4 +185,30 @@ class WeatherComfortTest {
         // Inside the chart nothing moves: this is the value the earlier tests already pin.
         assertEquals(40.6754, WeatherComfort.heatIndexC(35.0, 50.0)!!, 0.001)
     }
+
+    @Test fun theCompactFormFitsARowAndStaysSilentOnAnOrdinaryDay() {
+        // A dense surface joins its parts with separators and has one line, so the advice sentence
+        // that headline() carries has to go -- what survives is the number and the word for it.
+        assertEquals(
+            "Feels 42°C — danger",
+            WeatherComfort.compactFeelsLike(32.0, 75.0, 5.0, "°C"),
+        )
+        // -5 C in 40 km/h is -14.08 by the JAG/TI regression, computed rather than recalled:
+        // 13.12 + 0.6215(-5) - 11.37(40^0.16) + 0.3965(-5)(40^0.16), with 40^0.16 = 1.8044.
+        assertEquals(
+            "Feels -14°C in wind",
+            WeatherComfort.compactFeelsLike(-5.0, 60.0, 40.0, "°C"),
+        )
+        // Mild, still, ordinary: nothing to add, so nothing is added.
+        assertNull(WeatherComfort.compactFeelsLike(18.0, 50.0, 8.0, "°C"))
+        // A degree or two of wind chill is not worth a slot in a one-line row.
+        assertNull(WeatherComfort.compactFeelsLike(8.0, 60.0, 6.0, "°C"))
+        assertNull(WeatherComfort.compactFeelsLike(null, 60.0, 40.0, "°C"))
+    }
+
+    @Test fun theCompactFormFollowsTheUnitTheReaderUses() {
+        val f = WeatherComfort.compactFeelsLike(32.0, 75.0, 5.0, "°F")!!
+        // 42.3 C is about 108 F. The index is computed in Celsius either way; only the display moves.
+        assertTrue(f.contains("108°F"))
+    }
 }

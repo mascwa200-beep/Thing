@@ -179,4 +179,29 @@ class UnifiedBriefTest {
         val s = routine().copy(nextEventStartMs = NOW, pendingTaskCount = 0, pendingReminderCount = 0)
         assertEquals("Dentist now", UnifiedBriefComposer.compose(s)!!.row(BriefRowKind.AGENDA)!!.text)
     }
+
+    @Test fun theWeatherRowSaysWhatTheTemperatureDoesNotOnlyWhatItReads() {
+        // The board posts a temperature every time. severeWeather covers storm codes; a 32 C day at
+        // 75% humidity carries no storm code and is the more dangerous of the two.
+        val s = BriefSignals(
+            nowMs = 1_700_000_000_000L,
+            tempNow = 32.0, tempUnit = "°C", conditionText = "Clear",
+            tempC = 32.0, humidityPct = 75.0, windKmh = 5.0,
+        )
+        val row = UnifiedBriefComposer.compose(s)!!.rows.first { it.kind == BriefRowKind.WEATHER }
+        assertTrue(row.text.contains("Feels 42°C — danger"))
+        // And on an ordinary day the row is exactly what it was before this existed.
+        val mild = s.copy(tempNow = 18.0, tempC = 18.0, humidityPct = 50.0, windKmh = 8.0)
+        val mildRow = UnifiedBriefComposer.compose(mild)!!.rows.first { it.kind == BriefRowKind.WEATHER }
+        assertTrue(!mildRow.text.contains("Feels"))
+    }
+
+    @Test fun aBlobWithoutTheCanonicalFieldsStillRendersTheRow() {
+        // A cache written by a build before those fields existed decodes with them null, and the
+        // row must degrade to its old content rather than disappear.
+        val s = BriefSignals(nowMs = 1_700_000_000_000L, tempNow = 21.0, conditionText = "Cloudy")
+        val row = UnifiedBriefComposer.compose(s)!!.rows.first { it.kind == BriefRowKind.WEATHER }
+        assertTrue(row.text.contains("21°C now"))
+        assertTrue(row.text.contains("Cloudy"))
+    }
 }
