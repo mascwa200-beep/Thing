@@ -31,7 +31,7 @@ data class NightwirePalette(
 /** Ported verbatim (same values) from the Android app's `ui/theme/LcarsPalette.kt`. Style/interaction-
  *  language homage only — no franchise branding assets. */
 val lcarsPalette = NightwirePalette(
-    accent = Color(0xFFFF9C42),
+    accent = Color(0xFFFF9900),
     void = Color(0xFF000000),
     carbon = Color(0xFF0A0A0C),
     panel = Color(0xFF121214),

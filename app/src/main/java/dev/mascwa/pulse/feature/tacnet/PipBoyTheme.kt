@@ -13,7 +13,7 @@ internal object Pip {
     val grid = Color(0xFF3A3A3D)      // range rings / ticks
     val dim = Color(0xFFB8B8BD)       // secondary text
     val mid = Color(0xFF9999FF)       // standard contact (periwinkle)
-    val bright = Color(0xFFFF9C42)    // sweep / primary (LCARS orange)
+    val bright = Color(0xFFFF9900)    // sweep / primary (LCARS orange)
     val glow = Color(0xFFFFFFFF)      // brightest highlight (ISS/selected text)
     val alert = Color(0xFFCC6666)     // emergency
     val violet = Color(0xFFCC99CC)    // secondary hero accent (mauve)
