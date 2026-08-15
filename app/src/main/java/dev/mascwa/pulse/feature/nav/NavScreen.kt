@@ -77,7 +77,6 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
-import dev.mascwa.pulse.feature.objectives.ObjectivesViewModel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -129,9 +128,9 @@ private val BUILDING = Color(0xFFFF2A4E)       // red building mass
 private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
 private val ROAD = Color(0xFF2DE2E6)           // glowing cyan road network
 
-/** The NAV map's internal views: the live map, or the objectives manager folded in as a sub-tab. */
+/** The NAV map. */
 @Composable
-fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () -> Unit) {
+fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     PulseScaffold(
         title = "NAV",
@@ -141,14 +140,18 @@ fun NavScreen(vm: NavViewModel, objectivesVm: ObjectivesViewModel, onBack: () ->
             }
         },
     ) { innerPadding ->
-        NavBody(vm, objectivesVm, Modifier.padding(innerPadding))
+        NavBody(vm, Modifier.padding(innerPadding))
     }
 }
 
-/** The scaffold-free NAV map body — the live MapLibre map with the MAP | OBJECTIVES sub-switch. Extracted
- *  so it can be hosted both standalone ([NavScreen]) and as a tab inside the LCARS hub. */
+/** The scaffold-free NAV map body — the live MapLibre map. Extracted so it can be hosted both
+ *  standalone ([NavScreen]) and inside another screen.
+ *
+ *  It used to take an ObjectivesViewModel for a MAP | OBJECTIVES sub-switch that has since been
+ *  removed; the parameter outlived the feature and was threaded through two signatures without ever
+ *  being read. Waypoints come from NavViewModel's own WaypointStore. */
 @Composable
-fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modifier = Modifier) {
+fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     val location by vm.location.collectAsState()
     val heading by vm.headingDeg.collectAsState()
@@ -225,8 +228,15 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
                     vm.selectWaypoint(objId)
                     return@addOnMapClickListener true
                 }
-                val name = ml.queryRenderedFeatures(pt, POI_LAYER).firstOrNull()?.getStringProperty("name")
-                val hit = name?.let { n -> vm.pois.value.values.flatten().firstOrNull { it.name == n } }
+                // Match on the feature's own key, not its name. Place carries no id, and a name
+                // is not unique — tapping one branch of a coffee chain used to open whichever
+                // branch happened to come first in the list.
+                val pid = ml.queryRenderedFeatures(pt, POI_LAYER).firstOrNull()?.getStringProperty("pid")
+                val hit = pid?.let { key ->
+                    vm.pois.value.entries.firstNotNullOfOrNull { (cat, places) ->
+                        places.firstOrNull { poiKey(cat, it) == key }
+                    }
+                }
                 vm.selectWaypoint(null)
                 vm.selectPoi(hit)
                 hit != null
@@ -327,8 +337,6 @@ fun NavBody(vm: NavViewModel, objectivesVm: ObjectivesViewModel, modifier: Modif
     }
 
     Box(modifier.fillMaxSize()) {
-            // The map stays composed in both sub-tabs (cheap to keep, costly to recreate); the
-            // OBJECTIVES sub-tab simply draws an opaque manager panel over it.
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
             NavChrome(hasFix = location != null, c = c)
@@ -453,11 +461,22 @@ private fun poiGeoJson(enabled: Set<NavCategory>, pois: Map<NavCategory, List<Pl
                 .append(p.longitude).append(',').append(p.latitude)
                 .append("]},\"properties\":{\"color\":\"").append(cat.colorHex)
                 .append("\",\"name\":").append(jsonString(p.name))
+                .append(",\"pid\":").append(jsonString(poiKey(cat, p)))
                 .append(",\"cat\":\"").append(cat.id).append("\"}}")
         }
     }
     return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
+
+/**
+ * A stable identity for a POI.
+ *
+ * [Place] has no id field, so this is built from the one thing that genuinely distinguishes two
+ * places: where they are. Written into the feature and compared back verbatim, so there is no
+ * float round-trip to disagree about.
+ */
+private fun poiKey(cat: NavCategory, p: Place): String =
+    "${cat.id}:${p.longitude},${p.latitude}"
 
 /** Minimal JSON string escaping for POI names. */
 private fun jsonString(s: String): String {

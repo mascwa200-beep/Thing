@@ -344,11 +344,10 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.jarvis.JarvisDossierScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- 3D cyberpunk navigation map (OBJECTIVES manager folded in as a sub-tab) ----
+            // ---- 3D cyberpunk navigation map ----
             composable(Routes.NAV) {
                 val vm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
-                val objVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.nav.NavScreen(vm, objVm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.nav.NavScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Saved places / waypoint tracker ----
