@@ -204,7 +204,11 @@ class RefreshWorker(
         }
         if (prefs.showWeatherRow) {
             runCatching { resolveWeather(settings) }
-            runCatching { container.spaceWeatherRepository.fetch(force = true) }
+            // heavy = false: this pass exists to warm Kp for the brief board. The five large solar
+            // products are ~546 KB of a ~596 KB refresh and nothing in the background path reads
+            // them, so fetching them every 15 minutes was ~57 MB a day for one number. The console
+            // still gets the full set; a light pass carries the cached heavy values forward.
+            runCatching { container.spaceWeatherRepository.fetch(force = true, heavy = false) }
         }
 
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---
