@@ -207,11 +207,37 @@ class WeatherRepository(
     }
 
     private suspend fun loadAir(lat: Double, lon: Double): AirQuality? {
+        // The two index numbers were all this asked for, while the pollutants they are computed
+        // from — and the pollen — came back in the same round trip for free. An index hides the
+        // only question worth asking, which is what is actually in the air.
         val url = "https://air-quality-api.open-meteo.com/v1/air-quality" +
-            "?latitude=$lat&longitude=$lon&current=european_aqi,us_aqi,pm10,pm2_5&timezone=auto"
+            "?latitude=$lat&longitude=$lon&current=european_aqi,us_aqi,pm10,pm2_5," +
+            "carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,dust," +
+            "alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen" +
+            "&timezone=auto"
         val resp = http.getJson(url, OmAir.serializer())
-        return resp.current?.let {
-            AirQuality(it.european_aqi, it.us_aqi, it.pm10, it.pm2_5)
+        return resp.current?.let { c ->
+            AirQuality(
+                europeanAqi = c.european_aqi,
+                usAqi = c.us_aqi,
+                pm10 = c.pm10,
+                pm25 = c.pm2_5,
+                carbonMonoxide = c.carbon_monoxide,
+                nitrogenDioxide = c.nitrogen_dioxide,
+                sulphurDioxide = c.sulphur_dioxide,
+                ozone = c.ozone,
+                dust = c.dust,
+                // Absent species are dropped rather than carried as zero: outside Europe the feed
+                // returns null for every one of them, and a wall of "0" reads as a measurement.
+                pollen = listOfNotNull(
+                    c.alder_pollen?.let { PollenCount("Alder", it) },
+                    c.birch_pollen?.let { PollenCount("Birch", it) },
+                    c.grass_pollen?.let { PollenCount("Grass", it) },
+                    c.mugwort_pollen?.let { PollenCount("Mugwort", it) },
+                    c.olive_pollen?.let { PollenCount("Olive", it) },
+                    c.ragweed_pollen?.let { PollenCount("Ragweed", it) },
+                ),
+            )
         }
     }
 }

@@ -144,6 +144,41 @@ object WeatherExplainers {
     }
 
     /**
+     * A single pollutant: what it is, where it came from, and what it does.
+     *
+     * The averaging period is stated because a live reading is one hour and every guideline is a
+     * longer average, so the comparison is a direction rather than a verdict — and saying so is the
+     * difference between an honest reading and a reassuring one.
+     */
+    fun pollutant(reading: AirQualityGuide.Reading?): Explainer? {
+        if (reading == null) return null
+        val p = reading.pollutant
+        return Explainer(
+            "${p.label} ${reading.value.roundToInt()} µg/m³ — ${AirQualityGuide.describeRatio(reading.ratio)}",
+            "${p.source} ${p.effect} Measured against the World Health Organization's 2021 guideline " +
+                "of ${p.guideline.roundToInt()} µg/m³, stated as a ${p.averaging}. This reading covers " +
+                "one hour, so read it as a direction rather than a verdict.",
+        )
+    }
+
+    /** Why the two published air-quality indices disagree about identical air. */
+    fun aqiScales(euAqi: Double?, usAqi: Double?): Explainer? {
+        val detail = AirQualityGuide.scaleGap(euAqi, usAqi) ?: return null
+        return Explainer("Two indices, one set of air", detail)
+    }
+
+    /** Pollen, with the caveat that makes the number usable. */
+    fun pollen(species: String, grainsPerM3: Double?): Explainer? {
+        val band = AirQualityGuide.pollenBand(grainsPerM3) ?: return null
+        return Explainer(
+            "$species pollen ${grainsPerM3!!.roundToInt()} grains/m³ — $band",
+            "The count that provokes symptoms differs by species and differs enormously between " +
+                "people, so treat this as a magnitude rather than a clinical threshold. The forecast " +
+                "model only covers Europe, which is why pollen is absent elsewhere rather than zero.",
+        )
+    }
+
+    /**
      * Convective available potential energy — how much fuel a thunderstorm would have here.
      *
      * Fuel is not a trigger. High CAPE with nothing to lift the air produces a pleasant afternoon,

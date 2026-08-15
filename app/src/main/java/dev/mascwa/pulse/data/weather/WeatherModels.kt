@@ -92,7 +92,19 @@ data class AirQuality(
     val usAqi: Double?,
     val pm10: Double?,
     val pm25: Double?,
+    /** µg/m³. Defaulted, so a cache blob written before these were requested still decodes. */
+    val carbonMonoxide: Double? = null,
+    val nitrogenDioxide: Double? = null,
+    val sulphurDioxide: Double? = null,
+    val ozone: Double? = null,
+    val dust: Double? = null,
+    /** grains/m³, and null outside the European model domain. */
+    val pollen: List<PollenCount> = emptyList(),
 )
+
+/** One species' pollen count. A list, because which species matter depends on where you are. */
+@Serializable
+data class PollenCount(val species: String, val grainsPerM3: Double)
 
 @Serializable
 data class WeatherData(

@@ -105,4 +105,18 @@ data class OmAirCurrent(
     val us_aqi: Double? = null,
     val pm10: Double? = null,
     val pm2_5: Double? = null,
+    // All µg/m³, all in the same response the two index numbers already came from.
+    val carbon_monoxide: Double? = null,
+    val nitrogen_dioxide: Double? = null,
+    val sulphur_dioxide: Double? = null,
+    val ozone: Double? = null,
+    val dust: Double? = null,
+    // grains/m³, and null everywhere outside the European model domain — probed and confirmed, so
+    // the screen must be able to say nothing rather than show a row of zeroes.
+    val alder_pollen: Double? = null,
+    val birch_pollen: Double? = null,
+    val grass_pollen: Double? = null,
+    val mugwort_pollen: Double? = null,
+    val olive_pollen: Double? = null,
+    val ragweed_pollen: Double? = null,
 )
