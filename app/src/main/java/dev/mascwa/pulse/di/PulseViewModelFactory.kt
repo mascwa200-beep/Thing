@@ -104,7 +104,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.security.SecurityAuditViewModel::class.java) ->
                 dev.mascwa.pulse.feature.security.SecurityAuditViewModel(c.securityAuditor, c.securityAuditStore, c.applicationContext)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.nav.NavViewModel::class.java) ->
-                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository, c.rainViewerRepository)
+                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository, c.rainViewerRepository, c.radarRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->

@@ -12,6 +12,9 @@ import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.places.RoutingRepository
+import dev.mascwa.pulse.data.radar.Contact
+import dev.mascwa.pulse.data.radar.ContactKind
+import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -72,6 +75,7 @@ class NavViewModel(
     private val safety: SafetyRepository,
     private val routing: RoutingRepository,
     private val rainViewer: RainViewerRepository,
+    private val radar: RadarRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -113,6 +117,22 @@ class NavViewModel(
     private val _rainFrame = MutableStateFlow<RainViewerRepository.RadarFrame?>(null)
     val rainFrame: StateFlow<RainViewerRepository.RadarFrame?> = _rainFrame.asStateFlow()
     private var rainJob: Job? = null
+
+    /**
+     * Aircraft overhead and recent earthquakes, both drawn on the map.
+     *
+     * One fetch serves both — the radar repository returns aircraft, the station and quakes
+     * together — so the two overlays share a single refresh loop rather than each running one.
+     */
+    private val _traffic = MutableStateFlow(false)
+    val traffic: StateFlow<Boolean> = _traffic.asStateFlow()
+    private val _seismic = MutableStateFlow(false)
+    val seismic: StateFlow<Boolean> = _seismic.asStateFlow()
+    private val _aircraft = MutableStateFlow<List<Contact>>(emptyList())
+    val aircraft: StateFlow<List<Contact>> = _aircraft.asStateFlow()
+    private val _quakes = MutableStateFlow<List<Contact>>(emptyList())
+    val quakes: StateFlow<List<Contact>> = _quakes.asStateFlow()
+    private var radarJob: Job? = null
 
     /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
     private val _selectedPoi = MutableStateFlow<Place?>(null)
@@ -181,6 +201,9 @@ class NavViewModel(
                 // Restoring the rain overlay has to go through the setter: the layer needs a frame,
                 // and only the setter starts the loop that fetches one.
                 if (it.navRain) setRain(true)
+                _traffic.value = it.navTraffic
+                _seismic.value = it.navSeismic
+                if (it.navTraffic || it.navSeismic) restartRadar()
             }
         }
         // Keep a road-following route to the active waypoint, refreshed when it changes or the player
@@ -256,6 +279,55 @@ class NavViewModel(
             while (isActive) {
                 _rainFrame.value = runCatching { rainViewer.latest() }.getOrNull()
                 delay(5 * 60_000L)
+            }
+        }
+    }
+
+    fun setTraffic(on: Boolean) {
+        _traffic.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navTraffic = on) } } }
+        restartRadar()
+    }
+
+    fun setSeismic(on: Boolean) {
+        _seismic.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navSeismic = on) } } }
+        restartRadar()
+    }
+
+    /**
+     * Keep the aircraft and quake overlays fed, at a pace set by what is actually shown.
+     *
+     * Aircraft move; earthquakes have already happened. So the loop runs fast only while traffic is
+     * on, and drops to a crawl when the map is only showing seismic history. With both overlays off
+     * it stops entirely and drops what it was holding, so a hidden layer costs nothing.
+     */
+    private fun restartRadar() {
+        radarJob?.cancel()
+        if (!_traffic.value && !_seismic.value) {
+            _aircraft.value = emptyList()
+            _quakes.value = emptyList()
+            return
+        }
+        radarJob = viewModelScope.launch {
+            while (isActive) {
+                val loc = _location.value
+                if (loc != null) {
+                    val data = runCatching { radar.fetch(loc.latitude, loc.longitude, false).data }.getOrNull()
+                    if (data != null) {
+                        _aircraft.value = if (_traffic.value) {
+                            data.contacts.filter { it.kind == ContactKind.AIRCRAFT.name }
+                        } else {
+                            emptyList()
+                        }
+                        _quakes.value = if (_seismic.value) {
+                            data.contacts.filter { it.kind == ContactKind.QUAKE.name }
+                        } else {
+                            emptyList()
+                        }
+                    }
+                }
+                delay(if (_traffic.value) TRAFFIC_REFRESH_MS else SEISMIC_REFRESH_MS)
             }
         }
     }
@@ -469,6 +541,13 @@ class NavViewModel(
         compass.stop()
         pollJob?.cancel()
         pollJob = null
+    }
+
+    private companion object {
+        /** Aircraft move; this is the same cadence the radar scope itself uses. */
+        const val TRAFFIC_REFRESH_MS = 20_000L
+        /** Earthquakes have already happened. Refreshing often would only cost battery. */
+        const val SEISMIC_REFRESH_MS = 5 * 60_000L
     }
 
     override fun onCleared() {

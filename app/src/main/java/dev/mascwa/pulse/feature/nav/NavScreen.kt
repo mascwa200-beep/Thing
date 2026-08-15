@@ -72,6 +72,7 @@ import dev.mascwa.pulse.data.maps.RainViewerRepository
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
+import dev.mascwa.pulse.data.radar.Contact
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.telemetry.Terminator
@@ -96,6 +97,7 @@ import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.HeatmapLayer
 import org.maplibre.android.style.layers.HillshadeLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
@@ -135,6 +137,11 @@ private const val RELIEF_SOURCE = "nav-relief"
 private const val RELIEF_LAYER = "nav-relief-shade"
 private const val RAIN_SOURCE = "nav-rain"
 private const val RAIN_LAYER = "nav-rain-tiles"
+private const val TRAFFIC_SOURCE = "nav-traffic"
+private const val TRAFFIC_LAYER = "nav-traffic-sym"
+private const val TRAFFIC_ICON = "nav-plane"
+private const val QUAKE_SOURCE = "nav-quake"
+private const val QUAKE_LAYER = "nav-quake-heat"
 /** TileJSON version every hand-built TileSet declares; the spec requires the field. */
 private const val TILEJSON_VERSION = "2.2.0"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
@@ -201,6 +208,10 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val relief by vm.relief.collectAsState()
     val rain by vm.rain.collectAsState()
     val rainFrame by vm.rainFrame.collectAsState()
+    val trafficOn by vm.traffic.collectAsState()
+    val seismicOn by vm.seismic.collectAsState()
+    val aircraft by vm.aircraft.collectAsState()
+    val quakes by vm.quakes.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
 
@@ -353,6 +364,17 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(rainFrame, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         runCatching { applyRain(style, rainFrame) }
+    }
+
+    // Aircraft and quakes. Both sources are simply emptied when their overlay is off, which is
+    // also what the view model publishes, so there is one source of truth for "not shown".
+    LaunchedEffect(aircraft, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(TRAFFIC_SOURCE)?.setGeoJson(trafficGeoJson(aircraft))
+    }
+    LaunchedEffect(quakes, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        style.getSourceAs<GeoJsonSource>(QUAKE_SOURCE)?.setGeoJson(quakeGeoJson(quakes))
     }
 
     // Redraw the day/night terminator while it is lit. It slides west a quarter of a degree per
@@ -522,11 +544,16 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             relief = relief,
                             rain = rain,
                             rainFrame = rainFrame,
+                            traffic = trafficOn,
+                            aircraftCount = aircraft.size,
+                            seismic = seismicOn,
                             night = night,
                             c = c,
                             onBasemap = vm::setBasemap,
                             onRelief = vm::setRelief,
                             onRain = vm::setRain,
+                            onTraffic = vm::setTraffic,
+                            onSeismic = vm::setSeismic,
                             onNight = vm::setNight,
                         )
                     }
@@ -566,12 +593,14 @@ private fun installNavStyle(ml: MapLibreMap, c: NightwirePalette, onReady: () ->
         ensureBuildingExtrusion(style)
         addRasterLayers(style)
         addNightLayer(style)
+        addSeismicLayer(style)
         addRouteLayer(style)
         addPoiLayer(style, c)
         addIncidentLayer(style, c)
         addWaypointLayer(style, c)
         addObjectiveIcons(style)
         addObjectiveLayer(style)
+        addTrafficLayer(style, c)
         addPlayerMarker(style, c)
         onReady()
     }
@@ -968,6 +997,131 @@ private fun applyRain(style: Style, frame: RainViewerRepository.RadarFrame?) {
     // Above the ground, below the things you navigate by: rain should not hide your own route.
     if (style.getLayer(ROUTE_CASING_LAYER) != null) style.addLayerBelow(rain, ROUTE_CASING_LAYER)
     else style.addLayer(rain)
+}
+
+/**
+ * Aircraft overhead, and recent earthquakes as a heatmap.
+ *
+ * The quakes are a heatmap rather than dots on purpose: a scatter of points says where events were
+ * recorded, while a magnitude-weighted density says where the ground is actually restless, which is
+ * the question anyone looking at this is asking.
+ */
+private fun addTrafficLayer(style: Style, c: NightwirePalette) {
+    if (style.getSource(TRAFFIC_SOURCE) != null) return
+    style.addImage(TRAFFIC_ICON, planeBitmap(c.sky.toArgb()))
+    style.addSource(GeoJsonSource(TRAFFIC_SOURCE))
+    style.addLayer(
+        SymbolLayer(TRAFFIC_LAYER, TRAFFIC_SOURCE).withProperties(
+            PropertyFactory.iconImage(TRAFFIC_ICON),
+            // Rotate with the map, not the screen: an aircraft symbol that keeps pointing the same
+            // way while the map turns is worse than no symbol at all.
+            PropertyFactory.iconRotate(Expression.get("bearing")),
+            PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.textField(Expression.get("label")),
+            PropertyFactory.textSize(9f),
+            PropertyFactory.textColor(c.sky.toArgb()),
+            PropertyFactory.textHaloColor(LAND.toArgb()),
+            PropertyFactory.textHaloWidth(1.2f),
+            PropertyFactory.textOffset(arrayOf(0f, 1.4f)),
+            // Labels, unlike the symbols, are allowed to collide — so a busy sky thins its own
+            // callsigns out instead of turning into a wall of text.
+            PropertyFactory.textAllowOverlap(false),
+            PropertyFactory.textOptional(true),
+        ),
+    )
+}
+
+private fun addSeismicLayer(style: Style) {
+    if (style.getSource(QUAKE_SOURCE) != null) return
+    style.addSource(GeoJsonSource(QUAKE_SOURCE))
+    style.addLayer(
+        HeatmapLayer(QUAKE_LAYER, QUAKE_SOURCE).withProperties(
+            // Magnitude is logarithmic, so the weight ramp is steep on purpose: a 6 should not read
+            // as merely three times a 2.
+            PropertyFactory.heatmapWeight(
+                Expression.interpolate(
+                    Expression.linear(), Expression.get("mag"),
+                    Expression.stop(1.0, 0.08), Expression.stop(4.0, 0.35), Expression.stop(7.0, 1.0),
+                ),
+            ),
+            PropertyFactory.heatmapIntensity(
+                Expression.interpolate(
+                    Expression.linear(), Expression.zoom(),
+                    Expression.stop(0, 1.0), Expression.stop(10, 2.6),
+                ),
+            ),
+            PropertyFactory.heatmapColor(
+                Expression.interpolate(
+                    Expression.linear(), Expression.heatmapDensity(),
+                    Expression.stop(0.0, Expression.rgba(0, 0, 0, 0)),
+                    Expression.stop(0.25, Expression.rgba(45, 226, 230, 0.35)),
+                    Expression.stop(0.55, Expression.rgba(255, 197, 66, 0.55)),
+                    Expression.stop(1.0, Expression.rgba(255, 42, 78, 0.85)),
+                ),
+            ),
+            // A fixed pixel radius would make a continent-wide picture at low zoom and specks at
+            // high zoom; growing it with the zoom keeps the blobs about the same size on the ground.
+            PropertyFactory.heatmapRadius(
+                Expression.interpolate(
+                    Expression.linear(), Expression.zoom(),
+                    Expression.stop(0, 14.0), Expression.stop(8, 40.0), Expression.stop(14, 70.0),
+                ),
+            ),
+            PropertyFactory.heatmapOpacity(0.85f),
+        ),
+    )
+}
+
+/** Aircraft symbols: a plain delta pointing up, rotated to the track by the layer. */
+private fun planeBitmap(argb: Int): android.graphics.Bitmap {
+    val size = 30
+    val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = argb
+        style = android.graphics.Paint.Style.FILL
+    }
+    val path = android.graphics.Path().apply {
+        moveTo(size / 2f, 3f)
+        lineTo(size - 6f, size - 5f)
+        lineTo(size / 2f, size - 10f)
+        lineTo(6f, size - 5f)
+        close()
+    }
+    canvas.drawPath(path, paint)
+    return bmp
+}
+
+private fun trafficGeoJson(contacts: List<Contact>): String {
+    if (contacts.isEmpty()) return EMPTY_FC
+    val features = StringBuilder()
+    contacts.forEachIndexed { i, ct ->
+        if (i > 0) features.append(',')
+        features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
+            .append(ct.longitude).append(',').append(ct.latitude)
+            .append("]},\"properties\":{\"bearing\":").append(ct.trackDeg ?: 0.0)
+            .append(",\"label\":").append(jsonString(ct.label)).append("}}")
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
+}
+
+private fun quakeGeoJson(contacts: List<Contact>): String {
+    if (contacts.isEmpty()) return EMPTY_FC
+    val features = StringBuilder()
+    var written = 0
+    for (ct in contacts) {
+        // A quake with no magnitude cannot be weighted, and weighting it as zero would quietly
+        // shrink the picture. Leave it out and let the layer describe what it can measure.
+        val mag = ct.magnitude ?: continue
+        if (written > 0) features.append(',')
+        written++
+        features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
+            .append(ct.longitude).append(',').append(ct.latitude)
+            .append("]},\"properties\":{\"mag\":").append(mag).append("}}")
+    }
+    return if (written == 0) EMPTY_FC else "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
 }
 
 /**
@@ -1453,11 +1607,16 @@ private fun LayersPanel(
     relief: Boolean,
     rain: Boolean,
     rainFrame: RainViewerRepository.RadarFrame?,
+    traffic: Boolean,
+    aircraftCount: Int,
+    seismic: Boolean,
     night: Boolean,
     c: NightwirePalette,
     onBasemap: (MapLayerCatalog.Basemap) -> Unit,
     onRelief: (Boolean) -> Unit,
     onRain: (Boolean) -> Unit,
+    onTraffic: (Boolean) -> Unit,
+    onSeismic: (Boolean) -> Unit,
     onNight: (Boolean) -> Unit,
 ) {
     val shape = lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart)
@@ -1512,6 +1671,14 @@ private fun LayersPanel(
                 c = c,
                 onClick = { onRain(!rain) },
             )
+            LayerChip(
+                label = "TRAFFIC",
+                detail = if (traffic) "${aircraftCount} overhead" else "Aircraft overhead",
+                on = traffic,
+                c = c,
+                onClick = { onTraffic(!traffic) },
+            )
+            LayerChip("SEISMIC", "Recent quakes, by strength", seismic, c) { onSeismic(!seismic) }
             LayerChip("RELIEF", "Hillshaded terrain", relief, c) { onRelief(!relief) }
             LayerChip("NIGHT", "Where the Sun has set", night, c) { onNight(!night) }
         }

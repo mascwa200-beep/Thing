@@ -404,6 +404,8 @@ data class AppSettings(
     val navBasemap: String = "NIGHTWIRE", // MapLayerCatalog.Basemap name; unknown values fall back
     val navRelief: Boolean = false,       // hillshaded relief from elevation tiles
     val navRain: Boolean = false,         // live precipitation radar overlay
+    val navTraffic: Boolean = false,      // live aircraft over the map
+    val navSeismic: Boolean = false,      // recent earthquakes as a heatmap
 
     // NAV objectives: manual waypoints + the one currently tracked on the map.
     val waypoints: List<Waypoint> = emptyList(),
