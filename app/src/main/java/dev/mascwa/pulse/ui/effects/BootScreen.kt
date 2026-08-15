@@ -2,7 +2,6 @@ package dev.mascwa.pulse.ui.effects
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -11,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,14 +42,15 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.Stardate
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import dev.mascwa.pulse.ui.theme.Pulse
-import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import kotlinx.coroutines.delay
 
 /** One drifting mote of the field — fixed parameters only; its on-screen position is
  *  computed analytically from the animation clock in the draw pass, so there is no
@@ -108,17 +109,25 @@ private fun generateBootLog(): List<String> {
         )
 }
 
-/** A one-time, deterministic-from-the-real-clock stardate flourish for the boot reveal — advances with
- *  the wall clock like the show's own convention, not a canon-precise formula (nobody's fact-checking the
- *  exact math; it just needs to read like a stardate). */
+/**
+ * The boot reveal's stardate, now read from the shared core rather than computed here.
+ *
+ * The scale is unchanged — this is the same number the boot has always shown. What moved is where
+ * it is decided: [Stardate] is pure and tested, which is what the header and the brief will read
+ * too, so the app can never show itself two different stardates. Its own two defects went with it:
+ * the old form divided by a fixed 365 and drifted through a leap year, and formatted through the
+ * default locale.
+ */
 private fun starfleetStardate(): String {
     val cal = java.util.Calendar.getInstance()
-    val year = cal.get(java.util.Calendar.YEAR)
-    val dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR)
-    val frac = (dayOfYear * 1000L) / 365
-    val base = (year % 100) * 1000 + frac
-    val tenths = cal.get(java.util.Calendar.HOUR_OF_DAY) * 10 / 24
-    return "STARDATE %d.%d".format(base, tenths)
+    return Stardate.stamp(
+        Stardate.of(
+            year = cal.get(java.util.Calendar.YEAR),
+            dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR),
+            daysInYear = cal.getActualMaximum(java.util.Calendar.DAY_OF_YEAR),
+            hourOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY),
+        ),
+    )
 }
 
 // Deliberately unhurried (~half the old pace) so the message can actually be read.
