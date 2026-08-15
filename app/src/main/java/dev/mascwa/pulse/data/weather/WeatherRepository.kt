@@ -69,10 +69,15 @@ class WeatherRepository(
             append("https://api.open-meteo.com/v1/forecast")
             append("?latitude=$lat&longitude=$lon")
             append("&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,")
-            append("precipitation,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover")
-            append("&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m")
+            append("precipitation,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover,")
+            // Same request, no extra round trip: these were always on offer and never asked for.
+            append("dew_point_2m,wind_gusts_10m,visibility,surface_pressure,rain,showers,snowfall")
+            append("&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,")
+            append("wind_gusts_10m,apparent_temperature,dew_point_2m,uv_index,cape,visibility")
             append("&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,")
-            append("precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max")
+            append("precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,")
+            append("wind_gusts_10m_max,wind_direction_10m_dominant,apparent_temperature_max,")
+            append("apparent_temperature_min,precipitation_hours,sunshine_duration,daylight_duration,snowfall_sum")
             append("&timezone=auto&forecast_days=7")
             append("&temperature_unit=${s.temperatureUnit.apiValue}")
             append("&wind_speed_unit=${s.windUnit.apiValue}")
@@ -92,6 +97,13 @@ class WeatherRepository(
                 windDirection = c.wind_direction_10m,
                 pressure = c.pressure_msl,
                 cloudCover = c.cloud_cover,
+                dewPoint = c.dew_point_2m,
+                windGust = c.wind_gusts_10m,
+                visibility = c.visibility,
+                surfacePressure = c.surface_pressure,
+                rain = c.rain,
+                showers = c.showers,
+                snowfall = c.snowfall,
             )
         }
 
@@ -103,6 +115,12 @@ class WeatherRepository(
                     precipProbability = h.precipitation_probability.getOrNull(i),
                     weatherCode = h.weather_code.getOrNull(i) ?: 0,
                     windSpeed = h.wind_speed_10m.getOrNull(i),
+                    windGust = h.wind_gusts_10m.getOrNull(i),
+                    apparentTemperature = h.apparent_temperature.getOrNull(i),
+                    dewPoint = h.dew_point_2m.getOrNull(i),
+                    uvIndex = h.uv_index.getOrNull(i),
+                    capeJkg = h.cape.getOrNull(i),
+                    visibility = h.visibility.getOrNull(i),
                 )
             }
         }.orEmpty()
@@ -120,6 +138,14 @@ class WeatherRepository(
                     precipProbabilityMax = d.precipitation_probability_max.getOrNull(i),
                     windMax = d.wind_speed_10m_max.getOrNull(i),
                     uvIndexMax = d.uv_index_max.getOrNull(i),
+                    gustMax = d.wind_gusts_10m_max.getOrNull(i),
+                    windDirectionDominant = d.wind_direction_10m_dominant.getOrNull(i),
+                    apparentMax = d.apparent_temperature_max.getOrNull(i),
+                    apparentMin = d.apparent_temperature_min.getOrNull(i),
+                    precipitationHours = d.precipitation_hours.getOrNull(i),
+                    sunshineSeconds = d.sunshine_duration.getOrNull(i),
+                    daylightSeconds = d.daylight_duration.getOrNull(i),
+                    snowfallSum = d.snowfall_sum.getOrNull(i),
                 )
             }
         }.orEmpty()
