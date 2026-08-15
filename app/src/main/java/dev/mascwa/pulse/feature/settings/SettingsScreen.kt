@@ -489,10 +489,13 @@ fun SettingsScreen(
             // colour changed nothing on screen. A control that does nothing is worse than no
             // control, so they are gone. The settings fields survive — they are serialization keys,
             // and dropping one silently discards the rest of the blob.
-            if (vis(SettingsCategory.INTERFACE, "appearance haptics boot theme")) item {
+            if (vis(SettingsCategory.INTERFACE, "appearance haptics sounds audio boot theme")) item {
                 PrefSection("Appearance") {
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
+                    }
+                    PrefSwitch("Interface sounds", "Console chirps on taps and alerts", s.sounds) { v ->
+                        vm.update { it.copy(sounds = v) }
                     }
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }

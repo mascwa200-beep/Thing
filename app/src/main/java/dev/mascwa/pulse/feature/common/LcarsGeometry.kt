@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.LcarsCodes
+import dev.mascwa.pulse.ui.effects.HapticCue
+import dev.mascwa.pulse.ui.effects.SoundCue
+import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -226,13 +229,17 @@ fun LcarsChip(
     accent: Color = Pulse.colors.accent,
 ) {
     val c = Pulse.colors
+    // Wired at the kit rather than at the call site: the app has a full 13-cue haptic vocabulary that
+    // reached exactly one screen, and putting the cue here means every chip in every screen gains it
+    // without a 109-file sweep.
+    val cue = rememberLcarsCue()
     val shape = CutCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 0.dp, bottomStart = 10.dp)
     Box(
         modifier
             .clip(shape)
             .background(if (selected) accent else Color.Transparent)
             .border(1.dp, if (selected) accent else c.line, shape)
-            .clickable { onClick() }
+            .clickable { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
             .padding(horizontal = 15.dp, vertical = 7.dp),
     ) {
         Text(

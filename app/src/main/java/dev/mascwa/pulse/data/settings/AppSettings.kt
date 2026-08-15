@@ -341,6 +341,9 @@ data class AppSettings(
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
     val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
+    // Interface chirps, synthesised at runtime — see ui/effects/LcarsAudio.kt. Defaults on
+    // because it was asked for explicitly; it is one switch away in Appearance if it grates.
+    val sounds: Boolean = true,
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)
