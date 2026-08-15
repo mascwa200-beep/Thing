@@ -74,6 +74,12 @@ data class OracleSignals(
     val precipChancePct: Int? = null,
     val uvIndex: Double? = null,
     val windKmh: Double? = null,
+    /** Canonical (Celsius, km/h) — the comfort indices are defined in those and nothing else. */
+    val humidityPct: Double? = null,
+    val dewPointC: Double? = null,
+    val gustKmh: Double? = null,
+    /** Tonight's forecast low, for the overnight rules that fire before the cold arrives. */
+    val overnightLowC: Double? = null,
     // Markets
     val movers: List<OracleMover> = emptyList(),
     // News / emergencies
@@ -327,6 +333,140 @@ object Oracle {
         )
     }
 
+    /**
+     * Heat that the thermometer understates.
+     *
+     * Thirty-two degrees at thirty percent humidity is a hot day; the same thirty-two at seventy is
+     * a different problem, because sweat stops evaporating and the body loses its way of shedding
+     * heat. [WeatherComfort.heatIndexC] is the published correction for exactly that, and it
+     * returns null below the range it is fitted for, so this rule cannot fire on a mild day.
+     */
+    private fun heatStress(s: OracleSignals): Insight? {
+        val t = s.tempC ?: return null
+        val rh = s.humidityPct ?: return null
+        val hi = WeatherComfort.heatIndexC(t, rh) ?: return null
+        val risk = WeatherComfort.heatRisk(hi)
+        if (risk == WeatherComfort.HeatRisk.NONE || risk == WeatherComfort.HeatRisk.CAUTION) return null
+        // Only worth raising if you are out, going out, or it is the part of the day that bites.
+        val outSoon = s.events.any { it.hasLocation && minutesUntil(it.startMs, s.nowMs) in 0.0..240.0 }
+        if (s.awayFromHome != true && !outSoon && s.hourOfDay !in 11..17) return null
+        val urgency = when (risk) {
+            // A heat index past 54 is the band where heatstroke is likely, so it earns a push.
+            WeatherComfort.HeatRisk.EXTREME_DANGER -> Urgency.URGENT
+            WeatherComfort.HeatRisk.DANGER -> Urgency.IMPORTANT
+            else -> Urgency.NOTABLE
+        }
+        return Insight(
+            id = "heat_stress", kind = InsightKind.RISK, urgency = urgency,
+            title = "Feels like ${hi.roundToInt()}°C — ${risk.label.lowercase()}",
+            detail = "Humidity is doing this, not the thermometer: at ${rh.roundToInt()}% sweat " +
+                "evaporates slowly, so the air is ${(hi - t).roundToInt()}° harder on you than it " +
+                "reads. ${risk.advice}",
+            score = urgency.weight * 1000.0 + hi,
+            actionRoute = "weather",
+            sources = buildList { add("weather"); if (outSoon) add("calendar") else add("location") },
+        )
+    }
+
+    /**
+     * Cold made worse by wind, while there is still time to dress for it.
+     *
+     * The JAG/TI wind chill is only defined at or below 10 °C in moving air, which is the gate: a
+     * breezy spring afternoon cannot trip this.
+     */
+    private fun windChillBite(s: OracleSignals): Insight? {
+        val t = s.tempC ?: return null
+        val w = s.windKmh ?: return null
+        val chill = WeatherComfort.windChillC(t, w) ?: return null
+        if (chill > t - 3.0) return null // barely different from the air; not worth a word
+        val outSoon = s.events.any { it.hasLocation && minutesUntil(it.startMs, s.nowMs) in 0.0..240.0 }
+        if (s.awayFromHome != true && !outSoon) return null
+        val bite = WeatherComfort.frostbiteMinutes(chill)
+        val urgency = if (bite != null) Urgency.IMPORTANT else Urgency.NOTABLE
+        return Insight(
+            id = "wind_chill", kind = InsightKind.RISK, urgency = urgency,
+            title = "Feels like ${chill.roundToInt()}°C in the wind",
+            detail = "The air is ${t.roundToInt()}°, but ${w.roundToInt()} km/h of wind strips heat " +
+                "off skin far faster than still air does." +
+                if (bite != null) " Exposed skin freezes in about $bite min — cover everything." else
+                    " Dress for the chill, not the reading.",
+            score = urgency.weight * 1000.0 + (t - chill),
+            actionRoute = "weather",
+            sources = buildList { add("weather"); if (outSoon) add("calendar") else add("location") },
+        )
+    }
+
+    /**
+     * A gust well above the mean, which is the number that actually does damage.
+     *
+     * A forecast quotes an average over a period; the gust is the peak inside it, and the peak is
+     * what takes a branch down or catches a door. Fires in the evening too, when the useful action
+     * is to bring something in rather than to dress differently.
+     */
+    private fun gustWarning(s: OracleSignals): Insight? {
+        val note = WeatherComfort.gustNote(s.windKmh, s.gustKmh) ?: return null
+        val gust = s.gustKmh ?: return null
+        if (gust < 60.0) return null // below this the note is informational, not actionable
+        return Insight(
+            id = "gusts", kind = InsightKind.PREPARATION, urgency = Urgency.NOTABLE,
+            title = "Gusting to ${gust.roundToInt()} km/h",
+            detail = "$note Bring in anything loose, and expect doors to be taken out of your hand.",
+            score = Urgency.NOTABLE.weight * 1000.0 + gust,
+            actionRoute = "weather",
+            sources = listOf("weather"),
+        )
+    }
+
+    /**
+     * A cold night, raised in the evening while it is still useful.
+     *
+     * The actions this prompts — cover the plants, leave a few minutes for the windscreen, leave a
+     * tap dripping — all have to happen before bed, so the rule is time-gated to the evening rather
+     * than firing at dawn when the answer is already scraped onto the car.
+     *
+     * Deliberately **not** [WeatherComfort.frostPossible], which needs the dew point and wind *at
+     * the time the frost would form*. Those are tonight's, and the snapshot carries this evening's.
+     * Feeding it the current pair would be a confident answer to a question it was not asked, so
+     * this states the forecast low and says frost is possible rather than that it will happen.
+     */
+    private fun coldNight(s: OracleSignals): Insight? {
+        val low = s.overnightLowC ?: return null
+        if (low > 3.0) return null
+        if (s.hourOfDay !in 17..23) return null
+        return Insight(
+            id = "cold_night", kind = InsightKind.PREDICTION, urgency = Urgency.NOTABLE,
+            title = "Down to ${low.roundToInt()}°C tonight",
+            detail = "Frost is possible on a clear, still night even when the air stays above zero, " +
+                "because the ground radiates heat away faster than the air does. Cover anything " +
+                "tender and leave a few minutes for the windscreen.",
+            score = Urgency.NOTABLE.weight * 1000.0 + (5.0 - low),
+            actionRoute = "weather",
+            sources = listOf("weather"),
+        )
+    }
+
+    /**
+     * Fog, when the air is close enough to saturation for it.
+     *
+     * Raised in the small hours and early morning, which is when it forms and when it changes how
+     * long a journey takes.
+     */
+    private fun fogLikely(s: OracleSignals): Insight? {
+        val t = s.tempC ?: return null
+        val dp = s.dewPointC ?: return null
+        if (!WeatherComfort.fogLikely(t, dp)) return null
+        if (s.hourOfDay !in 3..10) return null
+        return Insight(
+            id = "fog", kind = InsightKind.PREDICTION, urgency = Urgency.NOTABLE,
+            title = "Fog likely — air is near saturation",
+            detail = "Temperature and dew point are within a degree of each other, which is what " +
+                "fog is. Allow extra time and extra stopping distance if you're driving.",
+            score = Urgency.NOTABLE.weight * 1000.0 + 20,
+            actionRoute = "weather",
+            sources = listOf("weather"),
+        )
+    }
+
     /** A storm front read from the phone's own barometer — hyper-local, works offline, and often
      *  ahead of a forecast refresh. Fired only on the fast fall (the Sensorium's PLUNGING band). */
     private fun stormFront(s: OracleSignals): Insight? {
@@ -361,6 +501,7 @@ object Oracle {
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
         ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
+        ::heatStress, ::windChillBite, ::gustWarning, ::coldNight, ::fogLikely,
     )
 
     /**

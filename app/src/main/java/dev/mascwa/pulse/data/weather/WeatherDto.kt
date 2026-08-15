@@ -26,6 +26,19 @@ data class OmCurrent(
     val wind_direction_10m: Double? = null,
     val pressure_msl: Double? = null,
     val cloud_cover: Double? = null,
+    // Everything below was already on offer from the same request and simply never asked for.
+    val dew_point_2m: Double? = null,
+    val wind_gusts_10m: Double? = null,
+    /**
+     * Horizontal visibility, in **metres or feet depending on the unit request** — verified by
+     * probing the same place twice: 25240.0 metric, 82808.4 imperial, which is the same distance.
+     * The documentation says metres; the service does not agree when asked in inches.
+     */
+    val visibility: Double? = null,
+    val surface_pressure: Double? = null,
+    val rain: Double? = null,
+    val showers: Double? = null,
+    val snowfall: Double? = null,
 )
 
 @Serializable
@@ -35,6 +48,13 @@ data class OmHourly(
     val precipitation_probability: List<Int?> = emptyList(),
     val weather_code: List<Int?> = emptyList(),
     val wind_speed_10m: List<Double?> = emptyList(),
+    val wind_gusts_10m: List<Double?> = emptyList(),
+    val apparent_temperature: List<Double?> = emptyList(),
+    val dew_point_2m: List<Double?> = emptyList(),
+    val uv_index: List<Double?> = emptyList(),
+    /** Convective available potential energy, J/kg — how much fuel a thunderstorm would have. */
+    val cape: List<Double?> = emptyList(),
+    val visibility: List<Double?> = emptyList(),
 )
 
 @Serializable
@@ -49,6 +69,16 @@ data class OmDaily(
     val precipitation_probability_max: List<Int?> = emptyList(),
     val wind_speed_10m_max: List<Double?> = emptyList(),
     val uv_index_max: List<Double?> = emptyList(),
+    val wind_gusts_10m_max: List<Double?> = emptyList(),
+    val wind_direction_10m_dominant: List<Double?> = emptyList(),
+    val apparent_temperature_max: List<Double?> = emptyList(),
+    val apparent_temperature_min: List<Double?> = emptyList(),
+    /** Hours of the day with measurable precipitation — how long it rains, not just how much. */
+    val precipitation_hours: List<Double?> = emptyList(),
+    /** Seconds. Sunshine is what actually reaches the ground; daylight is what the geometry allows. */
+    val sunshine_duration: List<Double?> = emptyList(),
+    val daylight_duration: List<Double?> = emptyList(),
+    val snowfall_sum: List<Double?> = emptyList(),
 )
 
 @Serializable
@@ -75,4 +105,18 @@ data class OmAirCurrent(
     val us_aqi: Double? = null,
     val pm10: Double? = null,
     val pm2_5: Double? = null,
+    // All µg/m³, all in the same response the two index numbers already came from.
+    val carbon_monoxide: Double? = null,
+    val nitrogen_dioxide: Double? = null,
+    val sulphur_dioxide: Double? = null,
+    val ozone: Double? = null,
+    val dust: Double? = null,
+    // grains/m³, and null everywhere outside the European model domain — probed and confirmed, so
+    // the screen must be able to say nothing rather than show a row of zeroes.
+    val alder_pollen: Double? = null,
+    val birch_pollen: Double? = null,
+    val grass_pollen: Double? = null,
+    val mugwort_pollen: Double? = null,
+    val olive_pollen: Double? = null,
+    val ragweed_pollen: Double? = null,
 )

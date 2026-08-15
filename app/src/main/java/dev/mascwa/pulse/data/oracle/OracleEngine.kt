@@ -16,9 +16,9 @@ import dev.mascwa.pulse.core.telemetry.UserProfile
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.settings.AppSettings
-import dev.mascwa.pulse.data.settings.TemperatureUnit
 import dev.mascwa.pulse.data.usage.FeatureCatalog
 import dev.mascwa.pulse.di.AppContainer
+import dev.mascwa.pulse.feature.weather.WeatherFormat
 import java.util.Calendar
 
 /**
@@ -62,19 +62,27 @@ object OracleEngine {
             UserProfile.inCategory(container.profileStore.all(), ProfileCategory.INTEREST).map { it.text }
         }.getOrDefault(emptyList())
 
-        // Weather — device location first, else a saved location. Convert temperature to °C (the API returns
-        // it in the user's chosen unit).
+        // Weather — device location first, else a saved location.
         val wxLat = loc?.latitude ?: settings.savedLocations.firstOrNull()?.latitude
         val wxLon = loc?.longitude ?: settings.savedLocations.firstOrNull()?.longitude
         val wxName = loc?.name ?: settings.savedLocations.firstOrNull()?.name ?: ""
         val wx = if (wxLat != null && wxLon != null)
             runCatching { container.weatherRepository.fetch(wxLat, wxLon, wxName, force = false).data }.getOrNull()
         else null
-        val tempC = wx?.current?.temperature?.let {
-            if (settings.temperatureUnit == TemperatureUnit.FAHRENHEIT) (it - 32.0) * 5.0 / 9.0 else it
-        }
+        // The comfort indices are defined in Celsius and km/h, and the repository now carries
+        // canonical companions converted at the one point the unit setting is known. Reading those
+        // replaces the hand conversion that used to live here and never covered wind at all.
+        val tempC = wx?.current?.temperatureC
         val precip = wx?.daily?.firstOrNull()?.precipProbabilityMax
         val uv = wx?.daily?.firstOrNull()?.uvIndexMax
+        // Tonight's low, taken as the minimum of the next twelve hourly readings rather than from a
+        // daily figure. A daily minimum belongs to a calendar day, so in the evening today's is
+        // already behind you and tomorrow's covers a night that has not started.
+        val overnightLow = wx?.hourly.orEmpty()
+            .dropWhile { h -> WeatherFormat.parseHourly(h.timeIso)?.time?.let { it < now } ?: true }
+            .take(12)
+            .mapNotNull { it.temperatureC }
+            .minOrNull()
 
         val movers = runCatching {
             container.marketsRepository.fetchAll(force = false).data
@@ -122,6 +130,9 @@ object OracleEngine {
             movement = movement, awayFromHome = awayFromHome,
             events = events, pendingTasks = pendingTasks, interests = interests,
             tempC = tempC, precipChancePct = precip, uvIndex = uv,
+            humidityPct = wx?.current?.humidity, dewPointC = wx?.current?.dewPointC,
+            windKmh = wx?.current?.windKmh, gustKmh = wx?.current?.gustKmh,
+            overnightLowC = overnightLow,
             movers = movers, emergencyHeadline = emergency, kpIndex = kp,
             batteryPct = dc?.batteryPct?.takeIf { it >= 0 }, charging = dc?.isCharging ?: false,
             storageFreePct = storageFreePct, onCellular = dc?.let { it.network == NetworkKind.CELLULAR },

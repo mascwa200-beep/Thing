@@ -84,4 +84,113 @@ object WeatherExplainers {
         }
         return Explainer("Pressure ${hPa.roundToInt()} hPa — ${band.first}", band.second)
     }
+
+    /**
+     * Dew point — the better humidity measure, and the less familiar one.
+     *
+     * Relative humidity is a percentage *of what the air could hold at this temperature*, so eighty
+     * percent means something entirely different on a cold morning than on a hot afternoon. Dew
+     * point is an absolute figure and does not move when the temperature does.
+     */
+    fun dewPoint(dewPointC: Double?, unit: String): Explainer? {
+        if (dewPointC == null) return null
+        val mugginess = WeatherComfort.mugginess(dewPointC) ?: return null
+        val shown = if (unit.contains("F")) dewPointC * 9.0 / 5.0 + 32.0 else dewPointC
+        val detail = when (mugginess) {
+            "Oppressive" -> "Sweat barely evaporates. Exertion is genuinely harder and hotter than the thermometer suggests."
+            "Very humid" -> "Sticky and uncomfortable; cooling off takes noticeably longer."
+            "Humid" -> "Noticeably muggy, though still workable."
+            "Comfortable" -> "About ideal — the air neither drains you nor dries you out."
+            "Dry" -> "Pleasant and dry; sweat evaporates readily."
+            else -> "Very dry air. Skin, lips and eyes will feel it, and static builds easily."
+        }
+        return Explainer("Dew point ${shown.roundToInt()}$unit — $mugginess", detail)
+    }
+
+    /**
+     * Wind gusts, against the mean the forecast usually quotes.
+     *
+     * The mean is an average over a period; the gust is the peak within it, and the peak is what
+     * takes a branch down, pushes a vehicle across a lane, or catches a tent.
+     */
+    fun gusts(windKmh: Double?, gustKmh: Double?, unit: String, displayGust: Double?): Explainer? {
+        if (gustKmh == null || displayGust == null) return null
+        val (force, description) = WeatherComfort.beaufort(gustKmh)
+        val over = if (windKmh != null && windKmh > 0.0) {
+            " That is about ${((gustKmh / windKmh - 1.0) * 100).roundToInt()}% above the mean wind."
+        } else {
+            ""
+        }
+        return Explainer(
+            "Gusting ${displayGust.roundToInt()} $unit — force $force, $description",
+            "A forecast quotes the average wind; the gust is the peak inside it, and the peak is " +
+                "what actually moves things.$over",
+        )
+    }
+
+    /** How far you can see, and what limits it. */
+    fun visibility(metres: Double?, imperial: Boolean): Explainer? {
+        if (metres == null) return null
+        val shown = WeatherUnits.describeVisibility(metres, imperial) ?: return null
+        val detail = when {
+            metres < 200.0 -> "Dense fog. Driving is hazardous and landmarks disappear at close range."
+            metres < 1000.0 -> "Fog or heavy precipitation. Allow far more stopping distance than usual."
+            metres < 4000.0 -> "Mist, haze or rain is cutting the view well below normal."
+            metres < 10_000.0 -> "Slightly hazy, but everything nearby is plainly visible."
+            else -> "Clear. The figure is capped by the model rather than by the air, so this means " +
+                "\"nothing in the way\" rather than a measured distance."
+        }
+        return Explainer("Visibility $shown", detail)
+    }
+
+    /**
+     * A single pollutant: what it is, where it came from, and what it does.
+     *
+     * The averaging period is stated because a live reading is one hour and every guideline is a
+     * longer average, so the comparison is a direction rather than a verdict — and saying so is the
+     * difference between an honest reading and a reassuring one.
+     */
+    fun pollutant(reading: AirQualityGuide.Reading?): Explainer? {
+        if (reading == null) return null
+        val p = reading.pollutant
+        return Explainer(
+            "${p.label} ${reading.value.roundToInt()} µg/m³ — ${AirQualityGuide.describeRatio(reading.ratio)}",
+            "${p.source} ${p.effect} Measured against the World Health Organization's 2021 guideline " +
+                "of ${p.guideline.roundToInt()} µg/m³, stated as a ${p.averaging}. This reading covers " +
+                "one hour, so read it as a direction rather than a verdict.",
+        )
+    }
+
+    /** Why the two published air-quality indices disagree about identical air. */
+    fun aqiScales(euAqi: Double?, usAqi: Double?): Explainer? {
+        val detail = AirQualityGuide.scaleGap(euAqi, usAqi) ?: return null
+        return Explainer("Two indices, one set of air", detail)
+    }
+
+    /** Pollen, with the caveat that makes the number usable. */
+    fun pollen(species: String, grainsPerM3: Double?): Explainer? {
+        val band = AirQualityGuide.pollenBand(grainsPerM3) ?: return null
+        return Explainer(
+            "$species pollen ${grainsPerM3!!.roundToInt()} grains/m³ — $band",
+            "The count that provokes symptoms differs by species and differs enormously between " +
+                "people, so treat this as a magnitude rather than a clinical threshold. The forecast " +
+                "model only covers Europe, which is why pollen is absent elsewhere rather than zero.",
+        )
+    }
+
+    /**
+     * Convective available potential energy — how much fuel a thunderstorm would have here.
+     *
+     * Fuel is not a trigger. High CAPE with nothing to lift the air produces a pleasant afternoon,
+     * which is why this is phrased as potential throughout rather than as a forecast.
+     */
+    fun cape(capeJkg: Double?): Explainer? {
+        val summary = WeatherComfort.thunderPotential(capeJkg) ?: return null
+        return Explainer(
+            "CAPE ${capeJkg!!.roundToInt()} J/kg — $summary",
+            "CAPE measures how much energy a rising parcel of air would gain. It is the fuel, not " +
+                "the spark: without a front, a sea breeze or heating to set air rising, a high " +
+                "figure can pass as a quiet day.",
+        )
+    }
 }

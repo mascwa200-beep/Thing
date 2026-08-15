@@ -13,6 +13,8 @@ object WeatherFormat {
 
     fun parseHourly(iso: String): Date? = runCatching { hourlyParser.parse(iso) }.getOrNull()
 
+    fun parseDate(isoDate: String): Date? = runCatching { dateParser.parse(isoDate) }.getOrNull()
+
     fun hourLabel(iso: String, use24h: Boolean): String {
         val d = parseHourly(iso) ?: return iso.takeLast(5)
         val fmt = SimpleDateFormat(if (use24h) "HH:mm" else "h a", Locale.getDefault())
@@ -23,7 +25,12 @@ object WeatherFormat {
 
     fun dayLabel(isoDate: String, index: Int): String {
         if (index == 0) return "Today"
-        val d = runCatching { dateParser.parse(isoDate) }.getOrNull() ?: return isoDate
+        return shortDayLabel(isoDate)
+    }
+
+    /** "Mon". A chart slot is too narrow for "Today", and every day needs the same width. */
+    fun shortDayLabel(isoDate: String): String {
+        val d = parseDate(isoDate) ?: return isoDate.takeLast(2)
         return SimpleDateFormat("EEE", Locale.getDefault()).format(d)
     }
 
