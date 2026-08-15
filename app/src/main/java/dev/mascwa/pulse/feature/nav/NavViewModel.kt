@@ -16,10 +16,14 @@ import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -319,15 +323,32 @@ class NavViewModel(
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
             _scanning.value = true
-            val out = _pois.value.toMutableMap()
-            for (cat in cats) {
-                out[cat] = runCatching {
-                    overpass.fetch(cat.id, cat.filter, cat.radius, cat.label, lat, lon, false).data.places
-                }.getOrDefault(emptyList())
+            try {
+                // Drop markers for categories switched off before anything new arrives.
+                _pois.update { current -> current.filterKeys { it in cats } }
+                // The categories go together rather than one after another. Each was previously a
+                // separate awaited round trip, so a first scan of six categories cost six times a
+                // single latency. The gate lives in the repository, so this stays polite to
+                // Overpass, and each result is published as it lands — markers appear
+                // progressively instead of all at the end.
+                coroutineScope {
+                    cats.map { cat ->
+                        async {
+                            val places = runCatching {
+                                overpass.fetch(cat.id, cat.filter, cat.radius, cat.label, lat, lon, false)
+                                    .data.places
+                            }.getOrDefault(emptyList())
+                            // Re-check: a category can be switched off while its request is in
+                            // flight, and a late arrival must not resurrect its markers.
+                            if (cat in _enabled.value) {
+                                _pois.update { current -> current + (cat to places) }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            } finally {
+                _scanning.value = false
             }
-            out.keys.retainAll(cats) // drop markers for categories that were switched off
-            _pois.value = out
-            _scanning.value = false
         }
     }
 

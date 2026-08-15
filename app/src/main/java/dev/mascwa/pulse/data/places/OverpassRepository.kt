@@ -5,6 +5,7 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.Geo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -46,7 +47,9 @@ class OverpassRepository(
         lon: Double,
         force: Boolean,
     ): Fetched<PlacesResult> {
-        val key = "places_${id}_${"%.2f".format(lat)}_${"%.2f".format(lon)}"
+        // Locale.US: the default renders a comma decimal on much of the planet, which would give
+        // one place two different cache keys depending on device settings.
+        val key = "places_${id}_${fmt(lat)}_${fmt(lon)}"
         if (!force) {
             cache.read(key, ttl, PlacesResult.serializer())?.let {
                 return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
@@ -81,7 +84,10 @@ class OverpassRepository(
             out center 80;
         """.trimIndent()
         val url = "https://overpass-api.de/api/interpreter?data=" + URLEncoder.encode(ql, "UTF-8")
-        val text = http.getString(url)
+        // One gate per host. Overpass is a free community endpoint and the NAV map scans several
+        // categories at once; firing them all simultaneously is exactly the behaviour that earns an
+        // IP a ban, which this project has already had happen once with another provider.
+        val text = gate.withPermit { http.getString(url) }
         val elements = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["elements"]?.jsonArray ?: return PlacesResult(id, lat, lon, emptyList())
 
         val places = elements.mapNotNull { el ->
@@ -106,7 +112,7 @@ class OverpassRepository(
                 address = address,
             )
         }
-            .distinctBy { "${it.name}_${"%.4f".format(it.latitude)}" }
+            .distinctBy { "${it.name}_${fmt(it.latitude, 4)}" }
             .sortedBy { it.distanceMeters }
             .take(40)
 
@@ -133,4 +139,13 @@ class OverpassRepository(
         )
         return parts.joinToString(", ").ifBlank { null }
     }
+
+    private companion object {
+        /** Shared across every caller, so parallel category scans stay polite. */
+        val gate = kotlinx.coroutines.sync.Semaphore(2)
+
+        fun fmt(v: Double, digits: Int = 2): String =
+            String.format(java.util.Locale.US, "%.${digits}f", v)
+    }
+
 }
