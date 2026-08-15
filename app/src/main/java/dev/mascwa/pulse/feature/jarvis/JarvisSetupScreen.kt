@@ -349,7 +349,7 @@ fun JarvisSetupScreen(
             )
 
             SettingToggle(
-                title = "WAKE WORD · \"J.A.R.V.I.S.\"",
+                title = "WAKE WORD · \"COMPUTER\"",
                 subtitle = "Listen for the wake word, then take a spoken command. Wake detection uses a " +
                     "small offline model (~128 MB, downloaded on first use); the command is transcribed " +
                     "by your phone's on-device speech recognition (private — audio stays on the device), " +
@@ -375,7 +375,7 @@ fun JarvisSetupScreen(
             SettingToggle(
                 title = "FOLLOW-UP MODE",
                 subtitle = "After a spoken reply, listen again briefly so you can respond without " +
-                    "re-saying \"J.A.R.V.I.S.\" — ends when you go quiet. Requires the wake word.",
+                    "re-saying \"Computer\" — ends when you go quiet. Requires the wake word.",
                 enabled = followUpMode,
                 onToggle = vm::setFollowUpMode,
             )

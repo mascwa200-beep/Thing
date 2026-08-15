@@ -151,7 +151,12 @@ data class JarvisSettings(
     val vitalsTracking: Boolean = false,
     /** Speak replies aloud using the device's on-device text-to-speech engine. */
     val voiceReplies: Boolean = false,
-    /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
+    /**
+     * Listen for the "Computer" wake word while resident (requires the mic, opt-in).
+     *
+     * The field name is a serialization key and stays as it is; the word it listens for lives in
+     * [dev.mascwa.pulse.core.telemetry.WakePhrase].
+     */
     val wakeWord: Boolean = false,
     /** After a spoken reply, reopen the mic briefly so you can answer WITHOUT re-saying the wake word
      *  (Alexa-style follow-up). Ends when you stay silent. Requires the wake word. */
