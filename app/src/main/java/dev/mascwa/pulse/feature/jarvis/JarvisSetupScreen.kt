@@ -80,6 +80,8 @@ fun JarvisSetupScreen(
     val resident by vm.resident.collectAsState()
     val vitals by vm.vitals.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
+    val voiceName by vm.voiceName.collectAsState()
+    val voices by vm.voices.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
     val followUpMode by vm.followUpMode.collectAsState()
     val conversationMode by vm.conversationMode.collectAsState()
@@ -336,6 +338,16 @@ fun JarvisSetupScreen(
                 enabled = voiceReplies,
                 onToggle = vm::setVoiceReplies,
             )
+
+            if (voiceReplies) {
+                // Only bind the TTS engine and enumerate voices once the user actually wants speech.
+                androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadVoices() }
+                VoicePicker(
+                    voices = voices,
+                    selected = voiceName,
+                    onPick = vm::setVoiceName,
+                )
+            }
 
             SettingToggle(
                 title = "ACTIVE-MATRIX",
@@ -619,6 +631,65 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
                 Text(preset.note, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
             }
         }
+    }
+}
+
+/**
+ * Choose which installed voice speaks.
+ *
+ * Voices are listed by the engine's own names, tidied — there is no portable way to get a friendly
+ * one, and inventing labels would mean claiming things about a voice the platform never told us.
+ * AUTO is first and is the honest default: it picks the best available, and on a device whose engine
+ * exposes no gender hint that is all anyone can do.
+ */
+@Composable
+private fun VoicePicker(
+    voices: List<dev.mascwa.pulse.jarvis.voice.VoiceOption>,
+    selected: String,
+    onPick: (String) -> Unit,
+) {
+    val c = Pulse.colors
+    NeonPanel {
+        // NeonPanel lays its content out in a Box, so several children would stack on top of each
+        // other. The Column is load-bearing.
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "VOICE",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink,
+            )
+            Text(
+                if (voices.isEmpty()) {
+                    "No text-to-speech voices found. Install a speech engine or a language pack to choose one."
+                } else {
+                    "Tap to hear it. AUTO leans female and American — the register the computer is dressed as."
+                },
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                VoiceChip("AUTO", selected.isBlank()) { onPick("") }
+                voices.forEach { v ->
+                    VoiceChip(v.label, v.name == selected) { onPick(v.name) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceChip(label: String, on: Boolean, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val tint = if (on) c.accent else c.muted
+    Box(
+        Modifier
+            .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
     }
 }
 

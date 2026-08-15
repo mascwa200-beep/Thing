@@ -49,6 +49,9 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
                 .distinctUntilChanged()
                 .collect { CleartextPolicy.enabled = it }
         }
+        // Keep the spoken voice in step with the setting. Does not create the TTS engine — most
+        // launches never speak, and binding one costs about a second.
+        container.observeVoicePreference(appScope)
     }
 
     override val workManagerConfiguration: Configuration

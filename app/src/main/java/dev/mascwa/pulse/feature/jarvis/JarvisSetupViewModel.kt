@@ -17,6 +17,7 @@ import dev.mascwa.pulse.jarvis.orchestrator.LockdownResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -32,6 +33,7 @@ class JarvisSetupViewModel(
     private val selfEdit: dev.mascwa.pulse.data.selfedit.SelfEditStore,
     private val jarvisMemory: JarvisMemory,
     private val orchestrator: ActionOrchestrator,
+    private val tts: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine,
 ) : ViewModel() {
 
     /** Download lifecycle (Idle → Running → Done/Failed). Pre-seeded to Done if a model already exists. */
@@ -87,8 +89,16 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. speaks replies aloud. */
     val voiceReplies: StateFlow<Boolean> = _voiceReplies.asStateFlow()
 
+    private val _voiceName = MutableStateFlow("")
+    /** The chosen TTS voice by engine name, or blank for automatic. */
+    val voiceName: StateFlow<String> = _voiceName.asStateFlow()
+
+    private val _voices = MutableStateFlow<List<dev.mascwa.pulse.jarvis.voice.VoiceOption>>(emptyList())
+    /** The installed on-device English voices, best first. Empty until the engine binds. */
+    val voices: StateFlow<List<dev.mascwa.pulse.jarvis.voice.VoiceOption>> = _voices.asStateFlow()
+
     private val _wakeWord = MutableStateFlow(false)
-    /** Whether J.A.R.V.I.S. listens for its wake word while resident. */
+    /** Whether the computer listens for its wake word while resident. */
     val wakeWord: StateFlow<Boolean> = _wakeWord.asStateFlow()
 
     private val _followUp = MutableStateFlow(false)
@@ -186,6 +196,7 @@ class JarvisSetupViewModel(
             _resident.value = saved.residentService
             _vitals.value = saved.vitalsTracking
             _voiceReplies.value = saved.voiceReplies
+            _voiceName.value = saved.voiceName
             _wakeWord.value = saved.wakeWord
             _followUp.value = saved.followUpMode
             _conversation.value = saved.conversationMode
@@ -301,6 +312,36 @@ class JarvisSetupViewModel(
         _voiceReplies.value = enabled
         viewModelScope.launch {
             settings.update { it.copy(jarvis = it.jarvis.copy(voiceReplies = enabled)) }
+        }
+    }
+
+    /**
+     * Load the installed voices for the picker.
+     *
+     * The engine binds asynchronously and reports nothing until it does, so this retries briefly
+     * rather than showing an empty list on a cold open. It gives up quietly: a device with no TTS
+     * engine has no voices, which the screen states rather than spinning forever.
+     */
+    fun loadVoices() {
+        viewModelScope.launch {
+            repeat(VOICE_LOAD_ATTEMPTS) {
+                val found = tts.voiceOptions()
+                if (found.isNotEmpty()) {
+                    _voices.value = found
+                    return@launch
+                }
+                delay(VOICE_LOAD_DELAY_MS)
+            }
+        }
+    }
+
+    /** Choose a voice by engine name, or blank for automatic. Speaks a sample so the choice is audible. */
+    fun setVoiceName(name: String) {
+        _voiceName.value = name
+        viewModelScope.launch {
+            tts.useVoice(name)
+            settings.update { it.copy(jarvis = it.jarvis.copy(voiceName = name)) }
+            tts.speak(VOICE_SAMPLE)
         }
     }
 
@@ -461,4 +502,12 @@ class JarvisSetupViewModel(
     }
 
     fun modelSizeBytes(): Long = modelManager.modelSizeBytes()
+
+    private companion object {
+        /** What a voice says when you pick it — short, and in the register it will actually be used in. */
+        const val VOICE_SAMPLE = "Voice interface online. Awaiting input."
+        // The engine binds asynchronously, so the first read after opening the screen is usually empty.
+        const val VOICE_LOAD_ATTEMPTS = 12
+        const val VOICE_LOAD_DELAY_MS = 250L
+    }
 }

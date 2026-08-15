@@ -152,6 +152,15 @@ data class JarvisSettings(
     /** Speak replies aloud using the device's on-device text-to-speech engine. */
     val voiceReplies: Boolean = false,
     /**
+     * The exact TTS voice to speak in, by the engine's own internal name.
+     *
+     * Blank means automatic, which leans female and American — the register the computer is dressed
+     * as. Stored as the raw name rather than an index because the installed set changes when the user
+     * adds or removes a language pack, and an index would then quietly point at a different voice.
+     * A name that is no longer installed falls back to automatic rather than to silence.
+     */
+    val voiceName: String = "",
+    /**
      * Listen for the "Computer" wake word while resident (requires the mic, opt-in).
      *
      * The field name is a serialization key and stays as it is; the word it listens for lives in

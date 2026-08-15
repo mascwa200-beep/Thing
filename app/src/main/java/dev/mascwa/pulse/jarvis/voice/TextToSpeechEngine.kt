@@ -10,13 +10,35 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Thin wrapper around the AOSP [TextToSpeech] engine so J.A.R.V.I.S. can speak replies
+ * One installed voice, as far as the platform will admit to knowing.
+ *
+ * [female] is a **guess**. Android's [Voice] exposes locale, quality and network requirement, and no
+ * gender at all — the only signal is whether the engine happened to put the word in the voice's
+ * internal name, which Google's do and several others do not. Treated as a hint for ordering the
+ * picker, never as a fact stated to the user.
+ */
+data class VoiceOption(
+    val name: String,
+    val label: String,
+    val female: Boolean,
+    val quality: Int,
+)
+
+/**
+ * Thin wrapper around the AOSP [TextToSpeech] engine so the computer can speak replies
  * fully on-device — no Google Play Services. Safe to use before initialization finishes
  * (requests are dropped until the engine reports ready) and an honest no-op when the
  * device has no TTS engine installed at all, which is common on de-Googled / GrapheneOS
  * builds. Lives for the app's lifetime; created on the main thread via the DI container.
+ *
+ * [preferredVoice] supplies the user's explicitly chosen voice name, or blank for automatic. It is a
+ * lambda rather than a value because the engine outlives any one reading of settings and must be
+ * able to re-select when the choice changes.
  */
-class TextToSpeechEngine(context: Context) {
+class TextToSpeechEngine(
+    context: Context,
+    private val preferredVoice: () -> String = { "" },
+) {
 
     private val ready = AtomicBoolean(false)
     @Volatile private var engine: TextToSpeech? = null
@@ -45,29 +67,100 @@ class TextToSpeechEngine(context: Context) {
         mainHandler.post(cb)
     }
 
-    /** Give J.A.R.V.I.S. a British voice and a calm, measured cadence. Falls back to US English (and
-     *  the default voice) on devices without en-GB data, so we still speak everywhere. */
+    /** Set the language, select a voice, and set the ship's-computer cadence. */
     private fun configure(e: TextToSpeech): Boolean {
-        val gb = e.setLanguage(Locale.UK)
-        if (gb == TextToSpeech.LANG_MISSING_DATA || gb == TextToSpeech.LANG_NOT_SUPPORTED) {
-            val us = e.setLanguage(Locale.US)
-            if (us == TextToSpeech.LANG_MISSING_DATA || us == TextToSpeech.LANG_NOT_SUPPORTED) return false
+        val us = e.setLanguage(Locale.US)
+        if (us == TextToSpeech.LANG_MISSING_DATA || us == TextToSpeech.LANG_NOT_SUPPORTED) {
+            val gb = e.setLanguage(Locale.UK)
+            if (gb == TextToSpeech.LANG_MISSING_DATA || gb == TextToSpeech.LANG_NOT_SUPPORTED) return false
         }
-        runCatching { pickBritishVoice(e)?.let { e.voice = it } }
-        e.setPitch(JARVIS_PITCH)
-        e.setSpeechRate(JARVIS_RATE)
+        selectVoice(e)
+        e.setPitch(COMPUTER_PITCH)
+        e.setSpeechRate(COMPUTER_RATE)
         return true
     }
 
-    /** Prefer an on-device en-GB voice, leaning male/high-quality where the engine exposes a hint. */
-    private fun pickBritishVoice(e: TextToSpeech): Voice? {
-        val gb = runCatching { e.voices }.getOrNull()
-            ?.filter { !it.isNetworkConnectionRequired && it.locale?.language == "en" && it.locale?.country == "GB" }
-            ?.takeIf { it.isNotEmpty() } ?: return null
-        return gb.firstOrNull { v -> MALE_HINTS.any { v.name.contains(it, ignoreCase = true) } }
-            ?: gb.maxByOrNull { it.quality }
-            ?: gb.first()
+    /**
+     * The choice made in this process, which wins over [preferredVoice].
+     *
+     * It exists to close a race: picking a voice persists it and then wants to speak a sample
+     * immediately, but the settings flow that feeds [preferredVoice] has not necessarily emitted yet,
+     * so re-reading it would sample the *old* voice. Setting it here makes the pick take effect at
+     * the moment it is made, and the later emission agrees.
+     */
+    @Volatile private var chosen: String? = null
+
+    /**
+     * Apply a choice now. Blank means automatic.
+     *
+     * The one entry point, called both when the user picks and when the persisted setting changes
+     * (including a settings restore), so [chosen] always holds the latest value rather than shadowing
+     * it for the life of the process. Re-selecting is cheap — no teardown, so the ~second it takes to
+     * bind the engine is not paid again.
+     */
+    fun useVoice(name: String) {
+        chosen = name
+        val e = engine ?: return
+        runCatching { selectVoice(e) }
     }
+
+    /**
+     * The on-device English voices, best first.
+     *
+     * Network voices are excluded outright: this app speaks on a phone that is regularly offline and
+     * a voice that silently fails without signal is worse than a plainer one that always works.
+     */
+    fun voiceOptions(): List<VoiceOption> {
+        val e = engine ?: return emptyList()
+        return runCatching {
+            englishVoices(e)
+                .sortedWith(compareByDescending<Voice> { isFemaleName(it.name) }.thenByDescending { it.quality })
+                .map { VoiceOption(it.name, labelFor(it), isFemaleName(it.name), it.quality) }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun englishVoices(e: TextToSpeech): List<Voice> =
+        runCatching { e.voices }.getOrNull().orEmpty()
+            .filter { !it.isNetworkConnectionRequired && it.locale?.language == "en" }
+
+    /**
+     * Apply the user's chosen voice, or pick one.
+     *
+     * Automatic selection leans female and American, in that order — the register this app is dressed
+     * as. It is a lean and not a requirement: a device with neither still speaks, in whatever English
+     * voice it has, rather than falling silent to protect a theme.
+     */
+    private fun selectVoice(e: TextToSpeech) {
+        val all = englishVoices(e).takeIf { it.isNotEmpty() } ?: return
+        val wanted = chosen ?: runCatching { preferredVoice() }.getOrDefault("")
+        val chosen = all.firstOrNull { it.name == wanted }
+            ?: all.filter { isFemaleName(it.name) }.bestOf()
+            ?: all.bestOf()
+        chosen?.let { runCatching { e.voice = it } }
+    }
+
+    /** Highest quality, preferring the American ones where quality ties. */
+    private fun List<Voice>.bestOf(): Voice? =
+        maxWithOrNull(compareBy<Voice> { it.quality }.thenBy { if (it.locale?.country == "US") 1 else 0 })
+
+    /** A name a person can choose between, since the raw ones look like `en-us-x-sfg#female_1-local`. */
+    private fun labelFor(v: Voice): String {
+        val country = v.locale?.country.orEmpty().ifBlank { "EN" }
+        val variant = v.name.substringAfter('#', "").substringBefore("-local").ifBlank {
+            v.name.substringAfterLast('-').ifBlank { v.name }
+        }
+        return "$country · ${variant.replace('_', ' ').uppercase()}"
+    }
+
+    /**
+     * Whether the engine's own name for the voice says "female".
+     *
+     * Google's voices do (`…#female_1-local`); Samsung's and eSpeak's do not, so a device with only
+     * those will simply have no hint and fall through to quality. Deliberately not inferred from
+     * anything else — guessing gender from a pitch measurement would be both unreliable and grim.
+     */
+    private fun isFemaleName(name: String): Boolean =
+        name.contains("female", ignoreCase = true) || name.contains("fem_", ignoreCase = true)
 
     /** True once an engine is bound and an English voice is available. */
     val isAvailable: Boolean get() = ready.get()
@@ -119,11 +212,12 @@ class TextToSpeechEngine(context: Context) {
         const val UTTERANCE_ID = "jarvis"
         // TextToSpeech.getMaxSpeechInputLength() is ~4000; stay comfortably under it.
         const val MAX_LEN = 3500
-        // Calm, faintly authoritative butler: a touch below neutral pitch, a shade slower than default.
-        const val JARVIS_PITCH = 0.96f
-        const val JARVIS_RATE = 0.95f
-        // Engine-specific name fragments that tend to denote a male en-GB voice.
-        val MALE_HINTS = listOf("gbb", "gbd", "male", "#male")
+        // The ship's computer: level and unhurried, neither confiding nor brisk. Pitch sits a touch
+        // above neutral and the rate a shade under it — the effect is announcement rather than
+        // conversation. Flat affect itself is not settable: TextToSpeech exposes pitch and rate and
+        // no control over intonation, so this is as close as the platform allows.
+        const val COMPUTER_PITCH = 1.04f
+        const val COMPUTER_RATE = 0.93f
 
         // Compiled once — forSpeech runs on every spoken utterance. Regex is immutable/thread-safe.
         val RE_CODE_FENCE = Regex("```[a-zA-Z0-9]*")
