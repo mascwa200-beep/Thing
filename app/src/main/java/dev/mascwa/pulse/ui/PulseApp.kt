@@ -109,6 +109,10 @@ fun PulseApp(
             navController = navController,
             startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = LcarsTransitions.enter,
+            exitTransition = LcarsTransitions.exit,
+            popEnterTransition = LcarsTransitions.popEnter,
+            popExitTransition = LcarsTransitions.popExit,
         ) {
             composable(Routes.HOME) {
                 val vm: HomeViewModel = viewModel(factory = factory)
