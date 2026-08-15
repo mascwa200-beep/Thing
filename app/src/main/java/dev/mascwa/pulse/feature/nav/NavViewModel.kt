@@ -41,6 +41,15 @@ import kotlin.math.roundToInt
 /** A nearby safety incident pinned on the NAV map (folded in from the old Map screen). */
 data class IncidentMarker(val latitude: Double, val longitude: Double, val title: String)
 
+/**
+ * The outcome of the last POI scan.
+ *
+ * Every category fetch used to collapse to `emptyList()` on failure, so a stretch of countryside
+ * with no cafés and a dead Overpass server produced exactly the same blank map. This says which
+ * one happened.
+ */
+data class ScanNotice(val message: String, val isError: Boolean)
+
 /** Live navigation readout for the active objective shown as a banner on the NAV map. */
 data class NavReadout(
     val label: String,
@@ -82,6 +91,10 @@ class NavViewModel(
     val nav3d: StateFlow<Boolean> = _nav3d.asStateFlow()
     private val _headingUp = MutableStateFlow(false)
     val headingUp: StateFlow<Boolean> = _headingUp.asStateFlow()
+
+    /** Shade the night half of the world (the day/night terminator) — persisted like the other view modes. */
+    private val _night = MutableStateFlow(false)
+    val night: StateFlow<Boolean> = _night.asStateFlow()
 
     /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
     private val _selectedPoi = MutableStateFlow<Place?>(null)
@@ -143,6 +156,7 @@ class NavViewModel(
             runCatching { settings.current() }.getOrNull()?.let {
                 _nav3d.value = it.nav3d
                 _headingUp.value = it.navHeadingUp
+                _night.value = it.navNight
             }
         }
         // Keep a road-following route to the active waypoint, refreshed when it changes or the player
@@ -183,6 +197,11 @@ class NavViewModel(
     fun setHeadingUp(on: Boolean) {
         _headingUp.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navHeadingUp = on) } } }
+    }
+
+    fun setNight(on: Boolean) {
+        _night.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navNight = on) } } }
     }
 
     /** Re-centre the map on the active objective (tapping the nav readout banner). */
@@ -279,6 +298,15 @@ class NavViewModel(
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
+    /** How the last scan went — null when it went fine and the markers speak for themselves. */
+    private val _scanNotice = MutableStateFlow<ScanNotice?>(null)
+    val scanNotice: StateFlow<ScanNotice?> = _scanNotice.asStateFlow()
+
+    fun clearScanNotice() { _scanNotice.value = null }
+
+    /** One category's fetch: whether it answered at all, and how many places it had. */
+    private data class CategoryOutcome(val reached: Boolean, val count: Int)
+
     /** Nearby safety incidents + whether the overlay is lit (folded in from the old Map screen). */
     private val _incidents = MutableStateFlow<List<IncidentMarker>>(emptyList())
     val incidents: StateFlow<List<IncidentMarker>> = _incidents.asStateFlow()
@@ -323,6 +351,7 @@ class NavViewModel(
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
             _scanning.value = true
+            _scanNotice.value = null
             try {
                 // Drop markers for categories switched off before anything new arrives.
                 _pois.update { current -> current.filterKeys { it in cats } }
@@ -331,20 +360,31 @@ class NavViewModel(
                 // single latency. The gate lives in the repository, so this stays polite to
                 // Overpass, and each result is published as it lands — markers appear
                 // progressively instead of all at the end.
-                coroutineScope {
+                val outcomes = coroutineScope {
                     cats.map { cat ->
                         async {
-                            val places = runCatching {
+                            val fetched = runCatching {
                                 overpass.fetch(cat.id, cat.filter, cat.radius, cat.label, lat, lon, false)
-                                    .data.places
-                            }.getOrDefault(emptyList())
+                            }.getOrNull()
+                            val places = fetched?.data?.places ?: emptyList()
                             // Re-check: a category can be switched off while its request is in
                             // flight, and a late arrival must not resurrect its markers.
                             if (cat in _enabled.value) {
                                 _pois.update { current -> current + (cat to places) }
                             }
+                            // Counted after every request settles rather than incremented from
+                            // inside them — these run concurrently.
+                            CategoryOutcome(reached = fetched != null, count = places.size)
                         }
                     }.awaitAll()
+                }
+                val unreachable = outcomes.count { !it.reached }
+                _scanNotice.value = when {
+                    outcomes.isEmpty() -> null
+                    unreachable == outcomes.size -> ScanNotice("Couldn't reach the map data service.", true)
+                    unreachable > 0 -> ScanNotice("$unreachable of ${outcomes.size} layers didn't load.", true)
+                    outcomes.sumOf { it.count } == 0 -> ScanNotice("Nothing of that kind around here.", false)
+                    else -> null
                 }
             } finally {
                 _scanning.value = false

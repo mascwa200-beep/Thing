@@ -400,6 +400,7 @@ data class AppSettings(
     // NAV map view (persisted so the map opens how you left it).
     val nav3d: Boolean = true,            // 3D tilted view vs flat 2D
     val navHeadingUp: Boolean = false,    // rotate map with phone heading vs north-up
+    val navNight: Boolean = false,        // shade the half of the world where the Sun has set
 
     // NAV objectives: manual waypoints + the one currently tracked on the map.
     val waypoints: List<Waypoint> = emptyList(),

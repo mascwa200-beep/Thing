@@ -72,6 +72,7 @@ import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.NavGuidance
+import dev.mascwa.pulse.core.telemetry.Terminator
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -118,6 +119,10 @@ private val ROUTE_GOLD = Color(0xFFFFD23F)
 private val ROUTE_CASING = Color(0xFFEAF2FF)
 private const val INCIDENT_SOURCE = "nav-incident"
 private const val INCIDENT_LAYER = "nav-incident-dot"
+private const val NIGHT_SOURCE = "nav-night"
+private const val NIGHT_LAYER = "nav-night-fill"
+private const val SUN_SOURCE = "nav-subsolar"
+private const val SUN_LAYER = "nav-subsolar-dot"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
@@ -127,6 +132,11 @@ private val WATER = Color(0xFF0B1A2E)          // slightly lifted navy so water 
 private val BUILDING = Color(0xFFFF2A4E)       // red building mass
 private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
 private val ROAD = Color(0xFF2DE2E6)           // glowing cyan road network
+// Day/night overlay: a cold wash over the night side, a warm dot at the subsolar point.
+private val NIGHT_FILL = Color(0xFF040814)
+private val SUN_GOLD = Color(0xFFFFC24B)
+/** Web Mercator cannot place the poles; every projected latitude stops here. */
+private const val MERCATOR_LIMIT = 85.05112878
 
 /** The NAV map. */
 @Composable
@@ -160,6 +170,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val scanning by vm.scanning.collectAsState()
     val nav3d by vm.nav3d.collectAsState()
     val headingUp by vm.headingUp.collectAsState()
+    val night by vm.night.collectAsState()
     val selectedPoi by vm.selectedPoi.collectAsState()
     val selectedWaypoint by vm.selectedWaypoint.collectAsState()
     val activeWaypoint by vm.activeWaypoint.collectAsState()
@@ -171,6 +182,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val searchMessage by vm.searchMessage.collectAsState()
     val incidents by vm.incidents.collectAsState()
     val showIncidents by vm.showIncidents.collectAsState()
+    val scanNotice by vm.scanNotice.collectAsState()
     var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -189,6 +201,13 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     var follow by remember { mutableStateOf(true) }
     // Metres per screen pixel at the map centre (MapLibre's own scale-bar input), refreshed on camera idle.
     var scaleMpp by remember { mutableStateOf(0.0) }
+    // The basemap has loaded and this screen's layers exist. Every effect below that touches a source
+    // keys on it: the map object is published before the style finishes, so an effect that fired in
+    // that gap used to find a null style and give up — leaving whatever it was meant to draw missing
+    // until something unrelated happened to re-trigger it.
+    var styleReady by remember { mutableStateOf(false) }
+    // Bumped to force a retry after a failed basemap load.
+    var styleAttempt by remember { mutableStateOf(0) }
 
     // One-time map wiring: free-roam gestures, cyberpunk style + red 3D buildings, the player marker,
     // tap-to-select POIs, and dropping follow-mode as soon as the user drives the camera by hand.
@@ -205,17 +224,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                 isLogoEnabled = false
                 isAttributionEnabled = true // keep the required OSM/OpenFreeMap attribution
             }
-            ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
-                cyberpunkify(style, c)
-                ensureBuildingExtrusion(style)
-                addRouteLayer(style)
-                addPoiLayer(style, c)
-                addIncidentLayer(style, c)
-                addWaypointLayer(style, c)
-                addObjectiveIcons(style)
-                addObjectiveLayer(style)
-                addPlayerMarker(style, c)
-            }
+            installNavStyle(ml, c) { styleReady = true }
             ml.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) follow = false
             }
@@ -258,15 +267,34 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
         }
     }
 
+    // Retry the basemap on demand. MapLibre's style callback has no failure branch, so a load that
+    // never arrives can only be recovered by asking again.
+    LaunchedEffect(styleAttempt) {
+        if (styleAttempt == 0) return@LaunchedEffect
+        val m = map ?: return@LaunchedEffect
+        styleReady = false
+        installNavStyle(m, c) { styleReady = true }
+    }
+
+    // Say something once the basemap is clearly not coming. Waiting a beat first keeps the message
+    // off the screen during a normal, slightly slow tile fetch.
+    var styleSlow by remember { mutableStateOf(false) }
+    LaunchedEffect(styleReady, styleAttempt) {
+        styleSlow = false
+        if (styleReady) return@LaunchedEffect
+        kotlinx.coroutines.delay(9_000)
+        styleSlow = true
+    }
+
     // Keep the player marker pinned to the live GPS fix even while free-roaming.
-    LaunchedEffect(location, map) {
+    LaunchedEffect(location, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         val loc = location ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(USER_SOURCE)?.setGeoJson(Point.fromLngLat(loc.longitude, loc.latitude))
     }
 
     // Rebuild the POI marker layer whenever the enabled categories or fetched results change.
-    LaunchedEffect(pois, enabled, map) {
+    LaunchedEffect(pois, enabled, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         val src = style.getSourceAs<GeoJsonSource>(POI_SOURCE) ?: return@LaunchedEffect
         src.setGeoJson(poiGeoJson(enabled, pois))
@@ -274,20 +302,40 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
 
     // Render the active objective waypoint (coloured by kind) + the road-following route to it. The
     // route line only appears once the road geometry resolves (no straight-line placeholder).
-    LaunchedEffect(activeWaypoint, route, map) {
+    LaunchedEffect(activeWaypoint, route, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(WAYPOINT_SOURCE)?.setGeoJson(waypointGeoJson(activeWaypoint))
         style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE)?.setGeoJson(routeLineGeoJson(route))
     }
 
     // Render every tracked objective as a per-kind icon (★ MAIN / ◆ SIDE / ● WORK), active emphasised.
-    LaunchedEffect(allWaypoints, activeWaypointId, map) {
+    LaunchedEffect(allWaypoints, activeWaypointId, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(OBJECTIVE_SOURCE)?.setGeoJson(objectiveGeoJson(allWaypoints, activeWaypointId))
     }
 
+    // Redraw the day/night terminator while it is lit. It slides west a quarter of a degree per
+    // minute, so a minute between updates is imperceptible; switching it off empties the source
+    // rather than leaving stale geometry behind.
+    LaunchedEffect(night, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        val fill = style.getSourceAs<GeoJsonSource>(NIGHT_SOURCE) ?: return@LaunchedEffect
+        val sun = style.getSourceAs<GeoJsonSource>(SUN_SOURCE)
+        if (!night) {
+            fill.setGeoJson(EMPTY_FC)
+            sun?.setGeoJson(EMPTY_FC)
+            return@LaunchedEffect
+        }
+        while (true) {
+            val now = System.currentTimeMillis()
+            fill.setGeoJson(nightGeoJson(now))
+            sun?.setGeoJson(subSolarGeoJson(now))
+            kotlinx.coroutines.delay(60_000)
+        }
+    }
+
     // Render nearby safety incidents (amber) when the overlay is lit.
-    LaunchedEffect(incidents, showIncidents, map) {
+    LaunchedEffect(incidents, showIncidents, map, styleReady) {
         val style = map?.style ?: return@LaunchedEffect
         style.getSourceAs<GeoJsonSource>(INCIDENT_SOURCE)
             ?.setGeoJson(incidentGeoJson(if (showIncidents) incidents else emptyList()))
@@ -339,7 +387,12 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-            NavChrome(hasFix = location != null, c = c)
+            NavChrome(
+                hasFix = location != null,
+                basemapMissing = styleSlow && !styleReady,
+                onRetryBasemap = { styleAttempt++ },
+                c = c,
+            )
 
                 // Compass readout (folded in from the old Compass screen): live true-north heading.
                 NavCompass(
@@ -386,6 +439,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     MapControlButton(active = showIncidents, c = c, icon = Icons.Filled.Warning) {
                         centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
                     }
+                    MapControlButton(active = night, c = c, label = "☾") { vm.setNight(!night) }
                     if (activeWaypoint != null) {
                         MapControlButton(active = false, c = c, icon = LcarsIcons.Close) { vm.clearWaypoint() }
                     }
@@ -420,6 +474,14 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             onSetWaypoint = { vm.setWaypointFromPoi(poi) },
                         )
                     }
+                    scanNotice?.let { notice ->
+                        NavNotice(
+                            message = notice.message,
+                            isError = notice.isError,
+                            c = c,
+                            onDismiss = { vm.clearScanNotice() },
+                        )
+                    }
                     FilterBar(
                         enabled = enabled,
                         counts = pois.mapValues { it.value.size },
@@ -430,6 +492,32 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     )
                 }
         }
+}
+
+/**
+ * Load the basemap and install every layer this screen owns, in draw order.
+ *
+ * [onReady] fires only when the style genuinely loads. MapLibre's callback is success-only — there
+ * is no error branch — so a failed tile fetch simply never calls back, which is what the screen
+ * watches for to tell the user the basemap is missing rather than leaving a blank rectangle.
+ *
+ * Order matters: the night wash goes in before the marker layers so it sits underneath the things
+ * you tap.
+ */
+private fun installNavStyle(ml: MapLibreMap, c: NightwirePalette, onReady: () -> Unit) {
+    ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
+        cyberpunkify(style, c)
+        ensureBuildingExtrusion(style)
+        addNightLayer(style)
+        addRouteLayer(style)
+        addPoiLayer(style, c)
+        addIncidentLayer(style, c)
+        addWaypointLayer(style, c)
+        addObjectiveIcons(style)
+        addObjectiveLayer(style)
+        addPlayerMarker(style, c)
+        onReady()
+    }
 }
 
 /** Camera for follow mode: tilt/bearing derive from the view mode (north-up = bearing 0). */
@@ -747,6 +835,58 @@ private fun routeLineGeoJson(route: List<Pair<Double, Double>>): String {
 }
 
 /** Category POI markers, coloured per-feature via the data-driven "color" property. */
+/**
+ * The day/night terminator, as a filled night hemisphere plus a dot where the Sun is overhead.
+ *
+ * Added before every marker layer so the shading sits under the things you actually tap. The fill
+ * is deliberately faint: it is a piece of context, not a mask.
+ */
+private fun addNightLayer(style: Style) {
+    if (style.getSource(NIGHT_SOURCE) != null) return
+    style.addSource(GeoJsonSource(NIGHT_SOURCE))
+    style.addLayer(
+        FillLayer(NIGHT_LAYER, NIGHT_SOURCE).withProperties(
+            PropertyFactory.fillColor(NIGHT_FILL.toArgb()),
+            PropertyFactory.fillOpacity(0.42f),
+        ),
+    )
+    style.addSource(GeoJsonSource(SUN_SOURCE))
+    style.addLayer(
+        CircleLayer(SUN_LAYER, SUN_SOURCE).withProperties(
+            PropertyFactory.circleRadius(6f),
+            PropertyFactory.circleColor(SUN_GOLD.toArgb()),
+            PropertyFactory.circleOpacity(0.9f),
+            PropertyFactory.circleStrokeWidth(2f),
+            PropertyFactory.circleStrokeColor(SUN_GOLD.copy(alpha = 0.35f).toArgb()),
+        ),
+    )
+}
+
+/**
+ * The night side as a GeoJSON polygon.
+ *
+ * Latitudes are clamped to the Web Mercator limit: the projection sends the poles to infinity, and
+ * the core's ring closes *across* the dark pole, so an unclamped 90 would be a coordinate the map
+ * cannot place.
+ */
+private fun nightGeoJson(epochMs: Long): String {
+    val ring = Terminator.nightPolygon(epochMs, stepDeg = 2.0)
+    if (ring.size < 4) return EMPTY_FC
+    val coords = ring.joinToString(",") { (lat, lon) ->
+        "[${lon},${lat.coerceIn(-MERCATOR_LIMIT, MERCATOR_LIMIT)}]"
+    }
+    return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"properties\":{}," +
+        "\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[$coords]]}}]}"
+}
+
+/** The point the Sun is directly above right now — noon, somewhere. */
+private fun subSolarGeoJson(epochMs: Long): String {
+    val s = Terminator.subSolarPoint(epochMs)
+    return "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"properties\":{}," +
+        "\"geometry\":{\"type\":\"Point\",\"coordinates\":[${s.longitudeDeg}," +
+        "${s.latitudeDeg.coerceIn(-MERCATOR_LIMIT, MERCATOR_LIMIT)}]}}]}"
+}
+
 private fun addPoiLayer(style: Style, c: NightwirePalette) {
     if (style.getSource(POI_SOURCE) != null) return
     style.addSource(GeoJsonSource(POI_SOURCE))
@@ -1119,7 +1259,12 @@ private fun NavCompass(heading: Float, headingUp: Boolean, c: NightwirePalette, 
 }
 
 @Composable
-private fun NavChrome(hasFix: Boolean, c: NightwirePalette) {
+private fun NavChrome(
+    hasFix: Boolean,
+    basemapMissing: Boolean,
+    onRetryBasemap: () -> Unit,
+    c: NightwirePalette,
+) {
     Box(Modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) {
             hudCorners(c.accent, 16.dp.toPx(), 1.5.dp.toPx(), 6.dp.toPx())
@@ -1131,6 +1276,54 @@ private fun NavChrome(hasFix: Boolean, c: NightwirePalette) {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
             )
         }
+        // The map tiles never arrived. Everything else on this screen still works — the compass,
+        // the heading, saved waypoints — so this says what is missing rather than taking over.
+        if (basemapMissing) {
+            val shape = lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart)
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .clip(shape)
+                    .background(c.panel.copy(alpha = 0.94f))
+                    .border(1.dp, c.amber, shape)
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("NO MAP TILES", fontFamily = ChakraPetch, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.amber)
+                Text(
+                    "The basemap needs a connection the first time.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "▸ TRY AGAIN",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = c.accent,
+                    modifier = Modifier.padding(top = 10.dp).clickable(onClick = onRetryBasemap).padding(6.dp),
+                )
+            }
+        }
+    }
+}
+
+/** A one-line map notice (scan outcome), tapped to dismiss. */
+@Composable
+private fun NavNotice(message: String, isError: Boolean, c: NightwirePalette, onDismiss: () -> Unit) {
+    val tint = if (isError) c.amber else c.muted
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.panel.copy(alpha = 0.92f))
+            .border(1.dp, tint.copy(alpha = 0.7f), shape)
+            .clickable(onClick = onDismiss)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(if (isError) "⚠" else "·", fontFamily = JetBrainsMono, fontSize = 11.sp, color = tint)
+        Text(message, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.ink, modifier = Modifier.weight(1f))
+        Text("✕", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
     }
 }
 
