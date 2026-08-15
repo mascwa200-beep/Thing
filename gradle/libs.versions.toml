@@ -46,6 +46,9 @@ composeCharts = "0.1.2"
 # 0.10.25+ is required to load the LiteRT-LM `.litertlm` model format; 0.10.24 only
 # opened legacy `.task` zip bundles (hence "Unable to open zip archive" on a .litertlm).
 mediapipeGenai = "0.10.27"
+# Sensorium's on-device classifiers (same versions the pre-b9ba600 perception stack shipped with).
+mediapipeTasks = "0.10.21"
+camerax = "1.4.1"
 
 # Offline on-device speech-to-text (Vosk — Kaldi-based, no Play Services / no account)
 vosk = "0.3.75"
@@ -117,6 +120,11 @@ androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exop
 
 # On-device LLM
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+mediapipe-tasks-audio = { group = "com.google.mediapipe", name = "tasks-audio", version.ref = "mediapipeTasks" }
+mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipeTasks" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 
 # Offline speech-to-text (JNA must be the @aar variant on Android — applied in the build script)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }

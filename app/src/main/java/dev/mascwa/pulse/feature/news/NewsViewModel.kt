@@ -11,6 +11,7 @@ import dev.mascwa.pulse.core.util.toUserMessage
 import dev.mascwa.pulse.data.breaking.BreakingCoverage
 import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.Article
+import dev.mascwa.pulse.data.news.MarketTape
 import dev.mascwa.pulse.data.news.NewsAnalysis
 import dev.mascwa.pulse.data.news.NewsAnalysisEngine
 import dev.mascwa.pulse.data.news.NewsAnalysisStore
@@ -68,6 +69,11 @@ class NewsViewModel(
 
     private val _state = MutableStateFlow(NewsUiState())
     val state: StateFlow<NewsUiState> = _state.asStateFlow()
+
+    /** Measures the macro complex's real 5-minute-bar moves after a story's publish time — the desk
+     *  note's factual grounding. Built here rather than injected: it needs only [markets], which this
+     *  ViewModel already holds. */
+    private val marketTape = MarketTape(markets)
 
     // In-memory cache so switching tabs is instant.
     private val cache = mutableMapOf<String, Async<List<Article>>>()
@@ -157,7 +163,21 @@ class NewsViewModel(
      */
     fun ensureAnalyzed(article: Article) {
         val url = article.url
-        if (analysisStore.get(url) != null) return
+        // A cached entry is treated as absent in two cases, each re-analyzing the story ONCE:
+        //  - an older prompt-spec generation (version < CURRENT_VERSION) — the register changed;
+        //  - a FRESH story analyzed before its wires window could exist. Analysis fires the moment a
+        //    card composes, typically minutes after publish, when the tape has nothing to measure —
+        //    permanently caching a tape-less note for exactly the stories the tape exists for. So an
+        //    entry generated inside the story's first TAPE_MATURITY_MS is re-analyzed once the window
+        //    has actually elapsed; after that pass generatedAtMs sits past maturity and the condition
+        //    can never fire again.
+        val cached = analysisStore.get(url)
+        if (cached != null && cached.version >= NewsAnalysisEngine.CURRENT_VERSION) {
+            val matured = System.currentTimeMillis() - article.publishedEpochMs >= TAPE_MATURITY_MS
+            val analyzedBeforeMaturity = article.publishedEpochMs > 0 &&
+                cached.generatedAtMs - article.publishedEpochMs < TAPE_MATURITY_MS
+            if (!(matured && analyzedBeforeMaturity)) return
+        }
         if (analysisStore.hasFailed(url)) return
         if (!analyzing.add(url)) return
         viewModelScope.launch {
@@ -172,6 +192,10 @@ class NewsViewModel(
                         category = article.category,
                         links = links,
                         livePulse = pulse,
+                        // A provider, invoked by the engine only AFTER its free cloud gates pass — a
+                        // cloud-off device must never pay the tape's 9 gated Yahoo fetches for an
+                        // analysis that would return null anyway. Null tape = directional-only note.
+                        wiresTape = { marketTape.wiresWindow(article.publishedEpochMs) },
                     )
                     if (result != null) analysisStore.record(url, result) else analysisStore.markFailed(url)
                 }
@@ -289,5 +313,10 @@ class NewsViewModel(
         // freshness-driven read (unlike the 90s default tuned for the time-critical BREAKING NEWS
         // takeover) — a day-long cache avoids re-searching the same story on every app open.
         private const val COVERAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000L
+
+        // A story's wires window is measurable once publish + 90m (the window) + ~10m (bar lag +
+        // intraday-cache TTL) have elapsed. An analysis generated before then couldn't have had a
+        // full tape — see ensureAnalyzed's one-shot maturity re-analysis.
+        private const val TAPE_MATURITY_MS = 100 * 60 * 1000L
     }
 }

@@ -68,6 +68,7 @@ private val GROUPS = listOf(
     )),
     MenuGroup("YOUR THINGS", { it.violet }, listOf(
         MenuEntry("Advisories", "The Computer's best next moves for you", Routes.ORACLE),
+        MenuEntry("Environment Scanner", "What the ship's senses read around you right now", Routes.SENSORIUM),
         MenuEntry("Saved Places", "Places you track, plus calendar stops", Routes.OBJECTIVES),
         MenuEntry("Notes", "Quick notes", Routes.NOTES),
         MenuEntry("Diary", "Your daily log", Routes.DIARY),

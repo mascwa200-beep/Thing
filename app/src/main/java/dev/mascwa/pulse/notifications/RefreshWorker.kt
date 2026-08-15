@@ -30,6 +30,15 @@ class RefreshWorker(
         val settings = runCatching { container.settingsRepository.current() }.getOrNull()
             ?: return Result.success()
 
+        // Sensorium self-heal — BEFORE the notification gates (service liveness isn't a notification
+        // preference). A background FGS start can be refused by the OS; then the next app-open arms
+        // it ("Unrestricted battery" is the owner-setup step that makes this reliably succeed).
+        if (settings.sensing.enabled) {
+            runCatching {
+                dev.mascwa.pulse.data.sensing.SensoriumService.start(applicationContext, foregroundLaunch = false)
+            }
+        }
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 
@@ -195,7 +204,11 @@ class RefreshWorker(
         }
         if (prefs.showWeatherRow) {
             runCatching { resolveWeather(settings) }
-            runCatching { container.spaceWeatherRepository.fetch(force = true) }
+            // heavy = false: this pass exists to warm Kp for the brief board. The five large solar
+            // products are ~546 KB of a ~596 KB refresh and nothing in the background path reads
+            // them, so fetching them every 15 minutes was ~57 MB a day for one number. The console
+            // still gets the full set; a light pass carries the cached heavy values forward.
+            runCatching { container.spaceWeatherRepository.fetch(force = true, heavy = false) }
         }
 
         // --- Nearby severe incident → the board's ALERT row (YELLOW), deduped by incident id. ---

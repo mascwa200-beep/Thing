@@ -3,23 +3,37 @@ package dev.mascwa.pulse.feature.nav
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.RouteProgress
+import dev.mascwa.pulse.core.telemetry.RouteProfile
+import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.data.maps.MapLayerCatalog
+import dev.mascwa.pulse.data.maps.ElevationRepository
+import dev.mascwa.pulse.data.maps.RainViewerRepository
+import dev.mascwa.pulse.data.nav.TrackStore
 import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.places.RoutingRepository
+import dev.mascwa.pulse.data.radar.Contact
+import dev.mascwa.pulse.data.radar.ContactKind
+import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.safety.Incident
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.data.weather.LocationProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -34,8 +48,21 @@ import kotlin.math.roundToInt
  * heading for the heading-up camera, and the toggleable POI "legend" (Overpass categories rendered
  * as map markers). Sensors/poll run only while the screen calls [start]/[stop].
  */
-/** A nearby safety incident pinned on the NAV map (folded in from the old Map screen). */
-data class IncidentMarker(val latitude: Double, val longitude: Double, val title: String)
+/**
+ * The outcome of the last POI scan.
+ *
+ * Every category fetch used to collapse to `emptyList()` on failure, so a stretch of countryside
+ * with no cafés and a dead Overpass server produced exactly the same blank map. This says which
+ * one happened.
+ */
+data class ScanNotice(val message: String, val isError: Boolean)
+
+/** A route's height profile: the sampled heights, and what they add up to. */
+data class RouteElevation(
+    val distancesM: List<Double>,
+    val elevationsM: List<Double>,
+    val summary: RouteProfile.Summary,
+)
 
 /** Live navigation readout for the active objective shown as a banner on the NAV map. */
 data class NavReadout(
@@ -56,6 +83,10 @@ class NavViewModel(
     private val waypointStore: WaypointStore,
     private val safety: SafetyRepository,
     private val routing: RoutingRepository,
+    private val rainViewer: RainViewerRepository,
+    private val radar: RadarRepository,
+    private val trackStore: TrackStore,
+    private val elevation: ElevationRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -78,6 +109,64 @@ class NavViewModel(
     val nav3d: StateFlow<Boolean> = _nav3d.asStateFlow()
     private val _headingUp = MutableStateFlow(false)
     val headingUp: StateFlow<Boolean> = _headingUp.asStateFlow()
+
+    /** Shade the night half of the world (the day/night terminator) — persisted like the other view modes. */
+    private val _night = MutableStateFlow(false)
+    val night: StateFlow<Boolean> = _night.asStateFlow()
+
+    /** Which world the map draws: the vector style, satellite imagery, or topographic tiles. */
+    private val _basemap = MutableStateFlow(MapLayerCatalog.Basemap.NIGHTWIRE)
+    val basemap: StateFlow<MapLayerCatalog.Basemap> = _basemap.asStateFlow()
+
+    /** Hillshaded relief from elevation tiles, drawn over whichever basemap is chosen. */
+    private val _relief = MutableStateFlow(false)
+    val relief: StateFlow<Boolean> = _relief.asStateFlow()
+
+    /** Live precipitation radar. Null frame = the overlay is off or RainViewer had nothing. */
+    private val _rain = MutableStateFlow(false)
+    val rain: StateFlow<Boolean> = _rain.asStateFlow()
+    private val _rainFrame = MutableStateFlow<RainViewerRepository.RadarFrame?>(null)
+    val rainFrame: StateFlow<RainViewerRepository.RadarFrame?> = _rainFrame.asStateFlow()
+    private var rainJob: Job? = null
+
+    /**
+     * Aircraft overhead and recent earthquakes, both drawn on the map.
+     *
+     * One fetch serves both — the radar repository returns aircraft, the station and quakes
+     * together — so the two overlays share a single refresh loop rather than each running one.
+     */
+    private val _traffic = MutableStateFlow(false)
+    val traffic: StateFlow<Boolean> = _traffic.asStateFlow()
+    private val _seismic = MutableStateFlow(false)
+    val seismic: StateFlow<Boolean> = _seismic.asStateFlow()
+    private val _aircraft = MutableStateFlow<List<Contact>>(emptyList())
+    val aircraft: StateFlow<List<Contact>> = _aircraft.asStateFlow()
+    private val _quakes = MutableStateFlow<List<Contact>>(emptyList())
+    val quakes: StateFlow<List<Contact>> = _quakes.asStateFlow()
+    private var radarJob: Job? = null
+
+    /** The breadcrumb trail: where you have actually been, drawn behind you. */
+    val trackPoints: StateFlow<List<TrackLog.TrackPoint>> = trackStore.pointsFlow
+    val trackRecording: StateFlow<Boolean> = trackStore.recording
+
+    /**
+     * The height profile of the road route ahead, once it is known.
+     *
+     * Rebuilt only when the route itself changes — the ground does not move, and the samples are
+     * positions along the route rather than the phone's own position, so a GPS tick means nothing
+     * here.
+     */
+    private val _profile = MutableStateFlow<RouteElevation?>(null)
+    val profile: StateFlow<RouteElevation?> = _profile.asStateFlow()
+    private var profileJob: Job? = null
+    private var profiledWpId: String? = null
+    private var profiledLengthM: Double = 0.0
+
+    fun setTrackRecording(on: Boolean) = trackStore.setRecording(on)
+
+    fun clearTrack() {
+        viewModelScope.launch { runCatching { trackStore.clear() } }
+    }
 
     /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
     private val _selectedPoi = MutableStateFlow<Place?>(null)
@@ -139,6 +228,16 @@ class NavViewModel(
             runCatching { settings.current() }.getOrNull()?.let {
                 _nav3d.value = it.nav3d
                 _headingUp.value = it.navHeadingUp
+                _night.value = it.navNight
+                _relief.value = it.navRelief
+                _basemap.value = runCatching { MapLayerCatalog.Basemap.valueOf(it.navBasemap) }
+                    .getOrDefault(MapLayerCatalog.Basemap.NIGHTWIRE)
+                // Restoring the rain overlay has to go through the setter: the layer needs a frame,
+                // and only the setter starts the loop that fetches one.
+                if (it.navRain) setRain(true)
+                _traffic.value = it.navTraffic
+                _seismic.value = it.navSeismic
+                if (it.navTraffic || it.navSeismic) restartRadar()
             }
         }
         // Keep a road-following route to the active waypoint, refreshed when it changes or the player
@@ -148,6 +247,9 @@ class NavViewModel(
                 if (wp == null || loc == null) {
                     _route.value = emptyList()
                     _routeInfo.value = null
+                    _profile.value = null
+                    profiledWpId = null
+                    profiledLengthM = 0.0
                     lastRouteWpId = null
                     lastRouteStart = null
                     return@collectLatest
@@ -166,7 +268,43 @@ class NavViewModel(
                     _routeInfo.value = r
                     lastRouteWpId = wp.id
                     lastRouteStart = loc
+                    refreshProfile(wp.id, r.points, r.distanceMeters)
                 }
+            }
+        }
+    }
+
+    /**
+     * Fetch the ground height along [route] and summarise it.
+     *
+     * Keyed on the objective and on the route's length, not on its exact geometry. The route
+     * re-resolves every sixty metres of travel and comes back very slightly different each time,
+     * so comparing geometry would mean a fresh elevation request every sixty metres — for a
+     * picture that has barely changed. A new objective, or a length that moves by a fifth (a
+     * reroute, or real progress made), is worth asking again for.
+     */
+    private fun refreshProfile(waypointId: String, route: List<Pair<Double, Double>>, lengthM: Double) {
+        val sameObjective = waypointId == profiledWpId
+        val similarLength = profiledLengthM > 0.0 &&
+            kotlin.math.abs(lengthM - profiledLengthM) < profiledLengthM * PROFILE_REFRESH_FRACTION
+        if (sameObjective && similarLength && _profile.value != null) return
+        profiledWpId = waypointId
+        profiledLengthM = lengthM
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            val samples = RouteProfile.sample(route, PROFILE_SAMPLES)
+            if (samples.size < 2) {
+                _profile.value = null
+                return@launch
+            }
+            val heights = runCatching {
+                elevation.elevations(samples.map { it.latitudeDeg to it.longitudeDeg })
+            }.getOrNull()
+            val summary = heights?.let { RouteProfile.summarise(samples, it) }
+            _profile.value = if (heights != null && summary != null) {
+                RouteElevation(samples.map { it.distanceM }, heights, summary)
+            } else {
+                null
             }
         }
     }
@@ -179,6 +317,92 @@ class NavViewModel(
     fun setHeadingUp(on: Boolean) {
         _headingUp.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navHeadingUp = on) } } }
+    }
+
+    fun setNight(on: Boolean) {
+        _night.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navNight = on) } } }
+    }
+
+    fun setBasemap(b: MapLayerCatalog.Basemap) {
+        _basemap.value = b
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navBasemap = b.name) } } }
+    }
+
+    fun setRelief(on: Boolean) {
+        _relief.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRelief = on) } } }
+    }
+
+    /**
+     * Turn the precipitation overlay on or off.
+     *
+     * While it is on the frame is refreshed on a slow loop — the radar scans every ten minutes, and
+     * the repository holds a floor of its own, so this cannot become a poll.
+     */
+    fun setRain(on: Boolean) {
+        _rain.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRain = on) } } }
+        rainJob?.cancel()
+        if (!on) {
+            _rainFrame.value = null
+            return
+        }
+        rainJob = viewModelScope.launch {
+            while (isActive) {
+                _rainFrame.value = runCatching { rainViewer.latest() }.getOrNull()
+                delay(5 * 60_000L)
+            }
+        }
+    }
+
+    fun setTraffic(on: Boolean) {
+        _traffic.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navTraffic = on) } } }
+        restartRadar()
+    }
+
+    fun setSeismic(on: Boolean) {
+        _seismic.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navSeismic = on) } } }
+        restartRadar()
+    }
+
+    /**
+     * Keep the aircraft and quake overlays fed, at a pace set by what is actually shown.
+     *
+     * Aircraft move; earthquakes have already happened. So the loop runs fast only while traffic is
+     * on, and drops to a crawl when the map is only showing seismic history. With both overlays off
+     * it stops entirely and drops what it was holding, so a hidden layer costs nothing.
+     */
+    private fun restartRadar() {
+        radarJob?.cancel()
+        if (!_traffic.value && !_seismic.value) {
+            _aircraft.value = emptyList()
+            _quakes.value = emptyList()
+            return
+        }
+        radarJob = viewModelScope.launch {
+            while (isActive) {
+                val loc = _location.value
+                if (loc != null) {
+                    val data = runCatching { radar.fetch(loc.latitude, loc.longitude, false).data }.getOrNull()
+                    if (data != null) {
+                        _aircraft.value = if (_traffic.value) {
+                            data.contacts.filter { it.kind == ContactKind.AIRCRAFT.name }
+                        } else {
+                            emptyList()
+                        }
+                        _quakes.value = if (_seismic.value) {
+                            data.contacts.filter { it.kind == ContactKind.QUAKE.name }
+                        } else {
+                            emptyList()
+                        }
+                    }
+                }
+                delay(if (_traffic.value) TRAFFIC_REFRESH_MS else SEISMIC_REFRESH_MS)
+            }
+        }
     }
 
     /** Re-centre the map on the active objective (tapping the nav readout banner). */
@@ -275,9 +499,33 @@ class NavViewModel(
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
+    /** How the last scan went — null when it went fine and the markers speak for themselves. */
+    private val _scanNotice = MutableStateFlow<ScanNotice?>(null)
+    val scanNotice: StateFlow<ScanNotice?> = _scanNotice.asStateFlow()
+
+    fun clearScanNotice() { _scanNotice.value = null }
+
+    /** One category's fetch: whether it answered at all, and how many places it had. */
+    private data class CategoryOutcome(val reached: Boolean, val count: Int)
+
     /** Nearby safety incidents + whether the overlay is lit (folded in from the old Map screen). */
-    private val _incidents = MutableStateFlow<List<IncidentMarker>>(emptyList())
-    val incidents: StateFlow<List<IncidentMarker>> = _incidents.asStateFlow()
+    /**
+      * Nearby safety incidents, carried whole.
+      *
+      * They used to be flattened to a coordinate and a title on the way in, which threw away the
+      * type, severity, magnitude, time and source link the feed had already delivered — so the map
+      * could draw a dot and nothing else, and tapping one had nothing to show.
+      */
+    private val _incidents = MutableStateFlow<List<Incident>>(emptyList())
+    val incidents: StateFlow<List<Incident>> = _incidents.asStateFlow()
+
+    /** The incident dot the user tapped, if any. */
+    private val _selectedIncidentId = MutableStateFlow<String?>(null)
+    val selectedIncident: StateFlow<Incident?> =
+        combine(_selectedIncidentId, _incidents) { id, list -> list.firstOrNull { it.id == id } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun selectIncident(id: String?) { _selectedIncidentId.value = id }
     private val _showIncidents = MutableStateFlow(false)
     val showIncidents: StateFlow<Boolean> = _showIncidents.asStateFlow()
     private var incidentJob: Job? = null
@@ -302,7 +550,6 @@ class NavViewModel(
                 safety.fetch(lat, lon, false).data.incidents
                     .filter { it.distanceMeters > 0 }
                     .take(40)
-                    .map { IncidentMarker(it.latitude, it.longitude, it.title) }
             }.getOrDefault(emptyList())
         }
     }
@@ -319,20 +566,51 @@ class NavViewModel(
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
             _scanning.value = true
-            val out = _pois.value.toMutableMap()
-            for (cat in cats) {
-                out[cat] = runCatching {
-                    overpass.fetch(cat.id, cat.filter, cat.radius, cat.label, lat, lon, false).data.places
-                }.getOrDefault(emptyList())
+            _scanNotice.value = null
+            try {
+                // Drop markers for categories switched off before anything new arrives.
+                _pois.update { current -> current.filterKeys { it in cats } }
+                // The categories go together rather than one after another. Each was previously a
+                // separate awaited round trip, so a first scan of six categories cost six times a
+                // single latency. The gate lives in the repository, so this stays polite to
+                // Overpass, and each result is published as it lands — markers appear
+                // progressively instead of all at the end.
+                val outcomes = coroutineScope {
+                    cats.map { cat ->
+                        async {
+                            val fetched = runCatching {
+                                overpass.fetch(cat.id, cat.filter, cat.radius, cat.label, lat, lon, false)
+                            }.getOrNull()
+                            val places = fetched?.data?.places ?: emptyList()
+                            // Re-check: a category can be switched off while its request is in
+                            // flight, and a late arrival must not resurrect its markers.
+                            if (cat in _enabled.value) {
+                                _pois.update { current -> current + (cat to places) }
+                            }
+                            // Counted after every request settles rather than incremented from
+                            // inside them — these run concurrently.
+                            CategoryOutcome(reached = fetched != null, count = places.size)
+                        }
+                    }.awaitAll()
+                }
+                val unreachable = outcomes.count { !it.reached }
+                _scanNotice.value = when {
+                    outcomes.isEmpty() -> null
+                    unreachable == outcomes.size -> ScanNotice("Couldn't reach the map data service.", true)
+                    unreachable > 0 -> ScanNotice("$unreachable of ${outcomes.size} layers didn't load.", true)
+                    outcomes.sumOf { it.count } == 0 -> ScanNotice("Nothing of that kind around here.", false)
+                    else -> null
+                }
+            } finally {
+                _scanning.value = false
             }
-            out.keys.retainAll(cats) // drop markers for categories that were switched off
-            _pois.value = out
-            _scanning.value = false
         }
     }
 
     fun start() {
         compass.start()
+        // Draw whatever is already on disk straight away, rather than only after the next fix.
+        trackStore.prime()
         if (pollJob?.isActive != true) {
             pollJob = viewModelScope.launch {
                 while (isActive) {
@@ -340,6 +618,14 @@ class NavViewModel(
                         runCatching { locationProvider.current() }.getOrNull()?.let { loc ->
                             _location.value = loc
                             compass.setLocation(loc.latitude, loc.longitude, 0.0)
+                            // Offered on every fix; the store keeps the ones worth keeping.
+                            trackStore.record(
+                                lat = loc.latitude,
+                                lon = loc.longitude,
+                                atMs = System.currentTimeMillis(),
+                                altitudeM = loc.altitudeM,
+                                accuracyM = loc.accuracyM?.toDouble(),
+                            )
                         }
                     }
                     delay(2500)
@@ -352,6 +638,17 @@ class NavViewModel(
         compass.stop()
         pollJob?.cancel()
         pollJob = null
+    }
+
+    private companion object {
+        /** Aircraft move; this is the same cadence the radar scope itself uses. */
+        const val TRAFFIC_REFRESH_MS = 20_000L
+        /** Earthquakes have already happened. Refreshing often would only cost battery. */
+        const val SEISMIC_REFRESH_MS = 5 * 60_000L
+        /** One request's worth, and about as many points as a phone-width chart can show. */
+        const val PROFILE_SAMPLES = 80
+        /** How much the route has to change before the heights are worth asking for again. */
+        const val PROFILE_REFRESH_FRACTION = 0.2
     }
 
     override fun onCleared() {

@@ -9,7 +9,9 @@ import dev.mascwa.pulse.data.fuel.FuelRepository
 import dev.mascwa.pulse.data.markets.MarketsRepository
 import dev.mascwa.pulse.data.emergency.EmergencyService
 import dev.mascwa.pulse.data.news.NewsRepository
+import dev.mascwa.pulse.data.orbital.LaunchRepository
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
+import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.sensors.SurvivalTools
@@ -162,6 +164,8 @@ class AppContainer(private val appContext: Context) {
     val orbitalRepository: OrbitalRepository by lazy {
         OrbitalRepository(http, diskCache, settingsRepository)
     }
+    val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
+    val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
     val locationProvider: LocationProvider by lazy { LocationProvider(appContext) }
 
     val connectivityObserver: dev.mascwa.pulse.core.connectivity.ConnectivityObserver by lazy {
@@ -173,6 +177,21 @@ class AppContainer(private val appContext: Context) {
     /** Road-snapped routing (free, keyless OSRM) for the NAV navigation path. */
     val routingRepository: dev.mascwa.pulse.data.places.RoutingRepository by lazy {
         dev.mascwa.pulse.data.places.RoutingRepository(http)
+    }
+
+    /** The breadcrumb trail behind you on the NAV map (on-device only, never transmitted). */
+    val trackStore: dev.mascwa.pulse.data.nav.TrackStore by lazy {
+        dev.mascwa.pulse.data.nav.TrackStore(appContext, json)
+    }
+
+    /** Ground height for a batch of coordinates — the NAV map's route elevation profile. */
+    val elevationRepository: dev.mascwa.pulse.data.maps.ElevationRepository by lazy {
+        dev.mascwa.pulse.data.maps.ElevationRepository(http)
+    }
+
+    /** Live precipitation-radar frames for the NAV map's rain overlay (keyless). */
+    val rainViewerRepository: dev.mascwa.pulse.data.maps.RainViewerRepository by lazy {
+        dev.mascwa.pulse.data.maps.RainViewerRepository(http)
     }
 
     /** Local / regional internet radio (Radio Browser community API; free, keyless). */
@@ -295,6 +314,41 @@ class AppContainer(private val appContext: Context) {
     val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {
         dev.mascwa.pulse.jarvis.voice.VoskSpeech(appContext)
     }
+
+    // ---- Sensorium: ambient environment sensing (classify-then-discard; labels only) ----
+
+    /** The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic. */
+    val ambientAudioSampler: dev.mascwa.pulse.data.sensing.AmbientAudioSampler by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientAudioSampler(
+            appContext, http, micBusy = { voskSpeech.consoleActive.value },
+        )
+    }
+
+    /** The Sensorium's eyes — one headless back-camera EfficientNet burst at a time. */
+    val ambientCameraSampler: dev.mascwa.pulse.data.sensing.AmbientCameraSampler by lazy {
+        dev.mascwa.pulse.data.sensing.AmbientCameraSampler(appContext, http)
+    }
+
+    /** The Sensorium's continuous type-free senses (motion EWMA, light, barometer trend, magnetics,
+     *  proximity) + on-demand WiFi/BLE density bursts. */
+    val sensorFusion: dev.mascwa.pulse.data.sensing.SensorFusionController by lazy {
+        dev.mascwa.pulse.data.sensing.SensorFusionController(appContext)
+    }
+
+    /** Learned normality + the 48 h event log (baseline must survive restarts or anomaly detection
+     *  restarts amnesiac). */
+    val sensoriumStore: dev.mascwa.pulse.data.sensing.SensoriumStore by lazy {
+        dev.mascwa.pulse.data.sensing.SensoriumStore(appContext, json)
+    }
+
+    /** The Sensorium's conductor: fuses sampler output each heartbeat, learns the baseline, extracts
+     *  events, dispatches alerts/memories. Driven by [dev.mascwa.pulse.data.sensing.SensoriumService]. */
+    val sensoriumEngine: dev.mascwa.pulse.data.sensing.SensoriumEngine by lazy {
+        dev.mascwa.pulse.data.sensing.SensoriumEngine(
+            sensoriumStore, ambientAudioSampler, ambientCameraSampler, sensorFusion,
+            memoryStream, notifier, settingsRepository,
+        )
+    }
     /** Android's on-device Google recognizer for the (more accurate) post-wake command; private,
      *  no network. Falls back to Vosk when on-device recognition isn't available on a device. */
     val deviceSpeech: dev.mascwa.pulse.jarvis.voice.DeviceSpeechRecognizer by lazy {
@@ -348,6 +402,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.DeviceTool(deviceContextProvider),
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
+            dev.mascwa.pulse.jarvis.agent.EnvironmentTool(sensoriumEngine, sensoriumStore),
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),

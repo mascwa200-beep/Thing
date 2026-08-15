@@ -292,6 +292,11 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.diary.DiaryScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            composable(Routes.SENSORIUM) {
+                val vm: dev.mascwa.pulse.feature.sensorium.SensoriumViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.sensorium.SensoriumScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
             composable(Routes.ORACLE) {
                 val vm: dev.mascwa.pulse.feature.oracle.OracleViewModel = viewModel(factory = factory)
@@ -339,11 +344,10 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.jarvis.JarvisDossierScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            // ---- 3D cyberpunk navigation map (OBJECTIVES manager folded in as a sub-tab) ----
+            // ---- 3D cyberpunk navigation map ----
             composable(Routes.NAV) {
                 val vm: dev.mascwa.pulse.feature.nav.NavViewModel = viewModel(factory = factory)
-                val objVm: dev.mascwa.pulse.feature.objectives.ObjectivesViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.nav.NavScreen(vm, objVm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.nav.NavScreen(vm, onBack = { navController.popBackStack() })
             }
 
             // ---- Saved places / waypoint tracker ----
@@ -402,7 +406,7 @@ fun PulseApp(
  *  any surface can deep-link any feature. */
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.SURVIVAL,
-    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE,
+    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
     Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
     Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,

@@ -77,6 +77,7 @@ class JarvisViewModel(
     private val taskStore: dev.mascwa.pulse.data.tasks.TaskStore,
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
     private val procedureStore: dev.mascwa.pulse.data.procedure.ProcedureStore,
+    private val sensorium: dev.mascwa.pulse.data.sensing.SensoriumEngine,
 ) : ViewModel() {
 
     /** The ordered tool names the last agent run used — captured for procedure learning. */
@@ -555,6 +556,20 @@ class JarvisViewModel(
         val procedures = runCatching { procedureStore.digest() }.getOrDefault("")
         if (procedures.isNotBlank()) {
             prompt += "\n\n" + procedures
+        }
+        // The Sensorium's live read — the Computer always knows the room it's speaking into. One line
+        // plus any current anomaly; label-derived, never raw sensor data.
+        val env = runCatching {
+            val r = sensorium.reading.value
+            val anomaly = sensorium.anomalies.value.firstOrNull()
+            buildString {
+                append(r.describe())
+                if (anomaly != null) append(" — " + anomaly.metric + " " + anomaly.text)
+            }
+        }.getOrDefault("")
+        if (env.isNotBlank()) {
+            prompt += "\n\nThe user's surroundings right now (from the on-device Sensorium; use naturally, " +
+                "don't recite): " + env
         }
         return prompt
     }

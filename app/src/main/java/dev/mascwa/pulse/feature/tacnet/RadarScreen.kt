@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
@@ -33,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,11 +57,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.connectivity.LocalIsOnline
+import dev.mascwa.pulse.core.telemetry.Cpa
+import dev.mascwa.pulse.core.telemetry.Explainer
+import dev.mascwa.pulse.core.telemetry.Seismic
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.radar.Contact
 import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.NeonChip
 import dev.mascwa.pulse.feature.common.NeonPanel
@@ -66,6 +74,8 @@ import dev.mascwa.pulse.feature.common.Sparkline
 import dev.mascwa.pulse.ui.effects.rememberHaptics
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -99,8 +109,12 @@ fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
     val emergOnly by vm.emergOnly.collectAsStateWithLifecycle()
     val countHistory by vm.countHistory.collectAsStateWithLifecycle()
     val sky by vm.sky.collectAsStateWithLifecycle()
+    val convergences by vm.convergences.collectAsStateWithLifecycle()
     val online = LocalIsOnline.current
     val haptic = rememberHaptics()
+    var tab by remember { mutableStateOf(RadarTab.SCOPE) }
+    // Tap a quake's read-out -> plain-English explanation of what the numbers mean.
+    var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
     val onSelect: (String) -> Unit = { id -> haptic(HapticFeedbackType.TextHandleMove); vm.select(id) }
 
     val permLauncher = rememberLauncherForActivityResult(
@@ -138,71 +152,385 @@ fun RadarBody(vm: RadarViewModel, modifier: Modifier = Modifier) {
         state.isError -> ErrorState(state.error ?: "Error", { vm.refresh() }, modifier)
         else -> {
             val d = state.data ?: return
-                val rangeM = rangeKm * 1000.0
-                val filtered = d.contacts
-                    .filter { it.distanceMeters <= rangeM }
-                    .filter { passesFilter(it, altFilter, milOnly, emergOnly) }
-                val airCount = filtered.count { it.kind == ContactKind.AIRCRAFT.name }
+            val rangeM = rangeKm * 1000.0
+            val filtered = d.contacts
+                .filter { it.distanceMeters <= rangeM }
+                .filter { passesFilter(it, altFilter, milOnly, emergOnly) }
+            val airCount = filtered.count { it.kind == ContactKind.AIRCRAFT.name }
+
+            Column(modifier) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RadarTab.entries.forEach { t ->
+                        NeonChip(t.label, selected = t == tab, onClick = {
+                            haptic(HapticFeedbackType.LongPress)
+                            tab = t
+                        })
+                    }
+                }
                 LazyColumn(
-                    modifier = modifier,
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                    state = remember(tab) { LazyListState() },
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item { RadarScope(filtered, rangeKm, rangeM, selected, online, onSelect = onSelect) }
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            vm.ranges.forEach { r ->
-                                NeonChip("$r KM", selected = r == rangeKm, onClick = { haptic(HapticFeedbackType.LongPress); vm.setRange(r) })
+                    when (tab) {
+                        RadarTab.SCOPE -> {
+                            item { RadarScope(filtered, rangeKm, rangeM, selected, online, onSelect = onSelect) }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    vm.ranges.forEach { r ->
+                                        NeonChip("$r KM", selected = r == rangeKm, onClick = { haptic(HapticFeedbackType.LongPress); vm.setRange(r) })
+                                    }
+                                }
+                            }
+                            item {
+                                Column {
+                                    Row(
+                                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        NeonChip("ALL", altFilter == RadarViewModel.AltFilter.ALL, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.ALL) })
+                                        NeonChip("<10K", altFilter == RadarViewModel.AltFilter.LOW, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.LOW) })
+                                        NeonChip("10-30K", altFilter == RadarViewModel.AltFilter.MID, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.MID) })
+                                        NeonChip(">30K", altFilter == RadarViewModel.AltFilter.HIGH, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.HIGH) })
+                                    }
+                                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        NeonChip("MIL", milOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleMil() })
+                                        NeonChip("EMERG", emergOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleEmerg() })
+                                    }
+                                }
+                            }
+                            item { StatusLine(d, filtered.size, airCount, countHistory) }
+                            if (filtered.isEmpty()) {
+                                item {
+                                    Text(
+                                        "// NO CONTACTS IN RANGE",
+                                        fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp,
+                                        color = Pip.dim, modifier = Modifier.padding(top = 6.dp),
+                                    )
+                                }
+                            } else {
+                                items(filtered, key = { it.id }) { ct ->
+                                    Column {
+                                        ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                                        // Tap a contact: its detail drops down right beneath the row.
+                                        if (ct.id == selected) ContactDetail(ct)
+                                    }
+                                }
                             }
                         }
-                    }
-                    item {
-                        Column {
-                            Row(
-                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                NeonChip("ALL", altFilter == RadarViewModel.AltFilter.ALL, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.ALL) })
-                                NeonChip("<10K", altFilter == RadarViewModel.AltFilter.LOW, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.LOW) })
-                                NeonChip("10-30K", altFilter == RadarViewModel.AltFilter.MID, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.MID) })
-                                NeonChip(">30K", altFilter == RadarViewModel.AltFilter.HIGH, onClick = { haptic(HapticFeedbackType.LongPress); vm.setAltFilter(RadarViewModel.AltFilter.HIGH) })
-                            }
-                            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                NeonChip("MIL", milOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleMil() })
-                                NeonChip("EMERG", emergOnly, onClick = { haptic(HapticFeedbackType.LongPress); vm.toggleEmerg() })
-                            }
+                        RadarTab.TRAFFIC -> trafficTab(filtered, convergences, selected, onSelect)
+                        // Named `explainers`, not `items`: inside a LazyListScope that would
+                        // shadow the list-builder function of the same name.
+                        RadarTab.SEISMIC -> seismicTab(d, selected, onSelect) { title, explainers ->
+                            explainer = title to explainers
                         }
+                        RadarTab.ORBITAL -> orbitalTab(d, sky, selected, onSelect)
                     }
-                    item { StatusLine(d, filtered.size, airCount, countHistory) }
-                    item { SkyPanel(sky) }
-                    if (filtered.isEmpty()) {
-                        item {
-                            Text(
-                                "// NO CONTACTS IN RANGE",
-                                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp,
-                                color = Pip.dim, modifier = Modifier.padding(top = 6.dp),
-                            )
-                        }
-                    } else {
-                        items(filtered, key = { it.id }) { ct ->
-                            Column {
-                                ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
-                                // Tap a contact: its detail drops down right beneath the row.
-                                if (ct.id == selected) ContactDetail(ct)
-                            }
-                        }
-                    }
-                    item {
-                        Text(
-                            "Live aircraft: ${d.source.ifBlank { "ADS-B" }} (keyless community ADS-B) · ISS: wheretheiss.at · quakes: USGS. " +
-                                "Coverage depends on nearby feeders.",
-                            style = MaterialTheme.typography.labelSmall, color = Pip.dim,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
+                    item { SourceNote(d) }
                 }
             }
         }
+    }
+
+    explainer?.let { (title, items) ->
+        ExplainerDialog(title, items, onDismiss = { explainer = null })
+    }
+}
+
+/** The four instruments the scope's data supports. */
+private enum class RadarTab(val label: String) {
+    SCOPE("SCOPE"),
+    TRAFFIC("TRAFFIC"),
+    SEISMIC("SEISMIC"),
+    ORBITAL("ORBITAL"),
+}
+
+// ---- TRAFFIC -----------------------------------------------------------------------------------
+
+private fun LazyListScope.trafficTab(
+    contacts: List<Contact>,
+    convergences: List<Cpa.Approach>,
+    selected: String?,
+    onSelect: (String) -> Unit,
+) {
+    val aircraft = contacts.filter { it.kind == ContactKind.AIRCRAFT.name }
+
+    if (convergences.isNotEmpty()) {
+        item {
+            Text(
+                "CONVERGING · ${convergences.size}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = Pip.bright,
+            )
+        }
+        items(convergences.take(6)) { approach -> ConvergenceRow(approach) }
+        item {
+            Text(
+                "Straight-line extrapolation from current headings — a geometry readout, not a " +
+                    "collision warning. Aircraft turn.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+            )
+        }
+    }
+
+    val declared = aircraft.filter { it.emergency || it.declaredEmergency != null }
+    if (declared.isNotEmpty()) {
+        item {
+            Text(
+                "DECLARED EMERGENCY · ${declared.size}",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = Pip.alert,
+            )
+        }
+        items(declared, key = { "em_${it.id}" }) { ct ->
+            Column {
+                ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                if (ct.id == selected) ContactDetail(ct)
+            }
+        }
+    }
+
+    item {
+        Text(
+            "TRAFFIC · ${aircraft.size}",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = Pip.bright,
+        )
+    }
+    if (aircraft.isEmpty()) {
+        item {
+            Text(
+                "// NO AIRCRAFT IN RANGE",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.dim,
+            )
+        }
+    } else {
+        items(aircraft, key = { it.id }) { ct ->
+            Column {
+                ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                if (ct.id == selected) ContactDetail(ct)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConvergenceRow(approach: Cpa.Approach) {
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.bright) {
+        Column {
+            Text(
+                "${approach.a.label} ⇄ ${approach.b.label}",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Pip.glow,
+            )
+            Text(
+                "closest in ${(approach.secondsToClosest / 60).roundToInt()} min · " +
+                    Geo.formatDistance(approach.closestHorizontalM) + " apart",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.bright,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                approach.closestVerticalM
+                    ?.let { "${(it / 0.3048).roundToInt()} ft vertically at that point" }
+                    ?: "vertical separation unknown — one of them reports no altitude",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+            )
+        }
+    }
+}
+
+// ---- SEISMIC -----------------------------------------------------------------------------------
+
+private fun LazyListScope.seismicTab(
+    d: RadarData,
+    selected: String?,
+    onSelect: (String) -> Unit,
+    onExplain: (String, List<Explainer>) -> Unit,
+) {
+    // Deliberately NOT range-filtered. The scope tops out at 500 km but quakes are fetched to 800,
+    // so everything past 500 used to be downloaded and silently discarded. A magnitude 6 at 700 km
+    // is worth knowing about; this is a list, not a scope, so it can show it.
+    val quakes = d.contacts.filter { it.kind == ContactKind.QUAKE.name }
+    item {
+        Text(
+            "SEISMIC · ${quakes.size}",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = Pip.bright,
+        )
+    }
+    if (quakes.isEmpty()) {
+        item {
+            Text(
+                "// NO RECENT EVENTS NEARBY",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.dim,
+            )
+        }
+        return
+    }
+    items(quakes, key = { it.id }) { q ->
+        Column {
+            QuakeRow(q, q.id == selected) { onSelect(q.id) }
+            if (q.id == selected) QuakeDetail(q, onExplain)
+        }
+    }
+    item {
+        Text(
+            "Ordered by the USGS significance score, which folds in magnitude, felt reports and " +
+                "estimated impact — not merely by distance.",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+        )
+    }
+}
+
+@Composable
+private fun QuakeRow(q: Contact, selected: Boolean, onClick: () -> Unit) {
+    val mag = q.magnitude
+    val severe = (mag ?: 0.0) >= 5.5
+    NeonPanel(
+        Modifier.fillMaxWidth().clickable(onClick = onClick),
+        corners = selected,
+        borderColor = if (severe) Pip.alert else Pip.grid,
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    q.label,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                    color = if (severe) Pip.alert else Pip.glow,
+                )
+                Text(
+                    q.detail,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.bright,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                q.depthKm?.let {
+                    Text(
+                        "${it.roundToInt()} km deep",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim,
+                    )
+                }
+                Text(
+                    Geo.formatDistance(q.distanceMeters),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.dim,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuakeDetail(q: Contact, onExplain: (String, List<Explainer>) -> Unit) {
+    val mag = q.magnitude
+    val depth = q.depthKm
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, borderColor = Pip.grid) {
+        Column {
+            // The honest read: neither magnitude nor depth means much on its own.
+            if (mag != null && depth != null) {
+                Text(
+                    Seismic.impact(mag, depth),
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.glow,
+                )
+            }
+            q.pagerAlert?.let { alert ->
+                Seismic.pagerAlert(alert)?.let {
+                    Text(
+                        it.headline,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp,
+                        color = if (alert.equals("green", true)) Pip.bright else Pip.alert,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            if (q.tsunami) {
+                Text(
+                    "TSUNAMI FLAG SET — check official warnings",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.alert,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                mag?.let { DetailRow("Magnitude", fmtDouble("%.1f", it)) }
+                q.magType?.let { DetailRow("Scale", it) }
+                depth?.let { DetailRow("Depth", "${it.roundToInt()} km") }
+                q.shakingIntensity?.let { DetailRow("Shaking", Seismic.shaking(it).headline) }
+                q.feltReports?.takeIf { it > 0 }?.let { DetailRow("Felt reports", "$it") }
+                q.significance?.let { DetailRow("Significance", "$it") }
+                q.reviewStatus?.let { DetailRow("Status", it) }
+                DetailRow("Distance", Geo.formatDistance(q.distanceMeters))
+                DetailRow("Bearing", "${Geo.cardinal(q.bearingDeg)} ${q.bearingDeg.roundToInt()}°")
+            }
+            Text(
+                "TAP FOR PLAIN ENGLISH",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = Pip.bright,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable {
+                        onExplain(
+                            q.label,
+                            buildList {
+                                mag?.let { add(Seismic.magnitude(it)) }
+                                depth?.let { add(Seismic.depth(it)) }
+                                q.magType?.let { add(Seismic.magnitudeType(it)) }
+                                Seismic.pagerAlert(q.pagerAlert)?.let { add(it) }
+                                q.shakingIntensity?.let { add(Seismic.shaking(it)) }
+                                q.feltReports?.let { add(Seismic.feltReports(it, q.communityIntensity)) }
+                                add(Seismic.reviewStatus(q.reviewStatus))
+                            },
+                        )
+                    },
+            )
+        }
+    }
+}
+
+// ---- ORBITAL -----------------------------------------------------------------------------------
+
+private fun LazyListScope.orbitalTab(
+    d: RadarData,
+    sky: RadarViewModel.SkyState,
+    selected: String?,
+    onSelect: (String) -> Unit,
+) {
+    val orbital = d.contacts.filter { it.kind == ContactKind.ISS.name }
+    item {
+        Text(
+            "ORBITAL · ${orbital.size}",
+            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = Pip.bright,
+        )
+    }
+    if (orbital.isEmpty()) {
+        item {
+            Text(
+                "// NO ORBITAL TRACK",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.dim,
+            )
+        }
+    } else {
+        items(orbital, key = { it.id }) { ct ->
+            Column {
+                ContactRow(ct, ct.id == selected) { onSelect(ct.id) }
+                if (ct.id == selected) ContactDetail(ct)
+            }
+        }
+        item {
+            Text(
+                "Live sub-point, not a pass prediction. The Observatory computes pass times for " +
+                    "your location from real element sets.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = Pip.dim,
+            )
+        }
+    }
+    item { SkyPanel(sky) }
+}
+
+@Composable
+private fun SourceNote(d: RadarData) {
+    Text(
+        "Live aircraft: ${d.source.ifBlank { "ADS-B" }} (keyless community ADS-B) · ISS: wheretheiss.at · quakes: USGS. " +
+            "Coverage depends on nearby feeders.",
+        style = MaterialTheme.typography.labelSmall, color = Pip.dim,
+        modifier = Modifier.padding(top = 8.dp),
+    )
 }
 
 @Composable
@@ -584,17 +912,69 @@ private fun ContactDetail(ct: Contact) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            // The feed's own emergency word, which the squawk does not carry. A medical flight or
+            // a fuel emergency is broadcast here and nowhere else.
+            ct.declaredEmergency?.let { declared ->
+                Text(
+                    "DECLARED — ${declaredMeaning(declared)}",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pip.alert,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 DetailRow("Distance", Geo.formatDistance(ct.distanceMeters))
                 DetailRow("Bearing", "${Geo.cardinal(ct.bearingDeg)} ${ct.bearingDeg.roundToInt()}°")
-                ct.altitudeM?.let { DetailRow("Altitude", "${(it / 0.3048).roundToInt()} ft") }
+                if (ct.onGround) {
+                    DetailRow("Altitude", "on the ground")
+                } else {
+                    ct.altitudeM?.let { DetailRow("Altitude", "${(it / 0.3048).roundToInt()} ft") }
+                }
+                // GPS altitude only when it differs enough from the barometric one to be worth
+                // saying — otherwise it is two lines showing the same number.
+                ct.altitudeGeomM?.let { geom ->
+                    val baro = ct.altitudeM
+                    if (baro == null || abs(geom - baro) > 30.0) {
+                        DetailRow("Altitude (GPS)", "${(geom / 0.3048).roundToInt()} ft")
+                    }
+                }
                 ct.groundSpeedKmh?.let { DetailRow("Ground speed", "${it.roundToInt()} km/h") }
-                ct.verticalRateFpm?.let { DetailRow("Vertical rate", "%+d fpm".format(it)) }
-                ct.trackDeg?.let { DetailRow("Heading", "${it.roundToInt()}°") }
+                ct.verticalRateFpm?.let { DetailRow("Vertical rate", fmtInt("%+d fpm", it)) }
+                ct.trackDeg?.let { DetailRow("Track", "${it.roundToInt()}°") }
+                // Track is the path over the ground; true heading is where the nose points. They
+                // differ by the wind, so a gap between them is the crosswind made visible.
+                ct.trueHeadingDeg?.let { DetailRow("Nose heading", "${it.roundToInt()}°") }
                 ct.squawk?.let { DetailRow("Squawk", it) }
-                ct.category?.let { DetailRow("Category", it) }
-                if (ct.detail.isNotBlank()) DetailRow("Ident", ct.detail)
-                if (ct.military) DetailRow("Flag", "Military / state")
+                if (ct.ident) DetailRow("Ident", "pressed — identifying to ATC")
+                // Prefer the plain-English label, fall back to the raw code rather than nothing.
+                val typeText = ct.categoryLabel ?: ct.category
+                if (typeText != null) DetailRow("Type", typeText)
+                val identity = ct.identityLine.ifBlank { ct.detail }
+                if (identity.isNotBlank()) DetailRow("Aircraft", identity)
+
+                // What it is about to do, rather than what it is doing.
+                ct.selectedAltitudeFt?.let { DetailRow("Selected altitude", "$it ft") }
+                ct.selectedHeadingDeg?.let { DetailRow("Selected heading", "${it.roundToInt()}°") }
+                ct.navModes.takeIf { it.isNotEmpty() }?.let {
+                    DetailRow("Autopilot", it.joinToString(", "))
+                }
+                ct.qnhHpa?.let { DetailRow("Altimeter set", "${it.roundToInt()} hPa") }
+
+                // How much to trust the symbol on the scope.
+                if (ct.positionIsEstimated) {
+                    DetailRow("Position", "estimated (${ct.sourceType})")
+                }
+                if (ct.coasting) {
+                    ct.seenPosSec?.let { DetailRow("Last fix", "${it.roundToInt()}s ago — coasting") }
+                }
+                ct.rssiDb?.let { DetailRow("Signal", fmtDouble("%.1f dBFS", it)) }
+
+                val flags = listOfNotNull(
+                    "Military / state".takeIf { ct.military },
+                    "Notable".takeIf { ct.interesting },
+                    "Rotating address".takeIf { ct.pia },
+                    "Limited display".takeIf { ct.ladd },
+                )
+                if (flags.isNotEmpty()) DetailRow("Flags", flags.joinToString(" · "))
             }
         }
     }
@@ -607,6 +987,22 @@ private fun DetailRow(label: String, value: String) {
         Text(value, fontFamily = JetBrainsMono, fontSize = 11.sp, color = Pip.glow)
     }
 }
+
+/** The feed's emergency vocabulary, spelled out. */
+private fun declaredMeaning(word: String): String = when (word) {
+    "general" -> "general emergency"
+    "lifeguard" -> "lifeguard / medical flight"
+    "minfuel" -> "minimum fuel"
+    "nordo" -> "no radio"
+    "unlawful" -> "unlawful interference"
+    "downed" -> "downed aircraft"
+    else -> word
+}
+
+/** Locale.US: these are numbers, and some locales render digits differently. */
+private fun fmtInt(pattern: String, value: Int): String = String.format(Locale.US, pattern, value)
+
+private fun fmtDouble(pattern: String, value: Double): String = String.format(Locale.US, pattern, value)
 
 private fun squawkMeaning(squawk: String?): String = when (squawk) {
     "7500" -> "unlawful interference (hijack)"

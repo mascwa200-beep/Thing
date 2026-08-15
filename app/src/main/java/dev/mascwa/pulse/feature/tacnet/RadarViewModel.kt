@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.tacnet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.Cpa
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.core.util.load
 import dev.mascwa.pulse.data.orbital.MoonInfo
@@ -55,6 +56,16 @@ class RadarViewModel(
 
     private val _sky = MutableStateFlow(SkyState())
     val sky: StateFlow<SkyState> = _sky.asStateFlow()
+
+    /**
+     * Pairs of aircraft currently converging, nearest-in-time first.
+     *
+     * Derived from contacts already on the scope, so it costs no extra network. Straight-line
+     * extrapolation, which is all the data supports — see [Cpa] for why this is a geometry
+     * readout and explicitly not a collision-avoidance system.
+     */
+    private val _convergences = MutableStateFlow<List<Cpa.Approach>>(emptyList())
+    val convergences: StateFlow<List<Cpa.Approach>> = _convergences.asStateFlow()
 
     private var lastLoc: DeviceLocation? = null
     private var auto: Job? = null
@@ -120,9 +131,39 @@ class RadarViewModel(
             _state.value.data?.let { d ->
                 val n = d.contacts.count { it.kind == ContactKind.AIRCRAFT.name }
                 _countHistory.value = (_countHistory.value + n).takeLast(40)
+                _convergences.value = findConvergences(d)
             }
         }
     }
+
+    /**
+     * Turn the aircraft on the scope into CPA tracks and look for convergences.
+     *
+     * Only aircraft, and only those actually reporting a heading and a speed — a contact without
+     * them cannot be extrapolated, and guessing would be worse than saying nothing. Runs on the
+     * calling coroutine because the pair count is small: the sweep is O(n²), but with well under a
+     * hundred aircraft in range that is a few thousand cheap comparisons.
+     */
+    private fun findConvergences(d: RadarData): List<Cpa.Approach> = runCatching {
+        val tracks = d.contacts
+            .filter { it.kind == ContactKind.AIRCRAFT.name && !it.onGround }
+            .mapNotNull { c ->
+                val speed = c.groundSpeedKmh ?: return@mapNotNull null
+                val track = c.trackDeg ?: return@mapNotNull null
+                Cpa.Track(
+                    id = c.id,
+                    label = c.label,
+                    latitudeDeg = c.latitude,
+                    longitudeDeg = c.longitude,
+                    altitudeM = c.altitudeM,
+                    groundSpeedMs = speed / 3.6,
+                    trackDeg = track,
+                    verticalRateMs = c.verticalRateFpm?.toDouble()
+                        ?.let { Cpa.feetPerMinuteToMs(it) } ?: 0.0,
+                )
+            }
+        Cpa.notableApproaches(tracks)
+    }.getOrDefault(emptyList())
 
     /** Moon + planets are pure offline computations from the GPS fix; space
      *  weather is best-effort over the network and never disturbs the scope. */

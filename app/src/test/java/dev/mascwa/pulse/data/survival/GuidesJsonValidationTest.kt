@@ -208,7 +208,10 @@ class GuidesJsonValidationTest {
     private companion object {
         const val FULL_PAGE_WORDS = 400
 
-        /** Measured after Wave B1 complete (238 guides · 2,902 sections). Ratchet upward as waves land. */
-        const val FULL_PAGE_BASELINE = 1614
+        /** Expansion is exhausted — every section of every guide already reaches [FULL_PAGE_WORDS], so
+         *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
+         *  waves land, never down. `tools/kb/ci_parity_lint.py` prints the value to use; it does not
+         *  edit this file, so the bump is a deliberate manual step after every merge. */
+        const val FULL_PAGE_BASELINE = 8256
     }
 }

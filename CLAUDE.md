@@ -2183,10 +2183,326 @@ AskUserQuestion decisions: reach = **same Wi-Fi only** (direct LAN, NOT the GitH
 - **Honest limit:** away-from-home access needs the GitHub-relay transport. The protocol is
   transport-agnostic, so it slots in behind the same interface if the owner ever wants it.
 
-### KB engine state (task #73, standing)
-**238 guides · 2,902 sections · 1,614 full pages** (was 1,310); manifest **70 / 14,490 topics covered**.
-Wave B1 fully merged. `FULL_PAGE_BASELINE = 1614`. Next wave: `select_wave.py` → drafting fan-out →
-`merge_new_guides.py` → `kb_pipeline.py` (must print CLEAN) → ratchet → one commit.
+### KB engine state (task #73, standing) — UPDATED this session
+
+**396 guides · 5,406 sections · 5,406 full pages** (was 1,614 at session start). Manifest **24,917
+topics** (was 14,490), **49/49 categories populated**, 396 covered. `FULL_PAGE_BASELINE = 5406`. Branch
+`claude/loving-edison-bd65oa`, PR **#426** (PR #425 merged as `28ea05e`). Waves B2–B6 added 158 new
+guides total; B5/B6 were cut short by the weekly usage limit and their 43 completed guides salvaged
+(see the limit note below — waves resume after Aug 12, 4pm UTC).
+
+**Sections and full pages are now the same number.** Every section of every guide clears the 400-word
+bar, so the expansion track is exhausted — it could only ever deepen sections that already existed.
+From here the count grows one-for-one with new guides, at ~13-15 pages each.
+
+**THE STRUCTURAL FIX — read this before planning more KB work.** `select_wave.py` only ever emits
+topics that exist in `topic_manifest.json`. **20 of 49 categories had ZERO topics**, so no drafting wave
+could ever commission a guide for them — and they were exactly the practical ones the app exists for
+(Hazards, Rescue, Essentials, Navigation, Movement, Preparedness, Skills, Making, Home & Repair,
+Sustenance, both Cooking, Sports, Games, Business, Economics, Education, Vehicles, Reference,
+Foundations). Root cause: `scratchpad/ontology_args.json` declared 22 enumeration domains and only 16
+produced files; the 6 that credit-failed mapped exactly onto the gap, and `Reference` was in no domain
+at all. Re-enumerated (+10,427 topics). **Every category is now reachable.**
+
+**Three new gates, all committed and each negative-tested against deliberately broken input:**
+- `tools/kb/ci_parity_lint.py` — local twin of `GuidesJsonValidationTest`. `kb_pipeline.py` is NOT a
+  twin: it misses blank `safetyNote`, a `Cooking — <not Food Safety>` guide with no safetyNote, empty or
+  blank ingredients/steps lists, unknown category, and index drift. Every one of those merges clean,
+  rewrites the shipped assets, and fails only in CI. Reads the allowlist straight out of the Kotlin
+  source so it cannot drift; prints the exact `FULL_PAGE_BASELINE` ratchet. Run before every commit.
+- `tools/kb/check_wave.py <dir> expand|new` — pre-merge gate. **`merge_expansions.py` never compares
+  `summary`/`safetyNote`**, so an agent that rebuilds a guide dict instead of mutating the original
+  silently corrupts shipped content and merges clean. This is why every expansion prompt mandates
+  *mutate the loaded dict, never construct a new one*. Run before every merge.
+- `tools/kb/merge_images.py` — the image merge step (didn't exist). Sniffs magic bytes, because a saved
+  404 page named `.png` is the normal way image sourcing fails and nothing downstream would question it.
+
+**Content banked:** expansion waves A1+A2 (73 guides, +224k words) took full pages 1,614 → 2,463, then
+A3 finished the job at 2,902 — every practical category 100% full-paged (Hazards went 0 → 63 of 63; its
+longest section had been 375 words against a 400 bar). Image waves 1–3 put a diagram in **all 238**
+guides that existed at the time (was 152), PD/CC0/CC-BY/CC-BY-SA only, provenance in
+`images/NOTICE.txt`. Then breadth waves B2–B4 added **115 new guides** (~865k words), 2,902 → 4,730.
+Those 115 have no diagram yet — the next image wave has a clear target list.
+
+**Reusable wave scripts** (in scratchpad, all three carry the args-string guard):
+`kb_wave_new.js` (args `{outDir, topics:[{id,topic,category}]}`) — Track B breadth, 14-16 sections at
+440-520 words each; `kb_wave_expand.js` (`{outDir, guides:[{id,category,thin}]}`); `kb_wave_images.js`
+(`{outDir, guides:[{id,title,category}]}`). 3 units per agent.
+
+**Honest remaining scope.** 10,000 pages needs roughly **340 more guides ≈ 2.4M words**. A 55-topic wave
+(19 agents) runs ~3 h and yields ~+740 pages, so ~6 more waves. Run **two waves in parallel** — the
+concurrency cap is per-workflow, and these agents are API-bound rather than CPU-bound, so two workflows
+genuinely double throughput on this 4-core box instead of queueing against each other. Multi-session by
+nature; the CI-printed count is the meter.
+
+**Operational lessons that cost real work this session:**
+1. **Entering plan mode kills in-flight subagents.** It propagates to running agents, which write plan
+   documents instead of doing the work — 15 expansion and 14 ontology agents lost that way.
+   `resumeFromRunId` does NOT recover them: it replays the cached "BLOCKED" result. Only a fresh
+   dispatch works. Don't enter plan mode with waves running.
+2. **Workflow `args` can arrive as a JSON string.** Always
+   `typeof args === 'string' ? JSON.parse(args) : args` — a wave died instantly without it.
+3. **Batching guides per agent is only ~12% faster, not 3×.** It amortizes fixed per-agent cost
+   (1–2 min); the ~5,500 words per guide dominates and is incurred either way.
+4. Never hardcode a wave's `outDir` in a reusable script — a second wave drops patches beside
+   already-merged ones, and `merge_images.py` fatals on a section that already has an image.
+5. **`select_wave.py` skips ids already bundled, not ids already in flight.** To queue a second wave
+   alongside a running one, select `2n` and take the tail — the selection is deterministic, so the
+   head is exactly the in-flight wave.
+6. Guard the invariant, not the headline number. A wave arrived with two sections at 397 and 375
+   words; merging as-is would still have raised the total while quietly breaking "zero sections under
+   400". Extend them instead.
+
+### "MARKET REACTION + IMPACT" desk-note card (owner spec, this session)
+Owner sent an exact prompt spec (with a screenshot of the old card mis-firing "miners feel it first"
+copy under a politics story): the card under each story is titled **MARKET REACTION + IMPACT** and its
+body is a **180-240-word clinical desk note** — instruments moved → transmission mechanism (desks,
+probability paths, second-order flows) → positioning backdrop → one concrete catalyst; continuous
+paragraph, no fluff phrases, no moralizing, **never invent a numerical print** (directional language
+where no public print exists). Implemented as a register change inside the EXISTING analysis pipeline
+(no new subsystem): `NewsAnalysisEngine.SYSTEM_PROMPT`'s MARKET line now carries the spec (the model
+may cite ONLY the live basket quotes passed in KNOWN MARKET FACTS — the app has no tick feed; the note
+is emitted as one paragraph on the single `MARKET:` line so the line-parser stands); `parse` MARKET
+bound 600→2,400 chars (other lines keep the sentence cap), moved to the companion as `internal` +
+covered by `NewsAnalysisParseTest` (5 JVM cases, arithmetic twin-validated). `NewsAnalysis.version`
+(defaulted 1) + `CURRENT_VERSION=2`: `ensureAnalyzed` treats an older-generation cache entry as absent,
+so a story re-analyzes ONCE into the new register — "at most once ever" became "at most once per spec
+generation". UI: strip header/dialog → "MARKET REACTION + IMPACT", desk note gets `lineHeight=15.sp`;
+heuristic fallback path untouched (no cloud → the old one-liners). `NewsExplainers.market()` honestly
+states the note is model reasoning from the shown quotes, not a market-data feed (desktop mirror got
+the title; it has no analysis engine). ⚠️ On-device-unverified: the live desk-note generation + length
+on the Pixel (needs the cloud key); a register sample was delivered in chat for owner veto.
+- **v3 — the WIRES-WINDOW TAPE (owner: "take this seriously"):** the note's part (1) is now MEASURED,
+  not reconstructed. Pure `core:telemetry/MarketWindow.kt` (+ 10-case test, **locally compiled AND
+  executed green**): last print at/before publish → last print inside publish+90m; a >45-min-stale
+  baseline flips to the flagged **reopen** regime (venue closed at publish → next session's window vs
+  prior close); every unmeasurable case → null (dropped line, never an estimate).
+  `MarketsRepository.intradayBars(symbol)` fetches `interval=5m&range=5d` through the SAME
+  `yahooGate`/`retrying`/UA as all Yahoo traffic (one gate per host — re-proven: an 11-request burst
+  got this container's proxy IP durably banned), 10-min per-symbol cache. `data/news/MarketTape.kt`
+  measures the macro complex (ES=F · NQ=F · ^TNX · 2YY=F · DX-Y.NYB · ^VIX · GC=F · CL=F · HYG; a
+  wrong symbol = a dropped line) and formats Locale.US lines with a `<30` sanity guard before any bp
+  annotation. `NewsAnalysisEngine` v3 (`CURRENT_VERSION=3`): the tape block is in the prompt, the
+  MARKET spec now says cite tape+facts figures ONLY, frame reopen lines as next-session reactions, and
+  attribute causation honestly (a window move is DURING, not necessarily BECAUSE). Tape computed
+  best-effort in `ensureAnalyzed` (`MarketTape` built inside NewsViewModel from its existing
+  `markets` dep — zero factory churn). **Local-verification recipe fix recorded:** the long-documented
+  "standalone kotlinc IR-lowering crash (env artifact)" was a wrong jar path — put
+  `/opt/gradle-8.14.3/lib/annotations-24.0.1.jar` on the compiler's `-cp` and full local
+  kotlinc+JUnit runs work. ⚠️ On-device-unverified: the live tape fetch + the grounded note (the
+  container's Yahoo ban made symbol-level verification impossible here; the Pixel's own IP is clean).
+- **v3 hardening — a 16-agent adversarial review confirmed 13 real defects in the first tape cut; all
+  fixed:** (1) **gate ordering** — the tape's 9 gated Yahoo fetches ran BEFORE analyze()'s cloud gates,
+  so cloud-off devices paid the full burst for a null result → `wiresTape` is now a **provider lambda
+  the engine invokes only after its gates pass**. (2) **fresh-story permanent miss** — analysis fires
+  minutes after publish, when the wires window doesn't exist yet, and cached forever at v3 → a
+  **one-shot maturity re-analysis** (`TAPE_MATURITY_MS` 100 min): an entry generated inside the story's
+  first 100 min is re-analyzed once after the window elapses; bounded because the second pass's
+  generatedAtMs sits past maturity. (3) **reopen falsehood** — a 45-min print gap on a thin instrument
+  mid-session was asserted as "venue closed" → `Move` now carries `baselineGapMinutes`/
+  `endOffsetMinutes` and every tape line states its own measured span ("wire-3m -> wire+88m" / "last
+  print 23h05m BEFORE the wire"), never a venue-hours claim; prompt vocabulary matches. (4) negative
+  caching (3-min TTL) + per-symbol Mutex in-flight dedup in `intradayBars` so an outage isn't hammered
+  36-requests-per-article and concurrent analyses coalesce. (5) zero-value bars filtered (a 0.0 print
+  is a feed artifact and poisons pct). (6) the pre-existing default-locale `"%.1f".format` in the
+  prompt's live-pulse figures → Locale.US (comma-decimal devices fed the model "1,3"). Core re-run
+  locally after the rewrite: 10/10 green.
+
+### ⚠️ WEEKLY USAGE LIMIT hit mid-KB-waves (resets Aug 12, 4pm UTC)
+Waves B5/B6 died on the limit (B6 6/19 agents done; B5 killed by a container restart mid-run). Their
+completed guides on disk were salvaged and merged (see the KB state section — the numbers there are
+post-salvage). **Subagent fan-outs are blocked until the reset; the main loop still works.** After the
+reset: resume the paired-wave loop (`select_wave.py 110` → split head/tail → two concurrent Workflows
+→ gate → commit) — the un-drafted B5/B6 topics re-emit automatically since they never got bundled.
+
+### SENSORIUM — ambient environment sensing, rebuilt overpowered (this session, S1–S6)
+Owner: *"look through my camera and all the sensors and stuff… make it super overpowered and clinically
+insanely creative."* Recon verdict: the life-sim perception stack was FULLY deleted with the game
+(`b9ba600`) — the older perception/ambient-sensing prose above describes subsystems that no longer
+exist; **Sensorium supersedes all of it.** Owner chose (AskUserQuestion): **Adaptive 24/7** posture +
+surfaced **Everywhere**. Built as 6 CI-green slices:
+- **S1 pure cores (31 tests, locally kotlinc+JUnit green):** `core:telemetry/Sensorium.kt` (SenseFrame
+  → EnvReading: setting/motion/social/noise/light/pressure-trend + describe(); carries the recorded
+  fixes — movement = EWMA(|accelG−1|), VEHICLE requires motion; + the **throttle ladder**
+  NOMINAL/SETTLED/CONSERVE/STANDDOWN with battery hysteresis as a pure function),
+  `SensoriumBaseline.kt` (**learned normality**: per hour×weekday/weekend EWMA mean+deviation baselines
+  → plain-English anomalies "unusually loud for 03:00 on a weekday"; young cells refuse to judge),
+  `SensoriumEvents.kt` (safety sounds at a strict floor [smoke/CO alarm, glass, gunshot → ALERT],
+  notable sounds [siren/doorbell/knock/dog/baby/thunder], pressure plunges, light transitions,
+  magnetic spikes framed honestly).
+- **S2 deps/manifest/settings:** MediaPipe tasks-audio+vision 0.10.21 + CameraX 1.4.1 restored (models
+  fetched at runtime, same URLs/filenames as before so cached copies reuse; proguard already keeps
+  `com.google.mediapipe.**` — matters now R8 is ON); `CAMERA`+`FOREGROUND_SERVICE_CAMERA` back;
+  `SensingSettings` (default ON per owner posture; mic/camera/radio/remember sub-toggles).
+- **S3 samplers (dumb by design; engine owns cadence):** `data/sensing/AmbientAudioSampler` (per-sip
+  open→classify→release, mic genuinely free between sips; yields to console capture),
+  `AmbientCameraSampler` (headless LifecycleRegistry back-camera bursts, camera fully closed after),
+  `SensorFusionController` (NORMAL-rate batched sensors + movement EWMA + 3h barometer ring + WiFi
+  cached-scan counts + 12s BLE bursts w/ one empty filter [screen-off suppression] + per-burst unique
+  counts only [MAC randomization]).
+- **S4 engine/store/service:** `SensoriumEngine` (per-heartbeat step: due samplers → fuse → learn →
+  events w/ per-key cooldowns; camera trigger-ramps on loud/light-jump/motion-after-stillness; ALERTs
+  → `notifyUrgentLine` red + a camera look; notable events → episodic memories ≤10/day; **GPS never
+  polled**), `SensoriumStore` (baseline + 48h event log; house pattern; serialization DTOs app-side),
+  `SensoriumService` — **the upgradeable FGS**: background starts = specialUse only (never attempts
+  mic/cam types — Android 14+ throws); MainActivity onCreate+onStart re-arm with `|microphone|camera`
+  which then persist in background; stepwise degradation; START_STICKY (deliberate divergence — the
+  type-free core is worth resurrecting); BootReceiver standby start + RefreshWorker self-heal placed
+  BEFORE the notification gates.
+- **S5 scanner:** `feature/sensorium/` — live reading + facet breakdown (seen/heard/inferred labelled
+  honestly) + anomaly panel + learned-normal line + instrument strip + 48h event log + ARM (requests
+  perms; the screen IS the foreground context that can arm) + LOOK NOW. `Routes.SENSORIUM`, MENU →
+  YOUR THINGS → "Environment Scanner", Settings section under SECURITY (whose keywords advertised
+  "ambient camera mic" with nothing behind them).
+- **S6 intelligence:** `composePersona` carries the one-line ambient read every turn (use naturally,
+  don't recite); `environment` JarvisTool; ORACLE gains envDescription/envAnomaly/pressureFallingFast
+  + **revives the dead `movement`/`awayFromHome` inputs** (windDown could NEVER fire; focusMoment's
+  "settled" was constant-true; awayFromHome = Trusted-Network home-SSID, never the scene guess) + 2
+  new rules (stormFront from the phone's own barometer; envAnomaly ambient awareness). OracleTest
+  13→16, locally green.
+- **Privacy invariant:** classify-then-discard — raw audio/frames never persisted or transmitted; only
+  text labels + numbers leave the samplers; the GrapheneOS indicators lighting during sips is the OS
+  working as designed. **Honest platform limits:** mic/camera arm only from a foreground app-open
+  (then persist); WiFi counts null without Location; GrapheneOS may refuse screen-off camera (marked
+  UNAVAILABLE, never faked); ~5-10%/day battery at defaults, self-throttling below.
+- ⚠️ **Owner-verify on the Pixel (CI compile-gates only):** the service arming flow (open app → EARS/
+  EYES ARMED in the scanner), the GrapheneOS indicator behaviour, a clap/alarm-sound ALERT test, the
+  learned-normal line appearing after a day or two, battery drain at L0, and the boot-revival path.
+
+### MAPS & SKY overhaul — owner directive, in progress (this session, PR #426)
+Owner (with a MENU screenshot): *"Make each tab in Maps & Sky have each of it's internal features and
+visuals and information broadened and more of it with different types too. Just the tabs in Maps & Sky.
+It must be on the level of borderline creative obsession on the cusp of insanity."* Then, binding:
+*"keep going autonomously normally while ensuring enough credits to spare as to not hit the weekly
+limiter."* The KB wave engine is **PARKED** under that constraint (~5M subagent tokens a round — it is
+what tripped the limit four times); resuming it is an explicit owner call.
+
+**Operating mode that came out of it: zero subagent spend.** Every verification this run was free —
+local kotlinc + JUnit, live `curl` probes, and CI itself. The planned per-slice compile reviews were
+skipped deliberately: CI is a free compile gate, and every runtime bug worth catching was found by
+*running* code locally, which a review would not have done better.
+
+**Local verification recipe (proven, zero cost)** — `scratchpad/sky/run.sh`. kotlinc via
+`/opt/gradle-8.14.3/lib/kotlin-compiler-embeddable-2.0.21.jar` with `kotlin-stdlib` + `trove4j` +
+`annotations-24.0.1` + `kotlinx-coroutines-core-jvm` on the **compiler's own `-cp`** (the long-blamed
+"IR-lowering crash" was only ever a missing jar), JUnit 4.13.2 + hamcrest from the Gradle cache.
+Reference libraries installed locally and free: `pip install sgp4 skyfield` (+ DE421, which must go in
+the scratchpad — `*.bsp` is now gitignored after a 17 MB kernel landed in the repo root).
+
+**New pure cores, all locally executed** — `Geodesy` (great-circle + UTM/MGRS), `SolarActivity`,
+`HfPropagation`, `Sgp4` + `Tle` (WGS-72, matched to the Vallado reference, worst error 7 mm),
+`Ephemeris` (Meeus 47.A/B, checked against JPL DE421), `SatellitePasses`, `Cpa`. Plus the LCARS
+instrument kit (`feature/common/LcarsCharts.kt`: time chart, gauge, histogram, alt-az sky plot, meter).
+
+**Shipped and CI-green:** the **space-weather console** (`b33897f`, run 1526) — six instruments
+NOW · SUN · AURORA · STORMS · **RADIO** · ALERTS over the full SWPC suite that was being fetched and
+discarded; the X-ray chart is a log axis labelled with the class letters, because flare classes are
+decades. The **observatory** (`a06ac39`) — TONIGHT · SATELLITES · SKY CHART · SUN & MOON · ASTEROIDS ·
+LAUNCHES, with real pass prediction. `TleRepository` (Celestrak, 12 h cache, 2 h floor honoured even on
+a forced refresh) and `LaunchRepository` (Launch Library, keyless).
+
+**Bugs found by running things, each worth recording:**
+- **A pass search took 77 seconds on one satellite.** Benchmarking the real catalogue before wiring it
+  to a screen: 78 s over 175 objects, of which **77.1 s was COSMOS 1867** against a 4 ms median. A
+  satellite already up when the window opens has no rise, but the rise time kept its `0L` sentinel and
+  the next descent was paired with it — a pass from **1970 to now**, ~59 M sampling iterations. The ISS
+  *masked* it: propagating an ISS element set back 56 years fails, so the existing "only whole passes
+  are reported" test **passed for the wrong reason**. 78,494 ms → 807 ms. Lesson: a green test is not
+  evidence the guarded behaviour works.
+- **`HfPropagation.summary` contradicted `mufDisplay`** — one returned null with no solar data, the
+  other quoted a MUF off the quiet-Sun floor, and they render two lines apart.
+- **Tonight's geometry used UTC midnight**, so "today's sunset" was the wrong day away from Greenwich.
+- **The sky chart pinned the Sun due north** (the VM carried only its altitude).
+- **Default-locale `format`** in `Explainers.trimNum`, the quake label and the radar cache key — the
+  recurring trap; these strings are numbers, so Locale.US.
+- **SWPC deleted `products/solar-wind/` entirely**, so speed and Bz had been showing em dashes on the
+  device. Replaced by the propagated geospace product; background payload also cut ~596 KB → ~50 KB.
+
+**Honest scope cut:** the planned WINDS ALOFT sub-tab is **not buildable**. Probed both feeds live —
+**0 of 124 aircraft** carry `wd`/`ws`/`oat`/`tat` (they need Comm-B decoding no public aggregator
+exposes). Better find in its place: adsb.fi serves `ownOp`/`desc`/`year`, so the bundled airline table
+is largely unnecessary. The radar model now carries ~40 fields instead of 13 (autopilot intent, the
+feed's own emergency word, signal quality, mlat/tisb provenance, dbFlags, on-ground).
+
+⚠️ **Everything visual is owner-verify on the Pixel** — CI compile-gates only. **MapLibre has no true
+3D terrain mesh at any version through 13.5.0 — hillshade only; do not promise a mesh.**
+
+### MAP (#90/#91) — the last program of the MAPS & SKY overhaul (this session, all pushed)
+
+**The capability worth remembering: MapLibre can be type-checked locally, with no Android SDK.**
+`curl` the published AAR from Maven Central (`org.maplibre.gl:android-sdk:11.8.0`), unzip
+`classes.jar`, and put it on kotlinc's target `-cp` alongside `kotlin-stdlib`. None of the
+style/layer/source/expression signatures reach into `android.*`, so they compile standalone; for the
+few that do (bitmaps), `com.google.android:android:4.1.1.4` from Maven Central is enough of a stub.
+The working method is to *extract the real functions out of `NavScreen.kt` by brace-matching* and
+compile those, stubbing only the Compose types — so what gets checked is the shipped code, not a
+paraphrase of it. Every map function this session was verified that way before push. `javap` on the
+same jar settles API questions outright (it is how `TileSet.encoding`, `RasterDemSource`,
+`HeatmapLayer`, `addLayerBelow` and `Property.ICON_ROTATION_ALIGNMENT_MAP` were confirmed).
+
+Shipped, in order: **`36c1278`** day/night terminator core; **`c17c0ac`** concurrent POI scans;
+**`e9158bd`** routing LRU + negative cache; **`f200d57`** terminator ring fix; **`2889fb9`** night
+layer + map states; **`4a5735b`** basemaps + rain + relief; **`57d7c02`** traffic + seismic heat;
+**`3091eb4`** incidents carried whole; **`6189208`** MGRS/DMS readout + `onLowMemory`; **`3aed077`**
+the breadcrumb trail. CI green through `4a5735b` (run 1537); the rest was pushed together.
+
+- **Layers.** A drawer (▤ control) picks the world — the vector style, **Sentinel-2 cloudless**
+  (EOX, CC-BY-4.0, zoom ≤14) or **OpenTopoMap** (CC-BY-SA, ≤17) — over which sit **RainViewer**
+  precipitation, **terrarium hillshade** (AWS Terrain Tiles, public domain, ≤15), live **aircraft**,
+  a magnitude-weighted **quake heatmap**, and the **night** wash. All keyless; every licence is
+  credited in the drawer, which two of them require. Sources are created up front and switched by
+  visibility, because a source's URL is fixed once it exists and hidden layers fetch nothing. Rain
+  is the exception — each scan is a new address, so the layer is torn down before the source.
+  `data/maps/MapLayerCatalog.kt` holds every address and its terms.
+- **⚠️ WMTS axis order.** EOX is `{z}/{y}/{x}` — row before column. Both orderings return a
+  perfectly valid JPEG; only one returns the right part of the world. Settled by fetching the Sahara
+  against the mid-Pacific and comparing sizes. Never assume this from a URL template.
+- **Bug found by reading, not by CI:** `Terminator.curve` normalised its longitudes, and
+  normalisation maps +180 onto −180 — the same place on a globe, the wrong end of a sweep. The last
+  point landed on the first, so `nightPolygon` read both pole corners off one edge and produced a
+  degenerate ring. The existing tests passed *because* of the collapse (`first == last`). Three new
+  tests, each confirmed to fail against the old code; the decisive one ray-casts the ring over a
+  grid of real places and requires exactly the ones where the Sun has set to be inside.
+- **Second lesson of the same kind:** `NeonPanel` puts its content in a **Box**, so a card that
+  emits several children directly stacks them on top of each other. Wrap in a `Column`.
+- **State the screen never had:** no loading, error or empty state existed anywhere on the map.
+  Scans now report what happened (all-failed / partly-failed / genuinely nothing there), counted
+  after the concurrent requests settle. MapLibre's style callback has **no error branch**, so a dead
+  basemap is detected by the callback never arriving (9 s) and offered a retry — no unverifiable
+  listener API involved. Also fixed a latent gap: `map` is published before its style loads, so any
+  effect firing in that window found a null style and gave up; the marker effects only recovered by
+  accident because GPS re-emits every 2.5 s. Everything now keys on `styleReady`.
+- **Data no longer thrown away:** incidents were flattened to a coordinate and a title, discarding
+  type/severity/magnitude/time/source-link — they are carried whole, coloured and sized by severity,
+  and tappable through to the report.
+- **Instruments:** position readout cycling decimal / DMS / **MGRS** (the geodesy core has produced
+  all three since it was written and the map showed none). DMS rounds to tenths *before* splitting —
+  the obvious order prints `179°59'60.0"`. `MapView.onLowMemory` is now subscribed via
+  `ComponentCallbacks2`; it normally rides the Activity callback, which never reaches a view inside
+  a composable. A **measuring tape** (mode, not gesture: taps add chain corners; great-circle
+  totals; the chain is one FeatureCollection carrying both the LineString and its points, because a
+  circle layer over a LineString renders nothing). `NavGuidance.turnHint` finally wired into the
+  banner — the phrasing was written and tested and only the arrow was ever asked for.
+- **Route elevation profile** (`core:telemetry/RouteProfile.kt` + `data/maps/ElevationRepository.kt`,
+  6 local tests) over Open-Meteo's keyless batch elevation endpoint — 80 samples in one request.
+  The sampling is the part that matters: a router's shape points are dense at roundabouts and sparse
+  on motorways, so charting them directly makes the x-axis the router's drawing style rather than
+  distance. Keyed on objective + route *length*, not geometry — the route re-resolves every 60 m of
+  travel and comes back slightly different, so a geometry comparison would refetch constantly.
+  `LcarsTimeChart` gained an optional `xFormat` (its axis is a Long because it was written for time;
+  here the number is metres).
+- **Camera persistence: decided against**, not forgotten. Every version writes the whole settings
+  blob per camera-idle or races the view model's teardown, for the marginal gain of reopening the
+  map exactly where you left it.
+- **The trail** (`core:telemetry/TrackLog.kt` + `data/nav/TrackStore.kt`, 9 local tests) closes the
+  feature catalogue's long-standing claim that this map has one. The filter scales with the fix
+  (refuse vague fixes, require movement > stated accuracy, refuse impossible speed at a bar high
+  enough that an airliner still records); climb ignores <3 m because GPS altitude noise otherwise
+  reports a mountain on a flat walk. On-device only; erasing erases.
+- **Still open on the map:** location polled every 2.5 s (`LocationComponent` would fix the jumpy
+  dot, but replacing a working marker is a real regression risk); `cyberpunkify` flattens parks and
+  landuse into the base colour; `nav3d` only tilts; declination computed at altitude 0.0 (verified
+  real, judged cosmetic — the WMM barely moves over normal altitudes); no `onSaveInstanceState`.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the

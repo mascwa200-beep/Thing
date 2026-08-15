@@ -43,7 +43,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
                 SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
-                OrbitalViewModel(c.orbitalRepository, c.locationProvider)
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository)
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)
             modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
@@ -82,7 +82,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                     c.intentRouter, c.actionOrchestrator, c.textToSpeech, c.settingsRepository,
                     c.voskSpeech, c.agentOrchestrator, c.knowledgeStore, c.selfEditStore, c.briefingBuilder,
                     c.curiosityEngine, c.approvalGate, c.usageRepository, c.cerebellumStore, c.profileStore,
-                    c.taskStore, c.memoryStream, c.procedureStore,
+                    c.taskStore, c.memoryStream, c.procedureStore, c.sensoriumEngine,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(
@@ -104,11 +104,13 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.security.SecurityAuditViewModel::class.java) ->
                 dev.mascwa.pulse.feature.security.SecurityAuditViewModel(c.securityAuditor, c.securityAuditStore, c.applicationContext)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.nav.NavViewModel::class.java) ->
-                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository)
+                dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository, c.rainViewerRepository, c.radarRepository, c.trackStore, c.elevationRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
                 dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sensorium.SensoriumViewModel::class.java) ->
+                dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T

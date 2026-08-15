@@ -150,3 +150,1921 @@ artwork itself unmodified).
 CC BY / CC BY-SA works above are unmodified apart from resizing (noted) — no crops,
 recolors, or edits to the artwork itself. Public-domain works need no attribution;
 it is recorded here as good practice, matching the rest of this file.
+
+Archaeology & Anthropology knowledge-base diagrams (Excavation Methods, Survey &
+Site Prospection, History of Archaeology). Files renamed on import; sources are the
+original Wikimedia Commons "File:" pages (dimensions reduced / re-encoded where noted,
+artwork itself unmodified).
+
+  archaeological-excavation-methods-and-techniques.jpg — labelled archaeological
+      section drawing: numbered layers, cuts and fills through a buried sequence
+      (derived from the Historic England Field Recording Manual)
+      by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Example_section_drawing_to_demonstrate_stratigraphic_relationships.jpg
+  archaeological-excavation-methods-and-techniques-2.png — Harris matrix diagram of
+      that same sequence (contexts 1-19: layers, post pipe, postholes, pit fills, natural),
+      showing how stratigraphic relationships become a single-context sequence
+      by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Example_of_a_simple_stratigraphic_sequence_as_visualised_using_a_Harris_matrix_diagram.png
+  archaeological-survey-and-site-prospection.jpg — lidar hillshade of Vindolanda,
+      Northumberland: the Roman fort and vicus standing out as earthworks in bare-earth
+      terrain data (derived from Environment Agency open data, OGL v3)
+      by Dr John Wells — CC BY 4.0, Wikimedia Commons (re-encoded from the original)
+      https://commons.wikimedia.org/wiki/File:A_lidar_view_of_Vindolanda.jpg
+  archaeological-survey-and-site-prospection-2.jpg — magnetic gradiometer survey plot
+      of a prehistoric campsite (site 3030, Wyoming): five later-excavated fire hearths
+      appear as circular magnetic highs, with a metre grid and a nT colour scale
+      Public domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:3030-mag.jpg
+  history-of-archaeology-as-a-science.jpg — the Hoxne handaxe as engraved for
+      Archaeologia vol. 13 (1800), the first Palaeolithic stone tool ever published and
+      the plate behind the earliest argument for human deep time
+      by John Frere (1740-1807) — Public domain, Wikimedia Commons
+      (resized; the file's transparent background flattened to white)
+      https://commons.wikimedia.org/wiki/File:Archaeologia_Volume_13_D259.png
+  history-of-archaeology-as-a-science-2.png — IntCal13 radiocarbon calibration curve:
+      radiocarbon age plotted against calendar age, showing how far the measured curve
+      departs from the 1:1 line and why raw radiocarbon years must be calibrated
+      by Mike Christie — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Intcal_13_calibration_curve.png
+
+Knowledge-base diagrams for the Archaeology and Biology guides "Introduction to Archaeology
+as a Discipline", "Endocytosis and Exocytosis" and "Ion Channels and Membrane Excitability"
+(files live in images/kb/; renamed on import after the guide they illustrate). Sources are
+the original Wikimedia Commons "File:" pages; where the upload is an SVG the bundled file is
+Commons' own PNG rendering of it, and JPEG/PNG uploads are reduced in dimensions only —
+the artwork itself is unmodified in every case.
+
+  introduction-to-archaeology-as-a-discipline.jpg — "Example section drawing to demonstrate
+      stratigraphic relationships" (an excavation section with layers, cuts, fills and
+      postholes, contexts numbered 1-19; derived from the Historic England Field Recording
+      Manual) — by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Example_section_drawing_to_demonstrate_stratigraphic_relationships.jpg
+  introduction-to-archaeology-as-a-discipline-2.png — "Example of a simple stratigraphic
+      sequence as visualised using a Harris matrix diagram" (the same numbered contexts
+      redrawn as the flow chart of stratigraphic relationships that forms the excavation
+      record) — by The Archaeologist's Guide To Good Practice — CC BY 4.0, Wikimedia Commons
+      (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Example_of_a_simple_stratigraphic_sequence_as_visualised_using_a_Harris_matrix_diagram.png
+  endocytosis-and-exocytosis.jpg — "Transport of Molecules Across the Cell Membrane by
+      Endocytosis and Exocytosis" (exocytosis and the three endocytic routes shown side by
+      side across the lipid bilayer) — by Sinigangalang — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Transport_of_Molecules_Across_the_Cell_Membrane_by_Endocytosis_and_Exocytosis_(1).jpg
+  endocytosis-and-exocytosis-2.png — "Endocytosis types", a labelled three-panel comparison
+      of phagocytosis, pinocytosis and receptor-mediated endocytosis (pseudopodium,
+      phagosome, vesicle, receptor, coated pit, coat protein, coated vesicle)
+      by Mariana Ruiz Villarreal (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Endocytosis_types.svg
+  ion-channels-and-membrane-excitability.png — membrane topology of a voltage-gated sodium
+      channel alpha-subunit: domains I-IV, segments S1-S6, the charged S4 voltage sensor,
+      and the selectivity (S), inactivation (I), glycosylation (G) and phosphorylation (P)
+      sites — by John Schmidt — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Alphasubunit_sodium_channel.png
+  ion-channels-and-membrane-excitability-2.png — "Schematic of an action potential":
+      the voltage trace against time with threshold, stimulus, depolarization,
+      repolarization, refractory period, resting state and failed sub-threshold initiations
+      by Chris 73, updated by Diberri, converted to SVG by tiZom — CC BY-SA 3.0,
+      Wikimedia Commons (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Action_potential.svg
+
+Knowledge-base diagrams for the Biology guides "Membrane Transport: Diffusion, Osmosis and
+Active Transport" and "The Cell Membrane and the Fluid Mosaic Model", and the Chemistry guide
+"Dimensional Analysis and Unit Conversion" (files live in images/kb/; renamed on import after
+the guide they illustrate). Every one of these six is a PUBLIC DOMAIN upload, so no attribution
+is legally required; authorship and provenance are recorded here as the established practice.
+Each source upload is an SVG, so the bundled file is Commons' own PNG rendering of it; the
+artwork itself is unmodified in every case.
+
+  membrane-transport-diffusion-osmosis-and-active-transport.png — "Osmotic pressure on blood
+      cells diagram": red blood cells in hypertonic, isotonic and hypotonic solution shown
+      side by side, with the resulting cell shape and the direction of water movement arrowed
+      for each case (crenation, normal biconcave disc, swelling and lysis)
+      by LadyofHats — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Osmotic_pressure_on_blood_cells_diagram.svg
+  membrane-transport-diffusion-osmosis-and-active-transport-2.png — "Scheme sodium-potassium
+      pump": the four stages of the Na+/K+-ATPase cycle across the lipid bilayer, labelled with
+      extracellular and intracellular space, sodium and potassium ions, ATP hydrolysis to
+      ADP + Pi, and the concentration gradient each ion is pumped against
+      by LadyofHats (Mariana Ruiz Villarreal) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Scheme_sodium-potassium_pump-en.svg
+  the-cell-membrane-and-the-fluid-mosaic-model.png — "Phospholipids aqueous solution
+      structures": cross sections of the three structures phospholipids assemble into in water
+      — liposome, micelle and bilayer sheet — with hydrophilic heads drawn as circles and the
+      fatty acyl tails as wavy lines
+      by Mariana Ruiz Villarreal (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' PNG rendering of the source SVG, reduced to 1000px wide and colour-quantized
+      to keep the bundle small)
+      https://commons.wikimedia.org/wiki/File:Phospholipids_aqueous_solution_structures.svg
+  the-cell-membrane-and-the-fluid-mosaic-model-2.png — "Cell membrane detailed diagram": the
+      fully labelled fluid mosaic membrane — phospholipid bilayer with hydrophilic heads and
+      hydrophobic tails, cholesterol, glycolipids, glycoproteins, protein channels, integral,
+      peripheral and surface proteins, alpha-helix proteins and cytoskeletal filaments
+      by Mariana Ruiz (LadyofHats) — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Cell_membrane_detailed_diagram_en.svg
+  dimensional-analysis-and-unit-conversion.png — the BIPM illustration of the SI: the seven
+      base units (s, kg, m, A, K, mol, cd) in the outer ring, each paired in the inner ring
+      with the defining constant that now fixes it (the caesium transition frequency, the
+      Planck constant, the speed of light, the elementary charge, the Boltzmann constant,
+      the Avogadro constant and the luminous efficacy Kcd)
+      by BIPM (original), rearranged by User:Cmglee — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:SI_Illustration_Base_Units_and_Constants_Colour_Full.svg
+  dimensional-analysis-and-unit-conversion-2.png — drag coefficient Cd of a sphere against
+      Reynolds number Re over six decades, for smooth and rough surfaces: a worked
+      demonstration of what the Buckingham Pi theorem buys you, since a problem in speed,
+      size, density and viscosity collapses onto a single curve in two dimensionless groups
+      by an anonymous NASA author (ed. Nancy Hall), vectorized by User:Kraaiennest, edited by
+      Olivier Cleynen — Public Domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Drag_coefficient_on_a_sphere_vs._Reynolds_number_-_main_trends.svg
+
+Knowledge-base diagrams for the Chemistry guides "Empirical and Molecular Formula
+Determination", "Measurement, Units and Significant Figures in Chemistry" and "The Mole
+Concept and Avogadro's Number" (files live in images/kb/; renamed on import after the guide
+they illustrate). Sources are the original Wikimedia Commons "File:" pages; where the upload
+is an SVG the bundled file is Commons' own 1280px PNG rendering of it, and JPEG/PNG uploads
+are reduced in dimensions only — the artwork itself is unmodified in every case.
+
+  empirical-and-molecular-formula-determination.png — "Tipos de fórmulas": the three ways a
+      compound can be written on paper, shown side by side for water and methane — Lewis
+      electron-dot structure, structural (bond-line) formula, and the condensed molecular
+      formula H2O / CH4 — by Science images — CC0 1.0 (public domain dedication),
+      Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Tipos_de_f%C3%B3rmulas.png
+  empirical-and-molecular-formula-determination-2.jpg — "Liebig's Kali-Apparat zu organischen
+      Analysen", the 1837 plate (drawn at natural size) of the five-bulb potash apparatus that
+      made combustion analysis quantitative: the lettered legend identifies the suction and
+      chloride-of-calcium openings (P, O), the large and small bulbs (M, N) and their limbs
+      (m, n), and marks the potash-solution levels before filling, after the leak test, after
+      combustion and after the tube is opened — from Justus Liebig, "Anleitung zur Analyse
+      organischer Körper", 1837 — Public Domain, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Kali-Apparat.jpg
+  measurement-units-and-significant-figures-in-chemistry.png — "Relations between new SI units
+      definitions": the seven SI base units (s, m, kg, A, K, mol, cd) as a dependency graph,
+      each fed by the defining constant that fixes it — the caesium hyperfine frequency, c, h,
+      e, k, the Avogadro constant and K_cd — with arrows showing which units are needed to
+      realise which — by Wikipetzi — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Relations_between_new_SI_units_definitions.png
+  measurement-units-and-significant-figures-in-chemistry-2.png — "Measurement example for
+      significant figures and precision": the same object measured against two rulers, one
+      graduated only in whole units and one finely subdivided, showing why the instrument —
+      not the arithmetic — sets how many digits a reading is entitled to
+      by Chemdiagrams — CC0 1.0 (public domain dedication), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Measurement_example_for_significant_figures_and_precision.png
+  the-mole-concept-and-avogadro-s-number.png — "Mole carbon-12 diagram": one mole shown as the
+      bridge between the weighable and the countable — 12 grams of carbon-12 on one side,
+      6.02214076x10^23 atoms (the Avogadro constant) on the other — by VectorVoyager —
+      CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mole_carbon-12_diagram.svg
+  the-mole-concept-and-avogadro-s-number-2.png — "Mass versus moles of iron vs gold": a worked
+      contrast showing that equal masses are not equal amounts — 1 kg of iron (M = 55.845
+      g/mol) is 17.89 mol while 1 kg of gold (M = 197.0 g/mol) is only 5.08 mol, with n = m/M
+      set out for both — by VectorVoyager — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px
+      PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mass_versus_moles_of_iron_vs_gold.svg
+
+Knowledge-base diagrams for the Climate guides "Carbon Dioxide and the Greenhouse Gases",
+"Arid Climate & Long-Term Drought Adaptation" and "Coastal & Maritime Climate Hazards" (files
+live in images/kb/; renamed on import after the guide they illustrate). Sources are the original
+Wikimedia Commons "File:" pages; where the upload is an SVG the bundled file is Commons' own
+1280px PNG rendering of it, and JPEG/PNG uploads are reduced in dimensions only — the artwork
+itself is unmodified in every case.
+
+  carbon-dioxide-and-the-greenhouse-gases.png — "The Greenhouse Effect": the energy path drawn
+      end to end — incoming solar radiation, the part reflected by the Earth and atmosphere, the
+      part absorbed at the surface, and the infrared the warmed surface re-emits, some escaping
+      to space and some absorbed and re-radiated in all directions by greenhouse-gas molecules,
+      which is what warms the surface and lower atmosphere — by US EPA (2012) — Public Domain,
+      Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Earth%27s_greenhouse_effect_(US_EPA,_2012).png
+  carbon-dioxide-and-the-greenhouse-gases-2.jpg — NASA's 400,000-year carbon-dioxide record:
+      atmospheric CO2 in parts per million against years before present, the long sawtooth of the
+      glacial cycles reconstructed from ice cores joined to the modern instrumental record, with
+      the ceiling that CO2 never crossed for the whole of that span marked and the near-vertical
+      present-day rise above it — by NASA (Vostok ice-core data, J. R. Petit et al.; NOAA Mauna
+      Loa CO2 record) — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:NASA_CO2_Chart.jpg
+  climate-arid-drought.jpg — "Wind tower and qanat cooling": a cutaway of the Persian passive-
+      cooling system, showing wind caught at the tower head and driven down into the building,
+      air drawn in through the qanat shaft and cooled by convection and evaporation over the
+      water flowing in the tunnel, the low-pressure zone that pulls it through the cooled
+      basement, and the exhaust leg back up the tower — no power required — by Williamborg,
+      after M. N. Bahadori, "Passive Cooling Systems in Iranian Architecture", Scientific
+      American, February 1978 — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Wind-Tower-and-Qanat-Cooling-1.jpg
+  climate-arid-drought-2.png — "Cone of depression": why a well can go dry while the aquifer
+      still holds water — a cross-section labelling precipitation, recharge, the water table and
+      the confining unit beneath, with the cone of depression and its drawdown that pumping
+      carves into the water table around the well itself — by Tara Gross (U.S. Geological
+      Survey) — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Cone_of_depression_-_Pumping_a_well_can_cause_water_level_lowering.png
+  climate-coastal-maritime.png — storm-surge cross-section: the three heights kept separate and
+      dimensioned against mean sea level — the 2 ft normal high tide, the 15 ft surge the storm
+      pushes on top of it, and the 17 ft storm tide that is their sum — with a house at the
+      shoreline showing what that total actually reaches — by SuperManu, after the original
+      graphic by Robert Simmon (NASA GSFC) — Public Domain, Wikimedia Commons (Commons' 1280px
+      PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Surge-en.svg
+  climate-coastal-maritime-2.png — "Rip Currents: Break the Grip of the Rip!": the NOAA rip-
+      current safety plan-view — the feeder currents running along the beach, the narrow rip neck
+      carrying water back out through the breakers, and the ESCAPE arrows showing the swim
+      parallel to shore that gets you out of it rather than the losing swim straight back in —
+      by the National Oceanic and Atmospheric Administration — Public Domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Ripcurrent.png
+
+Knowledge-base diagrams for the Climate guides "High Altitude: Thin Air, Altitude Illness &
+Acclimatization", "Humid Tropics & Rainforest Survival" and "The Global Carbon Cycle" (files live
+in images/kb/; renamed on import after the guide they illustrate). Sources are the original
+Wikimedia Commons "File:" pages. Where the upload is an SVG the bundled file is a PNG rendering of
+it, and JPEG/PNG uploads are reduced in dimensions only. The artwork itself is unmodified in every
+case; the one file needing more than a straight resize (climate-tropical-rainforest.png) has its
+processing spelled out in its own entry below.
+
+  climate-high-altitude.png — "Expected SpO2 and PaO2 levels at altitude": the three bands this
+      guide works in — high altitude (1,500–3,500 m), very high (3,500–5,500 m) and extreme
+      (5,500–8,850 m) — each given with the arterial oxygen saturation and partial pressure a
+      person should expect there, so a pulse-oximeter reading in the field can be judged against
+      the altitude rather than against sea-level normals
+      by Maryrosegrant — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Expected_SpO2_and_PaO2_levels_at_altitude.png
+  climate-high-altitude-2.png — "Oxygen-Haemoglobin dissociation curves for varying pH":
+      haemoglobin saturation against oxygen partial pressure, drawn for normal blood (pH 7.4) and
+      for the alkalosis and hypocapnia (pH 7.8) that the hypoxic ventilatory response of altitude
+      actually produces, with acidosis (pH 7.0) for contrast — the sigmoid shape is why saturation
+      holds up as partial pressure first falls and then collapses once it drops past the shoulder
+      of the curve
+      by Peter Southwood — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Oxygen-Haemoglobin_dissociation_curves.svg
+  climate-tropical-rainforest.png — "Heat Index": the National Weather Service chart of apparent
+      temperature against air temperature and relative humidity, banded by what that apparent
+      temperature does to people — fatigue, heat exhaustion possible, heat exhaustion likely, heat
+      stroke highly likely. Reading across the humid end of the chart gives this guide's central
+      point directly: a merely warm air temperature becomes an extreme apparent temperature once
+      relative humidity is high — by the National Weather Service, Southern Region Headquarters
+      (NOAA) — Public Domain, Wikimedia Commons
+      Processing note: rendered from the source SVG locally rather than taken from Commons' own
+      PNG. The file positions its axis labels with per-glyph x coordinates, which Commons'
+      rasteriser ignores — its rendering runs the whole relative-humidity scale together into an
+      unreadable "0102030405060708090100". The local rendering honours those coordinates. The
+      result was then flattened onto white (the source has transparent regions) and colour-
+      quantized to keep the bundle small; the artwork itself is unaltered.
+      https://commons.wikimedia.org/wiki/File:Heat_Index.svg
+  climate-tropical-rainforest-2.jpg — "Life Cycle of the Malaria Parasite": the transmission loop
+      drawn in both directions — the mosquito injecting sporozoites when it bites, the human liver
+      stage, the blood-cell cycle, the gametocytes that form, and the mosquito taking those back
+      up at its next blood meal — which is why every layer of the guide's bite defence (permethrin
+      -treated clothing, repellent, treated net) is aimed at that same single event
+      by the National Institutes of Health — Public Domain, Wikimedia Commons
+      (reduced to 1000px wide and re-encoded)
+      https://commons.wikimedia.org/wiki/File:Life_Cycle_of_the_Malaria_Parasite.jpg
+  the-global-carbon-cycle.jpg — "Simplified diagram of the global carbon cycle": reservoir masses
+      in Pg C and annual exchange fluxes in Pg C per year on one figure — atmosphere, vegetation,
+      soils, permafrost, surface and deep ocean, marine biota, sediments and fossil fuels — with
+      black numbers and arrows for the pre-industrial (pre-1750) state, red arrows for the
+      anthropogenic fluxes averaged over 2000–2009, and red reservoir numbers for the cumulative
+      industrial-era change in each pool
+      by Kandasamy S and Nagender Nath B (2016), after the diagram model of Sarmiento and Gruber
+      (2002) with stocks and fluxes reproduced from Ciais et al. (2013) — CC BY 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:Simplified_diagram_of_the_global_carbon_cycle.jpg
+  the-global-carbon-cycle-2.png — "Mauna Loa CO2 monthly mean concentration": the Keeling curve —
+      monthly mean CO2 as a mole fraction in dry air, measured continuously at Mauna Loa from 1958
+      to the present, with an inset of the mean seasonal departure from the yearly average. The
+      two things Keeling's record revealed are on the one figure: the relentless rise, and the
+      annual breathing of the Northern Hemisphere biosphere that rides on top of it
+      by Oeneis (data: Pieter Tans, NOAA/GML and Ralph Keeling, Scripps Institution of
+      Oceanography) — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Mauna_Loa_CO2_monthly_mean_concentration.svg
+
+Knowledge-base diagrams for the Climate guide "The Greenhouse Effect Explained" and the Computing
+guides "Ada Lovelace and the First Algorithm" and "Charles Babbage and the Analytical Engine"
+(files live in images/kb/; renamed on import after the guide they illustrate). Sources are the
+original Wikimedia Commons "File:" pages. Where the upload is an SVG the bundled file is Commons'
+own 1280px PNG rendering of it; JPEG/PNG uploads are reduced in dimensions only, and the one GIF
+is the original upload byte-for-byte. The artwork itself is unmodified in every case — no crops,
+no recolouring, no relabelling. The single CC BY work here (the 1840 engine plan) carries its
+photographer's credit both in this file and inline in the guide text, as that licence requires.
+
+  the-greenhouse-effect-explained.jpg — "Earth's energy budget": every radiative and non-radiative
+      flux in the climate system drawn as an arrow and given its ten-year average value in W/m2 —
+      incoming solar 340.4, reflected by clouds and atmosphere 77.0 and by the surface 22.9,
+      absorbed by the surface 163.3, emitted by the surface 398.2, the 40.1 that escapes straight
+      out through the atmospheric window, the 340.3 of back radiation returned to the surface by
+      greenhouse gases, plus thermals 18.4 and latent heat 86.4 — closing on a net absorbed 0.6,
+      which is the imbalance the whole guide is about — by NASA (CERES; Loeb et al., J. Clim.
+      2009; Trenberth et al., BAMS 2009) — Public Domain, Wikimedia Commons (reduced to 1280px
+      wide)
+      https://commons.wikimedia.org/wiki/File:The-NASA-Earth%27s-Energy-Budget-Poster-Radiant-Energy-System-satellite-infrared-radiation-fluxes.jpg
+  the-greenhouse-effect-explained-2.png — "Radiation Transmitted by the Atmosphere": the three
+      panels that explain WHY particular gases matter — the incoming 5525 K solar spectrum and the
+      outgoing 210-310 K thermal spectrum plotted against wavelength with their blackbody curves,
+      the total atmospheric absorption and scattering beneath them, and then the same band
+      structure broken out gas by gas (water vapour, carbon dioxide, oxygen and ozone, methane,
+      nitrous oxide, Rayleigh scattering), showing that greenhouse gases are nearly transparent to
+      sunlight but opaque in the infrared, and where the atmospheric window sits — by Wikkiwonkk,
+      after the original figure by Robert A. Rohde for the Global Warming Art project — CC0 1.0
+      (public domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of the source
+      SVG)
+      https://commons.wikimedia.org/wiki/File:Atmospheric_Transmission-en.svg
+  ada-lovelace-and-the-first-algorithm.jpg — "Diagram for the computation by the Engine of the
+      Numbers of Bernoulli. See Note G": the 1843 table itself — twenty-five numbered operations,
+      each with the operation performed, the variables acted upon, the variables receiving the
+      result, the indication of change in value, the statement of results, and the running
+      contents of the data, working and result variables, ending in the loop instruction "Here
+      follows a repetition of Operations thirteen to twenty-three". This plate is the artefact the
+      whole guide argues about, and it shows what prose cannot: a program with variables,
+      assignment and a loop, written for a machine that did not exist — by Ada Lovelace, in her
+      Notes to Menabrea's "Sketch of the Analytical Engine Invented by Charles Babbage" (1843) —
+      Public Domain, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Diagram_for_the_computation_of_Bernoulli_numbers.jpg
+  ada-lovelace-and-the-first-algorithm-2.jpg — the surviving Analytical Engine trial model
+      (1834-1871) in the Science Museum, London: the only part of the machine Babbage ever had
+      built, showing the stacked racks and figure wheels of the store, the gearing of the mill
+      below them and the drive shafts that would have sequenced them — the physical scale and
+      mechanism behind the abstraction the guide describes — by Daderot — CC0 1.0 (public domain
+      dedication), Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Analytical_engine_trial_model,_Charles_Babbage,_1834-1871_-_Science_Museum,_London_-_DSC05565.jpg
+  charles-babbage-and-the-analytical-engine.jpg — "The General Plan of Mr Babbage's Great
+      Calculating Engine", Plan 25, dated 6 August 1840: Babbage's own general arrangement drawing
+      of the Analytical Engine, with the circular mill at the centre ringed by its figure wheels,
+      the long rack running off to the right into the rows of store columns, and the three card
+      readers labelled separately at the edges — Operation Cards, Variable Cards and Number Cards
+      — together with the stamping-up levers, carriages and counting apparatus. It is the clearest
+      single evidence that the mill/store separation and the punched-card control the guide
+      describes were a worked-out engineering design, not a sketch of an idea — photographed at
+      the Computer History Museum by ArnoldReinhold — CC BY 4.0, Wikimedia Commons (reduced to
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Babbage_Analytical_Engine_Plan_1840_CHM.agr.jpg
+  charles-babbage-and-the-analytical-engine-2.gif — "Portion of Babbage's Difference Engine": the
+      contemporary engraving of the completed demonstration portion, drawn in enough detail to
+      follow the
+      mechanism — the columns of digit wheels carrying the successive differences with their
+      figures (21098, 89012) legible on the rings, the stepped adding sectors and carry levers
+      between the columns, the framing and the "calculation complete" indicator — by Benjamin
+      Herschel Babbage, printed in Harper's New Monthly Magazine — Public Domain, Wikimedia
+      Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Babbage_difference_engine_drawing.gif
+
+Knowledge-base diagrams for the Computing guide "History of Computing: From the Abacus to the
+Microprocessor" and the Earth Science guides "Crystallography and Crystal Systems" and
+"Introduction to Mineralogy" (files live in images/kb/; renamed on import after the guide they
+illustrate). None of these three guides carried an illustration before. Sources are the original
+Wikimedia Commons "File:" pages. Where the upload is an SVG or a WebP the bundled file is the
+raster rendering Commons serves for it; PNG and JPEG uploads are reduced in dimensions, and two
+files were additionally re-encoded to keep the bundle small (noted per entry). The artwork itself
+is unmodified in every case — no crops, no recolouring, no relabelling. The four CC BY / CC BY-SA
+works here carry their author credit in this file, as those licences require.
+
+  history-of-computing-from-the-abacus-to-the-microprocessor.png — "von Neumann Architecture": the
+      block diagram of what the guide's stored-program section argues in words — one memory unit
+      holding instructions and data alike, a central processing unit divided into a control unit
+      and an arithmetic/logic unit, input and output devices either side, and the path between
+      processor and memory drawn in both directions. It is the picture of the 1945 EDVAC report's
+      central claim: because the program lives in the same read-write store as the data, changing
+      the task means loading numbers rather than rewiring the machine, which is exactly what ENIAC
+      could not do — by Kapooht — CC BY-SA 3.0, Wikimedia Commons (Commons' 1280px PNG rendering
+      of the source SVG)
+      https://commons.wikimedia.org/wiki/File:Von_Neumann_Architecture.svg
+  history-of-computing-from-the-abacus-to-the-microprocessor-2.jpg — the development-phase chip
+      layout of the Intel 4004 (1971), the first commercial microprocessor, photographed as a
+      large plot at the Vintage Computer Festival in Berlin: a whole four-bit processor laid out
+      on a single die, with the regular repeating arrays of the register and memory-decode blocks
+      down two sides, the dense irregular control and arithmetic logic through the middle, the row
+      of square bond pads round the edge, and "4004", the intel wordmark and the year "71" drawn
+      into the corners of the mask. The guide's claim that an entire CPU — about 2,300 transistors
+      — had been reduced to one piece of silicon is something prose can only assert; this is the
+      artefact — original photograph by Wolfgang Stief, rectangular derivative by Pittigrilli —
+      CC0 1.0 (public domain dedication), Wikimedia Commons (reduced to 1000px wide and
+      re-encoded)
+      https://commons.wikimedia.org/wiki/File:Chip_layout_from_the_development_phase_of_the_Intel_4004_from_1971,_the_first_microprocessor_of_the_world_(cropped_and_edited_image).jpg
+  crystallography-and-crystal-systems.png — "The 14 Bravais lattices": all fourteen distinct
+      three-dimensional lattices drawn as unit cells and grouped under their seven crystal systems
+      — cubic (P, I, F), tetragonal (P, I), orthorhombic (P, C, I, F), hexagonal (P),
+      trigonal/rhombohedral (R), monoclinic (P, C) and triclinic (P) — with the extra lattice
+      points that centring introduces picked out in red. Two of the guide's sections resolve into
+      this one figure: the systems are the cell shapes, and the fourteen are what the P/I/F/C
+      centrings produce wherever they are neither redundant nor symmetry-lowering, which is why
+      the count falls so unevenly across the systems — by Davis Chow Jun Onn — CC BY-SA 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:The_14_Bravais_lattices.png
+  crystallography-and-crystal-systems-2.png — "Illustration of the Bragg diffraction": the
+      geometry behind n*lambda = 2d*sin(theta) — parallel planes of atoms a distance d apart, a
+      beam striking them at the glancing angle theta and leaving at the same angle, and the extra
+      distance the deeper ray travels marked out as the two d*sin(theta) segments that make up the
+      path difference. The law can be read straight off the drawing: the two reflections emerge in
+      phase, and a diffracted beam appears, only when that extra path is a whole number of
+      wavelengths — by Σ64 — CC BY 3.0, Wikimedia Commons (Commons' 1280px rendering of the
+      1299px upload)
+      https://commons.wikimedia.org/wiki/File:Bragg_diffraction_01.png
+  introduction-to-mineralogy.jpg — "Mohs Hardness Scale": the ten index minerals from talc at one
+      to diamond at ten, set beside the everyday objects that bracket them — fingernail 2.5,
+      copper penny 3.5, knife or glass plate 5.5, steel nail 6.5, masonry drill bit 8.5 — with
+      arrows placing each object at the point on the scale where it stops being able to scratch.
+      This turns the guide's hardness section from a list to be memorised into the field test it
+      actually is: you carry the comparators in your pocket, and what a specimen will and will not
+      scratch brackets it — by the National Park Service — Public Domain, Wikimedia Commons
+      (Commons' PNG rendering of the WebP upload, reduced to 1000px wide and re-encoded)
+      https://commons.wikimedia.org/wiki/File:Mohs_Hardness_Scale.webp
+  introduction-to-mineralogy-2.png — "Bowen's reaction series": the order in which minerals
+      crystallise out of a cooling magma, drawn as the two branches the guide describes — the
+      discontinuous series olivine, pyroxene, amphibole, biotite mica down one side and the
+      continuous plagioclase feldspar series running from calcium-rich to sodium-rich down the
+      other, the two converging on potassium feldspar, muscovite mica and finally quartz — plotted
+      against a relative crystallisation temperature axis from about 1300 °C to 540 °C and against
+      the ultramafic-to-felsic composition scale. It shows at a glance why certain minerals are
+      always found together and others never are — by Chloe Branciforte, in "GEOS: A Physical
+      Geology Lab Manual for California Community Colleges" (Branciforte and Haddad) — CC BY 4.0,
+      Wikimedia Commons (reduced to 960px wide)
+      https://commons.wikimedia.org/wiki/File:Bowen%27s_reaction_series_diagram.png
+
+Diagrams for the Earth Science guide "Silicate Minerals" and the Electronics guide
+"Automotive electronics and engine control units" (both previously unillustrated).
+Sources are the original Wikimedia Commons "File:" pages; files renamed on import.
+Where an SVG original relied on system fonts for its labels, the Commons-rendered
+raster is bundled instead, so the labels cannot shift under font substitution.
+
+  silicate-minerals.png — the silicon-oxygen tetrahedron, the single unit every silicate
+      is built from, shown twice: at left as a structural formula with the central silicon
+      bonded to four oxygens, wedge-and-dash notation carrying the three-dimensional
+      arrangement off the page; at right as the bare tetrahedron, which is the shorthand
+      the rest of the guide (and all of mineralogy) draws instead of the atoms. Having both
+      side by side is what makes the shorthand readable — "SiO4 tetrahedral.svg"
+      by Hbf878 — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:SiO4_tetrahedral.svg
+  silicate-minerals-2.png — "Ways in which silicate tetrahedrons can join together in
+      silicate minerals": the whole polymerization series in one figure, lettered a-f —
+      the isolated tetrahedron (a), the linked pair sharing one oxygen (b), the six-member
+      ring (c), the single chain (d), the double chain (e) and the continuous sheet (f).
+      This one plate is the structural spine of the entire guide: every class it goes on to
+      describe — neso-, soro-, cyclo-, ino-, phyllo- and tectosilicate — is one of these
+      linkages, and the progression from isolated units to a continuous framework is exactly
+      what the prose can only assert — by Actualist — CC BY-SA 3.0, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Silicate_structures.png
+  automotive-electronics-and-engine-control-units.jpg — two Rover Modular Engine Management
+      System (MEMS) engine control units, one sealed and one with its cover removed: the
+      finned cast-alloy case that sheds heat and survives underbonnet vibration, the single
+      multi-pin connector through which every sensor and actuator in the engine bay is wired,
+      and inside, the populated board itself — the microcontroller and its EPROM, the row of
+      power output stages along the connector edge that actually switch the injectors and
+      coils, and the bulk capacitor on the supply rail. It shows in one frame the split the
+      section describes between a small computing core and the much larger power-handling
+      hardware around it — by ColinMB — CC BY-SA 3.0, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Rover_MEMS_1.6_ECU.jpg
+  automotive-electronics-and-engine-control-units-2.png — CAN bus topology: several control
+      units (SG 1, SG 2 ... SG n) all hanging off one shared differential pair, CAN-Hi and
+      CAN-Low, terminated at each far end by a 120-ohm resistor. It makes concrete the point
+      the section turns on — that a modern car is not point-to-point wiring per function but
+      a small number of modules sharing one twisted pair, which is why the termination
+      resistors and the two-wire differential scheme matter — by Stefan-Xp — CC BY-SA 3.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:CAN-Bus_Elektrische_Zweidrahtleitung.svg
+
+Diagrams for three previously unillustrated Cooking — Food Safety guides ("Food Safety
+During a Power Outage", "Cooking for High-Risk Eaters" and "Date Labels, Recalls & the
+'Is This Still Good?' Decision Guide"). Sources are the original Wikimedia Commons
+"File:" pages; files renamed on import. Where an SVG original relied on system fonts for
+its labels, the Commons-rendered raster is bundled instead, so the labels cannot shift
+under font substitution.
+
+  cooking-food-safety-power-outage.png — temperature of one kilogram of water against heat
+      added, from −100 °C upward, with the two latent-heat plateaus drawn flat: melting ice
+      absorbs 334 kJ/kg and boiling water 2265 kJ/kg with the temperature not moving at all,
+      while the sloping runs are the ordinary specific heats (2.1 kJ/kg/K for ice, 4.2 for
+      liquid water). This is the whole argument of the freezer section made visible — a
+      packed freezer is a thermal battery whose ice must be melted through before anything
+      inside can rise past 32 °F, which is why a full freezer holds roughly 48 hours and a
+      half-full one roughly 24, and why empty space is wasted capacity rather than neutral
+      — by Cmglee — CC BY-SA 4.0, Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Water_temperature_vs_heat_added.svg
+  cooking-food-safety-power-outage-2.png — the pressure-temperature phase diagram of carbon
+      dioxide, with the solid, liquid, gas and supercritical fields labelled and the triple
+      point marked at about 5.2 bar. Reading across the bottom of the plot at one bar —
+      ordinary room pressure — the path runs straight from the solid field into the gas
+      field without ever crossing the liquid field, which is precisely why dry ice
+      sublimates instead of melting, why it leaves no puddle in a cooler, and why sealing it
+      in an airtight container is dangerous: the solid becomes several hundred times its
+      volume of gas with nowhere to go. The diagram supplies the mechanism the section can
+      only assert — by Rifleman 82 — CC0 1.0 (public domain dedication), Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Carbon_dioxide_pressure-temperature_phase_diagram-en.svg
+  cooking-food-safety-high-risk-eaters.png — the intracellular life cycle of Listeria
+      monocytogenes: a central cartoon of entry into a host cell (InlA/InlB), escape from
+      the vacuole (LLO and the phospholipases), actin nucleation by ActA, actin-based
+      motility across the cytoplasm and direct spread into the neighbouring cell, ringed by
+      the electron micrographs the cartoon was drawn from. It shows why this organism is the
+      one that ties three of the four high-risk groups together: it travels cell to cell
+      without ever re-entering the extracellular space, so antibody does little and the
+      defence that actually matters is cell-mediated immunity — exactly the defence that
+      chemotherapy, transplant immunosuppression, steroids and uncontrolled HIV degrade, and
+      the same route by which it crosses the placenta — by Daniel A. Portnoy, Victoria
+      Auerbuch and Ian J. Glomski, originally published in the Journal of Cell Biology
+      (2002), doi:10.1083/jcb.200205009 — CC BY-SA 3.0 US, Wikimedia Commons (original
+      upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:J_Cell_Biol_2002_Aug_158(3)_409-14,_Figure_1.png
+  cooking-food-safety-high-risk-eaters-2.png — the life cycle of Toxoplasma gondii, labelled
+      in English: the cat as definitive host shedding oocysts in faeces on one arm, and on
+      the other the tachyzoite-to-bradyzoite conversion that lays down tissue cysts in the
+      brain, liver and muscle of prey and livestock. Both arms are food routes the pregnancy
+      section names — tissue cysts are why undercooked meat matters and why freezing solid
+      at −18 °C for several days lowers the risk, while shed oocysts are why unwashed produce
+      and garden soil matter — and seeing them as one cycle explains why the advice covers
+      two apparently unrelated foods — by LadyofHats (Mariana Ruiz Villarreal) — public
+      domain, Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Toxoplasmosis_life_cycle_en.svg
+  cooking-food-safety-date-labels-recalls.jpg — the USDA Agricultural Marketing Service egg
+      grading chart: nine broken-out eggs photographed from above and again in profile,
+      running high/average/low AA, then A, then B. Read left to right and top to bottom it is
+      a picture of ageing itself — the thick white shrinking and spreading, the yolk
+      flattening from a tight dome to a low disc — which is the point the egg section makes
+      about a floating egg being old rather than spoiled, and about why an older egg behaves
+      badly in poaching while remaining perfectly safe to eat — by the U.S. Department of
+      Agriculture (Agricultural Marketing Service) — public domain (work of the U.S. federal
+      government), Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:AMS_Egg_Grading_Chart_(20170509-AMS-UNK-0001).jpg
+  cooking-food-safety-date-labels-recalls-2.jpg — labelled schematic of Rhizopus, the common
+      black bread mould, showing the sporangium and its sporangiospores held up on a
+      sporangiophore above the surface, and beneath it the stolon running sideways and the
+      rhizoids driven down into the substrate. The split is the entire "cut around it or
+      throw it out" decision in one drawing: the fuzzy patch a person sees is only the
+      spore-bearing structure, while the organism itself is the network below, which is why
+      an inch of margin works in dense hard cheese and fails completely in an aerated loaf
+      — uploaded by Commons user Timleo — public domain (released by the author), Wikimedia
+      Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Structure_of_Rhizopus_spp.-english.JPG
+
+Diagrams for three further previously unillustrated guides — "Kitchen Sanitation &
+Cross-Contamination — the Deep Mechanics" (Cooking — Food Safety), "Induction heating and
+industrial electric heating" (Electronics) and "Population Ecology and Population Growth"
+(Energy & Environment). Sources are the original Wikimedia Commons "File:" pages; files
+renamed on import. Where an SVG original relied on system fonts for its labels, the
+Commons-rendered raster is bundled instead, so the labels cannot shift under font
+substitution.
+
+  cooking-food-safety-sanitation-cross-contamination.png — the four stages of biofilm
+      formation on a surface, drawn in sequence and labelled in English: primary colonisers
+      settling onto a conditioning film, cell division inside a secreted EPS matrix to form
+      microcolonies, secondary colonisers arriving as single cells, coaggregates and groups
+      and coadhering to what is already there, and finally the mature multi-species biofilm
+      sitting under a continuous matrix layer. This is the mechanism the sponge section
+      names but cannot show — the section's claim that biofilm cells are far harder to
+      dislodge or kill than free-floating ones, and that rinsing water "simply flows past
+      them", is legible the moment you can see the cells embedded under a secreted layer
+      rather than sitting loose on the surface; it is also why microwaving re-sorts the
+      population instead of clearing it — by Khushairi Amri Kasim — CC BY-SA 4.0, Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Stages_of_biofilm_formation.svg
+  cooking-food-safety-sanitation-cross-contamination-2.png — "Hand Disinfection": the full
+      rub technique laid out as a ring of drawn steps — palm to palm, palm over back of hand
+      with interlaced fingers, palm to palm interlaced, backs of fingers into opposing palms,
+      each thumb clasped and rotated, and fingertips rotated into the opposing palm — with a
+      stopwatch marking the ≥30 s contact time, the "3×" dose panel, and two red-crossed
+      prohibitions: no rings, and do not re-touch the tap with a clean hand. It is the
+      picture behind the section's instruction to "scrub all surfaces": the diagram exists
+      because the spots people miss are systematic, not random — thumbs, fingertips, backs
+      and nail beds — and because the faucet handle is the exact object the raw-chicken
+      chain runs through — by Guido Hegasy (Commons user Guido4) — CC BY-SA 4.0, Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:04_Hegasy_Hand_Disinfection_Wiki_EN_CCBYSA.png
+  induction-heating-and-industrial-electric-heating.png — skin depth δ plotted against
+      frequency on log-log axes for six materials that actually get induction-heated or built
+      into the coil circuit — aluminium, copper, 410 steel, silicon iron, iron-nickel and
+      Mn-Zn ferrite — spanning 1 Hz to 1 MHz and 1 µm to 100 mm. This is the guide's
+      "reference depth" turned into something you can read off rather than compute: the
+      lines are the δ = √(ρ/πfµ) relation, their common −1/2 slope is why a hundredfold rise
+      in frequency only shrinks the heated shell tenfold, and the wide vertical spread
+      between copper and the ferromagnetic irons at any one frequency is the permeability
+      term — which is exactly why the same coil that surface-hardens steel in a fraction of
+      a millimetre heats an aluminium billet nearly through — by Zureks — CC0 1.0 (public
+      domain dedication), Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Skin_depth_by_Zureks.png
+  induction-heating-and-industrial-electric-heating-2.png — the working geometry of an
+      induction heating head, labelled: a bar work piece lying inside a multi-turn inductor
+      coil, the coil drawn as hollow tube (the water-cooling path) and running out to its
+      connections to the generator. It fixes the one thing the prose has to keep asserting —
+      that nothing touches and nothing burns; the coil carries the current, the work piece
+      carries none from the supply, and the only coupling is the field crossing the gap
+      between them. The gap itself is visible, which is what makes the later argument about
+      coupling distance and coil design concrete — by Pearson Scott Foresman, donated to
+      Wikimedia Commons — public domain (the parent plate File:PSF I-470002.png is released
+      into the public domain; the cropped derivative is additionally tagged CC BY-SA 4.0 by
+      its uploader), Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Induction_Heating_(PSF).png
+  population-ecology-and-population-growth.png — Gause's yeast experiments with logistic
+      curves fitted to them: measured yeast volume against age in hours for Saccharomyces
+      cerevisiae, Schizosaccharomyces kefir and a mixed culture, two runs each, with the
+      fitted curve through every set. It is the logistic model shown as an empirical result
+      rather than an equation — real counts rising almost exponentially, bending over, and
+      flattening onto a ceiling — and, critically, the three curves flatten at three
+      different heights and along three different timescales, which is the section's point
+      that K and r are properties of a particular population in a particular environment,
+      not universal constants — by Yapparina — CC0 1.0 (public domain dedication), Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gause%27s_experiment_and_fitted_logistic_curves.svg
+  population-ecology-and-population-growth-2.png — the five stages of the demographic
+      transition in one plate: crude birth rate and crude death rate per 1,000 plotted
+      through the transition with the gap between them shaded as "natural increase", total
+      population riding underneath, and below the axis a stage-by-stage table of what each
+      rate is doing, ending in a row of population pyramids that change shape from the wide
+      base of stage 1 to the near-column of stages 4 and 5. It carries the whole section:
+      that the population surge is the temporary gap opened when death rates fall before
+      birth rates follow, not a change in fertility alone, and that age structure is the
+      lagging record of that gap — by Max Roser (Our World in Data) — CC BY 4.0, Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Demographic-TransitionOWID.png
+  population-regulation-and-density-dependence.png — G. F. Gause's classic 1930s yeast-culture
+      experiment plotted as data points with logistic curves fitted to them: Saccharomyces
+      cerevisiae, Schizosaccharomyces kefir, and the two grown together as a mixed population,
+      each rising steeply and then flattening onto its own plateau. It is the empirical
+      counterpart of the section's algebra — the S-curve is not a theoretical shape imposed on
+      the data, it is what the data do — and the mixed culture settling below the pure S.
+      cerevisiae ceiling shows in one glance that carrying capacity is a property of the
+      species-and-environment pair rather than a fixed number the habitat holds — by Yapparina
+      — CC0 (public domain dedication), Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gause%27s_experiment_and_fitted_logistic_curves.svg
+  population-regulation-and-density-dependence-2.png — three stacked plots of population growth
+      rate (dN/dt) against abundance (N), for a strong Allee effect, a weak Allee effect, and no
+      Allee effect, each marked with the carrying capacity K. Read top to bottom it is the whole
+      low-density argument: only the strong case dips below zero at small N, giving the critical
+      threshold below which the population shrinks however much room it has — the extinction
+      vortex the section describes — while the weak case merely grows sluggishly and the ordinary
+      density-dependent case grows fastest when rarest — by Uscitizenjason — CC BY-SA 3.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:A_graph_showing_the_difference_between_strong_and_weak_Allee_effects.svg
+  the-engineering-design-process.png — the engineering design process drawn as a closed ring
+      rather than a list: identify the problem or need, define requirements and constraints,
+      brainstorm solutions, evaluate solutions, design and build a prototype, evaluate and test
+      it, communicate results — and the arrow carries straight on round to the start again. The
+      circle is the point the guide keeps making and a numbered sequence cannot show: there is no
+      terminal step, and testing feeds the next definition — by Steve Krause — CC BY-SA 2.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Engineering_design_process.svg
+  the-engineering-design-process-2.png — the systems-engineering "V" model: the left arm descends
+      from concept of operations through requirements and architecture to detailed design, the
+      right arm climbs back up through integration and test, system verification and validation,
+      to operation and maintenance, with time running along the bottom. Its value is the
+      horizontal pairing — each descending definition stage is answered by the ascending stage
+      that proves it — which is exactly the verification-versus-validation distinction ("did we
+      build it right" against "did we build the right thing") in a form the prose can only assert
+      — by Leon Osborne, Jeffrey Brummond, Robert Hart, Mohsen Zarean and Steven Conger for the
+      U.S. Federal Highway Administration (Clarus Concept of Operations, FHWA-JPO-05-072, 2005),
+      redrawn by Commons user Slashme — public domain (work of the U.S. federal government),
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Systems_Engineering_Process_II.svg
+  geography-of-algeria.jpg — shaded-relief physical map of Algeria built from SRTM elevation data,
+      with graticule, drainage and the international boundaries, and no place names to compete
+      with the terrain. Unlabelled is the reason it teaches: the country's four belts are visible
+      as landforms rather than as words — the crumpled Tell ridges and their green coastal fringe,
+      the pale flat High Plateaus behind them, the single long line of the Saharan Atlas closing
+      the steppe off, then the enormous smooth Sahara, and far south the dark dome of the Hoggar
+      with the Tassili n'Ajjer stepping east of it — by Eric Gaba (Wikimedia Commons user Sting)
+      — CC BY-SA 3.0, Wikimedia Commons (reduced in dimensions to 1280px wide; artwork unmodified)
+      https://commons.wikimedia.org/wiki/File:Algeria_relief_location_map.jpg
+  geography-of-algeria-2.png — Algeria coloured by Köppen climate class, with a legend naming the
+      five that occur: warm Mediterranean along the coast, cold and warm semi-arid in a narrow
+      band behind it, cold desert on the high interior, and warm desert over everything else. It
+      makes the section's central asymmetry impossible to miss — the entire humane climate of the
+      country is a thin ribbon along the top edge, and the red that fills the rest of the frame is
+      the same desert class from the Saharan Atlas to the Niger border — by Ali Zifan (enhanced,
+      modified and vectorized; derived from World Köppen Classification.svg) — CC BY-SA 4.0,
+      Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Algeria_map_of_K%C3%B6ppen_climate_classification.svg
+  geography-of-angola.png — a hypsometric topographic map of Angola built with GMT from
+      public-domain GLOBE elevation data: land tinted by height against the metre scale at
+      lower right, rivers in blue, the national and provincial frontier in red, a graticule
+      and a kilometre bar. It is the three-belt structure the section describes, made
+      visible in one look — the thin green ribbon of coastal lowland; the abrupt colour
+      crowding just inland where the Great Escarpment climbs in a few tens of kilometres;
+      the broad orange interior plateau holding 1,000–1,500 m across most of the country;
+      and the white above 2,000 m over the Bié highlands. The Cabinda exclave, cut off
+      north of the Congo, reads at a glance as separate territory — by Sadalmelik — public
+      domain, Wikimedia Commons (Commons' 960px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Angola_Topography.png
+  geography-of-angola-2.png — Köppen-Geiger climate zones across Angola with the major river
+      catchments overlaid as white dashed divides and named: Congo, Cuanza, Zambezi, Cunene,
+      Okavango, Cuvelai. The fill is the climate classification the legend explains, and it
+      is the section's argument in colour — a hot desert (BWh) strip pinned along the
+      south-western shore where the cold Benguela Current suppresses rain, a hot steppe
+      (BSh) band inland of it, tropical savanna (Aw) over the north, and the temperate
+      dry-winter classes (Cwa/Cwb) sitting exactly on the high central plateau, which is why
+      altitude and not latitude sets Angola's temperatures. The basin divides drawn on top
+      show the same rainfall gradient deciding which ocean the water reaches — by Peter in
+      s, after Beck, H. E., Zimmermann, N. E., McVicar, T. R., Vergopolan, N., Berg, A., &
+      Wood, E. F. — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Clima_Angola_Catchments.png
+  geography-of-benin.jpg — the CIA physiography sheet for Benin: shaded relief with named
+      rivers, towns, roads, international boundaries and a scale bar on a Transverse
+      Mercator projection. It carries the section's tour from the coast inland — the
+      sandbar-and-lagoon fringe at the Bight of Benin behind Cotonou and Porto-Novo, the
+      low barre plateaus above it, the one piece of real relief in the country as the
+      Atakora ridge runs north-east through Natitingou with Mont Sokbaro labelled at its
+      658 m (2,159 ft) summit, and the Niger plains falling away to the north-east. The
+      drainage the guide lists is all there to be traced: Ouémé, Zou and Couffo running
+      south, Mékrou, Alibori and Sota north to the Niger — by the Central Intelligence
+      Agency — public domain, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Benin_Physiography.jpg
+  geography-of-benin-2.png — population density by department, five classes from under 50 to
+      over 1,000 people per km². The map exists because the distribution is the whole point
+      of the section and prose can only assert it: every northern department sits in the
+      palest class while the colour steps darker with each department southward, ending in
+      the near-black Littoral around Cotonou at over 1,000 per km². Read top to bottom it
+      also shows why the elongated shape matters — a country roughly 700 km long with its
+      people packed into the last hundred — by Austiger — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 960px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Population_density_of_Benin_departments.png
+  hazards-flood-water-crossing.jpg — a cross-section through a weir or low-head dam with the
+      flow drawn as arrows: water pours over the crest, plunges to the bed, runs downstream
+      along the bottom, and then the surface layer turns and runs back upstream into the
+      face of the dam, closing a loop under the bracket marked "Bereich der Rückströmung"
+      — the zone of reverse flow. This is the drowning machine the section warns about,
+      and the single thing prose struggles to convey: the danger is not the drop but the
+      recirculation below it, which returns a swimmer to the wall no matter how hard they
+      swim away from it, and which is why the escape is to go down and let the bed current
+      carry you out rather than to fight for the surface. The label is German; the arrows
+      need no translation — by Wynyard — CC BY-SA 3.0, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:Wasserwalze.jpg
+  hazards-flood-water-crossing-2.png — the National Weather Service gauge trace for the Blanco
+      River at Wimberley, Texas, through the flash flood of 24 May 2015: stage in feet
+      against date, with the flood-stage bands (Action 10', Minor 13', Moderate 17', Major
+      26') shaded across the plot and the previous record marked at 33.3'. It is the
+      difference between the three flood types in one chart. The river sits flat near 5 ft
+      for four days, then the observed line goes essentially vertical — past every band and
+      seven feet over the record to 40.21 ft — inside a few hours, which is what "flash"
+      means and why no useful warning was possible; the forecast tail then eases back down
+      over the following week at the pace of an ordinary riverine flood, the regime the
+      section says can be predicted days ahead — by the U.S. Geological Survey & the
+      National Oceanic and Atmospheric Administration — public domain, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Blanco_River_May_25,_2015_hydrograph.png
+
+Knowledge-base diagrams for the three Hazards guides "Wildfire Behavior & Evacuation
+Triggers", "Earthquake & Structural Collapse Hazards" and "Hazardous Materials & Chemical
+Spill Awareness" (files live in images/kb/; renamed on import after the guide they
+illustrate). Where the source upload is an SVG the bundled file is Commons' own PNG
+rendering of it at 1280px; JPEG uploads are reduced in dimensions only. The artwork itself
+is unmodified in every case.
+
+  hazards-wildfire-evacuation.png — the fire triangle drawn as three labelled sides, HEAT,
+      OXYGEN and FUEL, enclosing the flame. It earns its place at the head of a wildfire
+      guide because the section's whole argument — that damp fuel steals the heat the fire
+      needs, that a break in any one leg stops combustion, and that every suppression and
+      defensible-space tactic is an attack on one of exactly three sides — is a claim about
+      this figure, and the figure makes the three-way dependency visible at a glance in a
+      way a paragraph naming them in sequence cannot — by Wikimedia Commons user Gustavb —
+      CC BY-SA 3.0, Wikimedia Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Fire_triangle.svg
+  hazards-wildfire-evacuation-2.png — a wind-driven wildfire in plan view, showing the
+      characteristic pear shape: the ignition point at the narrow end marked "fire start",
+      the burnt ground behind, the propagation axis running downwind, the fast bright "head
+      of the fire" at the blunt end and the much slower left and right fronts along the
+      flanks. This is the single most useful picture in a fire-weather section, because
+      the asymmetry it shows is the reason a wind shift is so dangerous — a shift turns a
+      slow flank into a new head — and the reason a bearing from the fire matters more than
+      a distance from it — by Christophe Dang Ngoc Chan, SVG conversion by Commons user
+      JBarta — CC BY-SA 3.0, Wikimedia Commons (Commons-rendered raster of the SVG,
+      1280px wide)
+      https://commons.wikimedia.org/wiki/File:Propagation_model_wildfire_(English).svg
+  hazards-earthquake-structural-collapse.jpg — a corner apartment block in the Marina
+      district of San Francisco after the 1989 Loma Prieta earthquake, its upper storeys
+      structurally intact and barely marked while the open garage-front ground floor beneath
+      them has racked over and buckled, the door panels leaning at an angle and the studs
+      of one bay exposed. It is the textbook soft-storey failure the section describes, and
+      a photograph carries the argument in a way prose cannot: the damage is concentrated
+      entirely at the one level that had the least shear wall, and the mass above simply
+      pivoted on it — by J.K. Nakata, U.S. Geological Survey — public domain (work of the
+      U.S. federal government), Wikimedia Commons (reduced in dimensions to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:LomaPrieta-Marina.jpeg
+  hazards-earthquake-structural-collapse-2.jpg — a timber house in Watsonville shifted
+      bodily off its foundation by the same earthquake, with the bare concrete stem wall and
+      the empty sill line it used to sit on visible alongside it. It illustrates the
+      mitigation section's most concrete recommendation exactly — foundation bolting and
+      cripple-wall bracing for older timber houses — by showing the failure those retrofits
+      exist to prevent, which is not a collapse of the structure but a house sliding off the
+      thing that was holding it — by J.K. Nakata, U.S. Geological Survey — public domain
+      (work of the U.S. federal government), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:089srUSGSoffFoundation.jpg
+  hazards-hazmat-chemical-spill.png — a full key to the NFPA 704 fire diamond: the four
+      coloured quadrants with an arrow into each and, beside them, what every rating means —
+      blue health 0 to 4 from "normal material" to "deadly", red flammability keyed to
+      flash-point temperatures, yellow reactivity from "stable" to "may detonate", and the
+      white quadrant's special symbols OXY, ACID, ALK, CORR, the radiation trefoil and the
+      struck-through W for "use no water". The guide's text walks through precisely this
+      scheme, and the reader who meets a real diamond on a tank needs the numbers decoded,
+      not described — by Marcos Rodríguez Bobadilla — CC BY-SA 4.0, Wikimedia Commons
+      (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:NFPA-704-diamond-standard.svg
+  hazards-hazmat-chemical-spill-2.png — a Gaussian dispersion plume in three dimensions:
+      the release point, the wind arrow, the plume centreline, the cone widening downwind
+      and the bell-shaped concentration profiles drawn across it at successive distances.
+      It is the mechanism behind every rule in the positioning section — why concentration
+      falls off so steeply with range, why a bystander upwind at 200 metres is safer than
+      one two kilometres directly downwind, and why moving crosswind leaves the cone fastest
+      — by Commons user BMacZero, a vector conversion of a diagram by Milton Beychok
+      (Mbeychok) — the SVG is released as public domain and the parent raster is CC BY-SA
+      3.0; both authors are credited here so the attribution holds under either — Wikimedia
+      Commons (Commons-rendered raster of the SVG, 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Gaussian_Plume_(SVG).svg
+
+Knowledge-base diagrams for the three Health guides "Breastfeeding: A Practical Guide",
+"Breast Health and Self-Examination" and "Postpartum Recovery and Newborn Care" (files live in
+images/kb/; renamed on import after the guide they illustrate). None of these three guides carried
+an image before. Sources are the original Wikimedia Commons "File:" pages; JPEG/PNG uploads are
+reduced in dimensions only where noted, and the artwork itself is unmodified in every case — no
+crops, no recolouring, no relabelling. The four CC BY / CC BY-SA works carry their author credit
+both here and inline in the guide text, as those licences require; the two public-domain National
+Cancer Institute plates need no attribution and record it anyway, matching the rest of this file.
+Every one of these is a labelled clinical or anatomical diagram rather than a photograph of a
+person — a deliberate choice for subject matter of this kind, and the same standard the Sexual
+Health guide's reproductive-anatomy schematics are held to.
+
+  breastfeeding-a-practical-guide.jpg — "Lactating Breast Structure": a lateral schematic cutaway
+      of the lactating breast. The branching duct tree converges on the nipple; the pink alveolar
+      clusters that actually make the milk pack the glandular tissue behind it (the upper lobe
+      labelled "Milk Glands / More Developed", the lower "Lactating"); the yellow fat lies outside
+      them. Two hormone arrows carry the causal story the prose can only assert — oestrogen and
+      progesterone building the glandular structure through pregnancy, prolactin and oxytocin
+      driving production and ejection after the birth. It is the picture that turns "milk is made
+      in the alveoli and drains through the ducts" from a sentence to be taken on trust into
+      something the reader can see — by Rajendra prabhune — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Lactating_Breast_Structure.jpg
+  breastfeeding-a-practical-guide-2.png — "Breastfeeding: Incorrect vs Correct Latch-On": the same
+      infant drawn twice in profile at the breast, side by side. On the left the lower lip is
+      tucked in and the mouth closes near the tip of the nipple; on the right the mouth is open
+      wide, the lower lip flanged outward, the chin pressed into the breast, and far more tissue
+      is drawn in. The deep latch is the most consequential technique in the guide and the hardest
+      thing in it to convey in words: the entire difference is a few millimetres of lip and jaw
+      position, and that difference decides between a comfortable feed that drains the breast and
+      cracked nipples with a baby who stays hungry. Two drawings settle it in a glance — by
+      BruceBlaus — CC BY-SA 4.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breastfeeding_-_Incorrect_vs_Correct_Latch-On.png
+  breast-health-and-self-examination.jpg — the National Cancer Institute plate "Breast and
+      Adjacent Lymph Nodes". Above, the chest with one arm raised and the lymph vessels drawn
+      running up to the labelled nodes in the armpit; below, a cutaway of the breast itself with
+      lobules, lobe, ducts, nipple, areola and fat each labelled and the duct system fanning back
+      from the nipple. It holds the section's whole anatomy in one view, including the point the
+      prose has to keep repeating — that breast tissue and its drainage extend up into the armpit,
+      which is why an examination that stops at the breast is an incomplete one — by Don Bliss
+      (National Cancer Institute) — public domain, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breast_and_adjacent_lymph_nodes.jpg
+  breast-health-and-self-examination-2.jpg — "Breast Cancer: Ductal Carcinoma in Situ": a milk duct
+      drawn as a cut cylinder, the wall of the duct labelled, and DCIS labelled as the mass of
+      abnormal cells filling the lumen and pressed up against that wall without breaking through
+      it. In situ versus invasive is the hinge the whole cancer section turns on, and "confined
+      within the duct" is genuinely hard to picture from the words alone; here the boundary that
+      has not yet been crossed is visible, and with it both why DCIS cannot spread and why it is
+      still treated — by Don Bliss (National Cancer Institute) — public domain, Wikimedia Commons
+      (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Breast_cancer_ductal_carcinoma_in_situ.jpg
+  postpartum-recovery-and-newborn-care.jpg — "The Newborn Skull", lateral view: the frontal,
+      parietal, occipital and temporal bones drawn as separate plates, the gaps between them
+      labelled as the anterior, posterior, sphenoidal and mastoid fontanelles, with a parietal
+      ossification centre marked. It answers the two things the section raises and prose cannot
+      settle — why a newborn head comes out of the birth canal elongated or lopsided and then
+      rounds within days (the plates are not yet fused and can slide over one another), and where
+      exactly the "soft spots" a new parent is told to watch actually are — by OpenStax College
+      (Anatomy & Physiology, Connexions) — CC BY 3.0, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:905_The_Newborn_Skull.jpg
+  postpartum-recovery-and-newborn-care-2.png — levels of neonatal jaundice: an infant figure
+      banded head to foot into five zones — I the face, II the trunk, III the lower trunk and
+      thighs, IV the arms and lower legs, V the hands and feet — each zone corresponding to a
+      higher bilirubin range, roughly 5-8 mg/dl when only the face is yellow rising to around
+      20 mg/dl by the time it reaches the palms and soles. This is Kramer's rule, and it is
+      precisely the observation the warning-signs section asks a caregiver to make: yellowing that
+      has spread to the arms, legs, palms or soles is not the same finding as a yellow face,
+      because how far down the body the colour has travelled tracks how high the level has climbed
+      — by Manco Capac — CC BY-SA 3.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Neonatal_jaundice.png
+
+Knowledge-base plates and diagrams for the three History-method guides "Primary and Secondary
+Sources in History", "What Is History? Historiography and Method" and "How Historians
+Reconstruct the Past" (files live in images/kb/; renamed on import after the guide they
+illustrate). These are historical plates and scholarly diagrams rather than photographs;
+dimensions are reduced from the original uploads where noted and the artwork itself is
+unmodified in every case.
+
+  primary-and-secondary-sources-in-history.jpg — page 318 of a ninth-century manuscript of
+      the False Decretals, at the exact point where the text of the Donation of Constantine
+      begins: the rubric in red reads "EPA CONSTANTINI IMP · AD SILVESTRVM PAPAM", the
+      "Letter of Emperor Constantine to Pope Sylvester", and a large initial I opens "In
+      nomine sanctae et individuae trinitatis". The guide names this document as the
+      classic case of forgery exposed by source criticism — Lorenzo Valla demolished it in
+      the 1440s on the anachronism of its Latin — and the page shows what the argument was
+      actually made against: not an imperial original but a copy in Carolingian minuscule,
+      written some five centuries after the grant it claims to record, bound inside a
+      collection that is itself a forgery. It is the section's whole point about provenance
+      and the chain of custody made visible in one opening — by the compiler known as
+      Pseudo-Isidore (uploaded to Commons by Stephan Dinkgreve) — public domain (ninth
+      century), Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:The_Donation_of_Constantine,_page_318.jpg
+  primary-and-secondary-sources-in-history-2.jpg — the stemma codicum of Polybius' Histories:
+      a family tree with the lost Archetype at the top branching down through the Excerpta
+      Antiqua and the Constantinian Excerpts to the surviving manuscripts A, B, C, D, E, F,
+      J and the rest, with the Editio Princeps hanging off one branch. External criticism
+      turns on the question the prose can only assert — whether the version in hand is a
+      faithful copy of the original — and the stemma is how that question is answered in
+      practice: it shows that no surviving witness is the original, that the manuscripts
+      are not independent votes but relatives, and that agreement between two copies
+      descended from the same parent counts once, not twice — by Commons user Mellangoose,
+      adapted from J. M. Moore, The Manuscript Tradition of Polybius (Cambridge University
+      Press, 1965) — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Polybius_Stemma_Codicum.jpg
+  what-is-history-historiography-and-method.jpg — Joseph Priestley's "A New Chart of History"
+      (London, 1769), the engraved sheet that made periodization a picture: a time axis
+      running from about 1200 BC to AD 1750 across the top and bottom, and beneath it every
+      region of the world — America, Africa, China, India, Persia, Turkey, Germany, Italy,
+      France, Spain, Great Britain, Poland, Scandinavia — given a horizontal band in which
+      each empire is a bar that begins, widens, shifts and ends. It belongs to the section
+      on periodization because it is an argument in graphic form: the Roman Empire's bar
+      running the width of half the sheet while a dozen smaller states flicker on and off
+      around it shows at once that the divisions of the past are drawn by the chartmaker,
+      that they are drawn differently for every region, and that no single line across the
+      page separates "ancient" from "modern" everywhere at once — by Joseph Priestley —
+      public domain (1769), Wikimedia Commons (Commons' 1920px-wide rendering, chosen over
+      the usual 1280px because the chart's labels are unreadable smaller)
+      https://commons.wikimedia.org/wiki/File:A_New_Chart_of_History.jpg
+  what-is-history-historiography-and-method-2.jpg — Papyrus Oxyrhynchus 16 (Penn Museum
+      E2747), a fragment of Book IV of Thucydides' History of the Peloponnesian War, written
+      in Greek majuscules without word division or punctuation, torn across the middle and
+      missing most of its lower right quarter. The section traces history-writing back to
+      Herodotus and Thucydides; the plate supplies the fact the prose cannot, which is that
+      "Thucydides" reaches us like this — a copy made some four to five hundred years after
+      he wrote, recovered from an Egyptian rubbish mound, with gaps that editors must fill
+      by conjecture. Every claim in the guide about transmission, reconstruction and the
+      limits of historical knowledge is legible in the physical state of this scrap — by an
+      unknown ancient copyist — public domain, Wikimedia Commons (original upload,
+      unmodified)
+      https://commons.wikimedia.org/wiki/File:Papyrus_Oxhyrhynchus_16_-_Thucydides_-_Penn_Museum_E2747.jpg
+  how-historians-reconstruct-the-past.jpg — an engraved script specimen from the Nouveau
+      traité de diplomatique (1750-65), the great Benedictine manual that carried Mabillon's
+      science forward: six lines of Merovingian display capitals, hatched and filigreed,
+      reproducing the opening of a manuscript of Gregory the Great's Homilies on Ezekiel,
+      captioned "Francogallique ou Merovingienne de lettres Capitales en broderie et a
+      filigranes". It illustrates the auxiliary sciences directly. The letters are Latin and
+      almost none of them can be read cold; palaeography is the training that makes them
+      legible, and diplomatics is the discipline that catalogued them by region and century
+      precisely so that a charter's script could be tested against the date it claims — by
+      René-Prosper Tassin and Charles-François Toustain (Commons upload and processing by
+      G. Garitan) — public domain, Wikimedia Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Diplomatique_m%C3%A9rovingienne_18533.jpg
+  how-historians-reconstruct-the-past-2.png — "Calibration error and measurement error":
+      radiocarbon age plotted against calendar age over a 400-year stretch of the IntCal
+      curve, with the curve's own uncertainty drawn as dashed envelopes and two worked
+      examples projected through it — a green pair of lines and a red pair, each carrying a
+      measured 14C age with its error bar across to the curve and then down to the calendar
+      range it implies. This is what the section means by dating "within a calculable margin
+      of error", and it shows the part that surprises people: the width of the answer is not
+      fixed by the laboratory but by the local steepness of the curve, so the same precision
+      of measurement yields a tight date on a steep segment and a badly smeared one where
+      the curve flattens or wiggles back on itself — by Mike Christie, from the IntCal13
+      dataset (Reimer et al.) — CC BY-SA 3.0, Wikimedia Commons (original upload, unmodified)
+      https://commons.wikimedia.org/wiki/File:Radiocarbon_calibration_error_and_measurement_error.png
+
+Knowledge-base diagrams for the two Language & Linguistics guides "Phonetics — The Sounds of
+Speech" and "Linguistics — The Scientific Study of Language", and the Law & Government guide
+"Liberalism" (files live in images/kb/; renamed on import after the guide they illustrate). None
+of these three guides carried an image before. Sources are the original Wikimedia Commons "File:"
+pages. Four of the six are Commons' own 1280px-wide raster renderings of the uploaded SVG — taken
+as rasters deliberately, because two of them set IPA and phonetic glyphs in fonts (DejaVu Serif)
+that an Android device will not have, and an on-device SVG renderer would substitute and mangle
+them; the Commons rendering is made with the intended font. The artwork itself is unmodified in
+every case — no crops, no recolouring, no relabelling. The five CC BY-SA works carry their author
+credit both here and inline in the guide text, as that licence requires; the CC0 dedication and
+the public-domain plate need no attribution and record it anyway, matching the rest of this file.
+Every one is a labelled diagram, chart or historical plate rather than a photograph of a person.
+
+  phonetics-the-sounds-of-speech.png — the IPA vowel quadrilateral. The trapezoid is the vowel
+      space itself, drawn as the mouth is: front, central and back across the top, close down to
+      open on the left, with every cardinal vowel of the International Phonetic Alphabet placed
+      at its height-and-backness coordinate and paired left-unrounded / right-rounded at each
+      dot. The section describes vowels as a continuum with no point of contact to name, located
+      only by tongue height, tongue backness and lip posture — three numbers that prose can list
+      but cannot show standing in relation to one another. The chart is that relation: it is the
+      map the words are describing, and it doubles as the key for every IPA vowel symbol used
+      elsewhere in the guide — by Zieben007 — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px
+      rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Ipa-chart-vowels.svg
+  phonetics-the-sounds-of-speech-2.png — the source-filter model: a head in profile with the
+      vocal folds picked out in one colour and labelled "source", and the pharyngeal, oral and
+      nasal cavities above them picked out in another and labelled "filter", with the legend
+      spelling out which is which. This is Fant's 1960 model, which the acoustic section states
+      in words — the folds produce a harmonic-rich buzz, the tract above resonates and reinforces
+      certain harmonics into formants — and the whole argument turns on the tract being a
+      separate thing sitting on top of the source, shaped independently of it. Seeing the two
+      regions coloured apart in one airway makes that separation obvious, and with it why
+      changing the shape of the mouth changes vowel quality without changing the voice's pitch
+      — by Emflazie — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Source-filter_model_diagram.svg
+  linguistics-the-scientific-study-of-language.png — a constituent-structure tree over the
+      sentence "The cat sat on the mat": Sentence branching into Noun Phrase and Predicate /
+      Verb Phrase, the verb phrase branching again into Verb and Prepositional Phrase, that into
+      Preposition and a further Noun Phrase, and each bottom node tied by a line to the actual
+      word beneath it. The syntax section's central claim is that a sentence is not a flat string
+      of words but a hierarchy of nested constituents, and that claim is difficult to hold in the
+      head from a description alone. The tree is the claim made visible in one sentence short
+      enough to read at a glance, including the point the prose has to argue — that "the mat" is
+      a unit inside "on the mat", which is a unit inside the predicate — by Chiswick Chap, after
+      an original by AnonMoos — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px rendering of
+      the SVG)
+      https://commons.wikimedia.org/wiki/File:Constituent_structure_analysis_English_sentence.svg
+  linguistics-the-scientific-study-of-language-2.png — the Indo-European family tree: a single
+      root labelled INDO-EUROPEAN descending through Anatolian, Hellenic, Italic, Celtic,
+      Germanic, Balto-Slavic, Armenian, Tocharian and Indo-Iranian into several hundred named
+      daughter languages, colour-coded by a legend into reconstructed proto-languages, extinct
+      languages and languages still spoken. The historical-linguistics section asserts that
+      English, Hindi, Russian, Persian and most of Europe descend from one unattested ancestor
+      recovered by the comparative method; the tree shows the actual shape of that descent, how
+      deep the nesting goes, and how much of it is dead — the branching structure being exactly
+      what a list of related languages in a sentence cannot convey — by multiple authors, first
+      version by Mandrak — CC BY-SA 3.0, Wikimedia Commons (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:IndoEuropeanTree.svg
+  liberalism.jpg — the 1789 plate of the Déclaration des droits de l'homme et du citoyen,
+      attributed to Jean-Jacques-François Le Barbier: the seventeen articles engrossed in gold on
+      two dark tablets shaped like the tablets of the law, framed by a figure of the Monarchy
+      holding the broken chains of tyranny on one side and the genius of the Nation on the other,
+      under the radiant eye of Reason. The section names this document as one of the two
+      revolutionary statements of natural rights. The plate is the document as its own age
+      presented it, and that presentation is itself the argument the section is making: rights
+      set down in public, numbered, legible to any citizen, and deliberately given the visual
+      authority of scripture and of law rather than of a royal grant — public domain (published
+      1789; photograph of a two-dimensional work in the Musée Carnavalet, Paris), Wikimedia
+      Commons (1280px-wide rendering of the original scan)
+      https://commons.wikimedia.org/wiki/File:Declaration_of_the_Rights_of_Man_and_of_the_Citizen_in_1789.jpg
+  liberalism-2.png — separation of powers and checks and balances, drawn as three circles —
+      Legislature, Executive, Judiciary — each listing its own powers, joined by labelled arrows
+      running both ways between every pair: veto legislation and override vetoes, appoint judges
+      and rule on the constitutionality of laws, confirm and reject appointments. The
+      constitutionalism section states Montesquieu's principle and then makes the subtler point
+      that separation alone is not enough, that the branches must be able to check one another.
+      A list of checks in prose reads as an inventory; the diagram shows it as a closed circuit
+      in which no branch has an unanswered power, which is the whole design — by AboutPolitics
+      — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px rendering)
+      https://commons.wikimedia.org/wiki/File:Separation_of_powers.png
+
+Knowledge-base diagrams for the Law & Government guide "Political Philosophy: The Great
+Questions" and the Literature & Writing guides "Close Reading & Literary Analysis" and "What
+Is Literature? An Introduction to Literary Study" (files live in images/kb/; renamed on import
+after the guide they illustrate). Sources are the original Wikimedia Commons "File:" pages;
+where the upload is an SVG the bundled file is Commons' own 1280px PNG rendering of it, and
+JPEG/PNG uploads are reduced in dimensions only — the artwork itself is unmodified in every
+case. All six are public-domain or CC0 works, so no attribution is legally required;
+authorship and provenance are recorded here as the established practice in this file.
+
+  political-philosophy-the-great-questions.jpg — the title-page engraving to Hobbes's
+      Leviathan (London, 1651): a crowned sovereign rising above the hills with a sword in the
+      right hand and a bishop's crozier in the left, whose torso and arms are composed entirely
+      of hundreds of small human figures, every one of them turned inward and facing him; below
+      the landscape a curtain carries the title, flanked by paired panels that set temporal
+      power against spiritual — castle against church, crown against mitre, cannon against
+      thunderbolts, the weapons of war against the forks of scholastic logic, a battle against
+      a council. The section explains the social contract as a covenant by which a multitude
+      transfers its right of self-government and is thereby made into one artificial person;
+      the plate is that argument drawn rather than stated, and it shows at a glance the thing
+      the prose can only assert, which is that the sovereign is constituted OF the subjects and
+      is not a separate power standing over against them — by Abraham Bosse, engraved to
+      Hobbes's own design — public domain (1651), Wikimedia Commons (Commons' 1280px-wide
+      rendering of the British Museum impression)
+      https://commons.wikimedia.org/wiki/File:Leviathan_frontispiece_cropped_British_Museum.jpg
+  political-philosophy-the-great-questions-2.jpg — two full-height reconstructions of an
+      Athenian kleroterion, the stone allotment machine, in the Ure Museum of Greek Archaeology
+      at Reading: five columns of narrow slots cut down each slab, headed by painted Greek
+      letters (Α Β Γ Δ Ε on one, Ζ Η Θ Ι Κ on the other) that section the citizen body, with the
+      fitting for the randomising tube still visible at the left edge. Candidates' inscribed
+      bronze tickets were slotted into the columns and black and white balls released from the
+      tube then took or rejected an entire row at a time. The section notes only in passing
+      that the Athenians governed "through assembly, lot, and rotation"; this is what "lot"
+      meant in practice, a purpose-built randomiser for public office, and seeing the machine
+      makes the ancient argument between selection by lot and selection by election concrete in
+      a way the word cannot — by Philafrenzy — CC0 1.0 (public domain dedication), Wikimedia
+      Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Reconstructed_Kleroterions_in_the_Ure_Museum.JPG
+  close-reading-literary-analysis.png — a scansion plate: two lines of Pope's Essay on
+      Criticism ("Trust not yourself: but your defects to know, / Make use of ev'ry friend—and
+      ev'ry foe.") marked as a prosodist marks them, with a breve over every unstressed
+      syllable, an acute over every stressed one, and vertical bars dividing each line into its
+      five feet. The section defines stress, foot and meter in words; the plate supplies the
+      notation those words name, and it also settles the point students most often get wrong,
+      because the bars fall where the meter falls and not where the words do — the fourth foot
+      of the first line is "de|fects" and "ev'ry" is split across two feet in the second — by
+      Pearson Scott Foresman — public domain (dedicated worldwide by the author), Wikimedia
+      Commons (Commons' 1280px-wide rendering)
+      https://commons.wikimedia.org/wiki/File:Scansion_(PSF).png
+  close-reading-literary-analysis-2.jpg — an opening (fols. 50v–51r) of a Vatican manuscript
+      of Justinian's Institutes copied about 1320–1335 with the Glossa ordinaria compiled by
+      Accursius. On each leaf a small block of the authoritative text sits in the middle of the
+      page, written large and widely spaced, and is surrounded on all four sides by commentary
+      written much smaller, keyed by letter to the words it explains, with still further notes
+      squeezed down the outer margins in a later hand. The section traces close reading back to
+      the scholarly interpretation of scripture, law and the classics, "where every word of an
+      authoritative text was weighed"; the proportion of gloss to text on this page is that
+      sentence made visible, the commentary covering several times the area of the law it
+      explains — by unknown fourteenth-century scribes; digitised by Universitätsbibliothek
+      Heidelberg from Biblioteca Apostolica Vaticana, Pal. lat. 765 — public domain, Wikimedia
+      Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Vatican,_Biblioteca_Apostolica_Vaticana_Ms_Vatican_Bibliotheca_Palatina_Latin_765_fol_50v-51r_Institutiones_Iustiniani_cum_Glossa_ordinaria_excerpt.jpg
+  what-is-literature-an-introduction-to-literary-study.png — Freytag's pyramid, the shape of
+      the closed dramatic plot, drawn with Freytag's own five terms from Die Technik des Dramas
+      (1863) — introduction, rise, climax, return or fall, catastrophe — rather than the later
+      classroom relabelling of them as exposition, rising action and resolution. The section
+      names Freytag directly and describes the arc in a sentence; the diagram gives the arc its
+      geometry, so that the asymmetry the words hide is plain: the climax sits at the top, and
+      everything after it is descent — by SinjoroFoster — CC0 1.0 (public domain dedication),
+      Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Freytag%27s_Pyramid_with_English_text.svg
+  what-is-literature-an-introduction-to-literary-study-2.png — the sestina's end-word scheme.
+      The six end-words of the first stanza are numbered 1 to 6 down the left, and the order in
+      which each must return in stanzas II to VI is read across the table (6 3 5 4 2 in the
+      first position, 1 6 3 5 4 in the second, and so on down). The spiral drawn over the
+      middle is the rule that generates every one of those rows: retrogradatio cruciata, in
+      which a stanza takes its end-words from the last of the stanza before it, then the first,
+      then the second from last, then the second, winding inward until after six turns the
+      sequence returns to where it began. The section lists the sestina among the fixed forms
+      whose "constraints paradoxically spur invention" but cannot show the constraint; this is
+      it, and it is the reason the form has exactly six stanzas — by ZooFari — public domain
+      (released by the author), Wikimedia Commons (Commons' 1280px PNG rendering of the SVG
+      upload)
+      https://commons.wikimedia.org/wiki/File:Sestina_system.svg
+
+Diagrams for the three elementary-arithmetic guides (Counting/Place Value, Addition and
+Subtraction, Multiplication and Division). These guides carry no images before this wave; each
+figure below is the written notation the prose can only describe in words:
+
+  multiplication-and-division-algorithms-and-strategies.png — the area model of 16 x 27, drawn
+      as a rectangle 27 wide and 16 tall cut once vertically at 20 and once horizontally at 10,
+      so the four regions are labelled 20·10, 7·10, 20·6 and 7·6. The section argues that the
+      standard algorithm is nothing but the distributive law applied to the place-value parts of
+      each factor, and that every digit-by-digit product written down is one of those parts. The
+      picture is that argument as geometry: the four partial products are four literal areas,
+      their sum is visibly the whole rectangle, and the tens digits are visibly worth ten times
+      the units because their strips are ten times as wide — by Averater — CC0 1.0 (public
+      domain dedication), Wikimedia Commons (Commons' 1280px rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:16x27_Illustration_with_different_areas_4.svg
+  multiplication-and-division-algorithms-and-strategies-2.png — a completed lattice (gelosia)
+      multiplication of 45 by 256. The 2, 5 and 6 head the columns, the 4 and 5 run down the
+      right, each cell holds one single-digit product split by its diagonal into tens above and
+      units below, and the answer 11520 is read off the left and bottom edges after the
+      diagonals are summed. The section describes the lattice as the method that "separates
+      every multiplication from every carry", but the claim only becomes obvious once the grid
+      is in front of you: no carrying happens at all until the last step, which is why the
+      method was taught for centuries to people working without an eraser — by Silly rabbit
+      (English Wikipedia) — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Gelosia_multiplication_45_256.png
+  addition-and-subtraction-algorithms-and-strategies.png — 963 + 572 set out in columns, with
+      the carried 1 written small above the hundreds column and the answer 1535 below the rule.
+      The section explains carrying as the exchange of ten units of one place for one unit of
+      the next; this is the notation that records that exchange, and it shows the small digit
+      sitting above the column it is about to be added into rather than the column it came from
+      — by Averater — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px
+      rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Addition_example_963%2B572.svg
+  addition-and-subtraction-algorithms-and-strategies-2.png — 306 - 19 worked with the standard
+      borrowing notation, chosen because it is the case learners fail: there is nothing in the
+      tens column to borrow from. The 3 is struck through and rewritten 2, the 0 becomes 10 and
+      is then itself struck through and rewritten 9, and the 6 becomes 16, giving 287. The
+      section warns that borrowing across a zero requires two exchanges rather than one; the
+      plate is that double exchange written out, and the two crossings-out on the same digit are
+      the whole difficulty in a single glance — by Averater — CC0 1.0 (public domain
+      dedication), Wikimedia Commons (Commons' 1280px rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Subtraction_example_306-19.svg
+  counting-place-value-and-positional-number-systems.png — the number 3140 with each digit
+      labelled by the column it stands in: thousands, hundreds, tens, units. The section states
+      that position alone encodes magnitude and that the same glyph means different amounts in
+      different columns; the figure names the columns explicitly, and it was chosen over a
+      tidier number because its 0 is doing the placeholder job the next section is about — with
+      nothing in the units column, the 4 could not be held in the tens without it — by
+      P Astbury — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Denary-3140.PNG
+  counting-place-value-and-positional-number-systems-2.png — the complete Babylonian cuneiform
+      numerals from 1 to 59, each wedge-group set beside its decimal value. The section names
+      the Babylonian system as the first positional one and describes it as base sixty built out
+      of a base ten sub-count; the chart shows exactly that structure, the single vertical wedge
+      repeated up to nine times for units and the sideways-hooked wedge repeated up to five times
+      for tens, so that a base-60 digit is itself written in tens and ones. It also shows what
+      the system lacked: the sequence simply stops at 59 with no sign for an empty place, which
+      is the ambiguity the guide's zero section then resolves — by Josell7 — CC BY-SA 4.0,
+      Wikimedia Commons (Commons' 1280px rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Babylonian_numerals.svg
+
+Diagrams for the humanities wave (History of Linguistics, Political Science, Literary Theory).
+Files renamed on import; sources are the original Wikimedia Commons "File:" pages:
+
+  the-history-of-linguistics-p-ini-to-chomsky.jpg — a time-calibrated Indo-European phylogeny:
+      eleven surviving branches — Celtic, Italic, Germanic, Balto-Slavic, Iranian, Indo-Aryan,
+      Albanian, Hellenic, Armenian, Tocharian, Anatolian — drawn as a bracketed tree against a
+      horizontal axis running from 6000 years before present to the present day, so that the
+      depth of every split can be read off directly and the two extinct branches, Tocharian and
+      Anatolian, simply stop partway across. The comparative-turn section describes what Jones,
+      Bopp and Rask actually achieved: not merely a claim of kinship but a reconstructed order
+      of descent. A bare list of related languages cannot show that order; this figure shows
+      both the nesting (Iranian and Indo-Aryan sharing a node before either meets Balto-Slavic)
+      and the dating that the method's later quantitative form produces, which is exactly the
+      "family tree" the section says the nineteenth century drew — by Ordinary Person —
+      CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px rendering)
+      https://commons.wikimedia.org/wiki/File:IndoEuropeanLanguageFamilyRelationsChart.jpg
+  the-history-of-linguistics-p-ini-to-chomsky-2.jpg — one English sentence, "The rules cannot
+      produce dependency structures", analysed twice side by side: on the left a constituency
+      tree in which S branches into NP and VP and the phrase nodes are labelled, on the right a
+      dependency tree in which there are no phrase nodes at all and every word hangs directly
+      from the word that governs it, with dotted lines carrying both analyses down to the same
+      row of words. The generative section explains that Chomsky's phrase-structure rules
+      claimed sentences are built of nested constituents, and that this was a claim about
+      grammar's form which rival formalisms dispute. Set against each other over identical
+      words, the two trees make the disagreement concrete — where the constituency analysis
+      posits VP1 and VP2 as real objects, the dependency analysis posits nothing between the
+      verb and its dependents — by Tjo3ya — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Phrase_structure_rules.jpg
+  what-political-science-studies.png — a world map colouring every country by its Polity regime
+      score, with the scale printed above it (-10 full autocracy to +10 full democracy) and a
+      four-band legend beneath naming Autocracy (-10 to -6), Closed Anocracy (-5 to 0), Open
+      Anocracy (1 to 5) and Democracy (6 to 10), plus a grey "no data" swatch. The comparative-
+      politics section says the subfield's first task is classifying regimes, and that the hard
+      part is the middle: most states are neither clean democracies nor clean autocracies. The
+      map is that classification actually applied, and its two anocracy bands are the middle the
+      prose is describing, shown at the size it really occupies across Africa, Central Asia and
+      Southeast Asia — by Our World In Data (based on Polity IV and Wimmer & Min) — CC BY 3.0,
+      Wikimedia Commons (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Political_Regime,_OWID.svg
+  what-political-science-studies-2.png — the counts of democracies and autocracies in the world
+      plotted year by year from 1900 to 2018 as two lines, autocracies starting near 110 and
+      falling, democracies starting near zero and rising, crossing in the mid-1990s, with the
+      definitions used stated in the subtitle and the source named beneath. The democracy
+      section explains that "how many democracies are there" is answerable only once democracy
+      has been operationalised into a measure, and that the answer then moves. Two crossing
+      lines carry that in one image: the interwar reversal, the post-1989 surge, and the flat
+      stall after 2010 that the section's discussion of democratic backsliding refers to — by
+      Our World In Data (Varieties of Democracy Project) — CC BY 3.0, Wikimedia Commons
+      (Commons' 1280px rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Numbers_of_autocracies_and_democracies,_OWID.svg
+  literary-theory-the-schools-of-criticism.png — Jakobson's model of the speech event: Sender
+      and Receiver at either end of an arrow, the Message on the arrow between them, and
+      Context, Channel and Code stacked around it, all six factors numbered. The Russian
+      Formalism section explains that the Formalists asked what makes a verbal message a work of
+      literature, and that Jakobson's answer was the poetic function — language turned back on
+      the message itself rather than through it to the world. That answer only means anything
+      once the six factors are laid out, because each function is defined by which factor the
+      utterance leans toward; the diagram is the frame the whole argument is built on — by
+      Artist2426 — public domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Roma_jakobson_theory.png
+  literary-theory-the-schools-of-criticism-2.png — Greimas's semiotic square worked on a real
+      opposition: "rich" and "poor" as the contrary pair along the top, "not poor" and "not
+      rich" as their contradictories along the bottom, joined by the vertical implication lines
+      and the diagonal contradiction lines that give the figure its X. The structuralism and
+      narratology section states that structuralist reading treats meaning as generated by
+      relations of difference rather than by reference, and that a binary opposition is never
+      just two terms. The square shows why: negating each pole opens two further positions the
+      original opposition did not contain, and "not rich" is demonstrably not the same as
+      "poor" — which is the move the section's account of narrative deep structure depends on
+      — by Phlsph7 — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px
+      rendering of the SVG)
+      https://commons.wikimedia.org/wiki/File:Semiotic_square2.svg
+
+Diagrams for the three Medical cardiovascular guides ("Blood Pressure Regulation and the
+Baroreflex", "The Cardiac Conduction System and the Heartbeat", and "The Heart: Chambers, Valves
+and the Cardiac Cycle"). None of the three carried an image before this wave. Files live in
+images/kb/, renamed on import after the guide they illustrate. Sources are the original Wikimedia
+Commons "File:" pages; where the upload is an SVG the bundled file is Commons' own 1280px-wide PNG
+rendering of it, and the one JPEG is reduced in dimensions only — the artwork itself is unmodified
+in every case, no crops, no recolouring, no relabelling. The four CC BY and CC BY-SA works carry
+their author credit here as those licences require; the public-domain plate needs none and records
+it anyway, matching the rest of this file. Every one is a labelled schematic or plotted trace
+rather than a photograph:
+
+  blood-pressure-regulation-and-the-baroreflex.jpg — the baroreflex drawn as a negative-feedback
+      flowchart, run twice: the upper row starts from increased blood pressure and the lower row
+      from decreased, and each traces the same chain of boxes — baroreceptor firing, then the
+      cardiac inhibitor, cardiac accelerator and vasomotor centres, then cardiac output and vessel
+      calibre — with a small red arrow in every box showing whether that quantity rises or falls,
+      both rows converging on "homeostasis restored". The section describes the two autonomic arms
+      in words and makes the point that a pressure rise is corrected simply by withdrawing
+      sympathetic drive rather than by a separate mechanism; the figure is that symmetry made
+      visible, because the two rows are the same diagram with every arrow reversed — by OpenStax
+      College (Anatomy & Physiology, Connexions) — CC BY 3.0, Wikimedia Commons (reduced to 1280px
+      wide)
+      https://commons.wikimedia.org/wiki/File:2116_Baroreceptor_Reflex_Flow_Art.jpg
+  blood-pressure-regulation-and-the-baroreflex-2.png — the renin-angiotensin-aldosterone system
+      drawn over the organs that run it. Angiotensinogen leaves the liver, renin from the kidney's
+      juxtaglomerular apparatus cleaves it to angiotensin I, ACE on the pulmonary endothelium
+      converts that to angiotensin II, and from angiotensin II five stimulatory arrows fan out at
+      once — sympathetic activity, tubular sodium reabsorption, aldosterone from the adrenal
+      cortex, arteriolar vasoconstriction, and ADH from the posterior pituitary driving water
+      absorption in the collecting duct — with a red inhibitory arrow closing the loop back onto
+      renin release. The section names each of these steps in sequence; the diagram shows what a
+      sentence cannot, which is that the arms act in parallel from a single hormone rather than one
+      after another, and that the system is a closed feedback loop rather than a one-way cascade —
+      by A. Rad (Aria Rad) — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Renin-angiotensin-aldosterone_system.png
+  the-cardiac-conduction-system-and-the-heartbeat.png — the conduction tissue alone, with the
+      surrounding heart muscle stripped away, labelled through its whole course: sinoatrial node,
+      Bachmann's bundle, atrioventricular node, His bundle, right and left posterior bundle
+      branches, and the Purkinje meshwork spreading through the ventricular walls. The section
+      explains that the fibrous cardiac skeleton electrically insulates the atria from the
+      ventricles and so forces the impulse through "the single permitted gateway", the AV node;
+      drawing the conduction system by itself is what proves the claim, because the picture shows
+      one narrow strand and only one crossing from the atrial network to the ventricular one — by
+      Madhero88 — CC BY-SA 3.0, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:ConductionsystemoftheheartwithouttheHeart.png
+  the-cardiac-conduction-system-and-the-heartbeat-2.png — one beat of normal sinus rhythm as it
+      appears on an electrocardiogram, with every feature the reader is asked to learn marked on
+      the trace: the P wave, the Q, R and S deflections colour-coded separately within the QRS
+      complex, the T wave, the baseline, and the PR segment, ST segment, PR interval and QT
+      interval drawn as measured spans between dashed guides. The section introduces Einthoven's
+      lettering and explains what each deflection corresponds to in the conduction sequence; the
+      figure supplies the notation those words name, and in particular it separates a segment from
+      an interval — the distinction the prose states but cannot draw — by Agateller (Anthony
+      Atkielski), converted to SVG by Atom — public domain (released by the author), Wikimedia
+      Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:SinusRhythmLabels.svg
+  the-heart-chambers-valves-and-the-cardiac-cycle.png — a frontal cutaway of the human heart with
+      every structure the guide names labelled on it: the four chambers, all four valves (tricuspid
+      and mitral, pulmonary and aortic), the superior and inferior venae cavae, the aorta, the
+      pulmonary artery and pulmonary veins, and the pericardium, with the chordae tendineae drawn
+      as fine strands running from the atrioventricular cusps down to the ventricular wall. White
+      arrows carry the blood through in sequence and the two sides are shaded blue and red. The
+      section works through the chambers and the vessels that drain into each; this is the map
+      those names belong to, and it settles by inspection the one fact readers most often doubt,
+      that the left ventricular wall is several times the thickness of the right — by Wapcaplet —
+      CC BY-SA 3.0, Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Diagram_of_the_human_heart_(cropped).svg
+  the-heart-chambers-valves-and-the-cardiac-cycle-2.png — a Wiggers diagram: two full cardiac
+      cycles of the left heart with aortic, atrial and ventricular pressure plotted on one time
+      axis, ventricular volume beneath it, and the electrocardiogram and phonocardiogram beneath
+      that, the whole ruled into its named phases (isovolumic contraction, ejection, isovolumic
+      relaxation, rapid inflow, diastasis, atrial systole) with the four valve events marked at the
+      instants the pressure curves cross. The section says the cycle "can be followed as a story of
+      pressures, since blood always moves from higher to lower pressure and the valves open and
+      close according to which pressure is greater"; this is that story plotted, and the crossings
+      of the red and blue curves are visibly the moments the valves are labelled as opening and
+      shutting — by adh30, revising work by DanielChangMD after DestinyQx; redrawn as SVG by xavax
+      — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Wiggers_Diagram_2.svg
+  vitamin-c-and-scurvy.jpg — a clinical watercolour made in April 1887 of the leg of a
+      fifty-year-old patient with scurvy of twelve months' standing: the shin is covered in
+      dozens of dark purple perifollicular haemorrhages, discrete and roughly follicle-sized,
+      densest over the front of the calf, with several coalescing into larger bruised patches
+      and the surrounding skin faintly stained where older bleeds have broken down. The
+      section describes exactly this sign in words — "the diagnostic perifollicular
+      hemorrhages, tiny bleeds surrounding follicles, especially on the shins and thighs" —
+      and prose cannot convey how a purpuric scorbutic eruption actually looks, nor why the
+      1887 clinician who drew it noted that it "resembles psoriasis with subcutaneous
+      haemorrhage". Drawn from life before photography could record colour in medicine, it is
+      also the historical record of the sign — by Godart, Thomas — CC BY 4.0, Wellcome
+      Collection via Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Leg_of_a_patient_with_scorbutus_(scurvy),_1887_Wellcome_L0062031.jpg
+  vitamin-c-and-scurvy-2.jpg — a British Ministry of Food wartime poster, "Vitamin 'C' content
+      of vegetables compared with oranges", plotting sprouts, parsley, cabbage, cauliflower,
+      spinach, watercress, swedes and lettuce against a horizontal reference band for oranges,
+      each bar split into two parts: the dark portion is what survives to be eaten and the
+      white portion, keyed at the foot as "amount lost in cooking", is what boiling destroys.
+      It carries both halves of the section at once — that several ordinary vegetables out-rank
+      citrus gram for gram, and that "boiling can leach the majority of a vegetable's vitamin C
+      into the discarded water", which is the fact the poster was printed to teach and the one
+      readers most often disbelieve. Colour lithograph — CC BY 4.0, Wellcome Collection via
+      Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:A_histogram_comparing_the_vitamin_C_content_of_various_foods_Wellcome_L0026921.jpg
+  vitamin-d-and-sunlight.png — the photochemistry of vitamin D drawn as two parallel reaction
+      sequences with full skeletal structures: 7-dehydrocholesterol to previtamin D3 to
+      cholecalciferol (vitamin D3) along the bottom, ergosterol to previtamin D2 to
+      ergocalciferol (vitamin D2) along the top, with the arrows labelled "UV sunlight,
+      electrocyclic ring-opening" and "[1,7]-sigmatropic shift". The section explains that
+      ultraviolet B "breaks one of the bonds in its ring structure, opening the ring" and that
+      the unstable product then "rearranges itself spontaneously"; those two sentences name
+      precisely the two named reactions on the arrows, and the drawn structures make visible
+      what a ring-opening is — the intact steroid B-ring on the left, the severed and splayed
+      chain on the right — which no verbal description achieves — by Boghog — CC0 1.0 (public
+      domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Vitamin_D_biosynthesis.svg
+  vitamin-d-and-sunlight-2.png — the WikiPathways WP1531 flow diagram of vitamin D metabolism,
+      with the three organs drawn as labelled compartments: in the skin, UVB radiation acting on
+      7-dehydrocholesterol (and DHCR7 diverting it to cholesterol) to give previtamin D3, then
+      spontaneous isomerisation to cholecalciferol; in the hepatocyte, CYP2R1 and CYP27A1
+      producing calcidiol; in the kidney, CYP27B1 producing calcitriol, with CYP24A1 branching
+      off to inactive 24,25-OH-vitamin D, PTH and calcium and phosphate shown regulating the two
+      kidney enzymes, and calcitriol binding VDR and RXR to reach its targets. Dietary vitamin D
+      enters on its binding protein at the side. The section's two-organ, two-hydroxylation
+      argument, every enzyme and metabolite named in the prose, is this diagram — and the
+      regulatory arrows show at a glance why the liver step "runs more or less in proportion to
+      supply" while the kidney step is the controlled one — by Chris Evelo, Lucia Ribeiro,
+      Kristina Hanspers, Alex Pico, Martijn Van Iersel and others (WikiPathways WP1531) — CC0 1.0
+      (public domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of the SVG
+      upload)
+      https://commons.wikimedia.org/wiki/File:Vitamin_D_synthesis_metabolism_pathway_WikiPathways_WP1531.svg
+  vitamins-roles-sources-and-deficiencies.png — the skeletal structures of seven vitamins drawn
+      to the same conventions and captioned with both chemical and vitamin names: thiamine (B1),
+      riboflavin (B2), nicotinic acid (niacin, B3), retinol (vitamin A), the three
+      interconvertible B6 forms pyridoxine, pyridoxal and pyridoxamine braced together,
+      pantothenic acid (B5) and ascorbic acid (vitamin C). The section's central claim is that
+      "chemically they have almost nothing in common; the category is defined not by structure
+      but by function"; set side by side at one scale, a sulphur-bearing double ring, a fused
+      three-ring flavin, a bare pyridine carboxylic acid, a long polyene chain and a
+      five-membered lactone prove that claim by inspection in a way a list of names cannot —
+      by Boghog — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px PNG
+      rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Vitamin_structures.svg
+  vitamins-roles-sources-and-deficiencies-2.png — health effect plotted against intake as a
+      single bell curve over a background graded red at the bottom to green at the top, the
+      low-intake tail labelled "Deficiency", the peak "Optimal" and the high-intake tail
+      "Toxicity". The section opens by attacking the belief "that vitamins are harmless because
+      they are natural and essential" and states that "every substance has a dose above which it
+      does harm"; the curve is that argument's exact shape, and its symmetry makes the
+      non-obvious half — that the descent on the right is as real as the descent on the left,
+      and that more is not monotonically better — impossible to skim past — by Mikael Häggström
+      — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of
+      the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Bell_curve_of_intake_versus_health_effect.svg
+  epistemology-the-theory-of-knowledge.png — the classical (tripartite) definition of knowledge
+      drawn as a Venn diagram: inside the box of all propositions, a circle of Truths overlaps a
+      circle of Beliefs, the lens where they meet is labelled "poorly justified true beliefs", and
+      strictly inside that lens sits a smaller disc labelled "Knowledge". The section states the
+      justified-true-belief analysis as three jointly necessary conditions; the figure is what shows
+      they are nested rather than merely listed — that every piece of knowledge is a true belief but
+      not every true belief is knowledge, which is exactly the point the third condition exists to
+      make and the point the prose has to assert in words — by Krishnavedala — CC0 1.0 (public
+      domain dedication), Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Classical_definition_of_Kno.svg
+  epistemology-the-theory-of-knowledge-2.png — the three structural answers to the regress problem
+      drawn side by side as belief-support graphs: under "Foundationalism" an arrow runs from Belief
+      B down to Belief A and stops; under "Coherentism" three beliefs support one another around a
+      closed loop; under "Infinitism" the chain descends from an ellipsis through C and B to A
+      without a first link. The section poses the regress as a trilemma — the chain of reasons must
+      either stop somewhere, circle back on itself, or go on forever — and names one theory per
+      horn; the figure draws the three shapes so the reader can see that the disagreement is about
+      the topology of justification and nothing else — by Phlsph7 — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Foundationalism,_coherentism,_infinitism.svg
+  metaphysics-the-study-of-what-exists.png — Plato's and Aristotle's accounts of form set against
+      each other on one sheet, using the same apple in both halves. On the left, an "Ideal Form" of
+      the apple floats in a separate red "World of Forms" connected by a receding chain of ellipses
+      down to a basket of ordinary apples in the green "World of Matter". On the right, a red Form
+      circle and a green Matter circle overlap, and the basket of apples sits in the intersection.
+      The section explains that Plato placed universals in a timeless realm the physical things
+      merely participate in, while Aristotle insisted universals exist in the things themselves;
+      the diagram makes that a difference of geometry — two worlds versus one — which is far
+      quicker to grasp than the sentences — by Chiswick Chap — CC BY-SA 4.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Platonic_and_Aristotelian_Forms.svg
+  metaphysics-the-study-of-what-exists-2.png — the free-will debate as a decision tree: the question
+      "Determinism?" branches True and False; the True branch asks "Free will?" and splits into
+      Compatibilism and Hard Determinism, while the False branch arrives at Libertarianism, and a
+      grey ellipse drawn around Hard Determinism and Libertarianism marks them jointly as the
+      incompatibilist positions. The section works through these positions in prose, where the one
+      thing readers reliably lose is why compatibilism is not a third option alongside the other
+      two but the answer to a different question; the diagram fixes that by showing which node each
+      position hangs from. (Note: the original artwork carries a typo, "Determimism", in one box.)
+      — by RobertG, from an original by Edward M. Hubbard — CC BY-SA 3.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:FreeWillTaxonomy2.svg
+  what-is-philosophy-questions-methods-and-why-it-matters.png — the standard classification of
+      arguments as a branching chart: "Argument" divides into Deductive and Non-deductive; the
+      deductive branch divides into Valid and Invalid, and Valid divides again into Sound and
+      Unsound while Invalid leads only to Unsound; the non-deductive branch divides into Strong and
+      Weak, with Strong yielding Cogent or Uncogent and Weak only Uncogent. The section defines
+      validity and soundness and distinguishes deductive from inductive reasoning; the chart shows
+      what the definitions imply but never say outright — that soundness is a property available
+      only to arguments that are already valid, so the two terms are levels of a hierarchy rather
+      than synonyms — by Farcaster (original raster), Nyq (English vector) and Phlsph7 (simplified
+      version) — CC BY-SA 4.0, Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Argument_terminology.svg
+  what-is-philosophy-questions-methods-and-why-it-matters-2.png — the trolley problem drawn as a
+      track schematic: a tram runs toward five figures standing on the main line, a set of points
+      diverts to a branch on which one figure stands, and a sixth figure waits beside the lever.
+      The section lists the runaway trolley among the thought experiments philosophy uses to pump
+      intuitions, in a single clause; the schematic supplies the whole set-up at a glance and, more
+      usefully, makes plain the feature the experiment is engineered to isolate — that the only
+      choice on offer is whether to act, since the numbers and the outcomes are fixed by the layout
+      of the track — by McGeddon, vectorised by Zapyon — CC BY-SA 4.0, Wikimedia Commons (Commons'
+      1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Trolley_Problem.svg
+
+Diagrams for three previously unillustrated Psychology and Religion & Mythology guides
+("Generalized Anxiety Disorder", "Depression: Understanding and Treating It" and "The
+Anthropology and Sociology of Religion"). None of the three carried an image before this wave.
+Files live in images/kb/, renamed on import after the guide they illustrate. Sources are the
+original Wikimedia Commons "File:" pages; where the upload is an SVG the bundled file is
+Commons' own 1280px-wide PNG rendering of it, and the one JPEG is reduced in dimensions only —
+the artwork itself is unmodified in every case, no crops, no recolouring, no relabelling. All
+six are CC BY or CC BY-SA works and carry their author credit here as those licences require.
+Every one is a labelled schematic, a plotted chart or an inscribed technical drawing rather
+than a photograph of a person:
+
+  generalized-anxiety-disorder.png — the hypothalamic-pituitary-adrenal axis drawn as a
+      three-gland cascade: the hypothalamus releasing corticotropin-releasing hormone onto the
+      anterior pituitary, the pituitary releasing adrenocorticotropic hormone onto the adrenal
+      cortex, and the adrenal cortex releasing cortisol, with both hormone abbreviations and
+      their full names given at each arrow and two red inhibitory arcs carrying cortisol back
+      onto the pituitary and the hypothalamus under the label "Negative Feedback". The section
+      names the HPA axis as one of the two stress pathways that produce the bodily symptoms of
+      anxiety and says it "releases cortisol and other stress hormones that prepare the body
+      for sustained challenge"; the figure shows what the prose cannot, which is that this is a
+      closed self-limiting loop rather than a one-way cascade — and so makes legible the claim
+      that chronic activation, not a single surge, is what leaves the persistent muscle
+      tension, fatigue and gut symptoms of GAD — by BrianMSweis (after Jessica Malisch and
+      Theodore Garland) — CC BY-SA 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:HPA_Axis_Diagram_(Brian_M_Sweis_2012).png
+  generalized-anxiety-disorder-2.png — the basic tenets of cognitive behavioural therapy: three
+      ellipses labelled BEHAVIOR, FEELINGS and THOUGHTS arranged in a ring with arrows running
+      both ways between every pair, and a small triangle at the centre labelled CORE BELIEFS
+      whose three corners are YOURSELF, OTHERS and FUTURE. The Psychological Treatments section
+      describes CBT for GAD as combining cognitive restructuring with behavioural experiments
+      and the dropping of safety behaviours; the diagram supplies the premise that makes those
+      two halves one therapy — that thought, feeling and action are mutually causing, so a
+      change entered at any one point propagates to the others, which is exactly why testing a
+      feared prediction in the world can alter a belief — by Urstadt — CC BY-SA 3.0, Wikimedia
+      Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Cognitive_behavioral_therapy_-_basic_tenets.svg
+  depression-understanding-and-treating-it.png — a world choropleth of the age-standardised
+      share of each country's population with a depressive disorder, graded from pale yellow at
+      about 2 per cent to near-black above 6.5 per cent, with the standardisation and the
+      meta-regression basis stated in the subtitle. The section's argument is that depression
+      "occurs in every country and culture" while "some groups carry more of the burden than
+      others"; a map carries both halves at once in a way a sentence cannot, since the reader
+      sees simultaneously that no country is unshaded and that the shading spans a threefold
+      range — and the age-standardisation note is itself the guide's point that raw diagnosis
+      counts are not the same thing as prevalence — by Our World In Data (data: IHME, Global
+      Burden of Disease) — CC BY 3.0, Wikimedia Commons (Commons' 1280px PNG rendering of the
+      SVG upload)
+      https://commons.wikimedia.org/wiki/File:Share_of_the_population_with_depression,_OWID.svg
+  depression-understanding-and-treating-it-2.png — Aaron Beck's cognitive triad as three
+      captions at the corners of a triangle — "Negative views about the world", "Negative views
+      about oneself", "Negative views about the future" — joined by arrows that run from each to
+      the next all the way round. The section quotes the triad in exactly these three terms and
+      argues that in Beck's model the distorted thoughts "are not just symptoms but drivers of
+      depression"; drawing it as a closed cycle rather than a list is what carries that claim,
+      because the arrows say that each negative view feeds the next and the whole figure is
+      self-sustaining — which is also the rationale for cognitive therapy breaking into the loop
+      at any corner — by LoudLizard, vectorised by Predatorix — CC BY-SA 3.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Beck's_CognitiveTriad.svg
+  the-anthropology-and-sociology-of-religion.png — a scatterplot of religiosity (the share of
+      adults in a country saying religion is an important part of their daily life, Gallup World
+      Poll 2024) against GDP per capita at purchasing-power parity, one point per country, with
+      selected countries named and the United States marked in red. The Secularization section
+      sets out the classical thesis that modernisation erodes religion and then the
+      counter-evidence that "the United States remained highly religious despite being modern,
+      wealthy, and pluralistic"; the chart shows both facts in one frame — a real downward
+      slope, and the American point sitting far above the cloud at its own income level, with
+      the Gulf states doing the same — so the reader can see why the debate "shifted from
+      whether religion declines to which conditions favour which religious forms" rather than
+      having to take that on trust — by Bonanzadavid — CC BY 4.0, Wikimedia Commons (Commons'
+      1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Religiosity_vs._GDP_per_Capita_(PPP),_by_Country_(1).svg
+  the-anthropology-and-sociology-of-religion-2.jpg — the Liver of Piacenza, the Etruscan bronze
+      model of a sheep's liver used by haruspices, drawn as a schematic: the organ's outline
+      divided by red rules into forty numbered regions, each carrying its inscribed Etruscan
+      name transcribed in the original alphabet, with the gall bladder and the two lobes shaded.
+      The section lists "reading entrails" among divinatory procedures and argues that
+      divination is "a decision-making technology that lends authority and social acceptability
+      to difficult choices"; this drawing is the proof of that claim, because it shows the organ
+      partitioned into a fixed, named, numbered grid of divine jurisdictions — an instrument
+      with a formal notation, not an improvisation — and the reader can see the rigour that
+      Evans-Pritchard's argument about the internal rationality of such systems depends on — by
+      Dbachmann — CC BY-SA 4.0, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Piacenza_liver_diagram.jpg
+
+Diagrams for three previously unillustrated Rescue guides ("Working With Search & Rescue",
+"Improvised Rescue Rigging" and "Structural Collapse: Self-Rescue, Void Awareness, and Helping
+Without Becoming a Casualty"). Files live in images/kb/ and are renamed on import to the guide
+id; sources are the original Wikimedia Commons "File:" pages. Where the upload is an SVG the
+bundled file is Commons' own 1280px-wide PNG rendering of it, and the larger PNG/JPEG uploads
+are reduced in dimensions only — no crops, no recolouring, no relabelling. The CC BY and
+CC BY-SA works carry their author credit here as those licences require; the public-domain and
+CC0 works carry it as good practice. Every one is a labelled chart, a force diagram, a field
+marking or a structural-failure plate rather than a portrait:
+
+  rescue-search-and-rescue-coordination.png — the FAA's "Ground-Air Visual Code for Use by
+      Survivors": a five-row table pairing each message a stranded person may need to send with
+      the single ground symbol that carries it — V for "require assistance", X for "require
+      medical assistance", N for "no", Y for "yes", an arrow for "proceeding in this direction"
+      — under the standing instruction that in doubt you lay out SOS, and above six numbered
+      construction rules (use fabric, parachute, wood or stones; maximise colour contrast
+      against the background; make symbols at least ten feet high; add radio, flares, smoke or
+      any other attention-getter; on snow, trample or shovel, since depressed symbols read black
+      from the air; the pilot acknowledges by rocking his wings). The Making Yourself Findable
+      section argues that contrast, size and motion are the multipliers on how fast a search
+      resolves; the chart is the part of that argument prose cannot carry, because it is the
+      actual agreed vocabulary — the reader learns the five glyphs, the ten-foot rule and the
+      wing-rock acknowledgement in one glance — by Federal Aviation Administration — public
+      domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Ground-Air_Visual_Code_for_Use_by_Survivors.png
+  rescue-search-and-rescue-coordination-2.png — the expanding-square search pattern drawn on a
+      ruled grid: a red datum dot at the centre and a dashed track that leaves it, turns through
+      a right angle, and spirals outward with every leg labelled by length — n, then 2n, 3n, 4n
+      and on to 8n — so that the searched box grows squarely around the starting point. The
+      Hasty Search vs. Grid Search section explains that the opening phase runs fast along
+      high-probability features and that only afterwards does a search become systematic
+      coverage anchored on a point; the diagram shows why that second phase is so expensive,
+      because the labelled legs make visible that reaching twice as far costs four times the
+      track — the same square law the guide states in words when it puts three kilometres of
+      possible travel at roughly twenty-eight square kilometres of ground — by Peter Southwood —
+      CC BY-SA 4.0, Wikimedia Commons (reduced to 1280px wide)
+      https://commons.wikimedia.org/wiki/File:Expanding_square_search.png
+  rescue-improvised-rope-rigging.png — four pulley systems drawn side by side and numbered 1 to
+      4, each lifting the same 100 N load hung from a ceiling anchor, each annotated with the
+      hauling force required (100 N, 50 N, 33⅓ N, 25 N), the tension carried in every rope part,
+      the load's rise (h = 10 cm in all four) and the rope the hauler must pull to get it
+      (s = 10, 20, 30, 40 cm). The What 2:1, 3:1 and 5:1 Mechanical Advantage Actually Mean
+      section opens by insisting that mechanical advantage is "bookkeeping on energy, not free
+      force", and that whatever a system multiplies your pull by it divides your travel by; this
+      is the one figure that proves it rather than asserting it, because force and distance are
+      labelled together on the same drawing and the reader can check that their product is the
+      same in all four systems — by Prolineserver and Tomia (minor edits by Stanisław Skowron,
+      scale adjusted by Atropos235) — CC BY 2.5, Wikimedia Commons (Commons' 1280px PNG
+      rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Four_pulleys.svg
+  rescue-improvised-rope-rigging-2.png — the force diagram of a 3:1 haul, the arrangement the
+      guide calls a Z-drag: the hauling line pulled with force F runs down through a travelling
+      pulley and back, so that three rope parts each carrying F converge on the load and pull it
+      with 3F while the ground anchor takes 2F, with every strand labelled. The Building a Basic
+      Z-Drag section describes this rope path in words — anchor, out to a pulley at the load,
+      back to a second pulley riding a friction hitch, and on to the haulers — but the zigzag is
+      exactly the kind of topology that is hard to hold in the head from a sentence; the labels
+      also settle the question the prose raises next, which is where the multiplied force
+      actually lands, by showing that the anchor sees twice the hauling force and the load three
+      times it — by Buz11 — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Truckers_hitch_pulley_model.png
+  rescue-structural-collapse-self-rescue.png — an INSARAG worksite marking sprayed on the
+      standing wall of a collapsed building, photographed in the field: a boxed identifier with
+      the hazard "ASBESTOS" written above it, three lines recording which national team searched
+      it, to what Assessment/Search/Rescue level and on what date (AUS-01 ASR2 5OCT, GER-01 ASR3
+      5OCT, TUR-01 ASR4 6OCT), and an arrow to the entry point. The Marking and Communicating
+      With Professional Responders section explains that teams write the answer on the building
+      itself because "memory and radio traffic fail at scale", and that the marking has to
+      survive rain, darkness and a change of personnel; seeing the real thing is what makes that
+      concrete, because the reader can watch three different countries' teams over two days
+      write into one box and read off the hazard, the coverage and the way in without a radio —
+      by E20dku — CC0 1.0 (public domain dedication), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:INSARAG_Marking_System.png
+  rescue-structural-collapse-self-rescue-2.jpg — Ronan Point, Canning Town, east London, after
+      16 May 1968: the 22-storey block still standing with one entire corner stripped away from
+      near the top to the ground, floor slabs hanging and stacked in the gap while the rest of
+      the facade is untouched. The Secondary Collapse section names this as the founding case of
+      progressive collapse and explains the mechanism — a small gas explosion on the eighteenth
+      floor blew out the load-bearing wall panels, the floors above lost their support and fell,
+      and each falling slab overloaded the one beneath it all the way down. The photograph is
+      the argument, because it shows the failure travelling in a narrow vertical line far from
+      the initiating blast while the neighbouring bays stand: exactly the load-path logic the
+      guide asks untrained helpers to respect when it says a building that has already shed one
+      element is still moving — by Derek Voller — CC BY-SA 2.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Tower_block_collapse._Canning_Town_(geograph_2540469).jpg
+
+Knowledge-base diagrams for the two Religion & Mythology guides "Comparative Religion — Patterns
+Across Faiths" and "What Is Religion? — Definitions and Theories", and the Rescue guide "Water Rescue
+Basics: Reach, Throw, Row, Go" (files live in images/kb/, renamed on import after the guide they
+illustrate). None of the three carried an image before this wave. Sources are the original Wikimedia
+Commons "File:" pages; where the upload is an SVG the bundled file is Commons' own 1280px-wide PNG
+rendering of it, and the JPEGs are the uploads themselves — the artwork is unmodified in every case,
+no crops, no recolouring, no relabelling. The two CC BY and CC BY-SA works carry their author credit
+here as those licences require; the CC0 dedication and the two public-domain plates need none and
+record it anyway, matching the rest of this file. Selection was constrained by the fact that the
+reader renders a diagram into a 260dp box with no zoom, so several otherwise-excellent dense charts
+(a full genealogical tree of world religions, Freud's structural model of the psyche) were rejected
+as unreadable at that size in favour of figures whose largest type and strongest shapes survive the
+reduction. Every one is a chart, comparative table or technical plate rather than a photograph:
+
+  comparative-religion-patterns-across-faiths.png — a timeline of the world's religions, each
+      tradition drawn as a coloured horizontal band running left to right across a scale from 3500 BC
+      to AD 2000, with the tradition's name set large across its band (Ancient Egyptian Religion,
+      Ancient Mesopotamian Religion, Hinduism, Judaism, Zoroastrianism, Buddhism, Jainism,
+      Confucianism, Daoism, Shintoism, Christianity, Islam, Bahaism and others) and finer lines
+      inside each band tracing its schools and branches. The section explains that comparative
+      religion sets traditions beside one another and asks what they share and where they diverge;
+      the chart supplies the axis the prose cannot draw — how far back each tradition reaches, which
+      ones are contemporaries, and how much of the world's religious history is older than the
+      familiar names — by Nojhan (French original) and Redx360 (English translation) — CC BY 2.5,
+      Wikimedia Commons (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Religions_Timeline_-_en.svg
+  comparative-religion-patterns-across-faiths-2.png — the ethic of reciprocity as a ten-row
+      comparative table: each row names a tradition in large type against its own colour block —
+      Judaism, Christianity, Islam, Baha'i Faith, Hinduism, Buddhism, Jainism, Confucianism, Taoism,
+      Wicca — and sets beside it that tradition's own wording of the rule, each with its citation
+      (Talmud Shabbat 31a, Matthew 7:12, 40 Hadith 13, Mahabharata 13.113.8, Udanavarga 5:18,
+      Analects 15.24 and so on). The section argues that unrelated traditions converge on a small set
+      of moral commonplaces, of which reciprocity is the clearest case; the table is the evidence for
+      that claim laid out so the convergence can be seen rather than taken on trust — by Di
+      (they-them) — CC0 1.0 (public domain dedication), Wikimedia Commons (Commons' 1280px PNG
+      rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:The_Golden_Rule_in_multiple_religions.svg
+  what-is-religion-definitions-and-theories.jpg — the world's population divided by religious
+      affiliation as a labelled pie chart on 2015 Pew Research Center data: Christians 31.2%, Muslims
+      24.1%, Unaffiliated 16%, Hindus 15.1%, Buddhists 6.9%, Folk Religions 5.7%, Other Religions
+      0.8%, Jews 0.2%. The section distinguishes religion from spirituality and from the secular and
+      discusses the growth of the religiously unaffiliated; the chart both sizes that group — third
+      largest on earth, ahead of every tradition but two — and quietly demonstrates the definitional
+      problem the whole guide is about, since "Unaffiliated" is counted as one slice of a religion
+      pie and "Folk Religions" as another, which only a prior decision about what religion is could
+      justify — by Serv181920 — CC BY-SA 4.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Adherents_of_worlds_major_religions_(2015).jpg
+  rescue-water-rescue-basics.jpg — the rescue hierarchy as a four-panel safety graphic: circular
+      pictograms captioned REACH (a bystander prone on the bank extending an arm), THROW (a ring buoy
+      on a line), ROW (a rescuer in a small boat) and, in place of a fourth technique, the instruction
+      "Don't Go In, Get Help!" over a figure swimming out. The section teaches the hierarchy as an
+      ordered rule rather than a menu; the graphic fixes the order in one glance and, more
+      importantly, shows that the last box is not a fourth method but a prohibition — the point the
+      section spends its closing paragraphs defending. (Note: the original upload is small, 240x210
+      pixels, so it renders softly; it is included because the lettering is poster-sized and stays
+      legible, and no larger freely-licensed equivalent was found.) — US Army Corps of Engineers —
+      public domain (work of the US federal government), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Proper_Rescue_Method.jpg
+  rescue-water-rescue-basics-2.jpg — a 1909 first-aid plate showing ice rescue done correctly: the
+      rescuer lies flat and face-down along a ladder laid out across the ice, his weight spread over
+      its whole length, and reaches a long pole out to a person who has broken through and is holding
+      the edge of the hole ahead of him. The section's rule is that you never walk up to a hole in
+      the ice and never reach with your hands — you spread your load and extend something rigid — and
+      the plate shows both halves of that rule in one picture, including the detail the prose has to
+      spell out, that the ladder is there to distribute weight and not to be climbed — by Cecilia
+      Grierson, plate 103 of "Primeros auxilios en los casos de accidentes é indisposiciones
+      repentinas" (Buenos Aires, 1909), p.182 — public domain (author died 1934), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Grierson_103_Salvamento_en_hielo_con_escalera.jpg
+
+Knowledge-base diagrams for the three Weather guides "The Composition of the Atmosphere", "The
+Troposphere and Where Weather Happens" and "The Structure and Layers of the Atmosphere" (files live
+in images/kb/, renamed on import after the guide they illustrate). None of the three carried an image
+before this wave. Sources are the original Wikimedia Commons "File:" pages; where the upload is an
+SVG the bundled file is Commons' own PNG rendering of it at the width noted, and the one native PNG
+is the upload itself — the artwork is unmodified in every case, no crops, no recolouring, no
+relabelling. The two CC BY-SA works carry their author credit here as that licence requires; the
+public-domain works need none and record it anyway, matching the rest of this file. Because the
+reader renders a diagram into a 260dp box with no zoom, each candidate was checked at the size it
+will actually occupy on the device before being accepted, and two otherwise-tempting figures were
+rejected on that test — a molecule-count grid of tropospheric air and a numbered limb view of the
+layers, both of which key their content to a legend the image itself never spells out. Every file
+below is a plotted chart or a labelled cutaway rather than a photograph:
+
+  the-composition-of-the-atmosphere.png — the proportions of dry air as two linked pie charts: the
+      main pie is N₂ 78.084 %, O₂ 20.946 % and Ar 0.9340 %, and the remaining sliver of 0.04338 % is
+      drawn out into a second magnified pie broken down into CO₂ 0.0407 %, Ne, He, CH₄, Kr and H₂,
+      each labelled with its exact fraction. The section states these figures; the chart supplies the
+      sense of proportion the figures alone do not — that air is essentially nitrogen with a fifth
+      oxygen, and that everything else together is a wedge too thin to see until it is magnified,
+      which is precisely the point the section is making when it calls those gases "trace" while
+      insisting they do most of the interesting chemistry — by Mysid — public domain, Wikimedia
+      Commons (Commons' 960px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Atmosphere_gas_proportions.svg
+  the-composition-of-the-atmosphere-2.png — the vertical distribution of ozone: partial pressure
+      plotted against altitude from the ground to 35 km, showing a small near-surface bump annotated
+      "smog" ozone, a minimum around the tropopause, and the broad stratospheric maximum peaking near
+      22–25 km. The two regions are bracketed and captioned — "Stratospheric Ozone (The Ozone Layer)"
+      holding 90 % of the total and acting as the ultraviolet shield, "Tropospheric Ozone" holding
+      10 % and toxic to people and vegetation. The section's central claim is that one molecule is
+      protective high up and harmful at the surface, and that the "layer" is a diffuse maximum rather
+      than a shell with edges; the plot shows both at once, which prose can only assert — by RedAndr,
+      after the NASA Earth Observing System Science Plan, ch. 7 — public domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Atmospheric_ozone.svg
+  the-troposphere-and-where-weather-happens.png — the 1962 US Standard Atmosphere plotted to 100 km:
+      temperature (red), pressure (green), density (orange) and the speed of sound (blue) against
+      geometric altitude, with the layer boundaries ticked on a vertical spine (Troposphere,
+      Tropopause, Stratosphere, Stratopause, Mesosphere, Mesopause, Thermosphere) and real objects set
+      at their true altitudes down the right-hand margin — Burj Khalifa, Mt Everest, a typical
+      airliner, Concorde, the SR-71, a weather balloon, the ozone layer, the ionosphere D layer,
+      meteors, aurora and the Kármán line. The section defines the environmental lapse rate as the
+      near-linear fall of temperature with height that ends abruptly at the tropopause; the red curve
+      is that fall and the kink where it stops, and the pressure and density curves standing beside it
+      make the section's other claim visible — that the overwhelming bulk of the atmosphere's mass is
+      packed into the first ten kilometres — by Cmglee — CC BY-SA 3.0, Wikimedia Commons (Commons'
+      1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Comparison_US_standard_atmosphere_1962.svg
+  the-troposphere-and-where-weather-happens-2.png — the general circulation drawn on a globe: the
+      Hadley, mid-latitude (Ferrel) and polar cells shown as overturning loops standing off the limb
+      in both hemispheres, with surface flow drawn as arrows across the face — the northeasterly and
+      southeasterly trades converging on the equator, the westerlies poleward of 30°, the subtropical
+      HIGH belts marked at 30° N and 30° S, and the intertropical convergence zone ruled in red along
+      the equator. The section explains why the prevailing winds blow as they do — air rising at the
+      equator, sinking near 30°, and deflected by the Coriolis effect — an argument in three
+      dimensions that prose can only take one step at a time; the diagram holds the vertical cells and
+      their surface consequences in a single view — by Kaidor — CC BY-SA 3.0, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Earth_Global_Circulation_-_en.svg
+  the-structure-and-layers-of-the-atmosphere.png — temperature against altitude from the surface to
+      beyond 600 km, with the layer boundaries drawn as dashed rules at 12 km, 45 km and 85 km and the
+      layers named in large type between them — TROPOSPHERE, STRATOSPHERE, MESOSPHERE, THERMOSPHERE,
+      EXOSPHERE — and a second, dashed curve of ionospheric electron density beside it with the E and
+      F regions marked. The guide's organising claim is that the layers are defined by the sign of the
+      temperature gradient rather than by composition, and this is the curve that claim is about: every
+      reversal of slope is a boundary, and the dashed rules land exactly on the reversals. The electron
+      density plotted alongside shows why the ionosphere is a separate, overlapping scheme rather than
+      a sixth layer — by Bhamer, converted to SVG by tiZom — public domain, Wikimedia Commons
+      (Commons' 1280px PNG rendering of the SVG upload)
+      https://commons.wikimedia.org/wiki/File:Atmosphere_with_Ionosphere.svg
+  the-structure-and-layers-of-the-atmosphere-2.png — a cutaway of the atmosphere to 400 km carrying
+      two things at once: at the right, the ionospheric electron-density profile with its D, E, F1 and
+      F2 regions plotted against vertical colour bands showing how deep X-rays, extreme, far and vivid
+      ultraviolet, visible light and infrared each penetrate before being absorbed; across the body,
+      the phenomena of each altitude placed where they belong — ground-based lidar, radar and optical
+      instruments, balloons, nacreous (polar stratospheric) clouds, noctilucent clouds, airglow,
+      aurora, a sounding rocket and a satellite. The section is about ionization and atmospheric
+      electricity, and the figure supplies the mechanism the prose describes: the D/E/F structure
+      exists because different wavelengths are stopped at different depths, which the penetration
+      bands show directly against the electron-density curve they produce — NASA Goddard — public
+      domain (work of the US federal government), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:1_atmosphere_layers.png
+
+Knowledge-base diagrams for the three Society & Culture sociology guides "What Sociology Is & How
+Sociologists Think", "Classical Social Theory: Marx, Durkheim & Weber" and "Functionalism, Conflict
+Theory & Symbolic Interactionism" (files live in images/kb/, renamed on import after the guide they
+illustrate). None of the three carried an image before this wave. Sources are the original Wikimedia
+Commons "File:" pages; the one SVG upload is bundled as Commons' own 1920px-wide PNG rendering of it
+and the rest are the uploads themselves — the artwork is unmodified in every case, no crops, no
+recolouring, no relabelling. The two CC BY works carry their author credit here as that licence
+requires; the public-domain and CC0 works need none and record it anyway, matching the rest of this
+file. Sociology is a field whose Commons holdings are overwhelmingly portraits of its founders and
+photographs of book covers, neither of which teaches anything a caption could not, so the whole wave
+was drawn instead from the small stock of genuine teaching diagrams and one historical didactic
+plate. Searches for a Parsons AGIL figure, a Durkheim solidarity or suicide-typology chart and a
+Weber authority-types diagram returned nothing freely licensed, which is why the two Durkheim and
+three Weber sections stay unillustrated rather than being given a portrait as decoration. Every file
+below is a labelled diagram or an inscribed historical plate rather than a photograph:
+
+  what-sociology-is-how-sociologists-think.png — the spurious-correlation case drawn as three arrows:
+      a sun on the left throws two arrows each captioned CAUSATION, one to an ice-cream sundae and one
+      to a fleeing thief carrying a money sack, while a separate double-headed arrow between the
+      sundae and the thief is captioned CORRELATION. The Variables, Correlation, and Causation section
+      states the principle that correlation does not prove causation and then lists the ways an
+      association can exist with no causal link between the two things associated, the common-cause
+      case first. The drawing is that case, and it does the one thing the sentence cannot: it puts the
+      two kinds of arrow on the page at once, so the reader can see the causal arrows leaving a third
+      variable that the correlational arrow never touches, and can see that the association between
+      ice cream and crime is a by-product of both being summer things rather than a link between them
+      — by Rcragun — CC BY 3.0, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Correlation_vs_causation.png
+  what-sociology-is-how-sociologists-think-2.jpg — George Ritzer's integrated model of social analysis
+      as a 2x2 grid: MACROSCOPIC over MICROSCOPIC on one axis, OBJECTIVE over SUBJECTIVE on the other,
+      each of the four quadrants filled with worked examples — macro-objective holding society, law,
+      bureaucracy, architecture, technology and language; macro-subjective holding culture, norms and
+      values; micro-objective holding patterns of behaviour, action and interaction; micro-subjective
+      holding perceptions, beliefs and the facets of the social construction of reality — with arrows
+      crossing between all four quadrants at the centre. The Levels of Analysis: Micro, Meso, and Macro
+      section teaches scale by naming what belongs at each level and then insists that no level is
+      self-sufficient. The grid supplies those examples in the section's own vocabulary, and the
+      crossed arrows in the middle are the section's closing argument in a form prose has to spend a
+      paragraph on: the levels are not stacked boxes but a single field whose regions act on one
+      another — by Ryan Cragun — public domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Ritzers_integration_theory.jpg
+  classical-social-theory-marx-durkheim-weber.png — historical materialism laid out whole: a two-tier
+      circle at the centre divides Superstructure from Base with an arrow rising through it, and four
+      labelled quadrants surround it — Forces of Production (human labour power, instruments of
+      labour, subjects of labour), Relations of Production (ownership of the means of production, the
+      division of labour, social classes, distribution of the social product), Legal and Political
+      Institutions (the state, legal systems, police, military, prisons, parties) and Forms of Social
+      Consciousness (dominant ideologies, religious doctrine, custom, art and media) — over a Mode of
+      Production panel naming the Asiatic, ancient, feudal, capitalist and communist modes and stating
+      the rule that contradictions produce class struggle and that a social revolution transforms the
+      mode of production and the superstructure with it. The Marx: Historical Materialism section
+      defines every one of those terms in sequence and then gives the engine of change; the diagram
+      holds them all in one frame and draws the base-superstructure relation as a direction, so the
+      reader can see which category contains which and which way the determination runs, neither of
+      which survives a linear paragraph intact — by Goszei — CC0 1.0 (public domain dedication),
+      Wikimedia Commons (Commons' 1920px PNG rendering of the SVG upload; the diagram embeds a "Book"
+      icon by scott desmond from the Noun Project, CC BY 3.0)
+      https://commons.wikimedia.org/wiki/File:Diagram_of_Historical_Materialism.svg
+  classical-social-theory-marx-durkheim-weber-2.jpg — the source of profit written as a labelled
+      equation: Bourgeoisie above Means of Production, plus Proletariat above Labor Power, equals a
+      large dollar sign captioned Profit. The Marx: Capital, Class, and Exploitation section argues
+      that profit is not a reward for risk or cleverness but the surplus left when a worker is hired
+      for a whole day yet reproduces the value of his wage in only part of it, an arrangement possible
+      only because one class owns the means of production and the other owns nothing but its capacity
+      to work. The equation names both classes on their own side of the sum and pairs each with the
+      one thing it brings, so the asymmetry the section spends its length establishing — two parties,
+      two contributions, one of them keeping the residual — is visible before the prose is read. A
+      small flat four-box drawing with large type, checked at the width the guide reader gives it
+      — by Ryan Cragun — public domain, Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Capitalism.jpg
+  functionalism-conflict-theory-symbolic-interactionism.jpg — "Pyramid of Capitalist System", the 1911
+      Industrial Worker plate: a money bag captioned CAPITALISM at the apex, then a crowned monarch
+      flanked by officials captioned WE RULE YOU, then clergy of three confessions captioned WE FOOL
+      YOU, then soldiers behind a field gun captioned WE SHOOT AT YOU, then a banquet of the
+      well-dressed captioned WE EAT FOR YOU, and at the base the workers holding the entire structure
+      up, captioned WE WORK FOR ALL and WE FEED ALL. The Conflict Theory: Marx, Class, and Material
+      Contradiction section argues that social order is the product of domination rather than
+      consensus, that an economic base carries a legal, political and ideological superstructure, and
+      that the ruling ideas of an epoch are the ideas of its ruling class. The plate stacks precisely
+      those strata in precisely that order and captions each one with the function it performs for the
+      system, so the abstract claim about ideology arrives as a tier that says what it is for; a
+      period document that shows how the argument was actually put to the people it was about — by an
+      uncredited artist, published by International Pub. Co., Cleveland, Ohio — public domain
+      (published 1911), Wikimedia Commons
+      https://commons.wikimedia.org/wiki/File:Pyramid_of_Capitalist_System.jpg
+  functionalism-conflict-theory-symbolic-interactionism-2.png — the looking-glass self: one figure
+      stands in the middle of four mirrors and each returns a different reflection of him, captioned
+      "How my mom and dad see me" (the reflection wears a halo), "How my girlfriend sees me", "How my
+      older brother sees me", and "How my ex-girlfriend sees me" (that reflection wears horns). The
+      Symbolic Interactionism: Mead, the Self, and Shared Meaning section names Cooley's looking-glass
+      self — that we build a self-image by imagining how we appear to others and how they judge that
+      appearance — and Mead's taking the role of the other. The hard part of the idea in words is that
+      the reflections disagree with each other, which is what makes the self plural and
+      audience-relative rather than a single inner fact; the drawing makes that disagreement the first
+      thing the reader sees, and shows the person standing outside all four images looking at them,
+      which is Mead's "me" regarded by the "I" — by Rcragun — CC BY 3.0, Wikimedia Commons
+      (Commons cannot render a scaled thumbnail of this upload, so the original file is bundled)
+      https://commons.wikimedia.org/wiki/File:The_looking_glass_self.png

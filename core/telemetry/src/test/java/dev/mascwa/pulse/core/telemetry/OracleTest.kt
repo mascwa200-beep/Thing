@@ -144,6 +144,30 @@ class OracleTest {
         assertTrue(Oracle.divine(s, limit = 3).size <= 3)
     }
 
-    // ---- World Pulse (the live world feed) ----
+    // ---- Sensorium-fed rules ----
+
+    @Test fun stormFrontFiresOnlyOnThePlungingSignal() {
+        val calm = base()
+        assertTrue(Oracle.divine(calm).none { it.id == "storm_front" })
+        val plunging = base().copy(pressureFallingFast = true)
+        val insight = Oracle.divine(plunging).first { it.id == "storm_front" }
+        assertEquals(Urgency.IMPORTANT, insight.urgency)
+        assertTrue(insight.sources.contains("sensorium"))
+    }
+
+    @Test fun envAnomalySurfacesTheLearnedNormalDeviation() {
+        val s = base().copy(envAnomaly = "noise unusually loud for 03:00 on a weekday")
+        val insight = Oracle.divine(s).first { it.id == "env_anomaly" }
+        assertEquals(Urgency.NOTABLE, insight.urgency)
+        assertTrue(insight.detail.contains("unusually loud"))
+        assertTrue(Oracle.divine(base()).none { it.id == "env_anomaly" })
+    }
+
+    @Test fun windDownCanActuallyFireNowThatAwayFromHomeIsFed() {
+        // The rule was dead while awayFromHome was never populated (null != false was always true).
+        val s = base(hour = 23).copy(awayFromHome = false)
+        assertTrue(Oracle.divine(s).any { it.id == "wind_down" })
+        assertTrue(Oracle.divine(base(hour = 23).copy(awayFromHome = null)).none { it.id == "wind_down" })
+    }
 
 }

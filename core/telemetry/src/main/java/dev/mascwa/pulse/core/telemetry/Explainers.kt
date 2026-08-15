@@ -71,8 +71,94 @@ object SpaceWeatherExplainers {
         else -> Explainer("No storm", "Geomagnetic conditions are calm — nothing notable.")
     }
 
+    /** GOES soft X-ray flux, W/m² — the channel the flare classes A/B/C/M/X are defined on. */
+    fun xrayFlux(wattsPerSqM: Double?): Explainer {
+        val flare = SolarActivity.flareClass(wattsPerSqM)
+            ?: return Explainer(
+                "X-rays — background",
+                "The Sun's X-ray output is below the A-class floor. Nothing is flaring.",
+            )
+        val band = when (flare.letter) {
+            'A', 'B' -> "Quiet" to "Background level. No effect on radio or anything else down here."
+            'C' -> "Common flare" to "Small flares happen most days on an active Sun. Little practical effect."
+            'M' -> "Medium flare" to
+                "Brief HF radio fades on the Sun-facing side of Earth, and sometimes minor radiation storms."
+            else -> "Major flare" to
+                "Wide HF blackouts on the daylit side, navigation errors, and a real chance of a storm to follow."
+        }
+        return Explainer("${flare.label} — ${band.first}", band.second)
+    }
+
+    /** F10.7 cm solar radio flux, sfu — the long-running proxy for how active the Sun is overall. */
+    fun solarFlux(sfu: Double): Explainer {
+        val band = when {
+            sfu < 80 -> "Solar minimum" to
+                "A quiet Sun. The ionosphere is thin, so long-distance shortwave is limited to lower frequencies."
+            sfu < 120 -> "Moderate" to "Middling activity. Decent daytime shortwave on the middle bands."
+            sfu < 180 -> "Active" to "An energised ionosphere — the higher shortwave bands open up."
+            else -> "Solar maximum" to
+                "Very active. The best conditions for long-distance shortwave, and the most flares."
+        }
+        return Explainer("F10.7 ${sfu.roundToInt()} sfu — ${band.first}", band.second)
+    }
+
+    /** Integral proton flux at >=10 MeV, in pfu — what the NOAA S (radiation) scale is defined on. */
+    fun protonFlux(pfu: Double): Explainer {
+        val level = SolarActivity.radiationStorm(pfu)
+        if (level == 0) {
+            return Explainer(
+                "Radiation — background",
+                "Proton levels are normal. No effect on flights, satellites or anyone on the ground.",
+            )
+        }
+        return Explainer(
+            "${SolarActivity.scaleLabel('S', level)} — ${trimNum(pfu)} pfu",
+            SolarActivity.effect('S', level),
+        )
+    }
+
+    /** Any of the three NOAA scales as a number, which is how the JSON feed publishes them. */
+    fun noaaScale(prefix: Char, level: Int): Explainer {
+        val what = when (prefix) {
+            'R' -> "Radio blackouts, caused by flares"
+            'S' -> "Radiation storms, caused by solar protons"
+            else -> "Geomagnetic storms, caused by the solar wind"
+        }
+        if (level <= 0) return Explainer("${prefix}0 — none", "$what: nothing happening right now.")
+        return Explainer(SolarActivity.scaleLabel(prefix, level), SolarActivity.effect(prefix, level))
+    }
+
+    /**
+     * Maximum usable frequency, MHz — the highest shortwave frequency the ionosphere will still bend
+     * back to Earth. Above it a signal goes straight out to space instead of reaching anyone.
+     */
+    fun maxUsableFrequency(mhz: Double): Explainer {
+        val band = when {
+            mhz < 10 -> "Low" to "Only the lower bands are reflecting. Long-distance contacts will be limited."
+            mhz < 18 -> "Fair" to "The middle shortwave bands are usable for long-distance paths."
+            mhz < 28 -> "Good" to "The upper bands are open — long hops are working well."
+            else -> "Excellent" to "Everything up to the top of shortwave is reflecting. Rare, and worth using."
+        }
+        return Explainer("MUF ~${mhz.roundToInt()} MHz — ${band.first}", band.second)
+    }
+
+    /** One shortwave band's day/night usability. */
+    fun band(report: HfPropagation.BandReport): Explainer = Explainer(
+        "${report.name} — ${report.day.name.lowercase()} by day, ${report.night.name.lowercase()} by night",
+        "This band sits at about ${trimNum(report.megahertz)} MHz. " + when {
+            report.day == HfPropagation.Quality.GOOD || report.night == HfPropagation.Quality.GOOD ->
+                "It is one of the better choices right now."
+            report.day == HfPropagation.Quality.CLOSED && report.night == HfPropagation.Quality.CLOSED ->
+                "It is shut in both directions — signals pass straight through the ionosphere or are absorbed."
+            else -> "It is workable but not at its best."
+        },
+    )
+
+    // Locale.US, not the default: on a comma-decimal device the default renders 1.3 as "1,3", and
+    // these strings are read as numbers. Same trap the news prompt's live figures already hit.
     private fun trimNum(v: Double): String =
-        if (abs(v - v.roundToInt()) < 0.05) v.roundToInt().toString() else String.format("%.1f", v)
+        if (abs(v - v.roundToInt()) < 0.05) v.roundToInt().toString()
+        else String.format(java.util.Locale.US, "%.1f", v)
 }
 
 /**

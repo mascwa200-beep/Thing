@@ -48,6 +48,9 @@ object Routes {
     // ORACLE — the Computer's cross-signal foresight HUD ("Advisories")
     const val ORACLE = "oracle"
 
+    // SENSORIUM — the ambient environment scanner (the ship's senses)
+    const val SENSORIUM = "sensorium"
+
     // The Computer (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"

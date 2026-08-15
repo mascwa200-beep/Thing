@@ -238,4 +238,98 @@ object LcarsIcons {
                 }
             }.build()
     }
+
+    // ---- Wave 3: the MAPS & SKY set --------------------------------------------------------
+    // The four sky/map screens had no glyphs at all and fell back to emoji (🌙, ☿♀♂♃♄, ⚠) in
+    // running text, which never picks up an `Icon` tint and renders at the mercy of the system
+    // emoji font. These are the same angular vocabulary as the waves above.
+
+    /** A body with two crossed orbit rings — the satellite/orbital marker. */
+    val Satellite: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsSatellite", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) { // body
+                    moveTo(10f, 10f); lineTo(14f, 10f); lineTo(14f, 14f); lineTo(10f, 14f); close()
+                }
+                path(fill = BLACK) { // solar wings
+                    moveTo(2f, 11f); lineTo(9f, 11f); lineTo(9f, 13f); lineTo(2f, 13f); close()
+                    moveTo(15f, 11f); lineTo(22f, 11f); lineTo(22f, 13f); lineTo(15f, 13f); close()
+                }
+                path(fill = BLACK) { // antenna
+                    moveTo(11.2f, 3f); lineTo(12.8f, 3f); lineTo(12.8f, 9f); lineTo(11.2f, 9f); close()
+                    moveTo(8f, 2f); lineTo(16f, 2f); lineTo(16f, 3.6f); lineTo(8f, 3.6f); close()
+                }
+            }.build()
+    }
+
+    /** A four-point angular star — the "visible tonight" / sky-chart marker. */
+    val Star: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsStar", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(12f, 1f); lineTo(14.5f, 9.5f); lineTo(23f, 12f); lineTo(14.5f, 14.5f)
+                    lineTo(12f, 23f); lineTo(9.5f, 14.5f); lineTo(1f, 12f); lineTo(9.5f, 9.5f); close()
+                }
+            }.build()
+    }
+
+    /** A hard-edged crescent (octagon minus an offset octagon) — the Moon marker. */
+    val Moon: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsMoon", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK, pathFillType = PathFillType.EvenOdd) {
+                    moveTo(9f, 2f); lineTo(15f, 2f); lineTo(21f, 8f); lineTo(21f, 16f)
+                    lineTo(15f, 22f); lineTo(9f, 22f); lineTo(3f, 16f); lineTo(3f, 8f); close()
+                    moveTo(13f, 4f); lineTo(19f, 4f); lineTo(24f, 9f); lineTo(24f, 15f)
+                    lineTo(19f, 20f); lineTo(13f, 20f); lineTo(8f, 15f); lineTo(8f, 9f); close()
+                }
+            }.build()
+    }
+
+    /** A disc with eight straight rays — the Sun / solar-activity marker. */
+    val Sun: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsSun", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(9f, 9f); lineTo(15f, 9f); lineTo(15f, 15f); lineTo(9f, 15f); close()
+                    moveTo(11f, 1f); lineTo(13f, 1f); lineTo(13f, 7f); lineTo(11f, 7f); close()
+                    moveTo(11f, 17f); lineTo(13f, 17f); lineTo(13f, 23f); lineTo(11f, 23f); close()
+                    moveTo(1f, 11f); lineTo(7f, 11f); lineTo(7f, 13f); lineTo(1f, 13f); close()
+                    moveTo(17f, 11f); lineTo(23f, 11f); lineTo(23f, 13f); lineTo(17f, 13f); close()
+                }
+            }.build()
+    }
+
+    /** Concentric sweep arcs with a scan line — the radar/scope marker. */
+    val Radar: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsRadar", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK, pathFillType = PathFillType.EvenOdd) {
+                    moveTo(12f, 2f); lineTo(19f, 5f); lineTo(22f, 12f); lineTo(19f, 19f)
+                    lineTo(12f, 22f); lineTo(5f, 19f); lineTo(2f, 12f); lineTo(5f, 5f); close()
+                    moveTo(12f, 4f); lineTo(18f, 6f); lineTo(20f, 12f); lineTo(18f, 18f)
+                    lineTo(12f, 20f); lineTo(6f, 18f); lineTo(4f, 12f); lineTo(6f, 6f); close()
+                }
+                path(fill = BLACK) { // sweep hand from centre to the upper right
+                    moveTo(11.2f, 11.2f); lineTo(12.8f, 12.8f); lineTo(19f, 6.6f); lineTo(17.4f, 5f); close()
+                }
+                path(fill = BLACK) { // hub
+                    moveTo(10.5f, 10.5f); lineTo(13.5f, 10.5f); lineTo(13.5f, 13.5f); lineTo(10.5f, 13.5f); close()
+                }
+            }.build()
+    }
+
+    /** Three stacked offset plates — the map "layers" control. */
+    val Layers: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsLayers", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(12f, 2f); lineTo(22f, 7f); lineTo(12f, 12f); lineTo(2f, 7f); close()
+                    moveTo(12f, 13.4f); lineTo(20.2f, 9.3f); lineTo(22f, 10.2f); lineTo(12f, 15.2f)
+                    lineTo(2f, 10.2f); lineTo(3.8f, 9.3f); close()
+                    moveTo(12f, 16.6f); lineTo(20.2f, 12.5f); lineTo(22f, 13.4f); lineTo(12f, 18.4f)
+                    lineTo(2f, 13.4f); lineTo(3.8f, 12.5f); close()
+                }
+            }.build()
+    }
 }

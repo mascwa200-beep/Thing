@@ -687,6 +687,50 @@ fun SettingsScreen(
                 }
             }
 
+            if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer")) item {
+                PrefSection("Ambient sensing (Sensorium)") {
+                    PrefSwitch(
+                        "Environment sensing",
+                        "The ship's senses: fuses motion, light, pressure, magnetics and radio density " +
+                            "24/7, learns your normal, and flags what's unusual. Everything stays on this " +
+                            "device — camera and mic produce text labels only, nothing raw is kept or sent.",
+                        checked = s.sensing.enabled,
+                        onChange = { v ->
+                            vm.update { it.copy(sensing = it.sensing.copy(enabled = v)) }
+                            if (!v) dev.mascwa.pulse.data.sensing.SensoriumService.stop(context)
+                            else dev.mascwa.pulse.data.sensing.SensoriumService.start(context, foregroundLaunch = true)
+                        },
+                    )
+                    PrefSwitch(
+                        "Ambient hearing (mic sips)",
+                        "Short mic samples classified on-device into soundscape labels — including safety " +
+                            "sounds like a smoke alarm or breaking glass, which raise an urgent alert.",
+                        checked = s.sensing.micSensing,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(micSensing = v)) } },
+                    )
+                    PrefSwitch(
+                        "Ambient sight (camera sips)",
+                        "Brief back-camera bursts classified on-device into scene labels. The status-bar " +
+                            "camera indicator lighting up during a sip is the OS working as designed.",
+                        checked = s.sensing.cameraSensing,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(cameraSensing = v)) } },
+                    )
+                    PrefSwitch(
+                        "Radio density (crowd sense)",
+                        "WiFi and Bluetooth scan bursts as a people-density signal. WiFi counts need " +
+                            "Location on; nothing is ever connected to.",
+                        checked = s.sensing.radioSensing,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(radioSensing = v)) } },
+                    )
+                    PrefSwitch(
+                        "Remember sensed events",
+                        "Notable moments (a doorbell, thunder, a storm-front pressure drop) become " +
+                            "episodic memories the Computer can recall — a few per day at most.",
+                        checked = s.sensing.rememberEvents,
+                        onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(rememberEvents = v)) } },
+                    )
+                }
+            }
             if (vis(SettingsCategory.SECURITY, "security network wifi ssid encryption https audit ledger")) item {
                 PrefSection("Security & network") {
                     PrefClickable(

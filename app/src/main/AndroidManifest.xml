@@ -66,6 +66,14 @@
          All audio is processed locally by Vosk and never recorded or transmitted (opt-in). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Sensorium: ambient environment sensing. Camera frames and mic sips are classified fully
+         on-device (MediaPipe) into text labels and immediately discarded — nothing raw is ever
+         persisted or transmitted. Camera is runtime-gated; the FGS camera/microphone types can only
+         be armed from a foreground app-open (Android 14+ while-in-use law), after which they persist
+         for the service's life. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
     <!-- Optional vitals: pair a Bluetooth LE heart-rate strap (opt-in, runtime-gated).
          neverForLocation: we never use BLE scans to derive location. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
@@ -91,6 +99,7 @@
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
@@ -285,6 +294,19 @@
             android:name=".jarvis.vitals.VitalsTrackingService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- Sensorium ambient environment sensing. The UPGRADEABLE service: background starts use
+             specialUse only (dataSync is the API 31-33 fallback); a foreground app-open re-invokes
+             startForeground adding microphone|camera, which then persist for the service's life.
+             Classify-then-discard — labels only, nothing raw persisted or transmitted. -->
+        <service
+            android:name=".data.sensing.SensoriumService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|dataSync|microphone|camera">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="ambient_environment_sensing" />
+        </service>
 
         <!--
             LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the

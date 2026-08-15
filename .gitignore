@@ -26,3 +26,8 @@ local.defaults.properties
 # secret (well-known password "android"); this is safe to commit.
 !/app/debug.keystore
 tools/kb/.next_wave.json
+
+# JPL/Skyfield ephemeris kernels. These are ~17 MB binaries fetched on demand purely to generate
+# expected values when validating the astronomy cores locally — the app never reads them, so they
+# must not end up in the repo (or the APK).
+*.bsp
