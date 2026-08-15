@@ -2,9 +2,13 @@ package dev.mascwa.pulse.data.weather
 
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.telemetry.WeatherUnits
 import dev.mascwa.pulse.core.util.Fetched
+import dev.mascwa.pulse.data.settings.PrecipUnit
 import dev.mascwa.pulse.data.settings.SavedLocation
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import dev.mascwa.pulse.data.settings.TemperatureUnit
+import dev.mascwa.pulse.data.settings.WindUnit
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.net.URLEncoder
@@ -85,6 +89,31 @@ class WeatherRepository(
         }
         val f = http.getJson(url, OmForecast.serializer())
 
+        // The unit setting is known here and nowhere downstream, so this is where the canonical
+        // conversion belongs. Display values below are left exactly as they were: half a dozen
+        // consumers read them and none of them should shift.
+        val tempUnit = if (s.temperatureUnit == TemperatureUnit.FAHRENHEIT) {
+            WeatherUnits.Temperature.FAHRENHEIT
+        } else {
+            WeatherUnits.Temperature.CELSIUS
+        }
+        val speedUnit = when (s.windUnit) {
+            WindUnit.MPH -> WeatherUnits.Speed.MPH
+            WindUnit.MS -> WeatherUnits.Speed.MS
+            WindUnit.KNOTS -> WeatherUnits.Speed.KNOTS
+            else -> WeatherUnits.Speed.KMH
+        }
+        // Visibility follows the precipitation family, not the wind one — established by probing
+        // the service rather than from its documentation, which says metres either way.
+        val distanceUnit = if (s.precipUnit == PrecipUnit.INCH) {
+            WeatherUnits.Distance.IMPERIAL
+        } else {
+            WeatherUnits.Distance.METRIC
+        }
+        fun degC(v: Double?) = WeatherUnits.toCelsius(v, tempUnit)
+        fun kmh(v: Double?) = WeatherUnits.toKmh(v, speedUnit)
+        fun metres(v: Double?) = WeatherUnits.toMetres(v, distanceUnit)
+
         val current = f.current?.let { c ->
             CurrentWeather(
                 temperature = c.temperature_2m,
@@ -104,6 +133,11 @@ class WeatherRepository(
                 rain = c.rain,
                 showers = c.showers,
                 snowfall = c.snowfall,
+                temperatureC = degC(c.temperature_2m),
+                dewPointC = degC(c.dew_point_2m),
+                windKmh = kmh(c.wind_speed_10m),
+                gustKmh = kmh(c.wind_gusts_10m),
+                visibilityMetres = metres(c.visibility),
             )
         }
 
@@ -121,6 +155,9 @@ class WeatherRepository(
                     uvIndex = h.uv_index.getOrNull(i),
                     capeJkg = h.cape.getOrNull(i),
                     visibility = h.visibility.getOrNull(i),
+                    temperatureC = degC(h.temperature_2m.getOrNull(i)),
+                    windKmh = kmh(h.wind_speed_10m.getOrNull(i)),
+                    gustKmh = kmh(h.wind_gusts_10m.getOrNull(i)),
                 )
             }
         }.orEmpty()
@@ -146,6 +183,10 @@ class WeatherRepository(
                     sunshineSeconds = d.sunshine_duration.getOrNull(i),
                     daylightSeconds = d.daylight_duration.getOrNull(i),
                     snowfallSum = d.snowfall_sum.getOrNull(i),
+                    tempMaxC = degC(d.temperature_2m_max.getOrNull(i)),
+                    tempMinC = degC(d.temperature_2m_min.getOrNull(i)),
+                    windMaxKmh = kmh(d.wind_speed_10m_max.getOrNull(i)),
+                    gustMaxKmh = kmh(d.wind_gusts_10m_max.getOrNull(i)),
                 )
             }
         }.orEmpty()

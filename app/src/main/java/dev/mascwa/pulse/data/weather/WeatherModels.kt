@@ -27,6 +27,16 @@ data class CurrentWeather(
     val rain: Double? = null,
     val showers: Double? = null,
     val snowfall: Double? = null,
+
+    // ---- canonical companions -------------------------------------------------------------
+    // The published comfort indices are defined in Celsius and km/h, and everything above is in
+    // whatever unit the user reads. Converted once, where the unit setting is actually known,
+    // rather than re-derived by each consumer that happens to need it.
+    val temperatureC: Double? = null,
+    val dewPointC: Double? = null,
+    val windKmh: Double? = null,
+    val gustKmh: Double? = null,
+    val visibilityMetres: Double? = null,
 )
 
 @Serializable
@@ -43,6 +53,10 @@ data class HourlyPoint(
     val capeJkg: Double? = null,
     /** Metres or feet, following the request's unit — see [CurrentWeather.visibility]. */
     val visibility: Double? = null,
+    /** Canonical companions, as on [CurrentWeather]. */
+    val temperatureC: Double? = null,
+    val windKmh: Double? = null,
+    val gustKmh: Double? = null,
 )
 
 @Serializable
@@ -65,6 +79,11 @@ data class DailyPoint(
     val sunshineSeconds: Double? = null,
     val daylightSeconds: Double? = null,
     val snowfallSum: Double? = null,
+    /** Canonical companions, as on [CurrentWeather]. */
+    val tempMaxC: Double? = null,
+    val tempMinC: Double? = null,
+    val windMaxKmh: Double? = null,
+    val gustMaxKmh: Double? = null,
 )
 
 @Serializable
