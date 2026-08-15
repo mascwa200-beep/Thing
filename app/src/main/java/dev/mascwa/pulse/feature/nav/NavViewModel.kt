@@ -15,6 +15,7 @@ import dev.mascwa.pulse.data.places.RoutingRepository
 import dev.mascwa.pulse.data.radar.Contact
 import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarRepository
+import dev.mascwa.pulse.data.safety.Incident
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.sensors.CompassController
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -43,9 +44,6 @@ import kotlin.math.roundToInt
  * heading for the heading-up camera, and the toggleable POI "legend" (Overpass categories rendered
  * as map markers). Sensors/poll run only while the screen calls [start]/[stop].
  */
-/** A nearby safety incident pinned on the NAV map (folded in from the old Map screen). */
-data class IncidentMarker(val latitude: Double, val longitude: Double, val title: String)
-
 /**
  * The outcome of the last POI scan.
  *
@@ -436,8 +434,23 @@ class NavViewModel(
     private data class CategoryOutcome(val reached: Boolean, val count: Int)
 
     /** Nearby safety incidents + whether the overlay is lit (folded in from the old Map screen). */
-    private val _incidents = MutableStateFlow<List<IncidentMarker>>(emptyList())
-    val incidents: StateFlow<List<IncidentMarker>> = _incidents.asStateFlow()
+    /**
+      * Nearby safety incidents, carried whole.
+      *
+      * They used to be flattened to a coordinate and a title on the way in, which threw away the
+      * type, severity, magnitude, time and source link the feed had already delivered — so the map
+      * could draw a dot and nothing else, and tapping one had nothing to show.
+      */
+    private val _incidents = MutableStateFlow<List<Incident>>(emptyList())
+    val incidents: StateFlow<List<Incident>> = _incidents.asStateFlow()
+
+    /** The incident dot the user tapped, if any. */
+    private val _selectedIncidentId = MutableStateFlow<String?>(null)
+    val selectedIncident: StateFlow<Incident?> =
+        combine(_selectedIncidentId, _incidents) { id, list -> list.firstOrNull { it.id == id } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun selectIncident(id: String?) { _selectedIncidentId.value = id }
     private val _showIncidents = MutableStateFlow(false)
     val showIncidents: StateFlow<Boolean> = _showIncidents.asStateFlow()
     private var incidentJob: Job? = null
@@ -462,7 +475,6 @@ class NavViewModel(
                 safety.fetch(lat, lon, false).data.incidents
                     .filter { it.distanceMeters > 0 }
                     .take(40)
-                    .map { IncidentMarker(it.latitude, it.longitude, it.title) }
             }.getOrDefault(emptyList())
         }
     }

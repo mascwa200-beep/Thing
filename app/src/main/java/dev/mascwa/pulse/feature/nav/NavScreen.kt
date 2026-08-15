@@ -73,6 +73,9 @@ import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.radar.Contact
+import dev.mascwa.pulse.data.safety.Incident
+import dev.mascwa.pulse.data.safety.IncidentType
+import dev.mascwa.pulse.data.safety.Severity
 import dev.mascwa.pulse.data.weather.DeviceLocation
 import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.telemetry.Terminator
@@ -212,6 +215,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val seismicOn by vm.seismic.collectAsState()
     val aircraft by vm.aircraft.collectAsState()
     val quakes by vm.quakes.collectAsState()
+    val selectedIncident by vm.selectedIncident.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
 
@@ -264,7 +268,17 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                 val objId = ml.queryRenderedFeatures(pt, OBJECTIVE_LAYER).firstOrNull()?.getStringProperty("id")
                 if (objId != null) {
                     vm.selectPoi(null)
+                    vm.selectIncident(null)
                     vm.selectWaypoint(objId)
+                    return@addOnMapClickListener true
+                }
+                // Incidents next: they are events with a source to read, and they sit above the
+                // ambient POI dots in what someone is likely to be reaching for.
+                val incidentId = ml.queryRenderedFeatures(pt, INCIDENT_LAYER).firstOrNull()?.getStringProperty("id")
+                if (incidentId != null) {
+                    vm.selectPoi(null)
+                    vm.selectWaypoint(null)
+                    vm.selectIncident(incidentId)
                     return@addOnMapClickListener true
                 }
                 // Match on the feature's own key, not its name. Place carries no id, and a name
@@ -277,6 +291,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 vm.selectWaypoint(null)
+                vm.selectIncident(null)
                 vm.selectPoi(hit)
                 hit != null
             }
@@ -527,6 +542,13 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             onClose = { vm.selectWaypoint(null) },
                             onTrack = { vm.trackWaypoint(wp.id) },
                             onRemove = { vm.removeWaypoint(wp.id) },
+                        )
+                    }
+                    selectedIncident?.let { incident ->
+                        IncidentDetailCard(
+                            incident = incident,
+                            c = c,
+                            onClose = { vm.selectIncident(null) },
                         )
                     }
                     selectedPoi?.let { poi ->
@@ -1197,8 +1219,10 @@ private fun addIncidentLayer(style: Style, c: NightwirePalette) {
     style.addSource(GeoJsonSource(INCIDENT_SOURCE))
     style.addLayer(
         CircleLayer(INCIDENT_LAYER, INCIDENT_SOURCE).withProperties(
-            PropertyFactory.circleColor(c.amber.toArgb()),
-            PropertyFactory.circleRadius(7f),
+            // Per-feature, because the feed says how bad each one is and a uniform amber threw
+            // that away.
+            PropertyFactory.circleColor(Expression.get("color")),
+            PropertyFactory.circleRadius(Expression.get("size")),
             PropertyFactory.circleStrokeColor(c.void.toArgb()),
             PropertyFactory.circleStrokeWidth(2f),
             PropertyFactory.circleOpacity(0.9f),
@@ -1207,15 +1231,87 @@ private fun addIncidentLayer(style: Style, c: NightwirePalette) {
 }
 
 /** FeatureCollection for the incident overlay (empty when the overlay is off). */
-private fun incidentGeoJson(incidents: List<IncidentMarker>): String {
+private fun incidentGeoJson(incidents: List<Incident>): String {
     val features = StringBuilder()
     incidents.forEachIndexed { i, it ->
         if (i > 0) features.append(',')
+        val severity = runCatching { Severity.valueOf(it.severity) }.getOrDefault(Severity.LOW)
         features.append("{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[")
             .append(it.longitude).append(',').append(it.latitude)
-            .append("]},\"properties\":{\"name\":").append(jsonString(it.title)).append("}}")
+            .append("]},\"properties\":{\"id\":").append(jsonString(it.id))
+            .append(",\"color\":\"").append(severityHex(severity))
+            .append("\",\"size\":").append(severityRadius(severity)).append("}}")
     }
     return "{\"type\":\"FeatureCollection\",\"features\":[$features]}"
+}
+
+/** Severity as colour: the same green→red ramp the rest of the app reads as "how bad". */
+private fun severityHex(s: Severity): String = when (s) {
+    Severity.LOW -> "#5CFF8F"
+    Severity.MODERATE -> "#FFC542"
+    Severity.HIGH -> "#FF8A3D"
+    Severity.EXTREME -> "#FF2A4E"
+}
+
+private fun severityRadius(s: Severity): Float = when (s) {
+    Severity.LOW -> 5f
+    Severity.MODERATE -> 7f
+    Severity.HIGH -> 9f
+    Severity.EXTREME -> 11f
+}
+
+/** The tapped incident, with everything the feed actually said about it. */
+@Composable
+private fun IncidentDetailCard(
+    incident: Incident,
+    c: NightwirePalette,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    val severity = runCatching { Severity.valueOf(incident.severity) }.getOrDefault(Severity.LOW)
+    val type = runCatching { IncidentType.valueOf(incident.type) }.getOrDefault(IncidentType.OTHER)
+    val tint = Color(android.graphics.Color.parseColor(severityHex(severity)))
+    // NeonPanel puts its content in a Box, so everything below has to sit inside one layout or the
+    // lines would stack on top of each other.
+    NeonPanel(Modifier.fillMaxWidth(), corners = true) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${type.label.uppercase()} · ${severity.name}",
+                    fontFamily = ChakraPetch, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = tint,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "✕",
+                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
+                    modifier = Modifier.clickable(onClick = onClose).padding(4.dp),
+                )
+            }
+            Text(
+                incident.title,
+                fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                buildList {
+                    add(Geo.formatDistance(incident.distanceMeters))
+                    add(Geo.cardinal(incident.bearing))
+                    incident.magnitude?.let { add("M%.1f".format(java.util.Locale.US, it)) }
+                    if (incident.timeEpochMs > 0) add(minutesAgo(incident.timeEpochMs))
+                    add(incident.source)
+                }.joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            incident.url?.takeIf { it.isNotBlank() }?.let { url ->
+                Text(
+                    "▸ READ THE REPORT",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.accent,
+                    modifier = Modifier.padding(top = 8.dp).clickable { openUrlExternally(context, url) },
+                )
+            }
+        }
+    }
 }
 
 /** Square HUD-styled map control button — shows [icon] when given, otherwise the text [label]. */
@@ -1450,6 +1546,15 @@ private fun WaypointDetailCard(
  * full turn-by-turn). If no maps app handles it, fall back to a share sheet with the coordinates + an
  * OpenStreetMap link. Fully defensive — does nothing on failure.
  */
+/** Open a source report in whatever the device uses for links; a missing browser is not a crash. */
+private fun openUrlExternally(context: Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
 private fun openLocationExternally(context: Context, label: String, lat: Double, lon: Double) {
     val geo = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon(${Uri.encode(label)})"))
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
