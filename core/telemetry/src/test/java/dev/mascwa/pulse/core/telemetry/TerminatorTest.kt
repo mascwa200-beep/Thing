@@ -95,6 +95,85 @@ class TerminatorTest {
         assertTrue(Terminator.curve(t0, stepDeg = 9999.0).isNotEmpty())
     }
 
+    @Test fun theCurveEndsAtBothEndsOfTheWorldRatherThanTwiceAtOne() {
+        // The sweep runs from one edge of the map to the other. Normalising its longitudes would
+        // fold +180 back onto -180 -- the same place on a globe, the wrong end of a sweep -- and
+        // the night polygon would then close its ring at one edge instead of spanning the world.
+        val curve = Terminator.curve(t0, stepDeg = 2.0)
+        assertEquals(-180.0, curve.first().second, 1e-9)
+        assertEquals(180.0, curve.last().second, 1e-9)
+        // Longitude increases the whole way; no fold-back anywhere in the middle either.
+        for (i in 1 until curve.size) {
+            assertTrue("longitude went backwards at $i", curve[i].second > curve[i - 1].second)
+        }
+    }
+
+    @Test fun theNightPolygonSpansTheWholeWorldAndReachesTheDarkPole() {
+        val ring = Terminator.nightPolygon(t0, stepDeg = 5.0)
+        // Both bottom corners are present, so the fill covers every longitude down to the pole.
+        val darkPole = if (Terminator.subSolarPoint(t0).latitudeDeg >= 0) -90.0 else 90.0
+        assertTrue("missing the eastern pole corner", ring.any { it == darkPole to 180.0 })
+        assertTrue("missing the western pole corner", ring.any { it == darkPole to -180.0 })
+        // Every point on the terminator itself really is a place where the Sun is on the horizon,
+        // and the whole ring stays inside the two poles the corners define.
+        val onCurve = ring.dropLast(3)
+        assertTrue(onCurve.size > 60)
+        for ((lat, lon) in onCurve) {
+            assertEquals(0.0, Ephemeris.sunPosition(lat, lon, t0).altitudeDeg, 0.05)
+        }
+        // A degenerate ring (both corners at one edge) would leave the curve's own span short.
+        val span = onCurve.maxOf { it.second } - onCurve.minOf { it.second }
+        assertEquals("the curve must cover every longitude", 360.0, span, 1e-9)
+    }
+
+    @Test fun theFilledRingActuallyContainsTheNightSide() {
+        // The strongest statement available without a renderer: take the ring as drawn and ask, for
+        // a grid of real places, whether it encloses exactly the ones where the Sun has set. A ring
+        // that closes at the wrong edge still passes "has a pole in it" and "first == last", but
+        // fails this immediately.
+        for (dayOffset in listOf(0L, 95L, 190L, 285L)) {
+            val t = t0 + dayOffset * 86_400_000L
+            val ring = Terminator.nightPolygon(t, stepDeg = 1.0)
+            var checked = 0
+            var lat = -84.0
+            while (lat <= 84.0) {
+                var lon = -175.0
+                while (lon <= 175.0) {
+                    val altitude = Terminator.sunAltitudeDeg(lat, lon, t)
+                    // Skip the horizon itself: a polygon sampled every degree cannot be expected to
+                    // resolve which side of the line a place a few hundred metres from it is on.
+                    if (kotlin.math.abs(altitude) > 1.0) {
+                        assertEquals(
+                            "($lat, $lon) at +$dayOffset d: Sun at $altitude deg",
+                            altitude < 0,
+                            contains(ring, lat, lon),
+                        )
+                        checked++
+                    }
+                    lon += 25.0
+                }
+                lat += 12.0
+            }
+            assertTrue("expected a real sweep, checked $checked", checked > 90)
+        }
+    }
+
+    /** Even-odd ray cast in (longitude, latitude) space, where the ring is a simple polygon. */
+    private fun contains(ring: List<Pair<Double, Double>>, lat: Double, lon: Double): Boolean {
+        var inside = false
+        var j = ring.size - 1
+        for (i in ring.indices) {
+            val (latI, lonI) = ring[i]
+            val (latJ, lonJ) = ring[j]
+            if ((lonI > lon) != (lonJ > lon)) {
+                val crossLat = latI + (lon - lonI) / (lonJ - lonI) * (latJ - latI)
+                if (lat < crossLat) inside = !inside
+            }
+            j = i
+        }
+        return inside
+    }
+
     @Test fun theNightPolygonClosesAcrossTheDarkPole() {
         // Northern summer: the Sun is north, so the dark pole is the south one.
         val summer = Terminator.nightPolygon(t0, stepDeg = 10.0)

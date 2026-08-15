@@ -61,7 +61,12 @@ object Terminator {
         while (lon <= 180.0 + 1e-9) {
             val hourAngle = (lon - sun.longitudeDeg) * DEG
             val lat = atan(-cos(hourAngle) / tan(dec)) / DEG
-            out += lat to Geodesy.normalizeLongitude(lon)
+            // Clamped, deliberately NOT normalised. Normalisation maps +180 onto -180, which is the
+            // same place on a globe but the wrong end of a sweep: the last point would land back on
+            // top of the first, and [nightPolygon] would close its ring at one edge of the world
+            // instead of spanning it. The loop only ever produces in-range values anyway; the clamp
+            // is here for the accumulated-step overshoot the loop guard tolerates.
+            out += lat to lon.coerceIn(-180.0, 180.0)
             lon += step
         }
         return out
@@ -80,9 +85,12 @@ object Terminator {
         if (line.isEmpty()) return emptyList()
         val ring = ArrayList<Pair<Double, Double>>(line.size + 3)
         ring.addAll(line)
-        // Close across the dark pole, then back to the start.
-        ring += darkPoleLat to line.last().second
-        ring += darkPoleLat to line.first().second
+        // Close across the dark pole at the edges of the world, then back to the start. The
+        // longitudes are stated outright rather than read off the curve's endpoints: the curve is a
+        // sweep of the whole globe, so its ends are the antimeridian by construction, and taking
+        // them from the data would put both corners at whichever end a rounding decision landed on.
+        ring += darkPoleLat to 180.0
+        ring += darkPoleLat to -180.0
         ring += line.first()
         return ring
     }
