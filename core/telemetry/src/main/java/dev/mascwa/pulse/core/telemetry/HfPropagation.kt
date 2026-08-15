@@ -121,9 +121,13 @@ object HfPropagation {
     fun summary(f107: Double?, kp: Double?, xrayLongChannelWm2: Double?): String {
         val report = report(f107, kp, xrayLongChannelWm2)
         val best = bestDayBand(report)
-        val muf = mufMhz(f107, kp, daytime = true)
         val blackout = SolarActivity.radioBlackout(xrayLongChannelWm2)
-        val head = String.format(Locale.US, "MUF ~%.0f MHz", muf)
+        // Defer to mufDisplay rather than computing one here. With no solar readings at all it
+        // returns null by design, and quoting a figure derived from the quiet-Sun floor would
+        // contradict it -- the two sit next to each other on the radio readout.
+        val muf = mufDisplay(f107, kp)
+        val head = if (muf == null) "MUF not yet measured"
+            else String.format(Locale.US, "MUF ~%d MHz", muf)
         return when {
             blackout >= 3 -> "$head · daylight HF blacked out"
             best == null -> "$head · bands closed"

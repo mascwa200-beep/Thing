@@ -109,6 +109,30 @@ class HfPropagationTest {
         assertTrue(HfPropagation.summary(150.0, 2.0, 5e-4).contains("blacked out"))
     }
 
+    @Test fun summaryAndMufDisplayNeverContradictEachOther() {
+        // These two are rendered a couple of lines apart on the radio readout. summary() used to
+        // quote a MUF computed off the quiet-Sun floor while mufDisplay() returned null for the
+        // same inputs, so a cold start showed a dash above the words "MUF ~12 MHz".
+        val cold = HfPropagation.summary(null, null, null)
+        assertNull(HfPropagation.mufDisplay(null, null))
+        assertTrue("a MUF was quoted with nothing to base it on: '$cold'", !cold.contains("~"))
+        assertTrue(cold.contains("not yet measured"))
+        // The band guidance still stands: it is the documented quiet-Sun floor, not a measurement.
+        assertTrue(HfPropagation.report(null, null, null).isNotEmpty())
+
+        // Whenever a figure IS available the two agree exactly.
+        for (f107 in listOf(70.0, 120.0, 200.0)) {
+            for (kp in listOf(0.0, 4.0, 8.0)) {
+                val muf = HfPropagation.mufDisplay(f107, kp)
+                assertNotNull(muf)
+                assertTrue(
+                    "summary must quote mufDisplay's own number",
+                    HfPropagation.summary(f107, kp, null).contains("~$muf MHz"),
+                )
+            }
+        }
+    }
+
     @Test fun mufDisplayIsNullOnlyWhenThereIsNothingToGoOn() {
         assertNull(HfPropagation.mufDisplay(null, null))
         assertNotNull(HfPropagation.mufDisplay(150.0, null))
