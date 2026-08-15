@@ -43,7 +43,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(SpaceWeatherViewModel::class.java) ->
                 SpaceWeatherViewModel(c.spaceWeatherRepository, c.locationProvider)
             modelClass.isAssignableFrom(OrbitalViewModel::class.java) ->
-                OrbitalViewModel(c.orbitalRepository, c.locationProvider)
+                OrbitalViewModel(c.orbitalRepository, c.locationProvider, c.tleRepository, c.launchRepository)
             modelClass.isAssignableFrom(CompassViewModel::class.java) ->
                 CompassViewModel(c.newCompassController(), c.locationProvider, c.waypointStore)
             modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
