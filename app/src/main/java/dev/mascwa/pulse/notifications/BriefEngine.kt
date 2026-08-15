@@ -5,10 +5,13 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.mascwa.pulse.core.telemetry.BriefSignals
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
+import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.OracleMover
+import dev.mascwa.pulse.core.telemetry.Urgency
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.UnifiedBriefComposer
 import dev.mascwa.pulse.data.news.NewsCategory
+import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.data.weather.WeatherData
@@ -159,6 +162,7 @@ object BriefEngine {
                 showMarkets = prefs.showMarketsRow,
                 showWeather = prefs.showWeatherRow,
                 showAgenda = prefs.showAgendaRow,
+                advisory = advisory(container, settings),
             ),
         )
         if (brief == null) {
@@ -198,6 +202,30 @@ object BriefEngine {
             container.diskCache.write(STATE_KEY, latest.copy(lastUrgentKey = urgentKey), NotifyState.serializer())
         }
     }
+
+    /**
+     * The Oracle's single most important call to action, or null.
+     *
+     * This is the foresight engine's way back to the user. Its proactive push was retired when the
+     * app consolidated to one notification, and nothing replaced it — so for a while the app's whole
+     * cross-signal reasoning layer only existed if you navigated to Advisories. It belongs on the
+     * board: every other row reports the world, and this one reports what to do about it.
+     *
+     * The bar is [Urgency.IMPORTANT] and above. Below that the insight is worth reading when you
+     * open the app and is not worth a sixth row on a notification you see all day.
+     *
+     * Cost is reasoning, not fetching: `snapshot` reads every store with `force = false`, so it
+     * consumes the caches this pass has already warmed. Best-effort throughout — a failure anywhere
+     * mutes the row rather than costing you the board.
+     */
+    private suspend fun advisory(container: AppContainer, settings: AppSettings): String? = runCatching {
+        val signals = OracleEngine.snapshot(container, settings)
+        val top = Oracle.focus(signals) ?: return@runCatching null
+        if (top.urgency.weight < Urgency.IMPORTANT.weight) return@runCatching null
+        // The title carries the instruction and the detail carries why — the board wants both, in
+        // that order, because a suggestion without a reason is just noise you learn to ignore.
+        listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — ")
+    }.getOrNull()
 
     /**
      * Put the console back into the condition the last board was in.

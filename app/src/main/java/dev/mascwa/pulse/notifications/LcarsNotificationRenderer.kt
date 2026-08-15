@@ -68,6 +68,7 @@ object LcarsNotificationRenderer {
         BriefRowKind.MARKETS -> R.string.notif_row_markets
         BriefRowKind.WEATHER -> R.string.notif_row_weather
         BriefRowKind.AGENDA -> R.string.notif_row_agenda
+        BriefRowKind.ADVISORY -> R.string.notif_row_advisory
     }
 
     /** Row tags use their fixed LCARS colour; the ALERT tag alone follows the live alert condition. */
@@ -81,5 +82,6 @@ object LcarsNotificationRenderer {
         BriefRowKind.MARKETS -> R.drawable.lcars_tag_markets
         BriefRowKind.WEATHER -> R.drawable.lcars_tag_weather
         BriefRowKind.AGENDA -> R.drawable.lcars_tag_agenda
+        BriefRowKind.ADVISORY -> R.drawable.lcars_tag_advisory
     }
 }
