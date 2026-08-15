@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,12 +32,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.LcarsCodes
+import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.LcarsBlocks
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
@@ -48,7 +54,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
  *
  * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single swept ROUNDED corner ([lcarsBlockShape]) rather than a
  * notch — safe for arbitrary held content, nothing can clip into a concave corner. The genuinely notched
- * elbow ([LcarsElbow], a real concave L-shape via [GenericShape] — the first use of it in this codebase) is
+ * elbow ([rememberLcarsElbow], a real concave L-shape via [GenericShape] — the first use of it in this codebase) is
  * reserved for small solid-color accents with no text inside them ([LcarsHeaderBar]'s lead block,
  * [LcarsDataRow]'s tab-adjacent nub) where a bitten corner can't clip anything readable.
  */
@@ -266,6 +272,206 @@ fun LcarsFillRow(segments: List<Pair<Float, Color>>, modifier: Modifier = Modifi
             if (weight > 0f) {
                 Box(Modifier.weight(weight).fillMaxHeight().background(color))
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The frame.
+//
+// Everything above draws a widget. Nothing above draws a SCREEN, and that was the gap: LCARS is
+// recognisable at arm's length because of its L-shaped chrome — a column of stacked colour blocks
+// down one side, elbowing into a bar across the top — and the app had none of it. The elbow shape
+// existed and was used once, as a 44x20dp nub inside a section header.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * How much width the rail takes.
+ *
+ * The honest cost of this whole idea, in one number. A phone is not a widescreen console and this
+ * comes off the content, so it is deliberately a single constant to tune from a screenshot rather
+ * than a value scattered through the kit. It buys back more than it costs: the top block is the
+ * back control, at roughly six times the touch area of the 24dp icon every screen was drawing.
+ */
+val LcarsRailWidth = 56.dp
+
+/** Black gutters between blocks. LCARS panels never touch; the ground shows through. */
+private val RailGutter = 3.dp
+private val HeaderHeight = 54.dp
+private val CornerSweep = 22.dp
+
+/**
+ * Block heights down the rail, as weights.
+ *
+ * Unequal on purpose and fixed rather than random — an LCARS rail is irregular, but it is the same
+ * irregularity every time you look at it.
+ */
+private val RailWeights = listOf(2.2f, 1f, 3.4f, 1.3f, 2.6f, 1f, 4.2f)
+
+/** Below this weight a block is too short to letter, so it carries no code. */
+private const val CODE_MIN_WEIGHT = 1.9f
+
+/**
+ * The vertical column of stacked colour blocks.
+ *
+ * [seed] fixes both the colours' starting offset and the numeric codes, so a given screen always
+ * draws the same rail — see [LcarsCodes] for why stability matters more than variety here.
+ */
+@Composable
+fun LcarsRail(
+    seed: String,
+    modifier: Modifier = Modifier,
+    blocks: List<Color> = LcarsBlocks,
+    weights: List<Float> = RailWeights,
+) {
+    if (blocks.isEmpty() || weights.isEmpty()) {
+        Box(modifier)
+        return
+    }
+    val c = Pulse.colors
+    val codes = remember(seed, weights.size) { LcarsCodes.column(seed, weights.size) }
+    // Offset the colour cycle by the screen, so two screens side by side in memory don't read as
+    // the same panel.
+    val offset = remember(seed) { LcarsCodes.of(seed, 1301).sumOf { it.code } }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(RailGutter)) {
+        weights.forEachIndexed { i, w ->
+            val last = i == weights.lastIndex
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(w)
+                    .clip(
+                        if (last) lcarsBlockShape(CornerSweep, LcarsCorner.BottomStart)
+                        else RoundedCornerShape(0.dp),
+                    )
+                    .background(blocks[(i + offset) % blocks.size]),
+                contentAlignment = Alignment.BottomEnd,
+            ) {
+                if (w >= CODE_MIN_WEIGHT) {
+                    Text(
+                        codes.getOrElse(i) { "" },
+                        fontFamily = JetBrainsMono,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        // Black on the block: the rail colours are all light, and this is stencilling.
+                        color = c.void,
+                        maxLines = 1,
+                        modifier = Modifier.padding(end = 5.dp, bottom = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A screen, framed.
+ *
+ * The corner piece is the back control when [navigationIcon] is supplied — which is the argument for
+ * the rail paying its way rather than merely decorating: every screen in this app was hand-rolling
+ * its own small back arrow, and the frame absorbs them.
+ *
+ * The title sets right, as LCARS titles do, and ellipsises rather than pushing the actions off the
+ * end. Set [rail] false for a full-bleed screen (a map) where the horizontal room genuinely cannot
+ * be spared.
+ */
+@Composable
+fun LcarsScreenFrame(
+    title: String,
+    modifier: Modifier = Modifier,
+    seed: String = title,
+    navigationIcon: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    rail: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val c = Pulse.colors
+    Column(modifier.fillMaxSize().background(c.void)) {
+        Row(
+            Modifier.fillMaxWidth().height(HeaderHeight),
+            horizontalArrangement = Arrangement.spacedBy(RailGutter),
+        ) {
+            Box(
+                Modifier
+                    .width(LcarsRailWidth)
+                    .fillMaxHeight()
+                    .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
+                    .background(c.accent),
+                contentAlignment = Alignment.Center,
+                // No clickable on the block itself: the icon passed in brings its own handler, and
+                // wrapping it in a second no-op one would give the whole corner a ripple that does
+                // nothing. The size win is real regardless — the icon centres in a 56x54 block.
+            ) { navigationIcon?.invoke() }
+
+            Row(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopEnd))
+                    .background(c.raise)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    title.uppercase(),
+                    fontFamily = Antonio,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    letterSpacing = 2.sp,
+                    color = c.accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f),
+                )
+                actions()
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(RailGutter),
+        ) {
+            if (rail) {
+                LcarsRail(seed, Modifier.width(LcarsRailWidth).fillMaxHeight())
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+        }
+    }
+}
+
+/**
+ * A thick divider of alternating blocks.
+ *
+ * The app's dividers are all 1px hairlines, which is a Material habit. An LCARS rule is a run of
+ * solid segments with the ground showing between them, and it is one of the cheapest ways to make a
+ * surface read as engineered rather than as a list.
+ */
+@Composable
+fun LcarsSegmentBar(
+    seed: String,
+    modifier: Modifier = Modifier,
+    segments: Int = 5,
+    blocks: List<Color> = LcarsBlocks,
+) {
+    if (segments <= 0 || blocks.isEmpty()) {
+        Box(modifier)
+        return
+    }
+    // Widths vary but are fixed per seed, for the same reason the codes are.
+    val widths = remember(seed, segments) {
+        (0 until segments).map { 1f + (LcarsCodes.of(seed, it + 4700).last().digitToInt() % 4) }
+    }
+    val offset = remember(seed) { LcarsCodes.of(seed, 88).sumOf { it.code } }
+    Row(modifier.height(6.dp), horizontalArrangement = Arrangement.spacedBy(RailGutter)) {
+        widths.forEachIndexed { i, w ->
+            Box(
+                Modifier
+                    .weight(w)
+                    .fillMaxHeight()
+                    .background(blocks[(i + offset) % blocks.size]),
+            )
         }
     }
 }
