@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -50,7 +46,7 @@ fun ErrorState(
     val c = Pulse.colors
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Filled.WarningAmber, null, modifier = Modifier.size(44.dp), tint = c.negative)
+            Icon(LcarsIcons.Warning, null, modifier = Modifier.size(44.dp), tint = c.negative)
             Text(
                 "COULDN'T LOAD",
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp,
@@ -77,7 +73,7 @@ fun EmptyState(message: String, modifier: Modifier = Modifier) {
     val c = Pulse.colors
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Filled.Inbox, null, modifier = Modifier.size(38.dp), tint = c.muted)
+            Icon(LcarsIcons.Inbox, null, modifier = Modifier.size(38.dp), tint = c.muted)
             Text(
                 message,
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, textAlign = TextAlign.Center,
@@ -98,7 +94,7 @@ fun StaleBanner(visible: Boolean, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(Icons.Filled.CloudOff, null, modifier = Modifier.size(16.dp), tint = c.amber)
+        Icon(LcarsIcons.CloudOff, null, modifier = Modifier.size(16.dp), tint = c.amber)
         Text(
             "OFFLINE — SHOWING CACHED DATA",
             fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp, color = c.amber,
