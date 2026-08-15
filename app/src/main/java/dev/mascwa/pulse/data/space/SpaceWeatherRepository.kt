@@ -6,15 +6,19 @@ import dev.mascwa.pulse.core.util.Fetched
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.time.Instant
 import kotlin.math.roundToInt
 
 /** NOAA SWPC space-weather data — keyless JSON. */
@@ -23,6 +27,16 @@ class SpaceWeatherRepository(
     private val cache: DiskCache,
 ) {
     private val ttl = 15 * 60 * 1000L
+
+    /**
+     * One gate per host, the way `MarketsRepository` gates Yahoo. A refresh now fans out ten
+     * products at once and OkHttp would happily put all of them on the wire together; that is the
+     * exact burst shape that has previously earned this app a durable rate-limit ban elsewhere.
+     * SWPC is a public feed built for polling, so four in flight is plenty polite and still fast.
+     */
+    private val swpcGate = Semaphore(4)
+
+    private suspend fun fetchText(url: String): String = swpcGate.withPermit { http.getString(url) }
 
     /** [lat]/[lon] optional — when present, the NOAA OVATION aurora probability
      *  for that point is included. */
@@ -36,25 +50,53 @@ class SpaceWeatherRepository(
         }
         return try {
             val data = coroutineScope {
+                // Every branch is individually runCatching-wrapped: one dead product must degrade
+                // to a missing panel, never take the console down with it.
                 val kpD = async { runCatching { loadKp() }.getOrDefault(emptyList()) }
-                val windD = async { runCatching { loadWindSpeed() }.getOrNull() }
-                val bzD = async { runCatching { loadBz() }.getOrNull() }
+                val windD = async { runCatching { loadSeries(SOLAR_WIND_PLASMA, column = 2) }.getOrDefault(emptyList()) }
+                val bzD = async { runCatching { loadSeries(SOLAR_WIND_MAG, column = 3) }.getOrDefault(emptyList()) }
                 val alertsD = async { runCatching { loadAlerts() }.getOrDefault(emptyList()) }
+                val xrayD = async { runCatching { loadXray() }.getOrNull() }
+                val protonD = async { runCatching { loadProtons() }.getOrDefault(emptyList()) }
+                val f107D = async { runCatching { loadF107() }.getOrDefault(null to null) }
+                val scalesD = async { runCatching { loadScales() }.getOrNull() }
+                val regionsD = async { runCatching { loadRegions() }.getOrDefault(emptyList()) }
                 val auroraD = async {
                     if (lat != null && lon != null) auroraFor(lat, lon) else null
                 }
 
-                val kpSeries = kpD.await()
+                val kpPoints = kpD.await()
+                val kpSeries = kpPoints.map { it.v }
                 val kp = kpSeries.lastOrNull()
+                val windPoints = windD.await()
+                val bzPoints = bzD.await()
+                val xray = xrayD.await()
+                val protonPoints = protonD.await()
+                val f107 = f107D.await()
+                val scales = scalesD.await()
                 SpaceWeather(
                     kp = kp,
                     kpSeries = kpSeries.takeLast(28),
-                    solarWindSpeed = windD.await(),
-                    bz = bzD.await(),
+                    kpPoints = kpPoints.takeLast(28),
+                    solarWindSpeed = windPoints.lastOrNull()?.v,
+                    windPoints = windPoints.takeLast(SERIES_CAP),
+                    bz = bzPoints.lastOrNull()?.v,
+                    bzPoints = bzPoints.takeLast(SERIES_CAP),
                     stormLevel = SpaceWeather.stormLevelForKp(kp),
                     auroraChance = SpaceWeather.auroraForKp(kp),
                     auroraProbabilityPct = auroraD.await(),
                     alerts = alertsD.await(),
+                    xrayFlux = xray?.longChannel?.lastOrNull()?.v,
+                    xrayShortFlux = xray?.shortChannel?.lastOrNull()?.v,
+                    xrayPoints = xray?.longChannel.orEmpty().takeLast(SERIES_CAP),
+                    protonFlux = protonPoints.lastOrNull()?.v,
+                    protonPoints = protonPoints.takeLast(SERIES_CAP),
+                    f107 = f107.first,
+                    f107Mean = f107.second,
+                    scalesNow = scales?.now,
+                    scales24h = scales?.past24h,
+                    scaleForecast = scales?.forecast.orEmpty(),
+                    regions = regionsD.await(),
                 )
             }
             cache.write(key, data, SpaceWeather.serializer())
@@ -70,7 +112,7 @@ class SpaceWeatherRepository(
     /** NOAA OVATION aurora probability (%) at the grid point nearest to [lat]/[lon].
      *  The feed is a full integer-degree grid of (lon 0..359, lat -90..90, prob) triples. */
     private suspend fun loadAurora(lat: Double, lon: Double): Int? {
-        val text = http.getString("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json")
+        val text = fetchText("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json")
         val coords = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["coordinates"]?.jsonArray ?: return null
         val lonR = (((lon % 360) + 360) % 360).roundToInt() % 360
         val latR = lat.roundToInt().coerceIn(-90, 90)
@@ -100,47 +142,181 @@ class SpaceWeatherRepository(
     suspend fun auroraFor(lat: Double, lon: Double): Int? =
         runCatching { withTimeoutOrNull(4_000) { loadAurora(lat, lon) } }.getOrNull()
 
-    /** Planetary K-index. NOAA serves this either as array-of-arrays (with a
+    /** Planetary K-index, timestamped. NOAA serves this either as array-of-arrays (with a
      *  header row) or array-of-objects — handle both. */
-    private suspend fun loadKp(): List<Double> {
-        val text = http.getString("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json")
+    private suspend fun loadKp(): List<TimePoint> {
+        val text = fetchText("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json")
         val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
-        return arr.mapNotNull { row ->
+        return arr.mapIndexedNotNull { i, row ->
             when (row) {
-                is JsonArray -> row.getOrNull(1)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
-                is JsonObject -> (row["kp_index"] ?: row["Kp"] ?: row["kp"])
-                    ?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                is JsonArray -> {
+                    if (i == 0) return@mapIndexedNotNull null // header
+                    val v = row.getOrNull(1)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                    val t = parseTime(row.getOrNull(0)?.jsonPrimitive?.contentOrNull)
+                    if (v == null || !v.isFinite()) null else TimePoint(t, v)
+                }
+                is JsonObject -> {
+                    val v = (row["kp_index"] ?: row["Kp"] ?: row["kp"])
+                        ?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+                    val t = parseTime(
+                        (row["time_tag"] ?: row["time"])?.jsonPrimitive?.contentOrNull,
+                    )
+                    if (v == null || !v.isFinite()) null else TimePoint(t, v)
+                }
                 else -> null
             }
         }
     }
 
-    /** Latest solar-wind bulk speed (km/s) from the DSCOVR/ACE plasma feed.
-     *  The summary-product objects were going empty ("—"); the real-time array
-     *  feeds are the canonical, reliable source. Header row + array-of-arrays;
-     *  speed is column 2; take the most recent row with a real value. */
-    private suspend fun loadWindSpeed(): Double? =
-        lastNumericInColumn(SOLAR_WIND_PLASMA, column = 2)
-
-    /** Latest IMF Bz (nT, GSM) from the magnetometer feed; bz_gsm is column 3. */
-    private suspend fun loadBz(): Double? =
-        lastNumericInColumn(SOLAR_WIND_MAG, column = 3)
-
-    /** From a NOAA array-of-arrays product (row 0 is a header), the newest row whose [column]
-     *  parses as a finite Double — recent rows are occasionally blank/null. */
-    private suspend fun lastNumericInColumn(url: String, column: Int): Double? {
-        val text = http.getString(url)
+    /**
+     * A timestamped series from a NOAA array-of-arrays product (row 0 is a header). Column 0 is
+     * always the time tag. Blank/null cells are skipped rather than zeroed — a gap in the feed is
+     * a gap, not a reading of zero.
+     */
+    private suspend fun loadSeries(url: String, column: Int): List<TimePoint> {
+        val text = fetchText(url)
         val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
-        for (i in arr.indices.reversed()) {
-            if (i == 0) break // header row
-            val v = arr[i].jsonArray.getOrNull(column)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
-            if (v != null && v.isFinite()) return v
+        return arr.mapIndexedNotNull { i, el ->
+            if (i == 0) return@mapIndexedNotNull null
+            val row = el as? JsonArray ?: return@mapIndexedNotNull null
+            val v = row.getOrNull(column)?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
+            if (v == null || !v.isFinite()) return@mapIndexedNotNull null
+            TimePoint(parseTime(row.getOrNull(0)?.jsonPrimitive?.contentOrNull), v)
         }
-        return null
+    }
+
+    /** Both GOES X-ray channels. The 0.1-0.8 nm long channel is the one flare class is defined on. */
+    private data class Xray(val longChannel: List<TimePoint>, val shortChannel: List<TimePoint>)
+
+    private suspend fun loadXray(): Xray {
+        val text = fetchText(XRAY_6H)
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
+        val long = mutableListOf<TimePoint>()
+        val short = mutableListOf<TimePoint>()
+        arr.forEach { el ->
+            val obj = el as? JsonObject ?: return@forEach
+            val flux = obj["flux"]?.jsonPrimitive?.doubleOrNull ?: return@forEach
+            if (!flux.isFinite()) return@forEach
+            val t = parseTime(obj["time_tag"]?.jsonPrimitive?.contentOrNull)
+            when (obj["energy"]?.jsonPrimitive?.contentOrNull) {
+                LONG_CHANNEL -> long += TimePoint(t, flux)
+                SHORT_CHANNEL -> short += TimePoint(t, flux)
+            }
+        }
+        return Xray(long.sortedBy { it.t }, short.sortedBy { it.t })
+    }
+
+    /** Integral proton flux at >=10 MeV — the channel the NOAA S scale is defined on. */
+    private suspend fun loadProtons(): List<TimePoint> {
+        val text = fetchText(PROTONS_1D)
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
+        return arr.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            if (obj["energy"]?.jsonPrimitive?.contentOrNull != PROTON_CHANNEL) return@mapNotNull null
+            val flux = obj["flux"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+            if (!flux.isFinite()) return@mapNotNull null
+            TimePoint(parseTime(obj["time_tag"]?.jsonPrimitive?.contentOrNull), flux)
+        }.sortedBy { it.t }
+    }
+
+    /**
+     * F10.7 cm radio flux and NOAA's 90-day mean. The feed is newest-first, but only some rows
+     * carry `ninety_day_mean` — the newest row usually has it as null — so the two are searched
+     * independently rather than taking both from the same row and losing the mean.
+     */
+    private suspend fun loadF107(): Pair<Double?, Double?> {
+        val text = fetchText(F107)
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
+        fun field(name: String): Double? = arr.firstNotNullOfOrNull { el ->
+            (el as? JsonObject)?.get(name)?.jsonPrimitive?.doubleOrNull
+                ?.takeIf { it.isFinite() && it > 0 }
+        }
+        return field("flux") to field("ninety_day_mean")
+    }
+
+    /** The current + past-24h + three-day NOAA R/S/G scales. */
+    private data class Scales(
+        val now: ScaleForecast?,
+        val past24h: ScaleForecast?,
+        val forecast: List<ScaleForecast>,
+    )
+
+    private suspend fun loadScales(): Scales {
+        val text = fetchText(NOAA_SCALES)
+        val obj = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
+        // Keys are "-1" (worst of the past 24 h), "0" (now) and "1".."3" (forecast days).
+        fun at(key: String, label: String): ScaleForecast? {
+            val day = obj[key]?.jsonObject ?: return null
+            fun scale(k: String) = day[k]?.jsonObject?.get("Scale")
+                ?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
+            fun prob(k: String, field: String) = day[k]?.jsonObject?.get(field)
+                ?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+            return ScaleForecast(
+                label = label,
+                r = scale("R"), s = scale("S"), g = scale("G"),
+                rMinorProbPct = prob("R", "MinorProb"),
+                rMajorProbPct = prob("R", "MajorProb"),
+                sProbPct = prob("S", "Prob"),
+            )
+        }
+        return Scales(
+            now = at("0", "Now"),
+            past24h = at("-1", "Past 24h"),
+            forecast = listOfNotNull(at("1", "Day 1"), at("2", "Day 2"), at("3", "Day 3")),
+        )
+    }
+
+    /**
+     * Sunspot groups. This feed lags — it can be weeks behind — so every region carries the date
+     * NOAA actually observed it and the UI must show that rather than implying "now".
+     */
+    private suspend fun loadRegions(): List<SolarRegion> {
+        val text = fetchText(SOLAR_REGIONS)
+        val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
+        val newestDate = arr.mapNotNull {
+            (it as? JsonObject)?.get("observed_date")?.jsonPrimitive?.contentOrNull
+        }.maxOrNull() ?: return emptyList()
+        return arr.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val observed = obj["observed_date"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            // Only the most recent observing day — older rows are the same regions, days earlier.
+            if (observed != newestDate) return@mapNotNull null
+            val number = obj["region"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null
+            fun int(k: String) = obj[k]?.jsonPrimitive?.intOrNull ?: 0
+            fun str(k: String) = obj[k]?.jsonPrimitive?.contentOrNull.orEmpty()
+            SolarRegion(
+                number = number,
+                location = str("location"),
+                spotClass = str("spot_class"),
+                magClass = str("mag_class"),
+                area = int("area"),
+                spotCount = int("number_spots"),
+                cFlareProbPct = int("c_flare_probability"),
+                mFlareProbPct = int("m_flare_probability"),
+                xFlareProbPct = int("x_flare_probability"),
+                observedDate = observed,
+            )
+        }.sortedByDescending { it.area }.take(12)
+    }
+
+    /**
+     * NOAA time tags are ISO-8601 UTC, sometimes with a trailing `Z`, sometimes space-separated,
+     * sometimes with fractional seconds. 0 when unparseable — a bad stamp must not sink the row.
+     *
+     * `Instant` rather than `SimpleDateFormat` deliberately: these loaders run concurrently and
+     * walk thousands of rows each, and SimpleDateFormat is both allocation-heavy per row and not
+     * thread-safe, so a shared one would corrupt across the parallel fetches.
+     */
+    private fun parseTime(raw: String?): Long {
+        val s = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return 0L
+        val iso = s.replace(' ', 'T').substringBefore('.').let {
+            if (it.endsWith("Z")) it else "${it}Z"
+        }
+        return runCatching { Instant.parse(iso).toEpochMilli() }.getOrDefault(0L)
     }
 
     private suspend fun loadAlerts(): List<SpaceAlert> {
-        val text = http.getString("https://services.swpc.noaa.gov/products/alerts.json")
+        val text = fetchText("https://services.swpc.noaa.gov/products/alerts.json")
         val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
         return arr.take(12).mapNotNull { el ->
             val obj = el.jsonObject
@@ -158,5 +334,19 @@ class SpaceWeatherRepository(
     companion object {
         private const val SOLAR_WIND_PLASMA = "https://services.swpc.noaa.gov/products/solar-wind/plasma-5-minute.json"
         private const val SOLAR_WIND_MAG = "https://services.swpc.noaa.gov/products/solar-wind/mag-5-minute.json"
+        private const val XRAY_6H = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json"
+        private const val PROTONS_1D = "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-1-day.json"
+        private const val F107 = "https://services.swpc.noaa.gov/json/f107_cm_flux.json"
+        private const val NOAA_SCALES = "https://services.swpc.noaa.gov/products/noaa-scales.json"
+        private const val SOLAR_REGIONS = "https://services.swpc.noaa.gov/json/solar_regions.json"
+
+        /** GOES energy-band labels, exactly as the feed spells them. */
+        private const val LONG_CHANNEL = "0.1-0.8nm"
+        private const val SHORT_CHANNEL = "0.05-0.4nm"
+        /** The proton channel the NOAA S scale is defined on. */
+        private const val PROTON_CHANNEL = ">=10 MeV"
+
+        /** Keep series bounded — these feeds run to thousands of rows and land in the disk cache. */
+        private const val SERIES_CAP = 180
     }
 }
