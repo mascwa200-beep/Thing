@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -54,6 +57,7 @@ import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.common.NeonChip
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
@@ -62,11 +66,17 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 import androidx.compose.ui.unit.sp
 
+/** The weather tab's own sections, mirroring the Markets sub-tab pattern. */
+private enum class WeatherTab(val label: String) {
+    NOW("NOW"), HOURS("HOURS"), DAYS("DAYS"), AIR("AIR")
+}
+
 @Composable
 fun WeatherScreen(vm: WeatherViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var tab by remember { mutableStateOf(WeatherTab.NOW) }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -74,6 +84,26 @@ fun WeatherScreen(vm: WeatherViewModel) {
 
     val data = state.data
     var explainer by remember { mutableStateOf<Pair<String, List<Explainer>>?>(null) }
+    val onExplain: (String, List<Explainer>) -> Unit = { t, l -> explainer = t to l }
+
+    // The shared chrome every tab shows. Passed as one object so each body's signature stays
+    // readable and so adding to the header later touches one place.
+    val chrome = WeatherChrome(
+        state = state,
+        vm = vm,
+        showSearch = showSearch,
+        query = query,
+        onQuery = { query = it; vm.search(it) },
+        onAdded = { showSearch = false; query = "" },
+        onRequestPermission = {
+            permLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        },
+    )
 
     PulseScaffold(
         title = data.data?.locationName ?: "Weather",
@@ -82,136 +112,23 @@ fun WeatherScreen(vm: WeatherViewModel) {
             IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = data.loading && data.data != null,
-            onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp, top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        Column(Modifier.padding(innerPadding)) {
+            // Only the rail is fixed. Everything else scrolls, as it did when this screen was one
+            // long page — a permanent header would cost real estate a phone does not have.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (data.stale) item { StaleBanner(true) }
-
-                if (showSearch) {
-                    item {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it; vm.search(it) },
-                            label = { Text("Search city") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    items(state.searchResults.distinctBy { "${it.name}_${it.latitude}" }, key = { "${it.name}_${it.latitude}" }) { loc ->
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text(loc.name, style = MaterialTheme.typography.bodyLarge)
-                                Text(loc.country, style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            AssistChip(onClick = {
-                                vm.addAndSelect(loc); showSearch = false; query = ""
-                            }, label = { Text("Add") })
-                        }
-                        HorizontalDivider()
-                    }
+                WeatherTab.entries.forEach { t ->
+                    NeonChip(t.label, selected = t == tab, onClick = { tab = t })
                 }
-
-                // Location chips
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = state.useDeviceLocation,
-                                onClick = { vm.useDeviceLocation() },
-                                label = { Text("My location") },
-                                leadingIcon = { Icon(Icons.Filled.MyLocation, null, Modifier.size(16.dp)) },
-                            )
-                        }
-                        itemsIndexed(state.savedLocations) { i, loc ->
-                            FilterChip(
-                                selected = !state.useDeviceLocation && i == state.selectedIndex,
-                                onClick = { vm.selectSaved(i) },
-                                label = { Text(loc.name) },
-                            )
-                        }
-                    }
-                }
-
-                if (state.needsLocationPermission && state.useDeviceLocation) {
-                    item {
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp)) {
-                                Text("Location permission", style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "Grant location access for weather at your current position, " +
-                                        "or search for a city above.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                )
-                                AssistChip(
-                                    onClick = {
-                                        permLauncher.launch(arrayOf(
-                                            android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                            android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                                        ))
-                                    },
-                                    label = { Text("Grant access") },
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-
-                when {
-                    data.isInitialLoading -> item { Box(Modifier.fillMaxWidth().padding(48.dp)) { LoadingState() } }
-                    data.isError && data.data == null ->
-                        item { ErrorState(data.error ?: "Error", onRetry = { vm.refresh() }) }
-                    data.data != null -> {
-                        val wd = data.data!!
-                        item { CurrentWeatherCard(wd) { t, l -> explainer = t to l } }
-
-                        val hourly = wd.hourly
-                        if (hourly.isNotEmpty()) {
-                            item { SectionLabel("Next 24 hours") }
-                            item {
-                                val start = WeatherFormat.nowIndex(hourly.map { it.timeIso })
-                                val window = hourly.drop(start).take(24)
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    items(window, key = { it.timeIso }) { h ->
-                                        HourCell(h, wd.tempUnitSymbol)
-                                    }
-                                }
-                            }
-                        }
-
-                        if (wd.daily.isNotEmpty()) {
-                            item { SectionLabel("7-day forecast") }
-                            itemsIndexed(wd.daily, key = { _, d -> d.dateIso }) { i, d ->
-                                DailyRow(i, d, wd.tempUnitSymbol)
-                            }
-                        }
-
-                        wd.airQuality?.let { aq -> item { AirQualityCard(aq) { t, l -> explainer = t to l } } }
-
-                        item {
-                            Text(
-                                "Source: Open-Meteo (forecast & air quality). Free, keyless, global.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+            }
+            when (tab) {
+                WeatherTab.NOW -> NowBody(vm, chrome, onExplain)
+                WeatherTab.HOURS -> HoursBody(vm, chrome)
+                WeatherTab.DAYS -> DaysBody(vm, chrome)
+                WeatherTab.AIR -> AirBody(vm, chrome, onExplain)
             }
         }
     }
@@ -219,6 +136,204 @@ fun WeatherScreen(vm: WeatherViewModel) {
     explainer?.let { (title, list) ->
         ExplainerDialog(title, list, onDismiss = { explainer = null })
     }
+}
+
+/** Everything the shared header needs, so each body takes one parameter rather than seven. */
+private data class WeatherChrome(
+    val state: WeatherUiState,
+    val vm: WeatherViewModel,
+    val showSearch: Boolean,
+    val query: String,
+    val onQuery: (String) -> Unit,
+    val onAdded: () -> Unit,
+    val onRequestPermission: () -> Unit,
+)
+
+/**
+ * The stale banner, city search, location picker and permission prompt.
+ *
+ * A `LazyListScope` extension rather than a composable above the rail, so it scrolls away with the
+ * content exactly as it did when this screen was a single page, and so the location picker stays
+ * reachable from every tab without being pinned to the top of all of them.
+ */
+private fun LazyListScope.weatherHeader(c: WeatherChrome) {
+    if (c.state.data.stale) item { StaleBanner(true) }
+
+    if (c.showSearch) {
+        item {
+            OutlinedTextField(
+                value = c.query,
+                onValueChange = c.onQuery,
+                label = { Text("Search city") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        items(
+            c.state.searchResults.distinctBy { "${it.name}_${it.latitude}" },
+            key = { "${it.name}_${it.latitude}" },
+        ) { loc ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                    Text(loc.name, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        loc.country, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                AssistChip(
+                    onClick = { c.vm.addAndSelect(loc); c.onAdded() },
+                    label = { Text("Add") },
+                )
+            }
+            HorizontalDivider()
+        }
+    }
+
+    item {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                FilterChip(
+                    selected = c.state.useDeviceLocation,
+                    onClick = { c.vm.useDeviceLocation() },
+                    label = { Text("My location") },
+                    leadingIcon = { Icon(Icons.Filled.MyLocation, null, Modifier.size(16.dp)) },
+                )
+            }
+            itemsIndexed(c.state.savedLocations) { i, loc ->
+                FilterChip(
+                    selected = !c.state.useDeviceLocation && i == c.state.selectedIndex,
+                    onClick = { c.vm.selectSaved(i) },
+                    label = { Text(loc.name) },
+                )
+            }
+        }
+    }
+
+    if (c.state.needsLocationPermission && c.state.useDeviceLocation) {
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Location permission", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Grant location access for weather at your current position, " +
+                            "or search for a city above.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    AssistChip(
+                        onClick = c.onRequestPermission,
+                        label = { Text("Grant access") },
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One tab's scrolling page: pull-to-refresh, the shared header, then whatever [content] the tab
+ * draws once there is data to draw.
+ *
+ * Loading and error live here rather than in each body, so all four behave the same way when the
+ * forecast has not arrived.
+ */
+@Composable
+private fun WeatherTabScaffold(
+    vm: WeatherViewModel,
+    chrome: WeatherChrome,
+    content: LazyListScope.(dev.mascwa.pulse.data.weather.WeatherData) -> Unit,
+) {
+    val data = chrome.state.data
+    PullToRefreshBox(
+        isRefreshing = data.loading && data.data != null,
+        onRefresh = { vm.refresh() },
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp, top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            weatherHeader(chrome)
+            when {
+                data.isInitialLoading ->
+                    item { Box(Modifier.fillMaxWidth().padding(48.dp)) { LoadingState() } }
+                data.isError && data.data == null ->
+                    item { ErrorState(data.error ?: "Error", onRetry = { vm.refresh() }) }
+                data.data != null -> {
+                    content(data.data!!)
+                    item { SourceNote() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NowBody(
+    vm: WeatherViewModel,
+    chrome: WeatherChrome,
+    onExplain: (String, List<Explainer>) -> Unit,
+) {
+    WeatherTabScaffold(vm, chrome) { wd ->
+        item { CurrentWeatherCard(wd, onExplain) }
+    }
+}
+
+@Composable
+private fun HoursBody(vm: WeatherViewModel, chrome: WeatherChrome) {
+    WeatherTabScaffold(vm, chrome) { wd ->
+        val hourly = wd.hourly
+        if (hourly.isNotEmpty()) {
+            item { SectionLabel("Next 24 hours") }
+            item {
+                val start = WeatherFormat.nowIndex(hourly.map { it.timeIso })
+                val window = hourly.drop(start).take(24)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(window, key = { it.timeIso }) { h -> HourCell(h, wd.tempUnitSymbol) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DaysBody(vm: WeatherViewModel, chrome: WeatherChrome) {
+    WeatherTabScaffold(vm, chrome) { wd ->
+        if (wd.daily.isNotEmpty()) {
+            item { SectionLabel("7-day forecast") }
+            itemsIndexed(wd.daily, key = { _, d -> d.dateIso }) { i, d ->
+                DailyRow(i, d, wd.tempUnitSymbol)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AirBody(
+    vm: WeatherViewModel,
+    chrome: WeatherChrome,
+    onExplain: (String, List<Explainer>) -> Unit,
+) {
+    WeatherTabScaffold(vm, chrome) { wd ->
+        wd.airQuality?.let { aq -> item { AirQualityCard(aq, onExplain) } }
+    }
+}
+
+@Composable
+private fun SourceNote() {
+    Text(
+        "Source: Open-Meteo (forecast & air quality). Free, keyless, global.",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
