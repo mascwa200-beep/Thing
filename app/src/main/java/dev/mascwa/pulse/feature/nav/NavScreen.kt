@@ -166,7 +166,15 @@ private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
 // Cyberpunk 2077 map palette (tuned to the reference screenshots).
-private val LAND = Color(0xFF080C18)          // near-black navy base (land / parks / background)
+private val LAND = Color(0xFF080C18)          // near-black navy base (land / background)
+// Landcover, kept just distinguishable from the base. Parks, woods, beaches and marsh used to be
+// flattened into LAND by the catch-all below, which cost the map its green space entirely — and a
+// park is where you walk, a wood is a landmark, and a marsh is somewhere not to. Each is lifted a
+// few points off the base in its own hue: legible on a dark map without becoming a daylight atlas.
+private val GREENSPACE = Color(0xFF0A1A12)     // parks, woods, grass, pitches, cemeteries
+private val SANDSPACE = Color(0xFF16140C)      // beach, dune, bare rock
+private val ICESPACE = Color(0xFF141A22)       // glacier, permanent snow
+private val WETLAND = Color(0xFF0A1A1C)        // marsh, swamp, bog
 private val WATER = Color(0xFF0B1A2E)          // slightly lifted navy so water reads distinct from land
 private val BUILDING = Color(0xFFFF2A4E)       // red building mass
 private val BUILDING_EDGE = Color(0xFFFF6E8C)  // lighter red footprint outline
@@ -773,6 +781,10 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
     val redEdge = BUILDING_EDGE.toArgb()
     val cyan = ROAD.toArgb()
     val water = WATER.toArgb()
+    val green = GREENSPACE.toArgb()
+    val sand = SANDSPACE.toArgb()
+    val ice = ICESPACE.toArgb()
+    val wet = WETLAND.toArgb()
     val label = c.ink.toArgb()
     style.layers.forEach { layer ->
         val id = layer.id.lowercase()
@@ -782,6 +794,9 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
                 PropertyFactory.fillExtrusionColor(red),
                 PropertyFactory.fillExtrusionOpacity(0.6f),
             )
+            // Order matters: the specific landcover words are tested before the green catch-all,
+            // because an OpenMapTiles layer is commonly named "landcover-sand" or "landcover-ice"
+            // and the broader match would otherwise swallow both.
             is FillLayer -> when {
                 "water" in id -> layer.setProperties(PropertyFactory.fillColor(water))
                 "building" in id -> layer.setProperties(
@@ -789,7 +804,17 @@ private fun cyberpunkify(style: Style, c: NightwirePalette) {
                     PropertyFactory.fillOpacity(0.45f),
                     PropertyFactory.fillOutlineColor(redEdge),
                 )
-                else -> layer.setProperties(PropertyFactory.fillColor(land)) // land/parks blend into the base
+                "sand" in id || "beach" in id || "dune" in id || "bare" in id ->
+                    layer.setProperties(PropertyFactory.fillColor(sand))
+                "ice" in id || "glacier" in id || "snow" in id ->
+                    layer.setProperties(PropertyFactory.fillColor(ice))
+                "wetland" in id || "marsh" in id || "swamp" in id || "bog" in id ->
+                    layer.setProperties(PropertyFactory.fillColor(wet))
+                "park" in id || "wood" in id || "forest" in id || "grass" in id ||
+                    "landcover" in id || "golf" in id || "pitch" in id || "garden" in id ||
+                    "cemetery" in id || "scrub" in id || "farmland" in id ->
+                    layer.setProperties(PropertyFactory.fillColor(green))
+                else -> layer.setProperties(PropertyFactory.fillColor(land)) // built-up landuse blends in
             }
             is LineLayer -> when {
                 "water" in id || "river" in id || "waterway" in id -> layer.setProperties(PropertyFactory.lineColor(water))
