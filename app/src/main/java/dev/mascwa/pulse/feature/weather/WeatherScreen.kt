@@ -47,7 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Explainer
+import dev.mascwa.pulse.core.telemetry.WeatherComfort
 import dev.mascwa.pulse.core.telemetry.WeatherExplainers
+import dev.mascwa.pulse.core.telemetry.WeatherUnits
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.feature.common.CyberChipCut
@@ -284,6 +286,111 @@ private fun NowBody(
 ) {
     WeatherTabScaffold(vm, chrome) { wd ->
         item { CurrentWeatherCard(wd, onExplain) }
+        // CAPE and UV are hourly rather than current, so the present hour is read out of the
+        // hourly series using the same index the forecast strip already uses.
+        val nowHour = wd.hourly.getOrNull(WeatherFormat.nowIndex(wd.hourly.map { it.timeIso }))
+        item { ConditionsCard(wd, nowHour, onExplain) }
+    }
+}
+
+/**
+ * The readings beyond the headline number: what the wind is really doing, how the air feels to
+ * breathe, how far you can see, and whether the atmosphere is carrying storm fuel.
+ *
+ * Every row is absent when its value is missing or when the underlying index does not apply, so a
+ * mild, clear, still day shows very little here. That is the intent — the card says something when
+ * there is something to say.
+ */
+@Composable
+private fun ConditionsCard(
+    wd: dev.mascwa.pulse.data.weather.WeatherData,
+    nowHour: dev.mascwa.pulse.data.weather.HourlyPoint?,
+    onExplain: (String, List<Explainer>) -> Unit,
+) {
+    val c = wd.current ?: return
+    val p = Pulse.colors
+    val imperial = wd.precipUnitSymbol.contains("in")
+
+    // The indices are defined in Celsius and km/h; these are the converted companions. A blob
+    // cached by an earlier build has none of them, so the headline is simply absent until the next
+    // refresh rather than taking the whole card down with it.
+    val headline = c.temperatureC?.let {
+        WeatherComfort.headline(
+            temperatureC = it,
+            humidityPercent = c.humidity,
+            windKmh = c.windKmh,
+            gustKmh = c.gustKmh,
+            dewPointC = c.dewPointC,
+            unitSymbol = wd.tempUnitSymbol,
+        )
+    }
+    val uv = nowHour?.uvIndex
+    val burn = WeatherComfort.burnMinutes(uv)
+    val thunder = WeatherComfort.thunderPotential(nowHour?.capeJkg)
+    val visibility = WeatherUnits.describeVisibility(c.visibilityMetres, imperial)
+
+    // Nothing to add beyond the main card — say nothing rather than draw an empty frame.
+    if (headline == null && c.gustKmh == null && c.dewPointC == null && visibility == null && uv == null) return
+
+    NeonPanel(Modifier.fillMaxWidth(), corners = true, padding = PaddingValues(16.dp)) {
+        Column {
+            Text(
+                "CONDITIONS", fontFamily = JetBrainsMono, fontSize = 11.sp,
+                letterSpacing = 1.5.sp, color = p.accent,
+            )
+            headline?.let {
+                Text(
+                    it, fontFamily = ChakraPetch, fontSize = 14.sp, color = p.ink,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Stat("Gusts", c.windGust?.let { "${Formatters.number(it, 0)} ${wd.windUnitSymbol}" } ?: "—") {
+                    WeatherExplainers.gusts(c.windKmh, c.gustKmh, wd.windUnitSymbol, c.windGust)
+                        ?.let { onExplain("Gusts", listOf(it)) }
+                }
+                Stat("Dew point", c.dewPoint?.let { "${Formatters.number(it, 0)}${wd.tempUnitSymbol}" } ?: "—") {
+                    WeatherExplainers.dewPoint(c.dewPointC, wd.tempUnitSymbol)
+                        ?.let { onExplain("Dew point", listOf(it)) }
+                }
+                Stat("Visibility", visibility ?: "—") {
+                    WeatherExplainers.visibility(c.visibilityMetres, imperial)
+                        ?.let { onExplain("Visibility", listOf(it)) }
+                }
+                Stat("UV", uv?.let { Formatters.number(it, 0) } ?: "—") {
+                    WeatherExplainers.uvIndex(uv)?.let { onExplain("UV index", listOf(it)) }
+                }
+            }
+            burn?.let {
+                Text(
+                    "Unprotected skin burns in about $it min",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = p.amber,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+            thunder?.let {
+                Text(
+                    it,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = p.amber,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .clickable {
+                            WeatherExplainers.cape(nowHour?.capeJkg)
+                                ?.let { e -> onExplain("Storm potential", listOf(e)) }
+                        },
+                )
+            }
+            WeatherComfort.mugginess(c.dewPointC)?.let { m ->
+                Text(
+                    "Air feels $m".lowercase().replaceFirstChar { ch -> ch.uppercase() },
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = p.muted,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
     }
 }
 
