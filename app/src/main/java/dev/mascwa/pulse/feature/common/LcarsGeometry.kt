@@ -63,8 +63,8 @@ import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
  * Genuine Star-Trek-Okudagram panel geometry — asymmetric elbow-connector silhouettes and swept blocks,
- * replacing the uniform rounded-rectangles/pills `PipUi.kt` built the earlier LCARS re-theme from. Same API
- * shape as `PipUi.kt`'s primitives (drop-in replacements, mechanical call-site swaps) and the same
+ * replacing the uniform rounded-rectangles/pills the earlier LCARS re-theme was built from (that kit is
+ * gone; these took over its call sites wholesale, which is why the signatures echo it) and the same
  * [Pulse.colors] read, so they render in whatever palette is provided. LTR geometry only (layoutDirection is
  * intentionally ignored below) — this app has no RTL-locale requirement today; flagged here rather than
  * silently assumed.
@@ -149,7 +149,7 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
     }
 }
 
-/** [PipFrame] replacement: a swept-corner block instead of the earlier two-nearly-square-corners rectangle. */
+/** A panel: a swept-corner block, not the near-square rectangle the earlier kit drew. */
 @Composable
 fun LcarsFrame(
     modifier: Modifier = Modifier,
@@ -170,7 +170,7 @@ fun LcarsFrame(
     ) { content() }
 }
 
-/** [PipHeader] replacement: the lead block is a genuine notched elbow (grown out of the screen edge) instead
+/** A section header whose lead block is a genuine notched elbow, grown out of the screen edge, instead
  *  of a stadium pill, dropping into the title via a straight rule out to the trailing edge. */
 @Composable
 fun LcarsHeaderBar(title: String, modifier: Modifier = Modifier, trailing: String? = null) {
@@ -196,7 +196,7 @@ fun LcarsHeaderBar(title: String, modifier: Modifier = Modifier, trailing: Strin
     }
 }
 
-/** [PipDataRow] replacement: the left colour tab gets a single swept corner (not a notch — it's too thin a
+/** A data row whose left colour tab gets a single swept corner (not a notch — it's too thin a
  *  bar for a notch to read as anything but a rounding error) instead of the earlier `RoundedCornerShape`
  *  sliver. Same label/value contract, stack with NO gaps so the rules form a continuous list. */
 @Composable
@@ -228,7 +228,7 @@ fun LcarsDataRow(label: String, value: String, modifier: Modifier = Modifier, va
     }
 }
 
-/** [PipChip] replacement: a stepped/notched chamfer segment (reusing this codebase's existing
+/** A chip: a stepped/notched chamfer segment (reusing this codebase's existing
  *  `CutCornerShape`-as-shared-shape idiom, see `Nightwire.kt`'s `CyberCut`) instead of a stadium pill. Sized
  *  to its own content, so a rail of these reads as distinct notched segments rather than uniform pills. */
 @Composable
@@ -261,7 +261,7 @@ fun LcarsChip(
     }
 }
 
-/** [PipStatTile] replacement — reuses [LcarsFrame] verbatim, same as the original reused [PipFrame]. */
+/** A stat tile — reuses [LcarsFrame] verbatim, exactly as the kit it replaced reused its own panel. */
 @Composable
 fun LcarsStatBlock(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Pulse.colors.ink) {
     val c = Pulse.colors

@@ -18,9 +18,7 @@ import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,25 +103,6 @@ fun StaleBanner(visible: Boolean, modifier: Modifier = Modifier) {
             "OFFLINE — SHOWING CACHED DATA",
             fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp, color = c.amber,
         )
-    }
-}
-
-@Composable
-fun SectionHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
-        if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
-        }
     }
 }
 
