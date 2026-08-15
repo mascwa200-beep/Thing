@@ -61,7 +61,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
             if (pending.isEmpty()) {
                 item {
                     Text(
-                        "Nothing awaiting approval. When J.A.R.V.I.S. proposes a change, it appears here — " +
+                        "Nothing awaiting approval. When the computer proposes a change, it appears here — " +
                             "and only takes effect when you tap APPROVE.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     )

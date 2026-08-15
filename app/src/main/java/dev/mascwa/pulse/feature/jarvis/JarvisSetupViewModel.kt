@@ -89,6 +89,10 @@ class JarvisSetupViewModel(
     /** Whether J.A.R.V.I.S. speaks replies aloud. */
     val voiceReplies: StateFlow<Boolean> = _voiceReplies.asStateFlow()
 
+    private val _address = MutableStateFlow("")
+    /** What the computer calls the user — blank for no honorific. */
+    val address: StateFlow<String> = _address.asStateFlow()
+
     private val _voiceName = MutableStateFlow("")
     /** The chosen TTS voice by engine name, or blank for automatic. */
     val voiceName: StateFlow<String> = _voiceName.asStateFlow()
@@ -197,6 +201,7 @@ class JarvisSetupViewModel(
             _vitals.value = saved.vitalsTracking
             _voiceReplies.value = saved.voiceReplies
             _voiceName.value = saved.voiceName
+            _address.value = saved.address
             _wakeWord.value = saved.wakeWord
             _followUp.value = saved.followUpMode
             _conversation.value = saved.conversationMode
@@ -419,6 +424,14 @@ class JarvisSetupViewModel(
     }
 
     /** Persist what J.A.R.V.I.S. should brief on in the home status feed (top-level setting, not chat). */
+    /** How the computer addresses the user. Blank means no honorific, which is the default. */
+    fun setAddress(value: String) {
+        _address.value = value
+        viewModelScope.launch {
+            settings.update { it.copy(jarvis = it.jarvis.copy(address = value.trim())) }
+        }
+    }
+
     fun onFeedTopicChange(value: String) {
         _feedTopic.value = value
         viewModelScope.launch {

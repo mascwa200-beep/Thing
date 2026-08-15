@@ -25,9 +25,9 @@ class WeatherTool(
         val place = arg.trim()
         val wd = runCatching { resolve(place) }.getOrNull()
             ?: return if (place.isBlank()) {
-                "I couldn't get a location for the weather, sir — grant location or set one in Settings."
+                "I couldn't get a location for the weather — grant location or set one in Settings."
             } else {
-                "I couldn't find \"$place\", sir."
+                "I couldn't find \"$place\"."
             }
         val unit = wd.tempUnitSymbol
         val now = wd.current
@@ -89,7 +89,7 @@ class WeatherTool(
                 }
             }
         }.trim()
-        return out.ifBlank { "No weather available for ${wd.locationName}, sir." }
+        return out.ifBlank { "No weather available for ${wd.locationName}." }
     }
 
     private suspend fun resolve(place: String): WeatherData? {

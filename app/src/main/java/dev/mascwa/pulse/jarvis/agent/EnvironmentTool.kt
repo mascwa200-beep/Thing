@@ -21,7 +21,7 @@ class EnvironmentTool(
     override suspend fun run(arg: String): String = runCatching {
         if (arg.trim().equals("events", ignoreCase = true)) {
             val events = store.eventsFlow.value.take(20)
-            if (events.isEmpty()) return@runCatching "Nothing sensed recently, sir."
+            if (events.isEmpty()) return@runCatching "Nothing sensed recently."
             events.joinToString("\n") { e ->
                 val mins = (System.currentTimeMillis() - e.atMs) / 60_000L
                 val ago = if (mins < 60) "${mins}m ago" else "${mins / 60}h ago"

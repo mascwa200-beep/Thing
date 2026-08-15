@@ -168,7 +168,7 @@ class TextToSpeechEngine(
     /**
      * Speak [text], replacing anything already being spoken. [onDone] runs (on the main thread) when
      * the utterance finishes — or immediately if there's nothing to speak / no engine, so callers can
-     * safely sequence after speech (e.g. reopen the mic only once J.A.R.V.I.S. has stopped talking).
+     * safely sequence after speech (e.g. reopen the mic only once the computer has stopped talking).
      */
     fun speak(text: String, onDone: () -> Unit = {}) {
         val trimmed = forSpeech(text)

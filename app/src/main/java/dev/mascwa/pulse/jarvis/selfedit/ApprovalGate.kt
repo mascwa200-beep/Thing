@@ -82,9 +82,9 @@ class ApprovalGate(
         // Fold structural self-changes (character + capabilities) into durable self-knowledge.
         runCatching {
             when (action.type) {
-                ActionType.PERSONA_EDIT -> recordSelfChange("Your persona/charter was updated (approved by sir).")
+                ActionType.PERSONA_EDIT -> recordSelfChange("Your persona/charter was updated (approved by the owner).")
                 ActionType.TOOL_REGISTER ->
-                    recordSelfChange("You gained a self-authored tool \"${action.payload["name"].orEmpty()}\" (approved by sir).")
+                    recordSelfChange("You gained a self-authored tool \"${action.payload["name"].orEmpty()}\" (approved by the owner).")
                 else -> {}
             }
         }

@@ -17,23 +17,23 @@ class CiTool(private val repo: GitHubRepo) : JarvisTool {
             "errors; a branch name targets that branch's latest run"
 
     override suspend fun run(arg: String): String {
-        if (repo.token() == null) return "Add a GitHub token (repo scope) so I can read CI, sir."
+        if (repo.token() == null) return "Add a GitHub token (repo scope) so I can read CI."
         val branch = arg.trim().trim('`', '"').ifBlank { null }
         val runs = runCatching { repo.recentRuns(30) }.getOrDefault(emptyList())
-        if (runs.isEmpty()) return "I can't see any CI runs, sir — check the token scope."
+        if (runs.isEmpty()) return "I can't see any CI runs — check the token scope."
         val run = if (branch != null) {
             runs.firstOrNull { it.branch == branch }
-                ?: return "No CI run for `$branch`, sir."
+                ?: return "No CI run for `$branch`."
         } else {
             runs.firstOrNull { it.branch.startsWith("jarvis/") && it.status == "completed" }
-                ?: return "No completed self-code (jarvis/) builds to report on, sir."
+                ?: return "No completed self-code (jarvis/) builds to report on."
         }
-        if (run.status != "completed") return "CI for `${run.branch}` is still ${run.status}, sir."
+        if (run.status != "completed") return "CI for `${run.branch}` is still ${run.status}."
         return when (run.conclusion) {
-            "success" -> "`${run.branch}` is green, sir — that build compiled."
+            "success" -> "`${run.branch}` is green — that build compiled."
             "failure" -> "`${run.branch}` failed CI. The errors:\n\n" + repo.runErrors(run.id)
-            "cancelled" -> "`${run.branch}` was cancelled (superseded by a newer push), sir."
-            else -> "`${run.branch}`: ${run.conclusion}, sir."
+            "cancelled" -> "`${run.branch}` was cancelled (superseded by a newer push)."
+            else -> "`${run.branch}`: ${run.conclusion}."
         }
     }
 }

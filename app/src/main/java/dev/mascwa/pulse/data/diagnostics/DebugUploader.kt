@@ -67,7 +67,7 @@ class DebugUploader(
     /** Manually send a report now (the latest crash, if any, plus current diagnostics). Ignores the
      *  opt-in toggle — it's an explicit user action — but still requires a token. */
     suspend fun sendNow(): Result = withContext(Dispatchers.IO) {
-        if (!hasToken()) return@withContext Result.Failed("Set a GitHub token in J.A.R.V.I.S. Setup first.")
+        if (!hasToken()) return@withContext Result.Failed("Set a GitHub token in Computer Setup first.")
         val latestCrash = crashReporter.entries().firstOrNull()?.let { crashReporter.read(it) }
         upload("manual", buildBundle("manual", latestCrash))
     }

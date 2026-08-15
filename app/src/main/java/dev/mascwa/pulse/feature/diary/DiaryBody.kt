@@ -92,7 +92,7 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
         // ---- JOURNAL (newest first) ----
         if (entries.isEmpty()) {
             Text(
-                "No entries yet — write one above, or ask J.A.R.V.I.S. to journal for you. Everything " +
+                "No entries yet — write one above, or ask the computer to journal for you. Everything " +
                     "stays on this device.",
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),

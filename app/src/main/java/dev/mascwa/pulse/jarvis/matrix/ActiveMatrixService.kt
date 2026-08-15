@@ -160,7 +160,7 @@ class ActiveMatrixService : Service() {
             lowPowerConserve = true
             if (!batteryWarned) {
                 batteryWarned = true
-                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power, sir."
+                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power."
                 update("⚠ $msg")
                 // Speak only when not mid-command: a TTS speak() here QUEUE_FLUSHes an in-flight spoken
                 // reply, dropping its done-callback so the wake mic never re-arms. The notification still
@@ -318,7 +318,7 @@ class ActiveMatrixService : Service() {
     private fun captureCommand(vosk: VoskSpeech) {
         val google = container?.deviceSpeech
         if (google != null && google.available) {
-            update("Yes, sir? Listening…")
+            update("Listening.")
             vosk.stop() // hand the mic to the system recognizer (no two-mic contention)
             google.listen(COMMAND_TIMEOUT_MS, object : VoskListener {
                 override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
@@ -347,7 +347,7 @@ class ActiveMatrixService : Service() {
     /** Offline fallback command capture on the Vosk wake model (used when on-device recognition
      *  isn't available). Same 128 MB model as wake spotting, so it never loads the heavy model. */
     private fun captureCommandVosk(vosk: VoskSpeech) {
-        update("Yes, sir? Listening…")
+        update("Listening.")
         vosk.start(dictation = false, grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
@@ -396,7 +396,7 @@ class ActiveMatrixService : Service() {
         vosk.stop()
         // Honour an explicit "stop" before doing anything else.
         if (isStopCue(command)) {
-            endConversation(vosk, "Very good, sir.")
+            endConversation(vosk, "Acknowledged.")
             return
         }
         update("One moment…")
@@ -411,7 +411,8 @@ class ActiveMatrixService : Service() {
         try {
             runCatching { engine.ensureReady() }
             var persona = JarvisPersona.compose(
-                runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
+                charter = runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
+                address = jarvisSettings?.address.orEmpty(),
             )
             // Only in conversation mode: let the model self-direct whether to keep the floor open.
             // (Appended here, not to the global persona, so the markers never leak into the console.)
@@ -439,7 +440,7 @@ class ActiveMatrixService : Service() {
             } else {
                 engine.generate(command, history, persona).collect { sb.append(it) }
             }
-            var reply = sb.toString().ifBlank { "Standing by, sir." }
+            var reply = sb.toString().ifBlank { "Standing by." }
             // Autonomous floor-control: explicit markers win; otherwise a trailing "?" implies it
             // expects an answer. Strip markers before showing/speaking either way.
             val wantsClose = reply.contains(MARK_CLOSE)
@@ -467,7 +468,7 @@ class ActiveMatrixService : Service() {
             throw e // honour service teardown — don't re-arm the mic on a dying service
         } catch (e: Throwable) {
             Log.e(TAG, "respond: failed to answer", e)
-            update("I couldn't answer that one, sir.")
+            update("I couldn't answer that one.")
             resetConvo()
             listenForWake(vosk)
         }
@@ -486,7 +487,7 @@ class ActiveMatrixService : Service() {
     private fun wrapUp(vosk: VoskSpeech) {
         convoTurns = 0
         convoStartedAt = System.currentTimeMillis() // fresh budget if the user carries on
-        speakThen("Will that be all, sir?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+        speakThen("Will that be all?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
     }
 
     /** End any open conversation: optionally speak a closing line, then return to wake listening. */

@@ -197,7 +197,7 @@ fun JarvisScreen(
     }
 }
 
-/** Inline approve/reject for a self-code change J.A.R.V.I.S. has staged — so the user can ship a code
+/** Inline approve/reject for a self-code change the computer has staged — so the user can ship a code
  *  change without leaving the console. The PR opens only on APPROVE (via the shared ApprovalGate). */
 @Composable
 private fun CodeApprovalCard(
@@ -388,7 +388,7 @@ private fun InputBar(
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (input.isEmpty()) {
-                            Text("Message J.A.R.V.I.S.", fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted)
+                            Text("Message the computer", fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted)
                         }
                         inner()
                     }

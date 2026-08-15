@@ -14,30 +14,30 @@ class SelfCodeReadTool(private val repo: GitHubRepo) : JarvisTool {
             "`log` shows recent commits, `prs` shows recent pull requests"
 
     override suspend fun run(arg: String): String {
-        if (repo.token() == null) return "Add a GitHub token (repo scope) in Setup so I can read the repository, sir."
+        if (repo.token() == null) return "Add a GitHub token (repo scope) in Setup so I can read the repository."
         val a = arg.trim().trim('`', '"')
         when (a.lowercase()) {
             "log", "commits", "history" -> {
                 val commits = runCatching { repo.commits("main", 25) }.getOrDefault(emptyList())
-                if (commits.isEmpty()) return "I couldn't read the commit log, sir — check the token scope."
+                if (commits.isEmpty()) return "I couldn't read the commit log — check the token scope."
                 return "Recent commits (main):\n" + commits.joinToString("\n")
             }
             "prs", "pulls", "pr" -> {
                 val prs = runCatching { repo.pulls(25) }.getOrDefault(emptyList())
-                if (prs.isEmpty()) return "No recent pull requests I can see, sir."
+                if (prs.isEmpty()) return "No recent pull requests I can see."
                 return "Recent pull requests:\n" + prs.joinToString("\n")
             }
         }
         val path = a.trimStart('/')
         if (path.isBlank()) {
             val tree = runCatching { repo.tree("main") }.getOrDefault(emptyList())
-            if (tree.isEmpty()) return "I couldn't read the repository tree, sir — check the token scope."
+            if (tree.isEmpty()) return "I couldn't read the repository tree — check the token scope."
             val shown = tree.take(MAX_TREE).joinToString("\n")
             val more = if (tree.size > MAX_TREE) "\n… (${tree.size - MAX_TREE} more; ask for a path)" else ""
             return "Repository files (${tree.size}):\n$shown$more"
         }
         val content = runCatching { repo.getFile(path, "main") }.getOrNull()
-            ?: return "I couldn't read `$path`, sir — check the path (run `code` with no argument to list files)."
+            ?: return "I couldn't read `$path` — check the path (run `code` with no argument to list files)."
         val body = content.take(MAX_FILE)
         val truncated = if (content.length > MAX_FILE) "\n… (truncated)" else ""
         return "`$path`:\n$body$truncated"

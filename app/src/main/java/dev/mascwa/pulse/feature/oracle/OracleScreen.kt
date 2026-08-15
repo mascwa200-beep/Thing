@@ -67,7 +67,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                     if (list.isEmpty()) {
                         item {
                             Text(
-                                "All quiet — nothing needs you right now. J.A.R.V.I.S. is watching.",
+                                "All quiet — nothing needs you right now. The computer is watching.",
                                 fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
                                 modifier = Modifier.padding(12.dp),
                             )

@@ -100,6 +100,7 @@ fun JarvisSetupScreen(
     val maxTokens by vm.maxTokens.collectAsState()
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
+    val address by vm.address.collectAsState()
     val feedTopic by vm.feedTopic.collectAsState()
     val autonomousCuriosity by vm.autonomousCuriosity.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
@@ -118,10 +119,10 @@ fun JarvisSetupScreen(
             val (name, text) = readPickedDocument(context, uri)
             if (text.isNotBlank()) {
                 vm.addKnowledge(name, text)
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Imported \"$name\", sir.", Toast.LENGTH_SHORT).show() }
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Imported \"$name\".", Toast.LENGTH_SHORT).show() }
             } else {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Couldn't read that — try a text file or a Google Doc, sir.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Couldn't read that — try a text file or a Google Doc.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -277,6 +278,14 @@ fun JarvisSetupScreen(
             Text(
                 "AUTO lets MediaPipe choose and falls back to CPU automatically if a GPU run crashes " +
                     "the model. If chat shows \"inference fault\", try CPU.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
+            FieldLabel("ADDRESS  ·  what it calls you")
+            MonoField(address, vm::setAddress, "Captain, Commander, your name… (blank = no honorific)")
+            Text(
+                "Blank is the default, and what a ship's computer actually does: it addresses you " +
+                    "directly. Set a term and it will use it — sparingly, not in every line.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 

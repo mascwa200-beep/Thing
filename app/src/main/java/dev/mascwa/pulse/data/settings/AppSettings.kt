@@ -152,6 +152,13 @@ data class JarvisSettings(
     /** Speak replies aloud using the device's on-device text-to-speech engine. */
     val voiceReplies: Boolean = false,
     /**
+     * How the computer addresses you — "Captain", a rank, your name.
+     *
+     * Blank (the default) means it addresses you directly with no honorific, which is what a ship's
+     * computer does. Injected into the system prompt each turn rather than hardcoded in replies.
+     */
+    val address: String = "",
+    /**
      * The exact TTS voice to speak in, by the engine's own internal name.
      *
      * Blank means automatic, which leans female and American — the register the computer is dressed

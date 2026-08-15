@@ -11,9 +11,9 @@ class LocationTool(private val location: LocationProvider) : JarvisTool {
     override val usage = "location — your current coordinates and place (read-only)"
 
     override suspend fun run(arg: String): String {
-        if (!location.hasPermission()) return "Location permission isn't granted, sir."
+        if (!location.hasPermission()) return "Location permission isn't granted."
         val loc = runCatching { location.current() }.getOrNull()
-            ?: return "I couldn't get a fix, sir — is location turned on?"
-        return "You're at %.4f, %.4f — %s, sir.".format(loc.latitude, loc.longitude, loc.name)
+            ?: return "I couldn't get a fix — is location turned on?"
+        return "You're at %.4f, %.4f — %s.".format(loc.latitude, loc.longitude, loc.name)
     }
 }

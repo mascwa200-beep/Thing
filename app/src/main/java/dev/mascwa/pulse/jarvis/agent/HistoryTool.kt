@@ -24,8 +24,8 @@ class HistoryTool(
         val q = arg.trim()
         val out = if (q.isEmpty()) store.timeline() else store.digest(q)
         out.ifBlank {
-            if (q.isEmpty()) "No episodic memories recorded yet, sir."
-            else "Nothing in my memory about \"$q\" yet, sir."
+            if (q.isEmpty()) "No episodic memories recorded yet."
+            else "Nothing in my memory about \"$q\" yet."
         }
     }.getOrElse { "History read failed: ${it.message}" }
 }

@@ -47,23 +47,23 @@ class NotesTool(
             deriveTitle(rest) to rest.trim()
         }
         val note = store.add(title, body, category)
-            ?: return "Give the note something to say, sir."
-        return "Filed in the library: \"${note.title}\" (${note.category}), sir."
+            ?: return "Give the note something to say."
+        return "Filed in the library: \"${note.title}\" (${note.category})."
     }
 
     private suspend fun read(query: String): String {
-        if (query.isBlank()) return "Which note should I read, sir?"
+        if (query.isBlank()) return "Which note should I read?"
         val notes = store.load()
         val hit = notes.firstOrNull { it.title.equals(query, true) }
             ?: notes.firstOrNull { it.title.contains(query, true) }
             ?: notes.firstOrNull { it.body.contains(query, true) }
-            ?: return "No note matches \"$query\", sir."
+            ?: return "No note matches \"$query\"."
         return "${hit.title} (${hit.category}):\n${hit.body}"
     }
 
     private suspend fun list(): String {
         val notes = store.load()
-        if (notes.isEmpty()) return "The library is empty, sir."
+        if (notes.isEmpty()) return "The library is empty."
         return "Library (${notes.size}):\n" + notes.take(30).joinToString("\n") { "• ${it.title} · ${it.category}" }
     }
 

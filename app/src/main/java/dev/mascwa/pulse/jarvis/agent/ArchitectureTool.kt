@@ -37,7 +37,7 @@ class ArchitectureTool(
         val titles = runCatching { knowledge.titles() }.getOrDefault(emptyList())
             .filter { it.startsWith(TITLE_PREFIX) }
         return if (titles.isEmpty()) {
-            "No architecture knowledge yet, sir — run `arch map` to build one from the code, or `arch note <insight>`."
+            "No architecture knowledge yet — run `arch map` to build one from the code, or `arch note <insight>`."
         } else {
             "Architecture knowledge:\n" + titles.joinToString("\n") { "· $it" }
         }
@@ -45,25 +45,25 @@ class ArchitectureTool(
 
     private suspend fun note(text: String): String {
         val t = text.trim()
-        if (t.length < 4) return "Give me the architecture insight to record, sir."
+        if (t.length < 4) return "Give me the architecture insight to record."
         val n = runCatching { knowledge.addDocument("$TITLE_PREFIX note — ${t.take(40)}", t, SOURCE) }.getOrDefault(0)
-        return if (n > 0) "Recorded, sir — I'll recall it when reasoning about the app's design." else "Couldn't record that, sir."
+        return if (n > 0) "Recorded — I'll recall it when reasoning about the app's design." else "Couldn't record that."
     }
 
     private suspend fun recall(query: String): String {
         val hits = runCatching { knowledge.search(query, 5) }.getOrDefault(emptyList())
             .filter { it.source == SOURCE }
         return if (hits.isEmpty()) {
-            "Nothing in my architecture notes on that, sir — try `arch map` to (re)build the map."
+            "Nothing in my architecture notes on that — try `arch map` to (re)build the map."
         } else {
             "From my architecture knowledge:\n" + hits.joinToString("\n\n") { it.text.take(500) }
         }
     }
 
     private suspend fun map(): String {
-        if (repo.token() == null) return "Add a GitHub token (repo scope) so I can read the tree, sir."
+        if (repo.token() == null) return "Add a GitHub token (repo scope) so I can read the tree."
         val tree = runCatching { repo.tree("main") }.getOrDefault(emptyList())
-        if (tree.isEmpty()) return "I couldn't read the repository tree, sir — check the token scope."
+        if (tree.isEmpty()) return "I couldn't read the repository tree — check the token scope."
         val summary = summarize(tree)
         runCatching { knowledge.deleteDocument("$TITLE_PREFIX map") }
         runCatching { knowledge.addDocument("$TITLE_PREFIX map", summary, SOURCE) }

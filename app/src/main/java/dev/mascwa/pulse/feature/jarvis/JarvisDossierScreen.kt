@@ -63,7 +63,7 @@ fun JarvisDossierScreen(vm: JarvisDossierViewModel, onBack: () -> Unit) {
             if (profile.isEmpty()) {
                 item {
                     EmptyLine(
-                        "No profile on file. As J.A.R.V.I.S. learns your preferences, interests and " +
+                        "No profile on file. As the computer learns your preferences, interests and " +
                             "projects — only from your answers — they're logged here.",
                         c,
                     )
