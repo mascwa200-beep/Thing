@@ -83,7 +83,9 @@ import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.core.telemetry.NavGuidance
 import dev.mascwa.pulse.core.telemetry.Terminator
 import dev.mascwa.pulse.core.telemetry.TrackLog
+import dev.mascwa.pulse.feature.common.ChartSeries
 import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsTimeChart
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.hudCorners
@@ -226,6 +228,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val selectedIncident by vm.selectedIncident.collectAsState()
     val trackPoints by vm.trackPoints.collectAsState()
     val trackRecording by vm.trackRecording.collectAsState()
+    val profile by vm.profile.collectAsState()
     var layersOpen by remember { mutableStateOf(false) }
     var posFormat by remember { mutableStateOf(PositionFormat.DECIMAL) }
     var query by remember { mutableStateOf("") }
@@ -557,6 +560,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // What the road ahead climbs, once the route and its heights are known.
+                    profile?.let { ElevationProfile(profile = it, c = c) }
                     // Live navigation readout — distance + driving ETA + turn arrow to the active objective.
                     readout?.let { r ->
                         NavReadoutBanner(readout = r, heading = heading, c = c, onTap = { vm.focusActive() })
@@ -1995,6 +2000,51 @@ private fun dms(value: Double, positive: String, negative: String): String {
     return "%d°%02d'%04.1f\"%s".format(
         java.util.Locale.US, totalMinutes / 60L, totalMinutes % 60L, sec, sign,
     )
+}
+
+/**
+ * What the route ahead climbs, drawn against distance rather than time.
+ *
+ * The chart kit's horizontal axis is a Long because it was written for real time; here the number
+ * is metres, which is why it is given its own label formatter rather than a clock.
+ */
+@Composable
+private fun ElevationProfile(profile: RouteElevation, c: NightwirePalette) {
+    val points = remember(profile) {
+        profile.distancesM.indices
+            .take(profile.elevationsM.size)
+            .map { profile.distancesM[it].toLong() to profile.elevationsM[it] }
+    }
+    if (points.size < 2) return
+    val shape = lcarsBlockShape(sweep = 10.dp, corner = LcarsCorner.TopStart)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.panel.copy(alpha = 0.92f))
+            .border(1.dp, c.accent.copy(alpha = 0.5f), shape)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "PROFILE",
+                fontFamily = ChakraPetch, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = c.accent,
+                modifier = Modifier.weight(1f),
+            )
+            // Null when the route is flat enough that saying anything would be noise.
+            profile.summary.describe()?.let {
+                Text(it, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+            }
+        }
+        LcarsTimeChart(
+            series = listOf(ChartSeries(label = "Elevation", points = points, color = c.sky, filled = true)),
+            modifier = Modifier.fillMaxWidth().height(70.dp).padding(top = 4.dp),
+            yTicks = 3,
+            xTicks = 3,
+            valueFormat = { "${it.roundToInt()}" },
+            xFormat = { Geo.formatDistance(it.toDouble()) },
+        )
+    }
 }
 
 /** A one-line map notice (scan outcome), tapped to dismiss. */

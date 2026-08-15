@@ -184,6 +184,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.nav.TrackStore(appContext, json)
     }
 
+    /** Ground height for a batch of coordinates — the NAV map's route elevation profile. */
+    val elevationRepository: dev.mascwa.pulse.data.maps.ElevationRepository by lazy {
+        dev.mascwa.pulse.data.maps.ElevationRepository(http)
+    }
+
     /** Live precipitation-radar frames for the NAV map's rain overlay (keyless). */
     val rainViewerRepository: dev.mascwa.pulse.data.maps.RainViewerRepository by lazy {
         dev.mascwa.pulse.data.maps.RainViewerRepository(http)

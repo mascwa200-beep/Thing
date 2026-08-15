@@ -3,11 +3,13 @@ package dev.mascwa.pulse.feature.nav
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.RouteProgress
+import dev.mascwa.pulse.core.telemetry.RouteProfile
 import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.maps.MapLayerCatalog
+import dev.mascwa.pulse.data.maps.ElevationRepository
 import dev.mascwa.pulse.data.maps.RainViewerRepository
 import dev.mascwa.pulse.data.nav.TrackStore
 import dev.mascwa.pulse.data.objectives.WaypointStore
@@ -55,6 +57,13 @@ import kotlin.math.roundToInt
  */
 data class ScanNotice(val message: String, val isError: Boolean)
 
+/** A route's height profile: the sampled heights, and what they add up to. */
+data class RouteElevation(
+    val distancesM: List<Double>,
+    val elevationsM: List<Double>,
+    val summary: RouteProfile.Summary,
+)
+
 /** Live navigation readout for the active objective shown as a banner on the NAV map. */
 data class NavReadout(
     val label: String,
@@ -77,6 +86,7 @@ class NavViewModel(
     private val rainViewer: RainViewerRepository,
     private val radar: RadarRepository,
     private val trackStore: TrackStore,
+    private val elevation: ElevationRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -138,6 +148,19 @@ class NavViewModel(
     /** The breadcrumb trail: where you have actually been, drawn behind you. */
     val trackPoints: StateFlow<List<TrackLog.TrackPoint>> = trackStore.pointsFlow
     val trackRecording: StateFlow<Boolean> = trackStore.recording
+
+    /**
+     * The height profile of the road route ahead, once it is known.
+     *
+     * Rebuilt only when the route itself changes — the ground does not move, and the samples are
+     * positions along the route rather than the phone's own position, so a GPS tick means nothing
+     * here.
+     */
+    private val _profile = MutableStateFlow<RouteElevation?>(null)
+    val profile: StateFlow<RouteElevation?> = _profile.asStateFlow()
+    private var profileJob: Job? = null
+    private var profiledWpId: String? = null
+    private var profiledLengthM: Double = 0.0
 
     fun setTrackRecording(on: Boolean) = trackStore.setRecording(on)
 
@@ -224,6 +247,9 @@ class NavViewModel(
                 if (wp == null || loc == null) {
                     _route.value = emptyList()
                     _routeInfo.value = null
+                    _profile.value = null
+                    profiledWpId = null
+                    profiledLengthM = 0.0
                     lastRouteWpId = null
                     lastRouteStart = null
                     return@collectLatest
@@ -242,7 +268,43 @@ class NavViewModel(
                     _routeInfo.value = r
                     lastRouteWpId = wp.id
                     lastRouteStart = loc
+                    refreshProfile(wp.id, r.points, r.distanceMeters)
                 }
+            }
+        }
+    }
+
+    /**
+     * Fetch the ground height along [route] and summarise it.
+     *
+     * Keyed on the objective and on the route's length, not on its exact geometry. The route
+     * re-resolves every sixty metres of travel and comes back very slightly different each time,
+     * so comparing geometry would mean a fresh elevation request every sixty metres — for a
+     * picture that has barely changed. A new objective, or a length that moves by a fifth (a
+     * reroute, or real progress made), is worth asking again for.
+     */
+    private fun refreshProfile(waypointId: String, route: List<Pair<Double, Double>>, lengthM: Double) {
+        val sameObjective = waypointId == profiledWpId
+        val similarLength = profiledLengthM > 0.0 &&
+            kotlin.math.abs(lengthM - profiledLengthM) < profiledLengthM * PROFILE_REFRESH_FRACTION
+        if (sameObjective && similarLength && _profile.value != null) return
+        profiledWpId = waypointId
+        profiledLengthM = lengthM
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            val samples = RouteProfile.sample(route, PROFILE_SAMPLES)
+            if (samples.size < 2) {
+                _profile.value = null
+                return@launch
+            }
+            val heights = runCatching {
+                elevation.elevations(samples.map { it.latitudeDeg to it.longitudeDeg })
+            }.getOrNull()
+            val summary = heights?.let { RouteProfile.summarise(samples, it) }
+            _profile.value = if (heights != null && summary != null) {
+                RouteElevation(samples.map { it.distanceM }, heights, summary)
+            } else {
+                null
             }
         }
     }
@@ -583,6 +645,10 @@ class NavViewModel(
         const val TRAFFIC_REFRESH_MS = 20_000L
         /** Earthquakes have already happened. Refreshing often would only cost battery. */
         const val SEISMIC_REFRESH_MS = 5 * 60_000L
+        /** One request's worth, and about as many points as a phone-width chart can show. */
+        const val PROFILE_SAMPLES = 80
+        /** How much the route has to change before the heights are worth asking for again. */
+        const val PROFILE_REFRESH_FRACTION = 0.2
     }
 
     override fun onCleared() {

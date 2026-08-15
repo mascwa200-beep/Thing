@@ -77,6 +77,15 @@ fun LcarsTimeChart(
     valueFormat: (Double) -> String = { trimNumber(it) },
     forceMin: Double? = null,
     forceMax: Double? = null,
+    /**
+     * Label the horizontal axis with something other than a clock.
+     *
+     * The axis is a Long because it was written for real time, and that is still what it usually
+     * is. But the same chart draws a route's elevation against distance, where the number is
+     * metres and a clock label would be nonsense — so a caller with a different axis says what
+     * its numbers mean rather than getting one made up for it.
+     */
+    xFormat: ((Long) -> String)? = null,
 ) {
     val c = Pulse.colors
     val usable = series.filter { it.points.size >= 2 }
@@ -163,7 +172,8 @@ fun LcarsTimeChart(
                 start = Offset(x, 0f), end = Offset(x, plotH), strokeWidth = 1f,
             )
             drawContext.canvas.nativeCanvas.drawText(
-                labelFormat.format(Date(t)), x, size.height - 2.dp.toPx(), axisPaint,
+                xFormat?.invoke(t) ?: labelFormat.format(Date(t)),
+                x, size.height - 2.dp.toPx(), axisPaint,
             )
         }
 
