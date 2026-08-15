@@ -8,6 +8,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -32,7 +34,9 @@ class RadarRepository(
     private val quakeMaxMeters = 800_000.0
 
     suspend fun fetch(lat: Double, lon: Double, force: Boolean): Fetched<RadarData> {
-        val key = "radar_${"%.2f".format(lat)}_${"%.2f".format(lon)}"
+        // Locale.US: the default locale renders a comma decimal on much of the planet, which would
+        // silently give the same place two different cache keys depending on device settings.
+        val key = "radar_${fmt("%.2f", lat)}_${fmt("%.2f", lon)}"
         if (!force) {
             cache.read(key, ttl, RadarData.serializer())?.let {
                 return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
@@ -80,33 +84,73 @@ class RadarRepository(
             ?: return emptyList<Contact>() to src
         val list = arr.mapNotNull { el ->
             val o = el.jsonObject
-            val clat = o["lat"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
-            val clon = o["lon"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
-            val hex = o["hex"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-            val flight = o["flight"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
-            val reg = o["r"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
-            val type = o["t"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
-            val altFeet = o["alt_baro"]?.jsonPrimitive?.doubleOrNull   // string "ground" → null
-            val gsKnots = o["gs"]?.jsonPrimitive?.doubleOrNull
-            val track = o["track"]?.jsonPrimitive?.doubleOrNull
-            val squawk = o["squawk"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
-            val baroRate = o["baro_rate"]?.jsonPrimitive?.doubleOrNull
-            val category = o["category"]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
-            val military = (o["dbFlags"]?.jsonPrimitive?.intOrNull ?: 0) and 0x1 == 0x1
+            fun str(k: String) = o[k]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
+            fun num(k: String) = o[k]?.jsonPrimitive?.doubleOrNull
+            fun int(k: String) = o[k]?.jsonPrimitive?.intOrNull
+            fun flag(k: String) = int(k) == 1
+
+            val clat = num("lat") ?: return@mapNotNull null
+            val clon = num("lon") ?: return@mapNotNull null
+            val hex = str("hex").orEmpty()
+            val flight = str("flight")
+            val reg = str("r")
+            val type = str("t")
+            // alt_baro is the string "ground" for an aircraft on the surface, so a null here is
+            // genuinely ambiguous — it means either "on the ground" or "not reported".
+            val rawAlt = o["alt_baro"]?.jsonPrimitive?.contentOrNull?.trim()
+            val onGround = rawAlt.equals("ground", ignoreCase = true)
+            val altFeet = num("alt_baro")
+            val gsKnots = num("gs")
+            val squawk = str("squawk")
+            val dbFlags = int("dbFlags") ?: 0
+
             Contact(
                 id = "ac_${hex.ifBlank { "$clat$clon" }}",
                 label = flight ?: reg ?: hex.uppercase().ifBlank { "UNKNOWN" },
                 latitude = clat, longitude = clon,
-                altitudeM = altFeet?.let { it * 0.3048 },
-                groundSpeedKmh = gsKnots?.let { it * 1.852 },
-                trackDeg = track,
+                altitudeM = altFeet?.let { it * FEET_TO_M },
+                groundSpeedKmh = gsKnots?.let { it * KNOTS_TO_KMH },
+                trackDeg = num("track"),
                 detail = listOfNotNull(reg, type).joinToString(" · "),
                 kind = ContactKind.AIRCRAFT.name,
                 squawk = squawk,
-                verticalRateFpm = baroRate?.toInt(),
-                category = category,
-                military = military,
-                emergency = squawk in setOf("7500", "7600", "7700"),
+                verticalRateFpm = num("baro_rate")?.toInt(),
+                category = str("category"),
+                military = dbFlags and 0x1 == 0x1,
+                emergency = squawk in EMERGENCY_SQUAWKS,
+
+                registration = reg,
+                typeCode = type,
+                description = str("desc"),
+                operator = str("ownOp"),
+
+                altitudeGeomM = num("alt_geom")?.let { it * FEET_TO_M },
+                verticalRateGeomFpm = num("geom_rate")?.toInt(),
+                trueHeadingDeg = num("true_heading"),
+                onGround = onGround,
+
+                selectedAltitudeFt = int("nav_altitude_mcp"),
+                selectedHeadingDeg = num("nav_heading"),
+                qnhHpa = num("nav_qnh"),
+                // `as?` rather than `.jsonArray`: the accessor throws on a non-array, and one
+                // oddly-shaped aircraft must not take down the whole sweep.
+                navModes = (o["nav_modes"] as? JsonArray)
+                    ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    .orEmpty(),
+
+                rssiDb = num("rssi"),
+                messageCount = int("messages"),
+                seenSec = num("seen"),
+                seenPosSec = num("seen_pos"),
+                sourceType = str("type"),
+
+                interesting = dbFlags and 0x2 == 0x2,
+                pia = dbFlags and 0x4 == 0x4,
+                ladd = dbFlags and 0x8 == 0x8,
+
+                emergencyText = str("emergency"),
+                alert = flag("alert"),
+                ident = flag("spi"),
             )
         }
         return list to src
@@ -148,11 +192,21 @@ class RadarRepository(
             val place = props["place"]?.jsonPrimitive?.contentOrNull ?: "Seismic event"
             Contact(
                 id = "qk_${o["id"]?.jsonPrimitive?.contentOrNull ?: "$ilat$ilon"}",
-                label = mag?.let { "M%.1f".format(it) } ?: "QUAKE",
+                label = mag?.let { fmt("M%.1f", it) } ?: "QUAKE",
                 latitude = ilat, longitude = ilon,
                 detail = place,
                 kind = ContactKind.QUAKE.name,
             )
         }.take(8)
+    }
+
+    private companion object {
+        const val FEET_TO_M = 0.3048
+        const val KNOTS_TO_KMH = 1.852
+        val EMERGENCY_SQUAWKS = setOf("7500", "7600", "7700")
+
+        /** Locale.US — these strings are numbers, not prose. */
+        fun fmt(pattern: String, value: Double): String =
+            String.format(java.util.Locale.US, pattern, value)
     }
 }
