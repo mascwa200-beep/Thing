@@ -76,7 +76,7 @@
    "id": "t00013",
    "topic": "Ribosomes and the Machinery of Protein Synthesis",
    "category": "Biology",
-   "guideId": null
+   "guideId": "ribosomes-and-the-machinery-of-protein-synthesis"
   },
   {
    "id": "t00014",
@@ -3052,13 +3052,13 @@
    "id": "t00509",
    "topic": "Primary Productivity in Ecosystems",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "primary-productivity-in-ecosystems"
   },
   {
    "id": "t00510",
    "topic": "Biomass and Ecological Production",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "biomass-and-ecological-production"
   },
   {
    "id": "t00511",
@@ -4336,7 +4336,7 @@
    "id": "t00723",
    "topic": "Osmosis and Osmotic Pressure",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "osmosis-and-osmotic-pressure"
   },
   {
    "id": "t00724",
@@ -7660,7 +7660,7 @@
    "id": "t01277",
    "topic": "The World Wide Web: Origins and Evolution",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-world-wide-web-origins-and-evolution"
   },
   {
    "id": "t01278",
@@ -7672,7 +7672,7 @@
    "id": "t01279",
    "topic": "The Unix Story and Its Legacy",
    "category": "Computing",
-   "guideId": null
+   "guideId": "the-unix-story-and-its-legacy"
   },
   {
    "id": "t01280",
@@ -11764,7 +11764,7 @@
    "id": "t01961",
    "topic": "Ruby and Sapphire — The Corundum Gems",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "ruby-and-sapphire-the-corundum-gems"
   },
   {
    "id": "t01962",
@@ -11776,7 +11776,7 @@
    "id": "t01963",
    "topic": "Opal — Structure, Play of Color and Origin",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "opal-structure-play-of-color-and-origin"
   },
   {
    "id": "t01964",
@@ -13198,7 +13198,7 @@
    "id": "t02200",
    "topic": "Ocean Acidification",
    "category": "Climate",
-   "guideId": null
+   "guideId": "ocean-acidification"
   },
   {
    "id": "t02201",
@@ -13210,7 +13210,7 @@
    "id": "t02202",
    "topic": "Permafrost Thaw and the Carbon Feedback",
    "category": "Climate",
-   "guideId": null
+   "guideId": "permafrost-thaw-and-the-carbon-feedback"
   },
   {
    "id": "t02203",
@@ -15034,13 +15034,13 @@
    "id": "t02506",
    "topic": "Statics: forces and equilibrium in structures",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "statics-forces-and-equilibrium-in-structures"
   },
   {
    "id": "t02507",
    "topic": "Strength of materials: stress, strain and deformation",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "strength-of-materials-stress-strain-and-deformation"
   },
   {
    "id": "t02508",
@@ -17026,13 +17026,13 @@
    "id": "t02838",
    "topic": "Smart grids and grid modernization",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "smart-grids-and-grid-modernization"
   },
   {
    "id": "t02839",
    "topic": "Power system protection: relays, breakers and fuses",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "power-system-protection-relays-breakers-and-fuses"
   },
   {
    "id": "t02840",
@@ -18274,13 +18274,13 @@
    "id": "t03046",
    "topic": "Geography of the Comoros",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-the-comoros"
   },
   {
    "id": "t03047",
    "topic": "Geography of the Democratic Republic of the Congo",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-the-democratic-republic-of-the-congo"
   },
   {
    "id": "t03048",
@@ -23344,7 +23344,7 @@
    "id": "t03891",
    "topic": "LiDAR in Archaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "lidar-in-archaeology"
   },
   {
    "id": "t03892",
@@ -24304,13 +24304,13 @@
    "id": "t04051",
    "topic": "Environmental History",
    "category": "History",
-   "guideId": null
+   "guideId": "environmental-history"
   },
   {
    "id": "t04052",
    "topic": "The Columbian Exchange",
    "category": "History",
-   "guideId": null
+   "guideId": "the-columbian-exchange"
   },
   {
    "id": "t04053",
@@ -29992,13 +29992,13 @@
    "id": "t04999",
    "topic": "Hermeneutics & the Art of Interpretation",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "hermeneutics-the-art-of-interpretation"
   },
   {
    "id": "t05000",
    "topic": "Feminist Literary Criticism",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "feminist-literary-criticism"
   },
   {
    "id": "t05001",
@@ -32182,13 +32182,13 @@
    "id": "t05364",
    "topic": "Semantics — The Study of Meaning",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "semantics-the-study-of-meaning"
   },
   {
    "id": "t05365",
    "topic": "Pragmatics — Meaning in Context",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "pragmatics-meaning-in-context"
   },
   {
    "id": "t05366",
@@ -33352,13 +33352,13 @@
    "id": "t05559",
    "topic": "Negative Numbers and the Integers",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "negative-numbers-and-the-integers"
   },
   {
    "id": "t05560",
    "topic": "Exponents, Powers and the Laws of Indices",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "exponents-powers-and-the-laws-of-indices"
   },
   {
    "id": "t05561",
@@ -36430,7 +36430,7 @@
    "id": "t06072",
    "topic": "How Blood Circulates Through the Body",
    "category": "Medical",
-   "guideId": null
+   "guideId": "how-blood-circulates-through-the-body"
   },
   {
    "id": "t06073",
@@ -36442,7 +36442,7 @@
    "id": "t06074",
    "topic": "Hematopoiesis: How Blood Cells Are Made",
    "category": "Medical",
-   "guideId": null
+   "guideId": "hematopoiesis-how-blood-cells-are-made"
   },
   {
    "id": "t06075",
@@ -38908,13 +38908,13 @@
    "id": "t06485",
    "topic": "Newborn Care Basics for New Parents",
    "category": "Health",
-   "guideId": null
+   "guideId": "newborn-care-basics-for-new-parents"
   },
   {
    "id": "t06486",
    "topic": "Feeding Babies and Introducing Solids",
    "category": "Health",
-   "guideId": null
+   "guideId": "feeding-babies-and-introducing-solids"
   },
   {
    "id": "t06487",
@@ -39694,7 +39694,7 @@
    "id": "t06616",
    "topic": "Social Anxiety Disorder",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "social-anxiety-disorder"
   },
   {
    "id": "t06617",
@@ -40438,7 +40438,7 @@
    "id": "t06740",
    "topic": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "carbohydrates-and-blood-sugar"
   },
   {
    "id": "t06741",
@@ -41674,7 +41674,7 @@
    "id": "t06946",
    "topic": "Scales, Keys and the Circle of Fifths",
    "category": "Music",
-   "guideId": null
+   "guideId": "scales-keys-and-the-circle-of-fifths"
   },
   {
    "id": "t06947",
@@ -41686,7 +41686,7 @@
    "id": "t06948",
    "topic": "Intervals and How to Hear Them",
    "category": "Music",
-   "guideId": null
+   "guideId": "intervals-and-how-to-hear-them"
   },
   {
    "id": "t06949",
@@ -44368,7 +44368,7 @@
    "id": "t07395",
    "topic": "Women in the History of Philosophy",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "women-in-the-history-of-philosophy"
   },
   {
    "id": "t07396",
@@ -45742,7 +45742,7 @@
    "id": "t07624",
    "topic": "Ritual — How Sacred Actions Work",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "ritual-how-sacred-actions-work"
   },
   {
    "id": "t07625",
@@ -47374,7 +47374,7 @@
    "id": "t07896",
    "topic": "Feminist Social Theory",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "feminist-social-theory"
   },
   {
    "id": "t07897",
@@ -48898,13 +48898,13 @@
    "id": "t08150",
    "topic": "Theories of Justice",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "theories-of-justice"
   },
   {
    "id": "t08151",
    "topic": "Power, Authority & Legitimacy",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "power-authority-legitimacy"
   },
   {
    "id": "t08152",
@@ -50626,7 +50626,7 @@
    "id": "t08438",
    "topic": "Soil Erosion Control and Conservation",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "soil-erosion-control-and-conservation"
   },
   {
    "id": "t08439",
@@ -55144,13 +55144,13 @@
    "id": "t09191",
    "topic": "Orson Welles and Citizen Kane",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "orson-welles-and-citizen-kane"
   },
   {
    "id": "t09192",
    "topic": "Film Noir",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "film-noir"
   },
   {
    "id": "t09193",
@@ -81316,7 +81316,7 @@
    "id": "t13553",
    "topic": "Rotational Dynamics and Moment of Inertia",
    "category": "Physics",
-   "guideId": null
+   "guideId": "rotational-dynamics-and-moment-of-inertia"
   },
   {
    "id": "t13554",
@@ -82834,7 +82834,7 @@
    "id": "t13806",
    "topic": "The Great Debate and the Discovery of Galaxies",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "the-great-debate-and-the-discovery-of-galaxies"
   },
   {
    "id": "t13807",
@@ -87976,7 +87976,7 @@
    "id": "t14663",
    "topic": "The Metre: Definition, History and Realisation",
    "category": "Reference",
-   "guideId": null
+   "guideId": "the-metre-definition-history-and-realisation"
   },
   {
    "id": "t14664",
@@ -90232,13 +90232,13 @@
    "id": "t15039",
    "topic": "Reciprocating Saws for Demolition Work",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "reciprocating-saws-for-demolition-work"
   },
   {
    "id": "t15040",
    "topic": "Oscillating Multi-Tools and Their Blades",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "oscillating-multi-tools-and-their-blades"
   },
   {
    "id": "t15041",
@@ -94552,13 +94552,13 @@
    "id": "t15759",
    "topic": "Quartersawn, Riftsawn and Flatsawn Boards",
    "category": "Making",
-   "guideId": null
+   "guideId": "quartersawn-riftsawn-and-flatsawn-boards"
   },
   {
    "id": "t15760",
    "topic": "Buying Rough Lumber and Reading a Board",
    "category": "Making",
-   "guideId": null
+   "guideId": "buying-rough-lumber-and-reading-a-board"
   },
   {
    "id": "t15761",
@@ -98860,7 +98860,7 @@
    "id": "t16477",
    "topic": "Competitor Analysis for New Ventures",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "competitor-analysis-for-new-ventures"
   },
   {
    "id": "t16478",
@@ -104644,7 +104644,7 @@
    "id": "t17441",
    "topic": "How Prices Carry Information",
    "category": "Economics",
-   "guideId": null
+   "guideId": "how-prices-carry-information"
   },
   {
    "id": "t17442",
@@ -104656,7 +104656,7 @@
    "id": "t17443",
    "topic": "Price Elasticity of Supply",
    "category": "Economics",
-   "guideId": null
+   "guideId": "price-elasticity-of-supply"
   },
   {
    "id": "t17444",
@@ -107518,13 +107518,13 @@
    "id": "t17920",
    "topic": "State-Dependent and Mood-Congruent Recall",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "state-dependent-and-mood-congruent-recall"
   },
   {
    "id": "t17921",
    "topic": "Recognition Versus Recall in Testing",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "recognition-versus-recall-in-testing"
   },
   {
    "id": "t17922",
@@ -110392,7 +110392,7 @@
    "id": "t18399",
    "topic": "Biofilms on Food Contact Surfaces",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "biofilms-on-food-contact-surfaces"
   },
   {
    "id": "t18400",
@@ -110404,7 +110404,7 @@
    "id": "t18401",
    "topic": "Toxicoinfection and Toxin-Mediated Illness",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "toxicoinfection-and-toxin-mediated-illness"
   },
   {
    "id": "t18402",
@@ -116824,7 +116824,7 @@
    "id": "t19471",
    "topic": "Finding and Mapping Oven Hot Spots",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "finding-and-mapping-oven-hot-spots"
   },
   {
    "id": "t19472",
@@ -116836,7 +116836,7 @@
    "id": "t19473",
    "topic": "Collagen Breakdown and the Gelatin Conversion",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "collagen-breakdown-and-the-gelatin-conversion"
   },
   {
    "id": "t19474",
@@ -120352,13 +120352,13 @@
    "id": "t20059",
    "topic": "Xiangqi Openings and Cannon Tactics",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "xiangqi-openings-and-cannon-tactics"
   },
   {
    "id": "t20060",
    "topic": "Janggi: Korean Chess and Its Strategy",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "janggi-korean-chess-and-its-strategy"
   },
   {
    "id": "t20061",
@@ -124720,7 +124720,7 @@
    "id": "t20787",
    "topic": "Double Overhand and Barrel Knots",
    "category": "Skills",
-   "guideId": null
+   "guideId": "double-overhand-and-barrel-knots"
   },
   {
    "id": "t20788",
@@ -133714,13 +133714,13 @@
    "id": "t22286",
    "topic": "Avoiding Widowmakers and Dead Standing Timber",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "avoiding-widowmakers-and-dead-standing-timber"
   },
   {
    "id": "t22287",
    "topic": "Insect Pressure and Shelter Placement",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "insect-pressure-and-shelter-placement"
   },
   {
    "id": "t22288",
@@ -134848,13 +134848,13 @@
    "id": "t22475",
    "topic": "Why Shelter Often Beats Fire",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "why-shelter-often-beats-fire"
   },
   {
    "id": "t22476",
    "topic": "The Concept of Survival Triage",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "the-concept-of-survival-triage"
   },
   {
    "id": "t22477",
@@ -135994,13 +135994,13 @@
    "id": "t22666",
    "topic": "Debris Flow Hazards After Wildfire",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "debris-flow-hazards-after-wildfire"
   },
   {
    "id": "t22667",
    "topic": "Reading Flood Maps and Base Flood Elevation",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "reading-flood-maps-and-base-flood-elevation"
   },
   {
    "id": "t22668",
@@ -139606,7 +139606,7 @@
    "id": "t23268",
    "topic": "Measuring Distance on a Map Accurately",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "measuring-distance-on-a-map-accurately"
   },
   {
    "id": "t23269",
@@ -139618,7 +139618,7 @@
    "id": "t23270",
    "topic": "Standard Topographic Map Symbols in the Field",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "standard-topographic-map-symbols-in-the-field"
   },
   {
    "id": "t23271",
@@ -141010,7 +141010,7 @@
    "id": "t23502",
    "topic": "Uphill Walking Technique and Breathing",
    "category": "Movement",
-   "guideId": null
+   "guideId": "uphill-walking-technique-and-breathing"
   },
   {
    "id": "t23503",
@@ -141022,7 +141022,7 @@
    "id": "t23504",
    "topic": "Side Hilling and Traversing Slopes",
    "category": "Movement",
-   "guideId": null
+   "guideId": "side-hilling-and-traversing-slopes"
   },
   {
    "id": "t23505",
@@ -142414,7 +142414,7 @@
    "id": "t23736",
    "topic": "Setting Realistic Preparedness Planning Horizons",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "setting-realistic-preparedness-planning-horizons"
   },
   {
    "id": "t23737",
