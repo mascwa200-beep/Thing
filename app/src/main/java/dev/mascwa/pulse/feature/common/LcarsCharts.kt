@@ -97,8 +97,18 @@ fun LcarsTimeChart(
 
     var vMin = forceMin ?: minOf(all.minOf { it.second }, bands.minOfOrNull { it.from } ?: Double.MAX_VALUE)
     var vMax = forceMax ?: maxOf(all.maxOf { it.second }, bands.maxOfOrNull { it.to } ?: -Double.MAX_VALUE)
+    // Order before widening. A caller pinning one end (forceMin = 0 against an all-negative
+    // series — which is exactly what IMF Bz is) would otherwise leave vMax below vMin, and every
+    // coerceIn(vMin, vMax) below throws on an inverted range.
+    if (vMax < vMin) { val swap = vMin; vMin = vMax; vMax = swap }
     if (vMax - vMin < 1e-9) { vMin -= 0.5; vMax += 0.5 } // a flat line still needs a box to sit in
     val vSpan = vMax - vMin
+    val ySteps = yTicks.coerceAtLeast(1)
+    val xSteps = xTicks.coerceAtLeast(1)
+    // Sort once per data change, not once per frame: this runs inside the draw lambda otherwise.
+    val prepared = remember(usable) {
+        usable.map { s -> s to s.points.sortedBy { it.first } }
+    }
 
     Canvas(modifier) {
         val gutter = 34.dp.toPx()   // left, for value labels
@@ -126,8 +136,8 @@ fun LcarsTimeChart(
         axisPaint.color = c.faint.toArgb()
         axisPaint.textSize = 8.dp.toPx()
         axisPaint.textAlign = Paint.Align.RIGHT
-        for (i in 0..yTicks) {
-            val v = vMin + vSpan * i / yTicks
+        for (i in 0..ySteps) {
+            val v = vMin + vSpan * i / ySteps
             val y = py(v)
             drawLine(
                 color = c.lineSoft.copy(alpha = 0.7f),
@@ -140,9 +150,14 @@ fun LcarsTimeChart(
 
         // Time ticks along the bottom.
         axisPaint.textAlign = Paint.Align.CENTER
-        for (i in 0..xTicks) {
-            val t = tMin + tSpan * i / xTicks
-            val x = px(t).coerceIn(gutter + 10.dp.toPx(), size.width - 10.dp.toPx())
+        // Keep the label bounds ordered: in a container narrower than the gutter plus both margins
+        // — including the zero-width first layout pass — the upper bound falls below the lower one
+        // and coerceIn throws on the empty range.
+        val loX = gutter + 10.dp.toPx()
+        val hiX = (size.width - 10.dp.toPx()).coerceAtLeast(loX)
+        for (i in 0..xSteps) {
+            val t = tMin + tSpan * i / xSteps
+            val x = px(t).coerceIn(loX, hiX)
             drawLine(
                 color = c.lineSoft.copy(alpha = 0.5f),
                 start = Offset(x, 0f), end = Offset(x, plotH), strokeWidth = 1f,
@@ -157,8 +172,7 @@ fun LcarsTimeChart(
         drawLine(c.line, Offset(gutter, plotH), Offset(size.width, plotH), strokeWidth = 1.5f)
 
         // Each series, oldest point first so the path runs left to right.
-        usable.forEach { s ->
-            val pts = s.points.sortedBy { it.first }
+        prepared.forEach { (s, pts) ->
             val line = Path()
             val area = Path()
             pts.forEachIndexed { i, (t, v) ->
@@ -411,6 +425,9 @@ fun LcarsMeter(
 
 /** 3.0 -> "3", 3.25 -> "3.3", 0.004 -> "4e-03" — short axis labels that stay honest. */
 internal fun trimNumber(v: Double): String {
+    // roundToInt() throws outright on NaN, and a NaN reaches here whenever any series value is
+    // NaN — minOf/maxOf propagate it straight into the axis ticks.
+    if (!v.isFinite()) return "—"
     val whole = v.roundToInt()
     return when {
         v == 0.0 -> "0"
