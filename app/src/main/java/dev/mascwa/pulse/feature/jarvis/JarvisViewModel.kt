@@ -186,8 +186,8 @@ class JarvisViewModel(
             memory.append(Speaker.USER, if (cap.isBlank()) "📎 [image]" else "📎 [image] $cap")
             try {
                 val dataUrl = encodeImage(context, uri)
-                if (dataUrl == null) sayJarvis("I couldn't read that image, sir.")
-                else analyzeImages(cap.ifBlank { "Describe and analyze this image in detail, sir." }, listOf(dataUrl))
+                if (dataUrl == null) sayJarvis("I couldn't read that image.")
+                else analyzeImages(cap.ifBlank { "Describe and analyze this image in detail." }, listOf(dataUrl))
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -211,20 +211,20 @@ class JarvisViewModel(
             memory.append(Speaker.USER, "📎 [file${name?.let { ": $it" } ?: ""}]" + if (cap.isBlank()) "" else " $cap")
             try {
                 val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty().lowercase()
-                val prompt = cap.ifBlank { "Interpret and summarize this file, sir." }
+                val prompt = cap.ifBlank { "Interpret and summarize this file." }
                 when {
                     mime.startsWith("image/") -> {
                         val d = encodeImage(context, uri)
-                        if (d == null) sayJarvis("I couldn't read that image, sir.") else analyzeImages(prompt, listOf(d))
+                        if (d == null) sayJarvis("I couldn't read that image.") else analyzeImages(prompt, listOf(d))
                     }
                     mime == "application/pdf" || name?.endsWith(".pdf", true) == true -> {
                         val pages = renderPdf(context, uri)
-                        if (pages.isEmpty()) sayJarvis("I couldn't read that PDF, sir.") else analyzeImages(prompt, pages)
+                        if (pages.isEmpty()) sayJarvis("I couldn't read that PDF.") else analyzeImages(prompt, pages)
                     }
                     isTextual(mime, name) -> {
                         val text = readTextFile(context, uri)
                         if (text.isNullOrBlank()) {
-                            sayJarvis("That file looks empty or unreadable, sir.")
+                            sayJarvis("That file looks empty or unreadable.")
                         } else {
                             runCatching { engine.ensureReady() }
                             val full = "$prompt\n\nFile \"${name ?: "document"}\" contents:\n${text.take(MAX_FILE_CHARS)}"
@@ -238,7 +238,7 @@ class JarvisViewModel(
                             speakIfEnabled(reply)
                         }
                     }
-                    else -> sayJarvis("I can't read that file type, sir — try an image, a PDF, or a text/code file.")
+                    else -> sayJarvis("I can't read that file type — try an image, a PDF, or a text/code file.")
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -255,10 +255,10 @@ class JarvisViewModel(
     private suspend fun analyzeImages(prompt: String, dataUrls: List<String>) {
         val vision = engine as? dev.mascwa.pulse.jarvis.inference.VisionEngine
         if (vision == null || !runCatching { vision.supportsVision() }.getOrDefault(false)) {
-            sayJarvis("I need a cloud AI key (Setup) to see images or PDFs, sir — the on-device model can't.")
+            sayJarvis("I need a cloud AI key (Setup) to see images or PDFs — the on-device model can't.")
             return
         }
-        if (dataUrls.isEmpty()) { sayJarvis("Nothing to analyze, sir."); return }
+        if (dataUrls.isEmpty()) { sayJarvis("Nothing to analyze."); return }
         val sb = StringBuilder()
         vision.generateWithImages(prompt, dataUrls, withMemory(composePersona(), prompt)).collect { tok ->
             sb.append(tok)
@@ -357,7 +357,7 @@ class JarvisViewModel(
                 // transient "process lost" self-heals instead of sticking on the persona core.
                 runCatching { engine.ensureReady() }
                 // Self-coding / self-edit live only inside the agent loop, so enabling either implies the
-                // tool loop even if "Agent Tools" itself is off — otherwise J.A.R.V.I.S. has no tools and
+                // tool loop even if "Agent Tools" itself is off — otherwise the computer has no tools and
                 // wrongly insists it can't read or change its own code.
                 val jcfg = runCatching { settings.current().jarvis }.getOrNull()
                 val useAgent = jcfg != null &&
@@ -420,24 +420,24 @@ class JarvisViewModel(
             }
             val fact = curiosity.distill(pending.question, text)
             pendingLearn = pending.copy(staged = fact)
-            sayJarvis("Noted — I'll remember: \"$fact\". Shall I keep that, sir? (yes / no — or just correct me.)")
+            sayJarvis("Noted — I'll remember: \"$fact\". Shall I keep that? (yes / no — or just correct me.)")
             return
         }
         when (curiosity.classify(text)) {
             CuriosityEngine.Confirm.AFFIRM -> {
                 runCatching { memory.remember(pending.staged, NoteSource.LEARNED) }
                 pendingLearn = null
-                sayJarvis("Committed to memory, sir.")
+                sayJarvis("Committed to memory.")
             }
             CuriosityEngine.Confirm.REJECT -> {
                 pendingLearn = null
-                sayJarvis("Forgotten, sir.")
+                sayJarvis("Forgotten.")
             }
             CuriosityEngine.Confirm.CORRECTION -> {
                 val fact = curiosity.distill(pending.question, text)
                 runCatching { memory.remember(fact, NoteSource.LEARNED) }
                 pendingLearn = null
-                sayJarvis("Corrected — saved, sir.")
+                sayJarvis("Corrected — saved.")
             }
             CuriosityEngine.Confirm.OTHER -> {
                 // Not an answer — don't hijack the conversation. Drop the staged fact and route normally.
@@ -543,7 +543,10 @@ class JarvisViewModel(
      *  plus the always-on user-profile digest (durable preferences/interests/projects) so tailoring is
      *  proactive on every turn, not gated on a keyword recall. */
     private suspend fun composePersona(): String {
-        val base = JarvisPersona.compose(runCatching { selfEdit.current().charter }.getOrDefault(""))
+        val base = JarvisPersona.compose(
+            charter = runCatching { selfEdit.current().charter }.getOrDefault(""),
+            address = runCatching { settings.current().jarvis.address }.getOrDefault(""),
+        )
         var prompt = base
         val digest = runCatching { profile.digest() }.getOrDefault("")
         if (digest.isNotBlank()) {
@@ -703,7 +706,7 @@ class JarvisViewModel(
     fun rejectCode(action: dev.mascwa.pulse.data.selfedit.PendingAction) {
         viewModelScope.launch {
             runCatching { approvalGate.reject(action.id) }
-            sayJarvis("Dropped that change, sir.")
+            sayJarvis("Dropped that change.")
         }
     }
 

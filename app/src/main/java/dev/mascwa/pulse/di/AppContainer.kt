@@ -1,6 +1,9 @@
 package dev.mascwa.pulse.di
 
 import android.content.Context
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.data.economy.EconomyRepository
@@ -306,9 +309,40 @@ class AppContainer(private val appContext: Context) {
     val actionOrchestrator: dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator by lazy {
         dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator(appContext)
     }
-    /** On-device text-to-speech so J.A.R.V.I.S. can speak replies (AOSP, no Play Services). */
-    val textToSpeech: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine by lazy {
-        dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext)
+    /**
+     * The chosen TTS voice, kept fresh by [observeVoicePreference].
+     *
+     * A plain field rather than a settings read because the engine selects its voice inside the
+     * platform's init callback, which is not a coroutine and cannot suspend — and
+     * `SettingsRepository.current()` is suspend. Blank until the first emission arrives, which the
+     * engine handles by auto-selecting and then correcting itself on the first emission.
+     */
+    @Volatile private var voicePreference: String = ""
+
+    private val ttsLazy = lazy {
+        dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine(appContext, preferredVoice = { voicePreference })
+    }
+
+    /** On-device text-to-speech so the computer can speak replies (AOSP, no Play Services). */
+    val textToSpeech: dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine by ttsLazy
+
+    /**
+     * Track the voice choice from the application scope.
+     *
+     * Deliberately does **not** touch [textToSpeech] unless it already exists: binding a TTS service
+     * costs about a second and most launches never speak, so the engine stays lazy and only an engine
+     * that is already up gets told to re-select.
+     */
+    fun observeVoicePreference(scope: kotlinx.coroutines.CoroutineScope) {
+        scope.launch {
+            settingsRepository.settings
+                .map { it.jarvis.voiceName }
+                .distinctUntilChanged()
+                .collect { name ->
+                    voicePreference = name
+                    if (ttsLazy.isInitialized()) runCatching { textToSpeech.useVoice(name) }
+                }
+        }
     }
     /** Offline on-device speech recognition (Vosk) for tap-to-talk and the wake word. */
     val voskSpeech: dev.mascwa.pulse.jarvis.voice.VoskSpeech by lazy {

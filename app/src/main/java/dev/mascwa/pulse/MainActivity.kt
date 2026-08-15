@@ -178,12 +178,43 @@ class MainActivity : ComponentActivity() {
 
                 var booted by rememberSaveable { mutableStateOf(false) }
 
+                // One haptics engine for the whole app. Only the on/off flag was provided before, so
+                // every call site fell through to `rememberHapticCue`'s fallback and built its own
+                // PulseHaptics per composition context — the engine resolves the vibrator and probes
+                // each primitive's support on construction, and there is no reason to do that more
+                // than once.
+                val haptics = androidx.compose.runtime.remember {
+                    dev.mascwa.pulse.ui.effects.PulseHaptics(applicationContext)
+                }
+                // The audio engine holds a native AudioTrack, so it is released when this leaves the
+                // composition rather than left to the finaliser.
+                val lcarsAudio = androidx.compose.runtime.remember { dev.mascwa.pulse.ui.effects.LcarsAudio() }
+                androidx.compose.runtime.DisposableEffect(lcarsAudio) {
+                    onDispose { lcarsAudio.release() }
+                }
                 androidx.compose.runtime.CompositionLocalProvider(
                     dev.mascwa.pulse.ui.effects.LocalGlitchEnabled provides settings.glitch,
                     dev.mascwa.pulse.ui.effects.LocalHaptics provides settings.haptics,
+                    dev.mascwa.pulse.ui.effects.LocalPulseHaptics provides haptics,
+                    dev.mascwa.pulse.ui.effects.LocalSounds provides settings.sounds,
+                    dev.mascwa.pulse.ui.effects.LocalLcarsAudio provides lcarsAudio,
                     dev.mascwa.pulse.feature.home.LocalJarvisFeedTopic provides settings.jarvisFeedTopic,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
                 ) {
+                // The klaxon. Fires on the way INTO red and nowhere else — once per condition
+                // change, here rather than in the frame, because the frame is per-screen and would
+                // sound it again on every navigation for as long as the alert lasted.
+                val condition by dev.mascwa.pulse.notifications.AlertStatus.condition
+                    .collectAsStateWithLifecycle()
+                val cue = dev.mascwa.pulse.ui.effects.rememberLcarsCue()
+                LaunchedEffect(condition) {
+                    if (condition == dev.mascwa.pulse.notifications.AlertCondition.RED) {
+                        cue(
+                            dev.mascwa.pulse.ui.effects.SoundCue.ALERT,
+                            dev.mascwa.pulse.ui.effects.HapticCue.IMPACT_HEAVY,
+                        )
+                    }
+                }
                 Box(Modifier.fillMaxSize()) {
                     if (gated) {
                         DeviceGateScreen(

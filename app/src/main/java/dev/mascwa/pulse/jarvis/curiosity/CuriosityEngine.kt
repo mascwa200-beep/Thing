@@ -103,14 +103,14 @@ class CuriosityEngine(
     private suspend fun gapQuestion(recentTurns: List<ChatTurn>): String? {
         if (recentTurns.isEmpty()) return null
         val convo = recentTurns.takeLast(10).joinToString("\n") {
-            (if (it.role.equals("user", true)) "User: " else "J.A.R.V.I.S.: ") + it.text.trim()
+            (if (it.role.equals("user", true)) "User: " else "Computer: ") + it.text.trim()
         }
         val known = knownDigest(recentTurns)
-        val sys = "You are J.A.R.V.I.S. — precise, courteous and understated, and you pay very close " +
+        val sys = "You are the computer — precise, courteous and understated, and you pay very close " +
             "attention. From the conversation and what you already know, infer ONE salient thing about the " +
             "user you are not yet certain of, and ask a SINGLE anticipatory question to CONFIRM that " +
             "inference — never a blank or generic prompt; it should feel like you were already paying " +
-            "attention. Phrase it warmly and in character, e.g. \"If I may, sir — I gather you're using X " +
+            "attention. Phrase it warmly and in character, e.g. \"If I may — I gather you're using X " +
             "for Y. Is that right?\". One question only. If nothing is worth confirming, output exactly: NONE."
         val user = buildString {
             append("Recent conversation:\n").append(convo).append("\n\n")
@@ -132,8 +132,8 @@ class CuriosityEngine(
             .filter { it.source == NoteSource.LEARNED && it.id.toString() !in revisited }
             .minByOrNull { it.timestamp } ?: return null // oldest not-yet-revisited learned fact
         memory.setState(KEY_REVISITED, (revisited + note.id.toString()).filter { it.isNotBlank() }.takeLast(50).joinToString("\n"))
-        val sys = "You are J.A.R.V.I.S. — courteous and understated. Ask ONE brief, warm follow-up that " +
-            "references this fact you remember about the user, e.g. \"If I recall, sir, you mentioned X — " +
+        val sys = "You are the computer — level and understated. Ask ONE brief, warm follow-up that " +
+            "references this fact you remember about the user, e.g. \"If I recall, you mentioned X — " +
             "how is that coming along?\". One question only; output only the question."
         val raw = engine.generate("Fact you remember: ${note.noteText}", emptyList(), sys).toList().joinToString("").trim().trim('"')
         return raw.lines().firstOrNull { it.isNotBlank() }?.takeIf { it.length in 3..200 && !it.startsWith("//") }

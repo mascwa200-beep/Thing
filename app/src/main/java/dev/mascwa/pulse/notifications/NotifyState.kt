@@ -18,4 +18,11 @@ data class NotifyState(
     /** The one-notification board: the last urgencyKey that buzzed the alert channel, so the same urgent
      *  item alerts exactly once and every later refresh stays silent. Owned by BriefEngine. */
     val lastUrgentKey: String = "",
+    /**
+     * The condition the last published board was in, so a cold app launch opens in the right one.
+     *
+     * Without it the console would sit at ROUTINE until the next worker pass — up to a refresh
+     * interval of showing calm orange while the tray reads RED ALERT. Owned by BriefEngine.
+     */
+    val lastCondition: String = "",
 )

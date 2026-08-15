@@ -26,14 +26,14 @@ class ProposeCodeChangeTool(
 
     override suspend fun run(arg: String): String {
         val a = arg.trim()
-        if (a.isBlank()) return "Tell me what to change, sir."
+        if (a.isBlank()) return "Tell me what to change."
         val (pathHint, goal) = if ("|" in a) {
             val parts = a.split("|", limit = 2).map { it.trim() }
             parts.getOrElse(0) { "" }.ifBlank { null } to parts.getOrElse(1) { "" }
         } else {
             null to a
         }
-        if (goal.isBlank()) return "Tell me what to change, sir."
+        if (goal.isBlank()) return "Tell me what to change."
         return runCatching {
             val result = selfCoder.stage(goal, pathHint)
             val action = result.action

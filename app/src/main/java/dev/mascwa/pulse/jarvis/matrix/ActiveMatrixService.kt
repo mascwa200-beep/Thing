@@ -22,6 +22,7 @@ import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.telemetry.WakePhrase
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.agent.AgentOrchestrator
@@ -159,7 +160,7 @@ class ActiveMatrixService : Service() {
             lowPowerConserve = true
             if (!batteryWarned) {
                 batteryWarned = true
-                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power, sir."
+                val msg = "Battery critical at ${ctx.batteryPct}% — conserving power."
                 update("⚠ $msg")
                 // Speak only when not mid-command: a TTS speak() here QUEUE_FLUSHes an in-flight spoken
                 // reply, dropping its done-callback so the wake mic never re-arms. The notification still
@@ -267,9 +268,9 @@ class ActiveMatrixService : Service() {
         }
         resetConvo() // back to idle: any open conversation is over
         capturing = false
-        update("Listening for \"J.A.R.V.I.S.\"…")
+        update("Listening for \"${WakePhrase.WORD.replaceFirstChar { it.uppercase() }}\"…")
         // Wake model (128 MB lgraph) with a keyword grammar: tight, cheap spotting for an always-on
-        // mic. The lenient isWakePhrase below still catches the near-homophones the model emits.
+        // mic. WakePhrase still catches the near-homophones the model emits.
         val started = vosk.start(dictation = false, grammar = WAKE_GRAMMAR, listener = object : VoskListener {
             override fun onPartial(text: String) { maybeWake(vosk, text) }
             override fun onFinal(text: String) { maybeWake(vosk, text) }
@@ -300,28 +301,15 @@ class ActiveMatrixService : Service() {
         voiceScope.launch { captureCommand(vosk) }
     }
 
-    /** Lenient wake detection: accepts "jarvis"/"hey jarvis"/etc., the near-homophones the small STT
-     *  model tends to mishear, and any token within an edit distance of 1 of "jarvis". */
-    private fun isWakePhrase(text: String): Boolean {
-        val lower = text.lowercase()
-        if (WAKE_WORDS.any { lower.contains(it) }) return true
-        return lower.split(Regex("[^a-z]+")).any { it.length in 4..7 && levenshtein(it, "jarvis") <= 1 }
-    }
-
-    /** Iterative Levenshtein edit distance (small strings; allocation-light). */
-    private fun levenshtein(a: String, b: String): Int {
-        val dp = IntArray(b.length + 1) { it }
-        for (i in 1..a.length) {
-            var prev = dp[0]
-            dp[0] = i
-            for (j in 1..b.length) {
-                val tmp = dp[j]
-                dp[j] = if (a[i - 1] == b[j - 1]) prev else 1 + minOf(prev, dp[j], dp[j - 1])
-                prev = tmp
-            }
-        }
-        return dp[b.length]
-    }
+    /**
+     * Wake detection now lives in [WakePhrase], a tested core.
+     *
+     * It was moved because the version here gated its fuzzy pass on `token.length in 4..7` — sized
+     * for "jarvis". Renaming the wake word to an eight-letter one would have left the strict matches
+     * working and the lenient ones silently dead, with nothing to report it. The window is derived
+     * from the word now, and there is a test that fails if it ever excludes the word again.
+     */
+    private fun isWakePhrase(text: String): Boolean = WakePhrase.matches(text)
 
     /** After the wake word, capture one free-form command, answer it, and speak the reply.
      *  Prefer the device's on-device Google recognizer (far more accurate, private, no app memory);
@@ -330,7 +318,7 @@ class ActiveMatrixService : Service() {
     private fun captureCommand(vosk: VoskSpeech) {
         val google = container?.deviceSpeech
         if (google != null && google.available) {
-            update("Yes, sir? Listening…")
+            update("Listening.")
             vosk.stop() // hand the mic to the system recognizer (no two-mic contention)
             google.listen(COMMAND_TIMEOUT_MS, object : VoskListener {
                 override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
@@ -359,7 +347,7 @@ class ActiveMatrixService : Service() {
     /** Offline fallback command capture on the Vosk wake model (used when on-device recognition
      *  isn't available). Same 128 MB model as wake spotting, so it never loads the heavy model. */
     private fun captureCommandVosk(vosk: VoskSpeech) {
-        update("Yes, sir? Listening…")
+        update("Listening.")
         vosk.start(dictation = false, grammar = null, timeoutMs = COMMAND_TIMEOUT_MS, listener = object : VoskListener {
             override fun onPartial(text: String) { if (text.isNotBlank()) update("◌ $text") }
             override fun onFinal(text: String) {
@@ -408,7 +396,7 @@ class ActiveMatrixService : Service() {
         vosk.stop()
         // Honour an explicit "stop" before doing anything else.
         if (isStopCue(command)) {
-            endConversation(vosk, "Very good, sir.")
+            endConversation(vosk, "Acknowledged.")
             return
         }
         update("One moment…")
@@ -423,7 +411,8 @@ class ActiveMatrixService : Service() {
         try {
             runCatching { engine.ensureReady() }
             var persona = JarvisPersona.compose(
-                runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
+                charter = runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
+                address = jarvisSettings?.address.orEmpty(),
             )
             // Only in conversation mode: let the model self-direct whether to keep the floor open.
             // (Appended here, not to the global persona, so the markers never leak into the console.)
@@ -451,7 +440,7 @@ class ActiveMatrixService : Service() {
             } else {
                 engine.generate(command, history, persona).collect { sb.append(it) }
             }
-            var reply = sb.toString().ifBlank { "Standing by, sir." }
+            var reply = sb.toString().ifBlank { "Standing by." }
             // Autonomous floor-control: explicit markers win; otherwise a trailing "?" implies it
             // expects an answer. Strip markers before showing/speaking either way.
             val wantsClose = reply.contains(MARK_CLOSE)
@@ -479,7 +468,7 @@ class ActiveMatrixService : Service() {
             throw e // honour service teardown — don't re-arm the mic on a dying service
         } catch (e: Throwable) {
             Log.e(TAG, "respond: failed to answer", e)
-            update("I couldn't answer that one, sir.")
+            update("I couldn't answer that one.")
             resetConvo()
             listenForWake(vosk)
         }
@@ -498,7 +487,7 @@ class ActiveMatrixService : Service() {
     private fun wrapUp(vosk: VoskSpeech) {
         convoTurns = 0
         convoStartedAt = System.currentTimeMillis() // fresh budget if the user carries on
-        speakThen("Will that be all, sir?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+        speakThen("Will that be all?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
     }
 
     /** End any open conversation: optionally speak a closing line, then return to wake listening. */
@@ -560,7 +549,7 @@ class ActiveMatrixService : Service() {
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Active-Matrix", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Keeps J.A.R.V.I.S. resident and surfaces proactive remarks."
+                    description = "Keeps the computer resident and surfaces proactive remarks."
                     setShowBadge(false)
                 },
             )
@@ -589,10 +578,7 @@ class ActiveMatrixService : Service() {
 
         // Keyword-spotting grammar for the small wake model: the wake word, common lead-ins, and the
         // unknown-word token. Vosk only emits words it's told about, so multi-word forms are explicit.
-        private const val WAKE_GRAMMAR =
-            "[\"jarvis\", \"hey jarvis\", \"ok jarvis\", \"okay jarvis\", \"hi jarvis\", \"[unk]\"]"
-        // Near-homophones the STT model often produces for "jarvis"; matched leniently below.
-        private val WAKE_WORDS = listOf("jarvis", "jervis", "jarvas", "jarvix", "javis", "travis", "charvis")
+        private const val WAKE_GRAMMAR = WakePhrase.GRAMMAR
         private const val TAG = "JarvisVoice"
         // Re-arm the wake loop if no command is spoken within this window after waking.
         private const val COMMAND_TIMEOUT_MS = 8000
@@ -624,7 +610,7 @@ class ActiveMatrixService : Service() {
         // Short whole-utterance phrases that end an exchange.
         private val STOP_CUES = listOf(
             "stop", "that's all", "thats all", "that is all", "thank you", "thanks",
-            "thank you jarvis", "thanks jarvis", "goodbye", "bye", "dismiss", "stand down",
+            "thank you computer", "thanks computer", "goodbye", "bye", "dismiss", "stand down",
             "that'll be all", "thatll be all", "nevermind", "never mind", "cancel", "be quiet",
         )
 

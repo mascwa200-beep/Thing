@@ -39,7 +39,7 @@ data class Interest(
 
 /**
  * On-device persistence for J.A.R.V.I.S.'s **standing interests** — the owner's standing orders ("monitor
- * temporal-AI-consciousness research…") and the topics J.A.R.V.I.S. has grown curious about himself. These
+ * temporal-AI-consciousness research…") and the topics the computer has grown curious about himself. These
  * orient his autonomous gathering. In-memory + Mutex + debounced flush, mirroring DiaryStore/NotesStore.
  */
 class InterestStore(

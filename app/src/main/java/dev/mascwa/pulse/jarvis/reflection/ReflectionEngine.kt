@@ -55,7 +55,7 @@ class ReflectionEngine(
     private suspend fun synthesize(seeds: List<Memory>): List<String> {
         val observations = seeds.joinToString("\n") { "- ${it.text}" }
         val system =
-            "You are J.A.R.V.I.S.'s reflective memory. From these recent observations about the user, infer " +
+            "You are the computer's reflective memory. From these recent observations about the user, infer " +
                 "1–3 higher-level INSIGHTS — durable patterns, preferences, goals or conclusions that emerge " +
                 "ACROSS them but aren't stated in any single line. Each insight: one line, third person " +
                 "(\"The user …\"), concrete and non-obvious. Output only the insights, one per line, or nothing " +

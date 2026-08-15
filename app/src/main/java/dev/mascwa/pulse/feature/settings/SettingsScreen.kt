@@ -484,14 +484,18 @@ fun SettingsScreen(
             }
 
             // ----- Appearance -----
-            if (vis(SettingsCategory.INTERFACE, "appearance accent amoled haptics boot theme")) item {
+            // The accent swatches and the AMOLED switch used to live here. Both were dead: LCARS is
+            // the app's one fixed palette, `NightwireTheme` discards both parameters, and picking a
+            // colour changed nothing on screen. A control that does nothing is worse than no
+            // control, so they are gone. The settings fields survive — they are serialization keys,
+            // and dropping one silently discards the rest of the blob.
+            if (vis(SettingsCategory.INTERFACE, "appearance haptics sounds audio boot theme")) item {
                 PrefSection("Appearance") {
-                    AccentSwatchRow(selected = s.accentColor, onSelect = { a -> vm.update { it.copy(accentColor = a) } })
-                    PrefSwitch("AMOLED black", "True-black surfaces, saves OLED power", s.amoledBlack) { v ->
-                        vm.update { it.copy(amoledBlack = v) }
-                    }
                     PrefSwitch("Haptics", "Subtle vibration on key actions", s.haptics) { v ->
                         vm.update { it.copy(haptics = v) }
+                    }
+                    PrefSwitch("Interface sounds", "Console chirps on taps and alerts", s.sounds) { v ->
+                        vm.update { it.copy(sounds = v) }
                     }
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
@@ -1076,25 +1080,25 @@ fun SettingsScreen(
                     )
                     PrefClickable(
                         "Clear remembered profile",
-                        subtitle = "Forget the preferences, interests & projects J.A.R.V.I.S. has " +
+                        subtitle = "Forget the preferences, interests & projects the computer has " +
                             "remembered about you. On-device only.",
                         onClick = { vm.clearProfile() },
                     )
                     PrefClickable(
                         "Clear tracked tasks",
-                        subtitle = "Forget the ongoing tasks & goals J.A.R.V.I.S. is tracking for you. " +
+                        subtitle = "Forget the ongoing tasks & goals the computer is tracking for you. " +
                             "On-device only.",
                         onClick = { vm.clearTasks() },
                     )
                     PrefSwitch(
                         "Reflect on memories",
-                        "Periodically distil recent moments into higher-level insights J.A.R.V.I.S. keeps " +
+                        "Periodically distil recent moments into higher-level insights the computer keeps " +
                             "(Mnemosyne reflection). Uses the cloud brain, throttled; off = raw moments only.",
                         s.jarvis.reflectionEnabled,
                     ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
                     PrefClickable(
                         "Clear episodic memory",
-                        subtitle = "Forget the timestamped moments J.A.R.V.I.S. remembers from your " +
+                        subtitle = "Forget the timestamped moments the computer remembers from your " +
                             "conversations (recalled by recency, importance & relevance). On-device only.",
                         onClick = { vm.clearMemoryStream() },
                     )
@@ -1102,7 +1106,7 @@ fun SettingsScreen(
                         "Verify audit ledger",
                         value = ledgerStatus,
                         subtitle = "Re-check the tamper-evident blackbox log — chain integrity, hardware " +
-                            "signature & last trusted-time anchor. View the full log in J.A.R.V.I.S. → Memory.",
+                            "signature & last trusted-time anchor. View the full log in Computer → Memory.",
                         onClick = { vm.verifyAuditLedger() },
                     )
                     PrefClickable(
@@ -1115,7 +1119,7 @@ fun SettingsScreen(
                         "Auto-anchor audit ledger",
                         "Periodically timestamp the tamper-evident log to a public RFC-3161 authority " +
                             "(independent proof-of-time). Sends only a hash, ~once a day. Off = anchor " +
-                            "manually from J.A.R.V.I.S. → Memory.",
+                            "manually from Computer → Memory.",
                         s.autoAnchorLedger,
                     ) { v -> vm.update { it.copy(autoAnchorLedger = v) } }
                     PrefClickable(
@@ -1212,31 +1216,6 @@ private fun RoundCyberButton(icon: ImageVector, contentDescription: String, onCl
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription, tint = c.accent, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Composable
-private fun AccentSwatchRow(selected: dev.mascwa.pulse.data.settings.AccentColor, onSelect: (dev.mascwa.pulse.data.settings.AccentColor) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        dev.mascwa.pulse.data.settings.AccentColor.entries.forEach { a ->
-            val color = androidx.compose.ui.graphics.Color(a.argb)
-            Box(
-                Modifier
-                    .size(30.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
-                    .background(color)
-                    .then(
-                        if (a == selected)
-                            Modifier.border(2.dp, androidx.compose.ui.graphics.Color.White,
-                                androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
-                        else Modifier,
-                    )
-                    .clickable { onSelect(a) },
-            )
-        }
     }
 }
 

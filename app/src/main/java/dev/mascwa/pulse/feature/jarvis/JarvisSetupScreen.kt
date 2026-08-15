@@ -80,6 +80,8 @@ fun JarvisSetupScreen(
     val resident by vm.resident.collectAsState()
     val vitals by vm.vitals.collectAsState()
     val voiceReplies by vm.voiceReplies.collectAsState()
+    val voiceName by vm.voiceName.collectAsState()
+    val voices by vm.voices.collectAsState()
     val wakeWord by vm.wakeWord.collectAsState()
     val followUpMode by vm.followUpMode.collectAsState()
     val conversationMode by vm.conversationMode.collectAsState()
@@ -98,6 +100,7 @@ fun JarvisSetupScreen(
     val maxTokens by vm.maxTokens.collectAsState()
     val curiosityLevel by vm.curiosityLevel.collectAsState()
     val charter by vm.charter.collectAsState()
+    val address by vm.address.collectAsState()
     val feedTopic by vm.feedTopic.collectAsState()
     val autonomousCuriosity by vm.autonomousCuriosity.collectAsState()
     val githubToken by vm.githubToken.collectAsState()
@@ -116,10 +119,10 @@ fun JarvisSetupScreen(
             val (name, text) = readPickedDocument(context, uri)
             if (text.isNotBlank()) {
                 vm.addKnowledge(name, text)
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Imported \"$name\", sir.", Toast.LENGTH_SHORT).show() }
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Imported \"$name\".", Toast.LENGTH_SHORT).show() }
             } else {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Couldn't read that — try a text file or a Google Doc, sir.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Couldn't read that — try a text file or a Google Doc.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -278,6 +281,14 @@ fun JarvisSetupScreen(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
             )
 
+            FieldLabel("ADDRESS  ·  what it calls you")
+            MonoField(address, vm::setAddress, "Captain, Commander, your name… (blank = no honorific)")
+            Text(
+                "Blank is the default, and what a ship's computer actually does: it addresses you " +
+                    "directly. Set a term and it will use it — sparingly, not in every line.",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+
             FieldLabel("CHARTER  ·  the Computer's personality, prepended to every prompt")
             MonoFieldArea(
                 charter, vm::onCharterChange,
@@ -337,6 +348,16 @@ fun JarvisSetupScreen(
                 onToggle = vm::setVoiceReplies,
             )
 
+            if (voiceReplies) {
+                // Only bind the TTS engine and enumerate voices once the user actually wants speech.
+                androidx.compose.runtime.LaunchedEffect(Unit) { vm.loadVoices() }
+                VoicePicker(
+                    voices = voices,
+                    selected = voiceName,
+                    onPick = vm::setVoiceName,
+                )
+            }
+
             SettingToggle(
                 title = "ACTIVE-MATRIX",
                 subtitle = "Keep the Computer resident in the background and surface proactive, " +
@@ -349,7 +370,7 @@ fun JarvisSetupScreen(
             )
 
             SettingToggle(
-                title = "WAKE WORD · \"J.A.R.V.I.S.\"",
+                title = "WAKE WORD · \"COMPUTER\"",
                 subtitle = "Listen for the wake word, then take a spoken command. Wake detection uses a " +
                     "small offline model (~128 MB, downloaded on first use); the command is transcribed " +
                     "by your phone's on-device speech recognition (private — audio stays on the device), " +
@@ -375,7 +396,7 @@ fun JarvisSetupScreen(
             SettingToggle(
                 title = "FOLLOW-UP MODE",
                 subtitle = "After a spoken reply, listen again briefly so you can respond without " +
-                    "re-saying \"J.A.R.V.I.S.\" — ends when you go quiet. Requires the wake word.",
+                    "re-saying \"Computer\" — ends when you go quiet. Requires the wake word.",
                 enabled = followUpMode,
                 onToggle = vm::setFollowUpMode,
             )
@@ -619,6 +640,65 @@ private fun ModelPresetRow(onPick: (String) -> Unit) {
                 Text(preset.note, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
             }
         }
+    }
+}
+
+/**
+ * Choose which installed voice speaks.
+ *
+ * Voices are listed by the engine's own names, tidied — there is no portable way to get a friendly
+ * one, and inventing labels would mean claiming things about a voice the platform never told us.
+ * AUTO is first and is the honest default: it picks the best available, and on a device whose engine
+ * exposes no gender hint that is all anyone can do.
+ */
+@Composable
+private fun VoicePicker(
+    voices: List<dev.mascwa.pulse.jarvis.voice.VoiceOption>,
+    selected: String,
+    onPick: (String) -> Unit,
+) {
+    val c = Pulse.colors
+    NeonPanel {
+        // NeonPanel lays its content out in a Box, so several children would stack on top of each
+        // other. The Column is load-bearing.
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "VOICE",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.ink,
+            )
+            Text(
+                if (voices.isEmpty()) {
+                    "No text-to-speech voices found. Install a speech engine or a language pack to choose one."
+                } else {
+                    "Tap to hear it. AUTO leans female and American — the register the computer is dressed as."
+                },
+                fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+            )
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                VoiceChip("AUTO", selected.isBlank()) { onPick("") }
+                voices.forEach { v ->
+                    VoiceChip(v.label, v.name == selected) { onPick(v.name) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceChip(label: String, on: Boolean, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val tint = if (on) c.accent else c.muted
+    Box(
+        Modifier
+            .border(1.dp, tint.copy(alpha = if (on) 0.6f else 0.3f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .background(tint.copy(alpha = if (on) 0.12f else 0.04f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = tint)
     }
 }
 

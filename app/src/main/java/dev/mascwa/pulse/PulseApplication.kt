@@ -49,6 +49,13 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
                 .distinctUntilChanged()
                 .collect { CleartextPolicy.enabled = it }
         }
+        // Keep the spoken voice in step with the setting. Does not create the TTS engine — most
+        // launches never speak, and binding one costs about a second.
+        container.observeVoicePreference(appScope)
+        // Open in whatever alert condition the last published board was in.
+        appScope.launch {
+            runCatching { dev.mascwa.pulse.notifications.BriefEngine.restoreCondition(container) }
+        }
     }
 
     override val workManagerConfiguration: Configuration

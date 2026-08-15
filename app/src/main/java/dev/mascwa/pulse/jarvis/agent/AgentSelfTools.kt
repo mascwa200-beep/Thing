@@ -13,7 +13,7 @@ import java.util.UUID
  * offered to the model when the user has turned self-edit on. [SelfInspectTool] is read-only.
  */
 private fun proposed(label: String) =
-    "Proposed: $label. It's queued in Approvals and will only take effect when you tap APPROVE, sir."
+    "Proposed: $label. It's queued in Approvals and will only take effect when you tap APPROVE."
 
 class ProposePersonaTool(private val selfEdit: SelfEditStore) : JarvisTool {
     override val name = "propose_persona"

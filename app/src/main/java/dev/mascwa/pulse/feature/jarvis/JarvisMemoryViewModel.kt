@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Backs the Memory screen — the user's view of (and control over) everything J.A.R.V.I.S. has learned.
+ * Backs the Memory screen — the user's view of (and control over) everything the computer has learned.
  * Every durable note is editable and deletable here; the structured profile (preferences / interests /
  * projects) is also visible and curatable, code-enforced like the rest of the app.
  */
@@ -55,7 +55,7 @@ class JarvisMemoryViewModel(
         .map { TaskBoard.pending(it) + TaskBoard.completed(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Live episodic memory stream (newest first) — what J.A.R.V.I.S. has observed, view + curate. */
+    /** Live episodic memory stream (newest first) — what the computer has observed, view + curate. */
     val episodic: StateFlow<List<Memory>> = memoryStream.memoriesFlow
         .map { list -> list.sortedByDescending { it.createdMs } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

@@ -31,10 +31,10 @@ class ReminderTool(
         val p = arg.split("|", limit = 2).map { it.trim() }
         val whenText = p.getOrElse(0) { "" }
         val message = p.getOrElse(1) { "" }.ifBlank { "Reminder" }
-        if (whenText.isBlank()) return "When should I remind you, sir? e.g. \"in 20 minutes | …\" or \"7:30 | …\"."
+        if (whenText.isBlank()) return "When should I remind you? e.g. \"in 20 minutes | …\" or \"7:30 | …\"."
         val delayMs = parseDelayMs(whenText)
-            ?: return "I couldn't read that time, sir — try \"in 30 minutes\" or \"3pm\"."
-        if (delayMs < 1_000 || delayMs > MAX_DELAY_MS) return "Pick a time from a minute out to about a week, sir."
+            ?: return "I couldn't read that time — try \"in 30 minutes\" or \"3pm\"."
+        if (delayMs < 1_000 || delayMs > MAX_DELAY_MS) return "Pick a time from a minute out to about a week."
 
         val id = (System.currentTimeMillis() and 0xFFFFFF).toInt()
         val req = OneTimeWorkRequestBuilder<ReminderWorker>()
@@ -43,12 +43,12 @@ class ReminderTool(
             .addTag(ReminderWorker.TAG)
             .build()
         runCatching { WorkManager.getInstance(context).enqueue(req) }
-            .onFailure { return "I couldn't schedule that reminder, sir." }
+            .onFailure { return "I couldn't schedule that reminder." }
 
         val pattern = if (delayMs > 12L * 3_600_000L) "EEE h:mm a" else "h:mm a"
         val label = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(System.currentTimeMillis() + delayMs))
         runCatching { memory.remember("Reminder at $label: $message", NoteSource.INFERENCE) }
-        return "Reminder set for $label — \"$message\", sir."
+        return "Reminder set for $label — \"$message\"."
     }
 
     /** Delay (ms) from now for a "when" phrase: relative ("in 30 min", "2 hours", "in 3 days") or a clock

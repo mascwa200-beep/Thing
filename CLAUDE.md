@@ -2612,6 +2612,112 @@ value from the shipped function or the defining table before writing the asserti
 arithmetic in the test comment.** Never dress a recollection up as validation — one wind-chill
 assertion against a "published table" I could not source was dropped rather than kept.
 
+### THE LCARS IDENTITY ARC — the app becomes the ship's computer (this session, PR #430)
+
+Owner: *"keep going autonomously and overpower the features of the whole app and Star Trek accents,
+themes, features, designs"*, then *"keep going autonomously. Keep overpowering the apps whole set of
+everything."* Via AskUserQuestion: palette = **full authentic LCARS**; sound = **all four** (UI
+chirps, computer voice register, wake word, TTS tuning); features = **all four** (Red Alert,
+Stardate, ship's status, panel transitions).
+
+**Standing credit directive still overrides ultracode — zero subagent spend this entire arc.** Every
+check was local kotlinc + JUnit, a `javap` against a published jar, or CI.
+
+**Recon's verdict, which governed the whole plan:** the colour work was already authentic; the
+geometry stopped at the widget level; the typeface had never been attempted. A frame and a typeface
+are what make an app read as LCARS.
+
+Shipped, in order — each its own CI-gated commit:
+
+- **`Stardate`** pure core + 8 tests; boot's private copy retired; a leap-year drift and a locale bug
+  fixed on the way.
+- **Antonio**, OFL verified from `google/fonts` METADATA *before* downloading; display/headline/title
+  scale; the font NOTICE that OFL requires and the repo was missing.
+- **Palette completion** — canonical `#FF9900`, `LcarsBlocks`, `lcarsRedAlert`, `LcarsAlertBlocks`;
+  the dead accent picker removed; **four drifted copies of the old accent corrected**, including the
+  launcher icon, two notification colours whose comments *asserted* they matched, and the desktop
+  mirror (which the explorer predicted would have drifted, and had).
+- **Frame kit** — `LcarsRail`, `LcarsScreenFrame`, `LcarsSegmentBar`, `LcarsCodes` (+6 tests).
+- **`PulseScaffold` rebuilt on the frame — 35 screens at once.** Three findings de-risked it:
+  `scrollBehavior` is passed by **zero** screens (the collapsing-toolbar concern was imaginary);
+  `topBarOverride` has exactly two users; and ⚠️ **the status-bar inset is the trap** — `PulseApp`
+  sets `contentWindowInsets` to zero, so each screen's top bar owns it, and missing that would slide
+  all 35 headers under the clock while compiling perfectly.
+- **Sound and haptics.** `ui/effects/Haptics.kt` was a production-ready 13-cue vocabulary wired into
+  *one* screen through the legacy adapter, so two cues ever fired; `LocalPulseHaptics` is now
+  provided and the cues ride the **kit primitives**, so adoption is automatic rather than a 109-file
+  sweep. `LcarsAudio` synthesises every chirp as a few dozen ms of arithmetic — **nothing sampled,
+  zero bytes on disk**, which is both the licence position and ~60 kB of RAM for the whole set.
+- **Wake word → "Computer"**, and the reason it is a commit rather than a find-and-replace: the
+  matcher gated its fuzzy pass on `token.length in 4..7`, sized for "jarvis". **"Computer" is eight
+  characters**, so changing only the literals would have left strict matches working and lenient ones
+  silently dead. Moved to `core:telemetry/WakePhrase.kt` where the window derives from the word, with
+  a test that fails if it ever excludes the word again. 8/8 locally green. Honest note in the source:
+  "computer" is a far more common English word than "Jarvis", so it *will* false-wake sometimes.
+- **TTS → the computer's voice.** en-US first, the male-hint list inverted, pitch/rate retuned to
+  announcement rather than conversation — and an honest note that **flat affect is not settable**
+  (the platform exposes pitch and rate, not intonation). Plus a by-name **voice picker**: the gender
+  hint is a guess (Google's voice names say "female"; Samsung's and eSpeak's do not), so the user
+  gets the list. Two design notes worth keeping: the engine selects inside the platform's init
+  callback, which cannot suspend, hence the volatile field fed by an app-scope collector rather than
+  `SettingsRepository.current()`; and `useVoice()` is the single entry point so a pick and a
+  persisted change cannot race, and a settings restore is not shadowed for the process lifetime.
+- **Red Alert as a real state.** `BriefUrgency` existed since the notification rewrite and stopped at
+  the tray — the board could read RED ALERT while the app sat in calm orange. `AlertStatus` carries
+  it into the console, set by `BriefEngine` on **every** publish so a resolved situation stands the
+  ship down as surely as a new one raises it. Palette + rail blocks swing to the alert range (the
+  blocks travel as their own composition local because they are a list, not a role). **Yellow
+  deliberately does not move the palette** — spending the signal early is how it stops meaning
+  anything. Two things this turned up: `PulseApp` re-provided `LocalNightwire` around the NavHost —
+  a no-op that would have silently eaten red alert for all 35 routes; and the bottom bar read
+  `lcarsPalette` directly, so it would have stayed orange under an alert.
+- **The persona stops being a butler.** `JarvisPersona.kt` was the last wholly un-migrated thing —
+  its opening line named Tony Stark and a British butler-engineer while every screen said COMPUTER.
+  Rewritten to the ship's-computer register (deliberately **not** the flat interrogative of the
+  original: that computer answers lookups, this one teaches and disagrees). **"sir" was hardcoded 131
+  times across 26 files**, almost all in tool result strings — the fix is not to parameterise it: a
+  tool result is a report, and "No open tasks." is better copy regardless. The honorific now lives in
+  the prompt once, from a new `JarvisSettings.address` (blank default = address directly, which is
+  what a ship's computer does; set "Captain" and it uses it). Also finished the display-name
+  migration the earlier pass left half-done — 17 files still said "J.A.R.V.I.S." in user-visible
+  copy. Comments and identifiers keep the old name: the package, classes and DataStore names are
+  identity, not copy.
+- **The bottom bar joins the console** — the last stock Material surface in the chrome, on every
+  screen. Now a run of blocks whose leading stub carries the rail's swept bottom-left corner so the L
+  closes. Hues come from the rail palette, so it goes red under alert with no code here knowing
+  alerts exist.
+- **Panel transitions.** Short and small: the outgoing panel fades clear, then the incoming one seats
+  itself with a brief travel from the rail side. ⚠️ **`Routes.NAV` is excluded and that is not
+  laziness** — a native GL surface does not alpha-blend with its parent and does not follow a
+  translation applied to the Compose node above it, so animating it produces a hole or a tear. The
+  exclusion is a `SURFACE_ROUTES` set so the next surface-backed screen is one entry, not a
+  rediscovered bug. The `NavHost` overload was **confirmed by `javap` against the published
+  navigation-compose 2.8.5 jar**, not recalled.
+
+**A capability worth reusing:** a published AAR settles API questions for free — `curl` it from
+Google's maven, `unzip classes.jar`, `javap`. That is how the NavHost signature and
+`NavBackStackEntry.getDestination` were confirmed here, and it is the same trick the MAPS & SKY
+session used for MapLibre.
+
+**A cheap local gate worth reusing:** running kotlinc over the touched Android files and grepping the
+output for *parse* errors only (`expecting`, `unexpected token`) catches every syntax and brace
+mistake in seconds, even though resolution fails wholesale without the Android SDK.
+
+⚠️ **Every visual claim above is CI-compile-gated only — the owner is the judge on the Pixel.**
+Worth eyes first: the **rail width at phone size** and whether Antonio reads well; the **bottom bar's
+six labels** (MARKETS is the tight one, and it clips rather than ellipsising); the **panel transition
+speed**; and the **alert strip**, which needs a RED board to see at all — Settings' notification test
+button posts a YELLOW one.
+
+**Left on the plan, deliberately:** the notification alert chime (C3) — it needs **new channel ids**,
+because Android freezes channel settings after creation; the ship's-status reframe (E3), which turned
+out to be **largely already done** by the earlier DIAGNOSTIC GRID rebuild; and the F cleanup list
+(`PipUi.kt` is 158 lines with **zero call sites**, `SectionHeader` likewise, four private `SourceNote`
+copies, and `settings/` holding 68 of 111 remaining `MaterialTheme` refs behind four helpers).
+
+**Flag to the owner, not guessed at:** `Routes.SURVIVE` is unreachable from any in-app UI (deep-link
+only), and `TasksViewModel` is built by the factory with no screen.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

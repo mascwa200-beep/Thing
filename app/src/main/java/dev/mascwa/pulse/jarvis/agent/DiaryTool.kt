@@ -51,26 +51,26 @@ class DiaryTool(
             deriveTitle(rest) to rest.trim()
         }
         val entry = store.add(title, body, mood)
-            ?: return "Give the entry something to record, sir."
+            ?: return "Give the entry something to record."
         val moodTag = if (entry.mood.isNotBlank()) " [${entry.mood}]" else ""
-        return "Journaled for ${dateFmt.format(Date(entry.createdMs))}: \"${entry.title}\"$moodTag, sir."
+        return "Journaled for ${dateFmt.format(Date(entry.createdMs))}: \"${entry.title}\"$moodTag."
     }
 
     private suspend fun read(query: String): String {
-        if (query.isBlank()) return "Which entry should I read, sir?"
+        if (query.isBlank()) return "Which entry should I read?"
         val all = store.load()
         val hit = all.firstOrNull { it.title.equals(query, true) }
             ?: all.firstOrNull { it.title.contains(query, true) }
             ?: all.firstOrNull { dateFmt.format(Date(it.createdMs)).contains(query, true) }
             ?: all.firstOrNull { it.body.contains(query, true) }
-            ?: return "No diary entry matches \"$query\", sir."
+            ?: return "No diary entry matches \"$query\"."
         val moodTag = if (hit.mood.isNotBlank()) " · ${hit.mood}" else ""
         return "${dateFmt.format(Date(hit.createdMs))}$moodTag — ${hit.title}:\n${hit.body}"
     }
 
     private suspend fun list(): String {
         val all = store.load()
-        if (all.isEmpty()) return "The diary is empty, sir."
+        if (all.isEmpty()) return "The diary is empty."
         return "Diary (${all.size}):\n" + all.take(30).joinToString("\n") {
             "• ${dateFmt.format(Date(it.createdMs))} · ${it.title}" + if (it.mood.isNotBlank()) " (${it.mood})" else ""
         }

@@ -38,25 +38,25 @@ class TaskTool(
             "open", "reopen", "todo" ->
                 applyStatus(rest, TaskStatus.OPEN, "Open")
             "drop", "remove", "delete", "forget", "cancel" -> {
-                if (rest.isBlank()) "Which task should I drop, sir?"
+                if (rest.isBlank()) "Which task should I drop?"
                 else store.remove(rest)?.let { "Dropped: \"${it.title}\"." } ?: noMatch(rest)
             }
             else -> {
                 // No status keyword — treat the whole argument as a new task title (optionally `| note`).
                 val (title, note) = a.splitNote()
-                store.add(title, note)?.let { "Tracking: \"${it.title}\", sir." }
-                    ?: "Give the task a title, sir."
+                store.add(title, note)?.let { "Tracking: \"${it.title}\"." }
+                    ?: "Give the task a title."
             }
         }
     }.getOrElse { "Task update failed: ${it.message}" }
 
     private suspend fun applyStatus(rest: String, status: TaskStatus, label: String): String {
         val (query, note) = rest.splitNote()
-        if (query.isBlank()) return "Which task, sir?"
-        return store.setStatus(query, status, note)?.let { "$label: \"${it.title}\", sir." } ?: noMatch(query)
+        if (query.isBlank()) return "Which task?"
+        return store.setStatus(query, status, note)?.let { "$label: \"${it.title}\"." } ?: noMatch(query)
     }
 
-    private fun noMatch(query: String) = "No tracked task matches \"$query\", sir."
+    private fun noMatch(query: String) = "No tracked task matches \"$query\"."
 
     private fun String.splitFirstWord(): Pair<String, String> {
         val i = indexOfFirst { it.isWhitespace() }

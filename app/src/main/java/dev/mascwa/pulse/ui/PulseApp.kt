@@ -1,17 +1,12 @@
 package dev.mascwa.pulse.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,59 +78,40 @@ fun PulseApp(
         }
     }
 
-    // LCARS is the app's one palette now — the bottom nav bar (rendered outside the NavHost's own
-    // provider below) reads it directly rather than the ambient default so it doesn't fall back to the
-    // pre-LCARS cyberpunk chrome.
-    val nw = dev.mascwa.pulse.ui.theme.lcarsPalette
+    // The ambient palette, which NightwireTheme provides and which now swings to the alert range when
+    // the ship goes to red. This used to read `lcarsPalette` directly, to escape a stale pre-LCARS
+    // default — but the redundant re-provider that made that necessary is gone, and a hardcoded read
+    // would have left the bottom bar sitting in calm orange under a red alert.
+    val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = nw.void,
         bottomBar = {
-            NavigationBar(
-                containerColor = nw.carbon,
-                tonalElevation = 0.dp,
-            ) {
-                TOP_DESTINATIONS.forEach { dest ->
-                    val selected = currentRoute == dest.route
-                    NavigationBarItem(
-                        selected = selected,
+            dev.mascwa.pulse.feature.common.LcarsNavBar(
+                TOP_DESTINATIONS.map { dest ->
+                    dev.mascwa.pulse.feature.common.LcarsNavItem(
+                        label = dest.label,
+                        icon = if (currentRoute == dest.route) dest.selectedIcon else dest.unselectedIcon,
+                        selected = currentRoute == dest.route,
                         onClick = { navigateTopLevel(dest.route) },
-                        icon = {
-                            Icon(
-                                if (selected) dest.selectedIcon else dest.unselectedIcon,
-                                contentDescription = dest.label,
-                            )
-                        },
-                        label = {
-                            Text(
-                                dest.label,
-                                fontFamily = dev.mascwa.pulse.ui.theme.JetBrainsMono,
-                                fontSize = 9.sp,
-                                letterSpacing = 0.6.sp,
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = nw.accent,
-                            selectedTextColor = nw.accent,
-                            indicatorColor = nw.accent.copy(alpha = 0.14f),
-                            unselectedIconColor = nw.muted,
-                            unselectedTextColor = nw.muted,
-                        ),
                     )
-                }
-            }
+                },
+                // The bar draws its own ground and sits flush against the system bar, which is
+                // black too — so it is padded for the gesture inset rather than letting the
+                // navigation blocks run underneath it.
+                Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+            )
         },
     ) { innerPadding ->
-        // LCARS is the app's one palette — provided once around the whole NavHost so every route
-        // re-themes with no per-screen edits.
-        androidx.compose.runtime.CompositionLocalProvider(
-            dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
-        ) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = LcarsTransitions.enter,
+            exitTransition = LcarsTransitions.exit,
+            popEnterTransition = LcarsTransitions.popEnter,
+            popExitTransition = LcarsTransitions.popExit,
         ) {
             composable(Routes.HOME) {
                 val vm: HomeViewModel = viewModel(factory = factory)
@@ -365,7 +341,6 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.security.SecurityAuditViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
-        }
         }
     }
 

@@ -1,0 +1,36 @@
+BUNDLED TYPEFACES
+=================
+
+Every typeface in this application is licensed under the SIL Open Font License,
+Version 1.1. The licence requires that this notice accompany the software, so it
+ships inside the app rather than sitting only in the repository.
+
+Copyright lines below are reproduced verbatim from each family's own OFL.txt in
+the google/fonts repository — they were fetched from source, not recalled.
+
+  Antonio          res/font/antonio_var.ttf
+                   Copyright 2013 The Antonio Project Authors
+                   https://github.com/googlefonts/antonioFont
+                   Used for display, headline and title — the condensed,
+                   letterspaced LCARS voice.
+
+  Chakra Petch     res/font/chakra_petch_{regular,medium,semibold,bold}.ttf
+                   Copyright 2018 The Chakra Petch Project Authors
+                   https://github.com/m4rc1e/Chakra-Petch.git
+
+  JetBrains Mono   res/font/jetbrains_mono_var.ttf
+                   Copyright 2020 The JetBrains Mono Project Authors
+                   https://github.com/JetBrains/JetBrainsMono
+                   Used for every label, reading and numeric column.
+
+  Space Grotesk    res/font/space_grotesk_var.ttf
+                   Copyright 2020 The Space Grotesk Project Authors
+                   https://github.com/floriankarsten/space-grotesk
+                   Used for body text.
+
+Full licence text: https://openfontlicense.org
+
+Note on the wider design: this application's LCARS-inspired interface is an
+original homage. It bundles no Paramount assets — no screen captures, no
+insignia artwork, and no audio from the programmes. Interface sounds are
+synthesised at runtime rather than sampled.

@@ -43,7 +43,7 @@ class CallTool(private val context: Context) : JarvisTool {
         val number = arg.trim()
         if (number.isBlank()) return "Give me a phone number to dial."
         dialNumber(context, number)
-        return "Opened the dialer for $number, sir."
+        return "Opened the dialer for $number."
     }
 }
 
@@ -54,7 +54,7 @@ class SmsTool(private val context: Context) : JarvisTool {
         val p = parts(arg)
         val number = p.getOrElse(0) { "" }
         if (number.isBlank()) return "Give me a number, then | and the message."
-        return if (composeSms(context, number, p.getOrElse(1) { "" })) "Opened a text to $number, sir."
+        return if (composeSms(context, number, p.getOrElse(1) { "" })) "Opened a text to $number."
         else "No app available to send texts."
     }
 }
@@ -65,7 +65,7 @@ class EmailTool(private val context: Context) : JarvisTool {
     override suspend fun run(arg: String): String {
         val p = parts(arg)
         return if (composeEmail(context, p.getOrElse(0) { "" }, p.getOrElse(1) { "" }, p.getOrElse(2) { "" }))
-            "Opened an email draft, sir." else "No email app available."
+            "Opened an email draft." else "No email app available."
     }
 }
 
@@ -77,7 +77,7 @@ class CalendarEventTool(private val context: Context) : JarvisTool {
         val title = p.getOrElse(0) { "" }
         if (title.isBlank()) return "Give me an event title."
         return if (createCalendarEvent(context, title, p.getOrElse(1) { "" }, 0))
-            "Opened a new event \"$title\" — set the time, sir." else "No calendar app available."
+            "Opened a new event \"$title\" — set the time." else "No calendar app available."
     }
 }
 
@@ -88,7 +88,7 @@ class AlarmTool(private val context: Context) : JarvisTool {
         val p = parts(arg)
         val time = parseTime(p.getOrElse(0) { "" }) ?: return "Give me a time like 7:30 or 9 pm."
         return if (setAlarm(context, time.first, time.second, p.getOrElse(1) { "" }))
-            "Alarm set for %02d:%02d, sir.".format(time.first, time.second) else "No clock app available."
+            "Alarm set for %02d:%02d.".format(time.first, time.second) else "No clock app available."
     }
 }
 
@@ -100,7 +100,7 @@ class TimerTool(private val context: Context) : JarvisTool {
         val minutes = p.getOrElse(0) { "" }.filter { it.isDigit() }.toIntOrNull()
             ?: return "Give me a number of minutes."
         return if (setTimer(context, minutes * 60, p.getOrElse(1) { "" }))
-            "Timer started for $minutes min, sir." else "No clock app available."
+            "Timer started for $minutes min." else "No clock app available."
     }
 }
 
@@ -108,14 +108,14 @@ class CameraTool(private val context: Context) : JarvisTool {
     override val name = "camera"
     override val usage = "camera — open the camera to take a photo"
     override suspend fun run(arg: String): String =
-        if (openCamera(context)) "Opening the camera, sir." else "No camera app available."
+        if (openCamera(context)) "Opening the camera." else "No camera app available."
 }
 
 class ContactsTool(private val context: Context) : JarvisTool {
     override val name = "contacts"
     override val usage = "contacts — open the contacts app"
     override suspend fun run(arg: String): String =
-        if (openContacts(context)) "Opening contacts, sir." else "No contacts app available."
+        if (openContacts(context)) "Opening contacts." else "No contacts app available."
 }
 
 class SpotifyTool(private val context: Context) : JarvisTool {
@@ -123,7 +123,7 @@ class SpotifyTool(private val context: Context) : JarvisTool {
     override val usage = "spotify <song or artist> — open Spotify on a search"
     override suspend fun run(arg: String): String {
         if (arg.isBlank()) return "What should I look up on Spotify?"
-        return if (openSpotifySearch(context, arg)) "Opening Spotify for \"${arg.trim()}\", sir." else "Couldn't open Spotify."
+        return if (openSpotifySearch(context, arg)) "Opening Spotify for \"${arg.trim()}\"." else "Couldn't open Spotify."
     }
 }
 
@@ -131,8 +131,8 @@ class MapsTool(private val context: Context) : JarvisTool {
     override val name = "maps"
     override val usage = "maps <place or address> — open maps to a place"
     override suspend fun run(arg: String): String {
-        if (arg.isBlank()) return "Where to, sir?"
-        return if (searchMaps(context, arg)) "Opening maps for \"${arg.trim()}\", sir." else "No maps app available."
+        if (arg.isBlank()) return "Where to?"
+        return if (searchMaps(context, arg)) "Opening maps for \"${arg.trim()}\"." else "No maps app available."
     }
 }
 
@@ -140,7 +140,7 @@ class SettingsTool(private val context: Context) : JarvisTool {
     override val name = "settings"
     override val usage = "settings <wifi|bluetooth|location|display|sound|battery|data|nfc|apps|airplane> — open a settings screen"
     override suspend fun run(arg: String): String =
-        if (openSettingsPanel(context, arg)) "Opening settings, sir." else "Couldn't open settings."
+        if (openSettingsPanel(context, arg)) "Opening settings." else "Couldn't open settings."
 }
 
 class OpenLinkTool(private val context: Context) : JarvisTool {
@@ -149,7 +149,7 @@ class OpenLinkTool(private val context: Context) : JarvisTool {
     override suspend fun run(arg: String): String {
         if (arg.isBlank()) return "Give me a URL to open."
         openUrl(context, arg.trim())
-        return "Opening ${arg.trim()}, sir."
+        return "Opening ${arg.trim()}."
     }
 }
 
@@ -158,10 +158,10 @@ class TorchTool(context: Context) : JarvisTool {
     override val name = "torch"
     override val usage = "torch <on|off> — turn the flashlight on or off"
     override suspend fun run(arg: String): String {
-        if (!tools.torchAvailable()) return "No flashlight on this device, sir."
+        if (!tools.torchAvailable()) return "No flashlight on this device."
         val off = arg.lowercase().trim().let { it == "off" || it == "false" || it == "0" || it == "stop" }
         tools.setTorch(!off)
-        return if (off) "Flashlight off, sir." else "Flashlight on, sir."
+        return if (off) "Flashlight off." else "Flashlight on."
     }
 }
 
@@ -172,7 +172,7 @@ class ClipboardTool(private val context: Context) : JarvisTool {
         if (arg.isBlank()) return "Give me something to copy."
         val cm = context.getSystemService(android.content.ClipboardManager::class.java)
             ?: return "Clipboard unavailable."
-        runCatching { cm.setPrimaryClip(android.content.ClipData.newPlainText("J.A.R.V.I.S.", arg.trim())) }
-        return "Copied to the clipboard, sir."
+        runCatching { cm.setPrimaryClip(android.content.ClipData.newPlainText("Computer", arg.trim())) }
+        return "Copied to the clipboard."
     }
 }

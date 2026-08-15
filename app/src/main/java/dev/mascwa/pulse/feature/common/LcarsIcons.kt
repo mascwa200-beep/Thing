@@ -20,6 +20,11 @@ import androidx.compose.ui.unit.dp
  * most-used icon in the app) — all wired to their call sites. Wave 2 (this addition): the next-highest-
  * frequency stock icons — `Refresh` (7 sites), `Delete` (5), `PlayArrow` (4), `Search`/`Close` (3 each).
  * Wave 2's call-site wiring and further icon waves are follow-up work — additive only until wired.
+ *
+ * Wave 3: the three icons inside the shared loading/error/empty/stale states — `Warning`, `Inbox` and
+ * `CloudOff` — and these are wired. They are worth more than their count suggests: those four
+ * composables render on sixteen screens, so a rounded Material triangle was the most-repeated foreign
+ * shape left in the interface, and it appeared precisely when something had gone wrong.
  */
 object LcarsIcons {
 
@@ -329,6 +334,64 @@ object LcarsIcons {
                     lineTo(2f, 10.2f); lineTo(3.8f, 9.3f); close()
                     moveTo(12f, 16.6f); lineTo(20.2f, 12.5f); lineTo(22f, 13.4f); lineTo(12f, 18.4f)
                     lineTo(2f, 13.4f); lineTo(3.8f, 12.5f); close()
+                }
+            }.build()
+    }
+
+    /**
+     * A hard-edged warning triangle with a rectangular bar and a square dot.
+     *
+     * Replaces `Icons.Filled.WarningAmber`. This one reaches further than most: every error state in
+     * the app draws it, on sixteen screens, so a rounded Material triangle was the most-repeated
+     * foreign shape left in the interface.
+     */
+    val Warning: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsWarning", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK, pathFillType = PathFillType.EvenOdd) {
+                    // Outer triangle, flat-topped apex so it reads at 16dp instead of vanishing.
+                    moveTo(12f, 2.5f); lineTo(23f, 21.5f); lineTo(1f, 21.5f); close()
+                    // The bar and the dot are punched out, so the glyph works on any fill.
+                    moveTo(10.9f, 9f); lineTo(13.1f, 9f); lineTo(13.1f, 15f); lineTo(10.9f, 15f); close()
+                    moveTo(10.9f, 16.6f); lineTo(13.1f, 16.6f); lineTo(13.1f, 19f); lineTo(10.9f, 19f); close()
+                }
+            }.build()
+    }
+
+    /**
+     * An open tray: a squared-off box with a slot cut across it.
+     *
+     * Replaces `Icons.Filled.Inbox`, which every empty state draws.
+     */
+    val Inbox: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsInbox", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK, pathFillType = PathFillType.EvenOdd) {
+                    moveTo(2f, 4f); lineTo(22f, 4f); lineTo(22f, 20f); lineTo(2f, 20f); close()
+                    // The slot: a full-width band with the tray's mouth notched out of its middle.
+                    moveTo(4.2f, 12.4f); lineTo(9f, 12.4f); lineTo(9f, 14.6f); lineTo(15f, 14.6f)
+                    lineTo(15f, 12.4f); lineTo(19.8f, 12.4f); lineTo(19.8f, 17.8f); lineTo(4.2f, 17.8f); close()
+                }
+            }.build()
+    }
+
+    /**
+     * A blocky cloud with a bar struck through it — the offline mark.
+     *
+     * Replaces `Icons.Filled.CloudOff` on the stale-data banner. Drawn as stacked rectangles rather
+     * than the usual lobed silhouette, which is the whole point: this vocabulary has no curves.
+     */
+    val CloudOff: ImageVector by lazy {
+        ImageVector.Builder(name = "LcarsCloudOff", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = W, viewportHeight = H)
+            .apply {
+                path(fill = BLACK) {
+                    moveTo(7f, 8f); lineTo(17f, 8f); lineTo(17f, 12f); lineTo(20f, 12f)
+                    lineTo(20f, 17f); lineTo(4f, 17f); lineTo(4f, 12f); lineTo(7f, 12f); close()
+                }
+                // The strike, drawn as a parallelogram so it stays a straight-edged shape.
+                path(fill = BLACK) {
+                    moveTo(3.2f, 4.4f); lineTo(5.1f, 2.5f); lineTo(21.5f, 18.9f)
+                    lineTo(19.6f, 20.8f); close()
                 }
             }.build()
     }

@@ -180,15 +180,15 @@ class SettingsViewModel(
                     val code = (e as? dev.mascwa.pulse.core.network.HttpException)?.code
                     val msg = when {
                         updates.token() == null ->
-                            "Your repo is private — add a GitHub token (repo scope) in J.A.R.V.I.S. Setup, or make the repo public, sir."
+                            "Your repo is private — add a GitHub token (repo scope) in Computer Setup, or make the repo public."
                         code == 401 ->
-                            "GitHub rejected the token (401). Re-paste it with no spaces — a classic token needs the 'repo' scope (or a fine-grained one with Contents: read on this repo), sir."
+                            "GitHub rejected the token (401). Re-paste it with no spaces — a classic token needs the 'repo' scope (or a fine-grained one with Contents: read on this repo)."
                         code == 403 ->
-                            "GitHub refused the request (403) — the token is rate-limited or lacks scope, sir."
+                            "GitHub refused the request (403) — the token is rate-limited or lacks scope."
                         code == 404 ->
-                            "Release or repo not found (404) — the token can't see this private repo. A classic token needs the 'repo' scope, sir."
+                            "Release or repo not found (404) — the token can't see this private repo. A classic token needs the 'repo' scope."
                         else ->
-                            "Couldn't reach the update server${code?.let { " ($it)" } ?: ""} — check your connection, sir."
+                            "Couldn't reach the update server${code?.let { " ($it)" } ?: ""} — check your connection."
                     }
                     UpdateUi.Error(msg)
                 },
@@ -203,7 +203,7 @@ class SettingsViewModel(
         _update.value = UpdateUi.Downloading(0)
         viewModelScope.launch {
             val file = runCatching { updates.download(info) { pct -> _update.value = UpdateUi.Downloading(pct) } }.getOrNull()
-            _update.value = if (file != null) UpdateUi.ReadyToInstall(info, file) else UpdateUi.Error("Download failed — try again, sir.")
+            _update.value = if (file != null) UpdateUi.ReadyToInstall(info, file) else UpdateUi.Error("Download failed — try again.")
         }
     }
 

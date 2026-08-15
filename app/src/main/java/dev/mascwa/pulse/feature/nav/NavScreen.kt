@@ -191,6 +191,8 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     PulseScaffold(
         title = "NAV",
+        // Full-bleed map: the rail would eat width the chart genuinely needs.
+        rail = false,
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)

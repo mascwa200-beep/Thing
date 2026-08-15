@@ -151,7 +151,28 @@ data class JarvisSettings(
     val vitalsTracking: Boolean = false,
     /** Speak replies aloud using the device's on-device text-to-speech engine. */
     val voiceReplies: Boolean = false,
-    /** Listen for the "J.A.R.V.I.S." wake word while resident (requires the mic, opt-in). */
+    /**
+     * How the computer addresses you — "Captain", a rank, your name.
+     *
+     * Blank (the default) means it addresses you directly with no honorific, which is what a ship's
+     * computer does. Injected into the system prompt each turn rather than hardcoded in replies.
+     */
+    val address: String = "",
+    /**
+     * The exact TTS voice to speak in, by the engine's own internal name.
+     *
+     * Blank means automatic, which leans female and American — the register the computer is dressed
+     * as. Stored as the raw name rather than an index because the installed set changes when the user
+     * adds or removes a language pack, and an index would then quietly point at a different voice.
+     * A name that is no longer installed falls back to automatic rather than to silence.
+     */
+    val voiceName: String = "",
+    /**
+     * Listen for the "Computer" wake word while resident (requires the mic, opt-in).
+     *
+     * The field name is a serialization key and stays as it is; the word it listens for lives in
+     * [dev.mascwa.pulse.core.telemetry.WakePhrase].
+     */
     val wakeWord: Boolean = false,
     /** After a spoken reply, reopen the mic briefly so you can answer WITHOUT re-saying the wake word
      *  (Alexa-style follow-up). Ends when you stay silent. Requires the wake word. */
@@ -341,6 +362,9 @@ data class AppSettings(
     val hudStrip: Boolean = true,                     // global HUD telemetry strip
     val hudDataStream: Boolean = true,                // HUD second-row live telemetry marquee
     val haptics: Boolean = true,                      // subtle UI haptic ticks
+    // Interface chirps, synthesised at runtime — see ui/effects/LcarsAudio.kt. Defaults on
+    // because it was asked for explicitly; it is one switch away in Appearance if it grates.
+    val sounds: Boolean = true,
 
     // Locale / region (International defaults; everything overridable here)
     val countryCode: String = "US",     // ISO 3166-1 alpha-2 (economy/fuel/news region)

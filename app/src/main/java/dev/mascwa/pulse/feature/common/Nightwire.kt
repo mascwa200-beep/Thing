@@ -30,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.ui.effects.HapticCue
+import dev.mascwa.pulse.ui.effects.SoundCue
+import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -130,6 +133,8 @@ fun SectionBar(
 @Composable
 fun NeonChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = Pulse.colors
+    // Same reasoning as LcarsChip: the cue belongs to the kit, not to each of the many call sites.
+    val cue = rememberLcarsCue()
     Box(
         modifier
             .clip(CyberChipCut)
@@ -138,7 +143,7 @@ fun NeonChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
                 BorderStroke(1.dp, if (selected) c.accent else c.line),
                 CyberChipCut,
             )
-            .clickable { onClick() }
+            .clickable { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
             .padding(horizontal = 13.dp, vertical = 7.dp),
     ) {
         Text(

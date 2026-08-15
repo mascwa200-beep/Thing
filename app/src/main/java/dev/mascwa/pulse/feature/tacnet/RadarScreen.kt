@@ -84,6 +84,8 @@ import kotlin.math.sin
 fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "RADSCOPE",
+        // Full-bleed scope: same reason as NAV.
+        rail = false,
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) {
                 Icon(LcarsIcons.ArrowBack, "Back")

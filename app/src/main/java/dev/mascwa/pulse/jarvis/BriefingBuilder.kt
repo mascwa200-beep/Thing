@@ -66,7 +66,7 @@ class BriefingBuilder(
             }
         }
 
-        if (parts.size == 1) parts += "Nothing notable to report — all quiet, sir."
+        if (parts.size == 1) parts += "Nothing notable to report — all quiet."
         return parts.joinToString(" ")
     }
 
@@ -77,7 +77,7 @@ class BriefingBuilder(
             h < 18 -> "Good afternoon"
             else -> "Good evening"
         }
-        return "$tod, sir. Here's your briefing."
+        return "$tod. Here's your briefing."
     }
 
     private suspend fun resolveWeather(s: AppSettings?): WeatherData? {

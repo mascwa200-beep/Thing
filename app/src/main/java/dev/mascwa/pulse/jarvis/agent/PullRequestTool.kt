@@ -20,19 +20,19 @@ class PullRequestTool(private val repo: GitHubRepo) : JarvisTool {
             "duplicate one of yours and tidies its branch. You cannot close a human's PR or merge here."
 
     override suspend fun run(arg: String): String {
-        if (repo.token() == null) return "Add a GitHub token (repo scope) in Setup so I can manage PRs, sir."
+        if (repo.token() == null) return "Add a GitHub token (repo scope) in Setup so I can manage PRs."
         val a = arg.trim().trim('`', '"')
         val parts = a.split(Regex("\\s+"), limit = 2)
         return when (parts.getOrElse(0) { "" }.lowercase()) {
             "", "list", "ls", "mine", "open" -> list()
             "close", "drop", "delete" -> close(parts.getOrElse(1) { "" })
-            else -> "Usage: `pr list` or `pr close <number>`, sir."
+            else -> "Usage: `pr list` or `pr close <number>`."
         }
     }
 
     private suspend fun list(): String {
         val prs = runCatching { repo.openSelfPrs() }.getOrDefault(emptyList())
-        if (prs.isEmpty()) return "No open PRs of mine right now, sir."
+        if (prs.isEmpty()) return "No open PRs of mine right now."
         val lines = prs.map { p ->
             val status = runCatching { repo.checksState(p.headSha) }.getOrDefault("none")
             "#${p.number} [$status] ${p.headRef} — ${p.url}"
@@ -43,13 +43,13 @@ class PullRequestTool(private val repo: GitHubRepo) : JarvisTool {
 
     private suspend fun close(rawArg: String): String {
         val number = rawArg.trim().trim('#', '`', '"').toIntOrNull()
-            ?: return "Give me the PR number to close, sir — see `pr list`."
+            ?: return "Give me the PR number to close — see `pr list`."
         // Resolve against MY own open PRs so I can never close a human's PR.
         val mine = runCatching { repo.openSelfPrs() }.getOrDefault(emptyList())
         val target = mine.firstOrNull { it.number == number }
-            ?: return "#$number isn't one of my open PRs, sir — I only close my own."
-        if (!repo.closePr(number)) return "Couldn't close #$number, sir — check the token scope."
+            ?: return "#$number isn't one of my open PRs — I only close my own."
+        if (!repo.closePr(number)) return "Couldn't close #$number — check the token scope."
         runCatching { repo.deleteBranch(target.headRef) }
-        return "Closed #$number and tidied up `${target.headRef}`, sir."
+        return "Closed #$number and tidied up `${target.headRef}`."
     }
 }

@@ -42,11 +42,11 @@ class SelfCoder(
      * touch GitHub — the PR opens only when the user approves (see [commit]).
      */
     suspend fun stage(goal: String, pathHint: String? = null): Result {
-        if (goal.isBlank()) return Result(false, "Tell me what to change, sir.")
-        if (repo.token() == null) return Result(false, "Add a GitHub token (repo scope) in Setup first, sir.")
+        if (goal.isBlank()) return Result(false, "Tell me what to change.")
+        if (repo.token() == null) return Result(false, "Add a GitHub token (repo scope) in Setup first.")
 
         val targets = planFiles(goal, pathHint?.trim()?.trimStart('/')?.ifBlank { null })
-        if (targets.isEmpty()) return Result(false, "I couldn't work out which files to change for that, sir — try naming the area.")
+        if (targets.isEmpty()) return Result(false, "I couldn't work out which files to change for that — try naming the area.")
 
         val diffs = StringBuilder()
         val files = targets.mapNotNull { t ->
@@ -56,7 +56,7 @@ class SelfCoder(
             diffs.append(LineDiff.diff(current, content, t.path))
             StagedFile(t.path, content, t.isNew)
         }
-        if (files.isEmpty()) return Result(false, "I couldn't draft valid contents for that change, sir.")
+        if (files.isEmpty()) return Result(false, "I couldn't draft valid contents for that change.")
 
         val preview = buildString {
             append(files.size).append(if (files.size == 1) " file:\n" else " files:\n")
@@ -81,7 +81,7 @@ class SelfCoder(
         return Result(
             true,
             "Drafted $summary across ${files.size} file(s). Approve it and I'll open a PR; once CI builds " +
-                "it (a few minutes), install the new build from Settings → Software update to see the change, sir.$newNote",
+                "it (a few minutes), install the new build from Settings → Software update to see the change.$newNote",
             action = action,
         )
     }
@@ -95,18 +95,18 @@ class SelfCoder(
     suspend fun commit(action: PendingAction): String {
         val goal = action.payload["goal"].orEmpty()
         val files = parseStaged(action)
-        if (files.isEmpty()) return "Nothing to commit, sir."
+        if (files.isEmpty()) return "Nothing to commit."
         // Last-line sanity gate: never write a malformed path (a label, spaces, no filename) to GitHub —
         // catches any legacy/queued proposal that predates path validation, so no more dead junk PRs.
         files.firstOrNull { !isCommittablePath(it.path) }?.let {
-            return "`${it.path}` isn't a real file path, sir — I won't commit that. Re-issue the goal and " +
+            return "`${it.path}` isn't a real file path — I won't commit that. Re-issue the goal and " +
                 "I'll plan the right files."
         }
         // Protected paths (CI/signing/manifest/gate/self-coder) are only refused for the fully-autonomous
         // loop; a user-approved change (a tap) may touch anything.
         if (repo.protectionEnforced()) {
             files.firstOrNull { repo.isProtected(it.path.trim().trimStart('/')) }?.let {
-                return "`${it.path}` is protected while autonomous self-coding is on, sir."
+                return "`${it.path}` is protected while autonomous self-coding is on."
             }
         }
         val base = runCatching { repo.headSha("main") }.getOrElse {
@@ -167,7 +167,7 @@ class SelfCoder(
         }
         if (candidates.isEmpty()) return emptyList()
 
-        val sys = "You are J.A.R.V.I.S. planning a change to your own Android app (Kotlin). List the MINIMAL " +
+        val sys = "You are the computer planning a change to your own Android app (Kotlin). List the MINIMAL " +
             "set of files to FULLY implement the goal — INCLUDING any wiring (DI registration, a screen, a " +
             "nav route) so the change actually takes effect. For each file, output one line: " +
             "`EDIT: <existing path>` or `NEW: <path>` (new paths under app/src/main/java/… or " +
@@ -208,7 +208,7 @@ class SelfCoder(
             .filter { it.endsWith(".kt") }
             .take(MAX_CANDIDATES)
         if (candidates.isEmpty()) return null
-        val sys = "You are J.A.R.V.I.S., deciding where to make a change in your own Android app (Kotlin). " +
+        val sys = "You are the computer, deciding where to make a change in your own Android app (Kotlin). " +
             "Either reply with ONE exact existing file path copied from the list (to edit it), OR — if the " +
             "goal needs a brand-new file — reply with `NEW: <path>` under app/src/main/java/… or " +
             "core/<module>/src/main/java/… that is not already in the list. Reply with ONLY the path."
@@ -264,7 +264,7 @@ class SelfCoder(
         } else {
             ""
         }
-        val sys = "You are J.A.R.V.I.S. editing your own Android app, written in Kotlin. Output ONLY the " +
+        val sys = "You are the computer editing your own Android app, written in Kotlin. Output ONLY the " +
             "complete new contents of the file `$path` that accomplishes the goal — valid Kotlin, no " +
             "markdown fences, no commentary, no explanations.$span"
         val user = buildString {

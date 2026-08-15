@@ -57,13 +57,13 @@ class FindingTool(
             rest.take(70).trim() to rest.trim()
         }
         val f = store.add(topic = "", headline = headline, body = body, sourceUrl = url, kind = kind)
-            ?: return "Give the finding something to say, sir."
-        return "Filed a ${f.kind.name.lowercase()} finding: \"${f.headline}\". I'll bring it up, sir."
+            ?: return "Give the finding something to say."
+        return "Filed a ${f.kind.name.lowercase()} finding: \"${f.headline}\". I'll bring it up."
     }
 
     private suspend fun list(): String {
         val all = store.load()
-        if (all.isEmpty()) return "No findings yet, sir."
+        if (all.isEmpty()) return "No findings yet."
         return "Findings (${all.size}):\n" + all.take(20).joinToString("\n") {
             val seen = if (it.seen) "" else " •NEW"
             "• ${dateFmt.format(Date(it.createdMs))} [${it.kind.name.lowercase()}] ${it.headline}$seen"

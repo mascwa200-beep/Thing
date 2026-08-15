@@ -72,7 +72,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (notes.isEmpty()) {
                 item {
                     Text(
-                        "Nothing remembered yet. As J.A.R.V.I.S. learns about you — only from your answers, " +
+                        "Nothing remembered yet. As the computer learns about you — only from your answers, " +
                             "and only after you confirm — facts appear here, editable and deletable anytime.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     )
@@ -91,7 +91,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (profile.isEmpty()) {
                 item {
                     Text(
-                        "No preferences, interests or projects remembered yet. Tell J.A.R.V.I.S. things " +
+                        "No preferences, interests or projects remembered yet. Tell the computer things " +
                             "like \"I prefer concise answers\" or \"I'm building an app\" and they'll appear here.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     )
@@ -129,7 +129,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (episodic.isEmpty()) {
                 item {
                     Text(
-                        "No episodic memories yet. As you talk, J.A.R.V.I.S. records significant moments " +
+                        "No episodic memories yet. As you talk, the computer records significant moments " +
                             "(time-stamped) and recalls the relevant ones later. They appear here to review " +
                             "and forget.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
@@ -149,7 +149,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (interests.isEmpty()) {
                 item {
                     Text(
-                        "No standing interests yet. Give J.A.R.V.I.S. a standing order (\"keep an eye on " +
+                        "No standing interests yet. Give the computer a standing order (\"keep an eye on " +
                             "temporal-AI-consciousness research\") and he'll track it — and develop his own " +
                             "curiosities over time. They appear here.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
@@ -169,7 +169,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (findings.isEmpty()) {
                 item {
                     Text(
-                        "Nothing curated yet. As J.A.R.V.I.S. follows his interests and audits this device, " +
+                        "Nothing curated yet. As the computer follows its interests and audits this device, " +
                             "he records things worth showing you here — newest first, with a NEW badge until " +
                             "you've seen them.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
@@ -193,7 +193,7 @@ fun JarvisMemoryScreen(vm: JarvisMemoryViewModel, onBack: () -> Unit) {
             if (procedures.isEmpty()) {
                 item {
                     Text(
-                        "No procedures learned yet. When J.A.R.V.I.S. carries out a multi-step request with " +
+                        "No procedures learned yet. When the computer carries out a multi-step request with " +
                             "tools and it works, he remembers the recipe here — so a similar goal later follows " +
                             "the known plan. They appear here to review and forget.",
                         fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
