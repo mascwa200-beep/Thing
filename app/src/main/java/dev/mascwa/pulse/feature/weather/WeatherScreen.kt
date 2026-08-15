@@ -22,18 +22,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -45,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,6 +60,8 @@ import dev.mascwa.pulse.feature.common.CyberHeader
 import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
+import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHistogram
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.LcarsMeter
@@ -175,81 +172,110 @@ private fun LazyListScope.weatherHeader(c: WeatherChrome) {
     if (c.state.data.stale) item { StaleBanner(true) }
 
     if (c.showSearch) {
-        item {
-            OutlinedTextField(
-                value = c.query,
-                onValueChange = c.onQuery,
-                label = { Text("Search city") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        item { CitySearchField(c.query, c.onQuery) }
         items(
             c.state.searchResults.distinctBy { "${it.name}_${it.latitude}" },
             key = { "${it.name}_${it.latitude}" },
         ) { loc ->
-            Row(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
-                Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                    Text(loc.name, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        loc.country, style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                AssistChip(
-                    onClick = { c.vm.addAndSelect(loc); c.onAdded() },
-                    label = { Text("Add") },
-                )
-            }
-            HorizontalDivider()
+            CityResultRow(loc.name, loc.country) { c.vm.addAndSelect(loc); c.onAdded() }
         }
     }
 
     item {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 4.dp),
+        ) {
             item {
-                FilterChip(
+                LcarsChip(
+                    "My location",
                     selected = c.state.useDeviceLocation,
                     onClick = { c.vm.useDeviceLocation() },
-                    label = { Text("My location") },
-                    leadingIcon = { Icon(Icons.Filled.MyLocation, null, Modifier.size(16.dp)) },
                 )
             }
             itemsIndexed(c.state.savedLocations) { i, loc ->
-                FilterChip(
+                LcarsChip(
+                    loc.name,
                     selected = !c.state.useDeviceLocation && i == c.state.selectedIndex,
                     onClick = { c.vm.selectSaved(i) },
-                    label = { Text(loc.name) },
                 )
             }
         }
     }
 
     if (c.state.needsLocationPermission && c.state.useDeviceLocation) {
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Location permission", style = MaterialTheme.typography.titleMedium)
+        item { LocationPermissionCard(c.onRequestPermission) }
+    }
+}
+
+/** The city search bar, in the same frame the knowledge base and radio tuner use. */
+@Composable
+private fun CitySearchField(query: String, onQuery: (String) -> Unit) {
+    val p = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        BasicTextField(
+            value = query,
+            onValueChange = onQuery,
+            singleLine = true,
+            textStyle = TextStyle(color = p.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
+            cursorBrush = SolidColor(p.accent),
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
                     Text(
-                        "Grant location access for weather at your current position, " +
-                            "or search for a city above.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                    AssistChip(
-                        onClick = c.onRequestPermission,
-                        label = { Text("Grant access") },
-                        modifier = Modifier.padding(top = 8.dp),
+                        "▸ SEARCH FOR A CITY", fontFamily = JetBrainsMono,
+                        fontSize = 12.sp, color = p.muted,
                     )
                 }
+                inner()
+            },
+        )
+    }
+}
+
+/** One search hit. The whole row adds the city, so there is no separate button to aim at. */
+@Composable
+private fun CityResultRow(name: String, country: String, onAdd: () -> Unit) {
+    val p = Pulse.colors
+    LcarsFrame(
+        Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(onClick = onAdd),
+        padding = PaddingValues(horizontal = 13.dp, vertical = 10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    name, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp, color = p.ink,
+                )
+                Text(country, fontFamily = JetBrainsMono, fontSize = 9.sp, color = p.muted)
             }
+            Text(
+                "ADD ▸", fontFamily = JetBrainsMono, fontSize = 10.sp,
+                letterSpacing = 1.sp, color = p.accent,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocationPermissionCard(onRequest: () -> Unit) {
+    val p = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth().padding(vertical = 4.dp), accent = p.amber) {
+        Column {
+            Text(
+                "LOCATION", fontFamily = JetBrainsMono, fontSize = 11.sp,
+                letterSpacing = 1.5.sp, color = p.amber,
+            )
+            Text(
+                "Grant location access for the weather where you are, or search for a city above.",
+                fontFamily = ChakraPetch, fontSize = 13.sp, color = p.ink,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Text(
+                "▸ GRANT ACCESS",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = p.amber,
+                modifier = Modifier.padding(top = 10.dp).clickable(onClick = onRequest),
+            )
         }
     }
 }
