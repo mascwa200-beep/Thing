@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.jarvis.agent
 
+import dev.mascwa.pulse.core.telemetry.AirQualityGuide
+import dev.mascwa.pulse.core.telemetry.WeatherComfort
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.weather.LocationProvider
@@ -43,6 +45,22 @@ class WeatherTool(
                 }
                 now.windSpeed?.let { append(", wind ").append(Formatters.number(it, 0)).append(" ").append(wd.windUnitSymbol) }
                 append(".")
+                // What the conditions do to a person, which is usually what was really being asked.
+                // Every index returns null outside the range it is fitted for, so a mild day adds
+                // nothing here rather than padding the answer.
+                now.temperatureC?.let { t ->
+                    WeatherComfort.headline(
+                        temperatureC = t,
+                        humidityPercent = now.humidity,
+                        windKmh = now.windKmh,
+                        gustKmh = now.gustKmh,
+                        dewPointC = now.dewPointC,
+                        unitSymbol = unit,
+                    )?.let { append(" ").append(it) }
+                }
+                WeatherComfort.mugginess(now.dewPointC)
+                    ?.takeIf { it == "Oppressive" || it == "Very humid" }
+                    ?.let { append(" Air is ").append(it.lowercase()).append(".") }
             }
             if (today != null) {
                 append(" Today ").append(Formatters.number(today.tempMax, 0)).append(unit)
@@ -50,20 +68,26 @@ class WeatherTool(
                 today.precipProbabilityMax?.let { append(", ").append(it).append("% rain") }
                 append(".")
             }
-            // Surface air quality only when it's worth mentioning.
-            wd.airQuality?.usAqi?.let { aqi ->
-                if (aqi >= 100) append(" Air quality ").append(Formatters.number(aqi, 0)).append(" (").append(aqiLabel(aqi)).append(").")
+            // Air quality, named by what is actually driving it rather than by an index number.
+            // "US AQI 118" tells you nothing you can act on; "ozone is 1.4x its guideline" tells
+            // you to stay in this afternoon rather than to shut the windows.
+            wd.airQuality?.let { aq ->
+                val readings = listOfNotNull(
+                    AirQualityGuide.assess(AirQualityGuide.Pollutant.PM2_5, aq.pm25),
+                    AirQualityGuide.assess(AirQualityGuide.Pollutant.PM10, aq.pm10),
+                    AirQualityGuide.assess(AirQualityGuide.Pollutant.OZONE, aq.ozone),
+                    AirQualityGuide.assess(AirQualityGuide.Pollutant.NITROGEN_DIOXIDE, aq.nitrogenDioxide),
+                    AirQualityGuide.assess(AirQualityGuide.Pollutant.SULPHUR_DIOXIDE, aq.sulphurDioxide),
+                )
+                val driver = AirQualityGuide.dominant(readings)
+                if (driver != null && driver.band != AirQualityGuide.Band.WELL_UNDER &&
+                    driver.band != AirQualityGuide.Band.WITHIN
+                ) {
+                    append(" ").append(AirQualityGuide.summary(readings))
+                }
             }
         }.trim()
         return out.ifBlank { "No weather available for ${wd.locationName}, sir." }
-    }
-
-    /** Coarse US-AQI band label for the notable (>=100) range. */
-    private fun aqiLabel(aqi: Double): String = when {
-        aqi < 150 -> "unhealthy for sensitive groups"
-        aqi < 200 -> "unhealthy"
-        aqi < 300 -> "very unhealthy"
-        else -> "hazardous"
     }
 
     private suspend fun resolve(place: String): WeatherData? {
