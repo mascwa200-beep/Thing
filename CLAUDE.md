@@ -2479,16 +2479,30 @@ the breadcrumb trail. CI green through `4a5735b` (run 1537); the rest was pushed
   all three since it was written and the map showed none). DMS rounds to tenths *before* splitting —
   the obvious order prints `179°59'60.0"`. `MapView.onLowMemory` is now subscribed via
   `ComponentCallbacks2`; it normally rides the Activity callback, which never reaches a view inside
-  a composable.
+  a composable. A **measuring tape** (mode, not gesture: taps add chain corners; great-circle
+  totals; the chain is one FeatureCollection carrying both the LineString and its points, because a
+  circle layer over a LineString renders nothing). `NavGuidance.turnHint` finally wired into the
+  banner — the phrasing was written and tested and only the arrow was ever asked for.
+- **Route elevation profile** (`core:telemetry/RouteProfile.kt` + `data/maps/ElevationRepository.kt`,
+  6 local tests) over Open-Meteo's keyless batch elevation endpoint — 80 samples in one request.
+  The sampling is the part that matters: a router's shape points are dense at roundabouts and sparse
+  on motorways, so charting them directly makes the x-axis the router's drawing style rather than
+  distance. Keyed on objective + route *length*, not geometry — the route re-resolves every 60 m of
+  travel and comes back slightly different, so a geometry comparison would refetch constantly.
+  `LcarsTimeChart` gained an optional `xFormat` (its axis is a Long because it was written for time;
+  here the number is metres).
+- **Camera persistence: decided against**, not forgotten. Every version writes the whole settings
+  blob per camera-idle or races the view model's teardown, for the marginal gain of reopening the
+  map exactly where you left it.
 - **The trail** (`core:telemetry/TrackLog.kt` + `data/nav/TrackStore.kt`, 9 local tests) closes the
   feature catalogue's long-standing claim that this map has one. The filter scales with the fix
   (refuse vague fixes, require movement > stated accuracy, refuse impossible speed at a bar high
   enough that an airliner still records); climb ignores <3 m because GPS altitude noise otherwise
   reports a mountain on a flat walk. On-device only; erasing erases.
-- **Still open on the map:** camera not persisted / no `onSaveInstanceState`; location polled every
-  2.5 s (`LocationComponent` would fix the jumpy dot); `cyberpunkify` flattens parks and landuse;
-  `nav3d` only tilts; declination computed at altitude 0.0 (verified real, judged cosmetic);
-  `NavGuidance.turnHint` still unused; elevation profile and measure tool not built.
+- **Still open on the map:** location polled every 2.5 s (`LocationComponent` would fix the jumpy
+  dot, but replacing a working marker is a real regression risk); `cyberpunkify` flattens parks and
+  landuse into the base colour; `nav3d` only tilts; declination computed at altitude 0.0 (verified
+  real, judged cosmetic — the WMM barely moves over normal altitudes); no `onSaveInstanceState`.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the

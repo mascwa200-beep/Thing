@@ -333,6 +333,9 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
             }
             // Long-press anywhere drops a waypoint there + opens its card (track / remove).
             ml.addOnMapLongClickListener { latLng ->
+                // While measuring, the map belongs to the tape; dropping a pin under it would be
+                // a second thing happening that nobody asked for.
+                if (measuring) return@addOnMapLongClickListener true
                 vm.dropWaypointAt(latLng.latitude, latLng.longitude)
                 true
             }
@@ -570,6 +573,9 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     MapControlButton(active = layersOpen, c = c, label = "▤") { layersOpen = !layersOpen }
                     MapControlButton(active = measuring, c = c, label = "⇔") {
                         measuring = !measuring
+                        // Measuring means you are studying the map, not being carried along by it,
+                        // so the camera stops chasing the GPS fix out from under the tape.
+                        if (measuring) follow = false
                         // Leaving the mode clears the chain: a measurement left lying on the map
                         // after you have moved on is just clutter you have to remember to dismiss.
                         if (!measuring) measurePoints = emptyList()
