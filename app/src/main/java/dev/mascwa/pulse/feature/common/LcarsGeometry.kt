@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -573,3 +575,110 @@ fun LcarsSegmentBar(
         }
     }
 }
+
+/**
+ * One destination in [LcarsNavBar].
+ *
+ * A plain data holder rather than a reference to the navigation module's own type, so the kit does
+ * not depend on the app's route table.
+ */
+data class LcarsNavItem(
+    val key: String,
+    val label: String,
+    val icon: ImageVector,
+    val selected: Boolean,
+    val onClick: () -> Unit,
+)
+
+/**
+ * The bottom bar as LCARS: a run of solid blocks, not a Material nav bar.
+ *
+ * This was the last stock Material surface in the chrome, and it sat on every screen — a row of
+ * tinted icons with a pill indicator, directly beneath a frame built entirely out of blocks. The
+ * blocks read as one console; the pill read as Android.
+ *
+ * The leading stub continues the rail's foot and carries its swept bottom-left corner, so the L
+ * closes at the corner instead of stopping short of it. Each destination gets its own hue from the
+ * rail palette — which means the bar goes red with everything else under an alert, and no code here
+ * knows about alerts at all.
+ *
+ * Labels sit on the block in the ground colour, because that is how LCARS letters a filled block and
+ * because it survives every hue in the palette. Icons stay: six words at phone width is a lot to
+ * read at a glance, and the icon is what the eye actually lands on.
+ */
+@Composable
+fun LcarsNavBar(
+    items: List<LcarsNavItem>,
+    modifier: Modifier = Modifier,
+    blocks: List<Color> = LocalLcarsBlocks.current,
+) {
+    if (items.isEmpty() || blocks.isEmpty()) {
+        Box(modifier)
+        return
+    }
+    val c = Pulse.colors
+    val cue = rememberLcarsCue()
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(c.void)
+            .height(NavBarHeight),
+        horizontalArrangement = Arrangement.spacedBy(RailGutter),
+    ) {
+        // The rail's foot. Not a control: the rail above it is not one either, and a corner block
+        // that navigated somewhere would be a surprise every time a thumb brushed it.
+        Box(
+            Modifier
+                .width(LcarsRailWidth)
+                .fillMaxHeight()
+                .clip(lcarsBlockShape(CornerSweep, LcarsCorner.BottomStart))
+                .background(c.accent),
+        )
+        items.forEachIndexed { i, item ->
+            val last = i == items.lastIndex
+            val tint = if (item.selected) c.accent else blocks[(i + 2) % blocks.size]
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(
+                        if (last) lcarsBlockShape(CornerSweep, LcarsCorner.BottomEnd)
+                        else RoundedCornerShape(0.dp),
+                    )
+                    // An unselected block is the same hue at a fraction of its strength, so the
+                    // selected one reads instantly without the row becoming a colour chart.
+                    .background(if (item.selected) tint else tint.copy(alpha = 0.34f))
+                    .clickable {
+                        cue(SoundCue.SELECT, HapticCue.SELECT)
+                        item.onClick()
+                    }
+                    .padding(horizontal = 2.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    item.icon,
+                    contentDescription = item.label,
+                    tint = c.void,
+                    modifier = Modifier.height(NavIconSize).width(NavIconSize),
+                )
+                Text(
+                    item.label,
+                    fontFamily = Antonio,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 9.sp,
+                    letterSpacing = 0.6.sp,
+                    color = c.void,
+                    maxLines = 1,
+                    // Antonio is condensed, which is most of why six words fit at all. Clipping
+                    // rather than ellipsising: a truncated word still reads, "MARKE…" does not.
+                    overflow = TextOverflow.Clip,
+                    softWrap = false,
+                )
+            }
+        }
+    }
+}
+
+private val NavBarHeight = 52.dp
+private val NavIconSize = 17.dp

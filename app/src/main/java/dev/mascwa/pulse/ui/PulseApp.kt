@@ -1,17 +1,12 @@
 package dev.mascwa.pulse.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,39 +88,21 @@ fun PulseApp(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = nw.void,
         bottomBar = {
-            NavigationBar(
-                containerColor = nw.carbon,
-                tonalElevation = 0.dp,
-            ) {
-                TOP_DESTINATIONS.forEach { dest ->
-                    val selected = currentRoute == dest.route
-                    NavigationBarItem(
-                        selected = selected,
+            dev.mascwa.pulse.feature.common.LcarsNavBar(
+                TOP_DESTINATIONS.map { dest ->
+                    dev.mascwa.pulse.feature.common.LcarsNavItem(
+                        key = dest.route,
+                        label = dest.label,
+                        icon = if (currentRoute == dest.route) dest.selectedIcon else dest.unselectedIcon,
+                        selected = currentRoute == dest.route,
                         onClick = { navigateTopLevel(dest.route) },
-                        icon = {
-                            Icon(
-                                if (selected) dest.selectedIcon else dest.unselectedIcon,
-                                contentDescription = dest.label,
-                            )
-                        },
-                        label = {
-                            Text(
-                                dest.label,
-                                fontFamily = dev.mascwa.pulse.ui.theme.JetBrainsMono,
-                                fontSize = 9.sp,
-                                letterSpacing = 0.6.sp,
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = nw.accent,
-                            selectedTextColor = nw.accent,
-                            indicatorColor = nw.accent.copy(alpha = 0.14f),
-                            unselectedIconColor = nw.muted,
-                            unselectedTextColor = nw.muted,
-                        ),
                     )
-                }
-            }
+                },
+                // The bar draws its own ground and sits flush against the system bar, which is
+                // black too — so it is padded for the gesture inset rather than letting the
+                // navigation blocks run underneath it.
+                Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+            )
         },
     ) { innerPadding ->
         NavHost(
