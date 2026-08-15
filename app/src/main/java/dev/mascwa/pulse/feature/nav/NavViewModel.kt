@@ -6,6 +6,8 @@ import dev.mascwa.pulse.core.telemetry.RouteProgress
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
+import dev.mascwa.pulse.data.maps.MapLayerCatalog
+import dev.mascwa.pulse.data.maps.RainViewerRepository
 import dev.mascwa.pulse.data.objectives.WaypointStore
 import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.places.Place
@@ -69,6 +71,7 @@ class NavViewModel(
     private val waypointStore: WaypointStore,
     private val safety: SafetyRepository,
     private val routing: RoutingRepository,
+    private val rainViewer: RainViewerRepository,
 ) : ViewModel() {
 
     /** The objective/waypoint currently tracked on the map (gold main / white side / green work), or null. */
@@ -95,6 +98,21 @@ class NavViewModel(
     /** Shade the night half of the world (the day/night terminator) — persisted like the other view modes. */
     private val _night = MutableStateFlow(false)
     val night: StateFlow<Boolean> = _night.asStateFlow()
+
+    /** Which world the map draws: the vector style, satellite imagery, or topographic tiles. */
+    private val _basemap = MutableStateFlow(MapLayerCatalog.Basemap.NIGHTWIRE)
+    val basemap: StateFlow<MapLayerCatalog.Basemap> = _basemap.asStateFlow()
+
+    /** Hillshaded relief from elevation tiles, drawn over whichever basemap is chosen. */
+    private val _relief = MutableStateFlow(false)
+    val relief: StateFlow<Boolean> = _relief.asStateFlow()
+
+    /** Live precipitation radar. Null frame = the overlay is off or RainViewer had nothing. */
+    private val _rain = MutableStateFlow(false)
+    val rain: StateFlow<Boolean> = _rain.asStateFlow()
+    private val _rainFrame = MutableStateFlow<RainViewerRepository.RadarFrame?>(null)
+    val rainFrame: StateFlow<RainViewerRepository.RadarFrame?> = _rainFrame.asStateFlow()
+    private var rainJob: Job? = null
 
     /** The POI the user tapped on the map (drives the detail card); null = nothing selected. */
     private val _selectedPoi = MutableStateFlow<Place?>(null)
@@ -157,6 +175,12 @@ class NavViewModel(
                 _nav3d.value = it.nav3d
                 _headingUp.value = it.navHeadingUp
                 _night.value = it.navNight
+                _relief.value = it.navRelief
+                _basemap.value = runCatching { MapLayerCatalog.Basemap.valueOf(it.navBasemap) }
+                    .getOrDefault(MapLayerCatalog.Basemap.NIGHTWIRE)
+                // Restoring the rain overlay has to go through the setter: the layer needs a frame,
+                // and only the setter starts the loop that fetches one.
+                if (it.navRain) setRain(true)
             }
         }
         // Keep a road-following route to the active waypoint, refreshed when it changes or the player
@@ -202,6 +226,38 @@ class NavViewModel(
     fun setNight(on: Boolean) {
         _night.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navNight = on) } } }
+    }
+
+    fun setBasemap(b: MapLayerCatalog.Basemap) {
+        _basemap.value = b
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navBasemap = b.name) } } }
+    }
+
+    fun setRelief(on: Boolean) {
+        _relief.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRelief = on) } } }
+    }
+
+    /**
+     * Turn the precipitation overlay on or off.
+     *
+     * While it is on the frame is refreshed on a slow loop — the radar scans every ten minutes, and
+     * the repository holds a floor of its own, so this cannot become a poll.
+     */
+    fun setRain(on: Boolean) {
+        _rain.value = on
+        viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRain = on) } } }
+        rainJob?.cancel()
+        if (!on) {
+            _rainFrame.value = null
+            return
+        }
+        rainJob = viewModelScope.launch {
+            while (isActive) {
+                _rainFrame.value = runCatching { rainViewer.latest() }.getOrNull()
+                delay(5 * 60_000L)
+            }
+        }
     }
 
     /** Re-centre the map on the active objective (tapping the nav readout banner). */

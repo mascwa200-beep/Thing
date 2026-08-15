@@ -179,6 +179,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.places.RoutingRepository(http)
     }
 
+    /** Live precipitation-radar frames for the NAV map's rain overlay (keyless). */
+    val rainViewerRepository: dev.mascwa.pulse.data.maps.RainViewerRepository by lazy {
+        dev.mascwa.pulse.data.maps.RainViewerRepository(http)
+    }
+
     /** Local / regional internet radio (Radio Browser community API; free, keyless). */
     val tuneInRepository: dev.mascwa.pulse.data.radio.TuneInRepository by lazy {
         dev.mascwa.pulse.data.radio.TuneInRepository(http)

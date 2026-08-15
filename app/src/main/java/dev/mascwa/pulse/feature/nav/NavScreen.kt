@@ -67,6 +67,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.maps.MapLayerCatalog
+import dev.mascwa.pulse.data.maps.RainViewerRepository
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
 import dev.mascwa.pulse.data.objectives.Waypoint
 import dev.mascwa.pulse.data.places.Place
@@ -94,10 +96,16 @@ import org.maplibre.android.style.layers.BackgroundLayer
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.HillshadeLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.RasterDemSource
+import org.maplibre.android.style.sources.RasterSource
+import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Point
 
 // OpenFreeMap: keyless, no-registration vector tiles (OSM data). We load it then recolour every
@@ -123,6 +131,12 @@ private const val NIGHT_SOURCE = "nav-night"
 private const val NIGHT_LAYER = "nav-night-fill"
 private const val SUN_SOURCE = "nav-subsolar"
 private const val SUN_LAYER = "nav-subsolar-dot"
+private const val RELIEF_SOURCE = "nav-relief"
+private const val RELIEF_LAYER = "nav-relief-shade"
+private const val RAIN_SOURCE = "nav-rain"
+private const val RAIN_LAYER = "nav-rain-tiles"
+/** TileJSON version every hand-built TileSet declares; the spec requires the field. */
+private const val TILEJSON_VERSION = "2.2.0"
 private const val EMPTY_FC = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 private const val FOLLOW_ZOOM = 16.5
 private const val FOLLOW_TILT = 50.0
@@ -183,6 +197,11 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val incidents by vm.incidents.collectAsState()
     val showIncidents by vm.showIncidents.collectAsState()
     val scanNotice by vm.scanNotice.collectAsState()
+    val basemap by vm.basemap.collectAsState()
+    val relief by vm.relief.collectAsState()
+    val rain by vm.rain.collectAsState()
+    val rainFrame by vm.rainFrame.collectAsState()
+    var layersOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -314,6 +333,28 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
         style.getSourceAs<GeoJsonSource>(OBJECTIVE_SOURCE)?.setGeoJson(objectiveGeoJson(allWaypoints, activeWaypointId))
     }
 
+    // The chosen world, and the relief shading over it. These reshape the style rather than just
+    // pushing data into a source, so they are guarded: a style torn down between the effect being
+    // scheduled and it running should cost the overlay, not the screen.
+    LaunchedEffect(basemap, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        runCatching { applyBasemap(style, basemap) }
+    }
+    LaunchedEffect(relief, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        runCatching {
+            style.getLayerAs<HillshadeLayer>(RELIEF_LAYER)?.setProperties(
+                PropertyFactory.visibility(if (relief) Property.VISIBLE else Property.NONE),
+            )
+        }
+    }
+    // Precipitation. Each scan lives at its own address, so a new frame is a new source rather
+    // than an update to the old one.
+    LaunchedEffect(rainFrame, map, styleReady) {
+        val style = map?.style ?: return@LaunchedEffect
+        runCatching { applyRain(style, rainFrame) }
+    }
+
     // Redraw the day/night terminator while it is lit. It slides west a quarter of a degree per
     // minute, so a minute between updates is imperceptible; switching it off empties the source
     // rather than leaving stale geometry behind.
@@ -440,6 +481,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                         centerOf(map, location)?.let { vm.toggleIncidents(it.first, it.second) }
                     }
                     MapControlButton(active = night, c = c, label = "☾") { vm.setNight(!night) }
+                    MapControlButton(active = layersOpen, c = c, label = "▤") { layersOpen = !layersOpen }
                     if (activeWaypoint != null) {
                         MapControlButton(active = false, c = c, icon = LcarsIcons.Close) { vm.clearWaypoint() }
                     }
@@ -472,6 +514,20 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             c = c,
                             onClose = { vm.selectPoi(null) },
                             onSetWaypoint = { vm.setWaypointFromPoi(poi) },
+                        )
+                    }
+                    if (layersOpen) {
+                        LayersPanel(
+                            basemap = basemap,
+                            relief = relief,
+                            rain = rain,
+                            rainFrame = rainFrame,
+                            night = night,
+                            c = c,
+                            onBasemap = vm::setBasemap,
+                            onRelief = vm::setRelief,
+                            onRain = vm::setRain,
+                            onNight = vm::setNight,
                         )
                     }
                     scanNotice?.let { notice ->
@@ -508,6 +564,7 @@ private fun installNavStyle(ml: MapLibreMap, c: NightwirePalette, onReady: () ->
     ml.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
         cyberpunkify(style, c)
         ensureBuildingExtrusion(style)
+        addRasterLayers(style)
         addNightLayer(style)
         addRouteLayer(style)
         addPoiLayer(style, c)
@@ -834,7 +891,85 @@ private fun routeLineGeoJson(route: List<Pair<Double, Double>>): String {
         "{\"type\":\"LineString\",\"coordinates\":[$sb]},\"properties\":{}}]}"
 }
 
-/** Category POI markers, coloured per-feature via the data-driven "color" property. */
+/**
+ * The raster basemaps and overlays, all created up front and switched by visibility.
+ *
+ * A MapLibre source's URL is fixed once it exists, so choosing between three basemaps means having
+ * all three present rather than rewriting one. That costs nothing while they are hidden: tiles are
+ * only fetched for a source some visible layer actually references.
+ *
+ * They go in *below* everything this screen draws and *above* the vector basemap, so a raster
+ * basemap covers the styled map underneath while the markers, routes and night wash stay on top.
+ */
+private fun addRasterLayers(style: Style) {
+    if (style.getSource(RELIEF_SOURCE) != null) return
+    for (base in MapLayerCatalog.Basemap.entries) {
+        val url = base.tileUrl ?: continue
+        val tiles = TileSet(TILEJSON_VERSION, url).apply { maxZoom = base.maxZoom }
+        style.addSource(RasterSource(basemapSourceId(base), tiles, base.tileSize))
+        style.addLayer(
+            RasterLayer(basemapLayerId(base), basemapSourceId(base)).withProperties(
+                PropertyFactory.visibility(Property.NONE),
+                // Imagery and topo maps are both brighter than this app; take the edge off so the
+                // cyan routes and coloured pins still read against them.
+                PropertyFactory.rasterBrightnessMax(0.86f),
+                PropertyFactory.rasterSaturation(-0.12f),
+                PropertyFactory.rasterFadeDuration(220f),
+            ),
+        )
+    }
+    // Elevation tiles carry height in their pixels; the encoding tells the renderer how to read it,
+    // and getting it wrong yields plausible-looking nonsense rather than an error.
+    val dem = TileSet(TILEJSON_VERSION, MapLayerCatalog.TERRAIN_DEM_URL).apply {
+        maxZoom = MapLayerCatalog.TERRAIN_DEM_MAX_ZOOM
+        encoding = MapLayerCatalog.TERRAIN_DEM_ENCODING
+    }
+    style.addSource(RasterDemSource(RELIEF_SOURCE, dem, 256))
+    style.addLayer(
+        HillshadeLayer(RELIEF_LAYER, RELIEF_SOURCE).withProperties(
+            PropertyFactory.visibility(Property.NONE),
+            PropertyFactory.hillshadeExaggeration(0.55f),
+            PropertyFactory.hillshadeShadowColor(Color(0xFF000814).toArgb()),
+            PropertyFactory.hillshadeHighlightColor(Color(0xFF2DE2E6).toArgb()),
+            PropertyFactory.hillshadeAccentColor(Color(0xFF0B1A2E).toArgb()),
+        ),
+    )
+}
+
+private fun basemapSourceId(b: MapLayerCatalog.Basemap) = "nav-base-${b.name.lowercase()}"
+private fun basemapLayerId(b: MapLayerCatalog.Basemap) = "nav-base-${b.name.lowercase()}-tiles"
+
+/** Show the chosen raster basemap and hide the others; NIGHTWIRE simply hides them all. */
+private fun applyBasemap(style: Style, chosen: MapLayerCatalog.Basemap) {
+    for (base in MapLayerCatalog.Basemap.entries) {
+        if (base.tileUrl == null) continue
+        style.getLayerAs<RasterLayer>(basemapLayerId(base))?.setProperties(
+            PropertyFactory.visibility(if (base == chosen) Property.VISIBLE else Property.NONE),
+        )
+    }
+}
+
+/**
+ * Swap in a precipitation frame, or clear the overlay when [frame] is null.
+ *
+ * Each frame lives at its own URL, so a new one means a new source rather than an update. The
+ * layer is torn down first: removing a source still referenced by a layer is refused.
+ */
+private fun applyRain(style: Style, frame: RainViewerRepository.RadarFrame?) {
+    style.removeLayer(RAIN_LAYER)
+    style.removeSource(RAIN_SOURCE)
+    if (frame == null) return
+    val tiles = TileSet(TILEJSON_VERSION, frame.tileUrl).apply { maxZoom = 12f }
+    style.addSource(RasterSource(RAIN_SOURCE, tiles, 512))
+    val rain = RasterLayer(RAIN_LAYER, RAIN_SOURCE).withProperties(
+        PropertyFactory.rasterOpacity(0.62f),
+        PropertyFactory.rasterFadeDuration(300f),
+    )
+    // Above the ground, below the things you navigate by: rain should not hide your own route.
+    if (style.getLayer(ROUTE_CASING_LAYER) != null) style.addLayerBelow(rain, ROUTE_CASING_LAYER)
+    else style.addLayer(rain)
+}
+
 /**
  * The day/night terminator, as a filled night hemisphere plus a dot where the Sun is overhead.
  *
@@ -887,6 +1022,7 @@ private fun subSolarGeoJson(epochMs: Long): String {
         "${s.latitudeDeg.coerceIn(-MERCATOR_LIMIT, MERCATOR_LIMIT)}]}}]}"
 }
 
+/** Category POI markers, coloured per-feature via the data-driven "color" property. */
 private fun addPoiLayer(style: Style, c: NightwirePalette) {
     if (style.getSource(POI_SOURCE) != null) return
     style.addSource(GeoJsonSource(POI_SOURCE))
@@ -1302,6 +1438,127 @@ private fun NavChrome(
                 )
             }
         }
+    }
+}
+
+/**
+ * The layer drawer: which world the map draws, and what is laid over it.
+ *
+ * Each tile service is credited by name. Two of these licences require it, and in any case a map
+ * ought to say where its picture came from.
+ */
+@Composable
+private fun LayersPanel(
+    basemap: MapLayerCatalog.Basemap,
+    relief: Boolean,
+    rain: Boolean,
+    rainFrame: RainViewerRepository.RadarFrame?,
+    night: Boolean,
+    c: NightwirePalette,
+    onBasemap: (MapLayerCatalog.Basemap) -> Unit,
+    onRelief: (Boolean) -> Unit,
+    onRain: (Boolean) -> Unit,
+    onNight: (Boolean) -> Unit,
+) {
+    val shape = lcarsBlockShape(sweep = 14.dp, corner = LcarsCorner.TopStart)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(c.panel.copy(alpha = 0.95f))
+            .border(1.dp, c.accent.copy(alpha = 0.7f), shape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("BASEMAP", fontFamily = ChakraPetch, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.accent)
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            MapLayerCatalog.Basemap.entries.forEach { base ->
+                LayerChip(
+                    label = base.label,
+                    detail = base.blurb,
+                    on = base == basemap,
+                    c = c,
+                    onClick = { onBasemap(base) },
+                )
+            }
+        }
+        Text(
+            basemap.attribution,
+            fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted,
+        )
+
+        Text(
+            "OVERLAYS",
+            fontFamily = ChakraPetch, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.accent,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            LayerChip(
+                label = "RAIN",
+                // The frame's own timestamp, so an overlay held over from a failed refresh still
+                // says how old the picture is instead of implying it is current.
+                detail = when {
+                    !rain -> "Precipitation radar"
+                    rainFrame == null -> "No frame yet"
+                    else -> "Scanned ${minutesAgo(rainFrame.timeEpochMs)}"
+                },
+                on = rain,
+                c = c,
+                onClick = { onRain(!rain) },
+            )
+            LayerChip("RELIEF", "Hillshaded terrain", relief, c) { onRelief(!relief) }
+            LayerChip("NIGHT", "Where the Sun has set", night, c) { onNight(!night) }
+        }
+        val credits = buildList {
+            if (rain) add(MapLayerCatalog.RAIN_ATTRIBUTION)
+            if (relief) add(MapLayerCatalog.TERRAIN_DEM_ATTRIBUTION)
+        }
+        if (credits.isNotEmpty()) {
+            Text(credits.joinToString(" · "), fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+        }
+    }
+}
+
+@Composable
+private fun LayerChip(
+    label: String,
+    detail: String,
+    on: Boolean,
+    c: NightwirePalette,
+    onClick: () -> Unit,
+) {
+    val shape = lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart)
+    Column(
+        Modifier
+            .clip(shape)
+            .background(if (on) c.accent.copy(alpha = 0.18f) else c.raise.copy(alpha = 0.5f))
+            .border(1.dp, if (on) c.accent else c.line, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text(
+            label,
+            fontFamily = ChakraPetch, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            color = if (on) c.accent else c.ink,
+        )
+        Text(detail, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.muted)
+    }
+}
+
+/** "4 min ago" / "just now" — a frame's age, in the plainest words available. */
+private fun minutesAgo(epochMs: Long): String {
+    val mins = ((System.currentTimeMillis() - epochMs) / 60_000L).toInt()
+    return when {
+        mins <= 0 -> "just now"
+        mins == 1 -> "1 min ago"
+        mins < 90 -> "$mins min ago"
+        else -> "${mins / 60} h ago"
     }
 }
 
