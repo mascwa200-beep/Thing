@@ -4,14 +4,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.mascwa.pulse.data.settings.AccentColor
+import dev.mascwa.pulse.notifications.AlertCondition
+import dev.mascwa.pulse.notifications.AlertStatus
 
 /** Access the NIGHTWIRE palette anywhere: `Pulse.colors.accent`. */
 val LocalNightwire = staticCompositionLocalOf {
     nightwirePalette(accentColorOf(AccentColor.CYAN), amoled = false)
 }
+
+/**
+ * The rail block colours in force.
+ *
+ * Not `static`, unlike the palette: this one genuinely changes at runtime when the ship goes to red,
+ * and a static local does not invalidate its readers.
+ */
+val LocalLcarsBlocks = compositionLocalOf { LcarsBlocks }
 
 object Pulse {
     val colors: NightwirePalette
@@ -33,7 +46,12 @@ fun NightwireTheme(
     amoledBlack: Boolean,
     content: @Composable () -> Unit,
 ) {
-    val palette = lcarsPalette
+    // The ship's condition, set by BriefEngine when it publishes the board. Only RED moves the
+    // palette: yellow means pay attention, and recolouring the whole console for it would spend the
+    // signal long before anything is actually wrong.
+    val condition by AlertStatus.condition.collectAsState()
+    val alert = condition == AlertCondition.RED
+    val palette = if (alert) lcarsRedAlert else lcarsPalette
 
     val scheme = darkColorScheme(
         primary = palette.accent,
@@ -55,7 +73,13 @@ fun NightwireTheme(
         scrim = Color(0xCC02030A),
     )
 
-    CompositionLocalProvider(LocalNightwire provides palette) {
+    CompositionLocalProvider(
+        LocalNightwire provides palette,
+        // The rail blocks are not in the palette (they are a list, and the palette is a fixed set of
+        // roles), so they travel separately. Providing them here means the rails and segment bars go
+        // red with everything else and no screen has to know.
+        LocalLcarsBlocks provides if (alert) LcarsAlertBlocks else LcarsBlocks,
+    ) {
         MaterialTheme(
             colorScheme = scheme,
             typography = NightwireTypography,

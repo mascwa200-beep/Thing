@@ -201,6 +201,20 @@ class MainActivity : ComponentActivity() {
                     dev.mascwa.pulse.feature.home.LocalJarvisFeedTopic provides settings.jarvisFeedTopic,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
                 ) {
+                // The klaxon. Fires on the way INTO red and nowhere else — once per condition
+                // change, here rather than in the frame, because the frame is per-screen and would
+                // sound it again on every navigation for as long as the alert lasted.
+                val condition by dev.mascwa.pulse.notifications.AlertStatus.condition
+                    .collectAsStateWithLifecycle()
+                val cue = dev.mascwa.pulse.ui.effects.rememberLcarsCue()
+                LaunchedEffect(condition) {
+                    if (condition == dev.mascwa.pulse.notifications.AlertCondition.RED) {
+                        cue(
+                            dev.mascwa.pulse.ui.effects.SoundCue.ALERT,
+                            dev.mascwa.pulse.ui.effects.HapticCue.IMPACT_HEAVY,
+                        )
+                    }
+                }
                 Box(Modifier.fillMaxSize()) {
                     if (gated) {
                         DeviceGateScreen(

@@ -83,10 +83,11 @@ fun PulseApp(
         }
     }
 
-    // LCARS is the app's one palette now — the bottom nav bar (rendered outside the NavHost's own
-    // provider below) reads it directly rather than the ambient default so it doesn't fall back to the
-    // pre-LCARS cyberpunk chrome.
-    val nw = dev.mascwa.pulse.ui.theme.lcarsPalette
+    // The ambient palette, which NightwireTheme provides and which now swings to the alert range when
+    // the ship goes to red. This used to read `lcarsPalette` directly, to escape a stale pre-LCARS
+    // default — but the redundant re-provider that made that necessary is gone, and a hardcoded read
+    // would have left the bottom bar sitting in calm orange under a red alert.
+    val nw = dev.mascwa.pulse.ui.theme.Pulse.colors
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -127,11 +128,6 @@ fun PulseApp(
             }
         },
     ) { innerPadding ->
-        // LCARS is the app's one palette — provided once around the whole NavHost so every route
-        // re-themes with no per-screen edits.
-        androidx.compose.runtime.CompositionLocalProvider(
-            dev.mascwa.pulse.ui.theme.LocalNightwire provides dev.mascwa.pulse.ui.theme.lcarsPalette,
-        ) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
@@ -365,7 +361,6 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.security.SecurityAuditViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
-        }
         }
     }
 

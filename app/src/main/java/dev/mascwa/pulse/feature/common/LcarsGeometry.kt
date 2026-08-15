@@ -1,5 +1,10 @@
 package dev.mascwa.pulse.feature.common
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +30,8 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,13 +48,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.LcarsCodes
+import dev.mascwa.pulse.notifications.AlertCondition
+import dev.mascwa.pulse.notifications.AlertStatus
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
-import dev.mascwa.pulse.ui.theme.LcarsBlocks
+import dev.mascwa.pulse.ui.theme.LocalLcarsBlocks
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
@@ -331,7 +340,7 @@ private const val CODE_MIN_WEIGHT = 1.9f
 fun LcarsRail(
     seed: String,
     modifier: Modifier = Modifier,
-    blocks: List<Color> = LcarsBlocks,
+    blocks: List<Color> = LocalLcarsBlocks.current,
     weights: List<Float> = RailWeights,
 ) {
     if (blocks.isEmpty() || weights.isEmpty()) {
@@ -448,6 +457,8 @@ fun LcarsScreenFrame(
             }
         }
 
+        AlertStrip()
+
         Row(
             Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(RailGutter),
@@ -456,6 +467,74 @@ fun LcarsScreenFrame(
                 LcarsRail(seed, Modifier.width(LcarsRailWidth).fillMaxHeight())
             }
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+        }
+    }
+}
+
+/**
+ * The condition strip: nothing at all when routine, a band across every screen when not.
+ *
+ * The palette already turns red on its own, but a colour shift with no words is ambiguous — it could
+ * be a theme. This says which condition and, when the board has told us, what raised it.
+ *
+ * Deliberately not tappable. The frame has no navigation, and a band that looks like a control and
+ * does nothing is worse than a band that plainly reports. The detail is one pull-down away in the
+ * notification that raised it.
+ */
+@Composable
+private fun AlertStrip() {
+    val condition by AlertStatus.condition.collectAsState()
+    if (condition == AlertCondition.ROUTINE) return
+
+    val c = Pulse.colors
+    val red = condition == AlertCondition.RED
+    val headline by AlertStatus.headline.collectAsState()
+    // Under red the palette's own accent IS the alert red, so this reads correctly in both.
+    val tint = if (red) c.accent else c.amber
+    // Only red pulses. A yellow alert that throbbed would be a distraction proportional to nothing,
+    // and this animates on every screen for as long as the condition lasts.
+    val alpha = if (red) {
+        val t = rememberInfiniteTransition(label = "alert")
+        val a by t.animateFloat(
+            initialValue = 0.42f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(760), RepeatMode.Reverse),
+            label = "alertAlpha",
+        )
+        a
+    } else {
+        1f
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = RailGutter)
+            .height(20.dp)
+            .background(tint.copy(alpha = alpha))
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            if (red) "RED ALERT" else "YELLOW ALERT",
+            fontFamily = Antonio,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            letterSpacing = 2.sp,
+            color = c.void,
+            maxLines = 1,
+        )
+        if (headline.isNotBlank()) {
+            Text(
+                headline,
+                fontFamily = JetBrainsMono,
+                fontSize = 9.sp,
+                color = c.void,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -472,7 +551,7 @@ fun LcarsSegmentBar(
     seed: String,
     modifier: Modifier = Modifier,
     segments: Int = 5,
-    blocks: List<Color> = LcarsBlocks,
+    blocks: List<Color> = LocalLcarsBlocks.current,
 ) {
     if (segments <= 0 || blocks.isEmpty()) {
         Box(modifier)

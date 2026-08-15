@@ -163,6 +163,9 @@ object BriefEngine {
         )
         if (brief == null) {
             container.notifier.cancelBrief()
+            // Nothing to report is the definition of routine. Stand the console down too, or a
+            // cleared situation would leave the app red until something else happened to publish.
+            setCondition(container, AlertCondition.ROUTINE)
             return
         }
 
@@ -175,6 +178,17 @@ object BriefEngine {
             else -> false
         }
         container.notifier.notifyBrief(brief, alertNew)
+        // The console follows the board. Set on every publish, in both directions, so a situation
+        // that resolves stands the ship down as surely as one that arises takes it to red.
+        setCondition(
+            container,
+            when (brief.urgency) {
+                dev.mascwa.pulse.core.telemetry.BriefUrgency.RED -> AlertCondition.RED
+                dev.mascwa.pulse.core.telemetry.BriefUrgency.YELLOW -> AlertCondition.YELLOW
+                dev.mascwa.pulse.core.telemetry.BriefUrgency.ROUTINE -> AlertCondition.ROUTINE
+            },
+            brief.headline,
+        )
 
         // Burn the key only when it actually alerted — if urgent alerts were toggled off, the item keeps
         // its right to buzz once the toggle comes back on (an unburned key is a pending alert, not a bug).
@@ -183,6 +197,34 @@ object BriefEngine {
             val latest = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
             container.diskCache.write(STATE_KEY, latest.copy(lastUrgentKey = urgentKey), NotifyState.serializer())
         }
+    }
+
+    /**
+     * Put the console back into the condition the last board was in.
+     *
+     * Called once at process start. Without it a cold launch opens routine-orange until the next
+     * worker pass, which can be a refresh interval away while the tray still reads RED ALERT.
+     */
+    suspend fun restoreCondition(container: AppContainer) {
+        val state = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: return
+        AlertStatus.set(AlertStatus.parse(state.lastCondition))
+    }
+
+    /**
+     * Publish the condition to the live console and persist it for the next cold launch.
+     *
+     * Writes only on a real change, because the read-modify-write shares `notify_state` with the
+     * other writers and a no-op write is a chance to lose one of their fields for nothing.
+     */
+    private suspend fun setCondition(
+        container: AppContainer,
+        condition: AlertCondition,
+        headline: String = "",
+    ) {
+        AlertStatus.set(condition, headline)
+        val latest = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
+        if (latest.lastCondition == condition.name) return
+        container.diskCache.write(STATE_KEY, latest.copy(lastCondition = condition.name), NotifyState.serializer())
     }
 
     /** Device location when enabled and permitted, else the selected saved location — warm caches only
