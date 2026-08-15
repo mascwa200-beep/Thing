@@ -54,6 +54,9 @@ object SatellitePasses {
     /** Default horizon cut for a reported pass — anything lower is usually behind buildings. */
     const val DEFAULT_MIN_ELEVATION_DEG = 10.0
 
+    /** Hard ceiling on how finely one pass is sampled for brightness and closest approach. */
+    private const val MAX_PASS_SAMPLES = 240L
+
     // ---- types -----------------------------------------------------------------------------
 
     /** A ground observer. Altitude is metres above the ellipsoid. */
@@ -144,6 +147,21 @@ object SatellitePasses {
         val length: Double get() = sqrt(x * x + y * y + z * z)
         operator fun minus(o: Vec3) = Vec3(x - o.x, y - o.y, z - o.z)
         infix fun dot(o: Vec3) = x * o.x + y * o.y + z * o.z
+    }
+
+    /**
+     * The observer's fixed geometry, worked out once.
+     *
+     * This is not micro-optimisation. A pass search evaluates hundreds of thousands of instants,
+     * and rebuilding the site vector and its four trig terms at every one of them dominated the
+     * cost: scanning two days over the bright-object catalogue took 88 seconds before this existed.
+     */
+    private class Observer(site: Site) {
+        val ecef = siteEcef(site)
+        val sinLat = sin(site.latitudeDeg * DEG)
+        val cosLat = cos(site.latitudeDeg * DEG)
+        val sinLon = sin(site.longitudeDeg * DEG)
+        val cosLon = cos(site.longitudeDeg * DEG)
     }
 
     // ---- standard magnitudes ---------------------------------------------------------------
@@ -238,7 +256,10 @@ object SatellitePasses {
      * it. Null when the element set cannot be propagated to this instant — a caller gets an honest
      * absence rather than a plausible wrong sky position.
      */
-    fun look(propagator: Sgp4.Propagator, site: Site, epochMs: Long): LookAngle? {
+    fun look(propagator: Sgp4.Propagator, site: Site, epochMs: Long): LookAngle? =
+        look(propagator, Observer(site), epochMs)
+
+    private fun look(propagator: Sgp4.Propagator, obs: Observer, epochMs: Long): LookAngle? {
         val state = (propagator.propagateAt(epochMs) as? Sgp4.Propagation.Ok)?.state ?: return null
         val gmst = Ephemeris.gmstDeg(Ephemeris.julianDate(epochMs))
 
@@ -251,22 +272,14 @@ object SatellitePasses {
             vRot.z,
         )
 
-        val obsEcef = siteEcef(site)
-        val rel = satEcef - obsEcef
+        val rel = satEcef - obs.ecef
         val range = rel.length
         if (range <= 0.0 || !range.isFinite()) return null
 
-        val lat = site.latitudeDeg * DEG
-        val lon = site.longitudeDeg * DEG
-        val sinLat = sin(lat)
-        val cosLat = cos(lat)
-        val sinLon = sin(lon)
-        val cosLon = cos(lon)
-
         // South-east-zenith: the local frame azimuth and elevation are defined in.
-        val south = sinLat * cosLon * rel.x + sinLat * sinLon * rel.y - cosLat * rel.z
-        val east = -sinLon * rel.x + cosLon * rel.y
-        val zenith = cosLat * cosLon * rel.x + cosLat * sinLon * rel.y + sinLat * rel.z
+        val south = obs.sinLat * obs.cosLon * rel.x + obs.sinLat * obs.sinLon * rel.y - obs.cosLat * rel.z
+        val east = -obs.sinLon * rel.x + obs.cosLon * rel.y
+        val zenith = obs.cosLat * obs.cosLon * rel.x + obs.cosLat * obs.sinLon * rel.y + obs.sinLat * rel.z
 
         val altitude = asin((zenith / range).coerceIn(-1.0, 1.0)) / DEG
         val azimuth = Geodesy.normalizeBearing(atan2(east, -south) / DEG)
@@ -274,12 +287,31 @@ object SatellitePasses {
 
         val sunEcef = sunEcef(epochMs, gmst)
         val illumination = illumination(satEcef, sunEcef)
-        val phase = phaseAngleDeg(satEcef, sunEcef, obsEcef)
+        val phase = phaseAngleDeg(satEcef, sunEcef, obs.ecef)
         val magnitude = standardMagnitude(propagator.elements.noradId)
             ?.takeIf { illumination.isLit }
             ?.let { visualMagnitude(it, range, phase) }
 
         return LookAngle(altitude, azimuth, range, rangeRate, illumination, phase, magnitude)
+    }
+
+    /**
+     * Altitude alone, which is all the pass search ever asks for.
+     *
+     * [look] additionally works out an Earth-fixed velocity, the Sun's position, the shadow cone,
+     * the phase angle and a magnitude. None of that changes whether the satellite is above the
+     * horizon, and computing it at every scanned instant made a two-day search over the bright
+     * catalogue take a minute and a half instead of a second.
+     */
+    private fun altitudeDegAt(propagator: Sgp4.Propagator, obs: Observer, epochMs: Long): Double? {
+        val state = (propagator.propagateAt(epochMs) as? Sgp4.Propagation.Ok)?.state ?: return null
+        val gmst = Ephemeris.gmstDeg(Ephemeris.julianDate(epochMs))
+        val satEcef = rotZ(Vec3(state.x, state.y, state.z), gmst)
+        val rel = satEcef - obs.ecef
+        val range = rel.length
+        if (range <= 0.0 || !range.isFinite()) return null
+        val zenith = obs.cosLat * obs.cosLon * rel.x + obs.cosLat * obs.sinLon * rel.y + obs.sinLat * rel.z
+        return asin((zenith / range).coerceIn(-1.0, 1.0)) / DEG
     }
 
     /** The Sun as an Earth-fixed vector, kilometres. */
@@ -356,29 +388,33 @@ object SatellitePasses {
         // Deep-space and malformed element sets fail here rather than returning wrong times.
         if (propagator.propagateAt(fromEpochMs) !is Sgp4.Propagation.Ok) return emptyList()
 
-        fun altitudeAt(ms: Long): Double? = look(propagator, site, ms)?.altitudeDeg
+        val obs = Observer(site)
+        fun altitudeAt(ms: Long): Double? = altitudeDegAt(propagator, obs, ms)
 
         val out = mutableListOf<Pass>()
         var previousMs = fromEpochMs
         var previousAlt = altitudeAt(previousMs) ?: return emptyList()
-        // A pass already under way when the window opens is skipped, not truncated.
-        var searchingForRise = previousAlt < minElevationDeg
-        var riseMs = 0L
+        // Null means "no rise seen yet". A satellite already up when the window opens has no
+        // observable rise, so its descent must NOT be treated as the end of a pass -- there is no
+        // start time to pair it with, and a sentinel like 0 would be read as 1970.
+        var riseMs: Long? = null
 
         var t = fromEpochMs + step
         while (t <= toEpochMs && out.size < limit) {
             val alt = altitudeAt(t)
             if (alt == null) break
 
-            if (searchingForRise) {
-                if (previousAlt < minElevationDeg && alt >= minElevationDeg) {
-                    riseMs = bisectCrossing(::altitudeAt, previousMs, t, minElevationDeg, rising = true)
-                    searchingForRise = false
+            val crossedUp = previousAlt < minElevationDeg && alt >= minElevationDeg
+            val crossedDown = previousAlt >= minElevationDeg && alt < minElevationDeg
+            if (crossedUp && riseMs == null) {
+                riseMs = bisectCrossing(::altitudeAt, previousMs, t, minElevationDeg, rising = true)
+            } else if (crossedDown) {
+                val start = riseMs
+                if (start != null) {
+                    val setMs = bisectCrossing(::altitudeAt, previousMs, t, minElevationDeg, rising = false)
+                    buildPass(propagator, site, obs, start, setMs, step)?.let { out += it }
                 }
-            } else if (previousAlt >= minElevationDeg && alt < minElevationDeg) {
-                val setMs = bisectCrossing(::altitudeAt, previousMs, t, minElevationDeg, rising = false)
-                buildPass(propagator, site, riseMs, setMs, step)?.let { out += it }
-                searchingForRise = true
+                riseMs = null
             }
 
             previousMs = t
@@ -412,12 +448,13 @@ object SatellitePasses {
     private fun buildPass(
         propagator: Sgp4.Propagator,
         site: Site,
+        obs: Observer,
         riseMs: Long,
         setMs: Long,
         stepMs: Long,
     ): Pass? {
-        val rise = look(propagator, site, riseMs) ?: return null
-        val set = look(propagator, site, setMs) ?: return null
+        val rise = look(propagator, obs, riseMs) ?: return null
+        val set = look(propagator, obs, setMs) ?: return null
 
         // Altitude has a single maximum across a pass, so a ternary search converges on it.
         var lo = riseMs
@@ -427,21 +464,27 @@ object SatellitePasses {
             val third = (hi - lo) / 3
             val a = lo + third
             val b = hi - third
-            val altA = look(propagator, site, a)?.altitudeDeg ?: return@repeat
-            val altB = look(propagator, site, b)?.altitudeDeg ?: return@repeat
+            val altA = altitudeDegAt(propagator, obs, a) ?: return@repeat
+            val altB = altitudeDegAt(propagator, obs, b) ?: return@repeat
             if (altA < altB) lo = a else hi = b
         }
         val culminationMs = lo + (hi - lo) / 2
-        val culmination = look(propagator, site, culminationMs) ?: return null
+        val culmination = look(propagator, obs, culminationMs) ?: return null
 
-        // Walk the pass to find the brightest lit moment and the closest approach.
+        // Walk the pass to find the brightest lit moment and the closest approach. The sample count
+        // is bounded rather than derived purely from the interval: a bad rise/set pair once turned
+        // this into a fifty-nine-million-iteration loop, and a bound costs nothing to keep.
         var brightest: Double? = null
         var minRange = minOf(rise.rangeKm, culmination.rangeKm, set.rangeKm)
         var anySunlit = false
-        val sampleStep = stepMs.coerceAtMost(((setMs - riseMs) / 8).coerceAtLeast(1_000L))
+        val span = (setMs - riseMs).coerceAtLeast(1L)
+        val sampleStep = maxOf(
+            stepMs.coerceAtMost((span / 8).coerceAtLeast(1_000L)),
+            span / MAX_PASS_SAMPLES,
+        ).coerceAtLeast(1L)
         var t = riseMs
         while (t <= setMs) {
-            val at = look(propagator, site, t)
+            val at = look(propagator, obs, t)
             if (at != null) {
                 if (at.illumination.isLit) anySunlit = true
                 if (at.rangeKm < minRange) minRange = at.rangeKm

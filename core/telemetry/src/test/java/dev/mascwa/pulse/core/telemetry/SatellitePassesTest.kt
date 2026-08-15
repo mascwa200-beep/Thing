@@ -286,6 +286,51 @@ class SatellitePassesTest {
         assertEquals(1786793492083.0, passes.first().riseEpochMs.toDouble(), 400.0)
     }
 
+    @Test fun aWindowOpeningMidPassCannotProduceAnEpochZeroRise() {
+        // The regression this guards is specific and was found by benchmarking, not by reading.
+        // A satellite already above the cut when the window opened left the rise time at its 0
+        // sentinel, and the following descent was paired with it -- so the pass was "1970 until
+        // now" and its sampling walk ran fifty-nine million iterations. One real catalogue object
+        // (COSMOS 1867) hit it and took 77 seconds; the ISS masked it, because propagating an ISS
+        // element set back fifty-six years fails and bailed out early by luck.
+        //
+        // COSMOS 1867's real element set, and a window that deliberately opens mid-pass.
+        val cosmos = Tle.parse(
+            "1 18187U 87060A   26227.09573321 -.00000100  00000+0  28882-6 0  9990",
+            "2 18187  65.0084 223.0799 0017877 281.6408  78.2670 14.31521137 42612",
+            "COSMOS 1867",
+        )!!
+        val site = SatellitePasses.Site(40.7128, -74.0060, 10.0)
+
+        // Find a moment the satellite is genuinely up, then start a search from exactly there.
+        val propagator = Sgp4.propagator(cosmos)
+        val scanFrom = 1787040000000L
+        var midPass = -1L
+        var t = scanFrom
+        while (t < scanFrom + 24 * 3600_000L) {
+            if ((SatellitePasses.look(propagator, site, t)?.altitudeDeg ?: -90.0) > 20.0) {
+                midPass = t
+                break
+            }
+            t += 30_000L
+        }
+        assertTrue("fixture never found the satellite above 20 degrees", midPass > 0)
+
+        val startedAt = System.currentTimeMillis()
+        val passes = SatellitePasses.passes(cosmos, site, midPass, midPass + 6 * 3600_000L)
+        val elapsed = System.currentTimeMillis() - startedAt
+
+        // Every reported pass is real and inside the window.
+        for (p in passes) {
+            assertTrue("rise before the window: ${p.riseEpochMs}", p.riseEpochMs >= midPass)
+            assertTrue("set before rise", p.setEpochMs > p.riseEpochMs)
+            assertTrue("implausible duration ${p.durationMs} ms", p.durationMs < 3600_000L)
+        }
+        // Six hours over one satellite is milliseconds of work. The bug made it a minute-plus, so
+        // a generous ceiling still catches any regression.
+        assertTrue("pass search took ${elapsed} ms — the unbounded walk is back", elapsed < 5_000L)
+    }
+
     @Test fun degenerateWindowsReturnNothing() {
         assertTrue(SatellitePasses.passes(iss, nyc, t0, t0).isEmpty())
         assertTrue(SatellitePasses.passes(iss, nyc, t0, t0 - 1000L).isEmpty())
