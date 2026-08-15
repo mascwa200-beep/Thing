@@ -16,6 +16,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * TACNET radar feed. Live aircraft come from the keyless community ADS-B
@@ -188,16 +189,42 @@ class RadarRepository(
             val ilon = coords.getOrNull(0)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
             val ilat = coords.getOrNull(1)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
             if (Geo.distanceMeters(lat, lon, ilat, ilon) > quakeMaxMeters) return@mapNotNull null
-            val mag = props["mag"]?.jsonPrimitive?.doubleOrNull
-            val place = props["place"]?.jsonPrimitive?.contentOrNull ?: "Seismic event"
+
+            fun str(k: String) = props[k]?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null }
+            fun num(k: String) = props[k]?.jsonPrimitive?.doubleOrNull
+            fun int(k: String) = props[k]?.jsonPrimitive?.intOrNull
+
+            val mag = num("mag")
+            val place = str("place") ?: "Seismic event"
+            // Depth is the THIRD coordinate, not a property. Missing it entirely is the easy
+            // mistake here, and depth is what decides whether a given magnitude is dangerous.
+            val depthKm = coords.getOrNull(2)?.jsonPrimitive?.doubleOrNull
+
             Contact(
                 id = "qk_${o["id"]?.jsonPrimitive?.contentOrNull ?: "$ilat$ilon"}",
                 label = mag?.let { fmt("M%.1f", it) } ?: "QUAKE",
                 latitude = ilat, longitude = ilon,
                 detail = place,
                 kind = ContactKind.QUAKE.name,
+                magnitude = mag,
+                depthKm = depthKm,
+                magType = str("magType"),
+                pagerAlert = str("alert"),
+                tsunami = int("tsunami") == 1,
+                feltReports = int("felt"),
+                communityIntensity = num("cdi"),
+                shakingIntensity = num("mmi"),
+                significance = int("sig"),
+                reviewStatus = str("status"),
+                eventTimeMs = props["time"]?.jsonPrimitive?.longOrNull,
+                infoUrl = str("url"),
             )
-        }.take(8)
+        }
+            // Most significant first, not merely nearest. A magnitude 6 at 700 km matters more
+            // than a magnitude 2.6 next door, and the feed's own significance score already folds
+            // in size, felt reports and estimated impact.
+            .sortedByDescending { it.significance ?: 0 }
+            .take(12)
     }
 
     private companion object {

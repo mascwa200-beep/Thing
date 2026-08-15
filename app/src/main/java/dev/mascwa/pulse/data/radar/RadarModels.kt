@@ -88,6 +88,34 @@ data class Contact(
     val alert: Boolean = false,
     /** Ident pressed — the crew is identifying themselves to a controller right now. */
     val ident: Boolean = false,
+
+    // ---- seismic events ----
+    val magnitude: Double? = null,
+    /**
+     * Depth below the surface, kilometres.
+     *
+     * Not a property in the USGS feed — it is the third element of the geometry coordinates, which
+     * is easy to miss and easy to get silently wrong. It matters enormously: a shallow magnitude 5
+     * does more damage than a deep magnitude 6.
+     */
+    val depthKm: Double? = null,
+    /** Which magnitude scale was used: mww, mb, ml, ms, md. They are not interchangeable. */
+    val magType: String? = null,
+    /** USGS PAGER humanitarian-impact estimate: green, yellow, orange, red. */
+    val pagerAlert: String? = null,
+    val tsunami: Boolean = false,
+    /** How many people filed a "did you feel it" report. */
+    val feltReports: Int? = null,
+    /** Community-reported intensity from those reports. */
+    val communityIntensity: Double? = null,
+    /** Instrumental shaking intensity, Modified Mercalli. */
+    val shakingIntensity: Double? = null,
+    /** USGS's own significance score, which folds in magnitude, felt reports and impact. */
+    val significance: Int? = null,
+    /** "reviewed" once a seismologist has checked it; "automatic" solutions can be revised. */
+    val reviewStatus: String? = null,
+    val eventTimeMs: Long? = null,
+    val infoUrl: String? = null,
 ) {
     /** True when this position was estimated rather than reported by the aircraft itself. */
     val positionIsEstimated: Boolean
