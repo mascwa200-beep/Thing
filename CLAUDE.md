@@ -2570,6 +2570,28 @@ second stat row's legibility, and the pollutant bars. CI compiles; it does not d
 **Open:** `SourceNote`, `LoadingState` and `ErrorState` still read `MaterialTheme` — shared
 composables whose call sites reach well beyond this screen, so left alone deliberately.
 
+### ORACLE gains the comfort core (`5a5fad7`, same PR)
+
+The payoff of the canonical fields, and worth recording as a pattern: **the Oracle was declaring
+`windKmh` in `OracleSignals` and never populating it**, so any rule reading wind could never have
+fired. It was also converting temperature by hand. Both are now the repository's canonical
+companions, and five rules sit on the CI-tested comfort core — heat the thermometer understates
+(push-worthy only in the top band), wind chill while there is still time to dress for it, a gust
+well above the mean, a cold night raised in the evening, and fog around dawn. Each is gated on its
+index being *defined*, so a mild day cannot trip any of them.
+
+- **The cold-night rule deliberately does not call `frostPossible`**, which needs the dew point and
+  wind *at the time the frost would form*; the snapshot carries this evening's. It states the
+  forecast low and says frost is possible. A test asserts the title does not claim frost.
+- **Tonight's low is the minimum of the next twelve hourly readings**, not a daily figure — a daily
+  minimum belongs to a calendar day, so in the evening today's is behind you and tomorrow's covers
+  a night that has not begun.
+- **Real defect found while checking an expectation of mine that was wrong** (the fifth time this
+  session — the lesson is now unmissable): the Rothfusz regression keeps climbing outside its table,
+  and 41 °C at 70% came out as an apparent **77 °C**. Barely physical, but a stuck sensor produces
+  it and "feels like 77" on a card is worse than silence. Clamped to the top of the published chart
+  (`HEAT_INDEX_MAX_F`), which changes nothing inside it.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
