@@ -2592,6 +2592,26 @@ index being *defined*, so a mild day cannot trip any of them.
   it and "feels like 77" on a card is worse than silence. Clamped to the top of the published chart
   (`HEAT_INDEX_MAX_F`), which changes nothing inside it.
 
+### The brief says what the temperature does (#428, merged `61d28df`)
+
+The board posts a temperature every time it appears and said nothing about what it means — it
+carried rain, UV and a `severeWeather` flag that only fires on a **storm code**, so a 32 °C day at
+75% humidity (the more dangerous of the two) went out as *"32°C now · Clear"*. The WEATHER row now
+carries `WeatherComfort.compactFeelsLike()` between the condition and the forecast. New in the core
+rather than formatted inline, because a notification row and a chat reply want the same judgement
+at different lengths and one place should decide it. Absent on an ordinary day (tested), and a
+pre-canonical cache blob still renders its old row (tested).
+
+**Both PRs merged; `main` is current at `61d28df` and the dev branch is re-synced.**
+
+⚠️ **Recurring-mistake note for the next session, because it cost the most time here:** six
+expectations of mine turned out wrong where the *code* was right (humidex break-even, heat index at
+35 °C/50%, a geodesic degree, wind chill at −5 °C/40 km/h, a heat-risk band, and one more). Two of
+the six led to real bugs, but that is luck compensating for a bad habit. **Compute the expected
+value from the shipped function or the defining table before writing the assertion, and put the
+arithmetic in the test comment.** Never dress a recollection up as validation — one wind-chill
+assertion against a "published table" I could not source was dropped rather than kept.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
