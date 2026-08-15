@@ -2424,10 +2424,71 @@ exposes). Better find in its place: adsb.fi serves `ownOp`/`desc`/`year`, so the
 is largely unnecessary. The radar model now carries ~40 fields instead of 13 (autopilot intent, the
 feed's own emergency word, signal quality, mlat/tisb provenance, dbFlags, on-ground).
 
-⚠️ **Everything visual is owner-verify on the Pixel** — CI compile-gates only. Remaining: #89 radar
-sub-tabs, #90/#91 the map (basemap switcher, raster/hillshade/heatmap, instruments, and a long list of
-real defects catalogued in the plan file). **MapLibre has no true 3D terrain mesh at any version through
-13.5.0 — hillshade only; do not promise a mesh.**
+⚠️ **Everything visual is owner-verify on the Pixel** — CI compile-gates only. **MapLibre has no true
+3D terrain mesh at any version through 13.5.0 — hillshade only; do not promise a mesh.**
+
+### MAP (#90/#91) — the last program of the MAPS & SKY overhaul (this session, all pushed)
+
+**The capability worth remembering: MapLibre can be type-checked locally, with no Android SDK.**
+`curl` the published AAR from Maven Central (`org.maplibre.gl:android-sdk:11.8.0`), unzip
+`classes.jar`, and put it on kotlinc's target `-cp` alongside `kotlin-stdlib`. None of the
+style/layer/source/expression signatures reach into `android.*`, so they compile standalone; for the
+few that do (bitmaps), `com.google.android:android:4.1.1.4` from Maven Central is enough of a stub.
+The working method is to *extract the real functions out of `NavScreen.kt` by brace-matching* and
+compile those, stubbing only the Compose types — so what gets checked is the shipped code, not a
+paraphrase of it. Every map function this session was verified that way before push. `javap` on the
+same jar settles API questions outright (it is how `TileSet.encoding`, `RasterDemSource`,
+`HeatmapLayer`, `addLayerBelow` and `Property.ICON_ROTATION_ALIGNMENT_MAP` were confirmed).
+
+Shipped, in order: **`36c1278`** day/night terminator core; **`c17c0ac`** concurrent POI scans;
+**`e9158bd`** routing LRU + negative cache; **`f200d57`** terminator ring fix; **`2889fb9`** night
+layer + map states; **`4a5735b`** basemaps + rain + relief; **`57d7c02`** traffic + seismic heat;
+**`3091eb4`** incidents carried whole; **`6189208`** MGRS/DMS readout + `onLowMemory`; **`3aed077`**
+the breadcrumb trail. CI green through `4a5735b` (run 1537); the rest was pushed together.
+
+- **Layers.** A drawer (▤ control) picks the world — the vector style, **Sentinel-2 cloudless**
+  (EOX, CC-BY-4.0, zoom ≤14) or **OpenTopoMap** (CC-BY-SA, ≤17) — over which sit **RainViewer**
+  precipitation, **terrarium hillshade** (AWS Terrain Tiles, public domain, ≤15), live **aircraft**,
+  a magnitude-weighted **quake heatmap**, and the **night** wash. All keyless; every licence is
+  credited in the drawer, which two of them require. Sources are created up front and switched by
+  visibility, because a source's URL is fixed once it exists and hidden layers fetch nothing. Rain
+  is the exception — each scan is a new address, so the layer is torn down before the source.
+  `data/maps/MapLayerCatalog.kt` holds every address and its terms.
+- **⚠️ WMTS axis order.** EOX is `{z}/{y}/{x}` — row before column. Both orderings return a
+  perfectly valid JPEG; only one returns the right part of the world. Settled by fetching the Sahara
+  against the mid-Pacific and comparing sizes. Never assume this from a URL template.
+- **Bug found by reading, not by CI:** `Terminator.curve` normalised its longitudes, and
+  normalisation maps +180 onto −180 — the same place on a globe, the wrong end of a sweep. The last
+  point landed on the first, so `nightPolygon` read both pole corners off one edge and produced a
+  degenerate ring. The existing tests passed *because* of the collapse (`first == last`). Three new
+  tests, each confirmed to fail against the old code; the decisive one ray-casts the ring over a
+  grid of real places and requires exactly the ones where the Sun has set to be inside.
+- **Second lesson of the same kind:** `NeonPanel` puts its content in a **Box**, so a card that
+  emits several children directly stacks them on top of each other. Wrap in a `Column`.
+- **State the screen never had:** no loading, error or empty state existed anywhere on the map.
+  Scans now report what happened (all-failed / partly-failed / genuinely nothing there), counted
+  after the concurrent requests settle. MapLibre's style callback has **no error branch**, so a dead
+  basemap is detected by the callback never arriving (9 s) and offered a retry — no unverifiable
+  listener API involved. Also fixed a latent gap: `map` is published before its style loads, so any
+  effect firing in that window found a null style and gave up; the marker effects only recovered by
+  accident because GPS re-emits every 2.5 s. Everything now keys on `styleReady`.
+- **Data no longer thrown away:** incidents were flattened to a coordinate and a title, discarding
+  type/severity/magnitude/time/source-link — they are carried whole, coloured and sized by severity,
+  and tappable through to the report.
+- **Instruments:** position readout cycling decimal / DMS / **MGRS** (the geodesy core has produced
+  all three since it was written and the map showed none). DMS rounds to tenths *before* splitting —
+  the obvious order prints `179°59'60.0"`. `MapView.onLowMemory` is now subscribed via
+  `ComponentCallbacks2`; it normally rides the Activity callback, which never reaches a view inside
+  a composable.
+- **The trail** (`core:telemetry/TrackLog.kt` + `data/nav/TrackStore.kt`, 9 local tests) closes the
+  feature catalogue's long-standing claim that this map has one. The filter scales with the fix
+  (refuse vague fixes, require movement > stated accuracy, refuse impossible speed at a bar high
+  enough that an airliner still records); climb ignores <3 m because GPS altitude noise otherwise
+  reports a mountain on a flat walk. On-device only; erasing erases.
+- **Still open on the map:** camera not persisted / no `onSaveInstanceState`; location polled every
+  2.5 s (`LocationComponent` would fix the jumpy dot); `cyberpunkify` flattens parks and landuse;
+  `nav3d` only tilts; declination computed at altitude 0.0 (verified real, judged cosmetic);
+  `NavGuidance.turnHint` still unused; elevation profile and measure tool not built.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
