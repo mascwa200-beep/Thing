@@ -2931,6 +2931,50 @@ reads as deliberate rather than broken.
 **Flagged, not built:** monthly CPI from BLS/FRED would make INFLATION genuinely current but only for
 the US, and the tab is country-agnostic (FRED also needs a key). That asymmetry is an owner call.
 
+### THREE PLACES THE APP WAS MORE CONFIDENT THAN ITS DATA (PR #435, merged `f6fc38e`)
+
+One shape, three surfaces: the app stating something it did not know.
+
+- **INFLATION headline vintage.** A 36sp percentage — the biggest number in the app for "what is
+  inflation" — with only a dim year beneath it, and today that is a 2024 figure. Now carries the full
+  vintage and goes amber when DATED/OLD. The staleness check is a `when` over the two stale bands, not
+  an ordinal `>=`: the bands are declared in age order but nothing enforces it.
+- **`Formatters.relativeTime` printed a date with no year** past a week, so last August and this
+  August rendered identically across all six call sites (news, safety incidents, fetch times) — a
+  resurfaced old story looked as current as a fresh one. Keys on **calendar year**, not a twelve-month
+  window: a date two weeks earlier can still be last year, and in January that is the common case.
+  Device locale and zone on purpose — "this year" should mean this year *where the reader is*.
+- **⚠️ Safety said "No incidents reported near you right now" everywhere.** Of its four sources,
+  weather alerts are US-only and street crime is England/Wales/NI-only, so outside those two return
+  nothing by construction. Worse, `runCatching{}.getOrDefault(emptyList())` collapsed **three**
+  situations at the fetch — looked-and-found-nothing, does-not-operate-here, and failed — so the UI
+  could not have told them apart. Each outcome is now kept in `SafetyResult.sourceStates` (string map,
+  defaulted, converted at the boundary since `core:telemetry` has no serialization dep), and the empty
+  state reads *"Checked: earthquakes and major disasters. Weather alerts and street crime aren't
+  published for your area."*
+
+**The coverage asymmetry is the reusable finding, and it came from probing both sources directly.**
+`api.weather.gov` answers **400 "out of bounds"** outside the US — it states its own reach, so that
+one is taken from the source. `data.police.uk` answers **`200 []`** for Berlin, for Edinburgh (Police
+Scotland does not publish there) and for a genuinely quiet English village alike — it cannot tell us,
+so geography is the only signal left. **Where a source will say, ask it; estimate only where it won't,
+and label the estimate.**
+
+`SafetyCoverage.crimeCoverage` needed **three boxes, not one** — a rectangle over England and Wales
+wide enough to reach the Isles of Scilly also reaches **Dublin**, at Welsh latitudes across the sea.
+A test caught that before it shipped, which is what real city coordinates in a test are for. Where the
+boxes are still imperfect they **over-claim deliberately**: guessing generously leaves a user where
+they are today, guessing stingily would deny English users an explanation for data the app is holding.
+
+**Follow-up, same family:** FUEL renders its pump-price sections conditionally, so outside the US they
+simply vanish with no reason given. Added a line saying why — the World Bank retired both pump-price
+indicators (**verified: `EP.PMP.SGAS.CD`/`EP.PMP.DESL.CD` now answer "indicator not found"**, so the
+existing `nationalPrices = emptyList()` and its comment are correct and need no change), and the EIA
+figures are US-only and key-gated.
+
+⚠️ **Owner-verify on the Pixel:** the vintage line under the big inflation percentage, and the safety
+empty state at real width — it is now three lines rather than one.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
