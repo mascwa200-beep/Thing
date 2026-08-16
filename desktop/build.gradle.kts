@@ -19,6 +19,20 @@ kotlin {
     jvmToolchain(21)
 }
 
+// The bundled Knowledge Base — 581 guides, their per-category shards and their diagrams — copied into
+// this module's resources at build time from the Android app's asset directory.
+//
+// A file copy, deliberately, NOT a project dependency: `:desktop` still declares no dependency on `:app`
+// or `:core:*`, so it never pulls in AGP or the Android SDK, and the module stays independently
+// buildable. And a copy rather than a second checked-in tree, so the corpus has exactly ONE home in the
+// repo — a duplicated 95 MB of content would drift the first time a KB wave landed.
+//
+// ⚠️ `.github/workflows/desktop-build.yml` lists this path in its trigger filter for the same reason: a
+// content wave changes what the desktop ships, so it has to re-verify the desktop too.
+tasks.processResources {
+    from(rootProject.file("app/src/main/assets/survival")) { into("survival") }
+}
+
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
