@@ -37,6 +37,14 @@ data class IndicatorSeries(
     val format: ValueFormat,
     val higherIsBetter: Boolean,
     val points: List<IndicatorPoint>,   // ascending by year, non-null values only
+    /**
+     * When the World Bank last revised this series — its own date, not ours.
+     *
+     * Defaulted so dashboards cached before this field existed still decode. Distinct from both the
+     * year a figure describes and the moment the app fetched it; conflating the three is what made a
+     * two-year-old number read as current.
+     */
+    val lastUpdatedMs: Long? = null,
 ) {
     val latest: IndicatorPoint? get() = points.lastOrNull()
     val previous: IndicatorPoint? get() = points.getOrNull(points.size - 2)

@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.EconomyExplainers
+import dev.mascwa.pulse.core.telemetry.EconomyVintage
+import dev.mascwa.pulse.core.telemetry.Explainer
 import dev.mascwa.pulse.data.economy.IndicatorSeries
 import dev.mascwa.pulse.feature.common.CyberHeader
 import dev.mascwa.pulse.feature.common.ErrorState
@@ -93,8 +95,45 @@ fun EconomyBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
     explain?.let { s ->
         ExplainerDialog(
             s.indicatorTitle,
-            listOf(EconomyExplainers.forIndicator(s.indicatorId, s.latest?.value)),
+            buildList {
+                add(EconomyExplainers.forIndicator(s.indicatorId, s.latest?.value))
+                // How much weight the figure can carry. Null unless it is genuinely behind — a
+                // warning on every card is a warning on none, and an annual series being a year
+                // late is how annual series work.
+                val year = s.latest?.year
+                if (year != null) {
+                    EconomyVintage.caution(year, System.currentTimeMillis())?.let { why ->
+                        add(Explainer(EconomyVintage.describe(year, System.currentTimeMillis()), why))
+                    }
+                }
+                // The source's own revision date — the third date, distinct from the year the figure
+                // describes and from when this app fetched it.
+                s.lastUpdatedMs?.let { updated ->
+                    add(
+                        Explainer(
+                            "Source last revised",
+                            // Spelled out with the year rather than run through the app's relative
+                            // formatter, which drops to "Jul 13" past a week. On a card whose whole
+                            // purpose is to stop three different dates being confused for each
+                            // other, a date with no year would be a poor place to economise.
+                            "World Bank revision date: ${revisionDate(updated)}. That is when the " +
+                                "figures were revised — not the period they cover, and not when " +
+                                "this app fetched them.",
+                        ),
+                    )
+                }
+            },
             onDismiss = { explain = null },
         )
     }
 }
+
+/**
+ * A revision date a reader can place without guessing the year.
+ *
+ * Device locale on purpose: this is a date rendered for a person to read, not a value anything
+ * parses back, so the reader's own conventions are the correct ones.
+ */
+private fun revisionDate(epochMs: Long): String =
+    java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.getDefault())
+        .format(java.util.Date(epochMs))
