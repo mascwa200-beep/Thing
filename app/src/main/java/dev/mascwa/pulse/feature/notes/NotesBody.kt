@@ -54,10 +54,16 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(vm.categories.first()) }
+    // Non-null while an existing entry is being rewritten rather than a new one composed.
+    var editingId by remember { mutableStateOf<String?>(null) }
+
+    fun clearComposer() {
+        title = ""; body = ""; editingId = null; category = vm.categories.first()
+    }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- ADD ENTRY ----
-        LcarsHeaderBar("Add Entry")
+        LcarsHeaderBar(if (editingId == null) "Add Entry" else "Edit Entry")
         LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 NoteField(title, { title = it }, "Title", c)
@@ -70,19 +76,34 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
                         CatChip(cat, selected = cat == category, c = c) { category = cat }
                     }
                 }
-                Box(
-                    Modifier.padding(top = 12.dp)
-                        .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-                        .clickable {
-                            if (title.isNotBlank() || body.isNotBlank()) {
-                                vm.add(title, body, category)
-                                title = ""; body = ""
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier
+                            .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                            .clickable {
+                                if (title.isNotBlank() || body.isNotBlank()) {
+                                    val id = editingId
+                                    if (id == null) vm.add(title, body, category)
+                                    else vm.update(id, title, body, category)
+                                    clearComposer()
+                                }
                             }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            if (editingId == null) "▸ FILE ENTRY" else "▸ SAVE CHANGES",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            letterSpacing = 1.5.sp, color = c.accent,
+                        )
+                    }
+                    if (editingId != null) {
+                        Box(
+                            Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
                         }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text("▸ FILE ENTRY", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                        letterSpacing = 1.5.sp, color = c.accent)
+                    }
                 }
             }
         }
@@ -100,21 +121,48 @@ fun NotesBody(vm: NotesViewModel, modifier: Modifier = Modifier) {
             order.forEach { cat ->
                 val items = grouped[cat] ?: return@forEach
                 LcarsHeaderBar(cat, trailing = items.size.toString())
-                items.forEach { note -> NoteRow(note, c) { vm.delete(note.id) } }
+                items.forEach { note ->
+                    NoteRow(
+                        note, c,
+                        editing = note.id == editingId,
+                        onEdit = {
+                            editingId = note.id
+                            title = note.title
+                            body = note.body
+                            category = note.category
+                        },
+                        onDelete = {
+                            if (note.id == editingId) clearComposer()
+                            vm.delete(note.id)
+                        },
+                    )
+                }
             }
             Box(Modifier.padding(bottom = 24.dp))
         }
     }
 }
 
-/** A banded library row in the canonical DATA>STATS look: an edge-to-edge banded row with
- *  a bright hairline rule beneath (rows stack gap-free), holding title + body + date and a delete control. */
+/**
+ * A banded library row: title, body, date, and a delete control.
+ *
+ * Tapping the row opens it in the composer above. There is no separate edit control because the row
+ * itself has nothing else it could usefully do when tapped, and a note you cannot correct is the
+ * kind of gap that is only tolerable until someone notices it.
+ */
 @Composable
-private fun NoteRow(note: Note, c: NightwirePalette, onDelete: () -> Unit) {
+private fun NoteRow(
+    note: Note,
+    c: NightwirePalette,
+    editing: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth()
+            .clickable { onEdit() }
             .drawBehind {
-                drawRect(c.accent.copy(alpha = 0.08f))
+                drawRect(c.accent.copy(alpha = if (editing) 0.22f else 0.08f))
                 drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
             }
             .padding(horizontal = 14.dp, vertical = 11.dp),

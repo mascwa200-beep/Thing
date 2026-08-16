@@ -27,6 +27,11 @@ class NotesViewModel(private val store: NotesStore) : ViewModel() {
         viewModelScope.launch { store.add(title, body, category) }
     }
 
+    /** Rewrite an entry in place. Keeps its id and its date — a correction is not a new note. */
+    fun update(id: String, title: String, body: String, category: String) {
+        viewModelScope.launch { store.update(id, title, body, category) }
+    }
+
     fun delete(id: String) {
         viewModelScope.launch { store.remove(id) }
     }

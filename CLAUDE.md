@@ -3152,6 +3152,131 @@ clear a page metric is the wrong instinct, and the ratchet only forbids the coun
 first, then real protocol text); ask *"how does a two stroke engine work"* (must stay an ordinary
 answer); **Test the console sounds** in Settings; SOS → the coordinate line and the new first-aid rows.
 
+### THE VOICE PATH (this session, PR #440)
+
+Owner's standing directive: ship slice after slice, never stop. PR #439 (the emergency path) merged
+as `331cc33`; its last intended slice was the voice half, and reading `ActiveMatrixService` to place
+that one edit turned up five more defects in the same file, three of them silent. So the arc became
+the voice path itself. **Zero subagent spend, as with the four arcs before it** — local kotlinc +
+JUnit, the parse-only kotlinc gate, and CI.
+
+- **`4976fba` — an emergency spoken aloud is answered by the device.** `EmergencyTriage.match` runs
+  before the engine lookup, so the first action is spoken with no model, no network, no settings and
+  no agent loop. Same table as the library tool and the SOS fast path, so all three agree by
+  construction.
+- **`64d3719` — `core:telemetry/VoiceMachine.kt` (+ 17 tests, locally executed).** Mic ownership was
+  two volatile booleans read across twelve call sites, three of which guarded before re-arming and
+  nine of which did not, so two in-flight paths could each open a wake session with nothing to
+  observe it. `Owner{NONE,WAKE,COMMAND,CONSOLE,SPEAKING}` × `Action{NOTHING,START_WAKE,
+  START_COMMAND,RELEASE_MIC}`; the property is that **settling twice yields one START_WAKE and then
+  nothing**, negative-tested by regressing the guard (fails exactly those two tests, nothing else).
+  Also lifts the six-input floor-holding expression out of the service, where it was inline and untested.
+- **`09e716d` — the service asks the arbiter.** Twelve raw call sites become one `rearm()` funnel;
+  `perform()` takes the new state **synchronously** and posts the work, so a racing caller sees the
+  new owner AND the "never restart inside a Vosk callback frame" rule is structural rather than
+  remembered per site. Three long-deferred items fell out: the console now cancels the **system**
+  recogniser too (it only ever stopped the offline one); a late wake partial can no longer open a
+  capture under whoever now holds the mic; standing down hands back the wake model's ~128 MB.
+- **`0d51069` — a TTS watchdog.** `speak()` covered the synchronous failure and not the asynchronous
+  one; an engine dropping both callbacks strands the completion callback that re-arms the mic, so the
+  wake word dies silently. Backstop is deliberately several times the real duration (firing early
+  would reopen the mic mid-sentence). The callback is now atomic; `stop()`/`shutdown()` fire it.
+- **`5793c02` — voice answers from the written page.** The library was unreachable by voice because
+  the tool that reaches it only exists when `agentToolsEnabled` is on, and that is **off by default**.
+  Consulted before the model: with no live brain the page is read out directly, with one it goes into
+  the prompt as context. The relevance bar is strict on purpose — the question's rarest word must
+  actually appear in the guide, because the ranker always returns its closest match and a confident
+  paragraph about the wrong subject is worse than no library.
+
+**Three corrections I owe the record.**
+1. **`inferenceEngine` is a non-null container `val`**, so "no engine → `respond()` says nothing"
+   (asserted in `4976fba`'s message) is the literal branch but is unreachable in practice. What
+   actually happens with no cloud key and no on-device model is that `RoutingInferenceEngine` serves
+   **`EchoInferenceEngine`** — "a templated responder, not a generative model", in its own KDoc — so
+   the phone gives an acknowledgement dressed as an answer. The bypass is still right for the reasons
+   that survive; the specific claim was not.
+2. **`VoskSpeech.shutdown()` on service destroy — the long-standing deferred note is wrong.** It frees
+   **both** models, including the console's 1.8 GB dictation model, costing a multi-second reload on
+   the next tap-to-talk. Added `releaseWakeModel()` instead; verified the console only ever uses
+   `dictation = true`, so the wake tier is exclusively the service's.
+3. **`agentToolsEnabled`'s default is deliberately not flipped.** Widening it would admit not only
+   the read-only tools but the device-action ones in the same base registry — Call, SMS, Settings,
+   Torch. That is an owner decision, not a side effect.
+
+**Two defects found by *running* code rather than reading it**, which is the pattern that keeps
+paying: writing `VoiceMachineTest` surfaced that a `RELEASE_MIC` issued while the console owns the
+shared `VoskSpeech` would stop the **console's** recognition (releases are now only issued against a
+mic we actually hold); and running the sentence trimmer on real input showed it emitting a lone
+full stop for an empty body.
+
+⚠️ **Owner-verify on the Pixel — CI cannot open a microphone.** (1) "Computer" then *"someone is
+choking"*: the first action is spoken, fast, and still works with the cloud key removed. (2) *"how do
+I purify water"* with no cloud key and agent tools off: a real answer naming the guide. (3) Open the
+console mid-command and close it: the wake word returns exactly once. (4) Leave it a day: the wake
+word is still alive.
+
+**Left open:** whether `agentToolsEnabled` should default on for voice (owner's call, see above); the
+grounding excerpt's length and whether the strict relevance bar is too strict in practice — both are
+single constants (`GROUNDING_CHARS`, the `topical` check) and easy to tune from real use.
+
+### SEARCH THIS DEVICE (this session cont., PR #440)
+
+Found while looking for the next arc, and it is the sharper kind of gap: the app is a **Library
+Computer Access and Retrieval System** and its only search box sent every query to the internet.
+Hundreds of written guides, the user's notes, their diary, their tasks, their profile, the
+assistant's episodic memory and its findings were all on the disk and none of it was findable except
+by opening the one screen that happened to hold it. Home's ⌕ icon and MENU's "Web Search" both landed
+on an engine picker.
+
+- **`core:telemetry/DeviceSearch.kt` (+ 10 tests, locally executed).** Ranking is **not**
+  reimplemented — `GuideSearch` was tuned against the real index last arc and its `Entry` shape
+  describes a note as well as a guide. What a mixed corpus needs and a single-kind one does not is
+  **diversity**: guides outnumber notes by two orders of magnitude, so a plain top-ten is ten guides
+  every time. `search` scores over the whole corpus (IDF is only meaningful across all of it) then
+  caps how many places any one kind may occupy.
+- **`data/search/DeviceSearchIndex.kt`** gathers from seven stores, shaped after `OracleEngine.snapshot`
+  — defensive per source, so one that fails costs its own kind. **The resident guide index only; no
+  shard is opened.** Answering a keystroke by parsing 577 guides is what the sharded loader exists to
+  avoid.
+- **`SearchScreen`** answers from the device as you type (debounced), engine picker below, and a
+  guide result opens **at the guide** via the argumented `survival?guide=` deep-link the survival
+  notifications already use. MENU's entry is now "Search · This device first, then the web".
+
+**Three things running the code taught me, none of which reading it would have.**
+1. **My fill pass defeated the cap it sat under.** Written to avoid short lists, it handed the freed
+   places straight back to the largest kind. It now runs only when everything that matched is one
+   kind and there is no diversity left to protect — **a short list is the cap working.**
+2. **A stopword-only query does not return empty.** `GuideSearch.tokens` deliberately falls back to
+   the raw words so a box someone typed into does not silently answer nothing; that is in its own
+   KDoc and I asserted the opposite. Now pinned, so changing it later reads as a decision.
+3. **`FindingStore`/`MemoryStreamStore` publish flows that hold an empty list until something causes
+   a load.** Reading `.value` would have made two whole kinds invisible on a cold screen — silently,
+   and only where nothing else had touched them. Both have public suspend loaders (`load()`/`all()`);
+   use those.
+
+⚠️ **Owner-verify on the Pixel:** type a word you know is in a note and in a guide — both should
+appear, under their own headings, with the guide capped rather than crowding the page; tapping a
+guide should open that guide, not the list.
+
+### Notes and diary can be corrected (same PR)
+
+Verified while looking for the next arc: both surfaces were **add and delete only**. No edit. Search
+now indexes both, so finding the entry you wanted to fix got easy while fixing it stayed impossible.
+`NotesStore.update` / `DiaryStore.update` rewrite **in place** — the id stays stable (search results
+refer to entries by it) and so does the date: correcting a word does not make a note new, and
+re-dating a diary entry over a typo would be worse than not being able to correct it. Tapping a row
+opens it in the composer above; the button becomes SAVE CHANGES and a CANCEL appears.
+
+**Deliberately no cap added to either store.** Every sibling store caps itself, but those hold
+derived or observed data. These hold what the user wrote, and silently evicting someone's own
+writing to bound a blob is not a trade worth making.
+
+**Stale notes corrected — two of the three F-cleanup items no longer exist.** `PipUi.kt` (158 "dead"
+lines) is already deleted, and the general `SectionHeader` is gone too: the only match now is
+`ObjectiveSectionHeader`, which is a different function and is used. **The four private `SourceNote`
+copies are real** — RadarScreen, SpaceWeatherScreen, OrbitalScreen and WeatherScreen each carry their
+own — and are the only part of that list still worth doing.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

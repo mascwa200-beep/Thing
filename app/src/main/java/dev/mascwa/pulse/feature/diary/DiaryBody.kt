@@ -54,10 +54,16 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var mood by remember { mutableStateOf("") }
+    // Non-null while an existing entry is being rewritten rather than a new one written.
+    var editingId by remember { mutableStateOf<String?>(null) }
+
+    fun clearComposer() {
+        title = ""; body = ""; mood = ""; editingId = null
+    }
 
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // ---- NEW ENTRY ----
-        LcarsHeaderBar("New Entry")
+        LcarsHeaderBar(if (editingId == null) "New Entry" else "Edit Entry")
         LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
                 DiaryField(title, { title = it }, "Title (optional)", c)
@@ -72,19 +78,34 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
                         MoodChip(if (m.isBlank()) "—" else m, selected = m == mood, c = c) { mood = m }
                     }
                 }
-                Box(
-                    Modifier.padding(top = 12.dp)
-                        .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-                        .clickable {
-                            if (title.isNotBlank() || body.isNotBlank()) {
-                                vm.add(title, body, mood)
-                                title = ""; body = ""; mood = ""
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier
+                            .border(1.dp, c.accent, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
+                            .clickable {
+                                if (title.isNotBlank() || body.isNotBlank()) {
+                                    val id = editingId
+                                    if (id == null) vm.add(title, body, mood)
+                                    else vm.update(id, title, body, mood)
+                                    clearComposer()
+                                }
                             }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            if (editingId == null) "▸ SAVE ENTRY" else "▸ SAVE CHANGES",
+                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            letterSpacing = 1.5.sp, color = c.accent,
+                        )
+                    }
+                    if (editingId != null) {
+                        Box(
+                            Modifier.clickable { clearComposer() }.padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Text("CANCEL", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp, letterSpacing = 1.5.sp, color = c.muted)
                         }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Text("▸ SAVE ENTRY", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-                        letterSpacing = 1.5.sp, color = c.accent)
+                    }
                 }
             }
         }
@@ -99,7 +120,22 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
             )
         } else {
             LcarsHeaderBar("Journal", trailing = entries.size.toString())
-            entries.forEach { entry -> EntryRow(entry, c) { vm.delete(entry.id) } }
+            entries.forEach { entry ->
+                EntryRow(
+                    entry, c,
+                    editing = entry.id == editingId,
+                    onEdit = {
+                        editingId = entry.id
+                        title = entry.title
+                        body = entry.body
+                        mood = entry.mood
+                    },
+                    onDelete = {
+                        if (entry.id == editingId) clearComposer()
+                        vm.delete(entry.id)
+                    },
+                )
+            }
             Box(
                 Modifier.padding(top = 14.dp, bottom = 28.dp)
                     .border(1.dp, c.line, lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
@@ -112,13 +148,25 @@ fun DiaryBody(vm: DiaryViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-/** A banded journal row (DATA>STATS look): date + optional mood header, title, body, delete. */
+/**
+ * A banded journal row: date + optional mood header, title, body, delete.
+ *
+ * Tapping it opens the entry in the composer above. A journal you can only append to and delete from
+ * is not a journal anyone would keep.
+ */
 @Composable
-private fun EntryRow(entry: DiaryEntry, c: NightwirePalette, onDelete: () -> Unit) {
+private fun EntryRow(
+    entry: DiaryEntry,
+    c: NightwirePalette,
+    editing: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth()
+            .clickable { onEdit() }
             .drawBehind {
-                drawRect(c.accent.copy(alpha = 0.08f))
+                drawRect(c.accent.copy(alpha = if (editing) 0.22f else 0.08f))
                 drawLine(c.accent.copy(alpha = 0.35f), Offset(0f, size.height), Offset(size.width, size.height), 1.2.dp.toPx())
             }
             .padding(horizontal = 14.dp, vertical = 11.dp),

@@ -135,6 +135,21 @@ class VoskSpeech(context: Context) {
         speechService = null
     }
 
+    /**
+     * Release the small wake model and any session, keeping the dictation model loaded.
+     *
+     * The resident service is the only consumer of the wake tier — the console exclusively uses
+     * `dictation = true` — so it can hand back its ~128 MB when it stands down, which is worth
+     * having on a device that may also be holding a multi-gigabyte language model. [shutdown] is
+     * the wrong call there: it would also free the console's 1.8 GB dictation model, costing a
+     * multi-second reload the next time tap-to-talk is used, for no reason.
+     */
+    fun releaseWakeModel() {
+        stop()
+        runCatching { wakeModel?.close() }
+        wakeModel = null
+    }
+
     /** Release both models and any session (e.g. on full app shutdown). */
     fun shutdown() {
         stop()
