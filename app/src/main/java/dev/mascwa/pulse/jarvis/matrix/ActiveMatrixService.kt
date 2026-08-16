@@ -22,6 +22,7 @@ import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.WakePhrase
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
@@ -399,6 +400,26 @@ class ActiveMatrixService : Service() {
             endConversation(vosk, "Acknowledged.")
             return
         }
+
+        // An emergency spoken aloud is answered by the device, before anything else is consulted.
+        //
+        // Every other reply on this path waits on an inference engine — and when none is configured
+        // the branch below simply returns, so the phone says NOTHING AT ALL. That is an acceptable
+        // outcome for "what's the weather" and not for "he's not breathing". Even with a model it is
+        // a round-trip, possibly to a cloud provider over the same failing signal that made the
+        // situation an emergency. So the curated table answers first: no model, no network, no
+        // settings, no agent loop.
+        //
+        // The same EmergencyTriage table backs the library tool and the SOS fast path, so all three
+        // surfaces give the same first action by construction rather than by three authors agreeing.
+        EmergencyTriage.match(command)?.let { e ->
+            Log.i(TAG, "emergency recognised in \"$command\" → ${e.id}")
+            val spoken = e.label + ". " + e.firstAction
+            update(spoken.take(140))
+            speakThen(spoken) { resetConvo(); listenForWake(vosk) }
+            return
+        }
+
         update("One moment…")
         val engine = container?.inferenceEngine
         if (engine == null) {
