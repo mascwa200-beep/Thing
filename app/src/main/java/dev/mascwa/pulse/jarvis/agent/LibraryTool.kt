@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.jarvis.agent
 
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
@@ -51,6 +52,11 @@ class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
     private val scanShards = 4
 
     private suspend fun search(query: String): String {
+        // Before ranking, never after. The scorer is good at the library and dangerous at an
+        // emergency -- it answers "stroke symptoms" with an article on two-stroke engines -- so a
+        // recognised emergency is routed by hand and the ranked list becomes the footnote.
+        EmergencyTriage.match(query)?.let { return emergency(it) }
+
         val index = runCatching { content.index() }.getOrDefault(emptyList())
         if (index.isEmpty()) return "The library isn't available right now."
 
@@ -81,6 +87,32 @@ class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
             extra.forEach { e -> appendEntry(e.id, e.title, e.category, e.summary, viaBody = true) }
             append("\nRead one with `library read <id>`, then cite it by title in your answer.")
         }
+    }
+
+    /**
+     * A recognised emergency: the action, then the protocol, then nothing else.
+     *
+     * The section text is inlined rather than named, because telling someone mid-emergency to make a
+     * second tool call to read the thing they need is a design that only works when nothing is wrong.
+     */
+    private suspend fun emergency(e: EmergencyTriage.Emergency): String = buildString {
+        append(EmergencyTriage.brief(e))
+        val gid = e.guideId
+        val heading = e.section
+        if (gid != null && heading != null) {
+            val guide = runCatching { content.guide(gid) }.getOrNull()
+            val section = guide?.sections?.firstOrNull { it.heading == heading }
+            if (guide != null && section != null) {
+                append("\n\n— from \"").append(guide.title).append("\" ▸ ").append(section.heading)
+                append(" (bundled library; cite it) —\n\n")
+                append(section.body.trim())
+            } else {
+                // The CI guard should make this unreachable; if content moved anyway, the first
+                // action above still stands and is the part that matters.
+                append("\n\nThe protocol page could not be opened. The action above still applies.")
+            }
+        }
+        append("\n\nThis is written guidance, not training and not medical advice.")
     }
 
     private fun StringBuilder.appendEntry(
