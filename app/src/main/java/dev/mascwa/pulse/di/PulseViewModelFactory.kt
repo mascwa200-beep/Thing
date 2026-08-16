@@ -70,8 +70,6 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository, c.settingsRepository, c.tuneInRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.notes.NotesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.notes.NotesViewModel(c.notesStore)
-            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tasks.TasksViewModel::class.java) ->
-                dev.mascwa.pulse.feature.tasks.TasksViewModel(c.taskStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diary.DiaryViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diary.DiaryViewModel(c.diaryStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.spotify.SpotifyViewModel::class.java) ->

@@ -51,6 +51,11 @@ private val GROUPS = listOf(
         MenuEntry("Nearest Help", "Hospitals, shelters and food banks around you", Routes.PLACES),
     )),
     MenuGroup("GUIDES", { it.accent }, listOf(
+        // The one screen that searches ACROSS survival — every destination and every offline guide,
+        // indexed down to section headings, so "knot" or "cpr" lands on the page rather than the
+        // library. It was wired into the NavHost and reachable only by deep link, which meant the
+        // fastest way into thousands of pages was the one route nothing linked to.
+        MenuEntry("Search Survival", "Find any guide or tool by what you need — offline", Routes.SURVIVE),
         MenuEntry("Knowledge Library", "Thousands of pages on everything — works offline", Routes.SURVIVAL),
         MenuEntry("Wildlife Guide", "Animals in your region and what to do — offline", Routes.HABITAT),
         MenuEntry("Field Tools", "Flashlight, strobe, alarm and morse", Routes.TOOLS),
