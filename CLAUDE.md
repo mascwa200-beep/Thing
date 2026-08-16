@@ -3258,8 +3258,11 @@ on an engine picker.
 appear, under their own headings, with the guide capped rather than crowding the page; tapping a
 guide should open that guide, not the list.
 
-**Stale note corrected:** the F-cleanup list said `PipUi.kt` is 158 dead lines. **It no longer
-exists** — already deleted. `SectionHeader` does still appear to be dead (one file references it).
+**Stale notes corrected — two of the three F-cleanup items no longer exist.** `PipUi.kt` (158 "dead"
+lines) is already deleted, and the general `SectionHeader` is gone too: the only match now is
+`ObjectiveSectionHeader`, which is a different function and is used. **The four private `SourceNote`
+copies are real** — RadarScreen, SpaceWeatherScreen, OrbitalScreen and WeatherScreen each carry their
+own — and are the only part of that list still worth doing.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
