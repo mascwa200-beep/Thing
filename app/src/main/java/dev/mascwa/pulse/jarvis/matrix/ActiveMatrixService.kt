@@ -23,6 +23,13 @@ import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.VoiceMachine
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.console
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.micFailed
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.settle
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.speaking
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.wakeHeard
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.wants
 import dev.mascwa.pulse.core.telemetry.WakePhrase
 import dev.mascwa.pulse.data.jarvis.db.Speaker
 import dev.mascwa.pulse.jarvis.JarvisPersona
@@ -56,8 +63,27 @@ class ActiveMatrixService : Service() {
     private lateinit var provider: DeviceContextProvider
     private var observing = false
 
-    @Volatile private var waking = false
-    @Volatile private var capturing = false
+    /**
+     * Who holds the microphone, decided by [VoiceMachine] rather than by whichever call site got
+     * there first. Written only from [voiceScope] (the main looper); volatile so the context and
+     * battery observers on [scope] see it.
+     */
+    @Volatile private var voice = VoiceMachine.State()
+
+    /** Whether the wake loop is meant to be running at all. */
+    private val waking get() = voice.wanted
+
+    /**
+     * Whether a spoken exchange is in flight — capturing a command, or speaking the reply.
+     *
+     * Speaking counts. Anything that calls `TextToSpeech.speak` mid-exchange QUEUE_FLUSHes the
+     * utterance in progress and takes its done-callback with it, which is what re-arms the mic; the
+     * previous `capturing`-only guard covered the capture and left the reply exposed, which is the
+     * larger of the two windows.
+     */
+    private val voiceBusy get() =
+        voice.owner == VoiceMachine.Owner.COMMAND || voice.owner == VoiceMachine.Owner.SPEAKING
+
     @Volatile private var pollingNews = false
 
     // Critical-battery care: conserve (pause heavy polling) + warn once until power recovers.
@@ -131,7 +157,10 @@ class ActiveMatrixService : Service() {
             }
         }
         if (micActive && !waking) {
-            waking = true
+            // Marks intent only — the mic is taken in startWakeWord, once the model has loaded.
+            // Setting it here is what makes the `!waking` guard above re-entrant: a second start
+            // command arriving during the (suspending) model load must not launch a second loop.
+            voice = voice.copy(wanted = true)
             startWakeWord()
         }
         // Near-real-time breaking news while the resident assistant is up (opt-in; ~90s cadence).
@@ -146,7 +175,7 @@ class ActiveMatrixService : Service() {
     /** Speak a proactive context remark aloud when the user has opted in — but never while the console is
      *  open, mid-command, or in quiet hours, so it can't talk over the user or surprise them at night. */
     private suspend fun maybeSpeakProactive(line: String) {
-        if (capturing) return
+        if (voiceBusy) return
         val c = container ?: return
         if (runCatching { c.voskSpeech.consoleActive.value }.getOrDefault(false)) return
         val prefs = runCatching { c.settingsRepository.current() }.getOrNull() ?: return
@@ -163,10 +192,11 @@ class ActiveMatrixService : Service() {
                 batteryWarned = true
                 val msg = "Battery critical at ${ctx.batteryPct}% — conserving power."
                 update("⚠ $msg")
-                // Speak only when not mid-command: a TTS speak() here QUEUE_FLUSHes an in-flight spoken
-                // reply, dropping its done-callback so the wake mic never re-arms. The notification still
-                // shows regardless. (Mirrors maybeSpeakProactive's `capturing` guard.)
-                if (!capturing) runCatching { container?.textToSpeech?.speak(msg) }
+                // Never mid-exchange: a TTS speak() here QUEUE_FLUSHes an in-flight spoken reply and
+                // takes its done-callback with it, so the wake mic never re-arms. The guard covers the
+                // reply as well as the capture — the reply is the longer window and was the exposed one.
+                // The notification shows regardless.
+                if (!voiceBusy) runCatching { container?.textToSpeech?.speak(msg) }
             }
         } else if (ctx.isCharging || ctx.batteryPct >= BATTERY_RECOVER_PCT) {
             lowPowerConserve = false
@@ -246,29 +276,68 @@ class ActiveMatrixService : Service() {
                 return@launch
             }
             Log.i(TAG, "startWakeWord: model ready, entering wake loop")
-            // The console and the wake loop share one recognizer. Pause while the console owns the
-            // mic for tap-to-talk; resume automatically when it's released. (StateFlow emits its
-            // current value on collect, so this also performs the initial start.)
+            // Seed the arbiter with the console's current claim BEFORE taking the mic, so a wake
+            // session is never opened underneath a console that already holds it — then start.
+            voice = voice.copy(console = vosk.consoleActive.value)
+            perform(voice.wants(true), vosk)
+            // The console and the wake loop share one recogniser; the arbiter decides who holds it.
+            // The first replayed emission is therefore a no-op, which is what idempotence buys.
             vosk.consoleActive.collect { inConsole ->
-                if (inConsole) {
-                    vosk.stop()
-                    update("Paused — console has the mic.")
-                } else if (waking && !capturing) {
-                    // Don't re-arm the wake mic while a command capture is in flight — the command flow
-                    // owns the mic and re-arms itself (its timeout/error paths always clear `capturing`).
-                    listenForWake(vosk)
-                }
+                if (inConsole) update("Paused — console has the mic.")
+                perform(voice.console(inConsole), vosk)
             }
         }
     }
 
-    private fun listenForWake(vosk: VoskSpeech) {
-        if (vosk.consoleActive.value) {
-            update("Paused — console has the mic.")
-            return
+    /**
+     * Apply one decision from the arbiter: **take the new state now, do the work next frame.**
+     *
+     * Taking the state synchronously is what makes the machine's idempotence real — a second caller
+     * racing this one already sees the new owner and is told to do nothing. Posting the work is the
+     * long-standing constraint of this file: Vosk delivers on the main looper and `stop()` joins the
+     * recogniser thread, so a restart must never run inside the callback frame that triggered it.
+     */
+    private fun perform(step: VoiceMachine.Step, vosk: VoskSpeech) {
+        voice = step.state
+        when (step.action) {
+            VoiceMachine.Action.NOTHING -> Unit
+            VoiceMachine.Action.START_WAKE -> voiceScope.launch { startWakeRecognizer(vosk) }
+            VoiceMachine.Action.START_COMMAND -> voiceScope.launch { startCommandRecognizer(vosk) }
+            VoiceMachine.Action.RELEASE_MIC -> voiceScope.launch { releaseMic(vosk) }
         }
-        resetConvo() // back to idle: any open conversation is over
-        capturing = false
+    }
+
+    /**
+     * **The single re-arm funnel.** Nothing is in flight — ask the arbiter where the mic belongs.
+     *
+     * Every path that used to call `listenForWake` itself calls this instead: a blank capture, a
+     * timeout, a recogniser error, the end of a reply, the console closing. They were each answering
+     * the same question separately, and inconsistently.
+     */
+    private fun rearm(vosk: VoskSpeech, holdFloor: Boolean = false) =
+        perform(voice.settle(holdFloor), vosk)
+
+    /**
+     * Let go of the mic — both recognisers, because a command capture may be running on the system
+     * one while the offline recogniser holds nothing. Only ever reached when we actually had it.
+     */
+    private fun releaseMic(vosk: VoskSpeech) {
+        vosk.stop()
+        runCatching { container?.deviceSpeech?.cancel() }
+    }
+
+    /** A recogniser died: drop ownership, back off, then ask the arbiter again rather than retrying blind. */
+    private fun retryAfterFailure(vosk: VoskSpeech) {
+        perform(voice.micFailed(), vosk)
+        voiceScope.launch {
+            delay(WAKE_RETRY_MS)
+            rearm(vosk)
+        }
+    }
+
+    /** Listen for the wake word. Reached only through [perform]; nothing else calls it. */
+    private fun startWakeRecognizer(vosk: VoskSpeech) {
+        resetConvo() // arriving back at the wake word means any open conversation is over
         update("Listening for \"${WakePhrase.WORD.replaceFirstChar { it.uppercase() }}\"…")
         // Wake model (128 MB lgraph) with a keyword grammar: tight, cheap spotting for an always-on
         // mic. WakePhrase still catches the near-homophones the model emits.
@@ -279,27 +348,25 @@ class ActiveMatrixService : Service() {
                 // Don't die silently: show it and self-heal after a backoff (no tight retry storm).
                 Log.w(TAG, "wake recognizer error: $message")
                 update("Mic hiccup ($message) — relistening shortly…")
-                voiceScope.launch {
-                    delay(WAKE_RETRY_MS)
-                    if (waking && !capturing && !vosk.consoleActive.value) listenForWake(vosk)
-                }
+                retryAfterFailure(vosk)
             }
         })
         if (!started) {
-            Log.e(TAG, "listenForWake: vosk.start returned false (mic unavailable)")
+            Log.e(TAG, "startWakeRecognizer: vosk.start returned false (mic unavailable)")
             update("Couldn't open the microphone for the wake word — retrying shortly…")
-            voiceScope.launch {
-                delay(WAKE_RETRY_MS)
-                if (waking && !capturing && !vosk.consoleActive.value) listenForWake(vosk)
-            }
+            retryAfterFailure(vosk)
         }
     }
 
     private fun maybeWake(vosk: VoskSpeech, text: String) {
-        if (capturing || !isWakePhrase(text)) return
+        if (!isWakePhrase(text)) return
+        // Only the wake recogniser can open a capture. A partial arriving late — after the console
+        // took the mic, or after a capture already began — is discarded rather than starting a second
+        // session underneath whoever now holds it.
+        val step = voice.wakeHeard()
+        if (step.action == VoiceMachine.Action.NOTHING) return
         Log.i(TAG, "wake phrase detected in: \"$text\"")
-        capturing = true
-        voiceScope.launch { captureCommand(vosk) }
+        perform(step, vosk)
     }
 
     /**
@@ -314,9 +381,9 @@ class ActiveMatrixService : Service() {
 
     /** After the wake word, capture one free-form command, answer it, and speak the reply.
      *  Prefer the device's on-device Google recognizer (far more accurate, private, no app memory);
-     *  fall back to the offline Vosk model where on-device recognition isn't available. A timeout
-     *  re-arms the wake loop if the user says nothing (so `capturing` never latches). */
-    private fun captureCommand(vosk: VoskSpeech) {
+     *  fall back to the offline Vosk model where on-device recognition isn't available. Every exit —
+     *  a transcript, silence, a timeout, an error — goes through [rearm], so ownership cannot latch. */
+    private fun startCommandRecognizer(vosk: VoskSpeech) {
         val google = container?.deviceSpeech
         if (google != null && google.available) {
             update("Listening.")
@@ -326,7 +393,7 @@ class ActiveMatrixService : Service() {
                 override fun onFinal(text: String) {
                     Log.i(TAG, "command heard (on-device): \"$text\"")
                     voiceScope.launch {
-                        if (text.isBlank()) listenForWake(vosk) else respond(vosk, interpret(text))
+                        if (text.isBlank()) rearm(vosk) else respond(vosk, interpret(text))
                     }
                 }
                 override fun onError(message: String) {
@@ -335,10 +402,10 @@ class ActiveMatrixService : Service() {
                         voiceScope.launch { captureCommandVosk(vosk) }
                     } else {
                         Log.w(TAG, "on-device command error: $message — re-arming wake")
-                        voiceScope.launch { listenForWake(vosk) }
+                        voiceScope.launch { rearm(vosk) }
                     }
                 }
-                override fun onTimeout() { Log.i(TAG, "on-device command timeout — re-arming wake"); voiceScope.launch { listenForWake(vosk) } }
+                override fun onTimeout() { Log.i(TAG, "on-device command timeout — re-arming wake"); voiceScope.launch { rearm(vosk) } }
             })
         } else {
             captureCommandVosk(vosk)
@@ -354,11 +421,11 @@ class ActiveMatrixService : Service() {
             override fun onFinal(text: String) {
                 Log.i(TAG, "command heard (vosk): \"$text\"")
                 voiceScope.launch {
-                    if (text.isBlank()) listenForWake(vosk) else respond(vosk, interpret(text))
+                    if (text.isBlank()) rearm(vosk) else respond(vosk, interpret(text))
                 }
             }
-            override fun onError(message: String) { Log.w(TAG, "command error: $message"); voiceScope.launch { listenForWake(vosk) } }
-            override fun onTimeout() { Log.i(TAG, "command timeout — re-arming wake"); voiceScope.launch { listenForWake(vosk) } }
+            override fun onError(message: String) { Log.w(TAG, "command error: $message"); voiceScope.launch { rearm(vosk) } }
+            override fun onTimeout() { Log.i(TAG, "command timeout — re-arming wake"); voiceScope.launch { rearm(vosk) } }
         })
     }
 
@@ -416,7 +483,7 @@ class ActiveMatrixService : Service() {
             Log.i(TAG, "emergency recognised in \"$command\" → ${e.id}")
             val spoken = e.label + ". " + e.firstAction
             update(spoken.take(140))
-            speakThen(spoken) { resetConvo(); listenForWake(vosk) }
+            speakThen(spoken, vosk) { resetConvo(); rearm(vosk) }
             return
         }
 
@@ -472,18 +539,22 @@ class ActiveMatrixService : Service() {
             while (convo.size > CONVO_BUFFER) convo.removeFirst()
             update(reply.take(140))
 
-            val overLimit = convoTurns >= MAX_CONVO_TURNS ||
-                System.currentTimeMillis() - convoStartedAt > MAX_CONVO_MS
-            val keepOpen = !wantsClose && !overLimit && (followUp || (conversation && wantsOpen))
+            val elapsed = System.currentTimeMillis() - convoStartedAt
+            val overLimit = VoiceMachine.overBudget(convoTurns, MAX_CONVO_TURNS, elapsed, MAX_CONVO_MS)
+            val keepOpen = VoiceMachine.holdFloor(
+                followUp = followUp, conversation = conversation,
+                modelClosed = wantsClose, modelOpened = wantsOpen,
+                turns = convoTurns, maxTurns = MAX_CONVO_TURNS, elapsedMs = elapsed, maxMs = MAX_CONVO_MS,
+            )
 
             when {
-                // Keep the floor: reopen the mic (no wake word) once J.A.R.V.I.S. stops speaking.
-                keepOpen -> speakThen(reply) { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+                // Keep the floor: the arbiter reopens the mic for a command, no wake word needed.
+                keepOpen -> speakThen(reply, vosk) { rearm(vosk, holdFloor = true) }
                 // Conversation mode decides to wind down (model closed, or we hit the safeguard): it
                 // says so, but checks first — if you keep talking it resumes; silence/"stop" ends it.
-                conversation && (wantsClose || overLimit) -> speakThen(reply) { wrapUp(vosk) }
+                conversation && (wantsClose || overLimit) -> speakThen(reply, vosk) { wrapUp(vosk) }
                 // Plain answer: speak it and return to wake listening.
-                else -> speakThen(reply) { resetConvo(); listenForWake(vosk) }
+                else -> speakThen(reply, vosk) { resetConvo(); rearm(vosk) }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e // honour service teardown — don't re-arm the mic on a dying service
@@ -491,13 +562,19 @@ class ActiveMatrixService : Service() {
             Log.e(TAG, "respond: failed to answer", e)
             update("I couldn't answer that one.")
             resetConvo()
-            listenForWake(vosk)
+            rearm(vosk)
         }
     }
 
-    /** Speak [text], then run [next] on the main thread once speech finishes (so the mic never picks
-     *  up J.A.R.V.I.S.'s own voice). Falls straight through to [next] if TTS is unavailable. */
-    private fun speakThen(text: String, next: () -> Unit) {
+    /**
+     * Speak [text], then run [next] on the main thread once speech finishes, so the mic never picks
+     * up the computer's own voice. Falls straight through to [next] if TTS is unavailable.
+     *
+     * Entering the speaking state hands the mic back first. Previously nothing did: whether the
+     * recogniser was still running through the reply depended on which capture path had produced it.
+     */
+    private fun speakThen(text: String, vosk: VoskSpeech, next: () -> Unit) {
+        perform(voice.speaking(), vosk)
         val tts = container?.textToSpeech
         if (tts == null) { voiceScope.launch { next() } } else tts.speak(text) { voiceScope.launch { next() } }
     }
@@ -508,15 +585,15 @@ class ActiveMatrixService : Service() {
     private fun wrapUp(vosk: VoskSpeech) {
         convoTurns = 0
         convoStartedAt = System.currentTimeMillis() // fresh budget if the user carries on
-        speakThen("Will that be all?") { if (waking) captureCommand(vosk) else listenForWake(vosk) }
+        speakThen("Will that be all?", vosk) { rearm(vosk, holdFloor = true) }
     }
 
     /** End any open conversation: optionally speak a closing line, then return to wake listening. */
     private fun endConversation(vosk: VoskSpeech, closing: String?) {
         resetConvo()
-        if (closing == null) { listenForWake(vosk); return }
+        if (closing == null) { rearm(vosk); return }
         update(closing)
-        speakThen(closing) { listenForWake(vosk) }
+        speakThen(closing, vosk) { rearm(vosk) }
     }
 
     private fun resetConvo() {
@@ -579,9 +656,12 @@ class ActiveMatrixService : Service() {
 
     override fun onDestroy() {
         observing = false
-        waking = false
-        capturing = false
-        runCatching { container?.voskSpeech?.stop() }
+        // Nobody holds the mic and nothing wants it, so no pending path can re-arm on the way down.
+        voice = VoiceMachine.State()
+        // Hands back the ~128 MB wake model as well as stopping the session. Deliberately NOT
+        // shutdown(), which would also free the console's 1.8 GB dictation model and cost it a
+        // multi-second reload on the next tap-to-talk.
+        runCatching { container?.voskSpeech?.releaseWakeModel() }
         runCatching { container?.deviceSpeech?.cancel() } // release the system recognizer + mic
         runCatching { container?.textToSpeech?.stop() }    // don't keep talking after "Stand down"
         voiceScope.cancel()
