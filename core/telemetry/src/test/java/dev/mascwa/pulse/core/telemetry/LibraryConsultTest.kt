@@ -47,6 +47,26 @@ class LibraryConsultTest {
         assertTrue(LibraryConsult.isTopical(entry(title = "Knots and Cordage"), "cordage"))
     }
 
+    /**
+     * ⚠️ The bar was a substring test until running it over the real 581-guide library caught "car"
+     * matching **Newborn Care Basics for New Parents**. A word inside another word is a coincidence,
+     * not a subject.
+     */
+    @Test
+    fun aWordInsideAnotherWordIsNotAMatch() {
+        assertFalse(LibraryConsult.isTopical(entry(title = "Newborn Care Basics"), "car"))
+        assertFalse(LibraryConsult.isTopical(entry(title = "Release Notes"), "lease"))
+        assertFalse(LibraryConsult.isTopical(entry(summary = "Wrap it in tape."), "tap"))
+        assertFalse(LibraryConsult.isTopical(entry(summary = "Meet at the station."), "ion"))
+    }
+
+    /** But a genuine stem relation still counts, exactly as it does when ranking. */
+    @Test
+    fun theStemRuleStillApplies() {
+        assertTrue(LibraryConsult.isTopical(entry(title = "Knot Tying"), "knots"))
+        assertTrue(LibraryConsult.isTopical(entry(title = "Waterproofing a Shelter"), "water"))
+    }
+
     // ---- picking a section ----------------------------------------------------------------------
 
     @Test
