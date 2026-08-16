@@ -120,10 +120,17 @@ fun IndicatorCard(series: IndicatorSeries, modifier: Modifier = Modifier) {
                 val yoy = series.yoyChange
                 val year = series.latest?.year
                 if (yoy != null && year != null) {
-                    val improving = if (series.higherIsBetter) yoy >= 0 else yoy <= 0
+                    // Neutral when the indicator has no agreed good direction. Colouring a rise in
+                    // military spending green or red would be the app taking a side; the number is
+                    // still shown, just not judged.
+                    val color = when (series.higherIsBetter) {
+                        null -> c.ink2
+                        true -> trendColor(yoy >= 0)
+                        false -> trendColor(yoy <= 0)
+                    }
                     Text(
                         "${if (yoy >= 0) "+" else ""}${Formatters.number(yoy, 2)} vs ${year - 1}",
-                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = trendColor(improving),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = color,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }

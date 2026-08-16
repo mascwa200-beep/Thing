@@ -48,7 +48,7 @@ class WorldBankClient(private val http: HttpClient) {
         title: String,
         unit: String,
         format: ValueFormat,
-        higherIsBetter: Boolean,
+        higherIsBetter: Boolean?,
         countryCode: String,
         startYear: Int = 2000,
     ): IndicatorSeries {

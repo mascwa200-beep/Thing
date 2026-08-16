@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.EconomyExplainers
 import dev.mascwa.pulse.core.telemetry.EconomyVintage
 import dev.mascwa.pulse.core.telemetry.Explainer
+import dev.mascwa.pulse.data.economy.EconomyGroup
+import dev.mascwa.pulse.data.economy.EconomyIndicator
 import dev.mascwa.pulse.data.economy.IndicatorSeries
 import dev.mascwa.pulse.feature.common.CyberHeader
 import dev.mascwa.pulse.feature.common.ErrorState
@@ -76,12 +78,26 @@ fun EconomyBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                         )
                     }
                     item { CyberHeader(data?.countryName ?: state.country) }
-                    items(data?.series.orEmpty().filter { it.points.isNotEmpty() }, key = { it.indicatorId }) {
-                        IndicatorCard(it, Modifier.clickable { explain = it })
+                    // Grouped, because nineteen indicators in one flat column is a wall rather than
+                    // a picture. Series are matched back to their indicator by id, and anything the
+                    // enum no longer knows about still renders — under the last group rather than
+                    // vanishing, since a cached dashboard can outlive a change to the list.
+                    val withData = data?.series.orEmpty().filter { it.points.isNotEmpty() }
+                    val byId = EconomyIndicator.entries.associateBy { it.id }
+                    EconomyGroup.entries.forEach { group ->
+                        val rows = withData.filter {
+                            (byId[it.indicatorId]?.group ?: EconomyGroup.entries.last()) == group
+                        }
+                        if (rows.isEmpty()) return@forEach
+                        item(key = "grp_${group.name}") { CyberHeader(group.label) }
+                        items(rows, key = { it.indicatorId }) {
+                            IndicatorCard(it, Modifier.clickable { explain = it })
+                        }
                     }
                     item {
                         Text(
-                            "Source: World Bank Open Data (annual). Some indicators lag by 1–2 years.",
+                            "Source: World Bank Open Data (annual). Each figure shows the year it " +
+                                "describes; some series lag by a year or more.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(8.dp),
