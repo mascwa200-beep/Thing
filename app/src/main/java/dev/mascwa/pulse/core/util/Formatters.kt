@@ -59,7 +59,19 @@ object Formatters {
         return "${String.format(Locale.getDefault(), "%.${digits}f", value)}%"
     }
 
-    /** "3m ago", "2h ago", "yesterday", "Jun 12". */
+    /**
+     * "3m ago", "2h ago", "yesterday", "Jun 12", "Jun 12 2024".
+     *
+     * Past a week this becomes a date, and the year appears as soon as the date is not in the year
+     * we are currently in. Without that, a news feed shows "Aug 12" for an article from last August
+     * and one from this August identically, which is precisely the confusion a timestamp exists to
+     * prevent — and a resurfaced old story is exactly the case where the reader most needs to know.
+     *
+     * Device locale and zone throughout, deliberately: this is a date for a person to read, not a
+     * value anything parses back, so the reader's own conventions and calendar are the right ones.
+     * That also means "this year" means this year *where the reader is*, which is the answer they
+     * would give themselves.
+     */
     fun relativeTime(epochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
         if (epochMs <= 0) return ""
         val diff = nowMs - epochMs
@@ -74,8 +86,14 @@ object Formatters {
             days < 2 -> "yesterday"
             days < 7 -> "${days}d ago"
             else -> {
-                val fmt = java.text.SimpleDateFormat("MMM d", Locale.getDefault())
-                fmt.format(java.util.Date(epochMs))
+                val cal = java.util.Calendar.getInstance()
+                cal.timeInMillis = nowMs
+                val nowYear = cal.get(java.util.Calendar.YEAR)
+                cal.timeInMillis = epochMs
+                val thenYear = cal.get(java.util.Calendar.YEAR)
+                val pattern = if (thenYear == nowYear) "MMM d" else "MMM d yyyy"
+                java.text.SimpleDateFormat(pattern, Locale.getDefault())
+                    .format(java.util.Date(epochMs))
             }
         }
     }
