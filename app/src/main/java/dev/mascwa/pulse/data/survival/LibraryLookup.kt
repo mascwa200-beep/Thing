@@ -23,13 +23,37 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
      * @param where "Guide ▸ Section", for telling a model exactly what it is looking at.
      * @param spoken a couple of sentences plus the citation — an answer a person can hear or read.
      * @param grounding the passage as prompt context, with instructions to ignore it if it misses.
+     * @param body the section in full — an emergency protocol is read whole, not in two sentences.
      */
     data class Found(
         val title: String,
         val where: String,
         val spoken: String,
         val grounding: String,
+        val body: String,
     )
+
+    /**
+     * A named guide and section, fetched exactly rather than searched for.
+     *
+     * For the emergency table, whose routes are curated precisely so that symptom-to-protocol is
+     * never left to a scorer. Ranking is the right tool for a question and the wrong one for
+     * "someone is not breathing".
+     */
+    suspend fun exact(guideId: String, heading: String): Found? {
+        val guide = runCatching { content.guide(guideId) }.getOrNull() ?: return null
+        val section = guide.sections.firstOrNull { it.heading == heading } ?: return null
+        val body = section.body.trim()
+        if (body.isBlank()) return null
+        val where = guide.title + " ▸ " + section.heading
+        return Found(
+            title = guide.title,
+            where = where,
+            spoken = LibraryConsult.firstSentences(body) + LibraryConsult.citation(guide.title),
+            grounding = LibraryConsult.groundingBlock(where, body),
+            body = body,
+        )
+    }
 
     /** The library's best answer to [query], or null when it genuinely has none. */
     suspend fun consult(query: String): Found? {
@@ -60,6 +84,7 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
             where = where,
             spoken = LibraryConsult.firstSentences(body) + LibraryConsult.citation(guide.title),
             grounding = LibraryConsult.groundingBlock(where, body),
+            body = body,
         )
     }
 }

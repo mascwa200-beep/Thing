@@ -17,6 +17,7 @@ import dev.mascwa.pulse.jarvis.curiosity.CuriosityEngine
 import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.IntentRouter
 import dev.mascwa.pulse.core.telemetry.JarvisIntent
 import dev.mascwa.pulse.jarvis.JarvisPersona
@@ -78,6 +79,7 @@ class JarvisViewModel(
     private val memoryStream: dev.mascwa.pulse.data.memory.MemoryStreamStore,
     private val procedureStore: dev.mascwa.pulse.data.procedure.ProcedureStore,
     private val sensorium: dev.mascwa.pulse.data.sensing.SensoriumEngine,
+    private val library: dev.mascwa.pulse.data.survival.LibraryLookup,
 ) : ViewModel() {
 
     /** The ordered tool names the last agent run used — captured for procedure learning. */
@@ -353,6 +355,20 @@ class JarvisViewModel(
                 sayJarvis(brief)
             }
             is JarvisIntent.Chat -> {
+                // An emergency typed here is answered by the device, before anything else is asked.
+                //
+                // The console has always sent this to the model. With no cloud key that is
+                // EchoInferenceEngine -- "a templated responder, not a generative model", in its own
+                // words -- so "he's not breathing" gets an acknowledgement dressed as an answer; and
+                // even with a good model it is a round trip, possibly over the failing signal that
+                // made the situation an emergency. The same curated table already backs the library
+                // tool, the SOS fast path and the voice service, so this is the fourth surface that
+                // gives the same first action by construction rather than by four authors agreeing.
+                val emergency = EmergencyTriage.match(intent.text)
+                if (emergency != null) {
+                    sayJarvis(emergencyReply(emergency))
+                    return
+                }
                 // Reload the model if its (separate) process was reclaimed or faulted, so a
                 // transient "process lost" self-heals instead of sticking on the persona core.
                 runCatching { engine.ensureReady() }
@@ -503,13 +519,56 @@ class JarvisViewModel(
     private suspend fun generateDirect(text: String): String {
         val history = memory.recentContext(HISTORY_TURNS).map { ChatTurn(it.speaker, it.messageText) }
         // Attentiveness/memory maximal: thread what J.A.R.V.I.S. remembers about the user into the moment.
-        val system = withMemory(withKnowledge(composePersona(), text), text)
+        val system = withMemory(withLibrary(withKnowledge(composePersona(), text), text), text)
         val sb = StringBuilder()
         engine.generate(text, history, system).collect { token ->
             sb.append(token)
             _streaming.value = sb.toString()
         }
         return sb.toString().ifBlank { "…" }
+    }
+
+    /**
+     * A recognised emergency: the action, then the protocol, then nothing else.
+     *
+     * The protocol text is inlined rather than named, because telling someone mid-emergency to go and
+     * open a page is a design that only works when nothing is wrong.
+     */
+    private suspend fun emergencyReply(e: EmergencyTriage.Emergency): String = buildString {
+        append(EmergencyTriage.brief(e))
+        // Fetched by the table's curated id and heading, never searched for: ranking is the right
+        // tool for a question and the wrong one for "someone is not breathing". A CI test resolves
+        // every route in that table against the real bundled guides, so this should always hit; if
+        // content moved anyway, the first action above still stands and is the part that matters.
+        val gid = e.guideId
+        val heading = e.section
+        val found = if (gid != null && heading != null) {
+            runCatching { library.exact(gid, heading) }.getOrNull()
+        } else {
+            null
+        }
+        if (found != null) {
+            append("\n\n— from \"").append(found.where).append("\" (bundled library) —\n\n")
+            append(found.body)
+        }
+        append("\n\nThis is written guidance, not training and not medical advice.")
+    }
+
+    /**
+     * Prepend the bundled library's best page to [base], so a direct chat answers from what was
+     * written and checked rather than from what the weights recall.
+     *
+     * ⚠️ Deliberately NOT fenced as `<untrusted>`, unlike [withKnowledge]. That fence exists because
+     * the knowledge store holds documents the user ingested, which could have come from anywhere; the
+     * library is curated content bundled into the app. Marking it untrusted would tell the model to
+     * distrust the most reliable thing it has been given.
+     *
+     * The relevance bar inside the lookup is strict on purpose — the ranker always returns its
+     * closest match, and a confident paragraph about the wrong subject is worse than no library.
+     */
+    private suspend fun withLibrary(base: String, query: String): String {
+        val found = runCatching { library.consult(query) }.getOrNull() ?: return base
+        return base + found.grounding
     }
 
     /** Prepend the most relevant knowledge-library chunks to [base] so direct chat is RAG-grounded

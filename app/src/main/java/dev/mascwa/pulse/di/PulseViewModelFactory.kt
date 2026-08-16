@@ -80,7 +80,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                     c.intentRouter, c.actionOrchestrator, c.textToSpeech, c.settingsRepository,
                     c.voskSpeech, c.agentOrchestrator, c.knowledgeStore, c.selfEditStore, c.briefingBuilder,
                     c.curiosityEngine, c.approvalGate, c.usageRepository, c.cerebellumStore, c.profileStore,
-                    c.taskStore, c.memoryStream, c.procedureStore, c.sensoriumEngine,
+                    c.taskStore, c.memoryStream, c.procedureStore, c.sensoriumEngine, c.libraryLookup,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(
