@@ -34,6 +34,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.LcarsFrame
+import dev.mascwa.pulse.ui.effects.HapticCue
+import dev.mascwa.pulse.ui.effects.SoundCue
+import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -121,6 +124,10 @@ fun SettingsScreen(
     ) { granted ->
         if (!granted) dev.mascwa.pulse.core.util.openAppNotificationSettings(context)
     }
+
+    // Lets the Appearance section sound a cue on demand. Gated by the Interface-sounds switch like
+    // every other cue, which is what makes it a useful test of the switch.
+    val soundTest = rememberLcarsCue()
 
     // Requests permission if needed, then fires the test notification.
     val testNotifLauncher = rememberLauncherForActivityResult(
@@ -494,6 +501,15 @@ fun SettingsScreen(
                     PrefSwitch("Interface sounds", "Console chirps on taps and alerts", s.sounds) { v ->
                         vm.update { it.copy(sounds = v) }
                     }
+                    // These ride the system/UI sound stream, which Android's own "Touch sounds"
+                    // setting silences independently of this app. Without a way to hear one on
+                    // demand there is no telling that apart from the app being broken.
+                    PrefClickable(
+                        "Test the console sounds",
+                        subtitle = "Plays the alert cue. If this is silent with the switch on, " +
+                            "it is Android's Sound & vibration ▸ Touch sounds, not LCARS.",
+                        onClick = { soundTest(SoundCue.ALERT, HapticCue.IMPACT_HEAVY) },
+                    )
                     PrefSwitch("Boot sequence", "Cinematic cold-open on launch (off saves startup RAM)", s.bootAnimation) { v ->
                         vm.update { it.copy(bootAnimation = v) }
                     }
