@@ -3,6 +3,7 @@ package dev.mascwa.pulse.feature.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.data.search.DeviceSearchIndex
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.data.settings.SettingsRepository
@@ -32,6 +33,17 @@ class SearchViewModel(
     /** "577 guides · 12 notes · 4 tasks" — so the box can say what it is actually searching. */
     private val _corpus = MutableStateFlow<List<Pair<DeviceSearch.RecordKind, Int>>>(emptyList())
     val corpus: StateFlow<List<Pair<DeviceSearch.RecordKind, Int>>> = _corpus.asStateFlow()
+
+    /**
+     * A recognised emergency in what is being typed, shown above every other result.
+     *
+     * Running the ranker over the real 581-guide index is what put this here: "how do I treat a
+     * burn" came back with twelve guides, no first aid, and *Metabolism & Cellular Respiration* on
+     * top. The curated table answers that phrasing correctly and this screen — the app's front door
+     * — was the one surface not consulting it.
+     */
+    private val _emergency = MutableStateFlow<EmergencyTriage.Emergency?>(null)
+    val emergency: StateFlow<EmergencyTriage.Emergency?> = _emergency.asStateFlow()
 
     private val _searched = MutableStateFlow(false)
     /** Whether a query has actually been run, so "nothing found" is distinguishable from "not yet". */
@@ -80,9 +92,13 @@ class SearchViewModel(
         typingJob?.cancel()
         if (query.isBlank()) {
             _results.value = emptyList()
+            _emergency.value = null
             _searched.value = false
             return
         }
+        // Set before the debounce: an emergency is a table lookup costing nothing, and it is the one
+        // answer that should not wait for a typing pause.
+        _emergency.value = EmergencyTriage.match(query)
         typingJob = viewModelScope.launch {
             delay(DEBOUNCE_MS)
             val hits = withContext(Dispatchers.Default) {

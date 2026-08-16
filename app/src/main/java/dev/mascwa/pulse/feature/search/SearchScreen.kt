@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.feature.common.LcarsChip
@@ -48,6 +49,7 @@ fun SearchScreen(
     vm: SearchViewModel,
     onBack: (() -> Unit)? = null,
     onOpen: ((DeviceSearch.Result) -> Unit)? = null,
+    onOpenGuide: ((String) -> Unit)? = null,
 ) {
     PulseScaffold(
         title = "Search",
@@ -55,7 +57,7 @@ fun SearchScreen(
             if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        SearchBody(vm, Modifier.padding(innerPadding), onOpen)
+        SearchBody(vm, Modifier.padding(innerPadding), onOpen, onOpenGuide)
     }
 }
 
@@ -72,11 +74,13 @@ fun SearchBody(
     vm: SearchViewModel,
     modifier: Modifier = Modifier,
     onOpen: ((DeviceSearch.Result) -> Unit)? = null,
+    onOpenGuide: ((String) -> Unit)? = null,
 ) {
     val engine by vm.engine.collectAsStateWithLifecycle()
     val results by vm.results.collectAsStateWithLifecycle()
     val corpus by vm.corpus.collectAsStateWithLifecycle()
     val searched by vm.searched.collectAsStateWithLifecycle()
+    val emergency by vm.emergency.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
     var query by remember { mutableStateOf("") }
@@ -114,6 +118,9 @@ fun SearchBody(
                     )
                 }
             }
+
+            // --- an emergency outranks everything, including the ranker ------------------------
+            emergency?.let { e -> EmergencyCard(e, onOpenGuide) }
 
             // --- what the device itself can answer -------------------------------------------
             if (corpus.isNotEmpty()) {
@@ -205,3 +212,37 @@ private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.
 
 /** One or two lines of context under a result — enough to recognise it, not enough to read it here. */
 private const val SUMMARY_CHARS = 160
+
+/**
+ * A recognised emergency, above every other result.
+ *
+ * The action is inline because the instruction that matters most must not itself require a tap, and
+ * the row is coloured against the rest of the page so it is not read as one more search result.
+ */
+@Composable
+private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: ((String) -> Unit)?) {
+    val c = Pulse.colors
+    // Local val: a property of a class in core:telemetry does not smart-cast across the module boundary.
+    val gid = e.guideId
+    val open = if (gid != null) onOpenGuide else null
+    LcarsFrame(
+        Modifier.fillMaxWidth().padding(top = 12.dp)
+            .let { m -> if (open != null) m.clickable { open(gid!!) } else m },
+        accent = c.magenta,
+    ) {
+        Text(
+            e.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp,
+            letterSpacing = 1.sp, fontWeight = FontWeight.Bold, color = c.magenta,
+        )
+        Text(
+            e.firstAction, fontFamily = JetBrainsMono, fontSize = 12.sp, lineHeight = 16.sp,
+            color = c.ink, modifier = Modifier.padding(top = 4.dp),
+        )
+        if (open != null) {
+            Text(
+                "TAP FOR THE FULL PROTOCOL", fontFamily = JetBrainsMono, fontSize = 8.sp,
+                letterSpacing = 0.8.sp, color = c.muted, modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}

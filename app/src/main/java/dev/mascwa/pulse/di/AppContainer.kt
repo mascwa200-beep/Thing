@@ -225,6 +225,17 @@ class AppContainer(private val appContext: Context) {
     val safetyRepository: dev.mascwa.pulse.data.safety.SafetyRepository by lazy {
         dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
     }
+    /**
+     * The one place that asks the bundled library whether it has anything to say about a question.
+     *
+     * Shared by the voice service and the chat console: each having its own copy of "which guide,
+     * which section, how much of it" is how two surfaces quietly start answering the same question
+     * differently.
+     */
+    val libraryLookup: dev.mascwa.pulse.data.survival.LibraryLookup by lazy {
+        dev.mascwa.pulse.data.survival.LibraryLookup(survivalContentRepository)
+    }
+
     val survivalContentRepository: SurvivalContentRepository by lazy {
         SurvivalContentRepository(appContext, json)
     }
