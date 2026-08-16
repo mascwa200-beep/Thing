@@ -124,8 +124,11 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
 
             // Coordinates
             item {
-                val coords = if (state.latitude != null && state.longitude != null)
-                    Geodesy.formatDecimal(state.latitude, state.longitude) else "Locating…"
+                // Local vals: `state` is a delegated property, so `state.latitude` does not smart-cast
+                // to non-null however it is guarded. The old `"%.5f".format(...)` took Any? and hid it.
+                val lat = state.latitude
+                val lon = state.longitude
+                val coords = if (lat != null && lon != null) Geodesy.formatDecimal(lat, lon) else "Locating…"
                 LcarsFrame(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Your coordinates", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
