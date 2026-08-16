@@ -452,6 +452,12 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.InterestTool(interestStore),
             dev.mascwa.pulse.jarvis.agent.FindingTool(findingStore),
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
+            // The app's own world, which the console could previously only reach by searching the web
+            // for what was already sitting in these repositories.
+            dev.mascwa.pulse.jarvis.agent.LibraryTool(survivalContentRepository),
+            dev.mascwa.pulse.jarvis.agent.MarketsTool(marketsRepository),
+            dev.mascwa.pulse.jarvis.agent.NewsTool(newsRepository),
+            dev.mascwa.pulse.jarvis.agent.DayTool(this, settingsRepository),
             dev.mascwa.pulse.jarvis.agent.LocationTool(locationProvider),
             // Device-action tools — each opens the relevant app pre-filled (you confirm the final step).
             dev.mascwa.pulse.jarvis.agent.CallTool(appContext),
