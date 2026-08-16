@@ -191,6 +191,70 @@ object MarketExplainers {
         return Explainer(label, assetClass(type, label))
     }
 
+    /**
+     * Whether the number on screen is a live market or the last thing that traded.
+     *
+     * The distinction is the whole reason this exists. A closed venue's price looks exactly like an
+     * open one's, and someone reading a price at ten at night deserves to be told that nothing has
+     * moved it since the afternoon rather than left to assume it is current.
+     *
+     * Null when the session cannot be established — see [MarketSession.Phase.UNKNOWN]. Saying
+     * nothing is correct there; saying "closed" would be a claim about the venue rather than about
+     * the gap in what we were sent.
+     */
+    fun session(phase: MarketSession.Phase, state: String, exchange: String? = null): Explainer? {
+        if (phase == MarketSession.Phase.UNKNOWN || state.isBlank()) return null
+        val where = exchange?.takeIf { it.isNotBlank() }?.let { " on $it" } ?: ""
+        val detail = when (phase) {
+            MarketSession.Phase.OPEN ->
+                "Trading is under way$where, so this price is live and will keep moving until the closing bell."
+            MarketSession.Phase.PRE ->
+                "The main session hasn't started$where yet. Early trading happens, but in much smaller " +
+                    "amounts than normal, so prices can jump around and are a weak guide to where the day opens."
+            MarketSession.Phase.AFTER ->
+                "The main session has finished$where. Some trading continues, but thinly — a big-looking " +
+                    "move after hours often shrinks or reverses once normal trading resumes."
+            MarketSession.Phase.CLOSED ->
+                "The market is shut$where. This is the last price that actually traded, not a live one, and " +
+                    "it will not change until the venue reopens."
+            MarketSession.Phase.UNKNOWN -> return null
+        }
+        return Explainer(state, detail)
+    }
+
+    /**
+     * Where today's price sits inside the last year's.
+     *
+     * A percentage move tells you what happened since yesterday and nothing about whether the price
+     * is high or low, which is usually the more interesting question — up half a percent from a
+     * twelve-month floor and up half a percent at a record are the same number and different news.
+     *
+     * Null when any of the three figures is missing or the range is unusable.
+     */
+    fun yearRange(price: Double?, low: Double?, high: Double?): Explainer? {
+        val position = MarketSession.rangePosition(price, low, high) ?: return null
+        val band = MarketSession.describeRange(position) ?: return null
+        val pct = (position * 100f).toInt()
+        val detail = "Over the past year it has traded between ${priceText(low!!)} and ${priceText(high!!)}. " +
+            "Today's price sits about $pct% of the way up that range — " + when {
+            position >= 0.80f -> "near the top, so it is close to the most it has been worth all year."
+            position <= 0.20f -> "near the bottom, so it is close to the least it has been worth all year."
+            else -> "neither unusually high nor unusually low by its own recent standards."
+        }
+        return Explainer("$band · 52-week range", detail)
+    }
+
+    /**
+     * A price with as many decimals as it needs and no more.
+     *
+     * Two is right for equities and wrong for anything that trades below a unit — a currency pair or
+     * a small coin rendered at two decimals loses the part of the number that moves. Locale.US
+     * because these are assembled into a sentence alongside other fixed punctuation, and a decimal
+     * comma mid-sentence reads as a thousands separator.
+     */
+    private fun priceText(v: Double): String =
+        String.format(java.util.Locale.US, if (abs(v) < 1.0) "%.4f" else "%.2f", v)
+
     /** Generic definition for an asset class (used when a specific blurb isn't known). */
     fun assetClass(type: String, label: String = "this"): String = when (type.uppercase()) {
         "INDEX" -> "A stock-market index — one number that shows how a whole group of companies is doing today, " +

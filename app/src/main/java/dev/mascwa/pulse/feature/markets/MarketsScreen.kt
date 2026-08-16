@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.MarketExplainers
 import dev.mascwa.pulse.core.telemetry.MarketMood
+import dev.mascwa.pulse.core.telemetry.MarketSession
 import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.feature.common.ChangePill
@@ -176,10 +177,22 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
 
     selected?.let { q ->
         ExplainerDialog(
-            q.label,
+            q.name?.takeIf { it.isNotBlank() } ?: q.label,
             buildList {
                 add(MarketExplainers.instrument(q.id, q.label, q.type))
                 q.changePercent?.let { add(MarketExplainers.changePercent(it)) }
+                // Whether the price is a market or a memory, and where it sits in its own year.
+                // Both come from the same response the app already fetches for every quote; both
+                // were being parsed away. Each returns null when it cannot be established, so an
+                // instrument the venue tells us nothing about simply carries fewer cards.
+                val now = System.currentTimeMillis()
+                val windows = q.hours?.toWindows()
+                MarketExplainers.session(
+                    phase = MarketSession.phaseAt(windows, now),
+                    state = MarketSession.describe(windows, now, q.marketTimeMs),
+                    exchange = q.exchange,
+                )?.let(::add)
+                MarketExplainers.yearRange(q.price, q.fiftyTwoWeekLow, q.fiftyTwoWeekHigh)?.let(::add)
             },
             onDismiss = { selected = null },
         )
