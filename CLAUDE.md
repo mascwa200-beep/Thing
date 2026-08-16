@@ -3041,6 +3041,64 @@ wall clock, whether the 8-minute arrival buffer feels right, the `⌁ rough esti
 busy, and above all the ALERT row firing **once** for a departure rather than re-buzzing every 15
 minutes as it counts down.
 
+### THE COMPUTER READS ITS OWN APP (PR #438)
+
+Owner: *"keep going autonomously."* Found by mapping the assistant's tools against the data layer: of
+37 packages under `data/`, `jarvis/agent/` imported exactly **one** (`oracle`). The split was
+one-sided — **every personal store had a tool** (profile, tasks, notes, diary, interests, findings,
+memory, cerebellum, procedure, usage, sensing) and **no world-data domain did** except weather. The
+Computer knew everything about *you* and nothing about the world the app gathers.
+
+**Sharpest instance:** the bundled guide library — **577 guides, 49 categories** (CLAUDE.md's older
+"396" predates later waves) — was referenced from `GuidesViewModel` and `AppContainer` and nowhere
+else. The app is named LCARS, *Library Computer Access and Retrieval System*, and the library was the
+one thing its computer could not access. `docs` is unrelated: it searches a Room table of
+user-ingested documents. Owner chose (AskUserQuestion) the **daily-life four** and an
+**authoritative** library — consult first, cite the guide.
+
+- **`f9fa5a0` `core:telemetry/GuideSearch.kt`** — the repository's body search is a single `contains`
+  over raw shard text: right for one distinctive term, useless for a sentence, since *"how do I purify
+  water"* appears verbatim in no guide ever written. Ranks the **resident index** (title/category/
+  summary/headings) instead — instant, offline, no shard opened.
+- **`6a2fc3d` the `library` tool** · **`88f4d83` `markets`/`news`/`day`** · **`5c71c66` the grounding
+  directive + registration** (~45 → 49 tools).
+
+**The lesson of the arc, and it is the same one as the last four:** field weights alone produced
+embarrassing results and **I only knew because I ran the ranker over the real 577-guide index rather
+than trusting my unit tests** — *"treating a snake bite"* returned **Depression: Understanding and
+Treating It** ahead of **Wildlife & Insects**, and *"tie a bowline"* put **Association Football Rules**
+level with **Knots & Cordage**, because a common verb in a title outweighed the subject noun in a
+summary. **Rarity weighting (IDF) fixes both outright**; the guard fails without it. A second pass
+showed pronoun-ish words (*someone, having, without*) were pure noise — stopwording them moved *"heart
+attack"* onto **The Heart: Chambers, Valves and the Cardiac Cycle**. Then I stopped: two of eighteen
+questions still return a weak best match (*car tyre*, *sharpening a knife*) and both are **content
+gaps, not ranking ones** — no automotive or knife-sharpening guide exists — which is what the
+body-scan fallback and the "say when it isn't covered" directive are for. Tuning further would have
+been overfitting to eighteen questions.
+
+**Reusable technique:** export the real index to TSV with Python, then run the **shipped** Kotlin
+against it from a throwaway `main` on the compiler classpath. Validates the real code on real data,
+costs nothing, and is far stronger than a unit test. (`scratchpad/kb/`.)
+
+**Two defects fixed while writing the tools:** `removePrefix` is case-sensitive where the dispatch
+above it was not, so `Read foo` fell through with the verb attached; and decimal places were derived
+from the number being printed, giving a −3.42 change on an ordinary stock four decimal places —
+**precision belongs to the instrument, not the value.**
+
+**Design constraints worth keeping:** a whole guide cannot be returned (a dozen-plus sections of
+several hundred words each, far past one tool result), so `read <id>` gives the shape and the safety
+note, and `read <id> <section>` gives text. An **UNKNOWN** market session says nothing rather than
+claiming CLOSED. All three live tools read warm caches (`force = false`).
+
+⚠️ **Owner-verify on the Pixel** (native tool-calling needs the cloud key): ask a practical question
+and check it searches the library and **names the guide** rather than answering from memory; ask
+something the library plainly lacks and check it **says so** instead of inventing a citation; **turn
+the radio off and ask again** — that is the half that should still work.
+
+**Content gap worth a KB wave when they resume:** there is **no cardiac-emergency or CPR guide** —
+"heart" mostly hits *heart of Africa* geography and CPR appears only inside First Aid — in a library
+that leads on safety. Also no automotive and no knife-sharpening guide.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
