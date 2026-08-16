@@ -217,7 +217,11 @@ fun PulseApp(
             }
             composable(Routes.SOS) {
                 val vm: SosViewModel = viewModel(factory = factory)
-                SosScreen(vm, onBack = { navController.popBackStack() })
+                SosScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenGuide = { id -> navController.navigate("${Routes.SURVIVAL}?guide=$id") },
+                )
             }
             composable(Routes.SAFETY) {
                 val vm: dev.mascwa.pulse.feature.safety.SafetyViewModel = viewModel(factory = factory)
