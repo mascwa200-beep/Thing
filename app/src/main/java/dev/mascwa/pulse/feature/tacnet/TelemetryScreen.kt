@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -350,7 +351,7 @@ private fun PositionCell(gps: DeviceLocation?, modifier: Modifier = Modifier) {
         if (gps != null) {
             Text(gps.name, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.void,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("%.5f, %.5f".format(gps.latitude, gps.longitude), fontFamily = JetBrainsMono, fontSize = 10.sp,
+            Text(Geodesy.formatDecimal(gps.latitude, gps.longitude), fontFamily = JetBrainsMono, fontSize = 10.sp,
                 color = c.void.copy(alpha = 0.68f), modifier = Modifier.padding(top = 2.dp))
         } else {
             Text("NO FIX", fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.void)

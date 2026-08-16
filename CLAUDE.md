@@ -3095,9 +3095,62 @@ and check it searches the library and **names the guide** rather than answering 
 something the library plainly lacks and check it **says so** instead of inventing a citation; **turn
 the radio off and ask again** — that is the half that should still work.
 
-**Content gap worth a KB wave when they resume:** there is **no cardiac-emergency or CPR guide** —
-"heart" mostly hits *heart of Africa* geography and CPR appears only inside First Aid — in a library
-that leads on safety. Also no automotive and no knife-sharpening guide.
+**⚠️ CORRECTION to a claim made here last session:** I wrote that the library had "no cardiac-emergency
+or CPR guide". That overstated it. **First Aid carries CPR (adult), Choking, Severe bleeding, Burns and
+Recovery position at 450+ words each**, and `Common Illnesses & Red Flags to Act On` carries stroke
+(FAST), heart attack and anaphylaxis as titled sections. The content was there and *unreachable* — see
+the emergency-path arc below. Real content gaps remaining: **automotive** and **knife sharpening**.
+
+### THE EMERGENCY PATH (PR #439)
+
+Owner: *"keep going autonomously"*, then a standing directive to ship slice after slice without
+pausing for authorisation. Also owner-reported: the LCARS sfx were "way too quiet or don't exist".
+
+**The defect that started it, and it was mine from an hour earlier.** PR #438 shipped a persona
+directive routing every injury/illness question through `GuideSearch`. Run against the real library
+that ranker answers *"stroke symptoms"* with **How a Two-Stroke Engine Works**, *"not breathing"* with
+**Uphill Walking Technique and Breathing**, *"severe allergic reaction"* with **Severe Weather**,
+*"burn from hot oil"* with **Making Soap**, and *"seizure"* with nothing. A scorer sees letters.
+
+- **`db99e9c` the SOS coordinates.** `buildSosMessage` formatted the position it texts your emergency
+  contacts with the **default locale** — on most of Europe `Location: 48,85661, 2,35222`, four
+  comma-separated numbers a rescuer cannot tell apart, in the one message that must be read right
+  first time. The maps link (raw `Double.toString`) was never affected. Now `Geodesy.formatDecimal`/
+  `formatDegrees` beside `formatDms`, which was always `Locale.US`; four call sites share it.
+- **`6b6bce8` the sfx.** They existed and were wired; they were inaudible — synthesis `0.5` × track
+  `0.35` = **17% of full scale**. Now per-cue (0.55 tap → 0.95 alert) at unity gain. Also fixed a
+  latent bug: **one shared `AudioTrack` reused whenever merely big enough**, and a static track plays
+  its *whole buffer*, so a 60 ms tap in a buffer sized for the 380 ms alert played the tap then the
+  alert's tail. Per-cue tracks now. ⚠️ These ride the system stream, which Android's **Touch sounds**
+  setting gates independently — hence the new "Test the console sounds" row under the toggle.
+- **`d5e1ce3` + `82435c5` triage.** `core:telemetry/EmergencyTriage.kt` — 19 emergencies, **curated
+  not inferred**, consulted **before** ranking, ordered by how fast each kills so "not breathing and
+  bleeding" surfaces the airway. Cues are whole phrases on word boundaries; three were deleted during
+  testing because a bare `burn` caught *calorie burn* and `fitting` caught *fitting a shelf*.
+- **`82435c5` the four missing protocols.** Seizure, head injury/concussion, electric shock, heat
+  stroke appeared in **no title, summary or heading anywhere**. Written (581 guides, full pages
+  8256→8258), and 18 of 19 emergencies now route; low blood sugar is the one admitted gap.
+- **`45cad6f` the SOS fast path.** Eight emergencies on the SOS screen, action printed **inline**,
+  protocol one tap. Below the call actions on purpose — reading is never the first thing to do.
+
+**The guard worth keeping:** an app-module test resolves **every** route against the real bundled
+guides, so renaming a section fails the build instead of silently sending someone doing CPR to a page
+that no longer exists. Negative-tested.
+
+**`b2274cb` — a trap worth remembering.** CI caught `Geodesy.formatDecimal(state.latitude, ...)`:
+`val state by collectAsStateWithLifecycle()` is a **delegated property**, so `state.latitude` never
+smart-casts to non-null however it is guarded. The old `"%.5f".format(...)` took `Any?` and hid it.
+Same family as the cross-module case already recorded here. Hoist to a local val.
+
+⚠️ **The four protocols are medical content written by me and reviewed by nobody** — owner accepted
+that explicitly. Standard public first-aid only: recognition, action, what *not* to do, when to call.
+No dosing, no diagnosis. Each carries a safetyNote saying it is not training and not medical advice.
+Sections run 240–420 words, deliberately under the library's 400 norm: padding emergency guidance to
+clear a page metric is the wrong instinct, and the ratchet only forbids the count regressing.
+
+⚠️ **Owner-verify on the Pixel:** ask *"stroke symptoms"* and *"someone's not breathing"* (action
+first, then real protocol text); ask *"how does a two stroke engine work"* (must stay an ordinary
+answer); **Test the console sounds** in Settings; SOS → the coordinate line and the new first-aid rows.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the

@@ -44,32 +44,39 @@ enum class SoundCue {
 /**
  * Renders and plays the cues.
  *
- * Each cue's PCM is built on first use and cached, so a tap costs a buffer write rather than a
- * synthesis pass. Every path is defensive: a device that refuses to give us an [AudioTrack] simply
- * gets no sound, and never an exception on the UI thread.
+ * Each cue is synthesised and written to its own track on first use, so playing one afterwards costs
+ * a rewind and a start — no synthesis, no buffer write. Every path is defensive: a device that
+ * refuses to give us an [AudioTrack] simply gets no sound, never an exception on the UI thread.
  */
 class LcarsAudio {
 
-    private val cache = HashMap<SoundCue, ShortArray>()
-    private var track: AudioTrack? = null
+    /**
+     * One track per cue, each sized to exactly that cue.
+     *
+     * ⚠️ Not one shared track sized to the longest cue, which is what this was. A static track plays
+     * its whole buffer, so writing a 60 ms tap into a buffer still sized for the 380 ms alert plays
+     * the tap and then whatever of the alert was left behind it. Per-cue tracks also mean the PCM is
+     * written once rather than on every play.
+     */
+    private val tracks = HashMap<SoundCue, AudioTrack>()
 
     fun play(cue: SoundCue) {
         runCatching {
-            val pcm = cache.getOrPut(cue) { render(cue) }
-            val t = obtain(pcm.size) ?: return
+            val t = tracks[cue] ?: build(cue)?.also { tracks[cue] = it } ?: return
             t.stop()
             t.reloadStaticData()
             t.setVolume(VOLUME)
-            t.write(pcm, 0, pcm.size)
             t.play()
         }
     }
 
-    /** One track, sized to the longest cue seen so far; rebuilt only when a longer one arrives. */
-    private fun obtain(samples: Int): AudioTrack? {
-        val existing = track
-        if (existing != null && existing.bufferSizeInFrames >= samples) return existing
-        runCatching { existing?.release() }
+    private fun build(cue: SoundCue): AudioTrack? {
+        val pcm = render(cue)
+        val t = newTrack(pcm.size) ?: return null
+        return runCatching { t.write(pcm, 0, pcm.size); t }.getOrNull()
+    }
+
+    private fun newTrack(samples: Int): AudioTrack? {
         return runCatching {
             AudioTrack.Builder()
                 .setAudioAttributes(
@@ -90,12 +97,12 @@ class LcarsAudio {
                 .setBufferSizeInBytes(samples * 2)
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
-        }.getOrNull()?.also { track = it }
+        }.getOrNull()
     }
 
     fun release() {
-        runCatching { track?.release() }
-        track = null
+        tracks.values.forEach { t -> runCatching { t.release() } }
+        tracks.clear()
     }
 
     /**
@@ -114,6 +121,16 @@ class LcarsAudio {
             // The one that is meant to be disliked: a hard two-tone alternation.
             SoundCue.ALERT -> listOf(740.0 to 90, 493.9 to 90, 740.0 to 90, 493.9 to 110)
         }
+        // Per-cue level. The vocabulary has dynamics on purpose -- a tap is not an alarm -- but the
+        // whole set was pitched far too low to hear: 0.5 here against a 0.35 track volume put every
+        // cue at 17% of full scale, which on a phone speaker at UI-sonification volume is silence.
+        val gain = when (cue) {
+            SoundCue.TAP -> 0.55
+            SoundCue.SELECT -> 0.66
+            SoundCue.CONFIRM -> 0.72
+            SoundCue.REJECT -> 0.70
+            SoundCue.ALERT -> 0.95
+        }
         val total = steps.sumOf { (_, ms) -> ms * RATE / 1000 }
         val out = ShortArray(total)
         var i = 0
@@ -125,7 +142,7 @@ class LcarsAudio {
                 // discontinuity, and a discontinuity is a click — which is audible, ugly, and the
                 // usual reason hand-rolled tones sound cheap.
                 val env = envelope(s, n)
-                out[i++] = (sin(angle) * env * Short.MAX_VALUE * 0.5).toInt().toShort()
+                out[i++] = (sin(angle) * env * Short.MAX_VALUE * gain).toInt().toShort()
             }
         }
         return out
@@ -143,7 +160,9 @@ class LcarsAudio {
 
     private companion object {
         const val RATE = 22050
-        const val VOLUME = 0.35f
+        /** Track gain left at unity: the per-cue [render] gain shapes the mix, and the phone's own
+         *  system volume is the control that should decide how loud a console is. */
+        const val VOLUME = 1.0f
     }
 }
 

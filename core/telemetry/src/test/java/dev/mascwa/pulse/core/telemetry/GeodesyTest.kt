@@ -103,6 +103,32 @@ class GeodesyTest {
         assertTrue(Geodesy.formatDms(-33.9, 151.2).contains("S"))
     }
 
+    /**
+     * The guard on the SOS message.
+     *
+     * These coordinates are texted to emergency contacts. Under a comma-decimal locale the default
+     * formatter renders them "48,85661, 2,35222" — four comma-separated numbers a rescuer cannot tell
+     * apart, in the one message that has to be read correctly the first time.
+     */
+    @Test fun decimalCoordinatesKeepADotWhateverTheReadersLanguage() {
+        assertEquals("48.85661, 2.35222", Geodesy.formatDecimal(48.85661, 2.35222))
+        assertEquals("-33.90000, 151.20000", Geodesy.formatDecimal(-33.9, 151.2))
+
+        val previous = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            val s = Geodesy.formatDecimal(48.85661, 2.35222)
+            assertEquals("48.85661, 2.35222", s)
+            // Exactly one comma: the separator between the two numbers, and none inside them.
+            assertEquals(1, s.count { it == ',' })
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+
+        // %.0f of 48.85661 rounds to 49, of 2.35222 to 2.
+        assertEquals("49, 2", Geodesy.formatDecimal(48.85661, 2.35222, decimals = 0))
+    }
+
     // ---- UTM / MGRS ----
 
     @Test fun utmZonesIncludeTheNorwayAndSvalbardExceptions() {

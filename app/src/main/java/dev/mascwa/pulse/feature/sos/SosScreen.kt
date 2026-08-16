@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import dev.mascwa.pulse.core.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Message
@@ -43,7 +46,7 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
+fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null, onOpenGuide: ((String) -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
@@ -123,14 +126,56 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
 
             // Coordinates
             item {
-                val coords = if (state.latitude != null && state.longitude != null)
-                    "%.5f, %.5f".format(state.latitude, state.longitude) else "Locating…"
+                // Local vals: `state` is a delegated property, so `state.latitude` does not smart-cast
+                // to non-null however it is guarded. The old `"%.5f".format(...)` took Any? and hid it.
+                val lat = state.latitude
+                val lon = state.longitude
+                val coords = if (lat != null && lon != null) Geodesy.formatDecimal(lat, lon) else "Locating…"
                 LcarsFrame(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Your coordinates", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
                         Text(coords, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = c.ink)
                     }
                 }
+            }
+
+            // First aid, one tap from the screen someone already opened in a crisis. It sits BELOW
+            // the call actions on purpose: reading is never the first thing to do, and the layout
+            // should not imply otherwise. The action line is shown inline because the instruction
+            // that matters most must not itself require another tap.
+            item { LcarsHeaderBar("First aid — while help is coming") }
+            items(FAST_PATH) { e ->
+                // Local val: guideId is a property of a class in core:telemetry, which does not
+                // smart-cast across the module boundary however it is guarded.
+                val gid = e.guideId
+                val open = if (gid != null) onOpenGuide else null
+                LcarsFrame(
+                    Modifier.fillMaxWidth().let { m -> if (open != null) m.clickable { open(gid!!) } else m },
+                    accent = c.magenta,
+                ) {
+                    Text(
+                        e.label.uppercase(), fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp, color = c.ink,
+                    )
+                    Text(
+                        e.firstAction, fontFamily = JetBrainsMono, fontSize = 10.sp,
+                        lineHeight = 14.sp, color = c.ink2, modifier = Modifier.padding(top = 3.dp),
+                    )
+                    if (open != null) {
+                        Text(
+                            "TAP FOR THE FULL PROTOCOL", fontFamily = JetBrainsMono, fontSize = 8.sp,
+                            letterSpacing = 0.8.sp, color = c.muted,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+            item {
+                Text(
+                    "Ask the Computer for anything not listed — it carries the whole library offline.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
             }
 
             // Emergency card
@@ -193,3 +238,13 @@ private fun CardRow(label: String, value: String) {
         Text(value, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = c.ink, textAlign = TextAlign.End)
     }
 }
+
+/**
+ * The emergencies worth putting one tap from the SOS screen.
+ *
+ * Taken from the head of [EmergencyTriage.EMERGENCIES], which is ordered by how fast each situation
+ * kills — so this list stays correct as that table changes rather than drifting from it. Only ones
+ * with a protocol behind them appear, because a row that cannot open anything is furniture.
+ */
+private val FAST_PATH: List<EmergencyTriage.Emergency> =
+    EmergencyTriage.EMERGENCIES.filter { it.covered }.take(8)
