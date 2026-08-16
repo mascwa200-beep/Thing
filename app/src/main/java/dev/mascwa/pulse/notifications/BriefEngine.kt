@@ -14,6 +14,7 @@ import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.settings.AppSettings
+import dev.mascwa.pulse.data.study.localDayIndex
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.data.weather.WeatherData
 import dev.mascwa.pulse.di.AppContainer
@@ -172,6 +173,7 @@ object BriefEngine {
                 showWeather = prefs.showWeatherRow,
                 showAgenda = prefs.showAgendaRow,
                 advisory = advisory(container, settings),
+                lesson = lesson(container, pendingTasks.map { it.title }),
                 departureNotice = departure?.first,
                 departureKey = departure?.second,
             ),
@@ -236,6 +238,22 @@ object BriefEngine {
         // The title carries the instruction and the detail carries why — the board wants both, in
         // that order, because a suggestion without a reason is just noise you learn to ignore.
         listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — ")
+    }.getOrNull()
+
+    /**
+     * Today's study item, or null.
+     *
+     * The library holds hundreds of guides and, until the study cores existed, the only way to be
+     * taught anything from it was to remember to go looking. A line on a board you already read all
+     * day is the difference between a library you own and a library you use.
+     *
+     * ⚠️ It is the first row shed when the board is busy and it never raises the alert condition —
+     * both enforced in `UnifiedBriefComposer`, not here. Best-effort: the index is resident and the
+     * pick is a rank over it, so this costs no fetch, and any failure simply drops the row.
+     */
+    private suspend fun lesson(container: AppContainer, pendingTasks: List<String>): String? = runCatching {
+        val interests = container.profileStore.all().sortedByDescending { it.weight }.map { it.text }
+        container.studyStore.today(interests, pendingTasks, localDayIndex())?.boardLine
     }.getOrNull()
 
     /**

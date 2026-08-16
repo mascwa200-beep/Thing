@@ -3322,6 +3322,76 @@ real protocol text, and still works with the cloud key removed); *"how do I puri
 tools off (a real answer naming the guide); *"how does a two stroke engine work"* (must stay an
 ordinary answer); and confirm voice behaves exactly as before.
 
+### THE COMPUTER TEACHES YOU (this session cont., PR #442)
+
+Owner: *"overpower the creativity and features beyond their unbroad criterias"*, then *"keep going
+autonomously with my same orders 100% of the time every time"*. The app's largest asset was **inert**:
+581 guides, 8,277 sections, and **no learning machinery of any kind** — no quiz, no curriculum, no
+spaced repetition, reading progress that died with the session — under a persona that calls itself a
+tutor. Owner chose, via AskUserQuestion: build **both** the ambient daily teaching and the enrolled
+path, and generate questions **deterministically, offline, never model-invented**.
+
+**Zero subagent spend, as with the six arcs before it.** Local kotlinc + JUnit, runs over the real
+bundled library, the parse-only kotlinc gate, and CI.
+
+Five cores, each locally executed: **`StudyQuestions`** (extractive — a gap in a real sentence where
+it is unambiguous, an open self-graded prompt everywhere else), **`Recall`** (SM-2's shape, interval
+**capped** because on a phone reinstalled every few months an uncapped card never returns, and a lapse
+**softens** the ease rather than flooring it), **`Curriculum`** (goal → ordered path; relevance from
+`GuideSearch.rank`, then regrouped for category/supergroup cohesion, both levels ordered by their
+**best** member), **`DailyLesson`** (the picker: a due review beats everything, then an enrolled path,
+then something on your list, then an interest, then something unread), and `StudyStore` + the
+surfaces — a **STUDY screen** (MENU ▸ GUIDES), a **LESSON row on the one board**, a **`study` tool**,
+and Settings ▸ "Clear study progress".
+
+**Everything worth recording came from running it over the real 581-guide index, not from reading it.**
+1. **A goal is not a question.** "learn"/"understand"/"basics" are said *around* a subject; matching on
+   them put *Depression: Understanding and Treating It* in a path about electricity. `Curriculum.GOAL_NOISE`
+   strips that class **for searching only** and lives there, not in the shared stopword list, because
+   the ranker is shared with callers whose phrasing is their own. ⚠️ **The list is short because the
+   wider ones were tested and made results worse** — dropping prepositions lost *Mapping Hazards Around
+   Your Home Address*, dropping "work" put *Ocean Acidification* atop an economics path.
+2. **Every suggested goal was chosen by composing it and reading the path.** "growing food" returns
+   seven food-*safety* guides and no gardening; "fixing things around the house" leads with *The SI
+   Base Units*; "money and how economies work" returns engineering project management. The shipped
+   wordings ("growing food and gardening", "home repair and maintenance", "economics and markets") were
+   picked from real output.
+3. **`LibraryConsult.isTopical` was a substring test** — "car" matched **Newborn Care Basics**, and
+   "lease" matches "release", "tap" matches "tape". Now whole-word via the ranker's own `fieldMatch`
+   (stem rule kept), with the case fold moved inside because `fieldMatch` lowercases the text it scans
+   but **not** the token. **This tightens voice and console grounding too.**
+4. **The anchor key must include words no guide contains** — that IS the mechanism. Task "service the
+   boiler", library has no boiler guide, nothing satisfies "boiler", anchor dropped. Preferring the
+   rarest *known* word looks accommodating and is far worse: it keys on the leftover verb and produced
+   "*service the boiler before winter* is on your list" above **Severe Weather**, and "*call the
+   dentist*" above **Poisoning and Overdose**.
+5. **Being mentioned is not being about.** A lesson asserts a connection nobody asked for, so
+   `DailyLesson.isAbout` is stricter than `isTopical`: title or category only. Allowing headings and
+   summaries offers *Archaeological Excavation* for photography, *Oven Hot Spots* for cycling, *History
+   of the Personal Computer* for "wiring a plug". Costs two good picks (water purification, sourdough —
+   the word is in the body, not the name); that is the honest price. Title-**or-heading** was also
+   measured and changes **nothing** — every incidental mention was in a heading.
+
+⚠️ **The board trap, pinned by a test:** the expanded layout has exactly **five** row slots and the
+renderer takes the first five, so a seventh row is dropped **silently** on a path that compiles and
+posts a perfectly good notification. `LESSON` is therefore **first** in `trimToFive`'s droppable list
+(before MARKETS) and, like ADVISORY, never raises the alert condition. It is also last in the headline
+preference list purely so a lesson-only board cannot throw in `firstNotNullOf`.
+
+**Cleanup:** removed a fourth copy of the index-row→ranker-entry mapping (private in `LibraryTool`,
+open-coded twice more, a fifth about to be written) — one `GuideIndexEntry.toSearchEntry()` in
+`GuideModels`. `localDayIndex` lives beside `StudyStore` because three callers need it and a "today"
+derived from UTC inside a pure module is a day out for half the planet.
+
+⚠️ **Owner-verify on the Pixel:** MENU ▸ GUIDES ▸ Study (is the reason plausible?); TEACH ME → answer →
+the "comes back in …" line, then that it returns a day later and at widening gaps; enrol in a goal;
+and the board's STUDY row — note the Settings **test button posts a busy five-row sample where the
+lesson is correctly the first row shed**, so the new row shows on a quiet real board, not in the test.
+
+**Open/steerable:** whether the strict `isAbout` bar is too strict in practice (one constant); whether
+a lesson should ever lead the collapsed line; a `LESSON`-carrying test-board sample if the owner wants
+to eyeball the new row tag.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

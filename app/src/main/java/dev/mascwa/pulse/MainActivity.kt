@@ -300,6 +300,7 @@ class MainActivity : ComponentActivity() {
             runCatching { app.container.securityAuditStore.flushNow() }
             runCatching { app.container.oracleLearningStore.flushNow() }
             runCatching { app.container.sensoriumStore.flushNow() }
+            runCatching { app.container.studyStore.flushNow() }
             // Refresh the Nova/TeslaUnread badge with the current unread-findings count.
             runCatching {
                 dev.mascwa.pulse.shortcuts.UnreadBadge.publish(

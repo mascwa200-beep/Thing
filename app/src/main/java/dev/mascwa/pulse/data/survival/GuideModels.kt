@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.survival
 
+import dev.mascwa.pulse.core.telemetry.GuideSearch
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -55,3 +56,12 @@ data class GuideIndexEntry(
 
 @Serializable
 data class GuideIndex(val entries: List<GuideIndexEntry>)
+
+/**
+ * The index row as the pure ranker sees it.
+ *
+ * One definition because four surfaces need it — the `library` tool, the grounding lookup, device
+ * search and the study path — and a fifth private copy is how they quietly start ranking differently.
+ */
+fun GuideIndexEntry.toSearchEntry(): GuideSearch.Entry =
+    GuideSearch.Entry(id = id, title = title, category = category, summary = summary, headings = headings)

@@ -21,12 +21,22 @@ object LibraryConsult {
      * an answer about something else is worse than having no library at all. Sharing a common noun
      * with half the corpus is not enough to claim a page is about the question; the distinctive word
      * has to actually appear somewhere in it.
+     *
+     * ⚠️ **Word-aware, not a substring test.** This was `contains` until running it over the real
+     * 581-guide library caught "car" matching **Newborn Care Basics for New Parents** — and "lease"
+     * matches "release", "tap" matches "tape", "ion" matches "station". [GuideSearch.fieldMatch]
+     * compares whole words and shares the ranker's own stem rule, so "knots" still finds "knot" and
+     * "water" still finds "waterproofing" while "car" no longer finds "care".
      */
-    fun isTopical(entry: GuideSearch.Entry, key: String): Boolean =
-        entry.title.contains(key, true) ||
-            entry.summary.contains(key, true) ||
-            entry.category.contains(key, true) ||
-            entry.headings.any { it.contains(key, true) }
+    fun isTopical(entry: GuideSearch.Entry, key: String): Boolean {
+        // fieldMatch lowercases the text it scans but not the token, because in ranking the token
+        // always arrives from GuideSearch.tokens. A key here can be any word a caller had to hand.
+        val k = key.lowercase()
+        return GuideSearch.fieldMatch(entry.title, k) > 0 ||
+            GuideSearch.fieldMatch(entry.summary, k) > 0 ||
+            GuideSearch.fieldMatch(entry.category, k) > 0 ||
+            entry.headings.any { GuideSearch.fieldMatch(it, k) > 0 }
+    }
 
     /**
      * The best section of a guide for [query], or null when the guide has no sections at all.

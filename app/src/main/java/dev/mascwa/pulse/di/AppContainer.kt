@@ -239,6 +239,16 @@ class AppContainer(private val appContext: Context) {
     val survivalContentRepository: SurvivalContentRepository by lazy {
         SurvivalContentRepository(appContext, json)
     }
+
+    /**
+     * What the reader is learning from the bundled library, and when they are next due to be asked.
+     *
+     * Separate from [libraryLookup]: that one answers a question, this one decides what to teach and
+     * keeps the schedule that turns being told into learning.
+     */
+    val studyStore: dev.mascwa.pulse.data.study.StudyStore by lazy {
+        dev.mascwa.pulse.data.study.StudyStore(appContext, json, survivalContentRepository)
+    }
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
@@ -466,6 +476,8 @@ class AppContainer(private val appContext: Context) {
             // The app's own world, which the console could previously only reach by searching the web
             // for what was already sitting in these repositories.
             dev.mascwa.pulse.jarvis.agent.LibraryTool(survivalContentRepository),
+            // Retrieval is not teaching. This one decides what to teach and holds the schedule.
+            dev.mascwa.pulse.jarvis.agent.StudyTool(studyStore, profileStore, taskStore),
             // One question — "what do I know about X" — over every store at once, so answering it
             // does not mean guessing which one holds the answer and guessing again when wrong.
             dev.mascwa.pulse.jarvis.agent.DeviceSearchTool(this),

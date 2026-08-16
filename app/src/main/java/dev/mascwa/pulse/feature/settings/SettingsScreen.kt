@@ -1122,6 +1122,12 @@ fun SettingsScreen(
                         onClick = { vm.clearMemoryStream() },
                     )
                     PrefClickable(
+                        "Clear study progress",
+                        subtitle = "Forget the enrolled path, which guides have been taught and every " +
+                            "review schedule. The library itself is untouched. On-device only.",
+                        onClick = { vm.clearStudy() },
+                    )
+                    PrefClickable(
                         "Verify audit ledger",
                         value = ledgerStatus,
                         subtitle = "Re-check the tamper-evident blackbox log — chain integrity, hardware " +
