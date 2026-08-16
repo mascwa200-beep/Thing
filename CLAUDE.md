@@ -3277,6 +3277,51 @@ lines) is already deleted, and the general `SectionHeader` is gone too: the only
 copies are real** — RadarScreen, SpaceWeatherScreen, OrbitalScreen and WeatherScreen each carry their
 own — and are the only part of that list still worth doing.
 
+### THE CONSOLE GETS WHAT THE VOICE PATH GOT (this session cont., PR #441)
+
+Owner: *"keep going autonomously."* PR #440 fixed two things on the **voice** path; reading
+`JarvisViewModel` — the console, the surface people actually type into — showed both were still
+present there, with the **identical** `agentToolsEnabled || selfCoding || selfEdit` gate at line 363.
+Zero subagent spend, as with the five arcs before.
+
+- **`core:telemetry/LibraryConsult.kt` + 14 tests (locally green) and `data/survival/LibraryLookup.kt`.**
+  The voice service held `libraryHit`/`firstSentences` privately; a second copy in the console is the
+  duplicated-definition mistake this repo has corrected four times with palettes. The pure half (the
+  relevance bar, section pick, sentence trim, prompt block, citation) moved to core; the Android half
+  is one class doing the index rank + single shard read, on `AppContainer.libraryLookup`. **The voice
+  path is unchanged by construction** — every produced string was diffed against the inline version.
+  `firstSentences` had never had a test despite shipping the lone-full-stop defect; it has one now.
+- **An emergency typed into the console is answered by the device.** It went to the model, which with
+  no cloud key is `EchoInferenceEngine`. Now `EmergencyTriage.match` runs first, in `routeTurn`'s Chat
+  branch — deliberately there, because `send()` does profile/task/episodic capture *before*
+  `routeTurn`, so the early return skips none of it. **Fourth surface on the same curated table.**
+- **The protocol is fetched by the table's curated `guideId`+`section`, never re-ranked** (`LibraryLookup.exact`).
+  I wrote the ranking version first and caught it on review: ranking is the right tool for a question
+  and the wrong one for "someone is not breathing."
+- **The library joined the console's grounding pipeline.** `generateDirect` already composed persona +
+  user-ingested knowledge + memory; the app's largest corpus was not a source. Now
+  `withMemory(withLibrary(withKnowledge(composePersona(), text), text), text)`.
+  ⚠️ **Deliberately NOT fenced as `<untrusted>`,** unlike `withKnowledge` — that fence is for documents
+  the user ingested from anywhere; the library is curated content bundled into the app, and marking it
+  untrusted would tell the model to distrust the most reliable thing it has.
+
+**A hypothesis of mine that was wrong, recorded because checking it is the only reason I know.** I
+expected the agent path to be missing memory and knowledge, since `generateWithAgent` passes only
+`composePersona()`. It is not: `AgentOrchestrator.run` does its own `memory.recall(query)` and
+`knowledge.search(query)` and feeds both into `buildNativeSystem`/`buildSystem`. The ViewModel passes
+only the persona *because* the orchestrator retrieves for itself. **No gap; nothing changed.**
+
+What the check did show: the orchestrator retrieves memory and knowledge but **not the library**, so
+the agent path reaches the corpus only if the model chooses to call the `library` tool. Left alone
+deliberately — the agent has that tool and the persona tells it to use it, so pre-injecting would be
+redundant and would land the same passage twice. Worth revisiting only if on-device text-ReAct turns
+out to skip the tool in practice.
+
+⚠️ **Owner-verify on the Pixel:** type *"someone is choking"* into the console (action first, then
+real protocol text, and still works with the cloud key removed); *"how do I purify water"* with agent
+tools off (a real answer naming the guide); *"how does a two stroke engine work"* (must stay an
+ordinary answer); and confirm voice behaves exactly as before.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
