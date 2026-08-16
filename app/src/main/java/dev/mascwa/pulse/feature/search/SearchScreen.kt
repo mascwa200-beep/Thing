@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.DeviceSearch
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.feature.common.LcarsChip
@@ -43,22 +44,39 @@ import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
 @Composable
-fun SearchScreen(vm: SearchViewModel, onBack: (() -> Unit)? = null) {
+fun SearchScreen(
+    vm: SearchViewModel,
+    onBack: (() -> Unit)? = null,
+    onOpen: ((DeviceSearch.Result) -> Unit)? = null,
+) {
     PulseScaffold(
         title = "Search",
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
         },
     ) { innerPadding ->
-        SearchBody(vm, Modifier.padding(innerPadding))
+        SearchBody(vm, Modifier.padding(innerPadding), onOpen)
     }
 }
 
-/** The scaffold-free web-search feed (query box + engine picker) — hosted standalone in [SearchScreen]
- *  and as the SEARCH sub-tab inside the LCARS COMMS section. */
+/**
+ * The search feed: what this device already knows, then the web.
+ *
+ * That order is the point. The app carries hundreds of written guides, the user's notes, their
+ * diary, their tasks and the assistant's memory, and until now the only thing this box could do was
+ * hand the question to a search engine. Typing now answers from the device first — offline, with no
+ * key and no request — and the engine picker sits below for when it genuinely is a web question.
+ */
 @Composable
-fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
+fun SearchBody(
+    vm: SearchViewModel,
+    modifier: Modifier = Modifier,
+    onOpen: ((DeviceSearch.Result) -> Unit)? = null,
+) {
     val engine by vm.engine.collectAsStateWithLifecycle()
+    val results by vm.results.collectAsStateWithLifecycle()
+    val corpus by vm.corpus.collectAsStateWithLifecycle()
+    val searched by vm.searched.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
     var query by remember { mutableStateOf("") }
@@ -79,7 +97,7 @@ fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
                     Text("⌕", fontFamily = JetBrainsMono, fontSize = 18.sp, color = c.accent)
                     BasicTextField(
                         value = query,
-                        onValueChange = { query = it },
+                        onValueChange = { query = it; vm.onQueryChanged(it) },
                         singleLine = true,
                         textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 15.sp),
                         cursorBrush = SolidColor(c.accent),
@@ -88,12 +106,35 @@ fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
                         modifier = Modifier.weight(1f).padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
                         decorationBox = { inner ->
                             if (query.isEmpty()) {
-                                Text("Search the web…", fontFamily = JetBrainsMono, fontSize = 15.sp, color = c.muted)
+                                Text("Search this device, or the web…", fontFamily = JetBrainsMono,
+                                    fontSize = 15.sp, color = c.muted)
                             }
                             inner()
                         },
                     )
                 }
+            }
+
+            // --- what the device itself can answer -------------------------------------------
+            if (corpus.isNotEmpty()) {
+                Text(
+                    "ON THIS DEVICE · " + corpus.joinToString(" · ") { (k, n) ->
+                        "$n ${k.label.lowercase()}${if (n == 1) "" else "s"}"
+                    },
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp,
+                    color = c.muted, modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+            if (results.isNotEmpty()) {
+                LcarsHeaderBar("On this device")
+                results.forEach { r -> DeviceResultRow(r, onOpen) }
+            } else if (searched) {
+                LcarsHeaderBar("On this device")
+                Text(
+                    "Nothing here matches that. The web is below.",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
             }
 
             LcarsHeaderBar("Engine")
@@ -116,9 +157,48 @@ fun SearchBody(vm: SearchViewModel, modifier: Modifier = Modifier) {
                 )
             }
             Text(
-                "Opens your query in ${engine.label} in the browser. No tracking key required.",
+                "Opens your query in ${engine.label} in the browser. No tracking key required. " +
+                    "Everything under \"On this device\" was answered without leaving the phone.",
                 fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
                 modifier = Modifier.padding(top = 10.dp, bottom = 24.dp),
             )
         }
 }
+
+/**
+ * One thing the device knows, and where it lives.
+ *
+ * The kind is shown rather than inferred from the styling: a result that came from your own diary
+ * and one that came from a written guide deserve to be told apart at a glance, and the reader should
+ * not have to learn a colour code to do it.
+ */
+@Composable
+private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.Result) -> Unit)?) {
+    val c = Pulse.colors
+    val open = onOpen
+    LcarsFrame(
+        Modifier.fillMaxWidth().padding(top = 6.dp)
+            .let { m -> if (open != null) m.clickable { open(result) } else m },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                result.kind.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 8.sp,
+                letterSpacing = 0.8.sp, color = c.accent,
+            )
+        }
+        Text(
+            result.title, fontFamily = JetBrainsMono, fontSize = 13.sp,
+            fontWeight = FontWeight.Bold, color = c.ink, modifier = Modifier.padding(top = 2.dp),
+        )
+        result.record.entry.summary.trim().takeIf { it.isNotBlank() }?.let { body ->
+            Text(
+                body.replace(Regex("\\s+"), " ").take(SUMMARY_CHARS),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 14.sp,
+                color = c.ink2, modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/** One or two lines of context under a result — enough to recognise it, not enough to read it here. */
+private const val SUMMARY_CHARS = 160

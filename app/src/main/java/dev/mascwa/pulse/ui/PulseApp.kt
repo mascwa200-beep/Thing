@@ -239,7 +239,22 @@ fun PulseApp(
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.search.SearchScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.search.SearchScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    // A guide opens at the guide, not at the list it happens to be in — the argumented
+                    // deep-link already exists for the survival-tip notifications. Everything else has
+                    // one screen that owns it, which is what RecordKind.route names.
+                    onOpen = { r ->
+                        navController.navigate(
+                            if (r.kind == dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE) {
+                                "${Routes.SURVIVAL}?guide=${r.id}"
+                            } else {
+                                r.kind.route
+                            },
+                        )
+                    },
+                )
             }
 
             // ---- Live radar + device telemetry (standalone, one tap from MENU) ----

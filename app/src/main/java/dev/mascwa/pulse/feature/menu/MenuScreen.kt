@@ -79,8 +79,8 @@ private val GROUPS = listOf(
         MenuEntry("Diary", "Your daily log", Routes.DIARY),
     )),
     MenuGroup("INTERNET", { it.positive }, listOf(
+        MenuEntry("Search", "This device first, then the web", Routes.SEARCH),
         MenuEntry("Social Feeds", "Lemmy, Mastodon and Hacker News", Routes.SOCIAL),
-        MenuEntry("Web Search", "Private web search", Routes.SEARCH),
     )),
     MenuGroup("SYSTEM", { it.muted }, listOf(
         MenuEntry("Settings", "Every switch and preference", Routes.SETTINGS),
