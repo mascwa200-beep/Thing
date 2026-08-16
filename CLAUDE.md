@@ -2805,6 +2805,78 @@ real density, and whether the advisory earns its place over a few days of real s
 from the LCARS palette since Phase 1.1), so what remains is a typeface difference on scattered
 one-off `Text`s, and the CI failure above proved the risk of sweeping them blind is real.
 
+### HOME LEADS WITH THE ORACLE (PR #432, merged `c63c811`)
+
+The learning shipped in #431 had almost nothing to learn from. Attribution needs an insight to be
+**seen** and then acted on, and outside the rarely-visited Advisories screen nothing was ever seen —
+the Oracle was reasoning across ~18 signal domains into a room with no one in it. Home's COMPUTER
+card now leads with the ranked read (urgency-coloured, tappable to the action route, `ALL ▸` to the
+full stream), replacing a line that read *"All systems nominal · BUILD n · ONLINE"* on every launch
+forever: the app's least informative row in its most valuable position. The usage heuristic drops to
+the **floor** rather than sitting beside it — the Oracle already eats usage rhythm as a signal, so
+showing both was showing a conclusion next to one of its own inputs.
+
+- **`read` gained a `visible` bound.** It recorded EVERY insight it produced regardless of what the
+  caller rendered. Home renders three of maybe eight; counting the other five as shown would drive
+  their hit rate toward the floor for want of screen space rather than want of usefulness, so the
+  statistic would stop measuring the thing it exists to measure. Re-ranking now happens **before**
+  recording, so "the first three" is the order actually rendered.
+- **Zero is a distinct case, not an empty list** — it skips learning altogether. Recording an empty
+  show would ALSO clear the pending attribution left by whichever surface last showed something, so
+  a speculative read landing between a show and the user acting on it would erase the evidence. The
+  `oracle` tool passes zero: what the model does with its output is unknowable from here.
+- **Found while wiring it:** `profileHighlight` and `taskFocus` were computed every load, passed to
+  the card, and **never read by it**. Gone rather than revived (the Oracle takes both as signals),
+  along with the two now-unused stores on the constructor. `urgencyColor` went private → internal so
+  Home and Advisories cannot drift — a duplicated palette is a mistake this app has corrected four times.
+
+### MARKETS LEARNS WHAT IT WAS ALREADY BEING HANDED (PR #433)
+
+MARKETS was the one bottom-nav tab never through a deepening arc, so I probed the live Yahoo chart
+endpoint the way the WEATHER rebuild did. **The first thing it turned up was a defect:**
+`meta.regularMarketOpen` **is not a key that endpoint returns**, so `Quote.open` has read null on
+every quote the app has ever shown. The open was in the response all along — the first price of the
+last daily candle, in an array the parser already reaches into for the closing series.
+
+⚠️ **That fix needs a guard, and the guard is the interesting part.** Before the bell the last candle
+is still *yesterday's*, so its open under a live price is a stale number with nothing marking it
+stale. `MarketSession.sameVenueDay` compares the candle against the venue's own timestamp on the last
+trade **on the exchange's calendar** (`Math.floorDiv`, not `/` — negatives must floor): a New York
+close is already tomorrow in Auckland, and the phone's midnight has no bearing on which session a
+print belongs to.
+
+Three more things were arriving and being discarded: the venue's **pre/regular/post windows** (so the
+screen can say whether the market is even open — it could not before, and a closed venue's price
+looks exactly like a live one, so the app implied freshness on every out-of-hours quote);
+`regularMarketTime`, the exchange's own timestamp on the last trade, distinct from the fetch time
+that was standing in for it; the **fifty-two-week extremes**; and the venue's own instrument name,
+exchange and quoted precision.
+
+- `core:telemetry/MarketSession.kt` (+20 tests) — phase, countdowns, range position, venue-day.
+  `Phase.UNKNOWN` rather than CLOSED when the session can't be established: CLOSED is a claim about a
+  venue, absent data is a claim about us, and they must not render the same.
+- Two new `MarketExplainers` (+ tests), each null when the fact can't be established.
+- The **row** shows the 52-week band only at or near an extreme and stays quiet through the broad
+  middle on purpose — a line that appears on every instrument stops being read.
+- `SessionHours` is a flat serializable mirror of the core's `Windows`, because `core:telemetry`
+  deliberately carries no serialization dependency. Every new `Quote` field is defaulted, so cached
+  quotes still decode; `mergeWithCache` replaces whole quotes by id so no stale field can mix in.
+
+**Method note worth keeping: one live `curl` at the endpoint found a bug that no amount of reading the
+code would have.** The parser and the model were internally consistent; only the wire disagreed. The
+container's Yahoo IP was NOT banned (the ban recorded earlier followed an 11-request burst) — a single
+probe is safe and was decisive. **Two fixture timestamps I wrote from recollection were wrong** (by
+two hours and by a day); computing them from the response before writing the assertions caught it.
+That is the same recurring habit CLAUDE.md already warns about, now on its eighth appearance.
+
+⚠️ **Owner-verify on the Pixel** for both arcs: three Oracle rows at real density and whether the
+insights that surface earn the top of Home (`ORACLE_ON_HOME` is one constant); the new explainer
+cards at dialog width; and whether the range line on a row is welcome or noise.
+
+**Same defect class, fixed straight after:** `QuoteRow`'s `L … · H …` line formatted at 2 decimals for
+every instrument, so an FX pair's day range rendered as "1.08 · 1.09" — rounding away exactly the
+digits that move. `formatPrice` already handled this for the price itself; the range line did not.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

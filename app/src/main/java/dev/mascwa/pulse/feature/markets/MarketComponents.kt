@@ -61,8 +61,12 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (quote.low != null && quote.high != null && type != WatchType.CRYPTO) {
+                // Four decimals for a currency pair, as [formatPrice] already does for the price
+                // itself. At two, a day's range on EURUSD renders as "1.08 · 1.09" — the digits that
+                // actually moved are the ones being rounded away.
+                val digits = if (type == WatchType.FOREX) 4 else 2
                 Text(
-                    "L ${Formatters.number(quote.low, 2)} · H ${Formatters.number(quote.high, 2)}",
+                    "L ${Formatters.number(quote.low, digits)} · H ${Formatters.number(quote.high, digits)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
