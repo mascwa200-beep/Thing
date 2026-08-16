@@ -79,7 +79,13 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                     if (list.isEmpty()) {
                         item {
                             Text(
-                                "All quiet — nothing needs you right now. The computer is watching.",
+                                // "Nothing needs you" would contradict the timeline below it when the
+                                // day has a departure in it. With one, this line is only claiming there
+                                // is nothing to act on *now*.
+                                if (state.dayAhead.isEmpty())
+                                    "All quiet — nothing needs you right now. The computer is watching."
+                                else
+                                    "Nothing needs you this minute. The rest of the day is below.",
                                 fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
                                 modifier = Modifier.padding(12.dp),
                             )
