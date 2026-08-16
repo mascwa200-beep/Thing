@@ -3258,6 +3258,19 @@ on an engine picker.
 appear, under their own headings, with the guide capped rather than crowding the page; tapping a
 guide should open that guide, not the list.
 
+### Notes and diary can be corrected (same PR)
+
+Verified while looking for the next arc: both surfaces were **add and delete only**. No edit. Search
+now indexes both, so finding the entry you wanted to fix got easy while fixing it stayed impossible.
+`NotesStore.update` / `DiaryStore.update` rewrite **in place** — the id stays stable (search results
+refer to entries by it) and so does the date: correcting a word does not make a note new, and
+re-dating a diary entry over a typo would be worse than not being able to correct it. Tapping a row
+opens it in the composer above; the button becomes SAVE CHANGES and a CANCEL appears.
+
+**Deliberately no cap added to either store.** Every sibling store caps itself, but those hold
+derived or observed data. These hold what the user wrote, and silently evicting someone's own
+writing to bound a blob is not a trade worth making.
+
 **Stale notes corrected — two of the three F-cleanup items no longer exist.** `PipUi.kt` (158 "dead"
 lines) is already deleted, and the general `SectionHeader` is gone too: the only match now is
 `ObjectiveSectionHeader`, which is a different function and is used. **The four private `SourceNote`
