@@ -23,6 +23,9 @@
     <color name="lcars_row_markets">#FFCC99</color>
     <color name="lcars_row_weather">#9999FF</color>
     <color name="lcars_row_agenda">#CC99CC</color>
+    <!-- Golden tanoi from the canonical block set; the one hue no other row tag uses, so all
+         six tags stay distinguishable at notification size. -->
+    <color name="lcars_row_advisory">#FFCC66</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

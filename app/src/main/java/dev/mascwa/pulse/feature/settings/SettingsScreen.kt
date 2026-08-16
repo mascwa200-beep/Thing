@@ -84,6 +84,7 @@ import dev.mascwa.pulse.data.settings.ThemeMode
 import dev.mascwa.pulse.data.settings.WatchItem
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.data.settings.WindUnit
+import dev.mascwa.pulse.feature.common.LcarsDialog
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.feature.economy.CountryPicker
@@ -357,29 +358,25 @@ fun SettingsScreen(
                     }
                 }
                 pendingWipe?.let { n ->
-                    AlertDialog(
-                        onDismissRequest = { pendingWipe = null },
-                        title = { Text("Arm device wipe?") },
-                        text = {
-                            Text(
-                                "After $n wrong unlock attempts, this device will FACTORY-RESET — erasing " +
-                                    "everything on it. This is an anti-theft measure and can't be undone once it " +
-                                    "triggers. Set it to Off any time to disarm.",
-                            )
+                    LcarsDialog(
+                        title = "Arm device wipe?",
+                        onDismiss = { pendingWipe = null },
+                        confirmText = "ARM WIPE",
+                        onConfirm = {
+                            if (dpc.setMaxFailedForWipe(n)) {
+                                wipeN = n; wipeError = false
+                                vm.recordDevicePolicy("wipe_after_fails", "$n")
+                            } else wipeError = true
+                            pendingWipe = null
                         },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                if (dpc.setMaxFailedForWipe(n)) {
-                                    wipeN = n; wipeError = false
-                                    vm.recordDevicePolicy("wipe_after_fails", "$n")
-                                } else wipeError = true
-                                pendingWipe = null
-                            }) { Text("Arm wipe") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { pendingWipe = null }) { Text("Cancel") }
-                        },
-                    )
+                        dismissText = "CANCEL",
+                    ) {
+                        DialogBody(
+                            "After $n wrong unlock attempts, this device will FACTORY-RESET — erasing " +
+                                "everything on it. This is an anti-theft measure and can't be undone once it " +
+                                "triggers. Set it to Off any time to disarm.",
+                        )
+                    }
                 }
             }
 
@@ -1097,6 +1094,12 @@ fun SettingsScreen(
                         s.jarvis.reflectionEnabled,
                     ) { v -> vm.update { it.copy(jarvis = it.jarvis.copy(reflectionEnabled = v)) } }
                     PrefClickable(
+                        "Clear what the Oracle learned",
+                        subtitle = "Forget which advisories you act on. The Oracle keeps a tally per rule " +
+                            "and ranks by it; clearing puts every rule back on equal footing. On-device only.",
+                        onClick = { vm.clearOracleLearning() },
+                    )
+                    PrefClickable(
                         "Clear episodic memory",
                         subtitle = "Forget the timestamped moments the computer remembers from your " +
                             "conversations (recalled by recency, importance & relevance). On-device only.",
@@ -1143,37 +1146,30 @@ fun SettingsScreen(
                     )
                 }
                 selfTest?.let { report ->
-                    AlertDialog(
-                        onDismissRequest = { vm.dismissLedgerSelfTest() },
-                        title = {
-                            Text(
-                                if (report.allOk) "Ledger self-test — all ${report.total} passed"
-                                else "Ledger self-test — ${report.passed}/${report.total} passed",
-                            )
-                        },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                report.checks.forEach { ch ->
-                                    Column {
-                                        Text(
-                                            "${if (ch.ok) "✓" else "✗"}  ${ch.name}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (ch.ok) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.error,
-                                        )
-                                        Text(
-                                            ch.detail,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                    LcarsDialog(
+                        title = if (report.allOk) "Self-test — all ${report.total} passed"
+                        else "Self-test — ${report.passed}/${report.total} passed",
+                        onDismiss = { vm.dismissLedgerSelfTest() },
+                        dismissText = "DONE",
+                    ) {
+                        // Read the palette here rather than reaching for an outer `c` — this
+                        // composable does not declare one, and nothing above it in this file does
+                        // either. That is the whole reason the remaining inline Material styles in
+                        // this screen are not being swept blind.
+                        val selfTestColors = Pulse.colors
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            report.checks.forEach { ch ->
+                                Column {
+                                    Text(
+                                        "${if (ch.ok) "✓" else "✗"}  ${ch.name}",
+                                        fontFamily = ChakraPetch, fontSize = 13.sp,
+                                        color = if (ch.ok) selfTestColors.positive else selfTestColors.negative,
+                                    )
+                                    DialogBody(ch.detail)
                                 }
                             }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { vm.dismissLedgerSelfTest() }) { Text("Done") }
-                        },
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -1294,18 +1290,18 @@ private fun TextEditDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text, onValueChange = { text = it }, singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
-            )
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+    LcarsDialog(
+        title = title,
+        onDismiss = onDismiss,
+        confirmText = "SAVE",
+        onConfirm = { onConfirm(text) },
+        dismissText = "CANCEL",
+    ) {
+        OutlinedTextField(
+            value = text, onValueChange = { text = it }, singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+        )
+    }
 }
 
 @Composable
@@ -1373,10 +1369,10 @@ private fun AddWatchRow(onAdd: (WatchItem) -> Unit) {
         var id by remember { mutableStateOf("") }
         var label by remember { mutableStateOf("") }
         var type by remember { mutableStateOf(WatchType.STOCK) }
-        AlertDialog(
-            onDismissRequest = { show = false },
-            title = { Text("Add to watchlist") },
-            text = {
+        LcarsDialog(
+            title = "Add to watchlist",
+            onDismiss = { show = false },
+            content = {
                 Column {
                     OutlinedTextField(id, { id = it }, label = { Text("Symbol / id") }, singleLine = true)
                     OutlinedTextField(label, { label = it }, label = { Text("Display name") }, singleLine = true)
@@ -1386,14 +1382,26 @@ private fun AddWatchRow(onAdd: (WatchItem) -> Unit) {
                     )
                 }
             },
-            confirmButton = {
-                TextButton(enabled = id.isNotBlank(), onClick = {
-                    onAdd(WatchItem(id.trim(), label.ifBlank { id }.trim(), type)); show = false
-                }) { Text("Add") }
+            confirmText = "ADD",
+            confirmEnabled = id.isNotBlank(),
+            onConfirm = {
+                onAdd(WatchItem(id.trim(), label.ifBlank { id }.trim(), type)); show = false
             },
-            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },
+            dismissText = "CANCEL",
         )
     }
+}
+
+/** Body copy inside a dialog — the app's own monospace, not Material's body style. */
+@Composable
+private fun DialogBody(text: String) {
+    Text(
+        text,
+        fontFamily = JetBrainsMono,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        color = Pulse.colors.ink2,
+    )
 }
 
 @Composable
@@ -1403,22 +1411,22 @@ private fun AddFeedRow(onAdd: (CustomFeed) -> Unit) {
     if (show) {
         var name by remember { mutableStateOf("") }
         var url by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { show = false },
-            title = { Text("Add RSS feed") },
-            text = {
+        LcarsDialog(
+            title = "Add RSS feed",
+            onDismiss = { show = false },
+            content = {
                 Column {
                     OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                     OutlinedTextField(url, { url = it }, label = { Text("Feed URL") }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Uri))
                 }
             },
-            confirmButton = {
-                TextButton(enabled = url.startsWith("http"), onClick = {
-                    onAdd(CustomFeed(name.ifBlank { url }, url.trim())); show = false
-                }) { Text("Add") }
+            confirmText = "ADD",
+            confirmEnabled = url.startsWith("http"),
+            onConfirm = {
+                onAdd(CustomFeed(name.ifBlank { url }, url.trim())); show = false
             },
-            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },
+            dismissText = "CANCEL",
         )
     }
 }
@@ -1430,23 +1438,23 @@ private fun AddContactRow(onAdd: (dev.mascwa.pulse.data.settings.EmergencyContac
     if (show) {
         var name by remember { mutableStateOf("") }
         var phone by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { show = false },
-            title = { Text("Add contact") },
-            text = {
+        LcarsDialog(
+            title = "Add contact",
+            onDismiss = { show = false },
+            content = {
                 Column {
                     OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                     OutlinedTextField(phone, { phone = it }, label = { Text("Phone") }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone))
                 }
             },
-            confirmButton = {
-                TextButton(enabled = phone.isNotBlank(), onClick = {
-                    onAdd(dev.mascwa.pulse.data.settings.EmergencyContact(name.ifBlank { phone }.trim(), phone.trim()))
-                    show = false
-                }) { Text("Add") }
+            confirmText = "ADD",
+            confirmEnabled = phone.isNotBlank(),
+            onConfirm = {
+                onAdd(dev.mascwa.pulse.data.settings.EmergencyContact(name.ifBlank { phone }.trim(), phone.trim()))
+                show = false
             },
-            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancel") } },
+            dismissText = "CANCEL",
         )
     }
 }

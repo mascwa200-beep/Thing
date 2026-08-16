@@ -40,6 +40,7 @@ class SettingsViewModel(
     private val wifi: dev.mascwa.pulse.security.WifiPolicyController,
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
+    private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
 ) : ViewModel() {
 
     private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
@@ -296,6 +297,11 @@ class SettingsViewModel(
         viewModelScope.launch { tasks.clear() }
     }
 
+    /** Forget which advisories the user acts on — every Oracle rule back to equal footing. */
+    fun clearOracleLearning() {
+        viewModelScope.launch { oracleLearning.clear() }
+    }
+
     /** Forget the episodic memory stream (timestamped observations & reflections). */
     fun clearMemoryStream() {
         viewModelScope.launch { memoryStream.clear() }
@@ -344,16 +350,20 @@ class SettingsViewModel(
                     "Your top story appears here — Sample Source",
                 ),
                 dev.mascwa.pulse.core.telemetry.BriefRow(
-                    dev.mascwa.pulse.core.telemetry.BriefRowKind.MARKETS,
-                    "NVDA +4.8% · TSLA -3.2% (+1 more)",
-                ),
-                dev.mascwa.pulse.core.telemetry.BriefRow(
                     dev.mascwa.pulse.core.telemetry.BriefRowKind.WEATHER,
                     "72°F now · Cloudy · High 78 / Low 61",
                 ),
                 dev.mascwa.pulse.core.telemetry.BriefRow(
                     dev.mascwa.pulse.core.telemetry.BriefRowKind.AGENDA,
                     "Dentist in 1h 40m · 3 tasks open · 2 reminders set",
+                ),
+                // ADVISORY in the MARKETS seat, which is exactly what a real six-row board looks
+                // like after the composer trims it. The layout has five slots and the renderer takes
+                // the first five, so a six-row sample would silently drop this row — the one row
+                // this button now exists to show.
+                dev.mascwa.pulse.core.telemetry.BriefRow(
+                    dev.mascwa.pulse.core.telemetry.BriefRowKind.ADVISORY,
+                    "Leave in 10 min — 4.2 km to the dentist and rain from 08:40",
                 ),
             ),
             urgency = dev.mascwa.pulse.core.telemetry.BriefUrgency.YELLOW,

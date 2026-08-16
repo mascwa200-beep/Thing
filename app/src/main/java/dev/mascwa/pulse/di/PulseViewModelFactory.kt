@@ -70,8 +70,6 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository, c.settingsRepository, c.tuneInRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.notes.NotesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.notes.NotesViewModel(c.notesStore)
-            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.tasks.TasksViewModel::class.java) ->
-                dev.mascwa.pulse.feature.tasks.TasksViewModel(c.taskStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diary.DiaryViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diary.DiaryViewModel(c.diaryStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.spotify.SpotifyViewModel::class.java) ->
@@ -98,7 +96,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest)
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest, c.oracleLearningStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter, c.debugUploader)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.security.SecurityAuditViewModel::class.java) ->

@@ -20,6 +20,13 @@ class OracleViewModel(private val container: AppContainer) : ViewModel() {
         val insights: List<Insight> = emptyList(),
         val briefing: String = "",
         val updatedMs: Long = 0L,
+        /**
+         * What the Oracle has learned about which of its own rules you act on.
+         *
+         * Surfaced rather than left to work invisibly: a ranking that quietly reshapes itself is
+         * indistinguishable from a ranking that is drifting, and the user is owed the difference.
+         */
+        val learned: String = "",
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -34,10 +41,12 @@ class OracleViewModel(private val container: AppContainer) : ViewModel() {
             val insights = if (settings != null)
                 runCatching { OracleEngine.read(container, settings) }.getOrDefault(emptyList())
             else emptyList()
+            val learned = runCatching { container.oracleLearningStore.summary() }.getOrDefault("")
             _state.update {
                 it.copy(
                     loading = false, insights = insights,
                     briefing = Oracle.briefing(insights), updatedMs = System.currentTimeMillis(),
+                    learned = learned,
                 )
             }
         }

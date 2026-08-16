@@ -34,6 +34,7 @@
     <string name="notif_row_markets">MARKET</string>
     <string name="notif_row_weather">WEATHER</string>
     <string name="notif_row_agenda">AGENDA</string>
+    <string name="notif_row_advisory">ADVISE</string>
 
     <!-- Live data-feed widget -->
     <string name="widget_feed_label">LCARS Live Feed</string>

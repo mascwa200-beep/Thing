@@ -103,6 +103,11 @@ class AppContainer(private val appContext: Context) {
     val taskStore: dev.mascwa.pulse.data.tasks.TaskStore by lazy {
         dev.mascwa.pulse.data.tasks.TaskStore(appContext, json)
     }
+
+    /** What the Oracle has learned about which of its own rules you actually act on. */
+    val oracleLearningStore: dev.mascwa.pulse.data.oracle.OracleLearningStore by lazy {
+        dev.mascwa.pulse.data.oracle.OracleLearningStore(appContext, json)
+    }
     /** Real calendar (on-device only) — feeds ORACLE's calendar-aware signal. */
     val calendarRepository: dev.mascwa.pulse.data.calendar.CalendarRepository by lazy {
         dev.mascwa.pulse.data.calendar.CalendarRepository(appContext)
@@ -437,6 +442,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.UsageInsightsTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.ActivityLogTool(usageRepository),
             dev.mascwa.pulse.jarvis.agent.EnvironmentTool(sensoriumEngine, sensoriumStore),
+            dev.mascwa.pulse.jarvis.agent.OracleTool(this, oracleLearningStore),
             dev.mascwa.pulse.jarvis.agent.ReflexTool(cerebellumStore),
             dev.mascwa.pulse.jarvis.agent.ProcedureTool(procedureStore),
             dev.mascwa.pulse.jarvis.agent.ProfileTool(profileStore),

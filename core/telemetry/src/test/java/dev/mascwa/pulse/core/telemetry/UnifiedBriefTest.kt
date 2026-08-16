@@ -204,4 +204,82 @@ class UnifiedBriefTest {
         assertTrue(row.text.contains("21°C now"))
         assertTrue(row.text.contains("Cloudy"))
     }
+
+    // ---- ADVISORY: the Oracle's call to action, back on the board ----
+
+    @Test fun advisoryRendersLastAndFitsWithoutDisplacingAnything() {
+        // routine() has no ALERT, so its four rows plus an advisory come to exactly five — the
+        // layout's capacity. Nothing is displaced; the advisory simply sits last.
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(advisory = "Leave in 10 min — 4.2 km and rain at 08:40"),
+        )!!
+        assertEquals(
+            listOf(
+                BriefRowKind.NEWS, BriefRowKind.MARKETS, BriefRowKind.WEATHER,
+                BriefRowKind.AGENDA, BriefRowKind.ADVISORY,
+            ),
+            b.rows.map { it.kind },
+        )
+        assertEquals("Leave in 10 min — 4.2 km and rain at 08:40", b.row(BriefRowKind.ADVISORY)!!.text)
+    }
+
+    @Test fun aSixthRowTakesMarketsSeatRatherThanOverflowing() {
+        // ALERT + the four routine rows + ADVISORY is six. The layout has exactly five slots and the
+        // renderer takes the first five — overflow would silently drop ADVISORY, which is last.
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(reminderNow = "call the dentist", advisory = "Charge now — 12% left"),
+        )!!
+        assertEquals(
+            listOf(
+                BriefRowKind.ALERT, BriefRowKind.NEWS, BriefRowKind.WEATHER,
+                BriefRowKind.AGENDA, BriefRowKind.ADVISORY,
+            ),
+            b.rows.map { it.kind },
+        )
+        assertNull(b.row(BriefRowKind.MARKETS))
+    }
+
+    @Test fun noAdvisoryMeansNoSixthRow() {
+        // The everyday shape is five rows; the caller passes an advisory only when one is earned.
+        assertNull(UnifiedBriefComposer.compose(routine())!!.row(BriefRowKind.ADVISORY))
+        assertNull(UnifiedBriefComposer.compose(routine().copy(advisory = "   "))!!.row(BriefRowKind.ADVISORY))
+    }
+
+    @Test fun anAdvisoryOutranksTheNewsForTheCollapsedLine() {
+        // The bar for passing one is high, so if it is here it beats reporting what merely happened.
+        val b = UnifiedBriefComposer.compose(routine().copy(advisory = "Charge now — 12% and 3 stops today"))!!
+        assertEquals("Charge now — 12% and 3 stops today", b.headline)
+    }
+
+    @Test fun anAlertStillOutranksAnAdvisory() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(reminderNow = "call the dentist", advisory = "Charge now — 12% left"),
+        )!!
+        assertEquals("Reminder — call the dentist", b.headline)
+        assertNotNull(b.row(BriefRowKind.ADVISORY))
+    }
+
+    @Test fun anAdvisoryAloneStillComposesABoard() {
+        val b = UnifiedBriefComposer.compose(
+            BriefSignals(nowMs = NOW, advisory = "Aurora likely tonight — look north after 22:00"),
+        )!!
+        assertEquals(listOf(BriefRowKind.ADVISORY), b.rows.map { it.kind })
+        assertEquals("Aurora likely tonight — look north after 22:00", b.headline)
+    }
+
+    @Test fun anAdvisoryNeverRaisesTheAlertCondition() {
+        // A suggestion, however well reasoned, is not an emergency. What buzzes is the notice chain.
+        val b = UnifiedBriefComposer.compose(routine().copy(advisory = "Leave now — traffic on your route"))!!
+        assertEquals(BriefUrgency.ROUTINE, b.urgency)
+        assertNull(b.urgencyKey)
+    }
+
+    @Test fun aLongAdvisoryIsCappedWithAnEllipsis() {
+        // ADVISORY_CAP is 110; cap() keeps 109 chars then appends the ellipsis, so 110 total.
+        val long = "x".repeat(200)
+        val text = UnifiedBriefComposer.compose(routine().copy(advisory = long))!!
+            .row(BriefRowKind.ADVISORY)!!.text
+        assertEquals(110, text.length)
+        assertTrue(text.endsWith("…"))
+    }
 }

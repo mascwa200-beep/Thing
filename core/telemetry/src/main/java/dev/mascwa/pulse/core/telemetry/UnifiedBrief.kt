@@ -7,8 +7,10 @@ import kotlin.math.roundToInt
  * THE one notification — the ship's whole situation board as a single LCARS brief.
  *
  * The app posts exactly one notification (one fixed id), refreshed in place: a collapsed [headline] +
- * always-on temperature chip, and up to five fixed-order rows — ALERT · NEWS · MARKETS · WEATHER · AGENDA —
- * each one plain sentence, no jargon, no emoji, readable at a glance by anyone. Urgency rides the Star Trek
+ * always-on temperature chip, and fixed-order rows — ALERT · NEWS · MARKETS · WEATHER · AGENDA · ADVISORY —
+ * each one plain sentence, no jargon, no emoji, readable at a glance by anyone. Five is the everyday
+ * shape; ADVISORY is the exception, and the caller is expected to pass one only when the Oracle has
+ * something genuinely worth acting on. Urgency rides the Star Trek
  * alert-condition convention: [BriefUrgency.RED]/[BriefUrgency.YELLOW] make the single notification re-post
  * on an alerting channel exactly once per new [UnifiedBrief.urgencyKey]; ROUTINE refreshes stay silent.
  *
@@ -21,8 +23,13 @@ import kotlin.math.roundToInt
 /** Maps 1:1 onto the app's notification AlertCondition (ROUTINE/YELLOW/RED). */
 enum class BriefUrgency { ROUTINE, YELLOW, RED }
 
-/** The fixed row order of the board. ALERT is only present when something is genuinely alert-worthy. */
-enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA }
+/**
+ * The fixed row order of the board. ALERT is only present when something is genuinely alert-worthy.
+ *
+ * ADVISORY is last because the board reads facts first and what to do about them second — every row
+ * above it reports the world, and that one reports the Oracle's judgement of it.
+ */
+enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA, ADVISORY }
 
 data class BriefRow(val kind: BriefRowKind, val text: String)
 
@@ -81,6 +88,17 @@ data class BriefSignals(
     val safetyNotice: String? = null,
     val safetyKey: String? = null,
     val opsNotice: String? = null,
+    /**
+     * The Oracle's single most important call to action, already filtered by the caller.
+     *
+     * The composer does not reason — it renders what it is handed. The bar for passing one lives at
+     * the call site, which is the only place that knows the insight's urgency, and it is deliberately
+     * high so this stays the exceptional sixth row rather than a permanent fixture.
+     *
+     * ⚠️ **An advisory never raises the alert condition.** What buzzes the phone is decided by the
+     * notice chain above; a suggestion, however well reasoned, is not an emergency.
+     */
+    val advisory: String? = null,
     // Per-row visibility (the user's Settings toggles).
     val showNews: Boolean = true,
     val showMarkets: Boolean = true,
@@ -93,6 +111,12 @@ object UnifiedBriefComposer {
     /** Longest collapsed headline; the expanded rows carry their own caps. */
     private const val HEADLINE_CAP = 90
     private const val NEWS_CAP = 80
+
+    /** Roomier than a news line: an advisory carries a reason and an action, and both must survive. */
+    private const val ADVISORY_CAP = 110
+
+    /** The expanded notification layout has exactly this many row slots. See [trimToFive]. */
+    private const val MAX_ROWS = 5
 
     /** Null when there is genuinely nothing to say — the caller cancels the notification. */
     fun compose(s: BriefSignals): UnifiedBrief? {
@@ -151,11 +175,20 @@ object UnifiedBriefComposer {
         // --- AGENDA: next event, else the top task; plus open-task and set-reminder counts. ---
         if (s.showAgenda) agendaText(s)?.let { rows += BriefRow(BriefRowKind.AGENDA, it) }
 
-        if (rows.isEmpty()) return null
+        // --- ADVISORY: the Oracle's call to action, when the caller judged one worth the space. ---
+        s.advisory?.takeIf { it.isNotBlank() }
+            ?.let { rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP)) }
 
-        // The collapsed line: the most consequential row wins, in fixed preference order.
-        val headline = listOf(BriefRowKind.ALERT, BriefRowKind.NEWS, BriefRowKind.AGENDA, BriefRowKind.WEATHER, BriefRowKind.MARKETS)
-            .firstNotNullOf { kind -> rows.firstOrNull { it.kind == kind } }.text
+        if (rows.isEmpty()) return null
+        trimToFive(rows)
+
+        // The collapsed line: the most consequential row wins, in fixed preference order. ADVISORY
+        // sits second because the bar for passing one is already high — if the Oracle has reasoned
+        // its way to something you should do now, that outranks reporting what merely happened.
+        val headline = listOf(
+            BriefRowKind.ALERT, BriefRowKind.ADVISORY, BriefRowKind.NEWS,
+            BriefRowKind.AGENDA, BriefRowKind.WEATHER, BriefRowKind.MARKETS,
+        ).firstNotNullOf { kind -> rows.firstOrNull { it.kind == kind } }.text
 
         return UnifiedBrief(
             headline = cap(headline, HEADLINE_CAP),
@@ -164,6 +197,26 @@ object UnifiedBriefComposer {
             urgency = urgency,
             urgencyKey = if (urgency == BriefUrgency.ROUTINE) null else urgencyKey,
         )
+    }
+
+    /**
+     * The board shows five rows, so an advisory takes a seat rather than adding one.
+     *
+     * ⚠️ This is not cosmetic. The expanded notification layout has exactly five row slots and the
+     * renderer takes the first five — a sixth row would be silently dropped, and since ADVISORY is
+     * last in row order it would be the row dropped. Doing the selection here keeps the renderer
+     * dumb and makes the choice testable.
+     *
+     * Markets go first: of everything on the board it is the one thing that is purely informational
+     * and unchanged by knowing it a refresh later. ALERT and ADVISORY are never dropped — one is the
+     * reason the board is interrupting and the other is the reason it earned the extra line.
+     */
+    private fun trimToFive(rows: MutableList<BriefRow>) {
+        val droppable = listOf(BriefRowKind.MARKETS, BriefRowKind.NEWS, BriefRowKind.WEATHER, BriefRowKind.AGENDA)
+        for (kind in droppable) {
+            if (rows.size <= MAX_ROWS) return
+            rows.removeAll { it.kind == kind }
+        }
     }
 
     private fun marketsText(s: BriefSignals): String? {

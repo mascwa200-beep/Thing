@@ -2718,6 +2718,17 @@ copies, and `settings/` holding 68 of 111 remaining `MaterialTheme` refs behind 
 **Flag to the owner, not guessed at:** `Routes.SURVIVE` is unreachable from any in-app UI (deep-link
 only), and `TasksViewModel` is built by the factory with no screen.
 
+**Merged to `main` as `b77d43f` (PR #430), CI-green through run 1577** — unit tests, release APK, and
+the publish to `latest` all passed. The dev branch is re-synced by merging `origin/main` back (my
+authorship, never a fast-forward onto GitHub's squash commit).
+
+**Two operational notes from this run.** Direct `curl` to the GitHub API is **blocked in this
+environment** (the proxy returns 403 — "GitHub access is not enabled for this session"); only the MCP
+tools reach it, so a background poll loop built on `curl` silently never works. And
+`list_workflow_runs` returns a payload far over the tool's token limit even at `per_page: 1`, while
+**`list_workflow_jobs` is small and gives per-step status** — it is the call to poll with, and it
+shows whether the compile step specifically has passed.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
