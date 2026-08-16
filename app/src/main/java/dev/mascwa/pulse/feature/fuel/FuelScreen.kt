@@ -96,6 +96,28 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
                             items(data!!.nationalPrices, key = { it.fuel }) { PumpPriceCard(it) }
                         }
 
+                        // Why there are no pump prices, when there are none.
+                        //
+                        // The benchmarks above are worldwide crude and gas contracts; what a driver
+                        // actually pays is national, and the two sources for that are both narrow —
+                        // the World Bank retired its pump-price indicators (both now answer
+                        // "indicator not found"), and the EIA covers the United States and needs a
+                        // key. Without a word, the section simply is not there, and an absence with
+                        // no reason reads as a fault rather than a limit.
+                        if (data?.nationalPrices.isNullOrEmpty() && data?.usRetail.isNullOrEmpty()) {
+                            item {
+                                Text(
+                                    "No pump prices for your country. The benchmarks above are the " +
+                                        "worldwide crude and gas contracts that drive them — the " +
+                                        "free source for national averages was retired, and the US " +
+                                        "figures need an EIA key in Settings.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                )
+                            }
+                        }
+
                         if (!data?.usRetail.isNullOrEmpty()) {
                             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
                             item { SectionLabel("US weekly retail (EIA)") }
