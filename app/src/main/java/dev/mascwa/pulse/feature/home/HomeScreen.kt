@@ -53,8 +53,9 @@ import androidx.compose.ui.geometry.Size
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.NeonPanel
-import dev.mascwa.pulse.feature.common.cyberTag
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
+import dev.mascwa.pulse.feature.oracle.urgencyColor
+import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.mascwa.pulse.feature.common.SectionBar
@@ -176,9 +177,9 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // (J.A.R.V.I.S. now lives in the bottom nav — the Home quick card was removed so there's
                 // a single shortcut to the console.)
 
-                // J.A.R.V.I.S. status feed — always present (J.A.R.V.I.S. is "always watching"): diagnostics
-                // + the user's monitoring focus + usage-based educated guesses. Never chat content.
-                item { ForYouCard(state.recommendations, state.profileHighlight, state.taskFocus, nav.openRoute) }
+                // The Computer's feed — always present: the Oracle's cross-signal foresight first,
+                // then the monitoring focus. Never chat content.
+                item { ForYouCard(state.insights, state.recommendations, nav.openRoute) }
 
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
@@ -380,16 +381,14 @@ private fun SkyDigestCard(lines: List<String>, onClick: () -> Unit = {}) {
 
 @Composable
 private fun ForYouCard(
+    insights: List<dev.mascwa.pulse.core.telemetry.Insight>,
     recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation>,
-    profileHighlight: String?,
-    taskFocus: String?,
     openRoute: (String) -> Unit,
 ) {
     val c = Pulse.colors
-    // The J.A.R.V.I.S. card reads the palette's `sky` accent slot — its own distinguishing hue within the
+    // The Computer's card reads the palette's `sky` accent slot — its own distinguishing hue within the
     // one app-wide LCARS palette, not a separate hardcoded colour — for a professional, non-chat status
-    // briefing. It NEVER surfaces chat content: only operational awareness — usage-based educated guesses,
-    // the user's chosen monitoring focus, and APK/internal diagnostics.
+    // briefing. It NEVER surfaces chat content: only operational awareness.
     val hud = c.sky
     val topic = LocalJarvisFeedTopic.current
     NeonPanel(
@@ -413,24 +412,50 @@ private fun ForYouCard(
                 )
                 Box(Modifier.weight(1f).height(1.dp).background(hud.copy(alpha = 0.35f)))
                 Text(
-                    "ONLINE · ${cyberTag("jarvis")}",
-                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = c.muted,
+                    "ALL ▸",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp, color = hud,
+                    modifier = Modifier.clickable { openRoute(Routes.ORACLE) },
                 )
             }
-            // APK / internal diagnostics — a professional status line (no chat).
-            QuestFeedRow(
-                "▸", "All systems nominal",
-                "DIAGNOSTICS · BUILD ${dev.mascwa.pulse.BuildConfig.VERSION_CODE} · ONLINE",
-                c.ink, hud, c,
-            )
-            // The user's chosen briefing focus (Settings) — what J.A.R.V.I.S. should keep an eye on.
+            // The Oracle: what it wants you to know right now, in its own ranked order, coloured by
+            // urgency and tappable straight through to whatever acts on it.
+            //
+            // This is deliberately the top of the card. The line that used to sit here read "All
+            // systems nominal · BUILD n · ONLINE" on every launch forever — the app's least
+            // informative row, in its most valuable position.
+            insights.forEach { ins ->
+                val route = ins.actionRoute?.takeIf { it.isNotBlank() }
+                QuestFeedRow(
+                    marker = "◈",
+                    title = ins.title,
+                    sub = ins.detail,
+                    titleColor = c.ink,
+                    blade = urgencyColor(ins.urgency),
+                    c = c,
+                    onClick = if (route != null) ({ openRoute(route) }) else null,
+                )
+            }
+            // The user's chosen briefing focus (Settings) — what the Computer should keep an eye on.
             if (topic.isNotBlank()) {
                 QuestFeedRow("◆", topic, "MONITORING · BRIEFING FOCUS", hud, hud, c) { openRoute("jarvis") }
             }
-            // Usage-based educated guesses — the "always watching" awareness (what you use, when).
-            recommendations.forEach { rec ->
-                val rk = rec.routeKey
-                QuestFeedRow("◇", rec.headline, rec.detail, c.ink, hud, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
+            // The usage heuristic, as the floor rather than a peer.
+            //
+            // The Oracle already consumes your usage rhythm as one of its ~18 signals, so showing
+            // both at once would be showing a conclusion beside one of its own inputs. It earns a
+            // row only when the Oracle has nothing — a fresh install, or a genuinely quiet moment —
+            // so the card is never empty.
+            if (insights.isEmpty()) {
+                recommendations.forEach { rec ->
+                    val rk = rec.routeKey
+                    QuestFeedRow("◇", rec.headline, rec.detail, c.ink, hud, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
+                }
+                if (recommendations.isEmpty()) {
+                    QuestFeedRow(
+                        "▸", "All quiet — nothing needs you right now",
+                        "STANDING BY · ADVISORIES", c.ink2, hud, c,
+                    ) { openRoute(Routes.ORACLE) }
+                }
             }
         }
     }
