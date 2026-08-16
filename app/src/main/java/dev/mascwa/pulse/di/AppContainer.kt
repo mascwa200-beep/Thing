@@ -455,6 +455,9 @@ class AppContainer(private val appContext: Context) {
             // The app's own world, which the console could previously only reach by searching the web
             // for what was already sitting in these repositories.
             dev.mascwa.pulse.jarvis.agent.LibraryTool(survivalContentRepository),
+            // One question — "what do I know about X" — over every store at once, so answering it
+            // does not mean guessing which one holds the answer and guessing again when wrong.
+            dev.mascwa.pulse.jarvis.agent.DeviceSearchTool(this),
             dev.mascwa.pulse.jarvis.agent.MarketsTool(marketsRepository),
             dev.mascwa.pulse.jarvis.agent.NewsTool(newsRepository),
             dev.mascwa.pulse.jarvis.agent.DayTool(this, settingsRepository),
