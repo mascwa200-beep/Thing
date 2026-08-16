@@ -194,15 +194,16 @@ object EmergencyTriage {
             cues = listOf("in shock", "going into shock", "pale clammy", "cold and clammy"),
         ),
 
-        // ---- recognised, not yet covered ----------------------------------------------------------
-        // These route to the first action and say plainly that the library has no page. Offering the
-        // nearest lexical match instead is how "seizure" ends up answered by an article on osmosis.
+        // ---- the protocols written for this arc ---------------------------------------------------
+        // These four had no page anywhere in the library -- not in a title, a summary or a heading --
+        // which is why they were answered by articles on osmosis, two-stroke engines and soap-making.
         Emergency(
             id = "seizure",
             label = "Seizure",
             firstAction = "Do not restrain them and do not put anything in their mouth. Move hard " +
                 "objects away, cushion the head, and time it. $CALL if it lasts over five minutes, " +
                 "repeats, or they do not wake up afterwards.",
+            guideId = "med-seizure-first-aid", section = "What to do while it is happening",
             cues = listOf("seizure", "seizing", "convulsing", "convulsion", "having a fit", "epileptic fit", "epilepsy"),
         ),
         Emergency(
@@ -210,6 +211,7 @@ object EmergencyTriage {
             label = "Head injury",
             firstAction = "$CALL if they lost consciousness, are confused, vomiting, or worsening. " +
                 "Keep them still and do not let them sleep it off unwatched.",
+            guideId = "med-head-injury-concussion", section = "The red flags that mean call now",
             cues = listOf("head injury", "concussion", "hit their head", "hit his head", "hit her head", "banged head"),
         ),
         Emergency(
@@ -217,6 +219,7 @@ object EmergencyTriage {
             label = "Electric shock",
             firstAction = "Do not touch them until the power is off. Cut the supply at the source, " +
                 "then $CALL",
+            guideId = "med-electric-shock", section = "Do not touch them",
             cues = listOf("electric shock", "electrocuted", "electrocution", "shocked by electricity", "touched a live wire"),
         ),
         Emergency(
@@ -224,6 +227,7 @@ object EmergencyTriage {
             label = "Heat stroke",
             firstAction = "$CALL Move them into shade, cool them aggressively — water on the skin, " +
                 "fanning, ice at the neck, armpits and groin.",
+            guideId = "med-heat-stroke-illness", section = "Cooling, properly and fast",
             cues = listOf("heat stroke", "heatstroke", "heat exhaustion", "overheating collapsed", "too hot collapsed"),
         ),
         Emergency(

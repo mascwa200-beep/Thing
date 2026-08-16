@@ -10433,6 +10433,63 @@
    "file": "guides_medical.json"
   },
   {
+   "id": "med-seizure-first-aid",
+   "title": "Seizures: What To Do While One Is Happening",
+   "category": "Medical",
+   "summary": "How to recognise a seizure, what to do and what never to do while it is happening, how to care for someone afterwards, and exactly when a seizure becomes an emergency that needs an ambulance.",
+   "headings": [
+    "What a seizure actually looks like",
+    "What to do while it is happening",
+    "What never to do",
+    "After it stops: the recovery period",
+    "When a seizure is an emergency",
+    "If seizures are part of your life, or someone's near you"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "med-head-injury-concussion",
+   "title": "Head Injury and Concussion: What To Watch For",
+   "category": "Medical",
+   "summary": "How to tell an ordinary bump on the head from one that needs a hospital, the red flags that mean call an ambulance now, why the old advice about keeping someone awake was wrong, and how to recover from a concussion without making it worse.",
+   "headings": [
+    "Recognising a concussion",
+    "What to do in the first hour",
+    "The red flags that mean call now",
+    "Myths that get people hurt",
+    "Recovering without making it worse"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "med-electric-shock",
+   "title": "Electric Shock: Making It Safe Before You Help",
+   "category": "Medical",
+   "summary": "Why the first move is never to touch the casualty, how to isolate the power safely, what an electrical injury does that you cannot see, and why someone who feels fine after a shock may still need a hospital.",
+   "headings": [
+    "Do not touch them",
+    "What the current does that you cannot see",
+    "Treating them once it is safe",
+    "When a shock needs a hospital",
+    "Preventing the next one"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "med-heat-stroke-illness",
+   "title": "Heat Stroke and Heat Illness: Cooling Comes First",
+   "category": "Medical",
+   "summary": "The difference between heat exhaustion and heat stroke, why confusion is the sign that changes everything, how to cool someone properly and fast, and why for heat stroke you cool first and transport second.",
+   "headings": [
+    "Heat exhaustion and heat stroke are not the same thing",
+    "Cooling, properly and fast",
+    "Fluids, and when not to give them",
+    "Who is at risk, and the ones people forget",
+    "Staying ahead of the heat"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
    "id": "uphill-walking-technique-and-breathing",
    "title": "Uphill Walking Technique and Breathing",
    "category": "Movement",

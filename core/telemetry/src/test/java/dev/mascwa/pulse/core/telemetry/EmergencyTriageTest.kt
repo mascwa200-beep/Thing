@@ -84,14 +84,26 @@ class EmergencyTriageTest {
      */
     @Test
     fun anUncoveredEmergencyGivesTheActionAndAdmitsTheGap() {
-        val seizure = EmergencyTriage.match("epileptic fit")
-        assertNotNull(seizure)
-        assertFalse(seizure!!.covered)
-        assertTrue(seizure.firstAction.isNotBlank())
+        // Low blood sugar is the one recognised emergency with no protocol page written for it yet.
+        val hypo = EmergencyTriage.match("low blood sugar")
+        assertNotNull(hypo)
+        assertFalse(hypo!!.covered)
+        assertTrue(hypo.firstAction.isNotBlank())
 
-        val brief = EmergencyTriage.brief(seizure)
+        val brief = EmergencyTriage.brief(hypo)
         assertTrue("must state the gap: $brief", brief.contains("no page on this yet"))
-        assertTrue("must not restrain is the whole point", brief.contains("Do not restrain"))
+        assertTrue("the action is to give sugar", brief.contains("give sugar"))
+    }
+
+    /** Seizure had no page in the library and now has one; it must route rather than apologise. */
+    @Test
+    fun theNewlyWrittenProtocolsAreRoutedNotApologisedFor() {
+        for (q in listOf("epileptic fit", "he hit his head", "electrocuted", "heat stroke")) {
+            val e = EmergencyTriage.match(q)
+            assertNotNull("$q no longer matches", e)
+            assertTrue("$q should now route to a protocol", e!!.covered)
+            assertFalse(EmergencyTriage.brief(e).contains("no page on this yet"))
+        }
     }
 
     @Test
