@@ -91,6 +91,39 @@ class NotesStore(
         return note
     }
 
+    /**
+     * Rewrite an entry in place, keeping its id and the date it was written.
+     *
+     * Editing is not a delete-and-re-add: that would move the note to the top of its category and
+     * restamp it as written today, which is wrong — fixing a typo does not make the note new. It also
+     * keeps the id stable, which matters now that search results and the assistant refer to notes by
+     * it. Returns null if the id is unknown or the edit would leave nothing behind.
+     */
+    suspend fun update(id: String, title: String, body: String, category: String): Note? {
+        val t = title.trim()
+        val b = body.trim()
+        if (t.isBlank() && b.isBlank()) return null
+        ensureLoaded()
+        var edited: Note? = null
+        mutex.withLock {
+            val after = (notes ?: emptyList()).map { n ->
+                if (n.id != id) n else {
+                    n.copy(
+                        title = t.ifBlank { b.take(40) },
+                        body = b,
+                        category = category.trim().ifBlank { n.category }.uppercase(),
+                    ).also { edited = it }
+                }
+            }
+            if (edited != null) {
+                notes = after
+                _notesFlow.value = after
+            }
+        }
+        if (edited != null) scheduleFlush()
+        return edited
+    }
+
     /** Remove an entry by id. */
     suspend fun remove(id: String) {
         ensureLoaded()

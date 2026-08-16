@@ -92,6 +92,35 @@ class DiaryStore(
         return entry
     }
 
+    /**
+     * Rewrite an entry in place, keeping its id and the date it was written.
+     *
+     * A diary is chronological, so re-dating an entry because a word in it was corrected would be
+     * worse than not being able to correct it at all. Returns null if the id is unknown or the edit
+     * would leave nothing behind.
+     */
+    suspend fun update(id: String, title: String, body: String, mood: String = ""): DiaryEntry? {
+        val t = title.trim()
+        val b = body.trim()
+        if (t.isBlank() && b.isBlank()) return null
+        ensureLoaded()
+        var edited: DiaryEntry? = null
+        mutex.withLock {
+            val after = (entries ?: emptyList()).map { e ->
+                if (e.id != id) e else {
+                    e.copy(title = t.ifBlank { b.take(40) }, body = b, mood = mood.trim())
+                        .also { edited = it }
+                }
+            }
+            if (edited != null) {
+                entries = after
+                _entriesFlow.value = after
+            }
+        }
+        if (edited != null) scheduleFlush()
+        return edited
+    }
+
     /** Remove an entry by id. */
     suspend fun remove(id: String) {
         ensureLoaded()

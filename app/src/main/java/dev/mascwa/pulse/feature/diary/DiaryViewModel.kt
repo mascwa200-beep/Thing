@@ -27,6 +27,11 @@ class DiaryViewModel(private val store: DiaryStore) : ViewModel() {
         viewModelScope.launch { store.add(title, body, mood) }
     }
 
+    /** Rewrite an entry in place. A diary is chronological, so a correction must not re-date it. */
+    fun update(id: String, title: String, body: String, mood: String) {
+        viewModelScope.launch { store.update(id, title, body, mood) }
+    }
+
     fun delete(id: String) {
         viewModelScope.launch { store.remove(id) }
     }
