@@ -2975,6 +2975,72 @@ figures are US-only and key-gated.
 ⚠️ **Owner-verify on the Pixel:** the vintage line under the big inflation percentage, and the safety
 empty state at real width — it is now three lines rather than one.
 
+### DAY AHEAD — the Computer stops describing now and starts projecting forward (PR #437)
+
+Owner: *"Keep going autonomously. Keep overpowering everything and make it a godlike feature."* The
+defect-hunting vein was worked out, so this is a feature. **Standing credit directive still overrides
+ultracode — zero subagent spend**, as with the three arcs before it.
+
+**The gap.** ORACLE answers *"what matters right now"* over ~18 signal domains; `TemporalReasoner`
+answers *"what happened, and how long ago"*. **Nothing looked forward** — though the device already
+knew you had a nine o'clock, where it was, how long the drive took, and that it would be raining at
+twenty past eight. The two outputs that justify the feature are the ones a calendar app cannot
+produce: **when to leave**, and **an impossible gap** (two commitments spaced closer than the journey
+between them, invisible until you are late for the second). Every ingredient was already live and
+merely uncomposed — geocoded calendar objectives, keyless OSRM routing, hourly precipitation since
+the WEATHER rebuild, position, tasks.
+
+- **`be23fe6` core** — `core:telemetry/DayAhead.kt`. Clock, position, forecast and travel all passed
+  in, so CI holds every rule. **The join needed no repository change:** an objective's id is already
+  `cal_<EVENT_ID>_<BEGIN>`, exactly the two fields a `CalEvent` carries, so times and coordinates meet
+  on a key rather than on a title.
+- **`17bf749` the zone.** Found auditing the screen before commit, and the deeper of the two defects
+  there. The core writes a time into **four** different beat texts and all four went through its own
+  `clockOf`, which is **UTC** — right in London, an hour out in Berlin, eleven hours out in Auckland,
+  with nothing on screen admitting it. Its KDoc said callers should pass pre-shifted times, but that
+  cannot work: `Beat.atMs` is compared against a real clock downstream and sorted on, so shifting it
+  would break both to fix a string. **The zone enters as a formatter**, injected exactly as travel
+  already is — DST-correct, where fixed-offset arithmetic would not be across a transition. (The
+  shallower defect: `clockOf` is `internal`, so `:app` could not see it at all — CI would have caught
+  that one; nothing would have caught the UTC.)
+- **`f6df8d3` the surface.** `DayAheadEngine` (shaped after `OracleEngine.snapshot`: best-effort
+  reads, `force = false`, a failure mutes one input) + a DAY AHEAD spine on ORACLE. Journeys are
+  pre-resolved because the core is pure and cannot suspend; road for the next few, straight-line
+  beyond, **the difference carried to the screen** as a `⌁ rough estimate` line. OSRM is
+  community-hosted, so the fallback is the normal path when it is busy, not a rare one.
+- **`8d481c1` the board.** The imminent departure rides the **existing** ALERT row — a new *kind* of
+  item, never a second notification. Above the other yellows because it is the only notice that
+  **expires**; both reds still outrank it.
+
+**Three lessons worth keeping:**
+1. **`Beat.subjectId` exists because a beat had no stable name.** `atMs` is pinned to `now` once a
+   departure is past, so it moves every pass, and the title carries a live countdown — keying the
+   alert off either would mint a new urgency key each pass and **buzz the phone the whole way to the
+   door**. Anything that must recognise the same beat twice keys on the subject.
+2. **Gate before the network.** `BriefEngine.publish` runs every background pass and the full plan
+   geocodes (rate-limited) and routes; it now asks the **local** calendar first whether anything even
+   starts within three hours and returns there when nothing does. Most passes stop at the gate.
+3. **A blocking `ContentResolver` query is not `suspend` and does not announce itself.**
+   `CalendarRepository.upcoming` is one — `BriefEngine` had always dispatched it to IO for exactly
+   that reason — and the new engine called it directly while running from `viewModelScope` on the main
+   thread. Fixed; worth checking at every new call site of that repository.
+
+**Verification (all free):** 60/60 locally green via kotlinc + JUnit; **both new guards
+negative-tested** (regressing the clock call site prints the offending strings; keying the alert off
+the sentence yields 3 distinct keys instead of 1); CI green on `f6df8d3` (run 1605).
+
+⚠️ **A recipe that beats the one recorded above:** exactly **one** file in `core:telemetry` imports
+`android.*` (`DeviceContextProvider.kt`), so
+`./run.sh $(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt') <TheTest.kt>`
+compiles and runs the **whole core** against any test in one shot — far better than chasing transitive
+deps one at a time, which is how the first three attempts here were wasted.
+
+⚠️ **Owner-verify on the Pixel** (CI compiles; it has no calendar, no GPS and no routing server): the
+timeline appearing at all (needs READ_CALENDAR + an upcoming event), clock times matching your real
+wall clock, whether the 8-minute arrival buffer feels right, the `⌁ rough estimate` line when OSRM is
+busy, and above all the ALERT row firing **once** for a departure rather than re-buzzing every 15
+minutes as it counts down.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
