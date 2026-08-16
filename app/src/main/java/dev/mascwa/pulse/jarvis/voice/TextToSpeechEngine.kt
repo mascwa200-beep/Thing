@@ -6,8 +6,10 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
+import android.util.Log
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * One installed voice, as far as the platform will admit to knowing.
@@ -43,8 +45,17 @@ class TextToSpeechEngine(
     private val ready = AtomicBoolean(false)
     @Volatile private var engine: TextToSpeech? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    /** Fired (once, on the main thread) when the current utterance finishes or fails. */
-    @Volatile private var pendingDone: (() -> Unit)? = null
+
+    /**
+     * Fired (once, on the main thread) when the current utterance finishes, fails, or is given up on.
+     *
+     * Atomic because there are now two things that can fire it — the engine and [watchdog] — and the
+     * callback re-arms a microphone. Firing it twice is not something to leave to luck.
+     */
+    private val pendingDone = AtomicReference<(() -> Unit)?>(null)
+
+    /** The backstop that runs [pendingDone] if the engine never calls back at all. */
+    @Volatile private var watchdog: Runnable? = null
 
     init {
         val appContext = context.applicationContext
@@ -62,8 +73,9 @@ class TextToSpeechEngine(
 
     /** Run and clear the completion callback on the main thread (TTS callbacks arrive off-thread). */
     private fun fireDone() {
-        val cb = pendingDone ?: return
-        pendingDone = null
+        val cb = pendingDone.getAndSet(null) ?: return
+        watchdog?.let(mainHandler::removeCallbacks)
+        watchdog = null
         mainHandler.post(cb)
     }
 
@@ -173,9 +185,39 @@ class TextToSpeechEngine(
     fun speak(text: String, onDone: () -> Unit = {}) {
         val trimmed = forSpeech(text)
         if (trimmed.isEmpty() || !ready.get()) { onDone(); return }
-        pendingDone = onDone
-        val res = engine?.speak(trimmed.take(MAX_LEN), TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        val spoken = trimmed.take(MAX_LEN)
+        pendingDone.set(onDone)
+        armWatchdog(spoken.length)
+        val res = engine?.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
         if (res != TextToSpeech.SUCCESS) fireDone()
+    }
+
+    /**
+     * Guarantee [speak]'s callback runs even if the engine never reports the utterance at all.
+     *
+     * `speak()` returning anything but SUCCESS is the *synchronous* failure and was already handled.
+     * The asynchronous one is not: an engine that dies or is swapped out mid-utterance can deliver
+     * neither `onDone` nor `onError`, and then the callback never runs. That callback is what re-arms
+     * the wake word, so the failure mode is a phone that silently stops answering to its name, with
+     * nothing on screen to say so and nothing short of restarting the service to recover it.
+     *
+     * Sized as a **backstop, not an estimate** — deliberately several times the real duration, since
+     * firing early would re-open the microphone while the computer is still talking, and it would
+     * then hear itself. Speech that finishes normally cancels this long before it comes due.
+     */
+    private fun armWatchdog(chars: Int) {
+        watchdog?.let(mainHandler::removeCallbacks)
+        val r = Runnable {
+            if (pendingDone.get() != null) {
+                Log.w(TAG, "TTS never reported the utterance finishing — running the callback anyway")
+                fireDone()
+            }
+        }
+        watchdog = r
+        mainHandler.postDelayed(
+            r,
+            (WATCHDOG_FLOOR_MS + chars * WATCHDOG_PER_CHAR_MS).coerceAtMost(WATCHDOG_MAX_MS),
+        )
     }
 
     /** Strip Markdown markup so the engine doesn't read the symbols aloud (e.g. "**" as "star star").
@@ -193,9 +235,15 @@ class TextToSpeechEngine(
         return t.trim()
     }
 
-    /** Stop the current utterance immediately. */
+    /**
+     * Stop the current utterance immediately.
+     *
+     * Fires any pending completion callback rather than leaving it for the watchdog: the utterance
+     * is over either way, and a caller waiting on it should not learn that a minute later.
+     */
     fun stop() {
         runCatching { engine?.stop() }
+        fireDone()
     }
 
     /** Release the engine (e.g. on full app shutdown). */
@@ -204,14 +252,22 @@ class TextToSpeechEngine(
             engine?.stop()
             engine?.shutdown()
         }
+        fireDone()
         engine = null
         ready.set(false)
     }
 
     private companion object {
+        const val TAG = "JarvisTts"
         const val UTTERANCE_ID = "jarvis"
         // TextToSpeech.getMaxSpeechInputLength() is ~4000; stay comfortably under it.
         const val MAX_LEN = 3500
+
+        // Backstop for a TTS engine that never calls back. Generous on purpose: ~7 characters per
+        // second is less than half of ordinary speech, so a real utterance always beats it.
+        private const val WATCHDOG_FLOOR_MS = 4_000L
+        private const val WATCHDOG_PER_CHAR_MS = 140L
+        private const val WATCHDOG_MAX_MS = 120_000L
         // The ship's computer: level and unhurried, neither confiding nor brisk. Pitch sits a touch
         // above neutral and the rate a shade under it — the effect is announcement rather than
         // conversation. Flat affect itself is not settable: TextToSpeech exposes pitch and rate and
