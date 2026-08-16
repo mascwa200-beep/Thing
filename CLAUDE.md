@@ -3219,6 +3219,48 @@ word is still alive.
 grounding excerpt's length and whether the strict relevance bar is too strict in practice — both are
 single constants (`GROUNDING_CHARS`, the `topical` check) and easy to tune from real use.
 
+### SEARCH THIS DEVICE (this session cont., PR #440)
+
+Found while looking for the next arc, and it is the sharper kind of gap: the app is a **Library
+Computer Access and Retrieval System** and its only search box sent every query to the internet.
+Hundreds of written guides, the user's notes, their diary, their tasks, their profile, the
+assistant's episodic memory and its findings were all on the disk and none of it was findable except
+by opening the one screen that happened to hold it. Home's ⌕ icon and MENU's "Web Search" both landed
+on an engine picker.
+
+- **`core:telemetry/DeviceSearch.kt` (+ 10 tests, locally executed).** Ranking is **not**
+  reimplemented — `GuideSearch` was tuned against the real index last arc and its `Entry` shape
+  describes a note as well as a guide. What a mixed corpus needs and a single-kind one does not is
+  **diversity**: guides outnumber notes by two orders of magnitude, so a plain top-ten is ten guides
+  every time. `search` scores over the whole corpus (IDF is only meaningful across all of it) then
+  caps how many places any one kind may occupy.
+- **`data/search/DeviceSearchIndex.kt`** gathers from seven stores, shaped after `OracleEngine.snapshot`
+  — defensive per source, so one that fails costs its own kind. **The resident guide index only; no
+  shard is opened.** Answering a keystroke by parsing 577 guides is what the sharded loader exists to
+  avoid.
+- **`SearchScreen`** answers from the device as you type (debounced), engine picker below, and a
+  guide result opens **at the guide** via the argumented `survival?guide=` deep-link the survival
+  notifications already use. MENU's entry is now "Search · This device first, then the web".
+
+**Three things running the code taught me, none of which reading it would have.**
+1. **My fill pass defeated the cap it sat under.** Written to avoid short lists, it handed the freed
+   places straight back to the largest kind. It now runs only when everything that matched is one
+   kind and there is no diversity left to protect — **a short list is the cap working.**
+2. **A stopword-only query does not return empty.** `GuideSearch.tokens` deliberately falls back to
+   the raw words so a box someone typed into does not silently answer nothing; that is in its own
+   KDoc and I asserted the opposite. Now pinned, so changing it later reads as a decision.
+3. **`FindingStore`/`MemoryStreamStore` publish flows that hold an empty list until something causes
+   a load.** Reading `.value` would have made two whole kinds invisible on a cold screen — silently,
+   and only where nothing else had touched them. Both have public suspend loaders (`load()`/`all()`);
+   use those.
+
+⚠️ **Owner-verify on the Pixel:** type a word you know is in a note and in a guide — both should
+appear, under their own headings, with the guide capped rather than crowding the page; tapping a
+guide should open that guide, not the list.
+
+**Stale note corrected:** the F-cleanup list said `PipUi.kt` is 158 dead lines. **It no longer
+exists** — already deleted. `SectionHeader` does still appear to be dead (one file references it).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

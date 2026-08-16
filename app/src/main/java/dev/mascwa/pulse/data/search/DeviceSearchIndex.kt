@@ -12,6 +12,10 @@ import dev.mascwa.pulse.di.AppContainer
  * store that has not loaded — or that throws — costs its own kind and nothing else. There is no
  * network here and no permission is consulted; every one of these is already on the disk.
  *
+ * Each store is asked to **load**, not read off its published flow. A flow holds an empty list until
+ * something else has caused a load, so reading it would have made findings and memories invisible on
+ * a screen opened cold — quietly, and only on the paths where nothing else had touched them.
+ *
  * **Bodies are not read.** The guide index is resident and carries a title, a category, a summary
  * and the section headings; the shards holding the prose stay closed. Opening 577 guides to answer
  * a keystroke is the thing the sharded loader exists to avoid.
@@ -61,11 +65,11 @@ object DeviceSearchIndex {
             out += DeviceSearch.of("profile:${p.text}", RecordKind.PROFILE, p.text, "", p.lastSeenMs)
         }
 
-        runCatching { c.findingStore.findingsFlow.value }.getOrNull()?.forEach { f ->
+        runCatching { c.findingStore.load() }.getOrNull()?.forEach { f ->
             out += DeviceSearch.of(f.id, RecordKind.FINDING, f.headline, f.body.take(BODY_CHARS), f.createdMs)
         }
 
-        runCatching { c.memoryStream.memoriesFlow.value }.getOrNull()?.forEach { m ->
+        runCatching { c.memoryStream.all() }.getOrNull()?.forEach { m ->
             // A memory is one line of text with no title of its own; `of` uses the opening as both.
             out += DeviceSearch.of("memory:${m.id}", RecordKind.MEMORY, "", m.text, m.createdMs)
         }
