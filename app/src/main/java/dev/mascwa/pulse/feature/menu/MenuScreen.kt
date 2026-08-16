@@ -57,6 +57,9 @@ private val GROUPS = listOf(
         // fastest way into thousands of pages was the one route nothing linked to.
         MenuEntry("Search Survival", "Find any guide or tool by what you need — offline", Routes.SURVIVE),
         MenuEntry("Knowledge Library", "Thousands of pages on everything — works offline", Routes.SURVIVAL),
+        // Sits beside the library rather than under YOUR THINGS: it is what turns those pages from
+        // something you can look up into something you are actually taught.
+        MenuEntry("Study", "Learn the library a piece a day, and be asked again", Routes.STUDY),
         MenuEntry("Wildlife Guide", "Animals in your region and what to do — offline", Routes.HABITAT),
         MenuEntry("Field Tools", "Flashlight, strobe, alarm and morse", Routes.TOOLS),
         MenuEntry("Compass", "Offline heading, sun and moon", Routes.COMPASS),

@@ -60,12 +60,7 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
         val index = runCatching { content.index() }.getOrNull().orEmpty()
         if (index.isEmpty()) return null
 
-        val entries = index.map {
-            GuideSearch.Entry(
-                id = it.id, title = it.title, category = it.category,
-                summary = it.summary, headings = it.headings,
-            )
-        }
+        val entries = index.map { it.toSearchEntry() }
         // The question's rarest word — the bar a guide has to clear to claim it is about the question.
         val key = GuideSearch.distinctiveToken(entries, query) ?: return null
         val entry = GuideSearch.rank(entries, query, limit = 1).firstOrNull()?.entry ?: return null

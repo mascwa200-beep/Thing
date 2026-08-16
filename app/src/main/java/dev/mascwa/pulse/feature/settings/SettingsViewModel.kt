@@ -41,6 +41,7 @@ class SettingsViewModel(
     private val auditLedger: dev.mascwa.pulse.data.blackbox.AuditLedgerStore,
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
     private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
+    private val study: dev.mascwa.pulse.data.study.StudyStore,
 ) : ViewModel() {
 
     private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
@@ -305,6 +306,11 @@ class SettingsViewModel(
     /** Forget the episodic memory stream (timestamped observations & reflections). */
     fun clearMemoryStream() {
         viewModelScope.launch { memoryStream.clear() }
+    }
+
+    /** Forget the study log — the enrolled path, what has been taught, and every review schedule. */
+    fun clearStudy() {
+        viewModelScope.launch { study.clear() }
     }
 
     // ----- Trusted Network Mode / security -----

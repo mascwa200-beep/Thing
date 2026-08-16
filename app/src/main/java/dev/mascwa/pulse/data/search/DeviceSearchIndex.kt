@@ -2,7 +2,7 @@ package dev.mascwa.pulse.data.search
 
 import dev.mascwa.pulse.core.telemetry.DeviceSearch
 import dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind
-import dev.mascwa.pulse.core.telemetry.GuideSearch
+import dev.mascwa.pulse.data.survival.toSearchEntry
 import dev.mascwa.pulse.di.AppContainer
 
 /**
@@ -38,13 +38,7 @@ object DeviceSearchIndex {
         // Guides: the resident index only. Title, category, summary and headings are exactly the
         // fields GuideSearch was tuned against, so these are passed through rather than flattened.
         runCatching { c.survivalContentRepository.index() }.getOrNull()?.forEach { g ->
-            out += DeviceSearch.Record(
-                entry = GuideSearch.Entry(
-                    id = g.id, title = g.title, category = g.category,
-                    summary = g.summary, headings = g.headings,
-                ),
-                kind = RecordKind.GUIDE,
-            )
+            out += DeviceSearch.Record(entry = g.toSearchEntry(), kind = RecordKind.GUIDE)
         }
 
         runCatching { c.notesStore.load() }.getOrNull()?.forEach { n ->

@@ -2,6 +2,7 @@ package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -317,6 +318,64 @@ class UnifiedBriefTest {
         val b = UnifiedBriefComposer.compose(routine().copy(advisory = "Leave now — traffic on your route"))!!
         assertEquals(BriefUrgency.ROUTINE, b.urgency)
         assertNull(b.urgencyKey)
+    }
+
+    // ---- the study row -------------------------------------------------------------------------------
+
+    /**
+     * ⚠️ The trap this pins. The expanded layout has exactly five slots; a seventh row would be
+     * silently dropped on a path that compiles and posts a perfectly good notification. The lesson is
+     * shed FIRST — it is the only row about nothing that is happening, and it will still be there
+     * tomorrow.
+     */
+    @Test fun aStudyRowIsTheFirstThingShedWhenTheBoardIsBusy() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(
+                reminderNow = "call the dentist",
+                advisory = "Charge now — 12% left",
+                lesson = "Read: Knots & Cordage",
+            ),
+        )!!
+        assertEquals(5, b.rows.size)
+        assertNull("the lesson goes before markets", b.row(BriefRowKind.LESSON))
+        assertNull(b.row(BriefRowKind.MARKETS))
+        assertNotNull("an alert is never dropped", b.row(BriefRowKind.ALERT))
+        assertNotNull("an advisory is never dropped", b.row(BriefRowKind.ADVISORY))
+    }
+
+    @Test fun onAQuietBoardTheStudyRowFits() {
+        // Three routine rows plus a lesson is four — room to spare.
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(showMarkets = false, lesson = "Read: Knots & Cordage"),
+        )!!
+        assertEquals(
+            listOf(BriefRowKind.NEWS, BriefRowKind.WEATHER, BriefRowKind.AGENDA, BriefRowKind.LESSON),
+            b.rows.map { it.kind },
+        )
+        assertEquals("Read: Knots & Cordage", b.row(BriefRowKind.LESSON)!!.text)
+    }
+
+    @Test fun aLessonNeverRaisesTheAlertCondition() {
+        val b = UnifiedBriefComposer.compose(routine().copy(lesson = "3 questions to answer"))!!
+        assertEquals(BriefUrgency.ROUTINE, b.urgency)
+        assertNull(b.urgencyKey)
+    }
+
+    /** Everything above it outranks it, so it only ever leads a board carrying nothing else. */
+    @Test fun aLessonIsTheLastThingToLeadTheCollapsedLine() {
+        val busy = UnifiedBriefComposer.compose(routine().copy(lesson = "Read: Knots & Cordage"))!!
+        assertNotEquals("Read: Knots & Cordage", busy.headline)
+
+        val alone = UnifiedBriefComposer.compose(
+            BriefSignals(nowMs = NOW, lesson = "3 questions to answer"),
+        )!!
+        assertEquals(listOf(BriefRowKind.LESSON), alone.rows.map { it.kind })
+        assertEquals("3 questions to answer", alone.headline)
+    }
+
+    @Test fun noLessonMeansNoStudyRow() {
+        assertNull(UnifiedBriefComposer.compose(routine())!!.row(BriefRowKind.LESSON))
+        assertNull(UnifiedBriefComposer.compose(routine().copy(lesson = "  "))!!.row(BriefRowKind.LESSON))
     }
 
     @Test fun aLongAdvisoryIsCappedWithAnEllipsis() {

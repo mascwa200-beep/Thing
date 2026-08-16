@@ -5,6 +5,7 @@ import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
+import dev.mascwa.pulse.data.survival.toSearchEntry
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 
@@ -185,9 +186,6 @@ class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
         }
     }
 }
-
-private fun GuideIndexEntry.toSearchEntry() =
-    GuideSearch.Entry(id = id, title = title, category = category, summary = summary, headings = headings)
 
 /** Collapse whitespace and cap, so one entry stays one readable line in a tool result. */
 private fun String.oneLine(max: Int): String {

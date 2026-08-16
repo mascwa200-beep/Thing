@@ -51,6 +51,9 @@ object Routes {
     // SENSORIUM — the ambient environment scanner (the ship's senses)
     const val SENSORIUM = "sensorium"
 
+    // STUDY — the bundled library taught rather than browsed
+    const val STUDY = "study"
+
     // The Computer (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"

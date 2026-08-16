@@ -26,10 +26,11 @@ enum class BriefUrgency { ROUTINE, YELLOW, RED }
 /**
  * The fixed row order of the board. ALERT is only present when something is genuinely alert-worthy.
  *
- * ADVISORY is last because the board reads facts first and what to do about them second — every row
- * above it reports the world, and that one reports the Oracle's judgement of it.
+ * ADVISORY is second-last because the board reads facts first and what to do about them second —
+ * every row above it reports the world, and that one reports the Oracle's judgement of it. LESSON is
+ * last: it is the only row that is not about today at all.
  */
-enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA, ADVISORY }
+enum class BriefRowKind { ALERT, NEWS, MARKETS, WEATHER, AGENDA, ADVISORY, LESSON }
 
 data class BriefRow(val kind: BriefRowKind, val text: String)
 
@@ -112,6 +113,15 @@ data class BriefSignals(
      * notice chain above; a suggestion, however well reasoned, is not an emergency.
      */
     val advisory: String? = null,
+    /**
+     * Today's study item, already chosen by the caller.
+     *
+     * ⚠️ **A lesson never raises the alert condition, and it is the first row shed when the board is
+     * busy** — see [UnifiedBriefComposer.trimToFive]. Learning something is worth a line on a quiet
+     * board and worth nothing at all on a loud one, and a row that pushes the weather off a full
+     * board to tell you about a guide has its priorities exactly backwards.
+     */
+    val lesson: String? = null,
     // Per-row visibility (the user's Settings toggles).
     val showNews: Boolean = true,
     val showMarkets: Boolean = true,
@@ -127,6 +137,9 @@ object UnifiedBriefComposer {
 
     /** Roomier than a news line: an advisory carries a reason and an action, and both must survive. */
     private const val ADVISORY_CAP = 110
+
+    /** A lesson row is a title and nothing else — the reason for it lives on the study screen. */
+    private const val LESSON_CAP = 70
 
     /** The expanded notification layout has exactly this many row slots. See [trimToFive]. */
     private const val MAX_ROWS = 5
@@ -200,6 +213,10 @@ object UnifiedBriefComposer {
         s.advisory?.takeIf { it.isNotBlank() }
             ?.let { rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP)) }
 
+        // --- LESSON: what to learn today. Last, and first to go when the board fills up. ---
+        s.lesson?.takeIf { it.isNotBlank() }
+            ?.let { rows += BriefRow(BriefRowKind.LESSON, cap(it.trim(), LESSON_CAP)) }
+
         if (rows.isEmpty()) return null
         trimToFive(rows)
 
@@ -209,6 +226,8 @@ object UnifiedBriefComposer {
         val headline = listOf(
             BriefRowKind.ALERT, BriefRowKind.ADVISORY, BriefRowKind.NEWS,
             BriefRowKind.AGENDA, BriefRowKind.WEATHER, BriefRowKind.MARKETS,
+            // Last, and present only so a board carrying nothing else cannot throw here.
+            BriefRowKind.LESSON,
         ).firstNotNullOf { kind -> rows.firstOrNull { it.kind == kind } }.text
 
         return UnifiedBrief(
@@ -228,12 +247,16 @@ object UnifiedBriefComposer {
      * last in row order it would be the row dropped. Doing the selection here keeps the renderer
      * dumb and makes the choice testable.
      *
-     * Markets go first: of everything on the board it is the one thing that is purely informational
-     * and unchanged by knowing it a refresh later. ALERT and ADVISORY are never dropped — one is the
+     * The lesson goes first: it is the only row about nothing that is happening, and it will still be
+     * there tomorrow. Markets next — of the rest it is the one thing purely informational and
+     * unchanged by knowing it a refresh later. ALERT and ADVISORY are never dropped: one is the
      * reason the board is interrupting and the other is the reason it earned the extra line.
      */
     private fun trimToFive(rows: MutableList<BriefRow>) {
-        val droppable = listOf(BriefRowKind.MARKETS, BriefRowKind.NEWS, BriefRowKind.WEATHER, BriefRowKind.AGENDA)
+        val droppable = listOf(
+            BriefRowKind.LESSON, BriefRowKind.MARKETS, BriefRowKind.NEWS,
+            BriefRowKind.WEATHER, BriefRowKind.AGENDA,
+        )
         for (kind in droppable) {
             if (rows.size <= MAX_ROWS) return
             rows.removeAll { it.kind == kind }
