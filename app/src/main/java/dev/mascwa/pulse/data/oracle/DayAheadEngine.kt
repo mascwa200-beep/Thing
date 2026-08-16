@@ -5,6 +5,8 @@ import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.di.AppContainer
 import dev.mascwa.pulse.feature.weather.WeatherFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,15 +49,31 @@ object DayAheadEngine {
      */
     fun clock(ms: Long): String = SimpleDateFormat("HH:mm", Locale.US).format(Date(ms))
 
-    suspend fun plan(container: AppContainer, settings: AppSettings): List<DayAhead.Beat> {
+    /**
+     * How far ahead the notification path looks for a departure worth interrupting for.
+     *
+     * A departure is `start − travel − buffer`, so a commitment can only be imminent if it starts
+     * within roughly the imminent window plus the journey. Three hours covers any journey anyone
+     * wants a fifteen-minute worker nagging them about, and bounds the gate below.
+     */
+    private const val ALERT_LOOKAHEAD_MS = 3 * 3_600_000L
+
+    suspend fun plan(
+        container: AppContainer,
+        settings: AppSettings,
+        maxRouted: Int = MAX_ROUTED,
+    ): List<DayAhead.Beat> {
         val now = System.currentTimeMillis()
         val horizon = now + HORIZON_HOURS * 3_600_000L
 
         // Times come from the calendar; coordinates come from the geocoded objectives view of the
         // same events. They join exactly rather than by title, because an objective's id is
         // "cal_<EVENT_ID>_<BEGIN>" — precisely the two fields a CalEvent already carries.
-        val events = runCatching { container.calendarRepository.upcoming(now) }.getOrDefault(emptyList())
-            .filter { it.startMs < horizon }
+        // Off the caller's dispatcher: upcoming() is a blocking ContentResolver query and is not
+        // suspend, and this runs from viewModelScope on the main thread.
+        val events = withContext(Dispatchers.IO) {
+            runCatching { container.calendarRepository.upcoming(now) }.getOrDefault(emptyList())
+        }.filter { it.startMs < horizon }
         if (events.isEmpty()) return emptyList()
 
         val placed = runCatching { container.calendarObjectives.upcoming(2) }
@@ -105,7 +123,7 @@ object DayAheadEngine {
         // Route only the journeys anybody will act on, nearest first, and remember what each cost so
         // the same question is never asked twice within one plan.
         val routed = HashMap<String, DayAhead.TravelEstimate?>()
-        var budget = MAX_ROUTED
+        var budget = maxRouted
 
         suspend fun road(
             fromLat: Double?, fromLon: Double?, toLat: Double?, toLon: Double?,
@@ -167,4 +185,33 @@ object DayAheadEngine {
             it.kind == DayAhead.BeatKind.DEPART &&
                 it.atMs - nowMs <= DayAhead.IMMINENT_MIN * 60_000L
         }
+
+    /**
+     * The imminent departure for the board, as `(sentence, stable key)`, or null.
+     *
+     * ⚠️ **The gate is the point of this function.** It runs on every background pass, and the full
+     * [plan] geocodes (rate-limited) and routes (a community-hosted endpoint). So it first asks the
+     * calendar — a local content-provider query, no network — whether anything is even starting
+     * inside [ALERT_LOOKAHEAD_MS], and returns on the spot when nothing is. Most passes stop there
+     * and cost nothing, which is what makes this affordable at a fifteen-minute cadence.
+     *
+     * Only one journey is routed, because only the next one can be imminent.
+     *
+     * The key names the commitment rather than the sentence: the sentence counts down, and keying on
+     * it would re-alert every pass all the way to the door.
+     */
+    suspend fun imminentDeparture(container: AppContainer, settings: AppSettings): Pair<String, String>? {
+        val now = System.currentTimeMillis()
+        val soon = withContext(Dispatchers.IO) {
+            runCatching {
+                container.calendarRepository.upcoming(now, horizonMs = ALERT_LOOKAHEAD_MS)
+            }.getOrDefault(emptyList())
+        }.any { !it.allDay && it.startMs > now }
+        if (!soon) return null
+
+        val beats = runCatching { plan(container, settings, maxRouted = 1) }.getOrDefault(emptyList())
+        val beat = urgentDeparture(beats, now) ?: return null
+        val subject = beat.subjectId ?: return null
+        return beat.title to subject
+    }
 }

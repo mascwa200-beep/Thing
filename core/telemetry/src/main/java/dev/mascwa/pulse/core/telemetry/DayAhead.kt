@@ -83,6 +83,16 @@ object DayAhead {
         val detail: String,
         val confidence: Confidence,
         val sources: List<String> = emptyList(),
+        /**
+         * The commitment this beat is about, where it is about one — for a conflict, the first of
+         * the pair. Null for beats about the shape of the day rather than a thing in it.
+         *
+         * ⚠️ The only stable name a beat has. [atMs] is not one: a departure already past reports
+         * `now`, so it moves on every pass, and [title] carries a live countdown. Anything that must
+         * recognise the same beat twice — a notification deduplicating its alert, most of all — has
+         * to key on this.
+         */
+        val subjectId: String? = null,
     )
 
     // ---- tunables ----------------------------------------------------------------------------
@@ -208,6 +218,7 @@ object DayAhead {
                     add(basis)
                     if (wet != null) add("forecast")
                 },
+                subjectId = c.id,
             )
         }
 
@@ -227,6 +238,7 @@ object DayAhead {
                     "${minutesOf(needMs / 1000)} — about $shortBy min short.",
                 confidence = confidenceOf(travel),
                 sources = listOf("calendar", if (travel.source == TravelSource.ROAD) "road route" else "straight-line estimate"),
+                subjectId = a.id,
             )
         }
 
@@ -239,6 +251,7 @@ object DayAhead {
                 detail = "${clock(c.startMs)} – ${clock(c.endMs)}",
                 confidence = Confidence.FIRM,
                 sources = listOf("calendar"),
+                subjectId = c.id,
             )
         }
 

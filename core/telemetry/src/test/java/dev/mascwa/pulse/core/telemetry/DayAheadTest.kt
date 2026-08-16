@@ -318,6 +318,42 @@ class DayAheadTest {
         assertEquals("1h 30m", DayAhead.minutesOf(5400))
     }
 
+    // ---- naming a beat -------------------------------------------------------------------------
+
+    /**
+     * A beat's only stable name is the commitment it is about.
+     *
+     * `atMs` is not one — a departure already past reports `now`, so it moves on every pass — and the
+     * title carries a countdown. A notification deduplicating its alert has nothing else to key on,
+     * and getting this wrong buzzes the phone the whole way to the door.
+     */
+    @Test
+    fun aBeatCarriesTheCommitmentItIsAbout() {
+        val beats = DayAhead.plan(
+            commitments = listOf(event("cal_88", "Dentist", 9, 10, 51.5, 0.1)),
+            nowMs = at(7, 0),
+            travelTo = { road(25) },
+        )
+        assertEquals("cal_88", beats.first { it.kind == K.DEPART }.subjectId)
+        assertEquals("cal_88", beats.first { it.kind == K.EVENT }.subjectId)
+        // The shape of the day is not about any one commitment.
+        assertNull(beats.first { it.kind == K.DAY_END }.subjectId)
+    }
+
+    /** And it holds once the departure is behind you, which is exactly when atMs starts moving. */
+    @Test
+    fun aLateDepartureKeepsItsNameEvenAsItsInstantMoves() {
+        val commitments = listOf(event("cal_88", "Dentist", 9, 10, 51.5, 0.1))
+        val late = listOf(at(8, 40), at(8, 50)).map { now ->
+            DayAhead.plan(commitments, nowMs = now, travelTo = { road(25) })
+                .first { it.kind == K.DEPART }
+        }
+        // Departure was 08:27, so both are past: atMs is pinned to each `now` and differs...
+        assertEquals(listOf(at(8, 40), at(8, 50)), late.map { it.atMs })
+        // ...while the name does not.
+        assertEquals(listOf("cal_88", "cal_88"), late.map { it.subjectId })
+    }
+
     // ---- the reader's zone ---------------------------------------------------------------------
 
     /**
