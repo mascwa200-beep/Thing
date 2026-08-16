@@ -128,7 +128,10 @@ fun SearchBody(
             if (results.isNotEmpty()) {
                 LcarsHeaderBar("On this device")
                 results.forEach { r -> DeviceResultRow(r, onOpen) }
-            } else if (searched) {
+            } else if (searched && corpus.isNotEmpty()) {
+                // Gated on the corpus being gathered: during the first moments after the screen
+                // opens there is nothing to search, and "nothing matches" would be a claim about
+                // your device rather than about the query.
                 LcarsHeaderBar("On this device")
                 Text(
                     "Nothing here matches that. The web is below.",

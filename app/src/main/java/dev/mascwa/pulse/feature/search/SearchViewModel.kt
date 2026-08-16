@@ -43,8 +43,12 @@ class SearchViewModel(
      * Rebuilding per keystroke would re-read seven stores to answer one letter. The stores are
      * append-mostly and this screen is short-lived, so a snapshot taken when it opens is current
      * enough — and [refresh] exists for the case where it is not.
+     *
+     * Volatile because it is written from the gathering coroutine and read from the ranking one.
+     * The dispatch between them very likely establishes the ordering anyway; one keyword is cheaper
+     * than depending on that.
      */
-    private var records: List<DeviceSearch.Record> = emptyList()
+    @Volatile private var records: List<DeviceSearch.Record> = emptyList()
     private var typingJob: Job? = null
 
     init {
