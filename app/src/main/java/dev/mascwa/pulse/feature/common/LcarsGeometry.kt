@@ -806,6 +806,8 @@ fun LcarsDialog(
     modifier: Modifier = Modifier,
     confirmText: String? = null,
     onConfirm: (() -> Unit)? = null,
+    /** Whether the confirm action is currently valid — a dialog that gathers input needs the guard. */
+    confirmEnabled: Boolean = true,
     dismissText: String = "CLOSE",
     seed: String = title,
     content: @Composable () -> Unit,
@@ -835,7 +837,7 @@ fun LcarsDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (confirmText != null && onConfirm != null) {
-                        LcarsButton(confirmText, onClick = onConfirm, color = c.accent)
+                        LcarsButton(confirmText, onClick = onConfirm, enabled = confirmEnabled, color = c.accent)
                     }
                     LcarsButton(dismissText, onClick = onDismiss, color = c.muted)
                 }
