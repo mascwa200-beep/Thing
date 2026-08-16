@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,8 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.DayAhead
 import dev.mascwa.pulse.core.telemetry.Insight
 import dev.mascwa.pulse.core.telemetry.Urgency
+import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LoadingState
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -76,7 +79,13 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                     if (list.isEmpty()) {
                         item {
                             Text(
-                                "All quiet — nothing needs you right now. The computer is watching.",
+                                // "Nothing needs you" would contradict the timeline below it when the
+                                // day has a departure in it. With one, this line is only claiming there
+                                // is nothing to act on *now*.
+                                if (state.dayAhead.isEmpty())
+                                    "All quiet — nothing needs you right now. The computer is watching."
+                                else
+                                    "Nothing needs you this minute. The rest of the day is below.",
                                 fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
                                 modifier = Modifier.padding(12.dp),
                             )
@@ -94,6 +103,26 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
                             }
                             items(list.drop(1), key = { it.id }) { ins -> InsightCard(ins, onOpenRoute) }
                         }
+                    }
+
+                    // The rest of the day. A different question from everything above it — those are
+                    // about now, this is about what is coming — so it gets its own heading rather
+                    // than being mixed into the ranked stream.
+                    if (state.dayAhead.isNotEmpty()) {
+                        item {
+                            Text(
+                                "DAY AHEAD",
+                                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.2.sp,
+                                fontWeight = FontWeight.Bold, color = c.accent,
+                                modifier = Modifier.padding(top = 12.dp, start = 2.dp),
+                            )
+                        }
+                        // Keyed on position as well as content: two calendar accounts syncing the
+                        // same entry produce two identical beats, and a repeated key is a crash.
+                        itemsIndexed(
+                            state.dayAhead,
+                            key = { i, b -> "$i-${b.atMs}-${b.kind}" },
+                        ) { _, beat -> BeatRow(beat) }
                     }
                 }
             }
@@ -193,4 +222,62 @@ internal fun urgencyColor(u: Urgency): Color = when (u) {
     Urgency.IMPORTANT -> Color(0xFFE0A21A)
     Urgency.NOTABLE -> Color(0xFF35C46A)
     Urgency.AMBIENT -> Color(0xFF7C8894)
+}
+
+/**
+ * One entry on the projected day.
+ *
+ * A spine down the left with a coloured node, so the column reads as a sequence rather than a list of
+ * cards — the ordering is the information here. Departures and conflicts are the reason anyone reads
+ * this, so they carry weight; the commitments themselves stay quiet and act as the ruler between them.
+ */
+@Composable
+private fun BeatRow(beat: DayAhead.Beat) {
+    val c = Pulse.colors
+    val tint = when (beat.kind) {
+        DayAhead.BeatKind.CONFLICT -> c.negative
+        DayAhead.BeatKind.DEPART -> c.amber
+        DayAhead.BeatKind.FOCUS -> c.positive
+        else -> c.muted
+    }
+    val loud = beat.kind == DayAhead.BeatKind.DEPART || beat.kind == DayAhead.BeatKind.CONFLICT
+
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        // The spine: a fixed-width clock column, then the node.
+        Text(
+            DayAheadEngine.clock(beat.atMs),
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            modifier = Modifier.width(40.dp).padding(top = 3.dp),
+        )
+        Box(
+            Modifier.width(3.dp).height(if (loud) 34.dp else 22.dp)
+                .clip(lcarsBlockShape(sweep = 2.dp, corner = LcarsCorner.TopStart))
+                .background(tint),
+        )
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Text(
+                beat.title,
+                fontFamily = ChakraPetch,
+                fontWeight = if (loud) FontWeight.Bold else FontWeight.Normal,
+                fontSize = if (loud) 14.sp else 13.sp,
+                color = if (loud) c.ink else c.ink2,
+            )
+            if (beat.detail.isNotBlank()) {
+                Text(
+                    beat.detail,
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, lineHeight = 14.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            // What it rests on. A departure from a straight-line guess is a weaker claim than one
+            // from a road route, and the screen has to carry that difference rather than flatten it.
+            if (beat.confidence == DayAhead.Confidence.ROUGH) {
+                Text(
+                    "⌁ rough estimate",
+                    fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.6.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+        }
+    }
 }

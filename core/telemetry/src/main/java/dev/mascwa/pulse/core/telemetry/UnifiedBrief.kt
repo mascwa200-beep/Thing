@@ -87,6 +87,19 @@ data class BriefSignals(
     val securityCritical: Boolean = false,
     val safetyNotice: String? = null,
     val safetyKey: String? = null,
+    /**
+     * A journey you need to start about now to reach something already in your calendar.
+     *
+     * The one output of [DayAhead] worth interrupting for: unlike everything else on the board it
+     * expires. A safety notice read ten minutes late is still a safety notice; a departure read ten
+     * minutes late is a meeting you have already missed.
+     *
+     * ⚠️ [departureKey] must identify the *commitment*, not the sentence. The text carries a live
+     * countdown ("Leave in 12 min"), so keying on it would mint a new urgency key every pass and
+     * buzz the phone all the way to the door.
+     */
+    val departureNotice: String? = null,
+    val departureKey: String? = null,
     val opsNotice: String? = null,
     /**
      * The Oracle's single most important call to action, already filtered by the caller.
@@ -138,6 +151,14 @@ object UnifiedBriefComposer {
             !s.emergencyHeadline.isNullOrBlank() && s.emergencyMajor -> {
                 urgency = BriefUrgency.RED; urgencyKey = "news:${s.emergencyHeadline.hashCode()}"
                 s.emergencyHeadline.trim()
+            }
+            // Above the other yellows because it is the only one that expires. A safety notice is
+            // as true in ten minutes as it is now; a departure is not, and the window to act on it
+            // closes whether or not the board is read.
+            !s.departureNotice.isNullOrBlank() -> {
+                urgency = BriefUrgency.YELLOW
+                urgencyKey = "depart:${s.departureKey ?: s.departureNotice.hashCode()}"
+                s.departureNotice.trim()
             }
             !s.safetyNotice.isNullOrBlank() -> {
                 urgency = BriefUrgency.YELLOW; urgencyKey = "safety:${s.safetyKey ?: s.safetyNotice.hashCode()}"

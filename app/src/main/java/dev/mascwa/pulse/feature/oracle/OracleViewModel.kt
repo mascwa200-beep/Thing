@@ -2,8 +2,10 @@ package dev.mascwa.pulse.feature.oracle
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.DayAhead
 import dev.mascwa.pulse.core.telemetry.Insight
 import dev.mascwa.pulse.core.telemetry.Oracle
+import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.di.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,14 @@ class OracleViewModel(private val container: AppContainer) : ViewModel() {
          * indistinguishable from a ranking that is drifting, and the user is owed the difference.
          */
         val learned: String = "",
+        /**
+         * The rest of the day, projected.
+         *
+         * Separate from [insights] because it answers a different question: those are about now,
+         * this is about what is coming. Empty when the calendar is empty or unreadable, which is the
+         * common case and reads as an absent section rather than an error.
+         */
+        val dayAhead: List<DayAhead.Beat> = emptyList(),
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -42,11 +52,16 @@ class OracleViewModel(private val container: AppContainer) : ViewModel() {
                 runCatching { OracleEngine.read(container, settings) }.getOrDefault(emptyList())
             else emptyList()
             val learned = runCatching { container.oracleLearningStore.summary() }.getOrDefault("")
+            // Best-effort and last, because it may route: a failure here costs the timeline, never
+            // the ranked read above it.
+            val day = if (settings != null) {
+                runCatching { DayAheadEngine.plan(container, settings) }.getOrDefault(emptyList())
+            } else emptyList()
             _state.update {
                 it.copy(
                     loading = false, insights = insights,
                     briefing = Oracle.briefing(insights), updatedMs = System.currentTimeMillis(),
-                    learned = learned,
+                    learned = learned, dayAhead = day,
                 )
             }
         }

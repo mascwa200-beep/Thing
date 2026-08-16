@@ -11,6 +11,7 @@ import dev.mascwa.pulse.core.telemetry.Urgency
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.UnifiedBriefComposer
 import dev.mascwa.pulse.data.news.NewsCategory
+import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.data.oracle.OracleEngine
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.weather.WeatherCode
@@ -126,6 +127,14 @@ object BriefEngine {
             }.getOrDefault(0)
         }
 
+        // The one thing on the timeline worth interrupting for. Cheap to ask: it checks the local
+        // calendar first and returns before any network when nothing is starting soon, which is
+        // most passes. Gated on the agenda row, because a user who has turned their calendar off
+        // the board has said what they think of calendar interruptions.
+        val departure = if (prefs.showAgendaRow) {
+            runCatching { DayAheadEngine.imminentDeparture(container, settings) }.getOrNull()
+        } else null
+
         val brief = UnifiedBriefComposer.compose(
             BriefSignals(
                 nowMs = now,
@@ -163,6 +172,8 @@ object BriefEngine {
                 showWeather = prefs.showWeatherRow,
                 showAgenda = prefs.showAgendaRow,
                 advisory = advisory(container, settings),
+                departureNotice = departure?.first,
+                departureKey = departure?.second,
             ),
         )
         if (brief == null) {

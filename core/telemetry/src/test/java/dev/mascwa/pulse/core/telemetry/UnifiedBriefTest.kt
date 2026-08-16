@@ -142,6 +142,51 @@ class UnifiedBriefTest {
         assertEquals("safety:usgs:abc123", b.urgencyKey)
     }
 
+    @Test fun anImminentDepartureIsYellowAndOutranksTheOtherYellows() {
+        // It is the only notice on the board that expires: a safety warning is as true ten minutes
+        // late, a departure is a meeting already missed.
+        val s = routine().copy(
+            departureNotice = "Leave in 12 min for Dentist",
+            departureKey = "cal_88_1699999200000",
+            safetyNotice = "Earthquake 12 km away", safetyKey = "usgs:abc123",
+            securityNotice = "Bootloader is unlocked",
+        )
+        val b = UnifiedBriefComposer.compose(s)!!
+        assertEquals("Leave in 12 min for Dentist", b.row(BriefRowKind.ALERT)!!.text)
+        assertEquals(BriefUrgency.YELLOW, b.urgency)
+        assertEquals("depart:cal_88_1699999200000", b.urgencyKey)
+    }
+
+    /**
+     * The guard that makes the row usable at all.
+     *
+     * The text carries a live countdown, so it differs on every pass. Keying on it would mint a new
+     * urgency key each time and buzz the phone the whole way to the door; the key names the
+     * commitment instead, so one departure alerts once.
+     */
+    @Test fun aCountingDownDepartureKeepsOneKeyAllTheWayDown() {
+        val keys = listOf(20, 12, 4).map { mins ->
+            UnifiedBriefComposer.compose(
+                routine().copy(
+                    departureNotice = "Leave in $mins min for Dentist",
+                    departureKey = "cal_88_1699999200000",
+                ),
+            )!!.urgencyKey
+        }
+        assertEquals(1, keys.distinct().size)
+        assertEquals("depart:cal_88_1699999200000", keys.first())
+    }
+
+    @Test fun aRealEmergencyStillOutranksADeparture() {
+        val s = routine().copy(
+            departureNotice = "Leave in 12 min for Dentist", departureKey = "cal_88_1699999200000",
+            emergencyHeadline = "Major earthquake strikes the coast", emergencyMajor = true,
+        )
+        val b = UnifiedBriefComposer.compose(s)!!
+        assertEquals("Major earthquake strikes the coast", b.row(BriefRowKind.ALERT)!!.text)
+        assertEquals(BriefUrgency.RED, b.urgency)
+    }
+
     @Test fun opsNoticeIsAlertRowButStaysRoutine() {
         val s = routine().copy(opsNotice = "Update ready — build 970")
         val b = UnifiedBriefComposer.compose(s)!!
