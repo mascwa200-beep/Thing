@@ -1152,13 +1152,18 @@ fun SettingsScreen(
                         onDismiss = { vm.dismissLedgerSelfTest() },
                         dismissText = "DONE",
                     ) {
+                        // Read the palette here rather than reaching for an outer `c` — this
+                        // composable does not declare one, and nothing above it in this file does
+                        // either. That is the whole reason the remaining inline Material styles in
+                        // this screen are not being swept blind.
+                        val selfTestColors = Pulse.colors
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             report.checks.forEach { ch ->
                                 Column {
                                     Text(
                                         "${if (ch.ok) "✓" else "✗"}  ${ch.name}",
                                         fontFamily = ChakraPetch, fontSize = 13.sp,
-                                        color = if (ch.ok) c.positive else c.negative,
+                                        color = if (ch.ok) selfTestColors.positive else selfTestColors.negative,
                                     )
                                     DialogBody(ch.detail)
                                 }
