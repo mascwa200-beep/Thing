@@ -23,6 +23,7 @@ import dev.mascwa.pulse.core.telemetry.BanterContextEngine
 import dev.mascwa.pulse.core.telemetry.DeviceContext
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
+import dev.mascwa.pulse.core.telemetry.GuideSearch
 import dev.mascwa.pulse.core.telemetry.VoiceMachine
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.console
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.micFailed
@@ -498,6 +499,28 @@ class ActiveMatrixService : Service() {
         val conversation = jarvisSettings?.conversationMode == true
         try {
             runCatching { engine.ensureReady() }
+
+            // What the bundled library has to say about this, if anything. Looked up before the
+            // model is asked, because how it gets used depends on whether there is a real brain
+            // behind the voice at all — and on a fresh install there is not.
+            val library = runCatching { libraryHit(command) }.getOrNull()
+            val realBrain = jarvisSettings?.cloudActive == true || engine.isModelActive
+
+            // No cloud key and no on-device model means RoutingInferenceEngine is serving
+            // EchoInferenceEngine — "a templated responder, not a generative model", in its own
+            // words. It cannot read a system prompt, so grounding it is pointless; but the library
+            // is hundreds of written guides sitting on the same disk, and reading the right one out
+            // is a genuine answer where a templated acknowledgement is not.
+            if (!realBrain && library != null) {
+                Log.i(TAG, "no live model — answering from the library: ${library.title}")
+                convo.addLast(ChatTurn(Speaker.USER, command))
+                convo.addLast(ChatTurn(Speaker.JARVIS, library.spoken))
+                while (convo.size > CONVO_BUFFER) convo.removeFirst()
+                update(library.spoken.take(140))
+                speakThen(library.spoken, vosk) { resetConvo(); rearm(vosk) }
+                return
+            }
+
             var persona = JarvisPersona.compose(
                 charter = runCatching { container?.selfEditStore?.current()?.charter }.getOrNull().orEmpty(),
                 address = jarvisSettings?.address.orEmpty(),
@@ -505,6 +528,10 @@ class ActiveMatrixService : Service() {
             // Only in conversation mode: let the model self-direct whether to keep the floor open.
             // (Appended here, not to the global persona, so the markers never leak into the console.)
             if (conversation) persona += CONVO_HINT
+            // Ground the reply in the written page rather than the model's recollection of one.
+            // The console's `library` tool does this deliberately, but it only exists when agent
+            // tools are on — off by default, so by voice the model has answered from memory.
+            if (library != null) persona += library.grounding
 
             if (convoTurns == 0) convoStartedAt = System.currentTimeMillis()
             val history = convo.toList()
@@ -564,6 +591,73 @@ class ActiveMatrixService : Service() {
             resetConvo()
             rearm(vosk)
         }
+    }
+
+    /** What the bundled library has to say about a spoken question. */
+    private class LibraryHit(val title: String, val spoken: String, val grounding: String)
+
+    /**
+     * The library's best answer to [query], or null when it genuinely has none.
+     *
+     * **The bar is deliberately strict.** The ranker is tuned to return its closest match, which is
+     * right for a search box and wrong here: an unasked-for paragraph about association football,
+     * injected confidently into an answer about something else, is worse than no library at all. So
+     * the question's rarest word must actually appear in the guide — sharing a common noun with
+     * half the corpus is not enough to claim a page is about the question.
+     */
+    private suspend fun libraryHit(query: String): LibraryHit? {
+        val content = container?.survivalContentRepository ?: return null
+        val index = runCatching { content.index() }.getOrNull().orEmpty()
+        if (index.isEmpty()) return null
+        val entries = index.map {
+            GuideSearch.Entry(
+                id = it.id, title = it.title, category = it.category,
+                summary = it.summary, headings = it.headings,
+            )
+        }
+        val key = GuideSearch.distinctiveToken(entries, query) ?: return null
+        val entry = GuideSearch.rank(entries, query, limit = 1).firstOrNull()?.entry ?: return null
+        val topical = entry.title.contains(key, true) || entry.summary.contains(key, true) ||
+            entry.category.contains(key, true) || entry.headings.any { it.contains(key, true) }
+        if (!topical) return null
+
+        // Only now is a shard opened — the index is resident, the bodies are not.
+        val guide = runCatching { content.guide(entry.id) }.getOrNull() ?: return null
+        val words = query.split(' ').map { it.trim() }.filter { it.length > 3 }
+        val section = guide.sections
+            .maxByOrNull { s -> words.count { s.heading.contains(it, true) } }
+            ?.takeIf { s -> words.any { w -> s.heading.contains(w, true) } }
+            ?: guide.sections.firstOrNull()
+        val body = (section?.body ?: guide.summary).trim()
+        if (body.isBlank()) return null
+
+        val where = if (section == null) guide.title else guide.title + " ▸ " + section.heading
+        return LibraryHit(
+            title = guide.title,
+            spoken = firstSentences(body, SPOKEN_SENTENCES, SPOKEN_CHARS) +
+                " The full page is \"" + guide.title + "\", in the library.",
+            grounding = "\n\nFrom the device's bundled library, possibly relevant to what was just " +
+                "asked — \"" + where + "\":\n" + body.take(GROUNDING_CHARS) +
+                "\n\nIf it answers the question, answer from it and name the guide. If it does not, " +
+                "ignore it entirely and never mention it.",
+        )
+    }
+
+    /** The opening of a written section, cut at a sentence rather than mid-word. Spoken text. */
+    private fun firstSentences(body: String, sentences: Int, maxChars: Int): String {
+        val flat = body.replace(Regex("\\s+"), " ").trim()
+        // Without this, splitting "" yields one empty part and the loop below speaks a lone ".".
+        // The caller already refuses a blank body; a helper should not depend on that to be right.
+        if (flat.isEmpty()) return ""
+        val out = StringBuilder()
+        var taken = 0
+        for (part in flat.split(". ")) {
+            if (taken >= sentences || out.length + part.length > maxChars) break
+            if (out.isNotEmpty()) out.append(' ')
+            out.append(part.trimEnd('.')).append('.')
+            taken++
+        }
+        return if (out.isEmpty()) flat.take(maxChars) else out.toString()
     }
 
     /**
@@ -689,6 +783,12 @@ class ActiveMatrixService : Service() {
         private const val LIVE_NEWS_INTERVAL_MS = 90_000L
         // Battery % at which we leave conserve mode (when not charging).
         private const val BATTERY_RECOVER_PCT = 25
+
+        // How much of a written page to read out, and how much to hand the model as context.
+        // Reading a five-hundred-word section aloud is not an answer to a spoken question.
+        private const val SPOKEN_SENTENCES = 2
+        private const val SPOKEN_CHARS = 320
+        private const val GROUNDING_CHARS = 900
 
         // --- Follow-up / conversation mode ---
         // Safeguards so an open conversation can't run forever (it then wraps up on its own).
