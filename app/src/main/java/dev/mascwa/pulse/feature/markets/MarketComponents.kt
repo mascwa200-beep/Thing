@@ -61,10 +61,9 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (quote.low != null && quote.high != null && type != WatchType.CRYPTO) {
-                // Four decimals for a currency pair, as [formatPrice] already does for the price
-                // itself. At two, a day's range on EURUSD renders as "1.08 · 1.09" — the digits that
-                // actually moved are the ones being rounded away.
-                val digits = if (type == WatchType.FOREX) 4 else 2
+                // At a flat two decimals a day's range on EURUSD renders as "1.08 · 1.09" — the
+                // digits that actually moved are the ones being rounded away.
+                val digits = priceDigits(quote, type)
                 Text(
                     "L ${Formatters.number(quote.low, digits)} · H ${Formatters.number(quote.high, digits)}",
                     style = MaterialTheme.typography.labelSmall,
@@ -105,12 +104,29 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
 
 fun formatPrice(quote: Quote): String {
     val type = runCatching { WatchType.valueOf(quote.type) }.getOrNull()
+    val digits = priceDigits(quote, type)
     return when (type) {
-        WatchType.FOREX -> Formatters.number(quote.price, 4)
-        WatchType.INDEX -> Formatters.number(quote.price, 2)
-        WatchType.CRYPTO -> Formatters.currency(quote.price, quote.currency.ifBlank { "USD" },
-            if ((quote.price ?: 0.0) < 1.0) 4 else 2)
-        else -> if (quote.currency.isBlank()) Formatters.number(quote.price, 2)
-        else Formatters.currency(quote.price, quote.currency, 2)
+        WatchType.FOREX, WatchType.INDEX -> Formatters.number(quote.price, digits)
+        WatchType.CRYPTO -> Formatters.currency(quote.price, quote.currency.ifBlank { "USD" }, digits)
+        else -> if (quote.currency.isBlank()) Formatters.number(quote.price, digits)
+        else Formatters.currency(quote.price, quote.currency, digits)
     }
+}
+
+/**
+ * How many decimals this instrument deserves.
+ *
+ * The venue states its own quoting precision, and it knows better than a guess keyed off the asset
+ * class — but it is used as a **floor**, never a ceiling. Taking it outright would be a regression
+ * the moment an exchange reported a coarser figure than the app already shows, and losing a digit
+ * that moves is a worse failure than carrying one that does not.
+ */
+internal fun priceDigits(quote: Quote, type: WatchType?): Int {
+    val default = when (type) {
+        WatchType.FOREX -> 4
+        WatchType.CRYPTO -> if ((quote.price ?: 0.0) < 1.0) 4 else 2
+        else -> 2
+    }
+    val hint = quote.priceHint?.takeIf { it in 0..8 } ?: return default
+    return maxOf(default, hint)
 }
