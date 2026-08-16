@@ -9,11 +9,15 @@ import java.io.File
  * The guard the copy-not-share convention never had.
  *
  * `:desktop` declares no dependency on `:app` or `:core:*` — that is what keeps it buildable without AGP
- * or the Android SDK — so shared pure logic is **copied** rather than imported. A copy with nothing
- * watching it drifts, and this one already had: before this test existed, `NewsMarketLink` and
- * `NewsExplainers` differed from their originals in real code, not merely in comments, and no gate
- * anywhere would have said so. The repo has separately had to correct duplicated-definition drift four
- * times over palettes.
+ * or the Android SDK — so shared pure logic is **copied** rather than imported, and nothing was watching
+ * the copies.
+ *
+ * ⚠️ Diffing them turned out well, which is the point: three were identical and `NewsMarketLink` differed
+ * only in trailing whitespace. But that could only be established by hand-diffing six files, and the one
+ * real difference — `NewsExplainers` — is a *deliberate* adaptation (it names social tabs and a cloud
+ * analysis engine the desktop does not have), so it is an adapted port rather than a mirror and is
+ * excluded here. The repo has separately had to correct duplicated-definition drift four times over
+ * palettes; being able to answer "has it drifted?" mechanically is worth more than the answer today.
  *
  * A mirror is allowed to differ in exactly three mechanical ways, each of them unavoidable: the
  * `// MIRROR OF` banner, the `package` line, and imports of this project's own packages. Everything
@@ -36,9 +40,25 @@ class MirrorDriftTest {
         "telemetry/DailyLesson.kt" to "$CORE/DailyLesson.kt",
         "telemetry/DeviceSearch.kt" to "$CORE/DeviceSearch.kt",
         "telemetry/EmergencyTriage.kt" to "$CORE/EmergencyTriage.kt",
+        "telemetry/NewsInsights.kt" to "$CORE/NewsInsights.kt",
+        "telemetry/NewsMarketLink.kt" to "$CORE/NewsMarketLink.kt",
+        "telemetry/MediaBias.kt" to "$CORE/MediaBias.kt",
+        "telemetry/SocialBuzz.kt" to "$CORE/SocialBuzz.kt",
         "library/GuideModels.kt" to "$SURVIVAL/GuideModels.kt",
         "library/GuideTaxonomy.kt" to "$SURVIVAL/GuideTaxonomy.kt",
     )
+
+    /** The same, for the tests — mirrored logic with unmirrored tests is unexercised logic. */
+    private val testMirrors = listOf(
+        "GuideSearchTest.kt", "LibraryConsultTest.kt", "StudyQuestionsTest.kt", "RecallTest.kt",
+        "CurriculumTest.kt", "DailyLessonTest.kt", "DeviceSearchTest.kt", "EmergencyTriageTest.kt",
+    ).associate { "telemetry/$it" to "$CORE_TEST/$it" }
+
+    private val all: Map<String, String> get() = mirrors + testMirrors
+
+    /** Mirrored tests live under src/test; everything else under src/main. */
+    private fun rootFor(mirrorRel: String): File =
+        if (mirrorRel.endsWith("Test.kt")) DESKTOP_TEST else DESKTOP_SRC
 
     /** Strip the three things a mirror is allowed to differ in. Everything left must match exactly. */
     private fun comparable(text: String): List<String> = text.lines().filterNot {
@@ -48,8 +68,8 @@ class MirrorDriftTest {
 
     @Test
     fun everyMirrorMatchesItsSourceLineForLine() {
-        mirrors.forEach { (mirrorRel, sourceRel) ->
-            val mirror = File(DESKTOP_SRC, mirrorRel)
+        all.forEach { (mirrorRel, sourceRel) ->
+            val mirror = File(rootFor(mirrorRel), mirrorRel)
             val source = File(REPO, sourceRel)
             assertTrue("mirror missing: $mirrorRel", mirror.isFile)
             assertTrue("source missing: $sourceRel", source.isFile)
@@ -64,8 +84,8 @@ class MirrorDriftTest {
     /** A mirror without its banner is a file nobody can tell is a mirror. */
     @Test
     fun everyMirrorDeclaresWhatItIsAMirrorOf() {
-        mirrors.forEach { (mirrorRel, sourceRel) ->
-            val first = File(DESKTOP_SRC, mirrorRel).readLines().firstOrNull().orEmpty()
+        all.forEach { (mirrorRel, sourceRel) ->
+            val first = File(rootFor(mirrorRel), mirrorRel).readLines().firstOrNull().orEmpty()
             assertTrue("$mirrorRel has no MIRROR OF banner: '$first'", first.startsWith("// MIRROR OF "))
             assertTrue("$mirrorRel banner names the wrong source: '$first'", first.contains(sourceRel))
         }
@@ -79,7 +99,7 @@ class MirrorDriftTest {
      */
     @Test
     fun nothingMirroredTouchesAndroid() {
-        mirrors.values.forEach { sourceRel ->
+        all.values.forEach { sourceRel ->
             val android = File(REPO, sourceRel).readLines().filter { it.startsWith("import android") }
             assertTrue("$sourceRel is no longer platform-free: $android", android.isEmpty())
         }
@@ -95,7 +115,9 @@ class MirrorDriftTest {
             require(File(it, "settings.gradle.kts").isFile) { "repo root not found from ${File(".").absolutePath}" }
         }
         val DESKTOP_SRC = File(REPO, "desktop/src/main/kotlin/dev/mascwa/pulse/desktop")
+        val DESKTOP_TEST = File(REPO, "desktop/src/test/kotlin/dev/mascwa/pulse/desktop")
         const val CORE = "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry"
+        const val CORE_TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry"
         const val SURVIVAL = "app/src/main/java/dev/mascwa/pulse/data/survival"
     }
 }

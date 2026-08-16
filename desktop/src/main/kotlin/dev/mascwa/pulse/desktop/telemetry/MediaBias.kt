@@ -1,9 +1,12 @@
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/MediaBias.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
 package dev.mascwa.pulse.desktop.telemetry
 
 /**
  * A widely-recognized political lean for a news outlet, using AllSides' own public 5-bucket taxonomy — the
  * same vocabulary Ground News surfaces — so a "COVERAGE" strip can show how a story's outlets spread across
- * the spectrum. Substring-matched against outlet-name strings (e.g. `Article.source`).
+ * the spectrum. Substring-matched against outlet-name strings (e.g. `Article.source`), mirroring
+ * `BreakingCoverageRepository.TRUSTED`'s existing matching style; that list is trustworthiness, a DIFFERENT
+ * axis from lean — an outlet can be trusted AND have a lean, both render independently.
  *
  * Only outlets with a genuinely uncontroversial, widely-cited public classification are listed here; anything
  * else is [MediaBias.leanOf] == null ("Unrated") rather than guessed — the same "never guess" discipline this
@@ -11,9 +14,6 @@ package dev.mascwa.pulse.desktop.telemetry
  * ones, most visibly on the Wall Street Journal: its opinion page is widely seen as Lean Right while its news
  * desk is closer to Center, but only a flat outlet name is available here, so the whole outlet is classified
  * Lean Right, matching AllSides' general placement — the single most arguable entry in the table.
- *
- * Ported byte-for-byte from the Android app's `core:telemetry/MediaBias.kt` (zero android.* imports there —
- * a straight copy with the package renamed).
  */
 enum class Lean(val label: String) {
     LEFT("Left"), LEAN_LEFT("Lean Left"), CENTER("Center"), LEAN_RIGHT("Lean Right"), RIGHT("Right"),
@@ -93,7 +93,8 @@ object MediaBias {
     }
 
     /** A plain-English read of the spread, e.g. "6 of 9 rated outlets lean left, 2 lean right — you're
-     *  seeing one side a lot more than the other." A non-political-junkie can follow it. */
+     *  seeing one side a lot more than the other." A non-political-junkie can follow it, matching this
+     *  codebase's established "plain English, no jargon" voice (see [MarketMood.summarize]). */
     fun summarize(b: BiasBreakdown): String {
         if (b.rated == 0) return if (b.total == 0) "" else "No outlet in this coverage has a known lean yet."
         val leftLeaning = b.left + b.leanLeft

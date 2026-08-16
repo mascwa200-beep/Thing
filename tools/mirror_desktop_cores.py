@@ -3,11 +3,16 @@
 
 The desktop module deliberately declares NO dependency on :app or :core:* — that is what keeps it
 independently buildable without AGP or the Android SDK. The price is that shared pure logic has to be
-copied rather than imported, and a copy with nothing watching it drifts. It already has: before this
-script existed, `NewsMarketLink` and `NewsExplainers` had diverged from their originals in real code,
-not just comments, and nothing anywhere would have said so.
+copied rather than imported, and a copy with nothing watching it can drift.
 
-So the copy is mechanical and the result is checked. Every mirrored file gets a `// MIRROR OF <path>`
+⚠️ Diffing the pre-existing mirrors is what motivated this, and the result was NOT the scandal a first
+skim suggested: `NewsInsights`, `MediaBias` and `SocialBuzz` were identical, and `NewsMarketLink`
+differed only in trailing whitespace. `NewsExplainers` differs in real copy — and *correctly*, because
+it names social tabs and a cloud analysis engine the desktop does not have. The actual problem was that
+none of that was knowable without diffing six files by hand.
+
+So the copy is mechanical and the result is checked. Files that must be identical are listed here;
+files that are deliberately adapted are not, and say so in their own headers. Every mirrored file gets a `// MIRROR OF <path>`
 banner as its first line, and `MirrorDriftTest` re-derives the comparison the same way this script
 writes it: strip the banner, strip `package` lines, strip project-internal imports (those legitimately
 differ), and require everything else byte-identical.
@@ -26,8 +31,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 CORE = "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry"
+CORE_TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry"
 SURVIVAL = "app/src/main/java/dev/mascwa/pulse/data/survival"
 DESKTOP = "desktop/src/main/kotlin/dev/mascwa/pulse/desktop"
+DESKTOP_TEST = "desktop/src/test/kotlin/dev/mascwa/pulse/desktop"
 
 # source path -> mirror path. Pure logic only: none of these import android.* (verified before adding).
 MIRRORS: dict[str, str] = {
@@ -40,9 +47,27 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/DailyLesson.kt": f"{DESKTOP}/telemetry/DailyLesson.kt",
     f"{CORE}/DeviceSearch.kt": f"{DESKTOP}/telemetry/DeviceSearch.kt",
     f"{CORE}/EmergencyTriage.kt": f"{DESKTOP}/telemetry/EmergencyTriage.kt",
+    # The News vertical's signal stack, ported before this script existed. Brought under the guard now:
+    # these are pure logic and must stay identical. (NewsExplainers.kt and Explainer.kt are deliberately
+    # NOT here — they are adapted ports, not mirrors; see their headers.)
+    f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
+    f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
+    f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
+    f"{CORE}/SocialBuzz.kt": f"{DESKTOP}/telemetry/SocialBuzz.kt",
     # The library's own models and taxonomy — app-side content, but pure data.
     f"{SURVIVAL}/GuideModels.kt": f"{DESKTOP}/library/GuideModels.kt",
     f"{SURVIVAL}/GuideTaxonomy.kt": f"{DESKTOP}/library/GuideTaxonomy.kt",
+    # The tests come across too, so the same assertions gate BOTH platforms' CI. Mirroring logic
+    # without mirroring its tests would leave the desktop copy unexercised — which is the state the
+    # drift this script exists to prevent grew in.
+    f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
+    f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",
+    f"{CORE_TEST}/StudyQuestionsTest.kt": f"{DESKTOP_TEST}/telemetry/StudyQuestionsTest.kt",
+    f"{CORE_TEST}/RecallTest.kt": f"{DESKTOP_TEST}/telemetry/RecallTest.kt",
+    f"{CORE_TEST}/CurriculumTest.kt": f"{DESKTOP_TEST}/telemetry/CurriculumTest.kt",
+    f"{CORE_TEST}/DailyLessonTest.kt": f"{DESKTOP_TEST}/telemetry/DailyLessonTest.kt",
+    f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
+    f"{CORE_TEST}/EmergencyTriageTest.kt": f"{DESKTOP_TEST}/telemetry/EmergencyTriageTest.kt",
 }
 
 # Package renames applied to the mirror. Order matters only in that each source package maps to exactly

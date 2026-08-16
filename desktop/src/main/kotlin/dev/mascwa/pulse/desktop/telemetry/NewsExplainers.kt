@@ -1,3 +1,8 @@
+// ADAPTED PORT of core/telemetry/.../NewsExplainers.kt — deliberately NOT a strict mirror, and so
+// deliberately absent from tools/mirror_desktop_cores.py. The Android copy names the SOCIAL tabs
+// (Lemmy / Hacker News / Mastodon) and the cloud desk-note the analysis engine writes; the desktop
+// has neither, and describing features it does not have would be worse than differing. Keep the
+// THRESHOLDS in step with the Android original by hand; the wording is meant to differ.
 package dev.mascwa.pulse.desktop.telemetry
 
 /**

@@ -1,3 +1,4 @@
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NewsMarketLink.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
 package dev.mascwa.pulse.desktop.telemetry
 
 /** The direction a story likely pushes a linked market: up (good), down (bad), or unclear. */
@@ -26,14 +27,11 @@ data class MarketLink(
  * The taxonomy is DELIBERATELY WIDE (≈40 markets): broad indices, macro (bonds, the dollar, small caps),
  * every major sector, individual soft/hard commodities, and consumer-behaviour signals — so even a minor,
  * local or political story surfaces what it touches, not only the big headlines. Genuinely non-market news
- * (a parking-rules debate, a sports result) still yields nothing. Pure logic: keyword sector matching for the
- * association + a move/event lexicon for the direction (UP/DOWN when the headline states or clearly implies
- * a move, MIXED otherwise — honest rather than over-claiming).
+ * (a parking-rules debate, a sports result) still yields nothing. Pure logic (CI-gated): keyword sector
+ * matching for the association + a move/event lexicon for the direction (UP/DOWN when the headline states or
+ * clearly implies a move, MIXED otherwise — honest rather than over-claiming).
  *
  * This is a heuristic read of a headline, NOT financial advice or a live quote; it says "watch these".
- *
- * Ported byte-for-byte from the Android app's `core:telemetry/NewsMarketLink.kt` (zero android.* imports
- * there — a straight copy with the package renamed).
  */
 object NewsMarketLink {
 
@@ -66,7 +64,7 @@ object NewsMarketLink {
         val market: String,
         val why: String,
         val triggers: List<String>,
-        val haven: Boolean = false, // lifted by CRISIS words
+        val haven: Boolean = false,            // lifted by CRISIS words
         val extraUp: List<String> = emptyList(),
         val extraDown: List<String> = emptyList(),
         val upWhy: String = "",
@@ -263,7 +261,7 @@ object NewsMarketLink {
 
         return hits
             .map { def -> toLink(t, def, category) }
-            .sortedByDescending { it.strength } // clearest reactions first
+            .sortedByDescending { it.strength }   // clearest reactions first
             .take(max)
     }
 

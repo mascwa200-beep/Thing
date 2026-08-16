@@ -1,3 +1,4 @@
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/SocialBuzz.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
 package dev.mascwa.pulse.desktop.telemetry
 
 /** How much social-platform chatter a story's own vocabulary overlaps with. */
@@ -11,22 +12,21 @@ enum class BuzzLevel(val label: String) {
 
 /**
  * A local, offline read of how much social-platform chatter overlaps with a news story — NOT a live
- * mention-count, but a same-vocabulary topic-overlap signal: every social-platform title already visible
- * this session is run through the exact same [NewsInsights.topics] extraction already used for the
+ * mention-count (Pulse has no such API, and never sends the story to any server to ask), but a
+ * same-vocabulary topic-overlap signal: every Lemmy / Hacker News / Mastodon title already visible in the
+ * app's SOCIAL tabs is run through the exact same [NewsInsights.topics] extraction already used for the
  * article's own "#tag" chips, so a buzz match visibly correlates with what the reader already sees — no new
- * vocabulary, no black box. Pure, deterministic, no network — the caller is expected to have already
- * fetched the social feeds ONCE per screen session, not per article.
- *
- * Ported byte-for-byte from the Android app's `core:telemetry/SocialBuzz.kt` (zero android.* imports there
- * — a straight copy with the package renamed). Desktop v1's News vertical doesn't have social tabs wired
- * yet (see Desktop Phase B plan notes), so [socialTitles]/[trendTagNames] will simply be empty for now —
- * ported now anyway since it's zero-cost and the whole insider-knowledge stack travels together.
+ * vocabulary, no black box. Mastodon's trending hashtag names are matched directly against the article's own
+ * title/summary text instead (a hashtag like "Ukraine" or "Bitcoin" is a literal word, not a category label
+ * like "Politics"/"Markets", so it wouldn't itself survive [NewsInsights.topics] as an input the way a
+ * headline does). Pure, deterministic, no network — the caller is expected to have already fetched the
+ * social feeds ONCE per screen session (see `NewsViewModel`), not per article.
  */
 object SocialBuzz {
 
     /** [articleTags] is the article's own [NewsInsights.topics] output (already computed for its "#tag"
-     *  chips — pass it in rather than re-deriving it here). [socialTitles] are raw social-post titles
-     *  already fetched this session. [trendTagNames] are raw trending hashtag names. */
+     *  chips — pass it in rather than re-deriving it here). [socialTitles] are raw Lemmy/HN/Mastodon-status
+     *  titles already fetched this session. [trendTagNames] are raw Mastodon trending hashtag names. */
     fun score(
         articleTags: List<String>,
         socialTitles: List<String>,
