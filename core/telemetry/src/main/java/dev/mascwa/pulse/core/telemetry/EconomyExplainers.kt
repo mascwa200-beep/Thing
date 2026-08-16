@@ -31,6 +31,73 @@ object EconomyExplainers {
             "Population",
             "The total number of people living in the country.",
         )
+        "FR.INR.RINR" -> Explainer(
+            "Real interest rate",
+            "What lenders earn after inflation is taken out. If a loan charges 6% while prices rise 4%, " +
+                "the real rate is about 2% — that is the part that actually gains buying power. " +
+                "Negative real rates quietly punish savers and favour borrowers.",
+        )
+        "SH.XPD.CHEX.GD.ZS" -> Explainer(
+            "Health spending",
+            "How much of everything the country produces goes on health care, from all sources — " +
+                "government, insurers and people paying out of their own pockets. A share rather than a " +
+                "total, so it says how much of a priority health is rather than how good the care is.",
+        )
+        "SE.XPD.TOTL.GD.ZS" -> Explainer(
+            "Education spending",
+            "Government spending on education as a share of the whole economy. Many countries report " +
+                "this late or only occasionally, so this one is often several years behind — check the " +
+                "year on the card before reading anything into it.",
+        )
+        "MS.MIL.XPND.GD.ZS" -> Explainer(
+            "Military spending",
+            "Defence spending as a share of the whole economy. Deliberately shown without a good or bad " +
+                "colour: whether a country should spend more or less on its armed forces is a political " +
+                "question, not a statistical one.",
+        )
+        "SP.DYN.LE00.IN" -> Explainer(
+            "Life expectancy",
+            "How long a baby born this year would live if today's death rates held for its whole life. " +
+                "It is the single broadest measure of a country's health, and because it is a snapshot " +
+                "of current conditions it moves sharply in a bad year — a pandemic shows up here.",
+        )
+        "SI.POV.GINI" -> Explainer(
+            "Income inequality (Gini)",
+            "How unevenly income is shared, on a scale where 0 would mean everyone earns exactly the " +
+                "same and 100 would mean one person earns everything. Most countries land between 25 " +
+                "and 50; higher means the gap between top and bottom is wider.",
+        )
+        "SI.POV.DDAY" -> Explainer(
+            "Extreme poverty",
+            "The share of people living below the international extreme-poverty line — enough to cover " +
+                "only the barest essentials, adjusted so it means the same thing in every country. In " +
+                "rich countries this sits near zero, which is why it looks flat there.",
+        )
+        "IT.NET.USER.ZS" -> Explainer(
+            "Internet users",
+            "The share of people who have used the internet recently. A rough measure of how much of " +
+                "daily life — banking, government, work — a person can reach at all.",
+        )
+        "SP.URB.TOTL.IN.ZS" -> Explainer(
+            "Urban population",
+            "The share of people living in towns and cities rather than the countryside. Shown without " +
+                "a good or bad direction: cities concentrate opportunity and strain alike, and each " +
+                "country defines 'urban' its own way, so compare a country with itself over time " +
+                "rather than against its neighbours.",
+        )
+        "EN.GHG.CO2.PC.CE.AR5" -> Explainer(
+            "CO₂ per person",
+            "Carbon dioxide emitted per person per year, in tonnes. Per person rather than in total, so " +
+                "a small country is not flattered by being small — it is a measure of how carbon-heavy " +
+                "an average life here is.",
+        )
+        "EG.USE.PCAP.KG.OE" -> Explainer(
+            "Energy use per person",
+            "How much energy an average person uses in a year, expressed as the equivalent weight of " +
+                "oil. Shown without a good or bad direction: rising use can mean a warming, better-lit, " +
+                "more industrial country or simply a wasteful one, and the number alone cannot tell " +
+                "you which.",
+        )
         else -> Explainer(
             "Economic indicator",
             "A macroeconomic statistic from the World Bank Open Data set (annual; some series lag 1–2 years).",

@@ -33,6 +33,7 @@ import dev.mascwa.pulse.feature.common.LineChart
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.core.telemetry.EconomyVintage
 import dev.mascwa.pulse.ui.theme.Pulse
 import dev.mascwa.pulse.ui.theme.trendColor
 
@@ -119,16 +120,38 @@ fun IndicatorCard(series: IndicatorSeries, modifier: Modifier = Modifier) {
                 val yoy = series.yoyChange
                 val year = series.latest?.year
                 if (yoy != null && year != null) {
-                    val improving = if (series.higherIsBetter) yoy >= 0 else yoy <= 0
+                    // Neutral when the indicator has no agreed good direction. Colouring a rise in
+                    // military spending green or red would be the app taking a side; the number is
+                    // still shown, just not judged.
+                    val color = when (series.higherIsBetter) {
+                        null -> c.ink2
+                        true -> trendColor(yoy >= 0)
+                        false -> trendColor(yoy <= 0)
+                    }
                     Text(
                         "${if (yoy >= 0) "+" else ""}${Formatters.number(yoy, 2)} vs ${year - 1}",
-                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = trendColor(improving),
+                        fontFamily = JetBrainsMono, fontSize = 11.sp, color = color,
                         modifier = Modifier.padding(top = 2.dp),
                     )
-                } else if (year != null) {
+                }
+                // The vintage, always — not only when there is no year-over-year line to show.
+                //
+                // This used to sit in the `else` branch, so in the normal case (a series with two
+                // points) the number above carried no date at all. The World Bank publishes annually
+                // and revises late, so that number is routinely a year or two old; read in 2026, the
+                // newest US inflation figure is the 2024 one. Shown bare, it reads as current.
+                if (year != null) {
+                    val now = System.currentTimeMillis()
+                    val band = EconomyVintage.band(year, now)
                     Text(
-                        "AS OF $year",
-                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp, color = c.muted,
+                        EconomyVintage.describe(year, now).uppercase(),
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp,
+                        // Dim while the lag is what you would expect of an annual statistic; amber
+                        // once it is genuinely behind, so the eye is drawn only when it should be.
+                        color = when (band) {
+                            EconomyVintage.Vintage.CURRENT, EconomyVintage.Vintage.RECENT -> c.muted
+                            else -> c.amber
+                        },
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
