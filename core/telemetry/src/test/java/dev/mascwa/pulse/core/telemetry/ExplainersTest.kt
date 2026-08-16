@@ -1,7 +1,10 @@
 package dev.mascwa.pulse.core.telemetry
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -151,5 +154,83 @@ class ExplainersTest {
             assertTrue(e.headline.startsWith(b.name))
             assertTrue("${b.name} detail should carry its frequency", e.detail.contains("MHz"))
         }
+    }
+
+    // ---- market session ---------------------------------------------------------------------
+
+    /**
+     * A closed venue must say the price is not live. This is the whole point of the explainer: the
+     * number looks identical either way, so only the words can carry the difference.
+     */
+    @Test
+    fun aClosedMarketSaysThePriceIsNotLive() {
+        val e = MarketExplainers.session(
+            MarketSession.Phase.CLOSED, "Closed · last traded 3h ago", "NasdaqGS",
+        )
+        assertNotNull(e)
+        assertEquals("Closed · last traded 3h ago", e!!.headline)
+        assertTrue("must name the venue", e.detail.contains("NasdaqGS"))
+        assertTrue("must deny liveness", e.detail.contains("not a live one"))
+    }
+
+    @Test
+    fun anOpenMarketSaysThePriceIsLive() {
+        val e = MarketExplainers.session(MarketSession.Phase.OPEN, "Open · 2h to the bell")
+        assertNotNull(e)
+        assertTrue(e!!.detail.contains("live"))
+        // No venue given, so no venue named — never an empty "on ".
+        assertFalse(e.detail.contains(" on "))
+    }
+
+    /** Thin after-hours moves overstate themselves; the explainer has to say so. */
+    @Test
+    fun afterHoursWarnsThatTheMoveMayNotHold() {
+        val e = MarketExplainers.session(MarketSession.Phase.AFTER, "After hours")
+        assertNotNull(e)
+        assertTrue(e!!.detail.contains("thinly"))
+    }
+
+    /** An unestablished session explains nothing rather than asserting the market is shut. */
+    @Test
+    fun anUnknownSessionProducesNoExplainer() {
+        assertNull(MarketExplainers.session(MarketSession.Phase.UNKNOWN, "whatever"))
+        assertNull(MarketExplainers.session(MarketSession.Phase.CLOSED, "   "))
+    }
+
+    // ---- fifty-two-week range ---------------------------------------------------------------
+
+    @Test
+    fun theYearRangeReportsWhereInsideItThePriceSits() {
+        // (150 - 100) / (200 - 100) = 0.5 → 50%, and 0.5 is the mid band
+        val e = MarketExplainers.yearRange(150.0, 100.0, 200.0)
+        assertNotNull(e)
+        assertTrue(e!!.headline.contains("mid-range for the year"))
+        assertTrue(e.detail.contains("about 50%"))
+        assertTrue(e.detail.contains("100.00") && e.detail.contains("200.00"))
+    }
+
+    @Test
+    fun aPriceAtTheTopOfItsYearSaysSo() {
+        // (198 - 100) / 100 = 0.98 → 98%, above the 0.95 band
+        val e = MarketExplainers.yearRange(198.0, 100.0, 200.0)
+        assertNotNull(e)
+        assertTrue(e!!.headline.contains("at its 52-week high"))
+        assertTrue(e.detail.contains("near the top"))
+    }
+
+    /** Sub-unit instruments need the decimals that actually move. */
+    @Test
+    fun smallPricesKeepTheirPrecision() {
+        val e = MarketExplainers.yearRange(0.5000, 0.1000, 0.9000)
+        assertNotNull(e)
+        assertTrue("a currency pair rendered at 2dp loses the moving digits", e!!.detail.contains("0.1000"))
+        assertTrue(e.detail.contains("0.9000"))
+    }
+
+    @Test
+    fun anUnusableYearRangeExplainsNothing() {
+        assertNull(MarketExplainers.yearRange(150.0, null, 200.0))
+        assertNull(MarketExplainers.yearRange(150.0, 200.0, 200.0))
+        assertNull(MarketExplainers.yearRange(null, 100.0, 200.0))
     }
 }

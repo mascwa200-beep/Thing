@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.markets
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.MarketBar
+import dev.mascwa.pulse.core.telemetry.MarketSession
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import dev.mascwa.pulse.data.settings.WatchItem
@@ -22,6 +23,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.net.URLEncoder
@@ -222,9 +224,12 @@ class MarketsRepository(
             ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject ?: error("No data for ${item.id}")
         val meta = result["meta"]?.jsonObject ?: error("No meta for ${item.id}")
         fun metaD(k: String) = meta[k]?.jsonPrimitive?.doubleOrNull
+        fun metaL(k: String) = meta[k]?.jsonPrimitive?.longOrNull
+        fun metaS(k: String) = meta[k]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         val price = metaD("regularMarketPrice") ?: error("No price for ${item.id}")
-        val closes = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
-            ?.firstOrNull()?.jsonObject?.get("close")?.jsonArray
+        val quoteArrays = result["indicators"]?.jsonObject?.get("quote")?.jsonArray
+            ?.firstOrNull()?.jsonObject
+        val closes = quoteArrays?.get("close")?.jsonArray
             ?.mapNotNull { it.jsonPrimitive.doubleOrNull } ?: emptyList()
         // Previous *trading-day* close, for TODAY's move. NOT chartPreviousClose: on a range=1mo chart
         // that field is the close BEFORE the whole month-long range, so price-vs-it is a ~1-MONTH change
@@ -239,6 +244,36 @@ class MarketsRepository(
         val currency = if (item.type == WatchType.FOREX) ""
         else meta["currency"]?.jsonPrimitive?.contentOrNull ?: currencyFor(item)
 
+        // The venue's own timestamps, all in epoch SECONDS on the wire.
+        val marketTimeSec = metaL("regularMarketTime")
+        val gmtOffsetSec = metaL("gmtoffset") ?: 0L
+
+        // Today's opening price.
+        //
+        // It is NOT `meta.regularMarketOpen` — the chart endpoint has no such key, so this field
+        // read null on every quote the app has ever shown. The open lives in the indicator arrays,
+        // as the first price of the last daily candle. Guarded on that candle belonging to the same
+        // venue day as the last trade: before the bell the last candle is still yesterday's, and its
+        // open under a live price would be a stale number with nothing marking it stale.
+        val barTimes = result["timestamp"]?.jsonArray?.map { it.jsonPrimitive.longOrNull } ?: emptyList()
+        val opens = quoteArrays?.get("open")?.jsonArray?.map { it.jsonPrimitive.doubleOrNull } ?: emptyList()
+        val open = run {
+            val lastBar = barTimes.lastOrNull() ?: return@run null
+            if (marketTimeSec == null) return@run null
+            if (!MarketSession.sameVenueDay(lastBar, marketTimeSec, gmtOffsetSec)) return@run null
+            opens.getOrNull(barTimes.lastIndex)
+        }
+
+        // The venue's sessions, so the UI can say whether the market is open rather than implying it.
+        val periods = meta["currentTradingPeriod"]?.jsonObject
+        fun periodMs(which: String, bound: String): Long? =
+            periods?.get(which)?.jsonObject?.get(bound)?.jsonPrimitive?.longOrNull?.times(1000L)
+        val hours = if (periods == null) null else SessionHours(
+            preStartMs = periodMs("pre", "start"), preEndMs = periodMs("pre", "end"),
+            startMs = periodMs("regular", "start"), endMs = periodMs("regular", "end"),
+            postStartMs = periodMs("post", "start"), postEndMs = periodMs("post", "end"),
+        )
+
         return Quote(
             id = item.id,
             label = item.label,
@@ -247,13 +282,20 @@ class MarketsRepository(
             change = change,
             changePercent = pct,
             previousClose = prev,
-            open = metaD("regularMarketOpen"),
+            open = open,
             high = metaD("regularMarketDayHigh"),
             low = metaD("regularMarketDayLow"),
             volume = metaD("regularMarketVolume"),
             currency = currency,
             updatedEpochMs = System.currentTimeMillis(),
             sparkline = closes.takeLast(40),
+            fiftyTwoWeekHigh = metaD("fiftyTwoWeekHigh"),
+            fiftyTwoWeekLow = metaD("fiftyTwoWeekLow"),
+            marketTimeMs = marketTimeSec?.times(1000L),
+            hours = hours,
+            name = metaS("longName") ?: metaS("shortName"),
+            exchange = metaS("fullExchangeName") ?: metaS("exchangeName"),
+            priceHint = meta["priceHint"]?.jsonPrimitive?.intOrNull,
         )
     }
 

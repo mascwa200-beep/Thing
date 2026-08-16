@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import dev.mascwa.pulse.core.util.Formatters
+import dev.mascwa.pulse.core.telemetry.MarketSession
 import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.settings.WatchType
 import dev.mascwa.pulse.feature.common.ChangePill
@@ -63,6 +64,22 @@ fun QuoteRow(quote: Quote, modifier: Modifier = Modifier) {
                 Text(
                     "L ${Formatters.number(quote.low, 2)} · H ${Formatters.number(quote.high, 2)}",
                     style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Where the price sits in its own year — but only when that is news.
+            //
+            // A percentage move says what changed since yesterday and nothing about whether the
+            // price is high or low, which is often the better question. The row stays quiet through
+            // the broad middle deliberately: a line that appears on every instrument stops being
+            // read, and "mid-range" is the answer most of the time. Tap through for the full range.
+            MarketSession.describeRange(
+                MarketSession.rangePosition(quote.price, quote.fiftyTwoWeekLow, quote.fiftyTwoWeekHigh),
+            )?.takeIf { it.startsWith("at") || it.startsWith("near") }?.let { band ->
+                Text(
+                    band.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
