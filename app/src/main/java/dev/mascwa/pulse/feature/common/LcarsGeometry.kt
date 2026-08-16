@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import dev.mascwa.pulse.core.telemetry.LcarsCodes
 import dev.mascwa.pulse.notifications.AlertCondition
 import dev.mascwa.pulse.notifications.AlertStatus
@@ -684,3 +685,175 @@ fun LcarsNavBar(
 private const val HUE_OFFSET = 2
 private val NavBarHeight = 52.dp
 private val NavIconSize = 17.dp
+
+// ---------------------------------------------------------------------------------------------
+// Controls. The kit could draw panels, rails, headers, chips and a nav bar, and had no button, no
+// switch and no dialog — so every screen that needed one either reached for Material or hand-rolled
+// its own. The good hand-rolled button was private inside one screen with a dozen call sites nobody
+// else could reach; these three exist so that stops being the reason a screen stays Material.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A button.
+ *
+ * The shape is the one `JarvisSetupScreen` had already arrived at privately — a swept-corner block,
+ * outlined, with the fill at a low alpha so it reads as a control rather than as a filled panel.
+ * Disabled goes to the muted hue rather than to a transparency, because a translucent control on a
+ * dark ground stops being legible before it stops being tappable.
+ */
+@Composable
+fun LcarsButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    color: Color = Pulse.colors.accent,
+    corner: LcarsCorner = LcarsCorner.TopStart,
+) {
+    val tint = if (enabled) color else Pulse.colors.muted
+    val cue = rememberLcarsCue()
+    val shape = lcarsBlockShape(ControlSweep, corner)
+    Box(
+        modifier
+            .clip(shape)
+            .background(tint.copy(alpha = 0.08f))
+            .border(1.dp, tint.copy(alpha = 0.6f), shape)
+            .clickable(enabled = enabled) { cue(SoundCue.TAP, HapticCue.TAP_CRISP); onClick() }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text,
+            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = tint,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * A two-state control.
+ *
+ * Material's switch is a rounded pill with a circular thumb, which is the most conspicuously
+ * un-LCARS shape the app had left — this vocabulary has no curves anywhere else. Two blocks in a
+ * track: the lit one is where the state is, and the whole control is the tap target.
+ *
+ * Labelled ON/OFF rather than relying on colour alone. A block that is orange when on and grey when
+ * off is unreadable to anyone who cannot tell those apart, and ambiguous to everyone at a glance in
+ * a row of eighty settings.
+ */
+@Composable
+fun LcarsSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    color: Color = Pulse.colors.accent,
+) {
+    val c = Pulse.colors
+    val tint = if (!enabled) c.muted else if (checked) color else c.line
+    val cue = rememberLcarsCue()
+    Row(
+        modifier
+            .clip(lcarsBlockShape(ControlSweep, LcarsCorner.TopStart))
+            .background(c.raise)
+            .clickable(enabled = enabled) {
+                cue(if (checked) SoundCue.TAP else SoundCue.SELECT, HapticCue.SELECT)
+                onCheckedChange(!checked)
+            }
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Off-block then on-block, so the lit half sits where the eye expects the "further along"
+        // state to be, the way a physical rocker does.
+        SwitchHalf("OFF", lit = !checked, tint = if (checked) c.line else c.muted)
+        SwitchHalf("ON", lit = checked, tint = tint)
+    }
+}
+
+@Composable
+private fun SwitchHalf(label: String, lit: Boolean, tint: Color) {
+    val c = Pulse.colors
+    Box(
+        Modifier
+            .width(SwitchHalfWidth)
+            .height(SwitchHeight)
+            .background(if (lit) tint else Color.Transparent),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 0.8.sp,
+            color = if (lit) c.void else c.muted,
+        )
+    }
+}
+
+/**
+ * A dialog.
+ *
+ * Material's `AlertDialog` brings its own rounded surface, its own typography and its own button
+ * row, which is three separate places for the app's own look to leak away — and it is the last
+ * thing standing between the user and a decision, so it is the worst place to look like a different
+ * application.
+ *
+ * The rail runs down the left, the same motif as every screen, so a dialog reads as part of the
+ * console rather than as something the system put on top of it.
+ */
+@Composable
+fun LcarsDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    confirmText: String? = null,
+    onConfirm: (() -> Unit)? = null,
+    dismissText: String = "CLOSE",
+    seed: String = title,
+    content: @Composable () -> Unit,
+) {
+    val c = Pulse.colors
+    Dialog(onDismissRequest = onDismiss) {
+        Row(
+            modifier
+                .fillMaxWidth()
+                .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
+                .background(c.panel)
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(RailGutter),
+        ) {
+            // A short rail, not the full screen one: enough to carry the motif without turning a
+            // dialog into a scale model of a screen.
+            LcarsRail(seed, Modifier.width(DialogRailWidth).fillMaxHeight(), weights = DialogRailWeights)
+            Column(Modifier.weight(1f).padding(end = 14.dp, top = 14.dp, bottom = 14.dp)) {
+                Text(
+                    title.uppercase(),
+                    fontFamily = Antonio, fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp, letterSpacing = 1.5.sp, color = c.accent,
+                )
+                Box(Modifier.padding(top = 10.dp)) { content() }
+                Row(
+                    Modifier.padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (confirmText != null && onConfirm != null) {
+                        LcarsButton(confirmText, onClick = onConfirm, color = c.accent)
+                    }
+                    LcarsButton(dismissText, onClick = onDismiss, color = c.muted)
+                }
+            }
+        }
+    }
+}
+
+private val ControlSweep = 8.dp
+private val SwitchHalfWidth = 30.dp
+private val SwitchHeight = 22.dp
+private val DialogRailWidth = 22.dp
+
+/**
+ * Fewer, chunkier blocks than a screen rail — a dialog is short and a seven-block rail reads as noise.
+ *
+ * ⚠️ Every weight is deliberately under [CODE_MIN_WEIGHT]. Above it the rail letters the block with a
+ * numeric code, and a four-digit code at 9sp is wider than this rail — it would clip, on a control
+ * whose whole job is to look deliberate.
+ */
+private val DialogRailWeights = listOf(1.4f, 0.6f, 1.8f)

@@ -47,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
@@ -169,15 +170,15 @@ fun JarvisSetupScreen(
             NeonPanel {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NeonButton(text = "APPROVALS", enabled = true, color = c.amber, onClick = onOpenApprovals)
-                        NeonButton(text = "MEMORY", enabled = true, color = c.positive, onClick = onOpenMemory)
+                        LcarsButton(text = "APPROVALS", enabled = true, color = c.amber, onClick = onOpenApprovals)
+                        LcarsButton(text = "MEMORY", enabled = true, color = c.positive, onClick = onOpenMemory)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NeonButton(text = "LOCKDOWN", enabled = true, color = c.magenta, onClick = vm::runLockdown)
-                        NeonButton(text = "CLEAR CHAT", enabled = true, color = c.muted, onClick = vm::clearChat)
+                        LcarsButton(text = "LOCKDOWN", enabled = true, color = c.magenta, onClick = vm::runLockdown)
+                        LcarsButton(text = "CLEAR CHAT", enabled = true, color = c.muted, onClick = vm::clearChat)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NeonButton(text = "DOSSIER", enabled = true, color = c.violet, onClick = onOpenDossier)
+                        LcarsButton(text = "DOSSIER", enabled = true, color = c.violet, onClick = onOpenDossier)
                     }
                 }
             }
@@ -249,14 +250,14 @@ fun JarvisSetupScreen(
 
             val isRunning = download is ModelDownloadState.Running
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NeonButton(
+                LcarsButton(
                     text = if (isRunning) "DOWNLOADING…" else "DOWNLOAD MODEL",
                     enabled = !isRunning && url.isNotBlank(),
                     color = c.accent,
                     onClick = vm::download,
                 )
                 if (download is ModelDownloadState.Done) {
-                    NeonButton(
+                    LcarsButton(
                         text = "DELETE",
                         enabled = !isRunning,
                         color = c.magenta,
@@ -296,7 +297,7 @@ fun JarvisSetupScreen(
                     "refers to itself, how it addresses you, its quirks…",
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NeonButton(text = "SAVE CHARTER", enabled = true, color = c.accent, onClick = vm::saveCharter)
+                LcarsButton(text = "SAVE CHARTER", enabled = true, color = c.accent, onClick = vm::saveCharter)
             }
             Text(
                 "Saved on-device. A built-in safety rule is always appended in code and can't be " +
@@ -513,7 +514,7 @@ fun JarvisSetupScreen(
                     MonoField(kbTitle, { kbTitle = it }, "Title (e.g. Kotlin coroutines)")
                     MonoFieldArea(kbBody, { kbBody = it }, "Paste document text…")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NeonButton(
+                        LcarsButton(
                             text = "ADD DOC",
                             enabled = kbBody.isNotBlank(),
                             color = c.accent,
@@ -523,7 +524,7 @@ fun JarvisSetupScreen(
                                 kbBody = ""
                             },
                         )
-                        NeonButton(
+                        LcarsButton(
                             text = "IMPORT FILE / DRIVE",
                             enabled = true,
                             color = c.accent,
@@ -538,7 +539,7 @@ fun JarvisSetupScreen(
                             },
                         )
                         if (knowledgeChunks > 0) {
-                            NeonButton(
+                            LcarsButton(
                                 text = "CLEAR",
                                 enabled = true,
                                 color = c.magenta,
@@ -932,20 +933,6 @@ private fun ProgressBar(pct: Int, downloadedBytes: Long, totalBytes: Long) {
             "${formatMb(downloadedBytes)} downloaded"
         }
         Text(label, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
-    }
-}
-
-@Composable
-private fun NeonButton(text: String, enabled: Boolean, color: Color, onClick: () -> Unit) {
-    val tint = if (enabled) color else Pulse.colors.muted
-    Box(
-        Modifier
-            .border(1.dp, tint.copy(alpha = 0.6f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-            .background(tint.copy(alpha = 0.08f), lcarsBlockShape(sweep = 6.dp, corner = LcarsCorner.TopStart))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    ) {
-        Text(text, fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp, color = tint)
     }
 }
 
