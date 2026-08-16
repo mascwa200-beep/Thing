@@ -317,4 +317,50 @@ class DayAheadTest {
         assertEquals("1h", DayAhead.minutesOf(3600))
         assertEquals("1h 30m", DayAhead.minutesOf(5400))
     }
+
+    // ---- the reader's zone ---------------------------------------------------------------------
+
+    /**
+     * Every clock time a beat states must come from the caller's formatter, not the core's UTC one.
+     *
+     * This is the guard on a real defect: the core writes times into four different beat texts, and
+     * before the formatter was injected all four rendered in UTC — correct in London, an hour out in
+     * Berlin and eleven hours out in Auckland, with nothing on screen admitting it.
+     */
+    @Test
+    fun everyClockTimeInThePlanComesFromTheCallersFormatter() {
+        // A deliberately unmistakable formatter: if any string escaped it, it would read "08:27".
+        val marked = { ms: Long -> "<${DayAhead.clockOf(ms)}>" }
+        val beats = DayAhead.plan(
+            commitments = listOf(
+                event("a", "Dentist", 9, 10, 51.5, 0.1),
+                event("b", "Studio", 16, 17, 51.6, 0.2),
+            ),
+            nowMs = at(7, 0),
+            topTask = "Ship the release",
+            travelTo = { road(25) },
+            clock = marked,
+        )
+        val texts = beats.map { it.title + " " + it.detail }
+        assertTrue("nothing may render a bare UTC clock: $texts", texts.none { Regex("(?<!<)\\d\\d:\\d\\d").containsMatchIn(it) })
+
+        // And each of the four places the core states a time went through it.
+        assertEquals("Leave by <08:27> for Dentist", beats.first { it.kind == K.DEPART }.title)
+        assertTrue(beats.first { it.kind == K.EVENT }.detail.contains("<09:00> – <10:00>"))
+        assertTrue(beats.first { it.kind == K.FOCUS }.detail.contains("<10:00> – <16:00>"))
+        assertTrue(beats.first { it.kind == K.DAY_END }.detail.contains("After <17:00>"))
+    }
+
+    /** The times themselves stay true epoch, so downstream comparisons against a real clock hold. */
+    @Test
+    fun theFormatterDoesNotMoveTheTimestamps() {
+        val commitments = listOf(event("a", "Dentist", 9, 10, 51.5, 0.1))
+        val plain = DayAhead.plan(commitments, nowMs = at(7, 0), travelTo = { road(25) })
+        val shifted = DayAhead.plan(
+            commitments, nowMs = at(7, 0), travelTo = { road(25) },
+            clock = { ms -> DayAhead.clockOf(ms + 13 * 3_600_000L) },
+        )
+        assertEquals(plain.map { it.atMs }, shifted.map { it.atMs })
+        assertEquals(at(8, 27), shifted.first { it.kind == K.DEPART }.atMs)
+    }
 }

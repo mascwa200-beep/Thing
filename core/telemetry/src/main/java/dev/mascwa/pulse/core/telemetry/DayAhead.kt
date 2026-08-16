@@ -153,6 +153,15 @@ object DayAhead {
      * stays pure, and the caller decides how much routing it is willing to pay for. Either may
      * return null, which suppresses the beats that depend on it rather than guessing.
      *
+     * [clock] is injected for the same reason and one more: the core has no zone, and every time it
+     * writes into a beat's text is read by a person. A caller rendering for a device passes a
+     * formatter in the device's own zone — which is also DST-correct, where an offset arithmetic
+     * would not be across a transition. The default is UTC, for tests.
+     *
+     * ⚠️ [Beat.atMs] stays true epoch throughout, deliberately: it is compared against a real clock
+     * downstream and sorted on. Shifting times into a display zone on the way *in* would corrupt
+     * both, which is why the zone enters as a formatter rather than as an offset.
+     *
      * Commitments that have already ended are dropped; ones under way are kept, because "you are in
      * this until 15:00" shapes everything after it.
      */
@@ -163,6 +172,7 @@ object DayAhead {
         topTask: String? = null,
         travelTo: (Commitment) -> TravelEstimate? = { null },
         travelFrom: (Commitment, Commitment) -> TravelEstimate? = { _, _ -> null },
+        clock: (Long) -> String = ::clockOf,
     ): List<Beat> {
         val live = commitments
             .filter { !it.allDay && it.endMs > nowMs }
@@ -180,7 +190,7 @@ object DayAhead {
             val title = when {
                 depart <= nowMs -> "Leave now for ${c.title}"
                 minutes <= IMMINENT_MIN -> "Leave in $minutes min for ${c.title}"
-                else -> "Leave by ${clockOf(depart)} for ${c.title}"
+                else -> "Leave by ${clock(depart)} for ${c.title}"
             }
             val wet = hourAt(hours, depart)?.precipProbability?.takeIf { it >= WET_PROBABILITY }
             val detail = buildString {
@@ -226,7 +236,7 @@ object DayAhead {
                 atMs = c.startMs,
                 kind = BeatKind.EVENT,
                 title = c.title,
-                detail = "${clockOf(c.startMs)} – ${clockOf(c.endMs)}",
+                detail = "${clock(c.startMs)} – ${clock(c.endMs)}",
                 confidence = Confidence.FIRM,
                 sources = listOf("calendar"),
             )
@@ -240,7 +250,7 @@ object DayAhead {
                     atMs = from,
                     kind = BeatKind.FOCUS,
                     title = topTask?.let { "Clear stretch for: $it" } ?: "Clear stretch",
-                    detail = "${clockOf(from)} – ${clockOf(to)}, about ${minutesOf(mins * 60)} with nothing booked.",
+                    detail = "${clock(from)} – ${clock(to)}, about ${minutesOf(mins * 60)} with nothing booked.",
                     confidence = Confidence.FIRM,
                     sources = buildList { add("calendar"); if (topTask != null) add("tasks") },
                 )
@@ -251,7 +261,7 @@ object DayAhead {
                 atMs = last.endMs,
                 kind = BeatKind.DAY_END,
                 title = "Last commitment ends",
-                detail = "After ${clockOf(last.endMs)} the day is yours.",
+                detail = "After ${clock(last.endMs)} the day is yours.",
                 confidence = Confidence.FIRM,
                 sources = listOf("calendar"),
             )
@@ -335,11 +345,11 @@ object DayAhead {
     }
 
     /**
-     * A wall clock time, UTC.
+     * A wall clock time in UTC — the default [plan] falls back to, and what the tests assert against.
      *
-     * ⚠️ The core cannot know the reader's zone and must not pretend to: callers that render for a
-     * person pass times already shifted into the device zone, exactly as this repo learned to do
-     * after shipping a "tonight" that was computed against UTC midnight.
+     * ⚠️ The core cannot know the reader's zone and must not pretend to. Anything rendering for a
+     * person passes its own formatter into [plan] instead, exactly as this repo learned to do after
+     * shipping a "tonight" that was computed against UTC midnight.
      */
     internal fun clockOf(ms: Long): String {
         val minutesOfDay = Math.floorMod(ms / MINUTE, 1440L)
