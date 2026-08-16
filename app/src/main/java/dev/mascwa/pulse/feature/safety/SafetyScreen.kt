@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.feature.safety
 
+import dev.mascwa.pulse.core.telemetry.SafetyCoverage
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
@@ -109,8 +110,22 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                     result.isInitialLoading -> LoadingState()
                     result.isError -> ErrorState(result.error ?: "Error", onRetry = { vm.refresh() })
                     filtered.isEmpty() -> EmptyState(
-                        if (typeFilter != null) "No ${typeFilter!!.label.lowercase()} incidents near you right now."
-                        else "No incidents reported near you right now.",
+                        // An empty list used to assert "nothing is happening near you", which is a
+                        // claim about the world made on evidence we may not have: two of the four
+                        // sources only cover the US and the UK respectively, so everywhere else they
+                        // return nothing by construction. Say what looked, and what could not.
+                        buildString {
+                            append(
+                                if (typeFilter != null) {
+                                    "No ${typeFilter!!.label.lowercase()} incidents near you right now."
+                                } else {
+                                    "No incidents reported near you right now."
+                                },
+                            )
+                            val states = result.data?.coverage().orEmpty()
+                            SafetyCoverage.describeChecked(states)?.let { append("\n\n").append(it) }
+                            SafetyCoverage.explainSilence(states)?.let { append("\n").append(it) }
+                        },
                     )
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp, top = 8.dp),

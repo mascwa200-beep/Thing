@@ -2877,6 +2877,60 @@ cards at dialog width; and whether the range line on a row is welcome or noise.
 every instrument, so an FX pair's day range rendered as "1.08 · 1.09" — rounding away exactly the
 digits that move. `formatPrice` already handled this for the price itself; the range line did not.
 
+### ECONOMY SAYS HOW OLD ITS NUMBERS ARE (PR #434)
+
+ECONOMY/INFLATION (sub-tabs of MARKETS) were the last feature areas never deepened. `IndicatorCard`
+showed `AS OF <year>` **only in the `else` branch** of the year-over-year line, so in the ordinary
+case — a series with two points — the big number carried **no date at all**. A live probe pinned the
+cost: today is 2026 and the newest US CPI figure the World Bank has is **2024**, twenty months old,
+rendering as a bare `2.95%` that any reader takes as current. The only warning was a footnote under
+the whole list.
+
+- **`5ff4960` — the vintage, on the number.** `core:telemetry/EconomyVintage.kt` (+10 tests, run
+  locally). Three decisions are load-bearing: age is measured **from the END of the data year**
+  (an annual figure describes the whole year; stamping it 1 January ages it by twelve months it never
+  lived); **fifteen months of slack** before anything is called stale (annual data lands part-way
+  through the next year, so a twelve-month cutoff flags every series for months and teaches the
+  reader to ignore the flag); and **years rounded, not truncated** ("3 years old" for 44 months
+  understates it in the one direction this feature exists to prevent). The hand-rolled calendar
+  (`civilFromDays`, kept platform-free for the core) was **checked against the JDK across ~50,000
+  days** incl. pre-epoch and leap years — the test builds fixtures with the *inverse* formula so a
+  shared bug cannot cancel itself out. Also carried through: the World Bank's own `lastupdated`,
+  which the client discarded — three different dates (the year described, the source's revision, our
+  fetch) were collapsed into one. **Plus a gate before it was needed:** the dashboard fanned one
+  unguarded request per indicator; `WorldBankClient` now mirrors `yahooGate`. One gate per host.
+- **`fad9a1b` — nine more indicators, grouped, none of them mute.** Life expectancy, Gini, extreme
+  poverty, internet users, urban share, CO₂/energy per person, health/education/military spending —
+  19 in all, **every id probed live before being added**; they span all four vintage bands (US
+  education spend is a 2021 figure and now says so in amber). `higherIsBetter` became **nullable**:
+  whether a country should spend more on its military is political, not statistical, and colouring
+  that change green or red would be the app answering it — military/urban/energy/population now
+  render neutral. Grouped into Prices · Growth & jobs · Government & trade · People.
+  ⚠️ **The guard:** `forIndicator` is a `when` with a generic `else`, so a new indicator ships
+  looking finished while explaining nothing. `app/src/test/…/EconomyIndicatorCoverageTest` enumerates
+  the enum and fails if any entry falls through — it lives in the **app** module because the enum
+  does (CI runs `:app:testDebugUnitTest`), and a hand-maintained id list in the core test would drift.
+
+**Method notes worth keeping.** The app-module guard was **negative-tested** — a deliberately mute
+indicator injected into a scratch copy of the enum, confirming the test fails and names it; a guard
+that cannot fail is worse than no guard. And app-module tests with no Android dependency **can be run
+locally**: compile them against `core:telemetry` sources plus `kotlinx-serialization-core-jvm`, with
+the usual jars on the compiler's own `-cp` (the coroutines jar is required there or the compiler dies
+with `NoClassDefFoundError: kotlinx/coroutines/CoroutineScope`).
+
+⚠️ **Owner-verify on the Pixel:** 19 cards under four headers is much more page than before — does it
+read as a picture or a list; the amber vintage line; and whether neutral grey on military spending
+reads as deliberate rather than broken.
+
+- **Follow-up, same defect at higher stakes:** the INFLATION sub-tab renders a **36sp** headline
+  percentage with only a dim year beneath it — the biggest number in the app for "what is inflation",
+  and today that is a 2024 figure. It now carries the full vintage and goes amber when DATED/OLD, the
+  same as the cards. (The staleness check is spelled out as a `when` rather than an ordinal `>=`
+  comparison: the bands happen to be declared in age order, but nothing enforces that.)
+
+**Flagged, not built:** monthly CPI from BLS/FRED would make INFLATION genuinely current but only for
+the US, and the tab is country-agnostic (FRED also needs a key). That asymmetry is an owner call.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

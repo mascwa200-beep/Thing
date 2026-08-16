@@ -1,5 +1,7 @@
 package dev.mascwa.pulse.data.safety
 
+import dev.mascwa.pulse.core.network.HttpException
+import dev.mascwa.pulse.core.telemetry.SafetyCoverage
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
@@ -38,17 +40,51 @@ class SafetyRepository(
             }
         }
         return try {
+            // Each source's outcome is kept, not swallowed. `runCatching{}.getOrDefault(emptyList())`
+            // made a failed fetch identical to an empty one, and both identical to a source that does
+            // not operate here — so the screen asserted "nothing reported nearby" in all three cases.
+            val states = mutableMapOf<SafetyCoverage.Source, SafetyCoverage.Availability>()
             val incidents = coroutineScope {
-                val quakesD = async { runCatching { usgs(lat, lon) }.getOrDefault(emptyList()) }
-                val gdacsD = async { runCatching { gdacs(lat, lon) }.getOrDefault(emptyList()) }
-                val nwsD = async { runCatching { nws(lat, lon) }.getOrDefault(emptyList()) }
-                val crimeD = async { runCatching { ukCrime(lat, lon) }.getOrDefault(emptyList()) }
-                (quakesD.await() + gdacsD.await() + nwsD.await() + crimeD.await())
+                val quakesD = async { runCatching { usgs(lat, lon) } }
+                val gdacsD = async { runCatching { gdacs(lat, lon) } }
+                val nwsD = async { runCatching { nws(lat, lon) } }
+                val crimeD = async { runCatching { ukCrime(lat, lon) } }
+
+                val quakes = quakesD.await()
+                val disasters = gdacsD.await()
+                val alerts = nwsD.await()
+                val crime = crimeD.await()
+
+                // Both of these are worldwide, so any absence of results is real.
+                states[SafetyCoverage.Source.QUAKES] = availability(quakes.isSuccess)
+                states[SafetyCoverage.Source.DISASTERS] = availability(disasters.isSuccess)
+
+                // The weather feed states its own reach: outside the United States it answers 400
+                // "out of bounds" rather than an empty list, so this needs no geographic guess.
+                states[SafetyCoverage.Source.WEATHER_ALERTS] = when {
+                    alerts.isSuccess -> SafetyCoverage.Availability.COVERED
+                    (alerts.exceptionOrNull() as? HttpException)?.code == 400 ->
+                        SafetyCoverage.Availability.NOT_COVERED
+                    else -> SafetyCoverage.Availability.FAILED
+                }
+
+                // The crime feed does not: Berlin, Edinburgh and a quiet English village all get
+                // `200 []`, so geography is the only signal there is. A failure still overrides it —
+                // we would rather say "couldn't reach it" than "it doesn't cover you" when the truth
+                // is that we never got an answer.
+                states[SafetyCoverage.Source.STREET_CRIME] =
+                    if (crime.isFailure) SafetyCoverage.Availability.FAILED
+                    else SafetyCoverage.crimeCoverage(lat, lon)
+
+                listOf(quakes, disasters, alerts, crime).flatMap { it.getOrDefault(emptyList()) }
             }
                 .distinctBy { it.id }
                 .sortedWith(compareBy({ it.distanceMeters }, { -it.timeEpochMs }))
                 .take(60)
-            val result = SafetyResult(lat, lon, incidents)
+            val result = SafetyResult(
+                lat, lon, incidents,
+                sourceStates = states.entries.associate { (k, v) -> k.name to v.name },
+            )
             cache.write(key, result, SafetyResult.serializer())
             Fetched(result, false)
         } catch (e: Exception) {
@@ -58,6 +94,10 @@ class SafetyRepository(
             throw e
         }
     }
+
+    /** A worldwide source either answered or did not; there is no third state for it. */
+    private fun availability(ok: Boolean) =
+        if (ok) SafetyCoverage.Availability.COVERED else SafetyCoverage.Availability.FAILED
 
     private fun recompute(r: SafetyResult, lat: Double, lon: Double): SafetyResult {
         val updated = r.incidents.map {

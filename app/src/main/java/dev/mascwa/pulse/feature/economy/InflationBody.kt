@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import dev.mascwa.pulse.core.telemetry.EconomyVintage
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -119,10 +120,24 @@ fun InflationBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                                         color = trendColor((latest?.value ?: 0.0) <= 3.0),
                                         modifier = Modifier.padding(top = 2.dp),
                                     )
+                                    // The vintage, not just the year — this is the biggest number in
+                                    // the app for "what is inflation", and read today it is likely
+                                    // to be a figure from two years ago. A bare year under a 36sp
+                                    // percentage is not enough to stop that reading as current.
+                                    val now = System.currentTimeMillis()
+                                    val vintage = latest?.year?.let { EconomyVintage.describe(it, now) }
+                                    // Spelled out rather than compared by ordinal: the bands happen
+                                    // to be declared in age order, but nothing enforces that, and a
+                                    // reorder should not silently change what counts as stale.
+                                    val aged = when (latest?.year?.let { EconomyVintage.band(it, now) }) {
+                                        EconomyVintage.Vintage.DATED, EconomyVintage.Vintage.OLD -> true
+                                        else -> false
+                                    }
                                     Text(
                                         ("${series?.countryName ?: state.country}" +
-                                            (latest?.year?.let { " · $it" } ?: "")).uppercase(),
-                                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp, color = c.muted,
+                                            (vintage?.let { " · $it" } ?: "")).uppercase(),
+                                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.6.sp,
+                                        color = if (aged) c.amber else c.muted,
                                     )
                                     if ((series?.points?.size ?: 0) >= 2) {
                                         LineChart(
