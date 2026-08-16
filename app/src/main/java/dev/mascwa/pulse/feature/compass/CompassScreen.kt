@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -159,8 +160,8 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
                     sunAz?.let { Row2("Sun", "${Geo.cardinal(it.toDouble())} ${it.roundToInt()}°") }
                     moonAz?.let { Row2("Moon", "${Geo.cardinal(it.toDouble())} ${it.roundToInt()}°") }
                     if (loc != null) {
-                        Row2("Latitude", "%.5f".format(loc.latitude))
-                        Row2("Longitude", "%.5f".format(loc.longitude))
+                        Row2("Latitude", Geodesy.formatDegrees(loc.latitude))
+                        Row2("Longitude", Geodesy.formatDegrees(loc.longitude))
                         Row2("Location", loc.name)
                     } else if (needsPermission) {
                         Text(

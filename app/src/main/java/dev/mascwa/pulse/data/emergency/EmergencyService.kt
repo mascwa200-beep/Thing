@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.data.settings.EmergencyCard
 import dev.mascwa.pulse.data.settings.EmergencyContact
 
@@ -38,7 +39,7 @@ class EmergencyService(private val context: Context) {
     ): String = buildString {
         append("SOS — I need help.")
         if (latitude != null && longitude != null) {
-            append("\nLocation: %.5f, %.5f".format(latitude, longitude))
+            append("\nLocation: ").append(Geodesy.formatDecimal(latitude, longitude))
             append("\nMap: https://maps.google.com/?q=$latitude,$longitude")
         }
         if (includeCard && !card.isEmpty) {

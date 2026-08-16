@@ -158,6 +158,23 @@ object Geodesy {
         else String.format(Locale.US, "%.1f mi", miles)
     }
 
+    /**
+     * Latitude/longitude in plain decimal degrees, e.g. `51.47771, -0.00143`.
+     *
+     * ⚠️ **The decimal separator must be a dot, and that is a correctness requirement rather than a
+     * style one.** These coordinates go into the SOS message texted to emergency contacts, and under a
+     * comma-decimal locale the default formatter renders them `48,85661, 2,35222` — four
+     * comma-separated numbers a rescuer cannot tell apart, in the one message that has to be read
+     * correctly the first time. Every other coordinate readout in the app uses this for the same
+     * reason: a position is not prose, and it should not follow the reader's language.
+     */
+    fun formatDecimal(lat: Double, lon: Double, decimals: Int = 5): String =
+        formatDegrees(lat, decimals) + ", " + formatDegrees(lon, decimals)
+
+    /** One coordinate component, for readouts that show latitude and longitude apart. See [formatDecimal]. */
+    fun formatDegrees(value: Double, decimals: Int = 5): String =
+        String.format(Locale.US, "%.${decimals.coerceIn(0, 8)}f", value)
+
     /** Latitude/longitude in degrees-minutes-seconds, e.g. `51°28'40"N 0°00'05"W`. */
     fun formatDms(lat: Double, lon: Double): String =
         "${dms(abs(lat), if (lat >= 0) "N" else "S")} ${dms(abs(lon), if (lon >= 0) "E" else "W")}"

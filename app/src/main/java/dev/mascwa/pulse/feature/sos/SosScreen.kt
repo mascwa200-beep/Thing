@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Message
@@ -124,7 +125,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null) {
             // Coordinates
             item {
                 val coords = if (state.latitude != null && state.longitude != null)
-                    "%.5f, %.5f".format(state.latitude, state.longitude) else "Locating…"
+                    Geodesy.formatDecimal(state.latitude, state.longitude) else "Locating…"
                 LcarsFrame(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Your coordinates", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
