@@ -152,19 +152,44 @@ object OracleEngine {
      * log. It closes the loop as a side effect of reading: settle the previous read against where
      * the user went, then record this one.
      *
+     * ⚠️ [visible] is how many of the returned insights the caller will actually put in front of the
+     * user, and it bounds what gets recorded as shown. This is not a detail. A rule that never earns
+     * a row cannot be acted on, so counting it as shown would drive its hit rate toward the floor
+     * for a reason that has nothing to do with the user — the statistic would measure screen space,
+     * not usefulness. Home renders three; the Advisories screen renders the lot and leaves the
+     * default alone. The full list is always returned either way.
+     *
+     * **Zero means this read teaches nothing and disturbs nothing** — it skips the learning step
+     * entirely rather than recording an empty show. That distinction is load-bearing: recording
+     * would also clear the pending attribution from whichever surface last showed something, so a
+     * background or speculative read landing between a show and the user acting on it would erase
+     * the very evidence the learning exists to collect. Callers that cannot know whether the user
+     * saw the result — the `oracle` tool, whose output the model may summarise or drop — pass zero.
+     *
+     * Re-ranking happens BEFORE recording so that "the first [visible]" is the order the surface
+     * renders, and it reads the state this pass is about to update — the ranking the user sees
+     * should reflect what was learned before this read, not part-way through it.
+     *
      * Best-effort — if learning fails for any reason the caller still gets the engine's own ranking,
      * which is what it got before any of this existed.
      */
-    suspend fun read(container: AppContainer, settings: AppSettings): List<Insight> {
+    suspend fun read(
+        container: AppContainer,
+        settings: AppSettings,
+        visible: Int = Int.MAX_VALUE,
+    ): List<Insight> {
         val signals = snapshot(container, settings)
         val raw = Oracle.divine(signals)
         return runCatching {
             val store = container.oracleLearningStore
-            val visits = container.usageRepository.recentActivity(VISIT_LOOKBACK)
-                .filter { it.category == "nav" }
-                .map { OracleMemory.Visit(it.label, it.epochMs) }
-            store.settleAndRecord(raw, visits, signals.habitualRoute, signals.nowMs)
-            store.reweight(raw)
+            val ranked = store.reweight(raw)
+            if (visible > 0) {
+                val visits = container.usageRepository.recentActivity(VISIT_LOOKBACK)
+                    .filter { it.category == "nav" }
+                    .map { OracleMemory.Visit(it.label, it.epochMs) }
+                store.settleAndRecord(ranked.take(visible), visits, signals.habitualRoute, signals.nowMs)
+            }
+            ranked
         }.getOrDefault(raw)
     }
 

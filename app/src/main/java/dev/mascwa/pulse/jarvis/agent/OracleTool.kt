@@ -34,7 +34,11 @@ class OracleTool(
             return@runCatching learning.summary()
         }
         val settings = container.settingsRepository.current()
-        val insights = OracleEngine.read(container, settings)
+        // `visible = 0` — read without teaching. What the model does with this is unknowable from
+        // here: it may relay every line, summarise one, or use it as background and mention none.
+        // Recording a show it cannot vouch for would both invent evidence and clear the pending
+        // attribution belonging to a surface that genuinely showed something. See `read`.
+        val insights = OracleEngine.read(container, settings, visible = 0)
         if (insights.isEmpty()) return@runCatching "All quiet — nothing needs the user right now."
         buildString {
             append(Oracle.briefing(insights))

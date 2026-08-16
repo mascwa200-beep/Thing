@@ -49,13 +49,30 @@ data class HomeUiState(
     val radar: Async<RadarData> = Async(loading = true),
     /** Staged self-code changes awaiting the user's approval (nudge on the home assistant card). */
     val pendingCode: Int = 0,
-    /** Tailored "for you" recommendations from on-device usage (empty until a pattern forms). */
+    /**
+     * Tailored "for you" recommendations from on-device usage (empty until a pattern forms).
+     *
+     * Now the floor under the Oracle rather than a peer of it — see the card in `HomeScreen`.
+     */
     val recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation> = emptyList(),
-    /** A one-line profile highlight ("Working on: …" / "Following: …"); null when unknown. */
-    val profileHighlight: String? = null,
-    /** A one-line top-task nudge ("In progress: …" / "To do: …"); null when nothing is pending. */
-    val taskFocus: String? = null,
+    /**
+     * The Oracle's ranked read — the cross-signal foresight, already re-ranked by what you act on.
+     *
+     * Capped at [ORACLE_ON_HOME] because the count is not cosmetic: it is what
+     * [dev.mascwa.pulse.data.oracle.OracleEngine.read] records as having been shown, and a rule that
+     * never earns a row must not be scored as though it had its chance.
+     */
+    val insights: List<dev.mascwa.pulse.core.telemetry.Insight> = emptyList(),
 )
+
+/**
+ * How many insights Home puts in front of you.
+ *
+ * Three, because Home is a glance and the Oracle's own ranking is the point — a fourth line pushes
+ * the news lead below the fold to say something the top three already implied. The full stream is
+ * one tap away on the Advisories screen.
+ */
+const val ORACLE_ON_HOME = 3
 
 class HomeViewModel(
     private val news: NewsRepository,
@@ -70,8 +87,14 @@ class HomeViewModel(
     private val radar: RadarRepository,
     private val selfEdit: SelfEditStore,
     private val usage: dev.mascwa.pulse.data.usage.UsageRepository,
-    private val profile: dev.mascwa.pulse.data.profile.ProfileStore,
-    private val tasks: dev.mascwa.pulse.data.tasks.TaskStore,
+    /**
+     * The container, for the Oracle alone.
+     *
+     * Every other dependency here is passed individually and that is the right default. The Oracle
+     * is the exception on purpose: it reads about eighteen stores to reason across them, so naming
+     * them one by one would put eighteen parameters on this constructor to express "all of it".
+     */
+    private val container: dev.mascwa.pulse.di.AppContainer,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
@@ -96,7 +119,12 @@ class HomeViewModel(
             val sections = s.homeSections
             _state.update { it.copy(sections = sections, jarvisStatus = jarvisStatus(s)) }
 
-            // Tailored "for you" recommendations + profile highlight from on-device data (no network).
+            // Tailored "for you" recommendations from on-device usage (no network).
+            //
+            // The profile highlight and the top-task nudge used to be computed here too. They were
+            // passed to the card and never read by it — dead since some earlier edit — and the
+            // Oracle now takes both as signals in its own right, so they are gone rather than
+            // revived: a second, weaker opinion about the same data helps nobody.
             launch {
                 val recs = runCatching {
                     val snap = usage.snapshot()
@@ -105,13 +133,17 @@ class HomeViewModel(
                         snap, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
                     )
                 }.getOrDefault(emptyList())
-                val highlight = runCatching {
-                    dev.mascwa.pulse.core.telemetry.UserProfile.highlight(profile.all())
-                }.getOrNull()
-                val taskFocus = runCatching {
-                    dev.mascwa.pulse.core.telemetry.TaskBoard.focus(tasks.all())
-                }.getOrNull()
-                _state.update { it.copy(recommendations = recs, profileHighlight = highlight, taskFocus = taskFocus) }
+                _state.update { it.copy(recommendations = recs) }
+            }
+
+            // The Oracle. Its own launch because it reasons over every store the others just filled
+            // and must not hold the rest of the screen behind it; best-effort, because a screen that
+            // fails to load over an advisory is a worse outcome than a screen with no advisory.
+            launch {
+                val insights = runCatching {
+                    dev.mascwa.pulse.data.oracle.OracleEngine.read(container, s, visible = ORACLE_ON_HOME)
+                }.getOrDefault(emptyList()).take(ORACLE_ON_HOME)
+                _state.update { it.copy(insights = insights) }
             }
 
             // Above-the-fold first (instant from cache, snappier cold start)…

@@ -181,7 +181,13 @@ private fun SourceRow(ins: Insight) {
     )
 }
 
-private fun urgencyColor(u: Urgency): Color = when (u) {
+/**
+ * How urgent an insight looks.
+ *
+ * `internal` rather than private because Home shows the same insights and must colour them the same
+ * way. A second copy is how a palette drifts — this app has already had to correct four of those.
+ */
+internal fun urgencyColor(u: Urgency): Color = when (u) {
     Urgency.CRITICAL -> Color(0xFFE0331A)
     Urgency.URGENT -> Color(0xFFE0661A)
     Urgency.IMPORTANT -> Color(0xFFE0A21A)

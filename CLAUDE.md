@@ -2729,6 +2729,82 @@ tools reach it, so a background poll loop built on `curl` silently never works. 
 **`list_workflow_jobs` is small and gives per-step status** — it is the call to poll with, and it
 shows whether the compile step specifically has passed.
 
+### THE ORACLE ARC — it reaches you again, and starts learning (this session, PR #431, merged `abf7a07`)
+
+Owner: *"keep going autonomously with the overpowering."* Local recon turned up a **real regression,
+not a polish gap**: `OracleEngine` had exactly one caller (`OracleViewModel`), and `Oracle.focus()` /
+`Oracle.pushWorthy()` were dead outside the core's own tests. The one-notification consolidation
+retired the Oracle's proactive path and **nothing replaced it**, so 22 cross-signal rules over ~18
+signal domains had gone invisible unless you navigated to Advisories. Owner chose, via
+AskUserQuestion: put it back **as a row on the one board** (not a second notification, not Home),
+plus all four scope items — make it learn, give the assistant a tool for it, finish Material→LCARS
+in screen content, fix the two dead spots.
+
+**Standing credit directive still overrides ultracode — zero subagent spend this arc**, as with the
+two before it. Every check was local kotlinc + JUnit, a scope grep, or CI.
+
+- **`23dd9c9` — back on the board.** `BriefRowKind.ADVISORY` appended **last**, so the board reads
+  facts first and then what to do about them; headline preference becomes
+  `ALERT → ADVISORY → NEWS → AGENDA → WEATHER → MARKETS`. Gated at `Urgency.IMPORTANT`, so an
+  ordinary refresh looks exactly as it did. `BriefEngine.advisory()` reuses the warm caches the
+  worker already filled (`force = false` throughout `snapshot`), so it adds reasoning, not fetching.
+  ⚠️ **The trap, found by reading and not by CI:** the expanded layout has exactly **five** row slots
+  and `expanded()` does `rows.take(ROWS.size)` — a sixth row would have been dropped *silently*, on a
+  path that compiles and posts a perfectly good notification. `UnifiedBriefComposer.trimToFive()`
+  now sheds the least consequential rows first (MARKETS → NEWS → WEATHER → AGENDA). The same trap
+  caught Settings' test button, which now posts a genuinely trimmed sample board.
+- **`4a31692` — it learns which rules you act on.** No new sensing and no new permission were needed:
+  `UsageRepository.log("nav", route)` already timestamps every screen visit and `Insight` already
+  carried an `actionRoute`, so *"did you go where it pointed, shortly after it fired?"* was already
+  answerable. `core:telemetry/OracleMemory.kt` (+20 tests, locally executed) — Laplace-smoothed
+  `(acted+1)/(shown+2)`, a **narrow** 0.75–1.35 band, silent under `MIN_SHOWN = 4`, 30-minute
+  attribution window. `data/oracle/OracleLearningStore.kt` mirrors ProfileStore and persists
+  `pending` + `pendingAtMs` (attribution can outlive the process). ⚠️ **The design decision that
+  separates learning from self-congratulation: a match on the habitual route earns no credit** —
+  crediting a screen you open daily at that hour would teach the Oracle to rank loudest what you
+  were going to do anyway. It is correlation either way, which the KDoc states outright; the narrow
+  band is the safeguard. `Insight.family` is a **new defaulted field, not a prefix parsed out of the
+  id** — five rules are instance-scoped (`leave_<hash>`, `market_<hash>`, …) and prefix-derivation
+  would collide `wind_chill` with `wind_down`.
+- **`76a633b` — an `oracle` tool.** 49 registered tools and the assistant could not ask its own
+  predictive cortex anything. Returns the ranked read with urgency, detail, the signal domains that
+  combined, and the action route; `oracle learned` returns what it has learned. Shaped on
+  `EnvironmentTool`.
+- **`05b68d9` — the kit gains the three controls it never had.** `LcarsButton` (promoted out of
+  `JarvisSetupScreen`, where the right design sat trapped as a private helper with 12 call sites no
+  other screen could reach), `LcarsSwitch` (Material's is a rounded pill with a circular thumb — the
+  most conspicuously un-LCARS shape left) and `LcarsDialog`. All take `rememberLcarsCue`, so sound
+  and haptics come free. ⚠️ Dialog rail weights are all deliberately **below `CODE_MIN_WEIGHT`
+  (1.9f)** — `LcarsRail` letters any block above it, and a 4-digit code at 9sp is wider than a 22dp
+  dialog rail.
+- **`badcec9` — Settings stops looking like a different application.** Migrated **the helpers, not
+  the 1600-line screen**: six of them back ~80 rows, so most of the screen moved with zero call-site
+  churn. All 6 `AlertDialog`s and all 11 `TextButton`s gone. `PrefSlider` deleted (0 call sites, the
+  app's only `Slider`).
+- **`55975dd` — the two dead spots.** `Routes.SURVIVE` was reachable only by deep link and offers
+  offline search across every guide and tool, which MENU does not — so it earned a MENU entry.
+  `TasksViewModel` was built by the factory with no screen and its KDoc described a view that died
+  with the game — deleted; the Memory screen remains the surface.
+- **`b1b5978` — the fix, and the lesson.** CI caught `Unresolved reference 'c'`: I read a palette in
+  a composable that declares none. Worth recording because I had described this exact failure *one
+  commit earlier* as my reason not to sweep the remaining inline styles, then walked into it on the
+  one site I did touch. **The local parse-only kotlinc gate finds brace and syntax errors and says
+  nothing whatsoever about name resolution.** Fixed at the site plus a scope check across the file.
+
+**The recurring bad habit showed up again and is now unmissable:** a test expectation of mine was
+wrong where the code was right (a four-row board plus an advisory is exactly five and displaces
+nothing). That is at least the seventh this arc-series. **Compute the expected value from the
+shipped function before writing the assertion.**
+
+⚠️ **Owner-verify on the Pixel** (CI compiles, it does not draw): the ADVISORY row in the tray
+(Settings' test button posts a sample board carrying one), Settings' six dialogs and its switches at
+real density, and whether the advisory earns its place over a few days of real signals.
+
+**Left open, deliberately:** ~47 inline `MaterialTheme.typography` reads remain in
+`SettingsScreen.kt`'s body — already correct in *colour* (the Material scheme derives mechanically
+from the LCARS palette since Phase 1.1), so what remains is a typeface difference on scattered
+one-off `Text`s, and the CI failure above proved the risk of sweeping them blind is real.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
