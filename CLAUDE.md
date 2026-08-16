@@ -3152,6 +3152,73 @@ clear a page metric is the wrong instinct, and the ratchet only forbids the coun
 first, then real protocol text); ask *"how does a two stroke engine work"* (must stay an ordinary
 answer); **Test the console sounds** in Settings; SOS → the coordinate line and the new first-aid rows.
 
+### THE VOICE PATH (this session, PR #440)
+
+Owner's standing directive: ship slice after slice, never stop. PR #439 (the emergency path) merged
+as `331cc33`; its last intended slice was the voice half, and reading `ActiveMatrixService` to place
+that one edit turned up five more defects in the same file, three of them silent. So the arc became
+the voice path itself. **Zero subagent spend, as with the four arcs before it** — local kotlinc +
+JUnit, the parse-only kotlinc gate, and CI.
+
+- **`4976fba` — an emergency spoken aloud is answered by the device.** `EmergencyTriage.match` runs
+  before the engine lookup, so the first action is spoken with no model, no network, no settings and
+  no agent loop. Same table as the library tool and the SOS fast path, so all three agree by
+  construction.
+- **`64d3719` — `core:telemetry/VoiceMachine.kt` (+ 17 tests, locally executed).** Mic ownership was
+  two volatile booleans read across twelve call sites, three of which guarded before re-arming and
+  nine of which did not, so two in-flight paths could each open a wake session with nothing to
+  observe it. `Owner{NONE,WAKE,COMMAND,CONSOLE,SPEAKING}` × `Action{NOTHING,START_WAKE,
+  START_COMMAND,RELEASE_MIC}`; the property is that **settling twice yields one START_WAKE and then
+  nothing**, negative-tested by regressing the guard (fails exactly those two tests, nothing else).
+  Also lifts the six-input floor-holding expression out of the service, where it was inline and untested.
+- **`09e716d` — the service asks the arbiter.** Twelve raw call sites become one `rearm()` funnel;
+  `perform()` takes the new state **synchronously** and posts the work, so a racing caller sees the
+  new owner AND the "never restart inside a Vosk callback frame" rule is structural rather than
+  remembered per site. Three long-deferred items fell out: the console now cancels the **system**
+  recogniser too (it only ever stopped the offline one); a late wake partial can no longer open a
+  capture under whoever now holds the mic; standing down hands back the wake model's ~128 MB.
+- **`0d51069` — a TTS watchdog.** `speak()` covered the synchronous failure and not the asynchronous
+  one; an engine dropping both callbacks strands the completion callback that re-arms the mic, so the
+  wake word dies silently. Backstop is deliberately several times the real duration (firing early
+  would reopen the mic mid-sentence). The callback is now atomic; `stop()`/`shutdown()` fire it.
+- **`5793c02` — voice answers from the written page.** The library was unreachable by voice because
+  the tool that reaches it only exists when `agentToolsEnabled` is on, and that is **off by default**.
+  Consulted before the model: with no live brain the page is read out directly, with one it goes into
+  the prompt as context. The relevance bar is strict on purpose — the question's rarest word must
+  actually appear in the guide, because the ranker always returns its closest match and a confident
+  paragraph about the wrong subject is worse than no library.
+
+**Three corrections I owe the record.**
+1. **`inferenceEngine` is a non-null container `val`**, so "no engine → `respond()` says nothing"
+   (asserted in `4976fba`'s message) is the literal branch but is unreachable in practice. What
+   actually happens with no cloud key and no on-device model is that `RoutingInferenceEngine` serves
+   **`EchoInferenceEngine`** — "a templated responder, not a generative model", in its own KDoc — so
+   the phone gives an acknowledgement dressed as an answer. The bypass is still right for the reasons
+   that survive; the specific claim was not.
+2. **`VoskSpeech.shutdown()` on service destroy — the long-standing deferred note is wrong.** It frees
+   **both** models, including the console's 1.8 GB dictation model, costing a multi-second reload on
+   the next tap-to-talk. Added `releaseWakeModel()` instead; verified the console only ever uses
+   `dictation = true`, so the wake tier is exclusively the service's.
+3. **`agentToolsEnabled`'s default is deliberately not flipped.** Widening it would admit not only
+   the read-only tools but the device-action ones in the same base registry — Call, SMS, Settings,
+   Torch. That is an owner decision, not a side effect.
+
+**Two defects found by *running* code rather than reading it**, which is the pattern that keeps
+paying: writing `VoiceMachineTest` surfaced that a `RELEASE_MIC` issued while the console owns the
+shared `VoskSpeech` would stop the **console's** recognition (releases are now only issued against a
+mic we actually hold); and running the sentence trimmer on real input showed it emitting a lone
+full stop for an empty body.
+
+⚠️ **Owner-verify on the Pixel — CI cannot open a microphone.** (1) "Computer" then *"someone is
+choking"*: the first action is spoken, fast, and still works with the cloud key removed. (2) *"how do
+I purify water"* with no cloud key and agent tools off: a real answer naming the guide. (3) Open the
+console mid-command and close it: the wake word returns exactly once. (4) Leave it a day: the wake
+word is still alive.
+
+**Left open:** whether `agentToolsEnabled` should default on for voice (owner's call, see above); the
+grounding excerpt's length and whether the strict relevance bar is too strict in practice — both are
+single constants (`GROUNDING_CHARS`, the `topical` check) and easy to tune from real use.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
