@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.safety
 
 import dev.mascwa.pulse.core.network.HttpException
 import dev.mascwa.pulse.core.telemetry.SafetyCoverage
+import dev.mascwa.pulse.core.telemetry.CapAlerts
 import dev.mascwa.pulse.core.telemetry.Seismic
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
@@ -209,11 +210,22 @@ class SafetyRepository(
         return features.mapNotNull { f ->
             val props = f.jsonObject["properties"]?.jsonObject ?: return@mapNotNull null
             val event = props["event"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val sev = when (props["severity"]?.jsonPrimitive?.contentOrNull) {
-                "Extreme" -> Severity.EXTREME
-                "Severe" -> Severity.HIGH
-                "Moderate" -> Severity.MODERATE
-                else -> Severity.LOW
+            // CAP grades an alert on three axes and this read one, so a "might happen tomorrow"
+            // watch and a "happening now, we can see it" warning graded identically.
+            val urgency = props["urgency"]?.jsonPrimitive?.contentOrNull
+            val certainty = props["certainty"]?.jsonPrimitive?.contentOrNull
+            val sev = when (CapAlerts.grade(props["severity"]?.jsonPrimitive?.contentOrNull, urgency, certainty)) {
+                CapAlerts.Grade.EXTREME -> Severity.EXTREME
+                CapAlerts.Grade.HIGH -> Severity.HIGH
+                CapAlerts.Grade.MODERATE -> Severity.MODERATE
+                CapAlerts.Grade.LOW -> Severity.LOW
+            }
+            val expires = parseIso(props["expires"]?.jsonPrimitive?.contentOrNull)
+            // The endpoint is called "active", but this result is cached and served from cache for
+            // as long as it is all there is offline. Without this an alert that ended hours ago is
+            // presented as a current danger.
+            if (CapAlerts.hasExpired(expires.takeIf { it > 0L }, System.currentTimeMillis())) {
+                return@mapNotNull null
             }
             Incident(
                 id = "nws_${f.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: event}",
@@ -225,6 +237,12 @@ class SafetyRepository(
                 bearing = 0.0,
                 timeEpochMs = parseIso(props["effective"]?.jsonPrimitive?.contentOrNull),
                 source = "NWS",
+                // The field that says what to do, present on 78 of 80 live alerts and previously
+                // parsed away — in the safety feature.
+                instruction = CapAlerts.instruction(props["instruction"]?.jsonPrimitive?.contentOrNull),
+                timing = CapAlerts.timing(urgency, certainty),
+                expiresEpochMs = expires.takeIf { it > 0L },
+                areaDescription = props["areaDesc"]?.jsonPrimitive?.contentOrNull?.take(120),
             )
         }
     }

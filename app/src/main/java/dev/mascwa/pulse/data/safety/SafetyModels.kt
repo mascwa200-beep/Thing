@@ -54,6 +54,17 @@ data class Incident(
     val feltReports: Int? = null,
     /** Instrumental shaking intensity, Modified Mercalli. */
     val shakingIntensity: Double? = null,
+    /**
+     * What the issuing authority says to actually do. Weather alerts carry it on nearly every
+     * message and it was parsed away, which is a strange thing for a safety feature to discard.
+     */
+    val instruction: String? = null,
+    /** "HAPPENING NOW" / "LIKELY SOON" / "FORECAST" — from CAP urgency and certainty. */
+    val timing: String? = null,
+    /** When the issuer says this stops applying, so a cached alert is not shown as current. */
+    val expiresEpochMs: Long? = null,
+    /** The counties or zones the alert covers, as the issuer describes them. */
+    val areaDescription: String? = null,
 )
 
 @Serializable

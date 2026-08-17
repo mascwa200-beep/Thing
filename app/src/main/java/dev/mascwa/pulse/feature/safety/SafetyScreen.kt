@@ -165,8 +165,13 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
     LcarsFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = color) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${type.label.uppercase()} · ${severity.name}", fontFamily = JetBrainsMono,
-                    fontSize = 9.sp, color = color)
+                // "HAPPENING NOW" against "FORECAST" is the distinction the app could not draw
+                // before, because it read CAP's severity and ignored urgency and certainty.
+                Text(
+                    listOfNotNull(type.label.uppercase(), severity.name, incident.timing)
+                        .joinToString(" · "),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = color,
+                )
                 Text(Formatters.relativeTime(incident.timeEpochMs), fontFamily = JetBrainsMono,
                     fontSize = 9.sp, color = c.muted)
             }
@@ -192,6 +197,15 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
                     // A tsunami evaluation is the one fact that should catch the eye on its own.
                     color = if (incident.tsunami) c.magenta else c.muted,
                     modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            // What the issuing authority says to do. It arrives on nearly every weather alert and
+            // was parsed away; in a safety feature it is the most useful line on the row.
+            incident.instruction?.let { what ->
+                Text(
+                    what,
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
             // Size and depth mean little apart; this is the sentence that combines them honestly.
