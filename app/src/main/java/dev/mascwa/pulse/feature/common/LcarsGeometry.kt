@@ -61,6 +61,7 @@ import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.LocalConsoleBlocks
+import dev.mascwa.pulse.ui.theme.Orbitron
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
@@ -490,10 +491,14 @@ fun LcarsScreenFrame(
                     }
                     Text(
                         title.uppercase(),
-                        fontFamily = Antonio,
+                        fontFamily = Orbitron,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        letterSpacing = 2.sp,
+                        // 16sp, not the 19 the condensed face used. Measured over every real screen
+                        // title in the app, the longest lands at 203dp here against roughly 230dp of
+                        // header — where the same string at 19sp would have needed 241dp and simply
+                        // ellipsised. Longer titles still degrade gracefully, as they always did.
+                        fontSize = 16.sp,
+                        letterSpacing = 1.5.sp,
                         color = c.accent,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -565,10 +570,12 @@ private fun AlertStrip() {
     ) {
         Text(
             if (red) "RED ALERT" else "YELLOW ALERT",
-            fontFamily = Antonio,
+            fontFamily = Orbitron,
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            letterSpacing = 2.sp,
+            // 11sp: the strip is 20dp tall and shares its width with a headline, so the wide face
+            // has to give some back. "YELLOW ALERT" renders at 120dp, leaving the headline the rest.
+            fontSize = 11.sp,
+            letterSpacing = 1.4.sp,
             color = c.void,
             maxLines = 1,
         )
@@ -716,8 +723,14 @@ fun LcarsNavBar(
                     letterSpacing = 0.6.sp,
                     color = c.void,
                     maxLines = 1,
-                    // Antonio is condensed, which is most of why six words fit at all. Clipping
-                    // rather than ellipsising: a truncated word still reads, "MARKE…" does not.
+                    // ⚠️ The one place that keeps the condensed face while the rest of the console
+                    // moved to the wide one, and the reason is measurable rather than aesthetic. Six
+                    // labels share the width of the phone, so each slot is 64.5dp on a 411dp screen
+                    // and 56dp on a 360dp one. COMPUTER renders at 37dp in Antonio at 9sp and 64dp
+                    // in Orbitron — inside the slot on one phone and outside it on the other.
+                    //
+                    // Clipping rather than ellipsising: a truncated word still reads, "MARKE…" does
+                    // not.
                     overflow = TextOverflow.Clip,
                     softWrap = false,
                 )
@@ -872,8 +885,8 @@ fun LcarsDialog(
             Column(Modifier.weight(1f).padding(end = 14.dp, top = 14.dp, bottom = 14.dp)) {
                 Text(
                     title.uppercase(),
-                    fontFamily = Antonio, fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp, letterSpacing = 1.5.sp, color = c.accent,
+                    fontFamily = Orbitron, fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp, letterSpacing = 1.2.sp, color = c.accent,
                 )
                 Box(Modifier.padding(top = 10.dp)) { content() }
                 Row(

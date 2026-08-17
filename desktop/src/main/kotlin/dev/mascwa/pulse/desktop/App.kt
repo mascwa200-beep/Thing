@@ -46,6 +46,7 @@ import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
+import dev.mascwa.pulse.desktop.theme.Orbitron
 import dev.mascwa.pulse.desktop.theme.LcarsNavItem
 import dev.mascwa.pulse.desktop.theme.Pulse
 import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
@@ -135,8 +136,9 @@ fun PulseDesktopApp(
                 ) {
                     Text(
                         "LCARS",
-                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp, letterSpacing = 4.sp, color = c.accent,
+                        // The wordmark is the identity element, so it takes the console face first.
+                        fontFamily = Orbitron, fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp, letterSpacing = 3.sp, color = c.accent,
                         modifier = Modifier.padding(start = 14.dp, bottom = 18.dp),
                     )
                     // Grouped, so the rail reads as the app's shape rather than a flat run of

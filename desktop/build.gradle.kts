@@ -73,6 +73,10 @@ val writeBuildInfo = tasks.register("writeBuildInfo") {
 
 tasks.processResources {
     from(rootProject.file("app/src/main/assets/survival")) { into("survival") }
+    // The typefaces, borrowed rather than copied. One set of `.ttf` files in the repository means
+    // the phone and the companion cannot end up on different versions of the same face, and the
+    // OFL notice that ships in the survival assets already covers them.
+    from(rootProject.file("app/src/main/res/font")) { into("font") }
     from(writeBuildInfo)
 }
 

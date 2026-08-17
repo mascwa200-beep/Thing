@@ -298,10 +298,10 @@ fun LcarsNavItem(
         Column(Modifier.padding(start = 10.dp)) {
         Text(
             text.uppercase(),
-            fontFamily = ChakraPetch,
+            fontFamily = Orbitron,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 12.sp,
-            letterSpacing = 1.5.sp,
+            fontSize = 11.sp,
+            letterSpacing = 1.2.sp,
             color = if (selected) c.ink else if (hovered) c.ink2 else c.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

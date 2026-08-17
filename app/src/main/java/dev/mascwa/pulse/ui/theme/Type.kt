@@ -14,21 +14,40 @@ private fun variable(resId: Int, weight: FontWeight, w: Int) =
     Font(resId, weight, variationSettings = FontVariation.Settings(FontVariation.weight(w)))
 
 /*
- * Four bundled families. All are SIL Open Font License 1.1; the notices ship in
+ * Five bundled families. All are SIL Open Font License 1.1; the notices ship in
  * `assets/fonts/NOTICE.txt`, which the licence requires and which was missing entirely.
  */
 
 /**
- * The LCARS voice.
+ * The console voice: wide, squarish, all-caps.
  *
- * The palette here has been authentic for a while — four of its values are byte-identical to the
- * canonical Okuda set — but the app still read as a dark application with square corners, because
- * the other half of the LCARS signature is the letterform: ultra-condensed, all-caps, generously
- * letterspaced. Chakra Petch is angular but normal-width, which is a different genre entirely.
+ * This is the era change. The condensed face below is the 1987 console's signature; the machine
+ * this app is now dressed as is twenty years older, and its readouts are the opposite genre —
+ * broad, geometric, squared-off capitals. Orbitron is the standard freely-licensed face in that
+ * genre and it ships weights, which the closer look-alikes do not.
  *
- * Antonio is the standard freely-licensed stand-in for the Swiss 911 family the show used. It takes
- * display, headline and title. It is emphatically **not** for body text — at a paragraph's length an
- * ultra-condensed face is punishing — and not for numbers, which stay monospaced below.
+ * ⚠️ **It is 1.86× wider than Antonio per capital** — 0.815 em against 0.433 em, measured from the
+ * two files rather than judged by eye — and its capitals are *shorter* at the same nominal size
+ * (0.720 em against 0.859). So every size it takes over is set smaller than the condensed face
+ * used, and it deliberately does not take over everywhere: see the nav bar, where six labels have
+ * to fit across a phone and only a condensed face makes that work.
+ */
+val Orbitron = FontFamily(
+    variable(R.font.orbitron_var, FontWeight.Normal, 400),
+    variable(R.font.orbitron_var, FontWeight.Medium, 500),
+    variable(R.font.orbitron_var, FontWeight.SemiBold, 600),
+    variable(R.font.orbitron_var, FontWeight.Bold, 700),
+)
+
+/**
+ * The condensed face, kept for the one place width is the binding constraint.
+ *
+ * It carried display, headline and title until the console moved eras, and it is still here rather
+ * than deleted because of the bottom navigation bar: six labels, one row, and the longest of them
+ * is COMPUTER. Measured across a 411dp phone, each slot is 64.5dp wide and the label renders at
+ * 37dp in Antonio at 9sp and **64dp in Orbitron** — a hair inside the slot on this phone and over
+ * it on a 360dp one. That is not a judgement call, it is arithmetic, so the nav keeps the
+ * condensed face and everything else moves.
  */
 val Antonio = FontFamily(
     variable(R.font.antonio_var, FontWeight.Normal, 400),
@@ -66,29 +85,35 @@ val JetBrainsMono = FontFamily(
  * style, so a header looks the same wherever it is written.
  */
 val LcarsLabel = TextStyle(
-    fontFamily = Antonio,
+    fontFamily = Orbitron,
     fontWeight = FontWeight.Bold,
-    fontSize = 13.sp,
-    letterSpacing = 2.sp,
+    fontSize = 11.sp,
+    letterSpacing = 1.4.sp,
 )
 
 /**
- * Material typography, now on Antonio for anything that carries the LCARS voice.
+ * Material typography, now on Orbitron for anything that carries the console voice.
  *
- * Display, headline and title-large are the app's shouting registers and take the condensed face
- * with real tracking — LCARS letterspacing is generous and it is a large part of why the style reads
- * as engineered rather than merely dark. Body stays Space Grotesk because a condensed face at
- * paragraph length is punishing, and every label stays JetBrains Mono because numbers on a console
- * should line up in columns.
+ * ⚠️ **Every size here came down, and the tracking with it.** Not taste: the new face is 1.86×
+ * wider per capital, so holding the old sizes would have pushed headlines off the side of the
+ * screen. Tracking falls too — generous letterspacing is what makes a *condensed* face read as
+ * engineered, and applying the same amount to a face that is already broad just makes it loose.
+ * The sizes are cut by roughly a fifth rather than by the full width ratio, because Orbitron's
+ * capitals are 16% shorter at the same nominal size and cutting for width parity would have left
+ * a screen title smaller than the labels under it.
+ *
+ * Body stays Space Grotesk — a display face at paragraph length is punishing whichever genre it
+ * belongs to — and every label stays JetBrains Mono because numbers on a console should line up in
+ * columns.
  */
 val NightwireTypography = Typography(
-    displayLarge = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 52.sp, letterSpacing = 1.sp),
-    displayMedium = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 40.sp, letterSpacing = 1.sp),
-    displaySmall = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 31.sp, letterSpacing = 1.sp),
-    headlineLarge = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 29.sp, letterSpacing = 1.2.sp),
-    headlineMedium = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 24.sp, letterSpacing = 1.2.sp),
-    headlineSmall = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.SemiBold, fontSize = 21.sp, letterSpacing = 1.2.sp),
-    titleLarge = TextStyle(fontFamily = Antonio, fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = 1.6.sp),
+    displayLarge = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 40.sp, letterSpacing = 0.5.sp),
+    displayMedium = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 31.sp, letterSpacing = 0.5.sp),
+    displaySmall = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 25.sp, letterSpacing = 0.5.sp),
+    headlineLarge = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 23.sp, letterSpacing = 0.8.sp),
+    headlineMedium = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = 0.8.sp),
+    headlineSmall = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, letterSpacing = 0.8.sp),
+    titleLarge = TextStyle(fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.2.sp),
     titleMedium = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
     titleSmall = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.Medium, fontSize = 13.sp),
     bodyLarge = TextStyle(fontFamily = SpaceGrotesk, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp),

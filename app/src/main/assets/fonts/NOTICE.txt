@@ -8,11 +8,22 @@ ships inside the app rather than sitting only in the repository.
 Copyright lines below are reproduced verbatim from each family's own OFL.txt in
 the google/fonts repository — they were fetched from source, not recalled.
 
+  Orbitron         res/font/orbitron_var.ttf
+                   Copyright 2018 The Orbitron Project Authors
+                   (https://github.com/theleagueof/orbitron), with Reserved
+                   Font Name: "Orbitron"
+                   Used for display, headline and title — the wide, squared
+                   console voice.
+                   ⚠️ Reserved Font Name. This file ships byte-for-byte as
+                   published; it is not subsetted, instanced or otherwise
+                   modified, so the reservation is not engaged.
+
   Antonio          res/font/antonio_var.ttf
                    Copyright 2013 The Antonio Project Authors
                    https://github.com/googlefonts/antonioFont
-                   Used for display, headline and title — the condensed,
-                   letterspaced LCARS voice.
+                   Used for the bottom navigation bar, where six labels must
+                   fit across the width of a phone and only a condensed face
+                   makes that work.
 
   Chakra Petch     res/font/chakra_petch_{regular,medium,semibold,bold}.ttf
                    Copyright 2018 The Chakra Petch Project Authors

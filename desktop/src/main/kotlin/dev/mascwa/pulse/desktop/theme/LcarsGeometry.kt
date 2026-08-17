@@ -165,7 +165,7 @@ fun LcarsHeaderBar(title: String, modifier: Modifier = Modifier, trailing: Strin
         Box(Modifier.height(20.dp).width(44.dp).clip(elbow).background(c.accent))
         Text(
             title.uppercase(),
-            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 2.sp,
+            fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.6.sp,
             color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Canvas(Modifier.weight(1f).height(2.dp)) {
