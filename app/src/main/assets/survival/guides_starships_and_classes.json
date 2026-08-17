@@ -47,6 +47,54 @@
      "body": "More is documented about this class's voyages than about any other, which distorts the record in a way worth naming: the era reads as unusually eventful because the ships that were out there were few and their logs are unusually complete, not because space was busier then. The class also sits at the point where several of the Federation's defining relationships were set. First contacts made in this period established the terms the following century inherited, including some it spent a great deal of effort trying to renegotiate. Decisions taken by individual captains under the Prime Directive in these years became the case law that later officers were taught. By the later eras the surviving ships are museum pieces and training vessels, and the class name carries the weight a famous ship's name always does — which is why it keeps being reissued to new vessels, and why the setting treats that reissue as a burden placed on a crew rather than an honour handed to them."
     }
    ]
+  },
+  {
+   "id": "fed-galaxy-class",
+   "title": "The Galaxy Class Starship",
+   "category": "Starships & Classes",
+   "summary": "The exploratory flagship: a starship designed on the assumption that peace would hold.",
+   "sections": [
+    {
+     "heading": "A Ship Built for a Long Peace",
+     "body": "The Galaxy class is the clearest statement the Federation ever made about what it thought the future would be like. Very large, lavishly equipped, and designed for missions measured in years rather than months, it was conceived as a mobile scientific and diplomatic institution that happened to be armed rather than as a warship with laboratories attached. The most conspicuous expression of that philosophy is that families live aboard. Officers on multi-year deployments bring partners and children; there are schools, a barber, gardens and a bar. Critics inside the setting call this indefensible on a vessel that goes armed into unexplored space, and they are not wrong. The counter-argument is that a fleet which sends its best people away for years without their families will not keep its best people, and that a Federation which will not take that risk has already conceded something. The design also assumes a stable strategic environment. When that assumption failed, the class's size and comfort became liabilities that a generation of subsequent designs was built to correct."
+    },
+    {
+     "heading": "Saucer Separation",
+     "body": "The class can divide into two independently operating vessels: the saucer, carrying most of the civilian complement under impulse power, and the drive section retaining warp capability and the bulk of the ship's offensive strength. The intended use is obvious — leave the non-combatants somewhere survivable and take the fight elsewhere. In practice it is used sparingly, and the setting is honest about why. Separation is slow, rejoining is slower and requires calm conditions, and the saucer left behind is a very large target with modest defences and no ability to leave the system. It solves a problem only when there is time to execute it, which is rarely the situation in which one would want it. It remains significant as a design statement. The class was built around the premise that the crew's dependants might have to be evacuated mid-mission, which tells you both that the designers took the danger seriously and that they were unwilling to solve it by leaving the families at home."
+    },
+    {
+     "heading": "Capability",
+     "body": "The class carries an extensive sensor and laboratory suite, a large sickbay, substantial shuttle and industrial-replicator capacity, and enough general-purpose space to be reconfigured for missions its designers never specified — a colony evacuation, a mobile hospital, a negotiation venue requiring neutral ground. That adaptability is the class's real strength and is easy to overlook beside its armament. Militarily it is formidable without being specialised. Heavy phaser arrays, torpedo launchers fore and aft, and shields proportionate to its size make it more than a match for most single opponents, and its size gives it endurance in a sustained engagement. Against a purpose-built warship of comparable era it is at a disadvantage, and against the truly outmatching threats of the period it is simply a large target. Its holodecks, so often treated as a recreational curiosity, are genuine mission equipment: training environments, engineering simulations and forensic reconstructions all run in them. The class's spare capacity is what makes that possible."
+    },
+    {
+     "heading": "Legacy",
+     "body": "The Galaxy class defines an era in the way a flagship should, and the era it defines ended during its own service life. Ships of the class fought in a general war they were not designed for, performed creditably, and took losses that a more cynical design philosophy might have avoided. What followed were smaller, harder ships — vessels with less room, fewer laboratories and far more armament, built by an institution that had stopped assuming the peace would hold. The setting treats that shift as a real loss rather than as maturity, and the Galaxy class is the thing being mourned. Its lasting influence is the demonstration that a ship can be a place rather than a platform. Crews who serve aboard one describe it as somewhere they lived rather than somewhere they were posted, and every later design that bothers with a lounge, a garden or a window is arguing on the Galaxy class's side."
+    }
+   ]
+  },
+  {
+   "id": "fed-bird-of-prey",
+   "title": "The Bird-of-Prey",
+   "category": "Starships & Classes",
+   "summary": "A small, cloaked raider that outlives its era — and the design philosophy behind it.",
+   "sections": [
+    {
+     "heading": "The Shape and the Name",
+     "body": "The Bird-of-Prey is a compact warship characterised by a forward command hull, a broad rear section and two wings that pivot between raised, level and lowered positions. The wing position is conventionally read as posture — raised for attack, level for cruise, lowered for landing — and the vessel can in fact set down on a planetary surface, which very few warships of comparable capability can. The name and the general layout have a complicated history in the setting, having been associated with more than one power before settling as a Klingon design. That ambiguity is usually explained in-universe as technology transfer between allies during a period of cooperation, which is neater than the production history behind it and does no harm. The class exists in several sizes across a long service life, from small scouts to substantially larger vessels sharing the same silhouette. Treating \"Bird-of-Prey\" as a single ship rather than a family of them is the commonest error in describing it."
+    },
+    {
+     "heading": "Cloak, and the Cost of It",
+     "body": "The defining capability is the cloaking device, which renders the vessel effectively invisible to most sensors. The tactical value is enormous: a cloaked raider chooses when an engagement begins, from what range and on what heading, and an enemy that cannot find it cannot defend against it. The cost is the interesting part. A cloaked vessel of this design cannot fire while cloaked, because raising weapons requires dropping the field, and the moment of decloaking is the moment of maximum vulnerability — shields not yet up, position revealed, opponent alerted. The whole tactical doctrine of the class is built around compressing that window: strike first, strike hard, and be gone before a reply is organised. Cloaking is also power-hungry and stresses the vessel's systems, which is why a damaged Bird-of-Prey so often has to choose between hiding and functioning. That trade — invisibility against everything else — is what makes the ship interesting rather than merely powerful."
+    },
+    {
+     "heading": "Small, Cheap and Everywhere",
+     "body": "A Bird-of-Prey carries a small crew, sometimes barely a dozen, which means it is inexpensive to build and inexpensive to lose. An empire that fields them in numbers can accept casualties a Federation admiralty could not, and can put a credible warship in far more places than a fleet of capital vessels would reach. This makes the class the natural instrument of raiding, escort, patrol and covert work, and also the natural vessel for anyone operating outside official sanction. Small crews mean a disaffected commander needs to persuade very few people, and the setting is full of Birds-of-Prey being flown by renegades, mercenaries, exiles and factions of one. Its endurance as a design says something about Klingon engineering priorities. The vessel is not comfortable, not versatile and not survivable in a stand-up fight against anything much larger. It is fast, quiet, deadly at the moment of its choosing, and cheap enough that there is always another one."
+    },
+    {
+     "heading": "Fighting One, and Fighting In One",
+     "body": "For a Federation captain, the Bird-of-Prey is a problem of detection rather than of firepower. Once located it is manageable; the entire engagement therefore turns on the minutes before that, and the setting's countermeasures are correspondingly about finding rather than shooting — sensor sweeps tuned to the faint distortions a cloak cannot help producing, tachyon detection grids, or simply provoking a decloak by presenting a target too good to refuse. For those aboard, service is cramped and unsentimental. The bridge is small, the corridors are narrow, and the culture aboard a Klingon vessel of this size is intensely personal — with a crew that small, the commander knows everyone and everyone knows exactly where they stand. The class also has a strong claim to being the setting's most versatile plot device. It is small enough to be stolen, cheap enough to be plausible in anyone's hands, capable enough to threaten a starship, and characterful enough that its arrival changes the tone of a scene before anyone has spoken."
+    }
+   ]
   }
  ]
 }

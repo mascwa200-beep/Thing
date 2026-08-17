@@ -578,7 +578,7 @@
   },
   {
    "id": "astro-galaxies-and-cosmology",
-   "title": "Galaxies, the Universe and Cosmology",
+   "title": "Galaxies: What a Galaxy Is, and How the Universe Is Built",
    "category": "Astronomy",
    "summary": "From the anatomy of the Milky Way out to the observable horizon: galaxy types, how astronomers actually measure cosmic distances, Hubble's law and redshift, the three pillars of Big Bang evidence, and the hard observational case for dark matter and dark energy — with formulas, worked calculations and the misconceptions to avoid.",
    "headings": [
@@ -6379,6 +6379,19 @@
    "file": "guides_federation_timeline.json"
   },
   {
+   "id": "fed-dominion-war",
+   "title": "The Dominion War",
+   "category": "Federation Timeline",
+   "summary": "The conflict that tested whether the Federation's principles were commitments or comforts.",
+   "headings": [
+    "The Adversary",
+    "How It Started",
+    "What the War Did to the Federation",
+    "Afterwards"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -11091,6 +11104,32 @@
    "file": "guides_notable_figures.json"
   },
   {
+   "id": "fed-science-officer",
+   "title": "The Science Officer",
+   "category": "Notable Figures",
+   "summary": "The Starfleet officer who makes exploration a profession: what the second chair is actually for.",
+   "headings": [
+    "The Post",
+    "The Discipline of the Answer",
+    "The Outsider's Chair",
+    "Why the Role Defines the Format"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-ships-doctor",
+   "title": "The Ship's Doctor",
+   "category": "Notable Figures",
+   "summary": "Sickbay and the one officer who can relieve a captain: medicine as the conscience of the crew.",
+   "headings": [
+    "The Post",
+    "The Authority to Relieve",
+    "The Conscience in the Room",
+    "Instruments and Limits"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "carbohydrates-and-blood-sugar",
    "title": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
@@ -13088,6 +13127,58 @@
    "file": "guides_species_and_civilisations.json"
   },
   {
+   "id": "fed-andorians",
+   "title": "Andorians",
+   "category": "Species & Civilisations",
+   "summary": "A cold-world people of martial honour and sensory antennae — and one of the Federation's founding members.",
+   "headings": [
+    "Biology and Homeworld",
+    "A Culture of Formalised Aggression",
+    "Family and the Question of Numbers",
+    "Andorians in the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-tellarites",
+   "title": "Tellarites",
+   "category": "Species & Civilisations",
+   "summary": "The founding member nobody quotes: why a culture that argues constantly is easy to underestimate.",
+   "headings": [
+    "A People Built on Argument",
+    "Engineering, Trade and Craft",
+    "Why the Federation Needed Them",
+    "Tellarites Aboard Ship"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-ferengi",
+   "title": "Ferengi",
+   "category": "Species & Civilisations",
+   "summary": "A civilisation organised entirely around profit — used by the setting as a mirror rather than a joke.",
+   "headings": [
+    "Commerce as a Total System",
+    "Physiology and the Lobes",
+    "The Rules and Their Limits",
+    "The Mirror the Federation Does Not Like"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-borg",
+   "title": "The Borg",
+   "category": "Species & Civilisations",
+   "summary": "A collective that assimilates rather than conquers, and why that is a different kind of threat.",
+   "headings": [
+    "What the Collective Is, and What Assimilation Means",
+    "Why Conventional Tactics Fail",
+    "The Horror Is Not the Machinery",
+    "Origins, Scale and the Problem of Explanation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "association-football-rules-and-positions",
    "title": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
@@ -13177,6 +13268,32 @@
    "file": "guides_starfleet_and_federation.json"
   },
   {
+   "id": "fed-starfleet-academy",
+   "title": "Starfleet Academy",
+   "category": "Starfleet & Federation",
+   "summary": "Where officers are made: admission, the four years, and the tests that are not about the subject.",
+   "headings": [
+    "Admission",
+    "Four Years, and What They Are For",
+    "The Tests That Are Not About the Subject",
+    "Afterwards"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-rank-and-command",
+   "title": "Starfleet Rank and the Chain of Command",
+   "category": "Starfleet & Federation",
+   "summary": "Who outranks whom, what a rank actually authorises, and why the chain matters most when it is inconvenient.",
+   "headings": [
+    "The Ladder",
+    "What a Rank Authorises",
+    "Succession and the Line",
+    "Why the Chain Holds"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
    "id": "fed-starship-design",
    "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
    "category": "Starships & Classes",
@@ -13199,6 +13316,32 @@
     "The Five-Year Mission",
     "Command and Crew",
     "Its Place in the Record"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-galaxy-class",
+   "title": "The Galaxy Class Starship",
+   "category": "Starships & Classes",
+   "summary": "The exploratory flagship: a starship designed on the assumption that peace would hold.",
+   "headings": [
+    "A Ship Built for a Long Peace",
+    "Saucer Separation",
+    "Capability",
+    "Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-bird-of-prey",
+   "title": "The Bird-of-Prey",
+   "category": "Starships & Classes",
+   "summary": "A small, cloaked raider that outlives its era — and the design philosophy behind it.",
+   "headings": [
+    "The Shape and the Name",
+    "Cloak, and the Cost of It",
+    "Small, Cheap and Everywhere",
+    "Fighting One, and Fighting In One"
    ],
    "file": "guides_starships_and_classes.json"
   },
@@ -13447,6 +13590,45 @@
    "file": "guides_warp_and_starship_technology.json"
   },
   {
+   "id": "fed-deflector-shields",
+   "title": "Deflector Shields",
+   "category": "Warp & Starship Technology",
+   "summary": "The energy barrier every starship depends on: how it is described to work, and why it always fails by degrees.",
+   "headings": [
+    "What a Shield Is",
+    "Why They Fail Gradually",
+    "Modulation, Adaptation and the Arms Race",
+    "Living Behind Them"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-phasers-and-torpedoes",
+   "title": "Phasers and Photon Torpedoes",
+   "category": "Warp & Starship Technology",
+   "summary": "The standard armament: a directed-energy weapon with a settable intensity, and a warhead that is not conventional at all.",
+   "headings": [
+    "The Phaser",
+    "Stun, and What It Costs",
+    "The Photon Torpedo",
+    "How the Two Are Used Together"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-holodeck",
+   "title": "The Holodeck",
+   "category": "Warp & Starship Technology",
+   "summary": "A room that can be anywhere: how it is described to work, what it is for, and why it keeps going wrong.",
+   "headings": [
+    "What It Does",
+    "What It Is Actually For",
+    "Why It Goes Wrong So Often",
+    "The Question of the People Inside"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
    "id": "the-stratosphere-and-the-ozone-layer",
    "title": "The Stratosphere and the Ozone Layer",
    "category": "Weather",
@@ -13685,6 +13867,19 @@
     "A Station at a Crossroads",
     "Life Aboard",
     "Why the Fixed Points Matter"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-neutral-zones",
+   "title": "The Neutral Zones",
+   "category": "Worlds & Stations",
+   "summary": "Bands of space nobody may enter — the Romulan and Klingon Neutral Zones: what they are for, and why the setting keeps returning to them.",
+   "headings": [
+    "A Border Made of Emptiness",
+    "Why It Is Unstable by Design",
+    "Life Along the Line",
+    "When the Line Moves"
    ],
    "file": "guides_worlds_and_stations.json"
   }

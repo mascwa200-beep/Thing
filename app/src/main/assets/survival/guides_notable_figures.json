@@ -23,6 +23,54 @@
      "body": "The format depends on a person who can be wrong. A ship that could consult headquarters in real time would have no decisions worth watching, and an institution that had anticipated every situation would need no judgement exercised. So the captain is constructed to be the point where a civilisation's stated values meet a situation those values did not anticipate. When the Federation is tested — by an empire, by a collective, by a rival that trades in profit, by a plague, by a rule that will kill someone — it is tested through one officer standing in a room having to answer. That is why the log entry is the setting's signature device. A captain narrating what they decided and why, aloud, for a record someone else will read, is the format admitting that the decision was arguable and putting the argument on the record anyway."
     }
    ]
+  },
+  {
+   "id": "fed-science-officer",
+   "title": "The Science Officer",
+   "category": "Notable Figures",
+   "summary": "The Starfleet officer who makes exploration a profession: what the second chair is actually for.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's science officer heads its scientific departments and is the officer the captain turns to when the question is what something is. In practice the post combines three jobs: running laboratories and specialists, interpreting sensor data in real time on the bridge, and supplying the analysis on which a command decision will be based within the next minute. Aboard many vessels the science officer is also second officer, standing behind the first officer in the command line, which puts a scientist in the command chair often enough to matter. That arrangement is a statement about what kind of organisation Starfleet is: the person who knows what the phenomenon is has standing to decide what to do about it. The characteristic image of the post — an officer bent over a hooded sensor display, reporting without turning around — is a good summary of the job. The science officer is looking at something nobody else on the bridge can see and has to convert it into a sentence the captain can act on."
+    },
+    {
+     "heading": "The Discipline of the Answer",
+     "body": "What distinguishes a good science officer in the setting is not knowledge but calibration. The job requires stating what is known, what is inferred and what is guessed, and keeping the three separate under pressure from a commander who would very much like a single confident sentence. This is why the role so often falls to characters with a cultivated relationship to certainty. An officer who will say \"insufficient data\" to a captain in a crisis is doing the job correctly, and an officer who supplies a probability rather than a reassurance is doing it better still. The setting has a recurring fondness for the precise numerical estimate delivered at an absurd moment, and the joke conceals a real professional virtue. The failure modes are correspondingly specific. A science officer who overstates confidence gets people killed by being believed. One who understates it is useless, because a captain who cannot get an answer will act without one. Learning where that line sits is most of what experience in the post consists of."
+    },
+    {
+     "heading": "The Outsider's Chair",
+     "body": "The setting has a long habit of placing a non-human, or a partly-human, in this role, and it is not an accident. An officer whose species reasons differently from the majority of the crew supplies exactly what the post requires — a perspective from outside the room's assumptions — and supplies it structurally rather than as a matter of personality. This produces the setting's most durable character dynamic: a commander who decides by instinct and conviction, and a science officer who decides by evidence and consistency, each of whom is right often enough that the other cannot simply be overruled. The arrangement is stable because it is not a hierarchy of correctness. It is two incompatible ways of being right, forced to produce one decision. The friction is the point, and the affection underneath it is what makes the friction bearable to watch. Officers in this pairing habitually argue in public and defend each other absolutely in private, which is a fair description of the relationship the setting thinks a good crew is built on."
+    },
+    {
+     "heading": "Why the Role Defines the Format",
+     "body": "A ship that only fought would need no science officer. The post exists because the mission is exploration, and exploration means routinely encountering things nobody has a procedure for. Every episode of the setting that opens with an unexplained reading is, structurally, an episode about this job. It also carries the setting's characteristic optimism about knowledge. The science officer's working assumption is that the phenomenon is comprehensible, that comprehension will suggest a course of action, and that the correct first response to something unknown is to study it rather than to shoot it. When a story ends with an enemy understood instead of destroyed, this is the officer whose method won. That is why the second chair is the one the format cannot do without. The captain supplies the decision, but the science officer supplies the reason there was something worth deciding about."
+    }
+   ]
+  },
+  {
+   "id": "fed-ships-doctor",
+   "title": "The Ship's Doctor",
+   "category": "Notable Figures",
+   "summary": "Sickbay and the one officer who can relieve a captain: medicine as the conscience of the crew.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's chief medical officer runs sickbay and is responsible for the health of everyone aboard, which on a long-range vessel means being simultaneously a general practitioner, a surgeon, an epidemiologist, a psychiatrist and a xenobiologist. There is no referral available. Whatever arrives, the doctor is who it arrives to. The xenobiological part is the hardest and the most distinctive. A mixed crew presents half a dozen incompatible physiologies with different organ placements, blood chemistries, drug tolerances and pain responses, and a treatment that saves one species can kill another. The setting's medical crises are frequently built on exactly this: the correct diagnosis for a human is the wrong one for the patient on the table. Sickbay itself is portrayed as the ship's one genuinely non-hierarchical space. Rank governs everywhere aboard except the room where the doctor is working, and the setting is consistent about that."
+    },
+    {
+     "heading": "The Authority to Relieve",
+     "body": "A chief medical officer may relieve any officer of duty, up to and including the commanding officer, on medical grounds. This is the single most significant check in the Starfleet structure and the only one that runs against the chain of command rather than along it. Its logic is simple and uncomfortable. A commander whose judgement is impaired — by injury, exhaustion, infection, grief or something stranger — is precisely the person least equipped to notice, and the officers beneath them are poorly placed to say so. Someone must be able to make that call from outside the hierarchy, and the doctor is the only officer whose professional standing supports it. The setting stages this repeatedly and never treats it as easy. Exercising the authority means a doctor telling a superior officer, in front of the bridge crew, that they are not fit — knowing that if the assessment is wrong the consequences fall on the ship, and that if it is right they have just made an enemy of someone they will keep working alongside."
+    },
+    {
+     "heading": "The Conscience in the Room",
+     "body": "Beyond the formal authority, the ship's doctor tends to serve as the crew's moral counterweight. A physician's professional obligation runs to the patient in front of them regardless of rank, nationality, species or which side they were on an hour ago, and that obligation is frequently in tension with what the mission requires. The setting uses this deliberately. When a captain is considering something expedient, the doctor is usually the character who says the plain human thing about it — often crudely, often at the worst moment, and generally from a position that cannot be dismissed as naive because the speaker has spent the day dealing with the consequences of the last decision. Doctors in this setting are consequently written as blunt in a way officers in other posts are not permitted to be. The bluntness is licensed by the role: a physician's duty of candour to a patient extends, in the hands of a good writer, into a duty of candour to a commander about what they are about to do."
+    },
+    {
+     "heading": "Instruments and Limits",
+     "body": "Federation medicine is portrayed as extraordinarily capable. Scanners diagnose without incision, bone is knitted and tissue regenerated in minutes, and injuries that would be career-ending elsewhere are an overnight stay. The bedside manner of the technology is a deliberate contrast with contemporary medicine: nothing hurts, nothing is invasive, and the physician spends their time thinking rather than cutting. The limits are where the stories are. Neurological damage, unfamiliar pathogens, diseases with no analogue in any database, and conditions of the mind resist the instruments entirely — and a doctor equipped to fix almost anything experiences the exceptions far more sharply than one who is used to losing. The setting also keeps returning to the point that a doctor with excellent tools still has to decide who to treat first, what to tell a patient, and whether to keep someone alive who has asked not to be. No amount of instrumentation touches those, which is why the post remains a character rather than a console."
+    }
+   ]
   }
  ]
 }
