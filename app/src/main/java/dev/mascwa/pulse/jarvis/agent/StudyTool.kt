@@ -1,7 +1,9 @@
 package dev.mascwa.pulse.jarvis.agent
 
 import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.ElapsedPhrase
 import dev.mascwa.pulse.core.telemetry.Recall
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.profile.ProfileStore
 import dev.mascwa.pulse.data.study.StudyStore
@@ -28,9 +30,11 @@ class StudyTool(
     override val name = "study"
 
     override val usage =
-        "study [today|due|path|goals|enroll <goal>|teach <guide-id>] — what to learn now from the " +
-            "581-guide offline library, what is due for review, an enrolled path and its progress. " +
-            "'today' is the default; 'enroll' starts a path; 'teach' turns a guide into questions."
+        "study [today|due|progress|path|goals|enroll <goal>|teach <guide-id>] — what to learn now from " +
+            "the 581-guide offline library, what is due for review, how the studying is actually " +
+            "going (time, accuracy, streak, and any way back after a break), an enrolled path and " +
+            "its progress. 'today' is the default; 'enroll' starts a path; 'teach' turns a guide " +
+            "into questions."
 
     override suspend fun run(arg: String): String = runCatching {
         val input = arg.trim()
@@ -39,6 +43,7 @@ class StudyTool(
         when {
             input.isEmpty() || verb == "today" -> today()
             verb == "due" -> due()
+            verb == "progress" || verb == "how" -> progress()
             verb == "path" -> path()
             verb == "goals" -> goals()
             verb == "enroll" || verb == "enrol" -> enroll(rest)
@@ -72,6 +77,35 @@ class StudyTool(
                 append("\n- ").append(item.question.prompt)
                 append("\n  answer: ").append(item.question.answer.take(ANSWER_CHARS))
                 append("  [").append(item.question.guideTitle).append(" ▸ ").append(item.question.heading).append("]")
+            }
+        }
+    }
+
+    /**
+     * How the studying is actually going — and, after a break, the way back.
+     *
+     * The time figure is credited rather than wall-clock (see [dev.mascwa.pulse.core.telemetry
+     * .StudyProgress.creditedMs]), so it is a floor on real work rather than a flattering total, and
+     * the accuracy comes only from objectively-marked answers. Nothing here is estimated.
+     */
+    private suspend fun progress(): String {
+        val p = study.progress()
+        if (!p.hasHistory) return "Nothing studied yet. Ask 'study today' to start."
+        return buildString {
+            append(StudyProgress.describeStudied(p.studiedMs)).append(" studied over ")
+            append(p.activeDays).append(" day")
+            if (p.activeDays != 1) append("s")
+            if (p.streakDays > 0) append(" · ").append(p.streakDays).append(" day streak")
+            if (p.answered > 0) append("\n").append(p.describeRatio())
+            p.trend()?.let { append(" · last ").append(p.recentAnswered).append(" running ").append(it) }
+            if (p.lastStudiedAtMs > 0L) {
+                append("\nLast sitting ").append(ElapsedPhrase.describe(System.currentTimeMillis() - p.lastStudiedAtMs))
+            }
+            study.refresher()?.let { plan ->
+                append("\n").append(plan.headline()).append(" — ").append(plan.note())
+                plan.steps.take(LISTED).forEach {
+                    append("\n- ").append(it.item.guideTitle).append(" (").append(it.note()).append(")")
+                }
             }
         }
     }

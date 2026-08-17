@@ -46,6 +46,10 @@ fun main() {
                         )
                     }
                     settingsStore.flushNow()
+                    // The window being open was the sitting; bank the time before the process dies.
+                    // An unbanked sitting is simply lost, which is the honest outcome — see the note
+                    // on StudyStore's open-sitting fields.
+                    studyStore.closeSession()
                     // The schedule is the whole point of the study feature; losing the last answer to
                     // a debounce window would make it quietly unreliable.
                     studyStore.flushNow()
@@ -64,6 +68,7 @@ fun main() {
                 onQuitForInstall = {
                     runBlocking {
                         settingsStore.flushNow()
+                        studyStore.closeSession()
                         studyStore.flushNow()
                     }
                     exitApplication()

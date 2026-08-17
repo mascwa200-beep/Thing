@@ -101,6 +101,24 @@ object Recall {
         )
     }
 
+    /**
+     * The grade an objectively-marked answer earns.
+     *
+     * Self-grading asks how it *felt*; a multiple-choice answer is right or wrong, and how long it took
+     * is the only remaining signal for how comfortably. Instant and right earns the long gap; right but
+     * laboured is [HARD], because a fact you had to reconstruct is not one you know yet.
+     *
+     * @param elapsedMs 0 when unknown — the schedule then takes the answer at face value rather than
+     *   inferring confidence from a measurement it does not have.
+     */
+    fun gradeFor(correct: Boolean, elapsedMs: Long): Grade = when {
+        !correct -> Grade.FORGOT
+        elapsedMs <= 0L -> Grade.GOOD
+        elapsedMs < QUICK_MS -> Grade.EASY
+        elapsedMs > LABOURED_MS -> Grade.HARD
+        else -> Grade.GOOD
+    }
+
     /** Cards ready to be asked, most overdue first, capped at [limit]. */
     fun due(cards: List<Card>, nowMs: Long, limit: Int = DEFAULT_DUE_LIMIT): List<Card> =
         cards.filter { it.dueAtMs <= nowMs }.sortedBy { it.dueAtMs }.take(limit)
@@ -159,4 +177,10 @@ object Recall {
 
     /** One sitting's worth. A queue longer than this is a chore, and chores get abandoned. */
     const val DEFAULT_DUE_LIMIT = 10
+
+    /** Answered this fast on a multiple choice, you knew it rather than worked it out. */
+    const val QUICK_MS = 8_000L
+
+    /** Long enough to have reconstructed the answer rather than recalled it. */
+    const val LABOURED_MS = 30_000L
 }

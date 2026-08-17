@@ -8,7 +8,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.mascwa.pulse.core.telemetry.Curriculum
 import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.QuizBuilder
 import dev.mascwa.pulse.core.telemetry.Recall
+import dev.mascwa.pulse.core.telemetry.Refresher
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.core.telemetry.StudyQuestions
 import dev.mascwa.pulse.data.survival.CATEGORY_SUPERGROUP
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
@@ -67,6 +70,16 @@ class StudyStore(
     /** One question and its schedule. What a review session is made of. */
     data class Item(val question: StudyQuestions.Question, val card: Recall.Card)
 
+    /**
+     * A question ready to be asked, and — when one could be built fairly — the multiple choice for it.
+     *
+     * A null [quiz] is not a failure. Only numeric cloze questions can be turned into a defensible set
+     * of options, so open recall remains the fallback: it is the strongest form of retrieval practice,
+     * and refusing to ask it at all in order to make everything multiple choice would cost real
+     * learning. What it cannot do is mark itself, which is why those answers stay self-graded.
+     */
+    data class Ask(val item: Item, val quiz: QuizBuilder.QuizItem?)
+
     @Serializable
     private data class StoredCard(
         val id: String,
@@ -84,12 +97,39 @@ class StudyStore(
     )
 
     @Serializable
+    private data class StoredAttempt(
+        val questionId: String,
+        val guideId: String,
+        val correct: Boolean,
+        val atMs: Long,
+        val elapsedMs: Long = 0L,
+    )
+
+    @Serializable
+    private data class StoredSession(
+        val startedAtMs: Long,
+        val endedAtMs: Long,
+        val attempts: Int = 0,
+        val reading: Boolean = false,
+    )
+
+    // Every field added for the progress layer is defaulted, so a save written before it existed still
+    // decodes — the same discipline every prior store change has kept.
+    @Serializable
     private data class Stored(
         val goal: String = "",
         val perDay: Int = Curriculum.DEFAULT_PER_DAY,
         val completed: List<String> = emptyList(),
         val taught: List<String> = emptyList(),
         val cards: List<StoredCard> = emptyList(),
+        val attempts: List<StoredAttempt> = emptyList(),
+        val sessions: List<StoredSession> = emptyList(),
+        /**
+         * Held separately rather than derived from the logs above, because both are capped: evicting
+         * old history must never make it look as though you studied longer ago than you did, which
+         * would have the refresher offer a cold return to somebody who was here yesterday.
+         */
+        val lastStudiedAtMs: Long = 0L,
     )
 
     private val prefsKey = stringPreferencesKey("study_json")
@@ -104,6 +144,21 @@ class StudyStore(
     private val _items = MutableStateFlow<List<Item>>(emptyList())
     /** Every card held, newest schedule included, so a screen can show progress without a query. */
     val items: StateFlow<List<Item>> = _items.asStateFlow()
+
+    /**
+     * The sitting currently open, if any.
+     *
+     * ⚠️ In memory only, and deliberately. A session is recorded when it *ends*; if the process is
+     * killed mid-sitting the time is simply lost. Persisting an open start would mean an app killed in
+     * the background reopened a week later credits a week of study, which is exactly the flattering
+     * figure [StudyProgress] exists to refuse.
+     */
+    // ⚠️ Volatile and atomic because these are genuinely cross-thread: opened and closed from the UI
+    // lifecycle, incremented from the IO dispatcher inside `answer`. A lost increment would only
+    // under-credit time, but an unsynchronised Long read is worse than that.
+    @Volatile private var openStartMs: Long = 0L
+    @Volatile private var openReading: Boolean = false
+    private val openAttempts = java.util.concurrent.atomic.AtomicInteger(0)
 
     // ---- loading and persistence -----------------------------------------------------------------
 
@@ -272,6 +327,85 @@ class StudyStore(
     suspend fun dueCount(nowMs: Long = System.currentTimeMillis()): Int =
         Recall.dueCount(ensureLoaded().cards.map { it.item().card }, nowMs)
 
+    /**
+     * The next thing to be asked, with a multiple choice built for it where one can be built fairly.
+     *
+     * The distractor pool is every numeric term the same guide uses anywhere — near misses from the
+     * material itself, which is what makes an option impossible to eliminate without having read it.
+     * That costs one shard read, which the content repository already caches.
+     */
+    suspend fun nextAsk(nowMs: Long = System.currentTimeMillis()): Ask? {
+        val item = due(nowMs, limit = 1).firstOrNull() ?: return null
+        val pool = poolFor(item.question.guideId)
+        // The seed advances with the card's own history, so re-meeting a question rotates its format
+        // and shuffles its options rather than replaying the same screen.
+        val seed = item.question.id.hashCode() + item.card.reps * PRIME_STRIDE + item.card.lapses
+        return Ask(item, quizFor(item, pool, seed))
+    }
+
+    /**
+     * The best multiple choice this question can carry, or null when neither form can be built fairly.
+     *
+     * A numeric gap becomes a near-miss value pick; anything else becomes a which-statement-belongs
+     * item. Refusing both is a real outcome, not a bug — the open-recall path then asks it as written
+     * and it stays self-graded, which is honest about what was actually measured.
+     */
+    private suspend fun quizFor(item: Item, pool: List<String>, seed: Int): QuizBuilder.QuizItem? {
+        // A minority of reviews are asked with no options at all — see QuizBuilder.asksOpenRecall.
+        if (QuizBuilder.asksOpenRecall(seed)) return null
+        return runCatching { QuizBuilder.build(item.question, pool, seed) }.getOrNull()
+            ?: statementQuiz(item, seed)
+    }
+
+    /** Every numeric term the guide uses — the near misses a fair option set is drawn from. */
+    private suspend fun poolFor(guideId: String): List<String> {
+        val guide = runCatching { content.guide(guideId) }.getOrNull() ?: return emptyList()
+        return guide.sections
+            .flatMap { StudyQuestions.sentences(it.body) }
+            .flatMap { StudyQuestions.blankableTerms(it) }
+            .distinct()
+    }
+
+    /**
+     * A multiple choice for a question that has no number in it: which statement this section actually
+     * makes.
+     *
+     * This is the half that checks **understanding** rather than a remembered figure, and it is the
+     * only reason an open-recall card can be marked objectively at all. The wrong answers are real
+     * sentences from a guide in a **different category** — perfectly sensible in their own context and
+     * simply not what this section says. Telling them apart requires having understood it.
+     */
+    private suspend fun statementQuiz(item: Item, seed: Int): QuizBuilder.QuizItem? {
+        val guide = runCatching { content.guide(item.question.guideId) }.getOrNull() ?: return null
+        val section = guide.sections.firstOrNull { it.heading == item.question.heading } ?: return null
+        val truths = StudyQuestions.sentences(section.body)
+        if (truths.size < MIN_TRUE_STATEMENTS) return null
+        // Rotated, so re-meeting the card asks about a different sentence of the same section rather
+        // than replaying one it has already taught you the answer to.
+        val rotated = Math.floorMod(seed, truths.size).let { truths.drop(it) + truths.take(it) }
+        val others = foreignSentences(guide.category, seed)
+        if (others.isEmpty()) return null
+        return runCatching {
+            QuizBuilder.statementItem(guide.id, guide.title, section.heading, rotated, others, seed)
+        }.getOrNull()
+    }
+
+    /**
+     * Sentences from somewhere genuinely unrelated.
+     *
+     * ⚠️ A different **category**, not merely a different guide. A sentence from a neighbouring guide
+     * on the same subject can easily also be true of this section, which is the two-defensible-answers
+     * failure the whole quiz layer is built to avoid. Category distance is the cheap, reliable proxy.
+     */
+    private suspend fun foreignSentences(category: String, seed: Int): List<String> {
+        val index = runCatching { content.index() }.getOrNull().orEmpty()
+        val candidates = index.filter { it.category != category }
+        if (candidates.isEmpty()) return emptyList()
+        val pick = candidates[Math.floorMod(seed, candidates.size)]
+        val other = runCatching { content.guide(pick.id) }.getOrNull() ?: return emptyList()
+        return other.sections.flatMap { StudyQuestions.sentences(it.body) }.take(FOREIGN_SENTENCES)
+    }
+
     /** Record an answer. Returns the new schedule, so the screen can say when it will come back. */
     suspend fun grade(
         questionId: String,
@@ -288,10 +422,173 @@ class StudyStore(
             updated = next
             val cards = s.cards.toMutableList()
             cards[at] = item.copy(card = next).stored()
-            publish(s.copy(cards = cards))
+            publish(s.copy(cards = cards, lastStudiedAtMs = maxOf(s.lastStudiedAtMs, nowMs)))
+            // No attempt is recorded — a self-graded answer says how it FELT, and inventing an
+            // objective right-or-wrong from that is exactly the flattering number to avoid. The
+            // sitting's count still moves, because the time allowance is about evidence of activity
+            // and answering something is activity whether or not it can be scored.
+            openAttempts.incrementAndGet()
         }
         if (updated != null) scheduleFlush()
         return updated
+    }
+
+    /**
+     * Record an objectively-marked answer: schedule it **and** keep it as evidence.
+     *
+     * This is the pairing the whole progress layer rests on. [grade] alone tells the schedule how it
+     * went; only an attempt tells the reader — and the refresher — whether it was actually right.
+     */
+    suspend fun answer(
+        questionId: String,
+        correct: Boolean,
+        elapsedMs: Long = 0L,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Recall.Card? {
+        var updated: Recall.Card? = null
+        mutex.withLock {
+            val s = loadLocked()
+            val at = s.cards.indexOfFirst { it.id == questionId }
+            if (at < 0) return@withLock
+            val item = s.cards[at].item()
+            val next = Recall.review(item.card, Recall.gradeFor(correct, elapsedMs), nowMs)
+            updated = next
+            val cards = s.cards.toMutableList()
+            cards[at] = item.copy(card = next).stored()
+            val attempt = StoredAttempt(
+                questionId = questionId,
+                guideId = item.question.guideId,
+                correct = correct,
+                atMs = nowMs,
+                elapsedMs = elapsedMs.coerceAtLeast(0L),
+            )
+            publish(
+                s.copy(
+                    cards = cards,
+                    attempts = (s.attempts + attempt).takeLast(MAX_ATTEMPTS),
+                    lastStudiedAtMs = maxOf(s.lastStudiedAtMs, nowMs),
+                ),
+            )
+            openAttempts.incrementAndGet()
+        }
+        if (updated != null) scheduleFlush()
+        return updated
+    }
+
+    // ---- sittings ---------------------------------------------------------------------------------------
+
+    /** Note that a study surface has opened. Idempotent — reopening without closing keeps the earlier start. */
+    fun openSession(reading: Boolean = false, nowMs: Long = System.currentTimeMillis()) {
+        if (openStartMs > 0L) return
+        openStartMs = nowMs
+        openAttempts.set(0)
+        openReading = reading
+    }
+
+    /**
+     * Close the sitting from a caller that may be going away, on the store's own scope.
+     *
+     * ⚠️ The screen's natural place to do this is disposal, and a view model's scope is cancelled at
+     * almost exactly that moment. Launching the close on `viewModelScope` therefore races its own
+     * cancellation and would silently lose the sitting every time you navigated back out of STUDY —
+     * silently, because a launch into a cancelled scope simply never runs. This store's scope lives as
+     * long as the container, so it cannot be cancelled out from under the caller.
+     */
+    fun endSitting(nowMs: Long = System.currentTimeMillis()) {
+        if (openStartMs <= 0L) return
+        scope.launch { closeSession(nowMs) }
+    }
+
+    /**
+     * Note that it has closed, and bank the credited time.
+     *
+     * Zero-length sittings are dropped rather than stored: a screen opened and immediately left is not
+     * evidence of anything, and a log full of them would push real history out of the cap.
+     */
+    suspend fun closeSession(nowMs: Long = System.currentTimeMillis()) {
+        val started = openStartMs
+        if (started <= 0L) return
+        val attempts = openAttempts.getAndSet(0)
+        val reading = openReading
+        openStartMs = 0L
+        openReading = false
+        val session = StoredSession(started, nowMs, attempts, reading)
+        if (StudyProgress.creditedMs(session.session()) <= 0L) return
+        mutex.withLock {
+            val s = loadLocked()
+            publish(
+                s.copy(
+                    sessions = (s.sessions + session).takeLast(MAX_SESSIONS),
+                    lastStudiedAtMs = maxOf(s.lastStudiedAtMs, nowMs),
+                ),
+            )
+        }
+        scheduleFlush()
+    }
+
+    // ---- how it is going ---------------------------------------------------------------------------------
+
+    private fun StoredAttempt.attempt() =
+        StudyProgress.Attempt(questionId, guideId, correct, atMs, elapsedMs)
+
+    private fun StoredSession.session() = StudyProgress.Session(
+        startedAtMs = startedAtMs,
+        endedAtMs = endedAtMs,
+        attempts = attempts,
+        kind = if (reading) StudyProgress.SessionKind.READING else StudyProgress.SessionKind.QUESTIONS,
+    )
+
+    /**
+     * Time studied, answered, accuracy, streak — the record as it stands.
+     *
+     * @param dayIndex whole local days since the epoch, for the same reason [today] takes one.
+     */
+    suspend fun progress(
+        dayIndex: Int = localDayIndex(),
+        nowMs: Long = System.currentTimeMillis(),
+    ): StudyProgress.Snapshot {
+        val s = ensureLoaded()
+        val snapshot = StudyProgress.summarise(
+            attempts = s.attempts.map { it.attempt() },
+            sessions = s.sessions.map { it.session() },
+            todayIndex = dayIndex,
+            dayOf = { localDayIndex(it) },
+        )
+        // The persisted stamp wins: the logs are capped, and eviction must not make the last sitting
+        // look older than it was.
+        return snapshot.copy(lastStudiedAtMs = maxOf(snapshot.lastStudiedAtMs, s.lastStudiedAtMs))
+    }
+
+    /** How well one guide is known, from its answers and its schedule together. */
+    suspend fun mastery(guideId: String): StudyProgress.Mastery {
+        val s = ensureLoaded()
+        val cards = s.cards.filter { it.guideId == guideId }.map { it.item().card }
+        return StudyProgress.mastery(guideId, s.attempts.map { it.attempt() }, cards)
+    }
+
+    /** The capped, ordered way back after time away, or null when the ordinary screen is right. */
+    suspend fun refresher(nowMs: Long = System.currentTimeMillis()): Refresher.Plan? {
+        val s = ensureLoaded()
+        val items = s.cards.map { stored ->
+            val item = stored.item()
+            Refresher.Item(stored.guideId, stored.guideTitle, item.card)
+        }
+        return Refresher.plan(
+            items = items,
+            attempts = s.attempts.map { it.attempt() },
+            lastStudiedAtMs = s.lastStudiedAtMs,
+            nowMs = nowMs,
+        )
+    }
+
+    /** Ask a specific question next — how a refresher step is entered. */
+    suspend fun askFor(questionId: String): Ask? {
+        val s = ensureLoaded()
+        val stored = s.cards.firstOrNull { it.id == questionId } ?: return null
+        val item = stored.item()
+        val pool = poolFor(item.question.guideId)
+        val seed = item.question.id.hashCode() + item.card.reps * PRIME_STRIDE + item.card.lapses
+        return Ask(item, quizFor(item, pool, seed))
     }
 
     // ---- today ----------------------------------------------------------------------------------------
@@ -332,6 +629,11 @@ class StudyStore(
 
     suspend fun clear() {
         flushJob?.cancel()
+        // An open sitting belongs to the history being erased; leaving it running would bank time
+        // against a deck that no longer exists.
+        openStartMs = 0L
+        openAttempts.set(0)
+        openReading = false
         mutex.withLock { publish(Stored()) }
         runCatching { context.studyDataStore.edit { it.remove(prefsKey) } }
     }
@@ -387,5 +689,20 @@ class StudyStore(
 
         /** Enough history that the daily pick keeps finding something new for years. */
         const val MAX_TAUGHT = 2_000
+
+        /** Answer history. Well past a year of daily sittings, and five small fields each. */
+        const val MAX_ATTEMPTS = 1_000
+
+        /** Sittings. Several a day for a year. */
+        const val MAX_SESSIONS = 500
+
+        /** Advances the quiz seed per review so a re-met question is not the same screen again. */
+        const val PRIME_STRIDE = 7
+
+        /** A statement item needs the section to make more than one statement to choose between. */
+        const val MIN_TRUE_STATEMENTS = 2
+
+        /** Enough unrelated prose to find well-shaped distractors in, without holding a whole guide. */
+        const val FOREIGN_SENTENCES = 80
     }
 }

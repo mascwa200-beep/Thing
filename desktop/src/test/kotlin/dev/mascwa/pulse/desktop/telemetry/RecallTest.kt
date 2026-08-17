@@ -180,6 +180,26 @@ class RecallTest {
         assertTrue(veteran.dueAtMs > t0)
     }
 
+    /**
+     * An objectively-marked answer is right or wrong; how long it took is the only signal left for how
+     * comfortably. Right but laboured is HARD — a fact you had to reconstruct is not one you know yet.
+     */
+    @Test
+    fun anObjectiveAnswerEarnsItsGradeFromCorrectnessAndPace() {
+        assertEquals(Grade.FORGOT, Recall.gradeFor(correct = false, elapsedMs = 2_000))
+        // Wrong stays wrong however fast it was.
+        assertEquals(Grade.FORGOT, Recall.gradeFor(correct = false, elapsedMs = 60_000))
+        assertEquals(Grade.EASY, Recall.gradeFor(correct = true, elapsedMs = 3_000))
+        assertEquals(Grade.GOOD, Recall.gradeFor(correct = true, elapsedMs = 15_000))
+        assertEquals(Grade.HARD, Recall.gradeFor(correct = true, elapsedMs = 45_000))
+    }
+
+    /** With no timing to read, the schedule takes the answer at face value rather than inventing one. */
+    @Test
+    fun anUntimedCorrectAnswerIsSimplyGood() {
+        assertEquals(Grade.GOOD, Recall.gradeFor(correct = true, elapsedMs = 0))
+    }
+
     @Test
     fun theGapIsDescribedInWordsAPersonWouldUse() {
         assertEquals("later today", Recall.describeInterval(Recall.LAPSE_DAYS))

@@ -5,7 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.Curriculum
 import dev.mascwa.pulse.core.telemetry.DailyLesson
 import dev.mascwa.pulse.core.telemetry.Recall
-import dev.mascwa.pulse.core.telemetry.StudyQuestions
+import dev.mascwa.pulse.core.telemetry.Refresher
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.data.study.StudyStore
 import dev.mascwa.pulse.data.study.localDayIndex
@@ -17,9 +18,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The study surface: what to learn now, what is due to be asked again, and an enrolled path.
+ * The study surface: what to learn now, what is due to be asked again, how it is going, and a way back
+ * in after time away.
  *
- * Holds one review at a time rather than a list, because a session is answered one question at a
+ * Holds one question at a time rather than a list, because a session is answered one question at a
  * time and a screen showing the next four prompts is a screen showing you four answers.
  */
 class StudyViewModel(private val container: AppContainer) : ViewModel() {
@@ -30,24 +32,55 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
         val loading: Boolean = true,
         val lesson: DailyLesson.Lesson? = null,
         val dueCount: Int = 0,
-        /** The question on screen, or null when the session is finished or not started. */
-        val asking: StudyQuestions.Question? = null,
-        /** Whether the answer is showing — self-grading only works after you have committed. */
+        /** The question on screen, with its multiple choice when one could be built fairly. */
+        val ask: StudyStore.Ask? = null,
+        /** Which option was chosen. Non-null means this question has been answered and marked. */
+        val picked: Int? = null,
+        val wasCorrect: Boolean? = null,
+        /** Free-recall path only: whether the answer is showing. Self-grading needs a commitment first. */
         val revealed: Boolean = false,
         /** "in 3 days" — what the last answer did to the schedule. Cleared on the next question. */
         val scheduled: String? = null,
         val syllabus: Curriculum.Syllabus? = null,
         val completed: Set<String> = emptySet(),
         val suggestions: List<String> = emptyList(),
-        /** Total questions held and how many are learned — the only honest progress number here. */
         val held: Int = 0,
         val learned: Int = 0,
+        /** Time studied, answered, accuracy, streak. Null until the first read completes. */
+        val progress: StudyProgress.Snapshot? = null,
+        /** Offered only after a real absence with something waiting. */
+        val refresher: Refresher.Plan? = null,
     )
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    /**
+     * When the question on screen was put there.
+     *
+     * How long an answer took is the only signal an objectively-marked question leaves about how
+     * comfortably it was known, so it is measured rather than guessed at.
+     */
+    private var shownAtMs: Long = 0L
+
     init { refresh() }
+
+    /** The screen came into view: a sitting starts, and the time it accrues starts being measured. */
+    fun enter() {
+        study.openSession()
+        refresh()
+    }
+
+    /**
+     * And left: bank it. Time is credited from what was actually done, not from the span.
+     *
+     * ⚠️ On the STORE's scope, not `viewModelScope`. This is called from the screen's disposal, which
+     * is almost exactly when this view model is cleared — a launch into a scope cancelled a moment
+     * later never runs, so navigating back out of STUDY would silently lose the sitting every time.
+     */
+    fun leave() {
+        study.endSitting()
+    }
 
     fun refresh() {
         viewModelScope.launch {
@@ -62,6 +95,8 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
             val syllabus = runCatching { study.syllabus() }.getOrNull()
             val completed = runCatching { study.completedIds() }.getOrDefault(emptySet())
             val suggestions = runCatching { study.suggestedGoals() }.getOrDefault(emptyList())
+            val progress = runCatching { study.progress() }.getOrNull()
+            val refresher = runCatching { study.refresher() }.getOrNull()
             val items = study.items.value
             _state.update {
                 it.copy(
@@ -73,6 +108,8 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
                     suggestions = suggestions,
                     held = items.size,
                     learned = items.count { i -> Recall.isLearned(i.card) },
+                    progress = progress,
+                    refresher = refresher,
                 )
             }
         }
@@ -92,21 +129,68 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { nextQuestion() }
     }
 
+    /** Begin the way back after an absence, at its first step. */
+    fun startRefresher() {
+        val first = _state.value.refresher?.steps?.firstOrNull() ?: return
+        viewModelScope.launch {
+            val ask = runCatching { study.askFor(first.item.card.id) }.getOrNull()
+            if (ask == null) {
+                nextQuestion()
+            } else {
+                shownAtMs = System.currentTimeMillis()
+                _state.update { it.copy(ask = ask, picked = null, wasCorrect = null, revealed = false, scheduled = null) }
+            }
+        }
+    }
+
     fun reveal() {
         _state.update { it.copy(revealed = true) }
     }
 
     /**
-     * Record an answer and move on.
+     * Commit to one of the options.
      *
-     * The schedule it produces is shown rather than hidden: "in 3 days" is the feedback that makes
-     * grading yourself honestly worth doing.
+     * Marked immediately and irrevocably: a choice you can take back measures nothing, and the whole
+     * value of the accuracy figure downstream is that it was not negotiated after the fact.
+     */
+    fun choose(index: Int) {
+        val current = _state.value
+        val ask = current.ask ?: return
+        val quiz = ask.quiz ?: return
+        if (current.picked != null) return
+        val correct = index == quiz.correctIndex
+        val elapsed = if (shownAtMs > 0L) (System.currentTimeMillis() - shownAtMs).coerceAtLeast(0L) else 0L
+        _state.update { it.copy(picked = index, wasCorrect = correct) }
+        viewModelScope.launch {
+            // ⚠️ The CARD's id, never the quiz's. A comprehension item mints its own identifier from
+            // the guide and heading it was assembled from, so grading by the quiz's id would find no
+            // card and the answer would vanish without a trace. The card under review is the item.
+            val next = runCatching { study.answer(ask.item.question.id, correct, elapsed) }.getOrNull()
+            _state.update { it.copy(scheduled = next?.let { c -> Recall.describeInterval(c.intervalDays) }) }
+            refresh()
+        }
+    }
+
+    /**
+     * Record a self-graded answer and move on. The open-recall path only.
+     *
+     * No attempt is recorded here, and that is deliberate: a self-grade says how it felt, and turning
+     * that into an objective right-or-wrong would put a number on the progress panel that nothing
+     * actually measured.
      */
     fun answer(grade: Recall.Grade) {
-        val id = _state.value.asking?.id ?: return
+        val id = _state.value.ask?.item?.question?.id ?: return
         viewModelScope.launch {
             val next = runCatching { study.grade(id, grade) }.getOrNull()
             _state.update { it.copy(scheduled = next?.let { c -> Recall.describeInterval(c.intervalDays) }) }
+            nextQuestion(keepScheduled = true)
+            refresh()
+        }
+    }
+
+    /** Move past a marked multiple choice to whatever is next. */
+    fun next() {
+        viewModelScope.launch {
             nextQuestion(keepScheduled = true)
             refresh()
         }
@@ -135,14 +219,17 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun endSession() {
-        _state.update { it.copy(asking = null, revealed = false, scheduled = null) }
+        _state.update { it.copy(ask = null, picked = null, wasCorrect = null, revealed = false, scheduled = null) }
     }
 
     private suspend fun nextQuestion(keepScheduled: Boolean = false) {
-        val next = runCatching { study.due(limit = 1) }.getOrDefault(emptyList()).firstOrNull()
+        val next = runCatching { study.nextAsk() }.getOrNull()
+        shownAtMs = if (next != null) System.currentTimeMillis() else 0L
         _state.update {
             it.copy(
-                asking = next?.question,
+                ask = next,
+                picked = null,
+                wasCorrect = null,
                 revealed = false,
                 scheduled = if (keepScheduled) it.scheduled else null,
             )

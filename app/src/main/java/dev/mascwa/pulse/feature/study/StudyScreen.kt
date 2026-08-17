@@ -22,10 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Curriculum
 import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.QuizBuilder
 import dev.mascwa.pulse.core.telemetry.Recall
+import dev.mascwa.pulse.core.telemetry.Refresher
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.core.telemetry.StudyQuestions
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsFillRow
@@ -54,6 +58,13 @@ fun StudyScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val c = Pulse.colors
 
+    // A sitting is the screen being in view. Bounded at both ends rather than left open, because time
+    // credited to a screen nobody is looking at is exactly the figure StudyProgress refuses to report.
+    LifecycleStartEffect(Unit) {
+        vm.enter()
+        onStopOrDispose { vm.leave() }
+    }
+
     PulseScaffold(
         title = "Study",
         navigationIcon = {
@@ -69,19 +80,36 @@ fun StudyScreen(
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val asking = state.asking
-                if (asking != null) {
+                val ask = state.ask
+                if (ask != null) {
                     item { LcarsHeaderBar("Recall", trailing = "${state.dueCount} DUE") }
                     item {
-                        QuestionCard(
-                            question = asking,
-                            revealed = state.revealed,
-                            onReveal = { vm.reveal() },
-                            onGrade = { vm.answer(it) },
-                            onStop = { vm.endSession() },
-                        )
+                        if (ask.quiz != null) {
+                            QuizCard(
+                                quiz = ask.quiz,
+                                picked = state.picked,
+                                wasCorrect = state.wasCorrect,
+                                scheduled = state.scheduled,
+                                onChoose = { vm.choose(it) },
+                                onNext = { vm.next() },
+                                onStop = { vm.endSession() },
+                            )
+                        } else {
+                            QuestionCard(
+                                question = ask.item.question,
+                                revealed = state.revealed,
+                                onReveal = { vm.reveal() },
+                                onGrade = { vm.answer(it) },
+                                onStop = { vm.endSession() },
+                            )
+                        }
                     }
                 } else {
+                    val plan = state.refresher
+                    if (plan != null) {
+                        item { LcarsHeaderBar("Back up to speed", trailing = "${plan.dueTotal} WAITING") }
+                        item { RefresherCard(plan, onStart = { vm.startRefresher() }) }
+                    }
                     item { LcarsHeaderBar("Today") }
                     item {
                         TodayCard(
@@ -93,6 +121,12 @@ fun StudyScreen(
                             onSkip = { id -> vm.markRead(id) },
                         )
                     }
+                }
+
+                val progress = state.progress
+                if (progress != null && progress.hasHistory) {
+                    item { LcarsHeaderBar("Progress") }
+                    item { ProgressCard(progress) }
                 }
 
                 val syllabus = state.syllabus
@@ -180,6 +214,217 @@ private fun TodayCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * A multiple choice, marked the moment it is answered.
+ *
+ * The grades are gone from this path and that is the point: a chosen option is objectively right or
+ * wrong, so the schedule no longer has to take your word for it and the accuracy figure downstream
+ * measures something real. The options stay on screen afterwards, right one marked — being told
+ * "wrong" is a score, being shown which one was right beside what you picked is a lesson.
+ */
+@Composable
+private fun QuizCard(
+    quiz: QuizBuilder.QuizItem,
+    picked: Int?,
+    wasCorrect: Boolean?,
+    scheduled: String?,
+    onChoose: (Int) -> Unit,
+    onNext: () -> Unit,
+    onStop: () -> Unit,
+) {
+    val c = Pulse.colors
+    val answered = picked != null
+    NeonPanel(corners = true) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    quiz.guideTitle + " ▸ " + quiz.heading,
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                )
+                // Naming the form is a courtesy, not decoration: "which is NOT" and "the answer may be
+                // absent" both change what a careful reader should do, and hiding that is trickery.
+                Text(
+                    formatLabel(quiz.format),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.sky,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                quiz.prompt,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            quiz.choices.forEachIndexed { index, choice ->
+                ChoiceRow(
+                    label = choice.text,
+                    index = index,
+                    state = when {
+                        !answered -> ChoiceState.OPEN
+                        choice.correct -> ChoiceState.RIGHT
+                        index == picked -> ChoiceState.WRONG
+                        else -> ChoiceState.IDLE
+                    },
+                    onClick = { onChoose(index) },
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            if (answered) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (wasCorrect == true) "RIGHT" else "NOT QUITE",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp,
+                    color = if (wasCorrect == true) c.positive else c.negative,
+                )
+                Spacer(Modifier.height(4.dp))
+                // The sentence the fact came from. This is the half that teaches.
+                Text(quiz.explanation, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.accent)
+                if (scheduled != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Comes back $scheduled.", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+                }
+                Spacer(Modifier.height(10.dp))
+                LcarsButton("NEXT", onClick = onNext)
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "STOP FOR NOW",
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.muted,
+                modifier = Modifier.clickable { onStop() }.padding(vertical = 4.dp),
+            )
+        }
+    }
+}
+
+private enum class ChoiceState { OPEN, IDLE, RIGHT, WRONG }
+
+@Composable
+private fun ChoiceRow(label: String, index: Int, state: ChoiceState, onClick: () -> Unit) {
+    val c = Pulse.colors
+    val tint = when (state) {
+        ChoiceState.OPEN -> c.accent
+        ChoiceState.IDLE -> c.muted
+        ChoiceState.RIGHT -> c.positive
+        ChoiceState.WRONG -> c.negative
+    }
+    val mark = when (state) {
+        ChoiceState.RIGHT -> "◉"
+        ChoiceState.WRONG -> "✕"
+        else -> ('A' + index).toString()
+    }
+    Row(
+        // Only clickable while open — a choice you can take back measures nothing.
+        Modifier.fillMaxWidth()
+            .then(if (state == ChoiceState.OPEN) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(mark, fontFamily = JetBrainsMono, fontSize = 12.sp, color = tint)
+        Text(label, fontFamily = JetBrainsMono, fontSize = 12.sp, color = tint)
+    }
+}
+
+private fun formatLabel(format: QuizBuilder.Format): String = when (format) {
+    QuizBuilder.Format.STANDARD -> "PICK ONE"
+    QuizBuilder.Format.DISCRIMINATE -> "ONE DETAIL APART"
+    QuizBuilder.Format.NONE_OF_THESE -> "MAY NOT BE LISTED"
+    QuizBuilder.Format.NEGATIVE -> "WHICH IS NOT"
+}
+
+/**
+ * The record, plainly. Time studied is a credited figure rather than a wall-clock one — see
+ * [StudyProgress.creditedMs] — so it can be trusted rather than admired.
+ */
+@Composable
+private fun ProgressCard(p: StudyProgress.Snapshot) {
+    val c = Pulse.colors
+    NeonPanel {
+        Column {
+            Text(
+                StudyProgress.describeStudied(p.studiedMs) + " studied",
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink,
+            )
+            Spacer(Modifier.height(6.dp))
+            if (p.answered > 0) {
+                // Blocks, not a smooth bar: how much is still going wrong should read as clearly as
+                // how much is going right.
+                LcarsFillRow(
+                    segments = listOf(
+                        p.correct.toFloat() to c.positive,
+                        p.incorrect.toFloat() to c.negative,
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    gap = 1.5.dp,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            Text(p.describeRatio(), fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+            p.trend()?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Last ${p.recentAnswered}: ${StudyProgress.percent(p.recentAccuracy)}% — $it",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "${p.streakDays} day streak · ${p.activeDays} day${if (p.activeDays == 1) "" else "s"} studied",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
+        }
+    }
+}
+
+/**
+ * The way back after time away — capped, ordered, and honest about what it is holding aside.
+ *
+ * Every step carries its reason, because "do these eight" with no explanation is a chore, and a chore
+ * is what somebody returning after a month away will close.
+ */
+@Composable
+private fun RefresherCard(plan: Refresher.Plan, onStart: () -> Unit) {
+    val c = Pulse.colors
+    NeonPanel(corners = true) {
+        Column {
+            Text(
+                plan.headline(),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(plan.note(), fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+            Spacer(Modifier.height(8.dp))
+            plan.steps.take(REFRESHER_PREVIEW).forEach { step ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("▸", fontFamily = JetBrainsMono, fontSize = 11.sp, color = reasonColor(step.reason))
+                    Column {
+                        Text(step.item.guideTitle, fontFamily = ChakraPetch, fontSize = 13.sp, color = c.ink)
+                        Text(step.note(), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            LcarsButton("PICK UP WHERE YOU LEFT OFF", onClick = onStart)
+        }
+    }
+}
+
+@Composable
+private fun reasonColor(reason: Refresher.Reason): Color {
+    val c = Pulse.colors
+    return when (reason) {
+        Refresher.Reason.WARMUP -> c.positive
+        Refresher.Reason.WEAK -> c.negative
+        Refresher.Reason.DECAYED -> c.amber
+        Refresher.Reason.OVERDUE -> c.accent
     }
 }
 
@@ -331,3 +576,6 @@ private fun GoalRow(goal: String, tint: Color, onEnrol: (String) -> Unit) {
 
 /** How much of the path to show. Enough to see where it is going, not the whole list. */
 private const val NEXT_STEPS = 3
+
+/** How much of the way back to preview. The point is that it looks doable, so it stays short. */
+private const val REFRESHER_PREVIEW = 4
