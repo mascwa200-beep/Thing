@@ -112,11 +112,19 @@ class RadioBrowserRepository(private val http: HttpClient) {
             .toList()
     }
 
-    /** Top stations for an ISO-2 [countryCode], most-clicked first — powers the WORLD browse. */
+    /**
+     * Top stations for an ISO-2 [countryCode], most-clicked first — powers the WORLD browse.
+     *
+     * ⚠️ Throws on failure, deliberately. It used to swallow, and the caller swallowed a second
+     * time, so a country with no stations and a country the app could not reach produced the same
+     * empty list — and the screen said "No stations found there." with no retry offered. The caller
+     * needs the difference; a blank country code is still an ordinary empty answer, because that is
+     * a question with no answer rather than a question that failed.
+     */
     suspend fun stationsByCountry(countryCode: String, limit: Int = 30): List<RadioStation> {
         val cc = countryCode.trim().uppercase()
         if (cc.isBlank()) return emptyList()
-        return runCatching { countryStations(cc, null, limit) }.getOrDefault(emptyList())
+        return countryStations(cc, null, limit)
     }
 
     /** A mapped station plus its lower-cased state key (for the "near me" partition). */

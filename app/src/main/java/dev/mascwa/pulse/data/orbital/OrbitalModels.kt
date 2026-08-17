@@ -52,6 +52,13 @@ data class OrbitalData(
     val planets: List<Planet> = emptyList(),
     val neos: List<NeoObject> = emptyList(),
     val neoHazardousCount: Int = 0,
+    /**
+     * True when the near-Earth-object fetch failed, so [neos] being empty says nothing.
+     *
+     * Defaulted so a result cached before this field existed still decodes, and defaulted to
+     * `false` because those cached entries were written from successful fetches.
+     */
+    val neosUnavailable: Boolean = false,
     val updatedEpochMs: Long = System.currentTimeMillis(),
 )
 

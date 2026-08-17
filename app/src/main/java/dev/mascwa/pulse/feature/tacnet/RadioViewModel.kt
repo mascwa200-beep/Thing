@@ -109,9 +109,17 @@ class RadioViewModel(
         browseJob?.cancel()
         browseJob = viewModelScope.launch {
             _browseStatus.value = BrowseStatus.LOADING
-            val list = runCatching { browser.stationsByCountry(country.code) }.getOrDefault(emptyList())
+            // The failure is kept rather than flattened to an empty list. ERROR already has copy and
+            // a retry beside it; it was simply unreachable, because the only thing that could set it
+            // was a null repository and the repository is a non-null lazy val.
+            val result = runCatching { browser.stationsByCountry(country.code) }
+            val list = result.getOrDefault(emptyList())
             _browse.value = list
-            _browseStatus.value = if (list.isEmpty()) BrowseStatus.EMPTY else BrowseStatus.READY
+            _browseStatus.value = when {
+                result.isFailure -> BrowseStatus.ERROR
+                list.isEmpty() -> BrowseStatus.EMPTY
+                else -> BrowseStatus.READY
+            }
         }
     }
 
@@ -144,12 +152,19 @@ class RadioViewModel(
             _searchStatus.value = SearchStatus.SEARCHING
             // Radio Browser first; then append TuneIn hits (US commercial stations Radio Browser lacks,
             // e.g. WTRV), de-duped by stream. Additive — TuneIn failing just means fewer results.
-            val browserList = runCatching { browser.searchStations(q) }.getOrDefault(emptyList())
+            val browserResult = runCatching { browser.searchStations(q) }
+            val browserList = browserResult.getOrDefault(emptyList())
             val tuneList = runCatching { tuneIn?.search(q) }.getOrNull().orEmpty()
             val seen = HashSet(browserList.map { it.streamUrl })
             val merged = browserList + tuneList.filter { seen.add(it.streamUrl) }
             _searchResults.value = merged
-            _searchStatus.value = if (merged.isEmpty()) SearchStatus.EMPTY else SearchStatus.READY
+            _searchStatus.value = when {
+                // Only an outright failure with nothing to show is an error. TuneIn is additive, so
+                // it failing while Radio Browser answered is fewer results, not a broken search.
+                browserResult.isFailure && merged.isEmpty() -> SearchStatus.ERROR
+                merged.isEmpty() -> SearchStatus.EMPTY
+                else -> SearchStatus.READY
+            }
         }
     }
 
@@ -186,11 +201,18 @@ class RadioViewModel(
             val place = runCatching { locator.describePlace(loc.latitude, loc.longitude) }.getOrNull()
             _localPlace.value = listOfNotNull(place?.country ?: place?.countryCode, place?.state)
                 .joinToString(" · ").ifBlank { "Near you" }
-            val list = runCatching {
+            val result = runCatching {
                 browser.localStations(loc.latitude, loc.longitude, place?.countryCode, place?.state)
-            }.getOrDefault(emptyList())
+            }
+            val list = result.getOrDefault(emptyList())
             _local.value = list
-            _localStatus.value = if (list.isEmpty()) LocalStatus.EMPTY else LocalStatus.READY
+            _localStatus.value = when {
+                // This is the one the retry copy was written for: "⟳ COULDN'T LOAD LOCAL STATIONS
+                // — RETRY" has been in RadioBody since it was written and could never be shown.
+                result.isFailure -> LocalStatus.ERROR
+                list.isEmpty() -> LocalStatus.EMPTY
+                else -> LocalStatus.READY
+            }
         }
     }
 }

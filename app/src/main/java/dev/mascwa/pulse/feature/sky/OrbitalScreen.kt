@@ -481,7 +481,21 @@ private fun LazyListScope.asteroidsTab(d: OrbitalData?, c: NightwirePalette) {
         }
     }
     if (neos.isEmpty()) {
-        item { Hint("No close approaches catalogued for today.", c) }
+        item {
+            // "None today" and "we could not ask" are different statements, and the second one used
+            // to be printed as the first. NASA's shared DEMO_KEY is rate-limited per IP, so this is
+            // a routine outcome rather than a rarity.
+            if (d?.neosUnavailable == true) {
+                Hint(
+                    "Could not reach NASA's close-approach catalogue, so this list is unknown " +
+                        "rather than empty. Adding your own NASA key in Settings avoids the shared " +
+                        "demo key's rate limit.",
+                    c,
+                )
+            } else {
+                Hint("No close approaches catalogued for today.", c)
+            }
+        }
     } else {
         items(neos) { neo -> NeoCard(neo, c) }
     }
