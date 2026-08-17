@@ -1,20 +1,23 @@
 # Feed-fidelity audit — verified findings
 
-Seven keyless live sources were probed against their parsers, then every raw finding was
-put to an independent verifier told to **refute** it. What follows is only what survived,
-with the verifier's own corrected severity — which moved in both directions.
+All seven keyless live sources were probed against their parsers, then every raw finding was put
+to an independent verifier told to **refute** it. Only what survived is below, carrying the
+verifier's own corrected severity — which moved in both directions.
 
 This file exists because the workflow transcript lives in an ephemeral container. It is a
 **work list, not a record of work done**: nothing here has been fixed.
 
-**41 confirmed of 43 raw** across 6 sources — 7 high, 13 medium, 21 cosmetic. 2 refuted.
+**49 confirmed of 53 raw** across all 7 sources — 7 high, 15 medium, 22 cosmetic. 4 refuted.
+
+Sources: `radio-browser` · `overpass-poi` · `rainviewer` · `osrm-routing` · `orbital-iss-sun` ·
+`news-google-rss` · `social-hn`.
 
 ## The defect class
 
-The same shape the USGS and NWS arcs found, in more places: **the response carries the
-field, the parser does not declare it, and the screen states something it cannot know.**
-Two variants recur — a failure rendered identically to an empty result (and then cached as
-a fact), and a server-side cap or snap applied before the app's own sorting.
+The same shape the USGS and NWS arcs found, in more places: **the response carries the field, the
+parser does not declare it, and the screen states something it cannot know.** Two variants recur —
+a failure rendered identically to an empty result (and then cached as a fact), and a server-side
+cap or snap applied before the app does its own sorting.
 
 ## HIGH (7)
 
@@ -132,7 +135,38 @@ so offline the user is told 'No stations found there.' with no retry offered. Sa
 this repo has repeatedly treated as high (the Freshness and safety-coverage arcs), and the
 correct copy already exists. Severity high stands.
 
-## MEDIUM (13)
+## MEDIUM (15)
+
+### `news-google-rss` — The <description> is a structured multi-outlet coverage cluster; the parser flattens it to a text blob and the app then re-fetches it over the network, once per article
+
+Reproduced end to end. Raw XML confirms the description is an <ol> of <li><a
+href=…>headline</a><font>Outlet</font>; my own fetch gives 37/38 TOP (claim 36/38) and 48/70
+TECHNOLOGY (claim exact), mean 4.86 and 4.94 links. RssParser.kt:110 does
+cleanText(stripHtml(description)).take(400) with TAG_REGEX = <[^>]*> replacing every tag with a
+space, so links, outlet attribution and item boundaries are all destroyed. The re-fetch is real
+and I confirmed the strongest version of it: ArticleCard has LaunchedEffect(article.url) {
+onNeedsCoverage(article) } (NewsComponents.kt:108) -> ensureCoverage ->
+BreakingCoverageRepository.coverage -> news.search, and the strip consumes ONLY cov.sources
+(NewsComponents.kt:129 MediaBias.breakdown(cov.sources)) — i.e. exactly the outlet-name list the
+discarded cluster already carries. showNewsCoverageStrip defaults true (AppSettings.kt:388), so
+scrolling a feed fires a Google News search per unseen article (Semaphore(2), 24h disk cache).
+Downgraded high->medium: this is real architectural waste plus a fidelity loss (a keyword search
+approximates Google's own editorial grouping), but no wrong user-visible output was demonstrated
+— the consequence is network/battery cost and an approximate outlet list.
+
+### `news-google-rss` — The summary printed under every headline is the headline again, and on the pooled feeds it runs four other stories together and cuts mid-word
+
+Measured independently and it holds exactly. On the search-shaped feed 100/100 summaries are
+EXACTLY displayTitle + ' ' + source (I checked that equality directly, not by eye). On the topic
+feeds 38/38 TOP and 70/70 TECH summaries open with their own headline, and 24/38 TOP and 26/70
+TECH hit the hard 400-char cap mid-text (claim said 23/38, 27/70 — same phenomenon, different
+fetch window). I reproduced a rendered example nearly identical to the one quoted. Confirmed
+both halves of the duplication: the card renders the summary at NewsComponents.kt:151 and the
+source separately via meta(article) at line 200, so the summary genuinely adds nothing on search
+feeds. Downgraded high->medium: the render is maxLines = 2 at 12sp, so the visible damage is a
+repeated headline plus a clipped fragment rather than a wall of text, and nothing factually
+wrong is asserted — it is wasted space and mild run-on ambiguity on every card, not a
+correctness failure.
 
 ### `orbital-iss-sun` — The close-approach time is shown raw in UTC beside device-local clocks
 
@@ -345,7 +379,20 @@ regardless of age and nothing the user sees becomes wrong — but the two surfac
 same SocialItem inconsistently, plus a fifth of rows being days old with no signal, is more than
 presentational.
 
-## COSMETIC (21)
+## COSMETIC (22)
+
+### `news-google-rss` — Hacker News self-post body text is never requested, so Ask HN and Show HN posts show a vote count instead of the post
+
+Facts confirmed almost exactly. I probed 60 live topstories: 6 carry `text` (claim 6/59), 1 has
+no `url` (claim 1/59), 1 is a `job` (claim 1/59). HackerNewsItem (NewsApiDto.kt:34-43) genuinely
+omits `text`, so it is dropped at deserialization, and NewsRepository.kt:248 synthesises
+'${score} points · ${descendants} comments on Hacker News' instead. Sample self-posts I pulled
+ranged 106-4479 chars of real content. Downgraded medium->cosmetic on exposure and consequence:
+HN is merged into TECH only and capped at limit = 12 top stories (NewsRepository.kt:231), so at
+~10% carrying text this is roughly one affected card per TECH load; the substituted line is
+still genuinely informative for the other ~90%; nothing is misstated; and for the affected posts
+the fallback link already goes to the thread where the text is the first thing visible, so the
+content is one tap away rather than lost.
 
 ### `orbital-iss-sun` — The ISS card tells you it is overhead but not that it is in the Earth's shadow
 
@@ -621,7 +668,7 @@ that is sound: on Hacker News the submitter is not a signal a reader acts on the
 community or a Mastodon handle is. Recorded for completeness of the field diff, not as something
 worth changing on its own.
 
-## Refuted (2) — do not re-audit
+## Refuted (4) — do not re-audit
 
 ### `osrm-routing` — A routing failure is displayed as "ROUTING…" forever — unreachable, rate-limited and no-route all look like still-in-progress
 
@@ -658,4 +705,38 @@ would render "▲ 1 · 0 comments" against every other row showing ▲15-477 —
 row on the screen, not a camouflaged one. Marking confirmed=false: the parser fact is real but
 the defect has no reachable user consequence, so shipping a fix for it would be work against a
 scenario that does not occur.
+
+### `news-google-rss` — Default-locale String.format on the live market percentage in the news market chip
+
+REFUTED. The code fact is right — NewsComponents.kt:628 is `"%.1f".format(live)` with no Locale
+and the file contains zero Locale references (I confirmed it is the only format( call in the
+file) — but the stated defect is not a defect in this codebase. The app's canonical displayed-
+percentage helpers deliberately use the device locale: Formatters.kt is documented 'Locale-aware
+formatting helpers used across every screen' and signedPercent (:54) and percent (:59) both pass
+Locale.getDefault() explicitly, and they are what HomeScreen, EconomyComponents, InflationBody
+and Charts render. So on a German device every percentage in the app reads '2,3%' by design, and
+this chip produces byte-identical output to the app's own helper — it is CONSISTENT, not a
+missed sweep. The two 'sibling fixes' cited actually undercut the claim:
+NewsAnalysisEngine.kt:96 carries a comment saying its Locale.US is there because 'this string
+feeds a prompt whose numbers the model may quote verbatim', and MarketTape likewise builds
+prompt text. Those are machine-readable strings; this one is human-facing, which is exactly the
+case where default locale is correct. At most this should call Formatters.percent for digit-
+handling consistency, which is a style preference, not a bug.
+
+### `news-google-rss` — AP is ranked as an untrusted outlet on the breaking coverage list because the outlet name is matched as a substring
+
+REFUTED on its central factual premise. The claim is that Google News publishes AP with a bare-
+domain display text 'apnews.com'. It does not. The raw XML in my own fetch is `<source
+url="https://apnews.com">AP News</source>` — the display text is 'AP News', which is a verbatim
+entry in BreakingCoverageRepository.TRUSTED (line 70, clearly added for exactly this reason). I
+ran the shipped isTrusted rule over 431 live items across six feeds: all 3 AP items matched
+TRUE. So AP sorts at the top, not the bottom, and the stated evidence ('11/431 items (AP)'
+ranked untrusted) does not reproduce. The audit's own reasoning is also self-contradictory here
+— its cosmetic finding correctly notes source@url would not help, and I measured that:
+substituting source@url changes 50 verdicts and ALL 50 are losses, 0 gains, so it would strictly
+make ranking worse. Worth recording for the maintainer: a REAL instance of this substring class
+does exist for other outlets whose display text is a bare domain — nytimes.com (5 items),
+washingtonpost.com (2), abcnews.com (2) all miss TRUSTED entries they plainly are, and 52 of 126
+distinct outlets present as bare domains — but that is a different finding from the one claimed,
+and it was not the one filed.
 
