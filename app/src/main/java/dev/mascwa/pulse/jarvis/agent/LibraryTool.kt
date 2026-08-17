@@ -176,6 +176,12 @@ class LibraryTool(
                 g.sections.joinToString("") { "\n  · " + it.heading }
         return buildString {
             append(g.title).append(" — ").append(s.heading).append("\n\n")
+            // ⚠️ The outline carries this and a section read did not, so a model that went straight to
+            // `read` — which the persona tells it to do — never saw the page's warning. In full and
+            // above the prose, matching the reader and the grounding block.
+            g.safetyNote?.trim()?.takeIf { it.isNotBlank() }?.let {
+                append("SAFETY WARNING ON THIS PAGE, repeat it in your answer: ").append(it).append("\n\n")
+            }
             append(s.body.trim())
             s.ingredients?.takeIf { it.isNotEmpty() }?.let { list ->
                 append("\n\nYou need:"); list.forEach { append("\n  - ").append(it) }

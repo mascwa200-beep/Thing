@@ -24,6 +24,9 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
      * @param spoken a couple of sentences plus the citation — an answer a person can hear or read.
      * @param grounding the passage as prompt context, with instructions to ignore it if it misses.
      * @param body the section in full — an emergency protocol is read whole, not in two sentences.
+     * @param safety the guide's own warning, already folded into [spoken] and [grounding]. Exposed
+     *   separately so a caller that shows the [body] itself can set the warning apart from it, the way
+     *   the reader does. Null when the guide carries none.
      */
     data class Found(
         val title: String,
@@ -31,6 +34,7 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
         val spoken: String,
         val grounding: String,
         val body: String,
+        val safety: String? = null,
     )
 
     /**
@@ -49,9 +53,10 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
         return Found(
             title = guide.title,
             where = where,
-            spoken = LibraryConsult.firstSentences(body) + LibraryConsult.citation(guide.title),
-            grounding = LibraryConsult.groundingBlock(where, body),
+            spoken = LibraryConsult.spokenAnswer(body, guide.safetyNote, guide.title),
+            grounding = LibraryConsult.groundingBlock(where, body, guide.safetyNote),
             body = body,
+            safety = guide.safetyNote?.trim()?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -77,9 +82,10 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
         return Found(
             title = guide.title,
             where = where,
-            spoken = LibraryConsult.firstSentences(body) + LibraryConsult.citation(guide.title),
-            grounding = LibraryConsult.groundingBlock(where, body),
+            spoken = LibraryConsult.spokenAnswer(body, guide.safetyNote, guide.title),
+            grounding = LibraryConsult.groundingBlock(where, body, guide.safetyNote),
             body = body,
+            safety = guide.safetyNote?.trim()?.takeIf { it.isNotBlank() },
         )
     }
 }

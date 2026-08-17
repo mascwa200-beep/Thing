@@ -89,12 +89,52 @@ object LibraryConsult {
         return if (out.isEmpty()) flat.take(maxChars) else out.toString()
     }
 
-    /** How the retrieved page is handed to a model. */
-    fun groundingBlock(where: String, body: String, maxChars: Int = GROUNDING_CHARS): String =
-        "\n\nFrom the device's bundled library, possibly relevant to what was just asked — \"" +
-            where + "\":\n" + body.take(maxChars) +
+    /**
+     * The answer a person hears or reads: the guide's warning, then the passage, then where it came
+     * from.
+     *
+     * ⚠️ **The warning leads, and it is never trimmed.** 184 of the bundled guides carry one and this
+     * path was dropping all of them — so the device would answer "someone is having a seizure" out
+     * loud without "never put anything in their mouth and never hold them down", and "they've been
+     * electrocuted" without "never touch someone who may still be in contact with electricity". Those
+     * are the instructions that stop a bystander causing the injury or becoming the second casualty.
+     *
+     * Leading with it is not a new judgement: the reader already renders the safety note as a
+     * highlighted card **above** the sections, so this makes the spoken answer agree with the written
+     * page. It also fails in the right direction — somebody who stops listening early has heard the
+     * part that matters most.
+     *
+     * The passage itself is still cut to a couple of sentences, because reading a five-hundred-word
+     * section aloud is not an answer to a spoken question. The warning is not, because a warning cut
+     * in half is where the "never do X" clause tends to live.
+     */
+    fun spokenAnswer(body: String, safety: String?, guideTitle: String): String {
+        val warning = safety?.replace(WHITESPACE, " ")?.trim().orEmpty()
+        val opening = if (warning.isEmpty()) "" else "First, the warning on this page: $warning "
+        return opening + firstSentences(body) + citation(guideTitle)
+    }
+
+    /**
+     * How the retrieved page is handed to a model.
+     *
+     * The guide's safety warning rides along in full when it has one, above the passage: a model
+     * answering from this page must not be able to leave it out, and it is short enough that the
+     * budget below still governs the prose.
+     */
+    fun groundingBlock(
+        where: String,
+        body: String,
+        safety: String? = null,
+        maxChars: Int = GROUNDING_CHARS,
+    ): String {
+        val warning = safety?.replace(WHITESPACE, " ")?.trim().orEmpty()
+        return "\n\nFrom the device's bundled library, possibly relevant to what was just asked — \"" +
+            where + "\":\n" +
+            (if (warning.isEmpty()) "" else "SAFETY WARNING ON THIS PAGE, repeat it in your answer: $warning\n\n") +
+            body.take(maxChars) +
             "\n\nIf it answers the question, answer from it and name the guide. If it does not, " +
             "ignore it entirely and never mention it."
+    }
 
     /** Where a quoted passage came from, for the reader to go and check. */
     fun citation(guideTitle: String): String = " The full page is \"" + guideTitle + "\", in the library."
