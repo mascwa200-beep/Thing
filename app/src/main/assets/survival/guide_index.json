@@ -13823,6 +13823,29 @@
    "file": "guides_vehicles_and_transport.json"
   },
   {
+   "id": "car-basics-and-roadside-problems",
+   "title": "Car Basics: Changing a Tyre, Jump-Starting, Breakdowns, Oil and Maintenance",
+   "category": "Vehicles & Transport",
+   "summary": "The practical car guide: what to carry, tyre pressure and tread and what wear is telling you, how to change a wheel safely, punctures and sealant kits and space-savers, jump-starting a flat battery in the right order, where to stop and how not to be hit when you break down, checking oil and coolant and brake fluid, what the warning lights mean, brakes and overheating, driving on ice and in floodwater, servicing and timing belts, electric and hybrid differences, misfuelling, and the checks to make before buying or insuring.",
+   "headings": [
+    "Before Anything Goes Wrong: What to Carry and What to Check",
+    "Tyres: Pressure, Tread, Age and What They Are Telling You",
+    "Changing a Wheel Safely",
+    "Punctures, Sealant Kits and Space-Saver Spares",
+    "A Flat Battery: Jump-Starting Without Damaging Anything",
+    "Breaking Down: Where to Stop and How Not to Be Hit",
+    "Fluids: Oil, Coolant, Brake Fluid and Screenwash",
+    "Warning Lights, Noises and What They Actually Mean",
+    "Brakes, Overheating, and Two Faults Worth Recognising",
+    "Driving in Rain, Ice and Poor Grip",
+    "Servicing, Inspections and Keeping Records",
+    "Electric and Hybrid Vehicles: What Is Different",
+    "Fuel, Filling Up and Getting It Wrong",
+    "Buying, Insuring and the Paperwork That Protects You"
+   ],
+   "file": "guides_vehicles_and_transport.json"
+  },
+  {
    "id": "prehistoric-art-cave-paintings-and-the-origins-of-image-maki",
    "title": "Prehistoric Art: Cave Paintings and the Origins of Image-Making",
    "category": "Visual Arts & Design",
