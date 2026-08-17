@@ -4129,6 +4129,73 @@ Sports & Fitness and Visual Arts & Design are done. Whatever is thinnest next is
 ⚠️ Every guide here is prose I wrote and nobody reviewed. The exercise guide carries a `safetyNote`
 and stays at the level of general public guidance — no individual programming, no medical advice.
 
+### THE SAFETY FEEDS WERE BEING HANDED MORE THAN THEY READ (this session, PR #448)
+
+Owner: *"keep going autonomously"* with no direction, so this was **found by hunting**, and the vein
+was the one that produced the ECONOMY-vintage and safety-coverage arcs: the app more confident than
+its data. **Zero subagent spend**, as with every arc since the credit directive.
+
+**Two pending items were re-checked first.** ⚠️ **Task #164 (images) is still blocked, and my earlier
+note was imprecise** — Wikimedia returns **429 on file downloads too**, not only on the API (the
+earlier 400 was a made-up filename). Openverse and NASA both answer 200, but Openverse's CC0 slice
+is decorative stock: a rope *sticker* on a knot-tying guide implies instruction it does not give.
+The instructional diagrams that matter are unreachable from this container's shared IP.
+
+**The find: the same USGS feed is parsed twice at two very different fidelities.**
+`RadarRepository` reads depth, magType, PAGER, tsunami, felt, intensity, significance and review
+status — the RADAR arc did that. `SafetyRepository.usgs()`, which feeds the safety screen, the NAV
+incident layer and **the notification**, read magnitude, place, time, id and url. Measured live: of
+54 events, `tsunami`, `sig`, `magType`, `status` and depth were present on **54/54** and all
+discarded; depth ranged **1.1 km to 564 km**. Severity was magnitude alone, and `RefreshWorker`
+gates the board's ALERT row on HIGH/EXTREME — so a tsunami flag could not influence whether you
+were told. The GDACS parser in the same file already reads its source's own `alertlevel`, so the
+inconsistency was internal.
+
+⚠️ **The reuse check changed the plan and saved a duplicate core.** The plan said "write
+`QuakeSeverity.kt`". `Seismic.kt` already existed — 227 lines, tested, covering magnitude, depth,
+magType, PAGER, Mercalli, felt reports and review status — **used only by the radar screen**. Its
+own KDoc says "the USGS feed carries twenty-six fields per event and the app read three." So the
+work was to *extend* it (tsunami, `alertLevel`, `compactFacts`) and point the safety path at it.
+**Always grep `core:telemetry` for an existing core before writing one.**
+
+**Then the same defect in the weather feed, which the owner picked as the follow-up.** Of 80 live
+NWS alerts the parser discarded `instruction` on **78/80** — the field that says *what to do*, in
+the safety feature — plus `expires` and `urgency`/`certainty` on 80/80. CAP grades on **three**
+axes; the app read one, so a *Severe/Future/Possible* watch graded identically to a
+*Severe/Immediate/Observed* warning. New `CapAlerts` core. An expired alert is now dropped: the
+endpoint is called "active" but the result is cached and served offline indefinitely.
+
+**GDACS and UK crime came back clean** — GDACS already reads `alertlevel` and both coordinates.
+
+**⚠️ THE LESSON OF THIS ARC, and it is about my own tests.** Negative-testing caught that one of my
+four rules was **not tested by its own test**: `anAbsentFieldNeverRaisesTheGrade` compared bare
+against explicit-null, and the perturbation that makes *every* absent PAGER escalate moved both
+sides together, so it passed against a deliberately broken function. **A self-referential assertion
+cannot catch a rule that shifts the whole function** — pin absolute expected values. Six rules
+across the two cores are now negative-tested, each confirmed to fail exactly its own test, with the
+perturbation script asserting it matched before running.
+
+**`tools/android_resolve_check.sh` gained kotlinx-serialization** on its target classpath —
+without it every `@Serializable` app model fails on the annotation and the differencing reports each
+**newly added member** as unresolved, which is the commonest edit there is. ⚠️ Honest scope: it took
+the unresolved count 286 → 285 and **changed no verdict here**, because the false positive I hit
+came through the `AppContainer` chain (the documented case). Proved by compiling a direct `Incident`
+probe: 0 errors. Recorded rather than overclaimed.
+
+**Verification:** 1024 core tests green locally; the shipped grader run over the **live 54-event
+feed** (3 events change grade, all 496–564 km deep with no PAGER, MODERATE → LOW; nothing wrongly
+escalated). ⚠️ `tsunami == 1` was 0 in today's feed, so that path is proven by unit test and **not by
+observation** — say so rather than implying it was seen working.
+
+⚠️ **Owner-verify on the Pixel:** the depth and TSUNAMI line on a safety row at real width, the
+weather alert's instruction text (the most useful line on the row now), and the HAPPENING NOW /
+FORECAST tag. Desktop untouched throughout — no safety feature there, neither core is mirrored, all
+42 mirrors current.
+
+**Open / steerable next:** the remaining unprobed feeds (Radio Browser, Overpass, RainViewer,
+Launch Library); the Federation Database lore waves (56 of 150–200); the evidenced content gaps
+(*"world war two"* → the Roman guide, *"what is a passport"*, *"nuclear power"*).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
