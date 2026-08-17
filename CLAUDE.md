@@ -3473,6 +3473,67 @@ says so, and syncing would need the remote link's allowlist widened — delibera
 desktop has no settings screen yet, so its few preferences are implicit; MSI size is now ~180 MB by the
 owner's own call.
 
+### HOW MUCH TO TRUST WHAT YOU ARE SEEING (this session, PR #444)
+
+Owner: *"Keep going autonomously."* No direction, so I hunted rather than picking off the open-items
+list — and the vein that produced the ECONOMY-vintage and safety-coverage arcs produced four more
+defects of the same shape: **the app more confident than its data**. Zero subagent spend, as with the
+ten arcs before it.
+
+- **A failed refresh was invisible on every screen.** `AsyncLoader.load` keeps the previous data when a
+  fetch throws — right, and documented — but its catch branch set only `loading` and `error`. Screens
+  gate their error on `Async.isError`, which is `error != null && data == null`, so with data present
+  nothing rendered; and nothing set `stale`, so no banner either. Yesterday's numbers stayed on screen
+  looking live. **This was the serious one.**
+- **The age was computed, threaded to twelve screens, and read on one.** `DiskCache.Cached` carries
+  `savedAtMs`, `Fetched` forwards it, `Async.lastUpdatedEpochMs` delivers it — read only at
+  `HomeScreen`'s sync line. `StaleBanner` took a bare `Boolean` and printed a fixed string.
+- **Offline mode was wrong in both directions.** `offlineSurviveTiles()` dropped **Wildlife** because it
+  "needs a live GPS+Overpass fetch" — `HabitatViewModel` imports a pure core and a location provider,
+  **no repository, no HTTP** — while keeping **Nearest Help** (`overpass-api.de`) and **Nearby Safety**
+  (live feeds), and omitting Study/Search/Notes/Diary, all added since and all verified request-free.
+- **`LocationProvider.formatCoords`** used the device locale for the label standing in for your location
+  when reverse geocoding fails — i.e. offline. "48,857, 2,352". Same defect as the SOS message.
+
+**New:** `core:telemetry/Freshness.kt` (+12 tests) — `assess(lastUpdated, now, online, servingStored,
+refreshFailed)` → `LIVE/OFFLINE/FAILED/STORED/UNKNOWN` + the label. `AsyncLoader` marks stale on
+failure; `StaleBanner` takes the `Async` whole (a vararg overload reports the **oldest** of several
+feeds); `SurviveTile.needs` drives both offline lists by derivation.
+
+**Two corrections I made to my own plan mid-build, both worth keeping:**
+1. **Online-and-serving-storage is deliberately NOT announced.** Every repository caches with its own
+   max age — half an hour for weather, hours for the economic series — so firing there would put a
+   notice on nearly every screen open that hit a warm cache. The original code's instinct was right.
+   ⚠️ **Honest gap, noted at the call site:** a repository that swallows a failure internally and falls
+   back past its own max age is indistinguishable from a warm hit at this layer; closing it needs the
+   repositories to report it.
+2. **Four `Need` values, not three.** "Needs the network but what it last received still helps" (cached
+   hospitals) ≠ "useless without one" (a map with no tiles cached).
+
+**Two false alarms, recorded so nobody re-chases them:** the four Computer sub-routes look orphaned but
+are reachable — the `navigate()` calls live in `PulseApp.kt`, which a naive grep excludes; and the app
+**does** have connectivity awareness (`ConnectivityObserver` + the auto Offline Survival Mode).
+
+**Tandem:** the desktop had defects 1 and 2 identically — `NewsRepository.headlines` read `savedAtMs`
+and returned `.value.articles`, so its stale fallback was silent. Now returns a `Fetched`. ⚠️ Mirroring
+`Freshness` needed `describeElapsed` **split out of `TemporalReasoner`** into `ElapsedPhrase.kt`, because
+that file is bound to the memory stream and would have dragged the whole subsystem across for one
+sentence; `TemporalReasoner` delegates, every caller untouched, verified against its own existing test.
+Desktop **182 → 194 tests**; 25 mirrors current.
+
+**Verification:** `Freshness` 12/12 locally against the whole real core, **both load-bearing decisions
+negative-tested** (flipping offline/failed precedence, dropping the zero filter — each fails exactly its
+own test). ⚠️ `OfflineTilesTest` is **CI-gated, not locally runnable** — it touches Compose types and
+there is no AndroidX in the local Gradle cache (only JetBrains Compose for `:desktop`). Its doc says
+what it can and cannot catch: it guards the *derivation*, not the *classification*, which came from
+reading each destination's view model for a repository or an HTTP call.
+
+⚠️ **Owner-verify on the Pixel:** aeroplane mode → the takeover should offer Wildlife/Study/Search/
+Notes/Diary under **WORKS RIGHT NOW** and Nearest Help/Nearby Safety under **LAST RECEIVED — NOT
+CURRENT**; MARKETS and WEATHER should say how old what they show is; then online with a source
+rate-limiting, they should say they could not update instead of going quiet. The banner wording is
+unproven and the grace period (`Freshness.GRACE_MS`) is one constant if it proves noisy.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
