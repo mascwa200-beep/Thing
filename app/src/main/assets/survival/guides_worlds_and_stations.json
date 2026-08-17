@@ -1,0 +1,52 @@
+{
+ "guides": [
+  {
+   "id": "fed-earth-and-sol",
+   "title": "Earth and the Sol System",
+   "category": "Worlds & Stations",
+   "summary": "Earth, Sol and the Federation capital: the seat of the Council and Starfleet Command, and the awkwardness of a union of equals headquartered on one member's homeworld.",
+   "sections": [
+    {
+     "heading": "Earth in the Federation",
+     "body": "Earth is one founding member among several, and it is also where the Federation Council sits, where Starfleet Command is headquartered, and where Starfleet Academy trains its officers. That concentration is a standing source of quiet friction: a union of equals whose administrative centre, military headquarters and officer school are all on one member's homeworld invites the charge that it is a human project wearing a wider name, and the charge is made inside the setting more than once. The defence offered is historical accident and convenience rather than principle. Earth was centrally placed among the founding powers, had recently emerged from a period that left it unusually committed to the idea of union, and offered to host. None of which fully answers the objection. Earth itself is described as having been substantially repaired. Its cities are rebuilt, its climate managed, its poverty and its wars ended — a state the setting presents as the outcome of a deliberate century of work following a catastrophe, not as a natural progression."
+    },
+    {
+     "heading": "San Francisco and the Institutions",
+     "body": "The Presidio at San Francisco holds Starfleet Command and the Academy, with the Council seated nearby. The choice of a single terrestrial city for all of it is one of the setting's more consequential pieces of geography, because it means a strike on one place can decapitate the Federation's civil and military leadership simultaneously — a vulnerability the stories exploit more than once. Utopia Planitia, in orbit of Mars, is the Federation's principal shipyard, and the pairing is deliberate: the institution that decides is on one world and the industry that builds is on another, several light-minutes away. The system also holds the Federation's oldest and densest civilian infrastructure — the transport network, the archives, the research institutes — which is why so many episodes that need a hearing, a trial, a court martial or an admiral bring the ship home."
+    },
+    {
+     "heading": "Getting Here From Elsewhere",
+     "body": "Sol is a long way from most of the Federation's frontier, which matters constantly. A ship recalled to Earth is a ship removed from its station for weeks, and an order issued from Earth reaches the frontier already out of date. That lag is the practical reason starship captains hold the discretion they do, and the practical reason the frontier periodically complains that the core legislates for conditions it does not experience. The system is heavily defended and heavily monitored, and the setting treats any breach of it as an emergency of the first order. Sequences in which something hostile reaches Earth orbit are used sparingly and always signal that the situation has exceeded what a starship can resolve."
+    },
+    {
+     "heading": "What Earth Represents",
+     "body": "Within the fiction Earth functions as the argument's exhibit. A civilisation that was, within living historical memory, poor, violent and close to ruining itself is now the administrative centre of an interstellar union — which is offered as evidence that the Federation's optimism is a description of something achieved rather than a hope. The setting is careful not to make that comfortable. The recovery is repeatedly shown to have been hard, contested and recent, and the institutions built on it are shown to be capable of backsliding under pressure. Earth is not written as having transcended its history; it is written as having decided about it, and as having to keep deciding."
+    }
+   ]
+  },
+  {
+   "id": "fed-deep-space-stations",
+   "title": "Starbases and Deep-Space Stations",
+   "category": "Worlds & Stations",
+   "summary": "The fixed points: what a starbase is for, and why a station at a crossroads produces different stories than a ship.",
+   "sections": [
+    {
+     "heading": "What a Starbase Does",
+     "body": "A starbase is the Federation's fixed presence in a region: a repair yard, a supply depot, a hospital, a court, a headquarters and a diplomatic post, usually all at once. Some are orbital structures, some are built on planetary surfaces, and their numbering is a long-running administrative sequence rather than a geographic one. For a starship the starbase is the place where the things a ship cannot do for itself get done: a damaged hull replaced, a crew rotated, a court martial heard, a prisoner transferred, an admiral consulted in person. The recurring narrative use is as punctuation — a ship arriving at a starbase marks the end of a situation, and a ship being ordered to one usually means somebody is in trouble. They are also where the Federation's bureaucracy becomes visible. A starship is a community with a captain; a starbase has departments, records offices, requisition procedures and an administrative culture, and the friction between the two is a reliable source of comedy and of genuine obstruction."
+    },
+    {
+     "heading": "A Station at a Crossroads",
+     "body": "The setting's most fully developed station is one positioned beside a stable passage to an otherwise unreachable region — a fixed point at a genuine strategic crossroads, jointly significant to several powers, and administered by the Federation on behalf of a world that has only recently emerged from occupation. A station cannot leave, and that single constraint changes every story told there. A starship that meets a problem can solve it and move on; a station has to live beside the consequences. Its residents include people who are not Federation citizens, do not share Federation values and have no intention of adopting them, and the administrator's job is therefore politics rather than command. It also inverts the format's usual direction. Instead of a crew travelling out to encounter the galaxy, the galaxy arrives — traders, refugees, spies, pilgrims and fleets — and the drama comes from who has just docked."
+    },
+    {
+     "heading": "Life Aboard",
+     "body": "A large station is a town. It has a promenade of shops and bars, a temple, a school, an infirmary, a security office and a permanent civilian population with no rank and no orders. Children grow up there. Businesses fail there. Somebody has to decide who gets which docking bay. That civilian texture is what distinguishes station stories from ship stories most sharply. Aboard a starship almost everyone is a Starfleet officer under the same discipline; aboard a station most people are not, and the Federation's authority over them is negotiated rather than assumed. The recurring figure of the resident trader who is technically subject to nobody exists to keep testing exactly that boundary."
+    },
+    {
+     "heading": "Why the Fixed Points Matter",
+     "body": "Strategically the stations are what make the Federation a polity rather than a fleet. A civilisation whose only presence in a region is a ship passing through does not actually hold that region; a base with repair capacity, a hospital and a garrison does. Narratively they supply the thing a starship format structurally lacks: consequence. A ship that solves a planet's crisis and warps away never learns what happened next. A station watches the next twenty years of it, and the setting uses that to ask harder questions than the travelling format can — about occupation, about collaboration, about what a principle costs when you cannot leave the people it applies to."
+    }
+   ]
+  }
+ ]
+}

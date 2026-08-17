@@ -1,0 +1,52 @@
+{
+ "guides": [
+  {
+   "id": "fed-starship-design",
+   "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
+   "category": "Starships & Classes",
+   "summary": "The layout of a Starfleet ship — saucer, engineering hull, nacelles, shields and weapons — and why each part is where it is.",
+   "sections": [
+    {
+     "heading": "The Standard Layout",
+     "body": "Federation starships of most eras share a recognisable arrangement: a broad saucer section carrying the majority of the crew, a secondary hull holding engineering and the bulk stores, and two warp nacelles held clear of both on pylons. The arrangement is not decorative. The nacelles must sit outside the ship's mass to form a stable warp field, and holding them away from the habitable volume is also a safety measure, since the machinery inside them is the most energetic thing aboard. The saucer is where people live. Crew quarters, the bridge, sickbay, laboratories and the recreational spaces are concentrated there, on the reasoning that the section most likely to survive a catastrophe should be the section holding the crew. Several classes can separate the saucer entirely and leave it under impulse power while the drive section fights or flees — a capability that appears rarely and always signals that the situation has become extremely serious. The bridge sits on top rather than buried in the middle, which is frequently pointed out as a tactical absurdity and is defended in-universe on the grounds of sightlines, evacuation and the fact that a ship whose bridge is destroyed can be commanded from a battle bridge below."
+    },
+    {
+     "heading": "Power and Propulsion",
+     "body": "The main engineering hull holds the warp core: a vertical shaft, running through several decks, in which matter and antimatter are combined under the moderation of a crystalline regulator. The energy is routed as plasma through conduits to the nacelles, where field coils shape it into the distortion that moves the ship. Impulse engines handle everything below light speed and are mounted at the rear of the saucer. They are fusion drives rather than reaction-mass rockets in the ordinary sense, and they are what a ship uses for orbital work, docking, and combat at close quarters. Because the core cannot always be brought back under control, it is designed to be ejected — dropped clear of the ship faster than the ship could be evacuated. The ejection sequence is one of the more reliable moments of dread in the setting, because it is the point at which a crew concedes it can no longer save the vessel and is now only trying to survive it."
+    },
+    {
+     "heading": "Defence",
+     "body": "A Federation ship's protection is layered. Deflector shields are the outer layer: a field that absorbs and redistributes incoming energy, described as having a finite capacity that regenerates, which is what makes a battle a contest of attrition rather than a single exchange. Below them is the hull itself, and below that structural integrity fields that keep the ship from tearing itself apart under stress. Armament is conventionally phasers and photon torpedoes: a directed-energy weapon that can be tuned from a stun setting to a cutting beam, and a launched warhead that carries its own matter-antimatter charge. The pairing matters dramatically, because phasers are stopped by shields in a way torpedoes partly are not, and most engagements in the setting are decided by someone finding a way through rather than by raw output. The navigational deflector — the large dish on the front of the secondary hull — is not a weapon and not a shield. Its job is to sweep the ship's path clear of dust and debris, which at warp would otherwise strike with the force of ordnance."
+    },
+    {
+     "heading": "What the Design Says",
+     "body": "The ships are drawn as exploratory vessels that can fight rather than as warships that can explore, and nearly every design decision restates that. A warship does not carry families. A warship does not devote a third of its volume to laboratories, or maintain an arboretum, or build a bridge with a carpet on it. That is why the classes designed explicitly for war read as a departure inside the fiction as well as outside it. When the Federation builds a small, heavily armed vessel with almost no science capacity and no room for civilians, the ship itself is the plot point: it means the institution has concluded that the situation no longer permits its usual answer. The recurring visual argument is the silhouette. A Federation ship is smooth, pale and open; its rivals are angular, dark and armoured. Neither is an accident, and both are making the same point about what the civilisation behind them believes a ship is for."
+    }
+   ]
+  },
+  {
+   "id": "fed-constitution-class",
+   "title": "The Constitution Class",
+   "category": "Starships & Classes",
+   "summary": "The heavy cruiser of the first era of deep exploration, and why a five-year mission is the format's founding idea.",
+   "sections": [
+    {
+     "heading": "The Ship",
+     "body": "The Constitution class is the vessel most associated with the Federation's first great period of deep exploration: a heavy cruiser of a few hundred crew, capable of operating for years beyond resupply, and designed to be the only Federation presence for many light years in any direction. Its layout established the pattern every later class follows — saucer, engineering hull, twin nacelles on pylons — and its proportions are the ones the silhouette is still read against. Perhaps a dozen or so ships of the class were in service at its height, which is a deliberately small number: these were the most capable vessels the Federation had, and losing one was a strategic event rather than an attritional one. The class was refitted substantially partway through its life, in a programme extensive enough that the result is sometimes treated as a separate class. The refit modernised the drive, rearranged the engineering spaces and changed the external lines considerably, and it is a rare example of the setting showing infrastructure being maintained rather than simply replaced."
+    },
+    {
+     "heading": "The Five-Year Mission",
+     "body": "The class is inseparable from the mission profile written for it: five years of continuous operation, charting unexplored space, with a standing instruction to seek out what has not been found and to make contact with what has not been met. That framing is the founding statement of the whole setting and it is worth reading carefully, because it is an instruction to explore rather than to expand, and to contact rather than to claim. Five years is a long time to be beyond help, and the isolation is the point. A ship that could call for instruction would not need a captain who could decide; a ship that could be reinforced within a day would not be a place where the crew's competence is the only thing between them and the vacuum. Every dramatic situation the format produces depends on the distance. It also means the ship is a community rather than a vehicle. Over five years a crew becomes the entirety of each other's society, which is why the relationships aboard carry the weight they do and why the loss of any one of them lands as it does."
+    },
+    {
+     "heading": "Command and Crew",
+     "body": "A Constitution-class command is drawn as the most desirable posting in the service and the loneliest. The captain is simultaneously the ranking military officer, the senior diplomat, the magistrate and, in practice, the head of state for the only piece of the Federation within reach — and is expected to hold all four roles without instruction. The structure around that officer is the setting's most enduring shape: a first officer whose job includes disagreeing, a chief medical officer with the standing to relieve the captain on medical grounds, and a chief engineer whose estimate of what the ship can survive is the practical limit on what the captain may attempt. The three constrain the command in different directions and none of them is decorative. Below them the ship runs on specialists — helm, navigation, communications, sciences, security — organised so that any watch can operate the vessel. The recurring device of the landing party taking the senior officers away from the ship exists precisely because the ship can be left in competent hands."
+    },
+    {
+     "heading": "Its Place in the Record",
+     "body": "More is documented about this class's voyages than about any other, which distorts the record in a way worth naming: the era reads as unusually eventful because the ships that were out there were few and their logs are unusually complete, not because space was busier then. The class also sits at the point where several of the Federation's defining relationships were set. First contacts made in this period established the terms the following century inherited, including some it spent a great deal of effort trying to renegotiate. Decisions taken by individual captains under the Prime Directive in these years became the case law that later officers were taught. By the later eras the surviving ships are museum pieces and training vessels, and the class name carries the weight a famous ship's name always does — which is why it keeps being reissued to new vessels, and why the setting treats that reissue as a burden placed on a crew rather than an honour handed to them."
+    }
+   ]
+  }
+ ]
+}

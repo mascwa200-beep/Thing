@@ -6366,6 +6366,19 @@
    "file": "guides_essentials.json"
   },
   {
+   "id": "fed-first-contact-and-founding",
+   "title": "From First Contact to the Founding",
+   "category": "Federation Timeline",
+   "summary": "The century between Earth's first warp flight and the Federation charter, and why the setting treats it as the hinge.",
+   "headings": [
+    "The Flight and the Meeting",
+    "The Difficult Apprenticeship",
+    "The Charter",
+    "Why the Period Is Told and Retold"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -11065,6 +11078,19 @@
    "file": "guides_navigation.json"
   },
   {
+   "id": "fed-the-starship-captain",
+   "title": "The Starship Captain",
+   "category": "Notable Figures",
+   "summary": "The setting's central role: what the job actually requires, and why so much turns on one person's judgement.",
+   "headings": [
+    "The Job",
+    "What the Service Actually Rewards",
+    "The Recurring Types",
+    "Why the Role Carries the Setting"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "carbohydrates-and-blood-sugar",
    "title": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
@@ -13151,6 +13177,32 @@
    "file": "guides_starfleet_and_federation.json"
   },
   {
+   "id": "fed-starship-design",
+   "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
+   "category": "Starships & Classes",
+   "summary": "The layout of a Starfleet ship — saucer, engineering hull, nacelles, shields and weapons — and why each part is where it is.",
+   "headings": [
+    "The Standard Layout",
+    "Power and Propulsion",
+    "Defence",
+    "What the Design Says"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-constitution-class",
+   "title": "The Constitution Class",
+   "category": "Starships & Classes",
+   "summary": "The heavy cruiser of the first era of deep exploration, and why a five-year mission is the format's founding idea.",
+   "headings": [
+    "The Ship",
+    "The Five-Year Mission",
+    "Command and Crew",
+    "Its Place in the Record"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
    "id": "foraging-safety-and-the-universal-rules",
    "title": "Foraging Safety and the Universal Rules",
    "category": "Sustenance",
@@ -13609,6 +13661,32 @@
     "Step-by-Step: Map Your Own Yard or Neighbourhood's Microclimates in One Week"
    ],
    "file": "guides_weather.json"
+  },
+  {
+   "id": "fed-earth-and-sol",
+   "title": "Earth and the Sol System",
+   "category": "Worlds & Stations",
+   "summary": "Earth, Sol and the Federation capital: the seat of the Council and Starfleet Command, and the awkwardness of a union of equals headquartered on one member's homeworld.",
+   "headings": [
+    "Earth in the Federation",
+    "San Francisco and the Institutions",
+    "Getting Here From Elsewhere",
+    "What Earth Represents"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-deep-space-stations",
+   "title": "Starbases and Deep-Space Stations",
+   "category": "Worlds & Stations",
+   "summary": "The fixed points: what a starbase is for, and why a station at a crossroads produces different stories than a ship.",
+   "headings": [
+    "What a Starbase Does",
+    "A Station at a Crossroads",
+    "Life Aboard",
+    "Why the Fixed Points Matter"
+   ],
+   "file": "guides_worlds_and_stations.json"
   }
  ]
 }

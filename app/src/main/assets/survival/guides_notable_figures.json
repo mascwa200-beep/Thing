@@ -1,0 +1,28 @@
+{
+ "guides": [
+  {
+   "id": "fed-the-starship-captain",
+   "title": "The Starship Captain",
+   "category": "Notable Figures",
+   "summary": "The setting's central role: what the job actually requires, and why so much turns on one person's judgement.",
+   "sections": [
+    {
+     "heading": "The Job",
+     "body": "A starship captain in this setting holds an authority that has no clean modern equivalent. At the range these ships operate, the captain is the ranking military officer, the senior diplomat, the magistrate, and the only representative of their government within reach — and is expected to be all four without instruction, without appeal, and frequently without time. The decisions that reach them are properly political: whether to intervene, whom to recognise, what to promise on their government's behalf, whether a civilisation is ready to be contacted. No rule can be written fine enough to decide those in advance, which is why the service invests so heavily in the judgement of individuals rather than in the specificity of regulations. The counterweight is deliberately built into the crew. A first officer whose job description includes disagreeing, a medical officer with the standing to relieve the captain outright, and an engineer whose assessment of what the ship can survive is the practical ceiling on what the captain may attempt. A captain who has silenced all three is, in this setting, always about to make a serious mistake."
+    },
+    {
+     "heading": "What the Service Actually Rewards",
+     "body": "Starfleet says it wants curiosity restrained by discipline. What it repeatedly rewards is officers who disobey correctly — and the gap between those two is not a writing inconsistency, it is the institution's central problem. A fleet operating beyond recall cannot function without initiative and cannot function on initiative alone. The Academy's most famous exercise is a scenario constructed to be unwinnable, whose purpose is not to test tactics but to observe how a candidate behaves in the presence of certain defeat. Its fame rests on a cadet who rejected its premises and altered it, and on the service commending rather than expelling him — an ambiguity the setting returns to for decades afterwards. The recurring test of a captain is therefore not competence but proportion: knowing which rule is load-bearing. An officer who breaks the Prime Directive to save a world has, in the service's view, done two things — rescued a civilisation, and established that the rule bends for a sufficiently sympathetic case — and the second is treated as the more consequential."
+    },
+    {
+     "heading": "The Recurring Types",
+     "body": "The setting has produced several distinct readings of the role, and they function as arguments with one another rather than as variations on a theme. There is the captain as frontier commander — instinctive, personally brave, inclined to solve a problem by placing himself in the middle of it, and formed by an era when there was nobody else within reach. There is the captain as diplomat and jurist, older, more deliberate, who treats the ship as a chamber and would rather convene a hearing than a boarding party. There is the captain as administrator of a fixed place, who cannot warp away from the consequences and therefore has to live with them. And there is the captain isolated absolutely, cut off from the institution entirely, for whom every regulation has become a choice rather than an order. Each is a different answer to the same question: what should a person with this much discretion be like? The setting declines to pick one, and is better for it."
+    },
+    {
+     "heading": "Why the Role Carries the Setting",
+     "body": "The format depends on a person who can be wrong. A ship that could consult headquarters in real time would have no decisions worth watching, and an institution that had anticipated every situation would need no judgement exercised. So the captain is constructed to be the point where a civilisation's stated values meet a situation those values did not anticipate. When the Federation is tested — by an empire, by a collective, by a rival that trades in profit, by a plague, by a rule that will kill someone — it is tested through one officer standing in a room having to answer. That is why the log entry is the setting's signature device. A captain narrating what they decided and why, aloud, for a record someone else will read, is the format admitting that the decision was arguable and putting the argument on the record anyway."
+    }
+   ]
+  }
+ ]
+}
