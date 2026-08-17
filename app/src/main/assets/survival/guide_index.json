@@ -9076,6 +9076,28 @@
    "file": "guides_law_and_government.json"
   },
   {
+   "id": "how-government-works",
+   "title": "How Government Works: Parliaments, Senates, Councils and the Making of Law",
+   "category": "Law & Government",
+   "summary": "A working guide to how states actually govern: the separation of powers, what a legislature does, why there is often a senate or second chamber, how a bill becomes law, what a local council controls and how to object to a planning application, how voting systems from first-past-the-post to proportional representation change the result, the courts, the civil service, standing orders, federal and unitary structures — and the practical routes to find out and take part.",
+   "headings": [
+    "The Three Powers, and Why They Are Kept Apart",
+    "Legislatures: Assemblies, Parliaments and Congresses",
+    "Why So Many Legislatures Have Two Chambers, and What a Senate Is",
+    "How a Bill Becomes Law",
+    "Committees: Where the Work Actually Happens",
+    "The Executive: Presidents, Prime Ministers and Cabinets",
+    "Local Government: Councils, Mayors, Planning Applications and What They Control",
+    "Elections, First-Past-the-Post and Proportional Representation",
+    "The Courts and Judicial Review",
+    "The Civil Service and the Permanent State",
+    "Standing Orders, Procedure and Why Rules of Debate Matter",
+    "Federal, Unitary and Devolved: Who Decides What",
+    "How to Find Out, and How to Take Part"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
    "id": "hermeneutics-the-art-of-interpretation",
    "title": "Hermeneutics & the Art of Interpretation",
    "category": "Literature & Writing",
