@@ -47,6 +47,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import dev.mascwa.pulse.core.telemetry.Seismic
 
 @Composable
 fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
@@ -175,6 +176,34 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
                 "${Geo.formatDistance(incident.distanceMeters)} · ${Geo.cardinal(incident.bearing)}" else "Your area"
             Text("$dist · ${incident.source}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
                 modifier = Modifier.padding(top = 2.dp))
+            // Depth, the tsunami flag and USGS's own impact call — all of it arrives on every
+            // earthquake in the feed and none of it was read until now. Empty for the other
+            // sources, which have no equivalent, so the row is unchanged for them.
+            val facts = Seismic.compactFacts(
+                depthKm = incident.depthKm,
+                tsunami = incident.tsunami,
+                pagerAlert = incident.pagerAlert,
+                magType = incident.magType,
+            )
+            if (facts.isNotEmpty()) {
+                Text(
+                    facts.joinToString("  ·  "),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp,
+                    // A tsunami evaluation is the one fact that should catch the eye on its own.
+                    color = if (incident.tsunami) c.magenta else c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            // Size and depth mean little apart; this is the sentence that combines them honestly.
+            incident.magnitude?.let { m ->
+                incident.depthKm?.let { d ->
+                    Text(
+                        Seismic.impact(m, d),
+                        fontFamily = ChakraPetch, fontSize = 11.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
         }
     }
 }

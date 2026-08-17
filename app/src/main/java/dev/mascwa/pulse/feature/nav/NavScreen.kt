@@ -118,6 +118,7 @@ import org.maplibre.android.style.sources.RasterDemSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Point
+import dev.mascwa.pulse.core.telemetry.Seismic
 
 // OpenFreeMap: keyless, no-registration vector tiles (OSM data). We load it then recolour every
 // layer into the NIGHTWIRE/cyberpunk look at runtime (red buildings, cyan roads, void background).
@@ -1488,6 +1489,31 @@ private fun IncidentDetailCard(
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            // Same facts as the safety list, from the same tested core, so the two surfaces
+            // cannot describe one earthquake differently.
+            val facts = Seismic.compactFacts(
+                depthKm = incident.depthKm,
+                tsunami = incident.tsunami,
+                pagerAlert = incident.pagerAlert,
+                magType = incident.magType,
+            )
+            if (facts.isNotEmpty()) {
+                Text(
+                    facts.joinToString("  ·  "),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (incident.tsunami) c.magenta else c.muted,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            incident.magnitude?.let { m ->
+                incident.depthKm?.let { d ->
+                    Text(
+                        Seismic.impact(m, d),
+                        fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             incident.url?.takeIf { it.isNotBlank() }?.let { url ->
                 Text(
                     "▸ READ THE REPORT",

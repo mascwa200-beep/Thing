@@ -10,6 +10,7 @@ import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.data.settings.AppSettings
 import dev.mascwa.pulse.data.weather.WeatherData
 import java.util.Calendar
+import dev.mascwa.pulse.core.telemetry.Seismic
 
 /**
  * Periodic background job behind THE one LCARS notification: runs the silent maintenance passes
@@ -226,14 +227,25 @@ class RefreshWorker(
                         it.distanceMeters <= radiusM && it.id !in already
                 }
                 if (severe.isNotEmpty()) {
-                    val lead = severe.minByOrNull { it.distanceMeters } ?: severe.first()
+                    // A tsunami evaluation leads even when something else is closer: it is the one
+                    // hazard here where the reader may have to move, and minutes matter.
+                    val lead = severe.filter { it.tsunami }.minByOrNull { it.distanceMeters }
+                        ?: severe.minByOrNull { it.distanceMeters }
+                        ?: severe.first()
                     val more = severe.size - 1
                     val where = if (lead.distanceMeters > 0) {
                         "${Formatters.compact(lead.distanceMeters / 1000)} km away"
                     } else {
                         "in your area"
                     }
-                    safetyNotice = ("Danger nearby: ${lead.title.take(60)} — $where" +
+                    // Say the two things that change what you do — how deep, and whether a tsunami
+                    // is being assessed — both of which the feed always sent and nothing ever read.
+                    val extra = Seismic.compactFacts(
+                        depthKm = lead.depthKm,
+                        tsunami = lead.tsunami,
+                        pagerAlert = lead.pagerAlert,
+                    ).firstOrNull()?.let { " · $it" }.orEmpty()
+                    safetyNotice = ("Danger nearby: ${lead.title.take(60)} — $where$extra" +
                         if (more > 0) " (+$more more)" else "") to "safety:${lead.id}"
                     severe.forEach { already += it.id }
                     state = state.copy(safetyAlertedIds = already.toList().takeLast(100))

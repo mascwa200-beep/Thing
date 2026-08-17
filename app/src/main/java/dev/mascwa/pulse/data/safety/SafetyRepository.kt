@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.safety
 
 import dev.mascwa.pulse.core.network.HttpException
 import dev.mascwa.pulse.core.telemetry.SafetyCoverage
+import dev.mascwa.pulse.core.telemetry.Seismic
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,7 +35,9 @@ class SafetyRepository(
     private val ttl = 10 * 60 * 1000L
 
     suspend fun fetch(lat: Double, lon: Double, force: Boolean): Fetched<SafetyResult> {
-        val key = "safety_${"%.2f".format(lat)}_${"%.2f".format(lon)}"
+        // Locale.US so the key is stable: a comma-decimal device would otherwise write a
+        // different key for the same place, and stop finding its own cached result.
+        val key = "safety_" + String.format(Locale.US, "%.2f_%.2f", lat, lon)
         if (!force) {
             cache.read(key, ttl, SafetyResult.serializer())?.let {
                 return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
@@ -122,16 +126,27 @@ class SafetyRepository(
             val mag = props["mag"]?.jsonPrimitive?.doubleOrNull
             val place = props["place"]?.jsonPrimitive?.contentOrNull ?: "Earthquake"
             val time = props["time"]?.jsonPrimitive?.longOrNull ?: 0L
-            val sev = when {
-                (mag ?: 0.0) >= 6.5 -> Severity.EXTREME
-                (mag ?: 0.0) >= 5.5 -> Severity.HIGH
-                (mag ?: 0.0) >= 4.0 -> Severity.MODERATE
-                else -> Severity.LOW
+            // Depth is the third coordinate, not a property, which is how it came to be missed.
+            // It matters more than almost anything else here: in a single day's feed the events
+            // ranged from 1 km to 564 km down, and a 564 km event is barely felt at the surface.
+            val depth = coords.getOrNull(2)?.jsonPrimitive?.doubleOrNull
+            val tsunami = (props["tsunami"]?.jsonPrimitive?.intOrNull ?: 0) == 1
+            val pager = props["alert"]?.jsonPrimitive?.contentOrNull
+            // Grading lives in the CI-tested core, so the notification gate, the map colour and
+            // the list badge cannot drift apart, and so the rules are provable.
+            val sev = when (Seismic.alertLevel(mag, depth, tsunami, pager)) {
+                Seismic.Alert.EXTREME -> Severity.EXTREME
+                Seismic.Alert.HIGH -> Severity.HIGH
+                Seismic.Alert.MODERATE -> Severity.MODERATE
+                Seismic.Alert.LOW -> Severity.LOW
             }
             Incident(
                 id = "usgs_${o["id"]?.jsonPrimitive?.contentOrNull ?: "$ilat$ilon$time"}",
                 type = IncidentType.EARTHQUAKE.name,
-                title = mag?.let { "M%.1f — %s".format(it, place) } ?: place,
+                // Locale.US: a magnitude is a number, and a comma decimal reads as a different
+                // one. RadarRepository renders the same value from the same feed and already
+                // pins it, so without this the two screens disagree on the same earthquake.
+                title = mag?.let { String.format(Locale.US, "M%.1f — %s", it, place) } ?: place,
                 severity = sev.name,
                 latitude = ilat, longitude = ilon,
                 distanceMeters = Geo.distanceMeters(lat, lon, ilat, ilon),
@@ -140,6 +155,13 @@ class SafetyRepository(
                 source = "USGS",
                 url = props["url"]?.jsonPrimitive?.contentOrNull,
                 magnitude = mag,
+                depthKm = depth,
+                tsunami = tsunami,
+                pagerAlert = pager,
+                significance = props["sig"]?.jsonPrimitive?.intOrNull,
+                magType = props["magType"]?.jsonPrimitive?.contentOrNull,
+                feltReports = props["felt"]?.jsonPrimitive?.intOrNull,
+                shakingIntensity = props["mmi"]?.jsonPrimitive?.doubleOrNull,
             )
         }
     }

@@ -117,4 +117,98 @@ class SeismicTest {
         }
         assertTrue(Seismic.headline(3.0, 5.0, "").contains("location unknown"))
     }
+
+    // --- alertLevel: the four rules, each written so that breaking it fails here ---
+
+    @Test fun magnitudeAloneGradesExactlyAsTheAppAlreadyDid() {
+        // The bands SafetyRepository shipped before this function existed. An event carrying
+        // nothing but a magnitude — which is most of a cached blob — must not move.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(6.5))
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(5.5))
+        assertEquals(Seismic.Alert.MODERATE, Seismic.alertLevel(4.0))
+        assertEquals(Seismic.Alert.LOW, Seismic.alertLevel(3.9))
+        assertEquals(Seismic.Alert.LOW, Seismic.alertLevel(null))
+    }
+
+    @Test fun pagerOutranksMagnitudeBecauseItKnowsWhoLivesThere() {
+        // Rule 1. A modest quake under a city: magnitude says MODERATE, USGS says people are hurt.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(4.2, pagerAlert = "red"))
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(4.2, pagerAlert = "orange"))
+        // ...and it only ever raises: green does not drag a great earthquake down on its own.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(7.5, pagerAlert = "green"))
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(5.6, pagerAlert = "yellow"))
+    }
+
+    @Test fun tsunamiPinsTheFloorAndCannotBeTalkedDown() {
+        // Rule 2. The floor holds against everything that could lower it — including the depth
+        // rule below, which is why the tsunami check returns before depth is considered at all.
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(3.0, tsunami = true))
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(6.0, depthKm = 550.0, tsunami = true))
+        assertEquals(
+            Seismic.Alert.HIGH,
+            Seismic.alertLevel(6.0, depthKm = 550.0, tsunami = true, pagerAlert = "green"),
+        )
+        // A floor, not a ceiling: a genuinely extreme event stays extreme.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(8.0, tsunami = true))
+    }
+
+    @Test fun depthDeEscalatesOnlyWhereUsgsIsUnconcerned() {
+        // Rule 3, the owner's rule. Deep and unremarkable: step down one grade.
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(6.6, depthKm = 560.0))
+        assertEquals(Seismic.Alert.HIGH, Seismic.alertLevel(6.6, depthKm = 560.0, pagerAlert = "green"))
+        // Deep but USGS has flagged impact: the step-down is forbidden.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(6.6, depthKm = 560.0, pagerAlert = "orange"))
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(6.6, depthKm = 560.0, pagerAlert = "red"))
+        // Only DEEP qualifies. 299 km is INTERMEDIATE and must not step down.
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(6.6, depthKm = 299.0))
+        assertEquals(Seismic.Alert.EXTREME, Seismic.alertLevel(6.6, depthKm = 300.0, pagerAlert = "yellow"))
+        // At most one grade, and never below the bottom of the scale.
+        assertEquals(Seismic.Alert.LOW, Seismic.alertLevel(2.0, depthKm = 600.0))
+    }
+
+    @Test fun anAbsentFieldNeverRaisesTheGrade() {
+        // Rule 4. Unknown is not danger — 50 of the 54 events in a real feed carry no PAGER at
+        // all, so "absent" must behave as no information rather than as either extreme.
+        //
+        // ⚠️ Pinned against the absolute band rather than against alertLevel's own bare result.
+        // The first version of this test compared bare-against-explicit-null, and a perturbation
+        // that made *every* absent PAGER escalate moved both sides together and slipped through.
+        // A self-referential assertion cannot catch a rule that shifts the whole function.
+        val expected = mapOf(
+            2.0 to Seismic.Alert.LOW,
+            4.0 to Seismic.Alert.MODERATE,
+            5.5 to Seismic.Alert.HIGH,
+            6.5 to Seismic.Alert.EXTREME,
+        )
+        for ((m, want) in expected) {
+            assertEquals("M$m with nothing else", want, Seismic.alertLevel(m))
+            assertEquals("M$m with an explicit null pager", want, Seismic.alertLevel(m, pagerAlert = null))
+            assertEquals("M$m with an explicit null depth", want, Seismic.alertLevel(m, depthKm = null))
+            assertEquals("M$m with a pager string we do not know", want, Seismic.alertLevel(m, pagerAlert = "chartreuse"))
+            assertEquals("M$m with green, which is not an escalation", want, Seismic.alertLevel(m, pagerAlert = "green"))
+        }
+    }
+
+    @Test fun compactFactsLeadWithWhatChangesWhatYouDo() {
+        val f = Seismic.compactFacts(depthKm = 8.0, tsunami = true, pagerAlert = "orange", magType = "mb")
+        assertEquals("TSUNAMI EVALUATION", f.first())          // evacuation beats everything
+        assertEquals("PAGER ORANGE", f[1])                      // then USGS's own impact call
+        assertTrue(f[2].contains("8 km deep"))
+        assertTrue(f[2].contains("very shallow"))
+        // Nothing to say is an empty list, not a row of blanks.
+        assertTrue(Seismic.compactFacts().isEmpty())
+        // Green is USGS saying "no significant impact" — it earns no space on a crowded row.
+        assertTrue(Seismic.compactFacts(pagerAlert = "green").isEmpty())
+        // The scale only earns a mention when it changes how to read the magnitude.
+        assertTrue(Seismic.compactFacts(magType = "mww").isEmpty())
+        assertTrue(Seismic.compactFacts(magType = "mb").single().contains("understate"))
+    }
+
+    @Test fun tsunamiExplainerIsHonestAboutWhatTheFlagMeans() {
+        assertNull(Seismic.tsunami(false))
+        val e = Seismic.tsunami(true)!!
+        // It is an evaluation marker, not a warning in force. Overstating it is its own failure.
+        assertTrue(e.detail.contains("not itself a warning"))
+        assertTrue(e.detail.contains("inland"))
+    }
 }

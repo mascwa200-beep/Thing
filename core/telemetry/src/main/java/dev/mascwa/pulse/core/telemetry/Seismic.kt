@@ -217,6 +217,115 @@ object Seismic {
         }
     }
 
+    /**
+     * The tsunami flag, which the feed sets on every event and which nothing here read until now.
+     *
+     * USGS sets it when the event is in a region where a tsunami evaluation is warranted — it is a
+     * "this is being assessed" marker rather than a warning in force. Say that plainly, because
+     * overstating it is as bad as ignoring it.
+     */
+    fun tsunami(flagged: Boolean): Explainer? = if (!flagged) null else Explainer(
+        "Tsunami evaluation",
+        "This event is in an oceanic region where a tsunami is possible, so the warning centres " +
+            "are assessing it. It is not itself a warning — check your national warning service " +
+            "for one, and if you are on the coast and the shaking was hard enough to make " +
+            "standing difficult, move inland and uphill without waiting to be told.",
+    )
+
+    /**
+     * How loudly the app should react: the four grades the safety screen colours by and the
+     * notification gates on.
+     *
+     * Distinct from [severity], which describes how big the earthquake was. A great earthquake in
+     * the deep ocean deserves a quiet grade; a moderate one under a city does not. Magnitude alone
+     * cannot tell those apart, which is why this exists.
+     *
+     * Every argument is nullable because the feed omits most of them most of the time, and the
+     * rules below are written so that **absent never raises the grade** — unknown is not danger.
+     */
+    enum class Alert { LOW, MODERATE, HIGH, EXTREME }
+
+    /**
+     * The rules, in the order they apply:
+     *
+     * 1. Magnitude sets the base, using the bands the app already shipped, so an event carrying
+     *    nothing else grades exactly as it did before this function existed.
+     * 2. **PAGER outranks magnitude when present**, because it folds in population exposure and a
+     *    raw magnitude does not. Orange and red are the two that mean people are affected.
+     * 3. **A tsunami evaluation never lowers the grade and pins it at least HIGH.** Coastal
+     *    evacuation is time-critical and a missed alert is the expensive error.
+     * 4. **Depth may de-escalate only when USGS itself is unconcerned** — PAGER green or absent.
+     *    A deep quake really is felt far less at the surface, but the app should not talk itself
+     *    out of an alert that USGS has flagged as consequential.
+     */
+    fun alertLevel(
+        magnitude: Double?,
+        depthKm: Double? = null,
+        tsunami: Boolean = false,
+        pagerAlert: String? = null,
+    ): Alert {
+        val mag = magnitude ?: 0.0
+        val base = when {
+            mag >= 6.5 -> Alert.EXTREME
+            mag >= 5.5 -> Alert.HIGH
+            mag >= 4.0 -> Alert.MODERATE
+            else -> Alert.LOW
+        }
+        val pager = pagerAlert?.lowercase()?.trim()
+        val fromPager = when (pager) {
+            "red" -> Alert.EXTREME
+            "orange" -> Alert.HIGH
+            "yellow" -> Alert.MODERATE
+            else -> null // green and absent carry no escalation of their own
+        }
+        // Rule 2: PAGER raises, and being an impact estimate it is allowed to outrank magnitude.
+        var level = maxOf(base, fromPager ?: base)
+
+        // Rule 3: a tsunami evaluation is a floor, applied after everything that could lower one.
+        if (tsunami) return maxOf(level, Alert.HIGH)
+
+        // Rule 4: depth de-escalates only where USGS is unconcerned, and only by one grade.
+        val usgsUnconcerned = pager == null || pager == "green"
+        if (usgsUnconcerned && depthKm != null && depthBand(depthKm) == DepthBand.DEEP) {
+            level = Alert.entries[maxOf(0, level.ordinal - 1)]
+        }
+        return level
+    }
+
+    /**
+     * The short facts a list row or a map card can show without becoming a paragraph, ordered by
+     * how much they change what the reader should do.
+     *
+     * Lives here rather than in either screen because the safety list and the map card show the
+     * same earthquake, and two copies of this would eventually disagree — which is the whole
+     * reason the app was showing one fidelity on one screen and another elsewhere.
+     */
+    fun compactFacts(
+        depthKm: Double? = null,
+        tsunami: Boolean = false,
+        pagerAlert: String? = null,
+        magType: String? = null,
+    ): List<String> = buildList {
+        if (tsunami) add("TSUNAMI EVALUATION")
+        when (pagerAlert?.lowercase()?.trim()) {
+            "red" -> add("PAGER RED")
+            "orange" -> add("PAGER ORANGE")
+            "yellow" -> add("PAGER YELLOW")
+            // Green is USGS saying "no significant impact". Worth nothing on a crowded row.
+        }
+        depthKm?.let {
+            val band = when (depthBand(it)) {
+                DepthBand.VERY_SHALLOW -> "very shallow"
+                DepthBand.SHALLOW -> "shallow"
+                DepthBand.INTERMEDIATE -> "intermediate"
+                DepthBand.DEEP -> "deep"
+            }
+            add("${it.roundToInt()} km deep · $band")
+        }
+        // Only worth saying when it changes how to read the number: mb saturates and understates.
+        if (magType?.lowercase()?.trim() == "mb") add("mb — may understate")
+    }
+
     /** "M6.1 · 10 km deep · 58 km N of Ende, Indonesia" */
     fun headline(magnitude: Double, depthKm: Double, place: String): String =
         listOf("M${fmt(magnitude)}", "${depthKm.roundToInt()} km deep", place.ifBlank { "location unknown" })
