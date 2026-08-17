@@ -3703,6 +3703,102 @@ mirrors current (unchanged by design). ⚠️ Render and real-signal behaviour a
 and the standing line in the reader, the study advisories earning their place over a few days, and
 whether the streak nudge feels supportive or naggy (every threshold is a named constant).
 
+### KHAN LEARNING · LIVE DESKTOP NEWS · EXPANSION PACKS (this session, PR #448)
+
+Owner's five-part directive: *"Khan academy inspired for both. Also, add a fuck ton of educational
+features to the library and expand the library 1000 fold and add images … free and high quality and
+don't require internet to load. Also, ensure that this goes for desktop version and mobile version and
+that the desktop version has a live news system that automatically updates everything to have the
+latest of the latest every 5 minutes. Also make sure that it the least resource intensive without
+changing it's looks it functionality or size."* **Zero subagent spend** across the whole arc, as with
+the several before it — the credit directive still overrides ultracode.
+
+**⚠️ Two corrections had to be made before starting, and the owner settled both.**
+
+**A literal 1000× is arithmetic that does not work.** Measured, not estimated: 581 guides · 8,277
+sections · **3.97M words** · **26 MB** of JSON. A thousandfold is ~4 billion words / ~26 GB —
+unshippable in an APK, and generating it is exactly what tripped the weekly limiter four times. Owner
+chose (AskUserQuestion) **expansion packs**: lean core, packs fetched **once**, permanently offline
+after. That is the only shape where "vastly bigger" and "don't change its size" are compatible rather
+than contradictory. Owner also chose **one bounded wave** — machinery first at zero spend, then a
+single capped content wave with headroom left.
+
+**The image claim in this file was wrong, and I wrote it.** It said 343 diagrams covering every guide.
+Reality: **45 image files**, reused across 238 guides — **343 of 581 guides have no diagram at all.**
+That is the real gap, and I1 remains open.
+
+- **K1 (`6d36eaf`) + K2 (`ae18073`) — the Khan model, both platforms.** `CourseMastery` (a course seen
+  at once; **points-weighted** percentage so a week's real work moves the bar instead of sitting at
+  zero until something finishes), `PracticeSet` (short bounded sets, interleaved unit tests, majority
+  pass mark), `Hints` (rule out → locate → show). Both screens gained a COURSE card (goal, bar, one
+  recommendation in the imperative, skills grouped into units with mastery band + due count + one-tap
+  PRACTISE, UNIT TEST per unit, COURSE CHALLENGE weakest-first) and session chrome ("3 OF 5" over a
+  progress bar, ending on a verdict card). Two departures from Khan are deliberate: **nothing is
+  locked** (a reference library somebody may open in an emergency must never refuse a page), and
+  mastery decays. `CourseMastery.label`/`units()` live in the shared core so the platforms cannot
+  group or name bands differently.
+- **N1 (`94de2dc`) — the desktop News feed keeps itself current, every 5 minutes.** Visibility and
+  category combine into one flow consumed with `collectLatest`, so **off the News screen there is no
+  timer at all** — that is what "least resource intensive" actually buys, versus a
+  `while(true){delay();if(visible)}` that wakes regardless. Background ticks raise no busy bar and a
+  failure leaves the headlines up with `refreshFailed` set rather than replacing a readable page with
+  an error. The tick is **forced** (the repo serves anything under ten minutes from disk, so an
+  unforced five-minute beat is a no-op every other time) and the countdown restarts from the age of
+  what is on screen, so arriving at a tab cached nine minutes ago refreshes on arrival.
+  ⚠️ Honest scoping against "updates everything": it keeps **the feed you are looking at** current, not
+  all fifteen — fifteen requests a tick at one reader is what a rate limiter is for.
+- **P1a (`8b3ae51`) — `core:telemetry/ContentPack.kt`, the pack format.** Three rules carry the
+  weight, all negative-tested: **the bundle wins every collision** (a safety property, not a
+  preference — the bundled corpus is what CI validates and where the emergency protocols live, so a
+  pack able to shadow `first-aid` could replace what somebody reads while performing CPR); **storage
+  names are derived, never taken from the archive** (`../guide_index.json` inside a zip would
+  otherwise land on the bundled catalog — both the file name and the pack id are reduced to a leaf and
+  sanitised); **newer, never merely different** (a rolled-back catalog must not downgrade what is
+  already held, then do it again every launch). Plus `verifies`, `newCount` (what a pack really adds
+  once collisions come off) and size phrasing. `isPackFile` keys on a double underscore and **no
+  bundled shard name contains one** — checked against the real 50-shard corpus.
+- **P1b (`9a35c9f`) — an installed pack IS the library.** The merge is at `index()` in each platform's
+  content repository, so the reader, browse rails, search, study, the daily lesson and the assistant's
+  `library` tool all see one corpus and **not one of them changed**. A pack is a bag of shards and
+  ships **no index of its own** — an index alongside content is a second copy that can disagree with
+  it, and the disagreement shows up only as a guide that lists but will not open; it is derived at
+  install time instead. Both stores install atomically (parse everything → staging → move). A pack
+  whose files have vanished is dropped from the view; an unreadable manifest is tolerated.
+  ⚠️ Bug caught while extracting the bundled index: the derive fallback was calling the now-pack-aware
+  `shardFiles()`, which would have listed every pack guide twice. Split into `bundledShardFiles()`.
+- **P1c (`28e4f5a`) — `PackArchive`, reading a downloaded pack.** Only `*.json` is taken; caps on
+  entry size, total size and count, checked **inside** the read loop so a bomb is stopped rather than
+  read and judged. ⚠️ **The most instructive failure of the arc.** The first cut decoded each 8 KB
+  block as UTF-8, which splits any multi-byte character on a read boundary — silent mojibake in a
+  corpus full of `—`, `°`, `·`. Fixed. Then **the test written to prove it passed against the broken
+  reader**: it tried to *aim* padding at the 8 KB mark, and a boundary lands wherever the inflater
+  decides. Rewritten to rely on **density** (a body that is almost entirely three-byte characters
+  leaves no clean boundary across half a megabyte), then confirmed green as shipped and failing
+  against the perturbed reader. **Writing the test is not the verification; running it against the
+  defect is.**
+
+**Verification, all free.** 13 `ContentPack` + 8 `CourseMastery` core tests locally executed; **323
+desktop tests genuinely run**, including 9 pack tests and 6 archive tests **against the real bundled
+581-guide library** — the claim the whole feature rests on is one of them (install a pack, and its
+guides are listed, openable with their real sections, findable by body text, and in the category rail,
+with no network in the reading path). **Ten rules negative-tested**, each confirmed to fail exactly its
+own test. Android: `tools/android_resolve_check.sh` + CI's "Run unit tests" (green through `9a35c9f`).
+⚠️ **`PackArchive`'s Android twin compiles standalone, fully resolved** — it touches only
+`java.util.zip` and the stdlib, so that is a complete check rather than the usual partial one; worth
+reaching for whenever a new Android file has no Android dependencies.
+
+**Open, in priority order.** **P1d** — fetching a pack (catalog + download + a management screen;
+`PackArchive` and both stores are ready, the wire is not) and `tools/kb/build_pack.py` so a pack can be
+produced. **I1** — the real image gap above. **E1** — the efficiency pass (N1 carried one real win;
+anything further should be measured, not guessed). Then the **one bounded content wave**, delivered as
+a pack rather than into the bundle. The KB wave engine (#73) stays **parked** under the credit
+directive; resuming it is an explicit owner call.
+
+⚠️ **Render is owner-verify throughout — CI compiles, it does not draw.** Worth eyes first: the COURSE
+card at phone width, whether four options and the hint ladder read clearly, roughly one question in
+five still asked with no options; and on Windows, the News age line resetting on its own after five
+minutes and refreshing on arrival after time on another screen.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
