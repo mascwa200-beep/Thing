@@ -8479,6 +8479,28 @@
    "file": "guides_history.json"
   },
   {
+   "id": "the-second-world-war",
+   "title": "The Second World War (WWII / WW2, 1939-1945): Causes, Course, the Holocaust, and What It Left",
+   "category": "History",
+   "summary": "World War Two as history rather than legend: why a second general war followed the first within twenty years, how Germany overran Europe and then invaded the Soviet Union, the Eastern Front where the war was mainly decided, the Atlantic and the bombing campaign, the war against Japan in the Pacific, already running since 1937, the Holocaust, occupation and resistance, Normandy and the fall of Berlin, the atomic bombs and the argument about them, what it all cost, and the institutions the survivors built out of the wreckage.",
+   "headings": [
+    "What made another war possible twenty years after the last one",
+    "1939 to 1941: Poland, the fall of France, Dunkirk and the Battle of Britain",
+    "The Eastern Front: Barbarossa, Stalingrad and Kursk, where the war was mainly decided",
+    "The war at sea, and the war in the air",
+    "The Pacific war and Pearl Harbor, already running before 1939",
+    "The Holocaust",
+    "Occupation, collaboration, resistance, and the home fronts",
+    "The Mediterranean: North Africa, Italy, and the war's first Allied turn",
+    "1944 to 1945: D-Day and Normandy, the Battle of the Bulge, and the fall of Berlin",
+    "Hiroshima, Nagasaki and the argument about the atomic bomb",
+    "The cost, and the difficulty of counting it",
+    "Things commonly got wrong about this war",
+    "What the war left"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
