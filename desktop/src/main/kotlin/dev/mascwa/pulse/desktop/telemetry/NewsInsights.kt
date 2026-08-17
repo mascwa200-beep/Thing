@@ -1,14 +1,11 @@
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/NewsInsights.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
 package dev.mascwa.pulse.desktop.telemetry
 
 /**
- * Lightweight "at-a-glance" infographics for a news headline — pure, deterministic, offline visual aids
- * that sit beside the MARKET REACTION strip: the story's TONE (a mood read), auto-extracted TOPIC/REGION
- * tags, and a MARKET-IMPACT level. All deterministic keyword logic over the headline + summary; no network,
- * no model. A heuristic read for glanceability, not a claim of fact.
- *
- * Ported byte-for-byte from the Android app's `core:telemetry/NewsInsights.kt` (zero android.* imports
- * there, so this is a straight copy with the package renamed) — the desktop News vertical's first slice
- * (`Desktop Phase B slice 1`) reuses the whole "insider-knowledge" signal stack this way.
+ * Lightweight "at-a-glance" infographics for a news headline — pure, CI-tested, offline visual aids that
+ * sit beside the MARKET REACTION strip: the story's TONE (a mood read), auto-extracted TOPIC/REGION tags,
+ * and a MARKET-IMPACT level. All deterministic keyword logic over the headline + summary; no network, no
+ * model. A heuristic read for glanceability, not a claim of fact.
  */
 
 /** The overall mood a headline reads as. */

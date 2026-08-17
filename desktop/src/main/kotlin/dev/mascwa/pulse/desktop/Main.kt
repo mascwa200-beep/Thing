@@ -5,10 +5,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.study.StudyStore
 import kotlinx.coroutines.runBlocking
 
 private val settingsStore = DesktopSettingsStore()
+
+/**
+ * The library and the study deck are owned here rather than inside the composition.
+ *
+ * ⚠️ Not a style choice. `exitApplication()` calls `System.exit(0)` the moment `onCloseRequest`
+ * returns, and the study store's writes are debounced by two seconds — so a deck built inside
+ * `remember` would be unreachable at exactly the moment it needs flushing, and answering a question
+ * and closing the window within two seconds would silently lose the answer. Same reason the settings
+ * store already lives out here.
+ */
+private val libraryRepository = LibraryRepository()
+private val studyStore = StudyStore(libraryRepository)
 
 fun main() {
     // A local file read, not a network call — a one-time blocking read at startup to seed the initial
@@ -32,13 +46,16 @@ fun main() {
                         )
                     }
                     settingsStore.flushNow()
+                    // The schedule is the whole point of the study feature; losing the last answer to
+                    // a debounce window would make it quietly unreliable.
+                    studyStore.flushNow()
                 }
                 exitApplication()
             },
             title = "LCARS",
             state = state,
         ) {
-            PulseDesktopApp(settingsStore)
+            PulseDesktopApp(settingsStore, libraryRepository, studyStore)
         }
     }
 }

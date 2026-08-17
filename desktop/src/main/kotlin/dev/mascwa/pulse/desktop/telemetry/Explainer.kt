@@ -1,3 +1,7 @@
+// ADAPTED PORT of core/telemetry/.../Explainers.kt — deliberately NOT a strict mirror. Only the
+// Explainer type is needed here; the 300 lines of Markets/Weather/SpaceWeather explainers in the
+// original belong to verticals the desktop does not have yet. Absent from the mirror script for
+// that reason, not by oversight.
 package dev.mascwa.pulse.desktop.telemetry
 
 /** A short, plain-language explanation of a number/metric: a one-line [headline] + a sentence of [detail].
