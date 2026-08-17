@@ -3997,9 +3997,50 @@ summary — **proportional representation** (lost to a *proportional reasoning* 
 **planning objections**. That is the fifth time this arc that the word a reader types was sitting in
 body text the index never sees; **check for it deliberately on every new guide.**
 
-**Still open (task #179):** translation, workplace policy, treaty history, medicine as a profession,
-antimatter, the mathematical continuum, the Roman empire. Writing them is the fix — and the
-government guide proved it also feeds the full-page target, so it serves task #73 at the same time.
+### FILLING THE LIBRARY'S HOLES (owner chose this over more lore waves; task #179)
+
+Owner decided via AskUserQuestion: **fix the real gaps first**, and **treat every declared category
+as a promise to fill over time** rather than merging or hiding thin shelves.
+
+**⚠️ STEP 0 — CHECK BEFORE WRITING. It saved two entire guides in one run.** `GuideIndexEntry`
+carries only id, title, category, summary and headings, so a subject covered in depth can be
+completely unfindable. Before writing a guide for a "missing" subject, grep the shard *bodies*:
+- **Antimatter** was fully covered in `phys-modern-physics-relativity-quantum` (positron
+  annihilation, 511 keV gammas) — "what is a positron" returned **nothing at all**. Index fix.
+- **Translation** has a whole guide, `Literary Translation`. "How does translation work" already
+  won; only the agent noun "translator" lost. Index fix. ⚠️ *Interpreting* (spoken) is still a real
+  gap — a different discipline, not the same guide.
+
+**⚠️ THE BURN DEFECT — the sharpest of the session, and it was in the safety content.** First Aid
+had only the plural "burns"; a biology guide has the singular "burn" (burning fuel). Exact beats
+stem, so **"how do I treat a burn" returned cellular respiration**. Same shape: "cpr on a child"
+returned a child-development guide while `med-pediatric-elderly-care-differences` covers it. Both
+fixed by naming the reader's words in a heading.
+
+**⚠️ AND THE FIX BROKE A SAFETY PATH.** Renaming First Aid's "Burns" heading broke the
+`EmergencyTriage` route pointing at it. CI caught it — that guard exists for exactly this. New
+local twin **`tools/kb/check_emergency_routes.py`** (negative-tested): **run it after ANY guide
+heading change.** Editing `EmergencyTriage.kt` also tripped `MirrorDriftTest` — it is a mirrored
+core, so `python3 tools/mirror_desktop_cores.py` is part of that change, not a follow-up.
+
+**⚠️ I under-write full-page sections by 70–90 words, every time.** Both new guides came in at
+335–380 when aiming for 400+. Extend with material that was genuinely missing (CLAUDE.md already
+records that padding to clear the metric is the wrong instinct) — or write ~470 from the start.
+
+**Shipped:** `how-government-works` (the Law & Government shelf held ten guides of political
+philosophy and **nothing on how a government works**), `getting-medical-care` (22 clinical guides,
+nothing on reaching any of it), `employment-and-rights-at-work` (**zero mentions of employment in
+638 guides**). `FULL_PAGE_BASELINE` 8258 → **8297**; corpus 638 → **640**.
+
+**Still open:** interpreting; **actual history** (the History shelf is 12 guides of historiography
+with no history in it); treaties and diplomacy; infinity and the continuum. Then the thin shelves,
+in reader-demand order: **Vehicles & Transport** (2 engine-cycle guides; "car tyre" is a recorded
+unanswerable query), **Skills** (knife sharpening, likewise), Sports & Fitness, Visual Arts & Design.
+
+⚠️ **Guard against overfitting.** Naming a subject the guide genuinely covers is legitimate
+indexing; bending a title to win one artificial query is not. Antimatter and translator still lose
+to lore entries whose *titles* hold the exact noun — left alone deliberately, the right guide is
+visible at second place.
 
 **Open / steerable:** lore waves continue toward 150–200 (46 done, ~4 sections × ~170 words each, the
 recipe is mechanical: staging shard → `kb_pipeline.py` → `ci_parity_lint.py` → ranker probe →
