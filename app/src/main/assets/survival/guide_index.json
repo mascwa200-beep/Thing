@@ -8435,6 +8435,28 @@
    "file": "guides_history.json"
   },
   {
+   "id": "diplomacy-and-treaties",
+   "title": "Diplomacy and Treaties: Embassies, Negotiation, and How Wars End",
+   "category": "History",
+   "summary": "How states deal with each other and how the modern order was built: what diplomacy is and what a diplomat does, embassies and consulates and high commissions, ambassadors, credentials, agrement and persona non grata, what diplomatic immunity actually covers under the Vienna Conventions and why an embassy is not foreign soil, how a treaty is made from negotiation through signature and ratification to entry into force, reservations and denunciation, the craft of negotiation and mediation, the difference between a ceasefire, an armistice and a peace treaty and how wars really end, Westphalia and sovereignty, the Congress of Vienna, the failure of Versailles, the United Nations and the Security Council veto, arms control and verification, sanctions and summits and soft power, and where international law comes from and what enforces it.",
+   "headings": [
+    "What Diplomacy Is, and What It Is For",
+    "Embassies, Consulates and Who Is Who",
+    "Diplomatic Immunity: What It Actually Covers",
+    "How a Treaty Is Made",
+    "Negotiation: How Agreements Are Actually Reached",
+    "How Wars End: Ceasefires, Armistices and Peace Treaties",
+    "Westphalia and the Idea of the Sovereign State",
+    "Vienna 1815 and the Nineteenth-Century Order",
+    "Versailles 1919 and the Peace That Failed",
+    "1945: The United Nations and the Post-War Architecture",
+    "Arms Control, Verification and Trust",
+    "Modern Diplomacy: Sanctions, Summits and Soft Power",
+    "International Law: What It Is and What Holds It Up"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
@@ -9145,7 +9167,7 @@
    "id": "how-government-works",
    "title": "How Government Works: Parliaments, Senates, Councils and the Making of Law",
    "category": "Law & Government",
-   "summary": "A working guide to how states actually govern: the separation of powers, what a legislature does, why there is often a senate or second chamber, how a bill becomes law, what a local council controls and how to object to a planning application, how voting systems from first-past-the-post to proportional representation change the result, the courts, the civil service, standing orders, federal and unitary structures — and the practical routes to find out and take part.",
+   "summary": "A working guide to how states actually govern: the separation of powers, what a legislature does, why there is often a senate or second chamber, how a bill becomes law, what a local council controls and how to object to a planning application, how voting systems from first-past-the-post to proportional representation change the result, what a court does and how the courts work, the civil service, standing orders, federal and unitary structures — and the practical routes to find out and take part.",
    "headings": [
     "The Three Powers, and Why They Are Kept Apart",
     "Legislatures: Assemblies, Parliaments and Congresses",
@@ -9155,7 +9177,7 @@
     "The Executive: Presidents, Prime Ministers and Cabinets",
     "Local Government: Councils, Mayors, Planning Applications and What They Control",
     "Elections, First-Past-the-Post and Proportional Representation",
-    "The Courts and Judicial Review",
+    "The Courts: What a Court Does, and Judicial Review",
     "The Civil Service and the Permanent State",
     "Standing Orders, Procedure and Why Rules of Debate Matter",
     "Federal, Unitary and Devolved: Who Decides What",
