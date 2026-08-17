@@ -51,6 +51,20 @@ data class DesktopSettings(
     val newsCategory: String = "TOP",
     /** Knowledge-library category last browsed — same precedent as [newsCategory]. */
     val libraryCategory: String = "",
+
+    /**
+     * A GitHub token with read access, so the app can see its own releases.
+     *
+     * ⚠️ The repository is private, so there is no anonymous way to read the installer — the phone asks
+     * for the same thing for the same reason. **Stored in plain text** in this settings file: the phone
+     * puts its copy behind the Titan M2 secure element, and a desktop has no equivalent this module can
+     * reach, so the file's own permissions in your user profile are the whole protection. Worth knowing
+     * before pasting a broadly-scoped token in; read-only is all this needs.
+     */
+    val githubToken: String = "",
+
+    /** Look for a newer build on launch. The check is one request and never installs anything by itself. */
+    val autoCheckUpdates: Boolean = true,
 )
 
 private val defaultJson = Json {

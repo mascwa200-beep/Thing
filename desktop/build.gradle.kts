@@ -29,8 +29,51 @@ kotlin {
 //
 // ⚠️ `.github/workflows/desktop-build.yml` lists this path in its trigger filter for the same reason: a
 // content wave changes what the desktop ships, so it has to re-verify the desktop too.
+// The build number this copy was produced by, and the version Windows Installer compares.
+//
+// ⚠️ This was hardcoded "1.0.0". Every build therefore carried the same ProductVersion, which means
+// Windows Installer would have seen a newly-downloaded MSI as the SAME product already installed and
+// declined to upgrade it — so an updater on top of that would have downloaded, run, and changed nothing.
+// The version has to move for an update to be an update.
+//
+// CI passes `-PdesktopBuild=<run_number>` of the DESKTOP workflow (its own counter, unrelated to the
+// Android one). 0 locally, which the app reports as a development build rather than pretending to a
+// provenance it does not have.
+val desktopBuild: Int = (findProperty("desktopBuild") as String?)?.toIntOrNull() ?: 0
+
+// major.minor.build, and MSI caps `build` at 65535 — far above any run number this will reach, but the
+// coercion is here so a bad property can never produce an installer jpackage rejects late in CI.
+val desktopVersion: String = "1.0.${desktopBuild.coerceIn(0, 65535)}"
+
+// How the running app learns its own build. A generated properties file rather than generated Kotlin:
+// nothing to order against compilation, and it reads back in three lines.
+//
+// ⚠️ Registered here, at the top level — registering a task from inside another task's configuration
+// block is not allowed and fails the build outright ("register on task set cannot be executed in the
+// current context").
+val writeBuildInfo = tasks.register("writeBuildInfo") {
+    // ⚠️ Copied into locals of THIS block before the action closure uses them. Referencing the
+    // script-level properties directly from inside `doLast` makes the closure capture the build script
+    // object, which the configuration cache refuses to serialise ("cannot serialize Gradle script object
+    // references"). Plain locals capture as plain values.
+    val out = layout.buildDirectory.file("generated/build-info/build-info.properties").get().asFile
+    val version = desktopVersion
+    val buildNumber = desktopBuild
+    // Declared as inputs so the task re-runs when the version changes, rather than being considered up to
+    // date with a stale number baked in — which is exactly the failure that would have the updater
+    // misreport which build is installed.
+    inputs.property("version", version)
+    inputs.property("build", buildNumber)
+    outputs.file(out)
+    doLast {
+        out.parentFile.mkdirs()
+        out.writeText("version=$version\nbuild=$buildNumber\n")
+    }
+}
+
 tasks.processResources {
     from(rootProject.file("app/src/main/assets/survival")) { into("survival") }
+    from(writeBuildInfo)
 }
 
 dependencies {
@@ -50,7 +93,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "LCARS"
-            packageVersion = "1.0.0"
+            packageVersion = desktopVersion
             description = "LCARS — on-device-first companion, desktop edition"
             vendor = "LCARS"
 

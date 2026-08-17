@@ -51,6 +51,9 @@ MIRRORS: dict[str, str] = {
     # was split out of TemporalReasoner precisely so this could travel without the memory stream.
     f"{CORE}/Freshness.kt": f"{DESKTOP}/telemetry/Freshness.kt",
     f"{CORE}/ElapsedPhrase.kt": f"{DESKTOP}/telemetry/ElapsedPhrase.kt",
+    # When a published build is safe to offer. Shared so the phone and the desktop cannot come to
+    # disagree about it — the tri-state green gate has an edge that cost real debugging once.
+    f"{CORE}/UpdatePolicy.kt": f"{DESKTOP}/telemetry/UpdatePolicy.kt",
     # The News vertical's signal stack, ported before this script existed. Brought under the guard now:
     # these are pure logic and must stay identical. (NewsExplainers.kt and Explainer.kt are deliberately
     # NOT here — they are adapted ports, not mirrors; see their headers.)
@@ -73,6 +76,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
     f"{CORE_TEST}/EmergencyTriageTest.kt": f"{DESKTOP_TEST}/telemetry/EmergencyTriageTest.kt",
     f"{CORE_TEST}/FreshnessTest.kt": f"{DESKTOP_TEST}/telemetry/FreshnessTest.kt",
+    f"{CORE_TEST}/UpdatePolicyTest.kt": f"{DESKTOP_TEST}/telemetry/UpdatePolicyTest.kt",
 }
 
 # Package renames applied to the mirror. Order matters only in that each source package maps to exactly
