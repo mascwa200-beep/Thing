@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import kotlinx.coroutines.runBlocking
@@ -21,7 +22,8 @@ private val settingsStore = DesktopSettingsStore()
  * and closing the window within two seconds would silently lose the answer. Same reason the settings
  * store already lives out here.
  */
-private val libraryRepository = LibraryRepository()
+private val packStore = PackStore()
+private val libraryRepository = LibraryRepository(packs = packStore)
 private val studyStore = StudyStore(libraryRepository)
 
 fun main() {

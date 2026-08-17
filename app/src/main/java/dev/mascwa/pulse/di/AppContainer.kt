@@ -237,7 +237,18 @@ class AppContainer(private val appContext: Context) {
     }
 
     val survivalContentRepository: SurvivalContentRepository by lazy {
-        SurvivalContentRepository(appContext, json)
+        SurvivalContentRepository(appContext, json, packStore)
+    }
+
+    /**
+     * Installed expansion packs.
+     *
+     * Passed into the library repository rather than consulted by anything else: the merge belongs at
+     * the one place that answers "what is in the library", so the reader, search, study and the
+     * assistant's tools see one corpus without knowing packs exist.
+     */
+    val packStore: dev.mascwa.pulse.data.survival.PackStore by lazy {
+        dev.mascwa.pulse.data.survival.PackStore(appContext, json)
     }
 
     /**

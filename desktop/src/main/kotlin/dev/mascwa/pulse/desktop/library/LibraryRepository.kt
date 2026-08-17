@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.desktop.library
 
+import dev.mascwa.pulse.desktop.telemetry.ContentPack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -28,21 +29,41 @@ import kotlinx.serialization.json.Json
  * *required* rather than a convenience — and `LibraryBundleTest` turns a missing or stale one into a
  * build failure instead of an empty library discovered on a Windows box.
  */
-class LibraryRepository(private val json: Json = Json { ignoreUnknownKeys = true }) {
+class LibraryRepository(
+    private val json: Json = Json { ignoreUnknownKeys = true },
+    /**
+     * Installed expansion packs, or null for a bundle-only library.
+     *
+     * ⚠️ The merge happens **here**, at the one place that answers "what is in the library", so the
+     * reader, search, study and the assistant's tools all see one corpus and none of them needed
+     * changing. A pack that had to be plumbed through every consumer would be a pack that is only
+     * half installed.
+     */
+    private val packs: PackStore? = null,
+) {
 
     @Volatile private var cachedIndex: List<GuideIndexEntry>? = null
+
+    /** Which pack revision [cachedIndex] was built from, so installing one invalidates it. */
+    @Volatile private var cachedAtPackRevision: Int = -1
 
     private val shardMutex = Mutex()
     private val shardLru = LinkedHashMap<String, List<Guide>>(8, 0.75f, true)
 
     /** The lightweight catalog — enough for browse rails, lists and heading-level search. */
     suspend fun index(): List<GuideIndexEntry> {
-        cachedIndex?.let { return it }
-        return withContext(Dispatchers.IO) {
+        val revision = packs?.revision ?: 0
+        cachedIndex?.let { if (revision == cachedAtPackRevision) return it }
+        val bundled = withContext(Dispatchers.IO) {
             runCatching {
                 json.decodeFromString(GuideIndex.serializer(), read(INDEX_FILE)).entries
-            }.getOrDefault(emptyList()).also { cachedIndex = it }
+            }.getOrDefault(emptyList())
         }
+        // Bundled first and bundled wins: a pack can add to the library and can never shadow it.
+        val merged = ContentPack.merge(bundled, packs?.indexEntries().orEmpty()) { it.id }
+        cachedAtPackRevision = revision
+        cachedIndex = merged
+        return merged
     }
 
     /** Full guide by id — parses only its own category shard. */
@@ -117,9 +138,19 @@ class LibraryRepository(private val json: Json = Json { ignoreUnknownKeys = true
         }
     }
 
-    private fun read(name: String): String =
-        javaClass.getResourceAsStream("$ROOT/$name")?.bufferedReader()?.use { it.readText() }
-            ?: error("Bundled library resource missing: $ROOT/$name")
+    /**
+     * A shard's text, from wherever it lives.
+     *
+     * A pack file is recognised by its name rather than by a lookup — the qualification scheme exists
+     * precisely so that this routing needs no table and cannot get out of step with what is installed.
+     */
+    private suspend fun read(name: String): String =
+        if (ContentPack.isPackFile(name)) {
+            packs?.read(name) ?: error("Expansion pack resource missing: $name")
+        } else {
+            javaClass.getResourceAsStream("$ROOT/$name")?.bufferedReader()?.use { it.readText() }
+                ?: error("Bundled library resource missing: $ROOT/$name")
+        }
 
     companion object {
         /** Where `processResources` puts the copied asset tree. */
