@@ -77,35 +77,35 @@ private fun hex(r: Random, digits: Int): String =
  */
 private fun generateBootLog(): List<String> {
     val r = Random(System.nanoTime() xor System.currentTimeMillis())
-    val modules = listOf("warpcore", "lifesupport", "navigation", "sensors", "comms", "shields", "impulse",
+    val modules = listOf("warpdrive", "lifesupport", "navigation", "sensors", "comms", "deflector", "impulse",
         "deflector", "transporter", "replicator", "inertial", "structural", "environmental", "powergrid",
         "computer", "medbay")
     val sensors = listOf("inertial", "magnetometer", "gravimetric", "subspace", "thermal", "biometric")
     val subsystems = listOf("navigation", "sensors", "communications", "life-support", "tactical", "engineering")
-    val volumes = listOf("core", "library", "records", "archive", "banks", "database")
-    val ifaces = listOf("subspace0", "shipnet0", "deflector0", "relay0")
+    val volumes = listOf("library", "records", "archive", "banks", "index", "tapes")
+    val ifaces = listOf("subspace0", "intraship0", "sensor0", "relay0")
     val ok = listOf("OK", "PASS", "READY", "NOMINAL", "ONLINE")
 
     val head = mutableListOf(
         "> MAIN COMPUTER CORE — POWER-ON SELF TEST .... ${ok.random(r)}",
-        "isolinear core 0x${hex(r, 8)} · LCARS loader 0x${hex(r, 4)}",
-        "computer core verified — ${2 + r.nextInt(4)} authorization codes accepted",
-        "mounting library computer banks /${volumes.random(r)} ... ${ok.random(r)}",
+        "duotronic core 0x${hex(r, 8)} · library loader 0x${hex(r, 4)}",
+        "computer verified — ${2 + r.nextInt(4)} authorization codes accepted",
+        "mounting library computer /${volumes.random(r)} ... ${ok.random(r)}",
         "encryption grid online (rotating cipher · seed 0x${hex(r, 8)})",
     )
     val mids = mutableListOf<String>()
     repeat(3 + r.nextInt(3)) { mids += "init ${modules.random(r)} @ 0x${hex(r, 8)} ... ${ok.random(r)}" }
     mids += "calibrating ${sensors.random(r)} array (${256 + r.nextInt(2048)} samples)"
-    mids += "isolinear storage allocated ${8 + r.nextInt(24)} kiloquads"
-    mids += "${ifaces.random(r)} up — ${50 + r.nextInt(950)} kiloquads/sec"
+    mids += "memory banks allocated ${8 + r.nextInt(24)} megaquads"
+    mids += "${ifaces.random(r)} up — ${50 + r.nextInt(950)} megaquads/sec"
     mids += "${1 shl (10 + r.nextInt(6))} sectors verified · CRC 0x${hex(r, 8)}"
     mids += "loading ${subsystems.random(r)} subsystem ... ${ok.random(r)}"
     mids.shuffle(r)
 
     return head + mids.take(4 + r.nextInt(3)) +
         listOf(
-            "computer core diagnostic complete ....... ${ok.random(r)}",
-            "all systems nominal — computer interface online",
+            "duotronic diagnostic complete ........... ${ok.random(r)}",
+            "all systems nominal — library computer standing by",
         )
 }
 
