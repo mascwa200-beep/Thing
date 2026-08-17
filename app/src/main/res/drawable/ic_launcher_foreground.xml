@@ -8,7 +8,7 @@
          delta. Matches this app's own lcarsBlockShape/LcarsFrame silhouette (one swept corner, sharp
          elsewhere) so the launcher icon reads as a shrunken panel from the app itself. -->
     <path
-        android:fillColor="#FF9900"
+        android:fillColor="#FFB000"
         android:pathData="M21,21 L61,21 A26,26 0 0 1 87,47 L87,87 L21,87 Z" />
     <path
         android:fillColor="#CC99CC"

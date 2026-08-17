@@ -1,32 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Shell colours (Compose drives the live palette at runtime). Matches lcarsPalette.void exactly
+    <!-- Shell colours (Compose drives the live palette at runtime). Matches tosPalette.void exactly
          (pure black) so the earliest-visible frame — window/splash background, launcher icon — is
-         consistent with the in-app LCARS palette. -->
+         consistent with the in-app console palette. -->
     <color name="nw_void">#000000</color>
-    <!-- The app's LCARS orange, the canonical value. Was #2DE2E6, a cyan left over from the retired
-         cyberpunk palette and referenced by nothing; corrected rather than deleted so a future
-         reference picks up the right colour instead of resurrecting the wrong one. -->
-    <color name="nw_accent">#FF9900</color>
+    <!-- The app's command gold. Was the LCARS orange #FF9900, and before that a stray cyberpunk
+         cyan; each time it has been corrected rather than deleted so a future reference picks up the
+         right colour instead of resurrecting a retired one. -->
+    <color name="nw_accent">#FFB000</color>
     <color name="ic_launcher_background">#000000</color>
-    <!-- LCARS notification alert-condition colours — the red-alert/yellow-alert convention.
-         lcars_condition_routine tracks LcarsPalette.accent exactly (the app's real in-app LCARS
-         orange); the other two are purpose-built for glanceable tray legibility at small size.
+    <!-- Notification alert-condition colours — the red-alert/yellow-alert convention.
+         lcars_condition_routine tracks tosPalette.accent exactly (the app's real command gold); the
+         other two stay purpose-built for glanceable tray legibility at small size rather than
+         tracking the palette, which is why they did not move with the accent.
          These are duplicated by hand because a notification is inflated from XML and cannot read the
          Compose palette — so when the accent moves, it must be moved here in the same commit. -->
-    <color name="lcars_condition_routine">#FF9900</color>
+    <color name="lcars_condition_routine">#FFB000</color>
     <color name="lcars_condition_yellow">#FFCC42</color>
     <color name="lcars_condition_red">#FF3B30</color>
-    <!-- The one-notification board's per-row tag colours — the real in-app LcarsPalette tokens
-         (accent/amber/sky/violet) so the notification and the app speak the same LCARS dialect. -->
-    <color name="lcars_row_news">#FF9900</color>
-    <color name="lcars_row_markets">#FFCC99</color>
-    <color name="lcars_row_weather">#9999FF</color>
-    <color name="lcars_row_agenda">#CC99CC</color>
-    <!-- Golden tanoi from the canonical block set; the one hue no other row tag uses, so all
-         six tags stay distinguishable at notification size. -->
-    <color name="lcars_row_advisory">#FFCC66</color>
-    <color name="lcars_row_lesson">#99CCFF</color>
+    <!-- The one-notification board's per-row tag colours — real in-app TosPalette tokens, so the
+         notification and the app speak the same dialect. Six tags that must stay tellable apart at
+         tray size, so they are spread across the hue circle rather than clustered in the warm end;
+         markets deliberately avoids green and red, which carry direction elsewhere in the app. -->
+    <color name="lcars_row_news">#FFB000</color>
+    <color name="lcars_row_markets">#FF7A1A</color>
+    <color name="lcars_row_weather">#22B8E0</color>
+    <color name="lcars_row_agenda">#8A5CE0</color>
+    <color name="lcars_row_advisory">#E0409A</color>
+    <color name="lcars_row_lesson">#24C04A</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

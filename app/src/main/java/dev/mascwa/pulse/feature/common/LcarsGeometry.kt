@@ -59,34 +59,54 @@ import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
-import dev.mascwa.pulse.ui.theme.LocalLcarsBlocks
+import dev.mascwa.pulse.ui.theme.LocalConsoleBlocks
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * Genuine Star-Trek-Okudagram panel geometry — asymmetric elbow-connector silhouettes and swept blocks,
- * replacing the uniform rounded-rectangles/pills the earlier LCARS re-theme was built from (that kit is
- * gone; these took over its call sites wholesale, which is why the signatures echo it) and the same
- * [Pulse.colors] read, so they render in whatever palette is provided. LTR geometry only (layoutDirection is
- * intentionally ignored below) — this app has no RTL-locale requirement today; flagged here rather than
- * silently assumed.
+ * Original-series console geometry — cut plates and mitred elbow connectors, rendered in whatever
+ * palette is provided via [Pulse.colors]. LTR geometry only (layoutDirection is intentionally ignored
+ * below) — this app has no RTL-locale requirement today; flagged here rather than silently assumed.
  *
- * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single swept ROUNDED corner ([lcarsBlockShape]) rather than a
- * notch — safe for arbitrary held content, nothing can clip into a concave corner. The genuinely notched
- * elbow ([rememberLcarsElbow], a real concave L-shape via [GenericShape] — the first use of it in this codebase) is
- * reserved for small solid-color accents with no text inside them ([LcarsHeaderBar]'s lead block,
- * [LcarsDataRow]'s tab-adjacent nub) where a bitten corner can't clip anything readable.
+ * ⚠️ **The `Lcars` prefix on these names is now historical, and deliberately left alone.** The shapes
+ * are 1966, not 1987, but the names describe *function* — a rail, a frame, a header bar, a data row —
+ * and those roles did not change. Renaming the prefix would be a blind mechanical sweep across every
+ * screen in the app for no user-visible gain, and a sweep of exactly that kind has already cost this
+ * project a CI failure. It is a separate, gated slice if it is ever worth doing at all.
+ *
+ * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single CUT corner ([lcarsBlockShape]) rather than a
+ * notch — safe for arbitrary held content, since nothing can clip into a concave corner. The genuinely
+ * notched elbow ([rememberLcarsElbow], a real concave L-shape via [GenericShape]) is reserved for small
+ * solid-colour accents with no text inside them ([LcarsHeaderBar]'s lead block, [LcarsDataRow]'s
+ * tab-adjacent nub), where a bitten corner cannot clip anything readable.
  */
 enum class LcarsCorner { TopStart, TopEnd, BottomStart, BottomEnd }
 
-/** A rectangle with one corner's radius swept large (clamped to half the shorter side, same as any
- *  [RoundedCornerShape]) and the other three left sharp — the asymmetric "one end is a pill cap" LCARS block
- *  silhouette. No [GenericShape] needed; per-corner [RoundedCornerShape] already expresses this. */
+/**
+ * A console plate: a rectangle with one corner cut away at an angle and the other three left sharp.
+ *
+ * ⚠️ **This is the shape that carries the era.** It used to be a [RoundedCornerShape] with one corner
+ * swept into a large pill cap — the 1987 LCARS block. The 1966 consoles are cut, not swept: hard
+ * plates with mitred corners, an angular language rather than a curved one. [CutCornerShape] is the
+ * same per-corner API and the same [Dp] parameter, so every call site keeps its argument and simply
+ * renders angular — which is what makes the whole console change with one edit.
+ *
+ * Clamped to half the shorter side by [CutCornerShape] itself, exactly as the rounded version was.
+ */
 fun lcarsBlockShape(sweep: Dp, corner: LcarsCorner): Shape = when (corner) {
-    LcarsCorner.TopStart -> RoundedCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.TopEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.BottomStart -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
-    LcarsCorner.BottomEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
+    LcarsCorner.TopStart -> CutCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.TopEnd -> CutCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.BottomStart -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
+    LcarsCorner.BottomEnd -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
 }
+
+/**
+ * The "jelly bean" — a full capsule, the 1966 bridge's signature control.
+ *
+ * A percentage rather than a [Dp] so it stays a true stadium at any height without the caller having
+ * to know its own size. Used for the button banks, where a bank of capsules on black is the single
+ * most recognisable thing about the original consoles.
+ */
+val tosCapsule: Shape = RoundedCornerShape(percent = 50)
 
 /**
  * A genuine concave L-shaped notch bitten out of one corner, with the interior (concave) joint filled by a
@@ -109,8 +129,10 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                 addRect(Rect(0f, 0f, w, h))
                 return@GenericShape
             }
-            // Every case sweeps +90° from the arc's start angle to its end angle — derived and verified
-            // analytically (arc endpoints match the adjoining lineTo points exactly) before writing this.
+            // Every case mitres straight across the corner. These were quarter-circle arcs for LCARS;
+            // the 1966 consoles are cut rather than swept, so each arc became a straight line to the
+            // very same end point — derived from the arc's start angle and its +90° sweep, so the
+            // silhouette keeps its exact bounding box and only the joint changes from curved to angular.
             when (corner) {
                 LcarsCorner.TopStart -> {
                     moveTo(s, 0f)
@@ -118,13 +140,13 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, h)
                     lineTo(0f, h)
                     lineTo(0f, s)
-                    arcTo(Rect(0f, 0f, 2 * s, 2 * s), 180f, 90f, false)
+                    lineTo(s, 0f)
                     close()
                 }
                 LcarsCorner.TopEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w - s, 0f)
-                    arcTo(Rect(w - 2 * s, 0f, w, 2 * s), 270f, 90f, false)
+                    lineTo(w, s)
                     lineTo(w, h)
                     lineTo(0f, h)
                     close()
@@ -134,14 +156,14 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, 0f)
                     lineTo(w, h)
                     lineTo(s, h)
-                    arcTo(Rect(0f, h - 2 * s, 2 * s, h), 90f, 90f, false)
+                    lineTo(0f, h - s)
                     close()
                 }
                 LcarsCorner.BottomEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w, 0f)
                     lineTo(w, h - s)
-                    arcTo(Rect(w - 2 * s, h - 2 * s, w, h), 0f, 90f, false)
+                    lineTo(w - s, h)
                     lineTo(0f, h)
                     close()
                 }
@@ -343,7 +365,7 @@ private const val CODE_MIN_WEIGHT = 1.9f
 fun LcarsRail(
     seed: String,
     modifier: Modifier = Modifier,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
     weights: List<Float> = RailWeights,
 ) {
     if (blocks.isEmpty() || weights.isEmpty()) {
@@ -554,7 +576,7 @@ fun LcarsSegmentBar(
     seed: String,
     modifier: Modifier = Modifier,
     segments: Int = 5,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
 ) {
     if (segments <= 0 || blocks.isEmpty()) {
         Box(modifier)
@@ -610,7 +632,7 @@ data class LcarsNavItem(
 fun LcarsNavBar(
     items: List<LcarsNavItem>,
     modifier: Modifier = Modifier,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
 ) {
     if (items.isEmpty() || blocks.isEmpty()) {
         Box(modifier)

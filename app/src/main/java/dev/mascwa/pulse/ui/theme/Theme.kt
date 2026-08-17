@@ -24,7 +24,7 @@ val LocalNightwire = staticCompositionLocalOf {
  * Not `static`, unlike the palette: this one genuinely changes at runtime when the ship goes to red,
  * and a static local does not invalidate its readers.
  */
-val LocalLcarsBlocks = compositionLocalOf { LcarsBlocks }
+val LocalConsoleBlocks = compositionLocalOf { TosBlocks }
 
 object Pulse {
     val colors: NightwirePalette
@@ -33,8 +33,8 @@ object Pulse {
 
 /**
  * [accent]/[amoledBlack] are vestigial — LCARS became the app's one fixed palette (see `PulseApp.kt`'s
- * unconditional `LocalNightwire provides lcarsPalette`), so both the composition-local default here and the
- * Material3 [darkColorScheme] below are built from [lcarsPalette] directly rather than the old
+ * unconditional `LocalNightwire provides tosPalette`), so both the composition-local default here and the
+ * Material3 [darkColorScheme] below are built from [tosPalette] directly rather than the old
  * accent-configurable [nightwirePalette]. Kept as parameters (not removed) so this stays a pure internal
  * simplification — no call-site or Settings-screen change needed. Before this, the Material3 `scheme` was
  * the ONE place still deriving from the old palette: any un-migrated default Material component (a system
@@ -51,7 +51,7 @@ fun NightwireTheme(
     // signal long before anything is actually wrong.
     val condition by AlertStatus.condition.collectAsState()
     val alert = condition == AlertCondition.RED
-    val palette = if (alert) lcarsRedAlert else lcarsPalette
+    val palette = if (alert) tosRedAlert else tosPalette
 
     val scheme = darkColorScheme(
         primary = palette.accent,
@@ -78,7 +78,7 @@ fun NightwireTheme(
         // The rail blocks are not in the palette (they are a list, and the palette is a fixed set of
         // roles), so they travel separately. Providing them here means the rails and segment bars go
         // red with everything else and no screen has to know.
-        LocalLcarsBlocks provides if (alert) LcarsAlertBlocks else LcarsBlocks,
+        LocalConsoleBlocks provides if (alert) TosAlertBlocks else TosBlocks,
     ) {
         MaterialTheme(
             colorScheme = scheme,
