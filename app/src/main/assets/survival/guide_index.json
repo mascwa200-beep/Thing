@@ -8413,6 +8413,28 @@
    "file": "guides_history.json"
   },
   {
+   "id": "the-roman-world",
+   "title": "The Roman World: The Republic, the Roman Empire, and What They Left Behind",
+   "category": "History",
+   "summary": "A survey of Rome from village to empire and after: how the Republic governed itself, why the army could lose battles and still win wars, Julius Caesar and the civil wars that broke the Republic, Augustus and the invention of the emperor, how a handful of officials ran fifty million people, Roman law and citizenship and why both still matter, daily life, slavery, the engineering, the arrival of Christianity, the third-century crisis and the end of the western empire — and what genuinely survived, as against what merely claims to.",
+   "headings": [
+    "From City to Republic: How Rome Began and How It Governed Itself",
+    "The Roman Army, the Punic Wars against Carthage, and How Rome Actually Conquered",
+    "The Republic Breaks: Land, Civil War, and Julius Caesar's Rise to Power",
+    "Augustus and the Invention of the Emperor",
+    "Running an Empire: Provinces, Roads, Taxes and Cities",
+    "Roman Law, and Why It Still Shapes Yours",
+    "Citizenship: The Idea That Made Rome Different",
+    "Daily Life, Work and the Roman City",
+    "Slavery in the Roman World",
+    "Engineering: Concrete, Aqueducts, Roads and Baths",
+    "Religion, and the Arrival of Christianity",
+    "Crisis, Division and the End of the Western Empire",
+    "What Actually Survived: The Roman Inheritance"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
