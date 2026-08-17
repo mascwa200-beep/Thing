@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
@@ -50,10 +51,14 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
                     modifier = Modifier.padding(start = 10.dp))
             }
             Text(
-                "No WiFi or cellular connection. These tools work with no signal.",
+                "No WiFi or cellular connection.",
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                 modifier = Modifier.padding(top = 6.dp),
             )
+            // Two headings, because the old single grid claimed "these tools work with no signal" while
+            // listing Nearest Help and Nearby Safety, which cannot fetch anything. Both lists are derived
+            // from each tile's declared Need, so neither can drift back into saying something untrue.
+            val cached = offlineCachedTiles()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp).weight(1f),
@@ -61,8 +66,17 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 12.dp),
             ) {
-                items(offlineSurviveTiles(), key = { it.route }) { tile ->
+                item(span = { GridItemSpan(maxLineSpan) }) { SectionLabel("WORKS RIGHT NOW", c.positive) }
+                items(offlineReadyTiles(), key = { it.route }) { tile ->
                     SurviveTileCard(tile, onOpenRoute)
+                }
+                if (cached.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SectionLabel("LAST RECEIVED — NOT CURRENT", c.amber)
+                    }
+                    items(cached, key = { it.route }) { tile ->
+                        SurviveTileCard(tile, onOpenRoute)
+                    }
                 }
             }
             Text(
@@ -74,3 +88,11 @@ fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) 
         }
     }
 }
+
+@Composable
+private fun SectionLabel(text: String, tint: androidx.compose.ui.graphics.Color) = Text(
+    text,
+    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp,
+    color = tint,
+    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
+)
