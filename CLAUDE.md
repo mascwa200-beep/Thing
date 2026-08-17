@@ -3913,6 +3913,89 @@ reading. Of those, `Geodesy.formatDms` is genuinely dead while `NavScreen` carri
 `dms()` (the better one — it rounds to tenths *before* splitting) — a duplicated definition worth
 converging, left as a follow-up because neither is wrong today.
 
+### THE ORIGINAL-SERIES ARC — the console changes era, and gains a lore library (PR #448)
+
+Owner: *"overpower the interface and design … exactly like the original series Star Trek … and it
+also has like this entire library directory of everything in Star Trek like as if it was actually
+the computer."* Then, twice: *"keep going with the font and more lore waves."* Chose via
+AskUserQuestion: **literal TOS 1966 console**, **original prose written by me**, **~150–200 entries**.
+
+⚠️ **Two blocking facts were surfaced before any work started, and the owner settled both.** LCARS is
+the *1987* console, not the original series — so this is a change of era, not a polish pass. And the
+lore is Paramount's. The IP boundary, restated in every lore commit: **original prose only; no
+Paramount artwork, logos, insignia, screenshots, fonts or copied text; no Memory Alpha content (it is
+CC BY-NC); sounds stay synthesised.** Private, sideloaded, undistributed.
+
+**Zero subagent spend across the whole arc** — the credit directive still overrides ultracode.
+
+**Shipped:** the palette-and-shape substitution (`9180e9a`) that repainted 35+ screens through
+`tosPalette` + `lcarsBlockShape`; the lore taxonomy in four-way lockstep (`705b800`); the location
+readout every screen gained for free from `LocalConsoleSection` (`ac5a8ab`); the desktop's matching
+console with a grouped, described rail (`9e52f04`); the retuned cue table and 1966 boot vocabulary
+(`20d4686`); and then the two below.
+
+**`29a43cc` — the typeface, and the measurement that changed the plan.** Orbitron (OFL, verified from
+`google/fonts` METADATA before downloading) takes display, headline, title and the console chrome.
+Measured with fontTools rather than judged by eye: **Orbitron is 1.86× wider per capital than Antonio**
+(0.815 em vs 0.433) and its capitals are **16% shorter** at the same nominal size (0.720 vs 0.859). So
+every size came down by about a fifth — not by the full width ratio, since cutting for width parity
+would leave a screen title smaller than the labels beneath it.
+- ⚠️ **The bottom nav keeps Antonio, and the reason is arithmetic.** Six labels share the phone's
+  width: each slot is 64.5dp on a 411dp screen and 56dp on a 360dp one, and COMPUTER renders at 37dp
+  condensed and **64dp** in Orbitron. Both faces ship; the NOTICE says why.
+- ⚠️ **Orbitron carries a Reserved Font Name**, so it ships byte-for-byte — not subsetted, not
+  instanced. That is also why the desktop registers **one weight** for variable faces: desktop
+  `Font(resource)` hands bytes to Skia, which instantiates at the *default master* with no axis
+  parameter, so four registrations of one file would be four identical 400s and would stop Compose
+  synthesising bold. Chakra Petch has four real statics and gets all four.
+- **Recon finding that shrank the change:** `MaterialTheme.typography.displayLarge` etc. have **zero
+  call sites**, and Antonio had **6, all in one file**. The app's real heading voice is ChakraPetch
+  (215 sites). So the typeface slice is console chrome only — content headings were left alone.
+- **Desktop tandem, long overdue:** it had rendered in *system sans and monospace* since the module
+  was created. `processResources` now copies `app/src/main/res/font` into the jar (the same trick that
+  bundles the guide library), so one copy of each `.ttf` lives in the repo. ⚠️ **New gate,
+  negative-tested:** `Font(resource=)` resolves at *render* time, so a wrong path compiles and throws
+  on a Windows machine — `BundledFontsTest` asserts every named resource is present and carries a real
+  sfnt signature, and `desktop-build.yml`'s path filter now watches the font directory.
+
+**`254cc80` / `bf74d80` / `fd1ea7e` — the Federation Database, 0 → 46 entries** across seven
+categories under a `Federation Database` supergroup. A lore entry **is** a guide, so it inherits the
+reader, search, device search, study/quizzing, the `library` tool, the desktop browser and packs — no
+new subsystem. Register is ~4 sections of ~170 words (looked up, not worked through), so
+`FULL_PAGE_BASELINE` stays flat at 8258 by design; corpus **595 → 627 guides**.
+
+**⚠️ THE THING THAT MADE THESE WAVES WORTH DOING CAREFULLY: run the shipped `GuideSearch` over the
+real index, in both directions.** Recipe in `scratchpad/kb/` — export the index to TSV, compile
+`GuideSearch.kt` plus a throwaway `main` with the local kotlinc recipe, assert (a) each new entry is
+the top hit for its own subject and (b) **ordinary practical questions do not get pulled into the
+database**. The second half is the one that matters and it found things reading never would:
+- Three entries were unreachable by their own subject because the word lived only in body text, which
+  the index does not carry — "how does assimilation work" missed the Borg entirely.
+- **A defect I introduced:** "what is a galaxy" returned The Galaxy Class ahead of the astronomy guide
+  actually about galaxies, because a title that exact-matches beats one that only stem-matches.
+- **Then my fix broke the plural.** Retitling the astronomy guide to the singular alone dropped
+  "galaxies" from finding its own best answer — one failure traded for another, caught only by
+  re-running the probe instead of assuming the edit was done. The shipped title carries **both** forms.
+- **A defect in the general library:** "how do I fly a space shuttle" beat the rockets guide, which
+  uses the Space Shuttle as its running worked example (boosters, max-Q throttle-down, silica tiles,
+  with real figures) across four sections — every mention in body text, invisible to the index.
+- **And the ranker disagreeing with me, correctly:** "who governs the United Federation of Planets"
+  returns the Federation entry, which has a section headed "How It Governs". My probe expectation was
+  wrong. **Fourth time this arc.** Check the corpus before writing the assertion.
+
+**Evidenced content gaps, not ranking faults** (each judged by its runner-up being unrelated): the
+corpus has **no guide on translation/linguistics, civic government, workplace policy, the history of
+treaties, or medicine as a profession**. Those five queries reach the lore because nothing else
+answers them. The fix is to write those guides, not to handicap these — a clean, well-scoped
+follow-up.
+
+**Open / steerable:** lore waves continue toward 150–200 (46 done, ~4 sections × ~170 words each, the
+recipe is mechanical: staging shard → `kb_pipeline.py` → `ci_parity_lint.py` → ranker probe →
+`./gradlew :desktop:build` → commit). ⚠️ **Everything visual and audible is owner-verify on the Pixel**
+— CI compiles, it does not draw or play. Worth eyes first: whether Orbitron reads at the header sizes
+tuned for a condensed face, whether the retuned cues land as the original console or merely as lower
+beeps, and the bottom bar's six labels. On Windows: whether the companion now looks like the phone.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
