@@ -4196,6 +4196,76 @@ FORECAST tag. Desktop untouched throughout — no safety feature there, neither 
 Launch Library); the Federation Database lore waves (56 of 150–200); the evidenced content gaps
 (*"world war two"* → the Roman guide, *"what is a passport"*, *"nuclear power"*).
 
+### THREE SHELVES THAT DID NOT HOLD WHAT THEY ADVERTISED (this session, PR #448)
+
+Owner: *"keep going autonomously."* No direction given, so the three evidenced misses recorded at
+the end of the last arc were closed. **Zero subagent spend on this part**, as with every arc since
+the credit directive — local kotlinc, the ranker probe over the real index, `:desktop:build`, CI.
+
+Each was a shelf whose name promised something it did not contain, which is a more useful thing to
+look for than a missing topic:
+
+| Query | Returned | Because |
+|---|---|---|
+| "nuclear power" | The Cell Nucleus and Nuclear Envelope | `Energy & Environment` held **twelve ecology guides and no energy guide** |
+| "world war two" | The Roman World | `History` held **eleven historiography guides** plus Rome, the Columbian Exchange and diplomacy |
+| "what is a passport" | Testing a Business Idea With Preorders | one mention of "passport" in 649 guides — "passport-sized", in a microprocessor guide |
+
+⚠️ **STEP 0 kept earning its place, and the nuclear case is the sharpest example yet of why it is
+not optional.** `phys-nuclear-physics-radioactivity` covers fission and fusion properly — so the
+lazy read is "index fix, not a guide". The body probe showed it mentions a reactor, a control rod, a
+fuel cycle or a repository *exactly nowhere*. The physics was there and the power station was not.
+Conversely, in the previous arc the same probe **saved two entire guides** (antimatter and literary
+translation were already covered and needed a one-line index fix). Probe the shard bodies before
+writing a word; the answer goes both ways and reading the index alone cannot tell you which.
+
+**651 guides, full pages 8401 → 8440.** Thirteen sections each at ~500 words. Every guide landed in
+an existing category, so no four-way taxonomy lockstep was needed.
+
+**The ranker probe found one regression that I introduced and would never have seen by reading.**
+The nuclear guide took *"how does the electricity grid work"* from the three real grid guides in
+Electronics — 221.18 against 218.76 — on two incidental words: "work" sitting in a control heading
+as an idiom, and "grid" in the closing heading as context. Both reworded; the grid guides are back
+on top and the nuclear guide is out of that result entirely. **Always run the control half.** The
+half that proves the new guide wins its own subject is the easy half and the less informative one.
+
+**Two index-visibility misses of the recurring shape, both in the war guide.** A subject covered at
+length is invisible because `GuideIndexEntry` carries no body text. *"who won the battle of
+stalingrad"* was a three-way tie at m=1 between the war guide, Basic Sewing & Fabric Repair and The
+Transistor; *"why were the atomic bombs dropped on japan"* lost outright to **Shogi: Japanese Chess
+and the Drop Rule**, whose title holds both "Japanese" and "Drop". Five headings now name Stalingrad,
+Pearl Harbor, the Battle of Britain, the Bulge, D-Day, Hiroshima and Nagasaki — all already covered
+in full. Every newly indexed word was then control-probed ("geography of japan", "japanese cooking",
+"travel to britain", "what is an atom", "how do I get to berlin"): all unchanged.
+
+⚠️ **One result reported honestly as a half-fix rather than a fix.** *"how long can I stay in the
+schengen area"* lost outright; naming Schengen in a heading **still** lost, because a heading is
+worth 5 against a title's 10 and three of the query's four words are near-noise that happen to sit
+in other guides' titles ("Stay Put, Get Found"). Adding it to the summary as well wins by **0.56
+points**, which is not a margin anybody should rely on. What actually makes this query work in the
+shipped app is different: "schengen" has a document frequency of **1**, so `distinctiveToken`
+returns it and `searchBodies` finds the guide. **The index-only probe understates the real search
+path whenever the query contains a genuinely rare word** — worth remembering before over-tuning an
+index against a probe that is not the whole system.
+
+**Two wrong results left deliberately alone**, because the probe proved nothing better was
+displaced: *"customs and traditions of a culture"* and *"what is a visa card"* both return the
+passport guide, and the library has **no cultural-etiquette guide and no payment-card guide**.
+Removing "customs" would cost the legitimate *"what can I take through customs"*. Recorded as
+content gaps, not bent around.
+
+**Evidenced gaps found in control lists and recorded rather than chased:** *"how does a wind turbine
+work"* returns Using Terrain for Wind Protection and *"what is a turbine"* returns The Cell's
+Powerhouses **and nothing else** — there is no turbine content in any title, summary or heading in
+the library. Plus cultural etiquette and payment cards, above. A bare *"what was d-day"* reduces to
+the single token "day" and is genuinely unfixable without overfitting; *"d-day normandy landings"*
+resolves.
+
+⚠️ The passport guide carries a **`safetyNote`**, unusually for this library, because unlike the
+rest of the corpus its content has a shelf life — entry rules are set by the destination, differ by
+nationality, and change. The note says to check the destination's own site, and the transit
+country's, every trip.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
