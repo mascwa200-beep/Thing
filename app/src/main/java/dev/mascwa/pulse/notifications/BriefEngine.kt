@@ -136,6 +136,8 @@ object BriefEngine {
             runCatching { DayAheadEngine.imminentDeparture(container, settings) }.getOrNull()
         } else null
 
+        val advisory = advisory(container, settings)
+
         val brief = UnifiedBriefComposer.compose(
             BriefSignals(
                 nowMs = now,
@@ -172,7 +174,9 @@ object BriefEngine {
                 showMarkets = prefs.showMarketsRow,
                 showWeather = prefs.showWeatherRow,
                 showAgenda = prefs.showAgendaRow,
-                advisory = advisory(container, settings),
+                advisory = advisory?.line,
+                advisoryUrgent = advisory?.urgent == true,
+                advisoryKey = advisory?.key,
                 lesson = lesson(container, pendingTasks.map { it.title }),
                 departureNotice = departure?.first,
                 departureKey = departure?.second,
@@ -231,13 +235,32 @@ object BriefEngine {
      * consumes the caches this pass has already warmed. Best-effort throughout — a failure anywhere
      * mutes the row rather than costing you the board.
      */
-    private suspend fun advisory(container: AppContainer, settings: AppSettings): String? = runCatching {
+    /**
+     * The Oracle's call to action for the board, and whether it is worth announcing.
+     *
+     * @param urgent the insight clears `Oracle.pushWorthy`. Of the rules that reach that bar, a
+     *   departure, a major emergency and a security notice each already have their own alert path,
+     *   so in practice this is extreme heat danger — a health risk that would otherwise be delivered
+     *   as a silent routine row.
+     * @param key the rule's stable family, never the sentence: the text carries live values that
+     *   move through the day, and keying on it would re-buzz on every rewrite.
+     */
+    private data class Advisory(val line: String, val urgent: Boolean, val key: String)
+
+    private suspend fun advisory(container: AppContainer, settings: AppSettings): Advisory? = runCatching {
         val signals = OracleEngine.snapshot(container, settings)
         val top = Oracle.focus(signals) ?: return@runCatching null
         if (top.urgency.weight < Urgency.IMPORTANT.weight) return@runCatching null
-        // The title carries the instruction and the detail carries why — the board wants both, in
-        // that order, because a suggestion without a reason is just noise you learn to ignore.
-        listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — ")
+        Advisory(
+            // The title carries the instruction and the detail carries why — the board wants both, in
+            // that order, because a suggestion without a reason is just noise you learn to ignore.
+            line = listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — "),
+            // ⚠️ The Oracle's own definition of "worth interrupting for", not a second threshold
+            // written here. Two definitions of that is how the board and the assistant quietly start
+            // disagreeing about what an emergency is.
+            urgent = Oracle.pushWorthy(listOf(top)).isNotEmpty(),
+            key = top.family,
+        )
     }.getOrNull()
 
     /**

@@ -109,10 +109,31 @@ data class BriefSignals(
      * the call site, which is the only place that knows the insight's urgency, and it is deliberately
      * high so this stays the exceptional sixth row rather than a permanent fixture.
      *
-     * ⚠️ **An advisory never raises the alert condition.** What buzzes the phone is decided by the
-     * notice chain above; a suggestion, however well reasoned, is not an emergency.
+     * ⚠️ **An advisory does not raise the alert condition — unless [advisoryUrgent] says the caller
+     * established it clears the push-worthy bar.** A suggestion, however well reasoned, is not an
+     * emergency; but of the Oracle rules that reach that bar, three already alert through their own
+     * notice above (a departure, a major emergency headline, a security notice) and one does not.
+     * Extreme heat danger would otherwise arrive as a silent routine row, which is the wrong way for
+     * a health risk to be delivered.
      */
     val advisory: String? = null,
+    /**
+     * Whether the advisory clears `Oracle.pushWorthy` — URGENT or CRITICAL.
+     *
+     * The composer still does not reason: the caller owns the bar, as it does for the advisory text
+     * itself. Defaulted false, so every existing caller and every cached blob behaves exactly as
+     * before.
+     */
+    val advisoryUrgent: Boolean = false,
+    /**
+     * Identifies the RULE behind the advisory, not the sentence.
+     *
+     * ⚠️ Same trap as [departureKey]: an advisory's text carries live values — an apparent
+     * temperature that climbs through the afternoon rewrites the line every pass. Keying the alert
+     * on the text would make each rewrite look like a new urgent item and buzz the phone again.
+     * The caller passes the insight's stable family.
+     */
+    val advisoryKey: String? = null,
     /**
      * Today's study item, already chosen by the caller.
      *
@@ -210,8 +231,17 @@ object UnifiedBriefComposer {
         if (s.showAgenda) agendaText(s)?.let { rows += BriefRow(BriefRowKind.AGENDA, it) }
 
         // --- ADVISORY: the Oracle's call to action, when the caller judged one worth the space. ---
-        s.advisory?.takeIf { it.isNotBlank() }
-            ?.let { rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP)) }
+        s.advisory?.takeIf { it.isNotBlank() }?.let {
+            rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP))
+            // ⚠️ Only when nothing above it already spoke, and never RED. An advisory can make a
+            // quiet board announce itself; it cannot outrank a security notice or a major emergency,
+            // and it cannot promote the board to a red alert. The key is the rule's, not the
+            // sentence's, so a line that rewrites itself as conditions move buzzes once.
+            if (s.advisoryUrgent && urgency == BriefUrgency.ROUTINE) {
+                urgency = BriefUrgency.YELLOW
+                urgencyKey = "advisory:${s.advisoryKey ?: it.trim().hashCode()}"
+            }
+        }
 
         // --- LESSON: what to learn today. Last, and first to go when the board fills up. ---
         s.lesson?.takeIf { it.isNotBlank() }

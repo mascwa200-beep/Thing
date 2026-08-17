@@ -253,6 +253,83 @@ class UnifiedBriefTest {
 
     // ---- ADVISORY: the Oracle's call to action, back on the board ----
 
+    // ---- an advisory that has earned an interruption ------------------------------------------------
+
+    /**
+     * ⚠️ The gap this closes. Of the Oracle rules that clear `pushWorthy`, a departure, a major
+     * emergency and a security notice each already alert through their own notice in the chain above
+     * — extreme heat danger does not, so it arrived as a silent row on a routine board. That is the
+     * wrong way to deliver a health risk.
+     */
+    @Test fun anUrgentAdvisoryMakesAQuietBoardAnnounceItself() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(
+                advisory = "Get out of the heat — feels like 47 °C, extreme danger",
+                advisoryUrgent = true,
+                advisoryKey = "heat_danger",
+            ),
+        )!!
+        assertEquals(BriefUrgency.YELLOW, b.urgency)
+        assertEquals("advisory:heat_danger", b.urgencyKey)
+    }
+
+    /** Unchanged for everything below that bar, which is nearly every advisory ever raised. */
+    @Test fun anOrdinaryAdvisoryStillSaysNothingOutLoud() {
+        val b = UnifiedBriefComposer.compose(
+            routine().copy(advisory = "Good moment for the tax return — you're settled and it's open"),
+        )!!
+        assertEquals(BriefUrgency.ROUTINE, b.urgency)
+        assertNull(b.urgencyKey)
+    }
+
+    /**
+     * ⚠️ It can wake a quiet board; it cannot outrank one that already spoke, and it can never make
+     * the board red. A suggestion is not a security notice however well reasoned, and red is the one
+     * signal that stops meaning anything the moment it is spent freely.
+     */
+    @Test fun anUrgentAdvisoryNeverOutranksARealAlertAndNeverGoesRed() {
+        val red = UnifiedBriefComposer.compose(
+            routine().copy(
+                securityNotice = "Bootloader state changed", securityCritical = true,
+                advisory = "Get out of the heat", advisoryUrgent = true, advisoryKey = "heat_danger",
+            ),
+        )!!
+        assertEquals(BriefUrgency.RED, red.urgency)
+        assertTrue("the advisory took the alert key from a security notice", red.urgencyKey!!.startsWith("sec:"))
+
+        val yellow = UnifiedBriefComposer.compose(
+            routine().copy(
+                reminderNow = "call the dentist",
+                advisory = "Get out of the heat", advisoryUrgent = true, advisoryKey = "heat_danger",
+            ),
+        )!!
+        assertEquals(BriefUrgency.YELLOW, yellow.urgency)
+        assertTrue(yellow.urgencyKey!!.startsWith("rem:"))
+
+        // On its own it reaches yellow and stops there.
+        val alone = UnifiedBriefComposer.compose(
+            routine().copy(advisory = "Get out of the heat", advisoryUrgent = true, advisoryKey = "heat_danger"),
+        )!!
+        assertNotEquals(BriefUrgency.RED, alone.urgency)
+    }
+
+    /**
+     * ⚠️ Keyed on the rule, not the sentence — the same trap as `departureKey`.
+     *
+     * An advisory's text carries live values: an apparent temperature climbing through the afternoon
+     * rewrites the line on every pass. Keying on the text would make each rewrite look like a new
+     * urgent item, and the phone would buzz all afternoon about one condition.
+     */
+    @Test fun anAdvisoryThatRewritesItselfAsConditionsMoveStillBuzzesOnce() {
+        fun keyFor(line: String) = UnifiedBriefComposer.compose(
+            routine().copy(advisory = line, advisoryUrgent = true, advisoryKey = "heat_danger"),
+        )!!.urgencyKey
+        assertEquals(
+            keyFor("Get out of the heat — feels like 44 °C"),
+            keyFor("Get out of the heat — feels like 47 °C"),
+        )
+    }
+
     @Test fun advisoryRendersLastAndFitsWithoutDisplacingAnything() {
         // routine() has no ALERT, so its four rows plus an advisory come to exactly five — the
         // layout's capacity. Nothing is displaced; the advisory simply sits last.
