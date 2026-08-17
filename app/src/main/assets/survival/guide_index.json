@@ -9602,9 +9602,9 @@
    "id": "make-metalworking-forging-heat-tools",
    "title": "Metalworking & Forging: Heat, Metals & Tools",
    "category": "Making",
-   "summary": "The science and craft of shaping metal: what metals and alloys are, forging temperatures and colors, heat treatment (annealing, hardening, tempering), basic tools and joining, plus safety.",
+   "summary": "Practical metallurgy and the craft of shaping metal: what metals, steel and alloys are, steelmaking and carbon content, forging temperatures and colors, heat treatment (annealing, hardening, quenching, tempering), basic tools and joining, plus safety.",
    "headings": [
-    "Metals, Alloys & Key Properties",
+    "Metals, Alloys and Practical Metallurgy: Key Properties",
     "Heat and Forging: Reading the Colors",
     "Heat Treatment: Annealing, Hardening, Tempering",
     "The Basic Toolkit and How Force Shapes Metal",
@@ -13108,6 +13108,28 @@
     "Sanding Progression: Why Grit Order Matters",
     "Basic Wood Finishing: Oil, Varnish, and Paint",
     "Wood Selection Basics: Softwood, Hardwood, and Moisture Content"
+   ],
+   "file": "guides_skills.json"
+  },
+  {
+   "id": "sharpening-knives-and-tools",
+   "title": "Sharpening: How to Sharpen a Knife, Axe, Chisel, Scissors and Serrated Blade",
+   "category": "Skills",
+   "summary": "Why a dull blade is the dangerous one, what an edge actually is, bevel angles for every kind of tool, choosing a whetstone and reading grit numbers, water stones, oil stones, diamond plates and sandpaper, finding and removing the burr, sharpening a kitchen knife on a stone step by step, honing steels and stropping, what pull-through and powered sharpeners cost you, axes and machetes, chisels and plane irons and why the flat back comes first, scissors and secateurs and serrated blades, field sharpening on a river stone or the base of a mug, and how to store tools so they stay sharp.",
+   "headings": [
+    "Why a Sharp Edge Is Safer Than a Dull One",
+    "What an Edge Actually Is: Bevels, Angles and Geometry",
+    "Steel, Hardness and What It Means for Sharpening",
+    "The Abrasives: Stones, Diamond, Ceramic and Sandpaper",
+    "Reading the Edge: The Burr, and How to Tell When It Is Sharp",
+    "Sharpening a Kitchen Knife on a Stone",
+    "Honing Steels, Stropping and Keeping an Edge Between Sharpenings",
+    "Pull-Through Sharpeners and Powered Systems: What They Cost You",
+    "Axes, Machetes and Outdoor Tools",
+    "Chisels, Plane Irons and Flat-Back Tools",
+    "Scissors, Secateurs and Serrated Blades",
+    "Field Sharpening Without Proper Kit",
+    "Storage, Care and Making an Edge Last"
    ],
    "file": "guides_skills.json"
   },
