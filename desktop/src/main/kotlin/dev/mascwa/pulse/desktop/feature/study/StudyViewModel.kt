@@ -74,6 +74,16 @@ class StudyViewModel(
         }
     }
 
+    /** Teach a named guide — the reader's "STUDY THIS" — and go straight into answering it. */
+    fun teach(guideId: String) {
+        if (guideId.isBlank()) return
+        scope.launch {
+            runCatching { store.teach(guideId) }
+            nextQuestion()
+            refresh()
+        }
+    }
+
     fun startReview() {
         scope.launch { nextQuestion() }
     }

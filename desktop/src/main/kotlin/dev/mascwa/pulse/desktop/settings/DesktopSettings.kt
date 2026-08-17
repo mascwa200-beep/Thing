@@ -49,6 +49,8 @@ data class DesktopSettings(
     val lastRemoteHost: String = "",
     /** News category last viewed, so the app reopens where it was left. */
     val newsCategory: String = "TOP",
+    /** Knowledge-library category last browsed — same precedent as [newsCategory]. */
+    val libraryCategory: String = "",
 )
 
 private val defaultJson = Json {

@@ -28,7 +28,7 @@ import kotlinx.serialization.json.Json
  * *required* rather than a convenience — and `LibraryBundleTest` turns a missing or stale one into a
  * build failure instead of an empty library discovered on a Windows box.
  */
-class LibraryRepository(private val json: Json) {
+class LibraryRepository(private val json: Json = Json { ignoreUnknownKeys = true }) {
 
     @Volatile private var cachedIndex: List<GuideIndexEntry>? = null
 

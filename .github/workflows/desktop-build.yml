@@ -11,6 +11,13 @@ on:
   push:
     paths:
       - "desktop/**"
+      # The desktop bundles the app's Knowledge Base assets and mirrors its pure cores, so a content
+      # wave or a core change alters what this module ships. Without these, the bundle and mirror
+      # guards would only run when desktop/ itself happened to change.
+      - "app/src/main/assets/survival/**"
+      - "app/src/main/java/dev/mascwa/pulse/data/survival/**"
+      - "core/telemetry/src/**"
+      - "tools/mirror_desktop_cores.py"
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle/libs.versions.toml"

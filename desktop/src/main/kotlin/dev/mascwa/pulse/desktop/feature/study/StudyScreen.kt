@@ -46,7 +46,6 @@ fun StudyScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by vm.state.collectAsState()
-    val c = Pulse.colors
 
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         LcarsHeaderBar(
