@@ -47,6 +47,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/DailyLesson.kt": f"{DESKTOP}/telemetry/DailyLesson.kt",
     # The Khan-model learning layer: a course seen at once, practice sets, and a hint ladder. Both
     # platforms teach from the same library and must judge and pace it identically.
+    f"{CORE}/ContentPack.kt": f"{DESKTOP}/telemetry/ContentPack.kt",
     f"{CORE}/CourseMastery.kt": f"{DESKTOP}/telemetry/CourseMastery.kt",
     f"{CORE}/PracticeSet.kt": f"{DESKTOP}/telemetry/PracticeSet.kt",
     f"{CORE}/Hints.kt": f"{DESKTOP}/telemetry/Hints.kt",
@@ -83,6 +84,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/RecallTest.kt": f"{DESKTOP_TEST}/telemetry/RecallTest.kt",
     f"{CORE_TEST}/CurriculumTest.kt": f"{DESKTOP_TEST}/telemetry/CurriculumTest.kt",
     f"{CORE_TEST}/DailyLessonTest.kt": f"{DESKTOP_TEST}/telemetry/DailyLessonTest.kt",
+    f"{CORE_TEST}/ContentPackTest.kt": f"{DESKTOP_TEST}/telemetry/ContentPackTest.kt",
     f"{CORE_TEST}/CourseMasteryTest.kt": f"{DESKTOP_TEST}/telemetry/CourseMasteryTest.kt",
     f"{CORE_TEST}/PracticeSetTest.kt": f"{DESKTOP_TEST}/telemetry/PracticeSetTest.kt",
     f"{CORE_TEST}/HintsTest.kt": f"{DESKTOP_TEST}/telemetry/HintsTest.kt",
