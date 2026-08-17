@@ -4,8 +4,11 @@ import dev.mascwa.pulse.desktop.AppPaths
 import dev.mascwa.pulse.desktop.library.CATEGORY_SUPERGROUP
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.toSearchEntry
+import dev.mascwa.pulse.desktop.telemetry.CourseMastery
 import dev.mascwa.pulse.desktop.telemetry.Curriculum
 import dev.mascwa.pulse.desktop.telemetry.DailyLesson
+import dev.mascwa.pulse.desktop.telemetry.Hints
+import dev.mascwa.pulse.desktop.telemetry.PracticeSet
 import dev.mascwa.pulse.desktop.telemetry.QuizBuilder
 import dev.mascwa.pulse.desktop.telemetry.Recall
 import dev.mascwa.pulse.desktop.telemetry.Refresher
@@ -427,6 +430,7 @@ class StudyStore(
         correct: Boolean,
         elapsedMs: Long = 0L,
         nowMs: Long = System.currentTimeMillis(),
+        hintsTaken: Int = 0,
     ): Recall.Card? {
         var updated: Recall.Card? = null
         mutex.withLock {
@@ -434,7 +438,8 @@ class StudyStore(
             val at = s.cards.indexOfFirst { it.id == questionId }
             if (at < 0) return@withLock
             val item = s.cards[at].item()
-            val next = Recall.review(item.card, Recall.gradeFor(correct, elapsedMs), nowMs)
+            // Hints cap the grade but never the correctness — see Hints.gradeFor.
+            val next = Recall.review(item.card, Hints.gradeFor(correct, elapsedMs, hintsTaken), nowMs)
             updated = next
             val cards = s.cards.toMutableList()
             cards[at] = item.copy(card = next).stored()
@@ -494,6 +499,75 @@ class StudyStore(
         }
         scheduleFlush()
     }
+
+
+    // ---- the course, seen at once -------------------------------------------------------------------
+
+    /**
+     * The enrolled path with how well each skill on it is known, or null when nothing is enrolled.
+     *
+     * ⚠️ Attempts are grouped by guide ONCE rather than re-scanned per step. The obvious shape is a
+     * `mastery(step.guideId)` call inside the loop, which re-walks the whole attempt log for every step
+     * — forty steps against a thousand attempts is forty thousand comparisons to draw one screen.
+     */
+    suspend fun course(): CourseMastery.Course? {
+        val syllabus = syllabus() ?: return null
+        val s = ensureLoaded()
+        val attemptsByGuide = s.attempts.map { it.attempt() }.groupBy { it.guideId }
+        val cardsByGuide = s.cards.groupBy { it.guideId }
+        val now = System.currentTimeMillis()
+        val levels = HashMap<String, StudyProgress.Level>()
+        val cardCount = HashMap<String, Int>()
+        val dueCount = HashMap<String, Int>()
+        for (step in syllabus.steps) {
+            val cards = cardsByGuide[step.guideId].orEmpty()
+            cardCount[step.guideId] = cards.size
+            dueCount[step.guideId] = cards.count { it.dueAtMs <= now }
+            levels[step.guideId] = StudyProgress.mastery(
+                step.guideId,
+                attemptsByGuide[step.guideId].orEmpty(),
+                cards.map { it.item().card },
+            ).level
+        }
+        return CourseMastery.course(syllabus, levels, cardCount, dueCount, s.taught.toSet())
+    }
+
+    // ---- practice -----------------------------------------------------------------------------------
+
+    /**
+     * A short set on one skill, teaching it first if it has never been asked.
+     *
+     * Teaching-on-demand matters: "practise this" on a guide you have only read should just work rather
+     * than telling you to go and do something else first.
+     */
+    suspend fun practice(guideId: String, title: String): PracticeSet.Session? {
+        if (ensureLoaded().cards.none { it.guideId == guideId }) teach(guideId)
+        val ids = ensureLoaded().cards.filter { it.guideId == guideId }.map { it.id }
+        return PracticeSet.practice(title, ids)
+    }
+
+    /** A mixed set across one category of the enrolled path. */
+    suspend fun unitTest(category: String): PracticeSet.Session? {
+        val course = course() ?: return null
+        val wanted = course.skills.filter { it.category.equals(category, ignoreCase = true) }.map { it.guideId }.toSet()
+        if (wanted.isEmpty()) return null
+        return PracticeSet.mixed(PracticeSet.Kind.UNIT_TEST, category, questionsByGuide(wanted))
+    }
+
+    /** A mixed set across the whole course, weighted toward what is weakest. */
+    suspend fun challenge(): PracticeSet.Session? {
+        val course = course() ?: return null
+        val order = PracticeSet.challengeOrder(course.skills).map { it.guideId }
+        if (order.isEmpty()) return null
+        // LinkedHashMap so the weakest-first ordering survives into the round-robin.
+        val byGuide = LinkedHashMap<String, List<String>>()
+        val all = questionsByGuide(order.toSet())
+        for (id in order) all[id]?.let { byGuide[id] = it }
+        return PracticeSet.mixed(PracticeSet.Kind.CHALLENGE, course.goal, byGuide)
+    }
+
+    private suspend fun questionsByGuide(guideIds: Set<String>): Map<String, List<String>> =
+        ensureLoaded().cards.filter { it.guideId in guideIds }.groupBy({ it.guideId }, { it.id })
 
     // ---- how it is going -------------------------------------------------------------------------------------
 

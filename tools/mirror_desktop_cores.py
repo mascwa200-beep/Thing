@@ -45,6 +45,11 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/Recall.kt": f"{DESKTOP}/telemetry/Recall.kt",
     f"{CORE}/Curriculum.kt": f"{DESKTOP}/telemetry/Curriculum.kt",
     f"{CORE}/DailyLesson.kt": f"{DESKTOP}/telemetry/DailyLesson.kt",
+    # The Khan-model learning layer: a course seen at once, practice sets, and a hint ladder. Both
+    # platforms teach from the same library and must judge and pace it identically.
+    f"{CORE}/CourseMastery.kt": f"{DESKTOP}/telemetry/CourseMastery.kt",
+    f"{CORE}/PracticeSet.kt": f"{DESKTOP}/telemetry/PracticeSet.kt",
+    f"{CORE}/Hints.kt": f"{DESKTOP}/telemetry/Hints.kt",
     # Marking an answer objectively, and knowing how the studying is actually going. Mirrored because
     # both platforms teach from the same library and must judge it the same way.
     f"{CORE}/QuizBuilder.kt": f"{DESKTOP}/telemetry/QuizBuilder.kt",
@@ -78,6 +83,9 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/RecallTest.kt": f"{DESKTOP_TEST}/telemetry/RecallTest.kt",
     f"{CORE_TEST}/CurriculumTest.kt": f"{DESKTOP_TEST}/telemetry/CurriculumTest.kt",
     f"{CORE_TEST}/DailyLessonTest.kt": f"{DESKTOP_TEST}/telemetry/DailyLessonTest.kt",
+    f"{CORE_TEST}/CourseMasteryTest.kt": f"{DESKTOP_TEST}/telemetry/CourseMasteryTest.kt",
+    f"{CORE_TEST}/PracticeSetTest.kt": f"{DESKTOP_TEST}/telemetry/PracticeSetTest.kt",
+    f"{CORE_TEST}/HintsTest.kt": f"{DESKTOP_TEST}/telemetry/HintsTest.kt",
     f"{CORE_TEST}/QuizBuilderTest.kt": f"{DESKTOP_TEST}/telemetry/QuizBuilderTest.kt",
     f"{CORE_TEST}/StudyProgressTest.kt": f"{DESKTOP_TEST}/telemetry/StudyProgressTest.kt",
     f"{CORE_TEST}/RefresherTest.kt": f"{DESKTOP_TEST}/telemetry/RefresherTest.kt",
