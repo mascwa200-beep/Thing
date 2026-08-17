@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.news.Article
 import dev.mascwa.pulse.desktop.news.NewsCategory
+import dev.mascwa.pulse.desktop.telemetry.Freshness
 import dev.mascwa.pulse.desktop.telemetry.MediaBias
 import dev.mascwa.pulse.desktop.telemetry.NewsInsights
 import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
@@ -67,6 +68,23 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
             LcarsFrame(Modifier.fillMaxWidth().padding(top = 10.dp), accent = c.negative) {
                 Text(err, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink)
             }
+        }
+
+        // How old what is on screen actually is. The repository serves the last stored headlines when a
+        // request fails, which used to be indistinguishable from a live fetch.
+        val freshness = Freshness.assess(
+            lastUpdatedMs = state.lastUpdatedEpochMs,
+            nowMs = System.currentTimeMillis(),
+            online = true, // A desktop has no connectivity signal to consult; the failure flag carries it.
+            servingStored = state.servingStored,
+            refreshFailed = state.refreshFailed,
+        )
+        if (freshness.worthShowing) {
+            Text(
+                freshness.label,
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
 
         if (state.articles.isEmpty() && !state.loading && state.error == null) {

@@ -22,11 +22,18 @@ class NewsRepository(
     /**
      * Headlines for [category]. Serves a fresh-enough cache entry without touching the network; on a
      * network failure falls back to a stale entry, and only surfaces an error when there is nothing at all.
+     *
+     * ⚠️ Returns [Fetched], not a bare list. The cache has always known when each entry was written and
+     * this threw it away at the boundary, so the fallback above — serving whatever was last stored after
+     * a failed request — was completely silent: the screen showed old headlines that looked live. Saying
+     * so needs the timestamp to survive the return.
      */
-    suspend fun headlines(category: NewsCategory, force: Boolean = false): Result<List<Article>> {
+    suspend fun headlines(category: NewsCategory, force: Boolean = false): Result<Fetched<List<Article>>> {
         val key = "news_${category.name}"
         if (!force) {
-            cache.read(key, FRESH_MS, ArticleList.serializer())?.let { return Result.success(it.value.articles) }
+            cache.read(key, FRESH_MS, ArticleList.serializer())?.let {
+                return Result.success(Fetched(it.value.articles, fromCache = true, timestampEpochMs = it.savedAtMs))
+            }
         }
         return runCatching {
             val xml = http.getString(urlFor(category))
@@ -45,10 +52,12 @@ class NewsRepository(
             }
             if (articles.isEmpty()) error("That feed returned nothing.")
             cache.write(key, ArticleList(articles), ArticleList.serializer())
-            articles
+            Fetched(articles, fromCache = false, timestampEpochMs = System.currentTimeMillis())
         }.recoverCatching { failure ->
-            cache.readAny(key, ArticleList.serializer())?.value?.articles
-                ?: throw failure
+            val stored = cache.readAny(key, ArticleList.serializer()) ?: throw failure
+            // refreshFailed, not merely fromCache: the request was made and it did not work, which is a
+            // different thing to say than "this came from disk".
+            Fetched(stored.value.articles, fromCache = true, refreshFailed = true, timestampEpochMs = stored.savedAtMs)
         }
     }
 

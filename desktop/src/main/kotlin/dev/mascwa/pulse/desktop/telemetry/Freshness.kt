@@ -1,4 +1,5 @@
-package dev.mascwa.pulse.core.telemetry
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/Freshness.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
+package dev.mascwa.pulse.desktop.telemetry
 
 /**
  * How much to trust what is on screen.

@@ -16,6 +16,14 @@ data class NewsUiState(
     val articles: List<Article> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
+    /**
+     * When the headlines on screen were actually obtained, and whether they came from storage after a
+     * request that did not work. The repository has always known both; until now it discarded them at
+     * the boundary, so serving day-old headlines looked exactly like serving live ones.
+     */
+    val lastUpdatedEpochMs: Long = 0L,
+    val servingStored: Boolean = false,
+    val refreshFailed: Boolean = false,
 )
 
 /**
@@ -59,10 +67,17 @@ class NewsViewModel(
         _state.value = _state.value.copy(loading = true, error = null)
         job = scope.launch {
             repository.headlines(category, force)
-                .onSuccess { articles ->
+                .onSuccess { fetched ->
                     // Guard against a stale response landing after the user moved on.
                     if (_state.value.category == category) {
-                        _state.value = _state.value.copy(articles = articles, loading = false, error = null)
+                        _state.value = _state.value.copy(
+                            articles = fetched.data,
+                            loading = false,
+                            error = null,
+                            lastUpdatedEpochMs = fetched.timestampEpochMs,
+                            servingStored = fetched.fromCache,
+                            refreshFailed = fetched.refreshFailed,
+                        )
                     }
                 }
                 .onFailure { e ->
