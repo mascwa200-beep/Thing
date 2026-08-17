@@ -3787,12 +3787,30 @@ own test. Android: `tools/android_resolve_check.sh` + CI's "Run unit tests" (gre
 `java.util.zip` and the stdlib, so that is a complete check rather than the usual partial one; worth
 reaching for whenever a new Android file has no Android dependencies.
 
+**E1 — the efficiency pass: measured, and there is nothing there.** Recorded so the next session does
+not re-chase it. Three hypotheses, three negatives, all measured rather than argued:
+- **Images are not heavy.** `du -sh` says 69 MB and that is block-allocation overhead; the sum of the
+  file sizes is **5.5 MB across 44 files**, largest 0.96 MB, 36 of them under 200 KB. Already
+  phone-appropriate. (I asserted the 69 MB figure out loud before checking — measuring is what caught it.)
+- **The shards are not pretty-printed fat.** Minifying all 50 saves **1.2%** (0.32 MB of 25.56 MB) —
+  they already use single-space indent. Not worth fighting the KB pipeline's formatting and making
+  every content diff unreadable for that.
+- **Assets already ship compressed.** No `noCompress` is set, so the 25.56 MB corpus deflates to about
+  **9 MB** in the APK. There is no uncompressed-asset mistake to fix.
+
+The one genuine efficiency change of the arc was N1's *no timer at all off-screen*, already shipped.
+Anything further needs a profiler on the Pixel, not more guessing from here.
+
+**⚠️ Wikimedia Commons returns HTTP 429 to this container.** The shared proxy IP is rate-limited — the
+same class of problem as the Yahoo ban already recorded above. Bulk image sourcing (I1) is **not
+possible from this environment** as things stand; it needs either a different source, a much slower
+paced fetch across sessions, or the owner's own network.
+
 **Open, in priority order.** **P1d** — fetching a pack (catalog + download + a management screen;
 `PackArchive` and both stores are ready, the wire is not) and `tools/kb/build_pack.py` so a pack can be
-produced. **I1** — the real image gap above. **E1** — the efficiency pass (N1 carried one real win;
-anything further should be measured, not guessed). Then the **one bounded content wave**, delivered as
-a pack rather than into the bundle. The KB wave engine (#73) stays **parked** under the credit
-directive; resuming it is an explicit owner call.
+produced. **I1** — the real image gap above, blocked on the 429. Then the **one bounded content wave**,
+delivered as a pack rather than into the bundle. The KB wave engine (#73) stays **parked** under the
+credit directive; resuming it is an explicit owner call.
 
 ⚠️ **Render is owner-verify throughout — CI compiles, it does not draw.** Worth eyes first: the COURSE
 card at phone width, whether four options and the hint ladder read clearly, roughly one question in
