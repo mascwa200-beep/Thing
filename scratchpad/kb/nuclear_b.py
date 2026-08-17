@@ -1,0 +1,231 @@
+# -*- coding: utf-8 -*-
+import json
+S = []
+def sec(h, b): S.append({"heading": h, "body": " ".join(b.split())})
+
+sec("The fuel cycle: from ore in the ground to a bundle in the core", """
+Uranium is not rare. It is about as abundant in the earth's crust as tin, more common than silver by
+a wide margin, and present in seawater at three parts per billion. What is rare is uranium
+concentrated enough to be worth digging. Typical ore runs around a tenth of a per cent uranium;
+the exceptional deposits of Canada's Athabasca Basin run to fifteen or twenty per cent, which is why
+Canada, Kazakhstan, Namibia and Australia dominate supply. Increasingly the ore is not dug at all
+but dissolved in place by in-situ leaching, pumping a mild solution down one borehole and drawing
+uranium-bearing liquid up another.
+
+The mill produces yellowcake, a coarse uranium oxide powder, which is the form uranium is traded in.
+From there the sequence is fixed. Conversion turns the oxide into uranium hexafluoride, chosen
+because it becomes a gas at a convenient temperature and is therefore separable by isotope.
+Enrichment then raises the uranium-235 fraction from nature's 0.7 per cent to the three to five per
+cent a light water reactor needs. Modern enrichment is done by gas centrifuge: thousands of tubes
+spinning at enormous speed, each achieving a tiny separation, cascaded so the small effects compound.
+The older gaseous-diffusion plants that did this work through the twentieth century were vast and
+consumed something like a fiftieth of a nation's electricity; centrifuges do the same job for a
+fraction of the power, which is precisely why the technology is watched so closely. The industrial
+capability that makes reactor fuel is the same capability that, run for longer, makes weapons
+material. Everything about the international safeguards regime follows from this one fact.
+
+Fabrication presses the enriched material into ceramic uranium dioxide pellets about a centimetre
+across, sinters them at high temperature until they are hard and dense, grinds them to tolerance and
+stacks them in thin tubes of zirconium alloy. Zirconium is used because it is almost transparent to
+neutrons and stands up to hot water; its one bad habit, oxidising in high-temperature steam and
+liberating hydrogen, is the reason Fukushima's reactor buildings exploded. Sealed tubes are bundled
+into assemblies, and the assemblies are the units handled at the plant.
+
+Fuel stays in the core for four to six years, typically with a third of the assemblies replaced
+every eighteen months or two years. It is not consumed evenly, and it is not consumed much: modern
+burn-up is around forty-five to fifty gigawatt-days per tonne, which sounds impressive and means
+only a few per cent of the original uranium's energy has been extracted. What limits it is not the
+fuel running out but the cladding, the accumulation of neutron-absorbing fission products, and the
+mechanical state of the assembly. What comes out is called spent fuel, and the name is a considerable
+overstatement — most of the energy is still in it, which is the argument for reprocessing and the
+whole reason fast reactors are of interest.
+""")
+
+sec("What comes out: spent fuel, and the honest state of the waste question", """
+A spent fuel assembly is roughly ninety-five per cent uranium-238, about one per cent uranium-235
+still unburnt, about one per cent plutonium bred from the uranium-238, and three or four per cent
+fission products and minor actinides. It is thermally hot and intensely radioactive — unshielded, it
+would deliver a lethal dose in minutes — and both properties decline steeply. Fresh from the core it
+goes into a storage pool, water being an excellent shield and coolant, for at least five years and
+often much longer. After that it can move to dry cask storage: sealed steel canisters inside
+concrete overpacks, standing on a pad in the open, cooled by nothing but the air moving past them.
+
+Two things about the quantity are worth stating clearly, because the public argument tends to lose
+both. The volume is small. All the spent fuel ever produced by the entire United States civil
+programme, over some seven decades, would cover a single football pitch to a depth of about ten
+metres. And it is not going anywhere on its own: it is a solid ceramic in a sealed metal tube in a
+concrete cask, not a liquid, not a gas, and not something that leaks quietly into a river. The
+disposal problem is genuinely hard, but it is hard in the way that a bank vault is hard, not in the
+way that carbon dioxide is hard.
+
+The timescale is the sting. The fission products — the caesium and strontium that make spent fuel
+dangerous now — have half-lives of about thirty years and are down to background levels within
+roughly three hundred. It is the minor actinides, plutonium and americium and neptunium, that
+produce the hundred-thousand-year figures. Reprocessing, which chemically separates the uranium and
+plutonium for reuse, both recovers usable fuel and sharply reduces the volume and longevity of what
+remains. France does it at La Hague and burns the product as mixed-oxide fuel; the United States
+stopped in the 1970s on the deliberate policy judgment that separated plutonium is a proliferation
+risk not worth taking, and has not restarted.
+
+The long-term answer everyone agrees on in principle is deep geological disposal: several hundred
+metres down, in a stable rock formation that has demonstrably not moved or admitted water for
+millions of years. The engineering is not the obstacle. Finland has built one, at Onkalo in bedrock
+that has been quiet since long before there were humans to worry about it; Sweden has approved a
+similar site. Almost everywhere else the obstacle has been political, most famously at Yucca
+Mountain in Nevada, which absorbed decades and billions of dollars of study before being defunded in
+2010 over the objections of a state that did not want it. The honest summary is that the waste
+problem is solved technically and unsolved politically, and that the interim answer — casks on a pad
+under guard — works, is monitored, and was never meant to be permanent.
+""")
+
+sec("Three accidents, and what each one actually taught", """
+Three civil accidents dominate the technology's reputation, and they taught genuinely different
+lessons. Conflating them, in either direction, is the commonest error in the argument.
+
+Three Mile Island, Pennsylvania, 1979. A relief valve on the pressuriser stuck open and the control
+room had no direct indication of it — the instrument showed the signal sent to the valve, not the
+valve's actual position. Coolant escaped for hours. Misreading a rising water level in the
+pressuriser as a full system, operators cut back the emergency injection that was keeping the core
+covered. About half the core melted. The containment held, and offsite radiation exposure was of the
+order of a chest X-ray at most; no deaths or detectable health effects have been attributed to it.
+The lesson was about human factors, not physics. Control rooms were redesigned, instrumentation was
+changed to show what things are doing rather than what they were told to do, simulator training
+became mandatory, and an industry body was created to police operational standards. It was, in
+engineering terms, a containment success and a control-room failure.
+
+Chernobyl, Ukraine, 1986. A badly conceived low-power test, run by a crew who had disabled safety
+systems to complete it, drove an RBMK reactor into exactly the region where its positive void
+coefficient made it unstable. Power ran away in seconds through prompt criticality; the reactor
+destroyed itself in a steam explosion, the graphite burned, and there was no Western-style
+containment building to hold any of it. This was a real catastrophe: two workers died immediately,
+twenty-eight more of acute radiation syndrome within months, and around six thousand thyroid cancers
+followed among people who were children at the time and drank contaminated milk — a toll that mass
+distribution of iodine tablets and a milk ban would have largely prevented. The lesson was about
+design and institutions: do not build a reactor with a positive void coefficient, do build a
+containment, and do not run a safety culture in which a test schedule outranks a shutdown limit.
+
+Fukushima Daiichi, Japan, 2011. A magnitude 9.0 earthquake; the reactors scrammed correctly. Then a
+tsunami far above the design basis flooded the emergency diesel generators, which had been sited
+low. With the grid down and the diesels drowned, there was no way to remove decay heat. Three cores
+melted over the following days and hydrogen from the zirconium-steam reaction blew the tops off the
+reactor buildings. The radiological toll was strikingly small — no deaths attributable to radiation,
+and one worker's later cancer officially compensated. But the evacuation itself killed on the order
+of two thousand people, mostly elderly, through the disruption of care and the stress of
+displacement. That is the most uncomfortable finding in the whole field: at Fukushima, the response
+to the radiation did far more harm than the radiation, and this is now taken seriously in emergency
+planning rather than dismissed.
+""")
+
+sec("Radiation dose, in numbers you can actually compare", """
+Almost every public argument about nuclear power founders on the absence of a scale. Radiation is
+reported in units nobody uses for anything else and in quantities separated by factors of a million,
+so "radiation detected" and "radiation dangerous" become the same headline. The unit worth learning
+is the sievert, which measures biological dose, and the practical unit is the millisievert, a
+thousandth of one, or the microsievert, a millionth.
+
+Eating a banana is about 0.1 microsieverts, from its natural potassium-40. A dental X-ray is roughly
+5. A transatlantic flight is 30 to 50, because at altitude there is less atmosphere overhead to stop
+cosmic rays. A chest X-ray is around 100 microsieverts, which is 0.1 millisieverts. An abdominal CT
+scan is about 8 millisieverts — that is, some eighty chest X-rays, which is worth knowing before
+consenting to one casually.
+
+The number to anchor everything else against is natural background: about 2.4 millisieverts a year
+on average worldwide, from cosmic rays, from radon seeping out of the ground, from potassium in your
+own body, and from the rocks around you. It varies enormously by geology. Parts of Cornwall,
+Kerala and Ramsar in Iran run several times the average, and in the highest natural-background
+places on earth residents receive tens of millisieverts a year with no detected excess of disease.
+
+Occupational limits for radiation workers are set at 20 millisieverts a year averaged over five
+years. The level at which epidemiology can actually detect an increase in cancer risk is around 100
+millisieverts of accumulated dose; below that, the increase, if there is one, is too small to
+separate from the ordinary variation in cancer rates. Acute radiation sickness begins around 1000
+millisieverts — one sievert — delivered at once, and around five sieverts acute is lethal to roughly
+half of people without intensive treatment.
+
+The gap between those figures is the crux. A dose that a monitor can measure easily and report
+alarmingly may be a thousandth of the level at which any effect has ever been observed. Below 100
+millisieverts, safety regulation uses the linear no-threshold model, which assumes risk continues
+proportionally all the way down to zero. It is a deliberately cautious administrative assumption
+rather than a measured fact, and it is a sensible one for setting worker limits. Used as a
+prediction — multiplying a minuscule dose by a large population to compute expected deaths — it
+produces numbers that sound authoritative and rest on an extrapolation the model's own authors do
+not endorse. If you take one thing from this section, take the habit of asking for a number and a
+comparison before forming a view.
+""")
+
+sec("What it costs, and why the money is the genuinely hard part", """
+Nuclear power has an unusual cost structure and nearly all of its difficulties are downstream of it.
+The fuel is almost free — uranium is a few per cent of the cost of the electricity, so a fuel price
+shock that would wreck a gas plant barely registers. Operating costs are moderate and predictable.
+Capital costs are enormous, and they arrive years before a single unit of electricity is sold.
+
+For a modern Western reactor, something like sixty to eighty per cent of the lifetime cost of the
+electricity is the cost of building the plant and the interest on the money borrowed to do it. This
+makes the schedule, not the engineering, the decisive variable. A project financed at seven per cent
+that runs five years late has accumulated an enormous interest bill on capital that is earning
+nothing, and this is why nuclear projects do not fail slowly and expensively — they fail by being
+late, and the lateness is what makes them expensive.
+
+The recent Western record is poor and there is no use dressing it up. Flamanville 3 in France was
+begun in 2007 with a budget in the low billions of euros and connected to the grid in 2024 at
+several times that. Hinkley Point C in Britain has seen its estimate rise repeatedly across its
+construction. Vogtle units 3 and 4 in Georgia came in around seven years late and at roughly double
+the original figure, and bankrupted their reactor vendor along the way. The common thread is
+first-of-a-kind construction by workforces and supply chains that had not built a reactor in
+decades, to designs still being finalised as concrete was poured.
+
+The counter-examples matter as much. South Korea built a fleet of standardised units on schedule and
+at a fraction of Western cost, and exported that capability to build four reactors at Barakah in the
+United Arab Emirates broadly to plan. China builds reliably and quickly. What distinguishes them is
+not different physics or laxer regulation but repetition: the same design, the same firms, the same
+crews, one project after another, so the learning curve is climbed rather than restarted. Nuclear
+construction rewards a programme and punishes a one-off, which is exactly what most Western
+countries have attempted for forty years.
+
+Two further costs are real and often argued about dishonestly in both directions. Decommissioning a
+reactor costs a substantial sum and takes decades, and in most countries operators are legally
+required to accumulate a fund for it during operation rather than presenting the bill later.
+Long-term waste management is similarly levied on the electricity sold. These are internalised in a
+way that the atmospheric disposal of combustion products is not, which is the fairest single
+sentence anyone can offer about how the technology's costs compare with its alternatives.
+""")
+
+sec("Where nuclear fits on a grid that now has wind and solar on it", """
+Nuclear supplies roughly a tenth of the world's electricity and about a quarter of its low-carbon
+electricity. The share is concentrated: France draws around two-thirds of its power from reactors,
+and a handful of countries account for most of the rest. Measured over the full lifecycle — mining,
+enrichment, construction, operation, decommissioning — the IPCC's assessed median is about twelve
+grams of carbon dioxide equivalent per kilowatt-hour, which puts it alongside wind and below solar,
+and one to two orders of magnitude below coal or gas. On the grounds of carbon it is not a marginal
+case.
+
+Its operational character is baseload: high capital cost, near-zero marginal cost, and a strong
+economic incentive to run flat out. Modern plants achieve capacity factors above ninety per cent,
+producing at night, in still air, in winter, and through the weather events that matter most to a
+grid. That is the property nothing else on a low-carbon system supplies at scale without either
+storage or fuel.
+
+The awkwardness is that this profile fits badly with the one that variable renewables produce. A
+grid with a large solar fleet has hours of near-zero or negative wholesale prices in the middle of
+sunny days, and a plant whose costs are almost entirely fixed loses money in every one of them. The
+French fleet does load-follow, adjusting output substantially over a day, so the claim that reactors
+technically cannot is false. The claim that it is economic for them to is much weaker: throttling
+back a plant whose fuel is nearly free saves almost nothing and forgoes revenue that was supposed to
+pay off the construction loan.
+
+The honest framing is that nuclear and variable renewables are neither straightforward substitutes
+nor natural partners. They compete for the same low-carbon investment, and on a grid that has
+already built out a lot of one, the value of the other changes. What both are competing against, in
+practice, is gas, whose flexibility is currently what keeps the lights on when the wind drops.
+
+Nuclear's remaining advantages are density and reliability. A reactor site occupies a very small
+footprint for the energy it delivers, which matters where land is contested. It is indifferent to
+weather. Its fuel can be stockpiled for years in a warehouse, which is a strategic consideration
+that several countries have re-learned recently. Its disadvantages are that it is slow to build,
+expensive to finance, dependent on a construction capability most Western countries let wither, and
+politically fragile in a way that no other generating technology is — a single accident anywhere in
+the world changes policy everywhere. Whether it deserves a large role is a question about cost,
+speed and public consent. It has not, for some decades, been a question about whether the physics
+works.
+""")
+print(json.dumps(S, ensure_ascii=False))

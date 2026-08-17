@@ -1,0 +1,15 @@
+# --- the recorded miss this guide is meant to close ---
+nuclear power
+how does a nuclear reactor work
+is nuclear energy safe
+what happens to nuclear waste
+uranium fuel
+# --- must NOT be pulled in by the new guide (control set) ---
+what is the nucleus of a cell
+what is radioactivity
+half life of an isotope
+how does the electricity grid work
+how does a wind turbine work
+what is a turbine
+how do I boil water safely to drink
+what is steam

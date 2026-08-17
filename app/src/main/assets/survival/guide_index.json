@@ -5644,6 +5644,28 @@
    "file": "guides_energy_and_environment.json"
   },
   {
+   "id": "nuclear-power-and-reactors",
+   "title": "Nuclear Power: How a Reactor Makes Electricity, Uranium Fuel, Radiation, Waste and Cost",
+   "category": "Energy & Environment",
+   "summary": "Nuclear energy from the inside: how a nuclear reactor turns uranium fission into steam and electricity, why the chain reaction is controllable, what the pressurised and boiling water designs actually do, the fuel cycle from ore to fuel assembly, radioactive waste and where it goes, radiation dose in numbers you can compare, what Three Mile Island, Chernobyl and Fukushima each taught, and why the money — not the physics — is the hard part.",
+   "headings": [
+    "A reactor is a kettle with an unusual firebox",
+    "The chain reaction, and the accident of physics that makes it controllable",
+    "Moderation: why the neutrons have to be slowed down",
+    "Control: rods, boron, and the feedback that acts faster than any operator",
+    "The pressurised water reactor, and why most of the world runs one",
+    "Boiling water, heavy water, gas and the designs that took another road",
+    "Decay heat: the problem that does not switch off",
+    "The fuel cycle: from ore in the ground to a bundle in the core",
+    "What comes out: spent fuel, and the honest state of the waste question",
+    "Three accidents, and what each one actually taught",
+    "Radiation dose, in numbers you can actually compare",
+    "What it costs, and why the money is the genuinely hard part",
+    "Where nuclear fits alongside wind and solar"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
    "id": "eng-electricity-and-circuits-from-scratch",
    "title": "Electricity & Circuits From Scratch",
    "category": "Engineering",
