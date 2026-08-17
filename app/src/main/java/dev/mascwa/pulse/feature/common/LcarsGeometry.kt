@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.mascwa.pulse.core.telemetry.LcarsCodes
+import dev.mascwa.pulse.navigation.LocalConsoleSection
 import dev.mascwa.pulse.notifications.AlertCondition
 import dev.mascwa.pulse.notifications.AlertStatus
 import dev.mascwa.pulse.ui.effects.HapticCue
@@ -466,18 +467,39 @@ fun LcarsScreenFrame(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    title.uppercase(),
-                    fontFamily = Antonio,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp,
-                    letterSpacing = 2.sp,
-                    color = c.accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f),
-                )
+                // Where you are, above what you are looking at. A 1966 console is banks of unlabelled
+                // colour, which is exactly why this is here: the hardware idiom is the original
+                // series, but a screen that does not say where it sits would make the app harder to
+                // navigate rather than easier, and legibility is not the part being stylised.
+                //
+                // Read from a composition local rather than passed in, so all thirty-five screens
+                // gained it without one of them being edited. Absent for anything the directory does
+                // not list, and the title simply keeps the whole block as it did before.
+                val section = LocalConsoleSection.current
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    if (section != null) {
+                        Text(
+                            section,
+                            fontFamily = JetBrainsMono,
+                            fontSize = 8.sp,
+                            letterSpacing = 1.4.sp,
+                            color = c.muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        title.uppercase(),
+                        fontFamily = Antonio,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp,
+                        letterSpacing = 2.sp,
+                        color = c.accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                    )
+                }
                 actions()
             }
         }

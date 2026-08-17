@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +51,8 @@ import dev.mascwa.pulse.feature.settings.SettingsScreen
 import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.feature.weather.WeatherScreen
 import dev.mascwa.pulse.feature.weather.WeatherViewModel
+import dev.mascwa.pulse.navigation.LocalConsoleSection
+import dev.mascwa.pulse.navigation.sectionOf
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.navigation.TOP_DESTINATIONS
 
@@ -104,6 +107,10 @@ fun PulseApp(
             )
         },
     ) { innerPadding ->
+        // Where you are, provided once for the whole NavHost. Every screen's header reads it and no
+        // screen passes it, which is why the readout reached thirty-five screens with no edit to any
+        // of them. Keyed on the live route so it follows navigation without the screens knowing.
+        CompositionLocalProvider(LocalConsoleSection provides sectionOf(currentRoute)) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
@@ -380,6 +387,7 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.security.SecurityAuditViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
+        }
         }
     }
 
