@@ -157,6 +157,57 @@ object StudyQuestions {
     )
 
     /**
+     * The guide's safety warning, as a card that comes back.
+     *
+     * **184 of the 581 bundled guides carry a `safetyNote` and not one of them was ever taught.** It
+     * was rendered in the reader and referenced nowhere else — the same defect as the ordered steps
+     * (structured content present and never read), at considerably higher stakes. These are the
+     * sentences that matter most in the whole library: "always add concentrated acid to water, never
+     * the reverse", "never enter a soil pit deeper than about 1.2 m without shoring". Read once,
+     * forgotten by the weekend.
+     *
+     * ⚠️ **Deliberately a [QuestionKind.RECALL] and never a graded multiple choice.** Distractors
+     * would have to be other guides' real safety warnings, and two guides may warn about the same
+     * thing in different words — so marking one "wrong here" would teach a reader that a true and
+     * possibly applicable precaution does not apply. That is a hazard, and no amount of question
+     * variety is worth it. The corpus agrees independently: these notes run to a median of 448
+     * characters and only 7 of the 184 sit inside the cloze window, so the checkable forms were never
+     * on offer anyway.
+     *
+     * ⚠️ **The answer is the note in full, never trimmed**, unlike [recall] which caps at
+     * [RECALL_CHARS]. A third of these run past that, and cutting one at a fixed length would drop
+     * the second half of a warning — which on this material is exactly where "never do X" tends to
+     * live.
+     *
+     * @return null when there is no note, or when it is too slight to be worth a card.
+     */
+    fun safety(guideId: String, guideTitle: String, note: String?): Question? {
+        val text = note?.replace(WHITESPACE, " ")?.trim().orEmpty()
+        if (text.length < MIN_SAFETY_NOTE) return null
+        return Question(
+            id = "$SAFETY_ID_PREFIX$guideId".take(ID_MAX),
+            kind = QuestionKind.RECALL,
+            prompt = "\"$guideTitle\" carries a safety warning. What is it? " +
+                "Recall what you can, then check.",
+            answer = text,
+            guideId = guideId,
+            guideTitle = guideTitle,
+            heading = SAFETY_HEADING,
+        )
+    }
+
+    /**
+     * Whether this card is a guide's safety warning.
+     *
+     * ⚠️ Load-bearing for the callers that build a multiple choice by looking the question's [heading]
+     * up among the guide's real sections: [SAFETY_HEADING] is synthetic, and a guide that happened to
+     * title a section the same way would otherwise have its safety card quietly answered by a
+     * comprehension item about that section instead. Checked by prefix because that is already how
+     * ids are namespaced here.
+     */
+    fun isSafety(question: Question): Boolean = question.id.startsWith(SAFETY_ID_PREFIX)
+
+    /**
      * "What comes next" over an ordered procedure.
      *
      * ⚠️ Needs [MIN_ORDER_STEPS] steps, because three honest distractors have to exist. A shorter
@@ -195,6 +246,49 @@ object StudyQuestions {
                 options = others,
             )
         }.take(max)
+    }
+
+    /**
+     * Option text a reader can actually take in at a glance.
+     *
+     * Measured over the real corpus: a step has a median length of 180 characters, so an ordering
+     * question puts a **median 962 characters on screen** (p90 1337, max 2153) and 58% of them exceed
+     * 900. At phone width that is four options of a dozen lines each and a scroll to see them all,
+     * which turns a recall exercise into a reading-speed one — the exact failure [QuizBuilder]'s own
+     * documentation says is not a legitimate difficulty.
+     *
+     * ⚠️ **The load-bearing rule: shortening must never make two options look alike.** Steps of one
+     * procedure often open identically ("Put on goggles…", "Put on gloves…"), and two options that
+     * truncate to the same text make the question unanswerable — a far worse outcome than a long one.
+     * So this returns the **originals unchanged** whenever shortening would reduce how many distinct
+     * options are on offer, or would leave one too clipped to mean anything. An over-long readable
+     * question beats a compact unanswerable one.
+     *
+     * Nothing is invented: a shortened option is a genuine prefix of a real step, cut at a sentence
+     * boundary where one is available, and always marked with an ellipsis so the reader can see that
+     * there is more. The full text is what the explanation shows once they have answered.
+     */
+    fun shortOptions(options: List<String>, maxChars: Int = MAX_OPTION_CHARS): List<String> {
+        val original = options.map { it.trim() }
+        if (original.none { it.length > maxChars }) return original
+        val short = original.map { shorten(it, maxChars) }
+        val keptApart = short.distinctBy { it.lowercase() }.size ==
+            original.distinctBy { it.lowercase() }.size
+        val keptMeaning = short.all { it.length >= MIN_OPTION_CHARS }
+        return if (keptApart && keptMeaning) short else original
+    }
+
+    /** One option, cut at the latest sentence boundary that fits, else at a word boundary. */
+    private fun shorten(text: String, maxChars: Int): String {
+        if (text.length <= maxChars) return text
+        val head = text.substring(0, maxChars)
+        // Half the budget is the floor for a cut: any earlier and the option loses its subject.
+        val floor = maxChars / 2
+        val sentence = maxOf(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "))
+        if (sentence >= floor) return head.substring(0, sentence + 1) + ELLIPSIS
+        val space = head.lastIndexOf(' ')
+        val cut = if (space >= floor) head.substring(0, space) else head
+        return cut.trimEnd(' ', ',', ';', ':') + ELLIPSIS
     }
 
     /**
@@ -286,6 +380,31 @@ object StudyQuestions {
     const val MAX_ORDER_PER_SECTION = 2
     const val RECALL_SENTENCES = 3
     const val RECALL_CHARS = 420
+
+    /**
+     * How much of a step an option may show — roughly three lines at phone width.
+     *
+     * Chosen by measuring: at 120 the median ordering question drops from 962 characters on screen to
+     * about 700, 96% of options are shortened, and **not one of the 804 questions the real corpus
+     * generates hits a collision**. Shorter reads better still but shows almost nothing of any step;
+     * longer stops earning the truncation.
+     */
+    const val MAX_OPTION_CHARS = 120
+
+    /** Below this an option has been clipped past the point of meaning anything. */
+    const val MIN_OPTION_CHARS = 24
+
+    /** Marks an option as abbreviated, so nothing is silently dropped. */
+    const val ELLIPSIS = " …"
+
+    /** Shorter than this, a "safety warning" is not worth a card of its own. */
+    const val MIN_SAFETY_NOTE = 60
+
+    /** Synthetic — a safety note belongs to the guide, not to any one of its sections. */
+    const val SAFETY_HEADING = "Safety note"
+
+    /** Ids are namespaced by form; this one is also how [isSafety] recognises the card. */
+    const val SAFETY_ID_PREFIX = "safety:"
 
     /** Ids are persisted as review-card keys; keep them bounded. */
     const val ID_MAX = 180

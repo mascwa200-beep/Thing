@@ -201,6 +201,9 @@ object QuizBuilder {
      * Always [Format.STANDARD]. The clever formats are wrong here: "which is NOT the next step" makes
      * three true-but-misplaced statements read as endorsements, and withholding the answer would ask
      * someone to certify that a real step of this very procedure does not belong in it.
+     *
+     * Options are shown abbreviated where a step is long, but the [QuizItem.explanation] always
+     * carries the next step in full — short to choose from, complete to learn from.
      */
     private fun ordering(question: StudyQuestions.Question, seed: Int): QuizItem? {
         val answer = question.answer.trim()
@@ -216,10 +219,18 @@ object QuizBuilder {
         if (wrong.size < wanted) return null
         // Deterministic pick, so a card asks the same question every time it comes back.
         val picked = shuffled(wrong, seed).take(wanted)
+        // Steps run to a median of 180 characters, so four of them verbatim is a wall to read rather
+        // than a question to answer. Shortened as one set, because whether two options stay
+        // distinguishable is a property of the set — see StudyQuestions.shortOptions, which declines
+        // and hands back the originals rather than produce a question that cannot be answered.
+        val shown = StudyQuestions.shortOptions(listOf(answer) + picked)
         return QuizItem(
             questionId = question.id,
             prompt = question.prompt,
-            choices = shuffled(picked.map { Choice(it, false) } + Choice(answer, true), seed),
+            choices = shuffled(
+                shown.drop(1).map { Choice(it, false) } + Choice(shown.first(), true),
+                seed,
+            ),
             format = Format.STANDARD,
             guideId = question.guideId,
             guideTitle = question.guideTitle,

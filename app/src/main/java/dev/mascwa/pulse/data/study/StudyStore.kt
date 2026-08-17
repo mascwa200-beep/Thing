@@ -281,6 +281,9 @@ class StudyStore(
     suspend fun teach(guideId: String, nowMs: Long = System.currentTimeMillis()): List<StudyQuestions.Question> {
         val guide = runCatching { content.guide(guideId) }.getOrNull() ?: return emptyList()
         val made = ArrayList<StudyQuestions.Question>(MAX_QUESTIONS_PER_LESSON)
+        // ⚠️ First, so the cap below can never be the reason a guide's warning goes untaught. 184 of
+        // the bundled guides carry one and none of them was ever asked about.
+        StudyQuestions.safety(guide.id, guide.title, guide.safetyNote)?.let { made += it }
         for (section in guide.sections.take(LESSON_SECTIONS)) {
             for (q in StudyQuestions.forSection(
                 guide.id, guide.title, section.heading, section.body,
@@ -391,6 +394,11 @@ class StudyStore(
      * simply not what this section says. Telling them apart requires having understood it.
      */
     private suspend fun statementQuiz(item: Item, seed: Int): QuizBuilder.QuizItem? {
+        // ⚠️ A safety warning is answered as written, never marked against distractors — see
+        // StudyQuestions.safety. Its heading is synthetic, so without this a guide that happened to
+        // title a section the same way would have its warning quietly replaced by a comprehension
+        // item about that section.
+        if (StudyQuestions.isSafety(item.question)) return null
         val guide = runCatching { content.guide(item.question.guideId) }.getOrNull() ?: return null
         val section = guide.sections.firstOrNull { it.heading == item.question.heading } ?: return null
         val truths = StudyQuestions.sentences(section.body)

@@ -1,8 +1,12 @@
 package dev.mascwa.pulse.desktop.study
 
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.library.PackStore
+import dev.mascwa.pulse.desktop.telemetry.ContentPack
 import dev.mascwa.pulse.desktop.telemetry.DailyLesson
+import dev.mascwa.pulse.desktop.telemetry.QuizBuilder
 import dev.mascwa.pulse.desktop.telemetry.Recall
+import dev.mascwa.pulse.desktop.telemetry.StudyQuestions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -524,6 +528,135 @@ class StudyStoreTest {
         s.answer(s.due(limit = 1).first().question.id, correct = true, elapsedMs = 1_000L, hintsTaken = 3)
         assertEquals(1, s.progress().correct)
         assertEquals(0, s.progress().incorrect)
+    }
+
+    // ---- the guide's safety warning ------------------------------------------------------------------
+
+    /**
+     * 184 of the bundled guides carry a `safetyNote` and, until this slice, not one was ever asked
+     * about. This is the end-to-end proof against real content: teaching a guide that carries one
+     * schedules it, and it comes back like any other card.
+     */
+    @Test
+    fun teachingAGuideThatCarriesAWarningSchedulesIt() = runBlocking {
+        val warned = library.index().map { it.id }
+            .firstNotNullOf { id -> library.guide(id)?.takeIf { !it.safetyNote.isNullOrBlank() } }
+        val s = store()
+        s.teach(warned.id)
+
+        val card = s.due().firstOrNull { StudyQuestions.isSafety(it.question) }
+        assertNotNull("the guide's safety warning was never made into a card", card)
+        // ⚠️ In full. A third of the real notes exceed StudyQuestions.RECALL_CHARS, and the whole point
+        // of the card is the half of the sentence that says what never to do.
+        assertEquals(warned.safetyNote!!.trim(), card!!.question.answer)
+        assertTrue(card.question.prompt.contains(warned.title))
+    }
+
+    /**
+     * ⚠️ A safety warning is answered as written and never marked against distractors.
+     *
+     * Wrong options would have to be other guides' real warnings, and marking a true precaution
+     * "wrong here" is a hazard. The heading these cards carry is synthetic, so this also proves the
+     * comprehension path cannot reach one by matching it against a same-named real section.
+     */
+    @Test
+    fun aSafetyWarningIsNeverTurnedIntoAMultipleChoice() = runBlocking {
+        val warned = library.index().map { it.id }
+            .firstNotNullOf { id -> library.guide(id)?.takeIf { !it.safetyNote.isNullOrBlank() } }
+        val s = store()
+        s.teach(warned.id)
+        val id = s.due().first { StudyQuestions.isSafety(it.question) }.question.id
+
+        // Answer everything else away so the safety card is what nextAsk offers.
+        var guard = 0
+        while (guard++ < 40) {
+            val ask = s.nextAsk() ?: break
+            if (ask.item.question.id == id) {
+                assertNull("a safety warning was offered as a multiple choice", ask.quiz)
+                return@runBlocking
+            }
+            s.answer(ask.item.question.id, correct = true, elapsedMs = 1_000L)
+        }
+        throw AssertionError("the safety card never came up")
+    }
+
+    /**
+     * ⚠️ The scenario the guard actually exists for, and the only way to reach it.
+     *
+     * [StudyQuestions.SAFETY_HEADING] is synthetic and no bundled guide uses it, so **removing the
+     * guard changes nothing against the bundle** — that was checked, and it is why the test above
+     * cannot stand in for this one. A content pack can introduce a guide that titles a section the
+     * same way, and then the comprehension path would match the warning card against that section and
+     * mark the reader on it. Installing exactly such a pack is what proves the guard works.
+     */
+    @Test
+    fun aPackCannotMakeASafetyWarningGradeableByReusingItsHeading() = runBlocking {
+        val json = Json { ignoreUnknownKeys = true }
+        val packs = PackStore(json, tmp.root.toPath().resolve("packs"))
+        val lib = LibraryRepository(json, packs)
+        packs.install(
+            ContentPack.Pack(
+                id = "collide", title = "Collide", summary = "s", version = 1,
+                sizeBytes = 0L, guideCount = 1, url = "https://example.invalid/collide.zip",
+            ),
+            mapOf(
+                "guides_collide.json" to """
+                {"guides":[{"id":"collide-guide","title":"Colliding Guide","category":"Chemistry",
+                  "summary":"A guide that titles a section the way a safety card is headed.",
+                  "safetyNote":"Never add water to concentrated acid, because the heat of mixing can boil the acid out of the vessel and into your face.",
+                  "sections":[{"heading":"${StudyQuestions.SAFETY_HEADING}",
+                    "body":"Goggles are worn at all times in this room. Gloves are changed between reagents. The fume cupboard sash stays low."}]}]}
+                """.trimIndent(),
+            ),
+        ).getOrThrow()
+
+        val s = StudyStore(lib, path = tmp.root.toPath().resolve("study.json"))
+        s.teach("collide-guide")
+        val id = s.due().first { StudyQuestions.isSafety(it.question) }.question.id
+
+        var guard = 0
+        while (guard++ < 40) {
+            val ask = s.nextAsk() ?: break
+            if (ask.item.question.id == id) {
+                assertNull("a pack's heading turned a safety warning into a graded question", ask.quiz)
+                return@runBlocking
+            }
+            s.answer(ask.item.question.id, correct = true, elapsedMs = 1_000L)
+        }
+        throw AssertionError("the safety card never came up")
+    }
+
+    /**
+     * Steps run to a median of 180 characters, so four verbatim is a wall to read. Options are
+     * shortened; nothing is invented, and the explanation still carries the whole instruction.
+     */
+    @Test
+    fun aProcedureQuestionOffersOptionsShortEnoughToRead() = runBlocking {
+        val s = store()
+        var checked = 0
+        for (row in library.index()) {
+            val guide = library.guide(row.id) ?: continue
+            val section = guide.sections.firstOrNull { (it.steps?.size ?: 0) >= 6 } ?: continue
+            val q = StudyQuestions.procedure(
+                guide.id, guide.title, section.heading, section.steps.orEmpty(),
+            ).firstOrNull() ?: continue
+            val item = QuizBuilder.build(q, pool = emptyList(), seed = 3) ?: continue
+            item.choices.forEach { choice ->
+                assertTrue(
+                    "an option is ${choice.text.length} characters on screen",
+                    choice.text.length <= StudyQuestions.MAX_OPTION_CHARS + StudyQuestions.ELLIPSIS.length,
+                )
+                val body = choice.text.removeSuffix(StudyQuestions.ELLIPSIS).trimEnd()
+                assertTrue(
+                    "an option is not a real step of this procedure: '${choice.text}'",
+                    section.steps.orEmpty().any { it.trim().startsWith(body) },
+                )
+            }
+            assertTrue("the explanation lost the full step", item.explanation.contains(q.answer))
+            if (++checked >= 25) break
+        }
+        assertTrue("no procedure question was found to check", checked > 0)
+        s.clear()
     }
 
     /** A corrupt file must not erase what a later write would otherwise save — nor crash the app. */

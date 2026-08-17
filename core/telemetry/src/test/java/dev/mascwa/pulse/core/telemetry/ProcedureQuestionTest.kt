@@ -26,8 +26,8 @@ class ProcedureQuestionTest {
     // ---- the safety rule ----------------------------------------------------------------------------
 
     /**
-     * ⚠️ **The load-bearing test.** Every option a learner is shown must be a verbatim step of the
-     * same procedure.
+     * ⚠️ **The load-bearing test.** Every option a learner is shown must be a real step of the same
+     * procedure — verbatim, or a truthful prefix of one marked as abbreviated.
      *
      * A wrong option is then a true instruction in the wrong position — somebody who misreads one has
      * still read something correct. A synthesised "plausible" step would put invented instructions in
@@ -44,7 +44,8 @@ class ProcedureQuestionTest {
                     ?: continue
                 built++
                 item.choices.forEach {
-                    assertTrue("offered an option that is not a real step: '${it.text}'", it.text in verbatim)
+                    assertTrue("offered an option that is not a real step: '${it.text}'",
+                        isRealStep(it.text, verbatim))
                 }
                 assertEquals(1, item.choices.count { it.correct })
                 assertEquals(StudyQuestions.STANDARD_DISTRACTORS + 1, item.choices.size)
@@ -52,7 +53,7 @@ class ProcedureQuestionTest {
                 // Found by reading real generated questions, not by any fixture.
                 val shown = steps.first { it in q.prompt }
                 assertTrue("offered the step already shown in the prompt",
-                    item.choices.none { it.text == shown })
+                    item.choices.none { isRealStep(it.text, setOf(shown)) })
             }
         }
         assertTrue("nothing was built, so the assertions above proved nothing", built > 0)
@@ -197,5 +198,145 @@ class ProcedureQuestionTest {
     fun anOrderQuestionWithNoOptionsCannotBeBuilt() {
         val stripped = make().first().copy(options = emptyList())
         assertNull(QuizBuilder.build(stripped, pool = List(20) { "step $it" }, seed = 1))
+    }
+
+    /**
+     * An option is a real step, whole or abbreviated.
+     *
+     * A shortened option must still be something the author wrote — a genuine prefix, marked with the
+     * ellipsis so the reader can see there is more. Anything else is invention.
+     */
+    private fun isRealStep(text: String, steps: Set<String>): Boolean {
+        if (text in steps) return true
+        if (!text.endsWith(StudyQuestions.ELLIPSIS)) return false
+        val body = text.removeSuffix(StudyQuestions.ELLIPSIS).trimEnd()
+        return body.isNotEmpty() && steps.any { it.startsWith(body) }
+    }
+
+    // ---- readable options ----------------------------------------------------------------------------
+
+    /**
+     * Steps this long are ordinary in the corpus — the median is 180 characters and the longest 600 —
+     * so four of them verbatim is a wall to read rather than a question to answer.
+     */
+    private val longSteps = listOf(
+        "Fill the vessel to the shoulder with the clearest water you can find, leaving a finger of air " +
+            "beneath the neck so the contents can move when you shake it. Cloudy water must be settled " +
+            "or strained through cloth before this stage, because suspended solids shield organisms.",
+        "Bring the water to a rolling boil, meaning a boil that cannot be stirred flat, and hold it " +
+            "there for one full minute at any altitude below two thousand metres. Above that, hold it " +
+            "for three minutes, since the boiling point falls with the pressure.",
+        "Allow the vessel to cool without a lid for at least twenty minutes, standing it out of direct " +
+            "sun and away from anything that might tip it, and do not decant it while it is still hot " +
+            "enough to soften the container.",
+        "Decant carefully into a clean stoppered bottle, pouring in one movement and leaving the last " +
+            "centimetre behind with whatever has settled into it, then label the bottle with the date " +
+            "and the source it came from.",
+        "Store the bottle upright somewhere dark and cool, and treat it as drinkable for two days once " +
+            "opened, after which the safe assumption is that it has been recontaminated by handling.",
+    )
+
+    @Test
+    fun aLongStepIsShownShortEnoughToRead() {
+        val q = StudyQuestions.procedure("water", "Water", "Boiling", longSteps).first()
+        val item = QuizBuilder.build(q, pool = emptyList(), seed = 2)!!
+        item.choices.forEach {
+            assertTrue("an option is still ${it.text.length} characters", it.text.length <= StudyQuestions.MAX_OPTION_CHARS + StudyQuestions.ELLIPSIS.length)
+            assertTrue("shortened past meaning", it.text.length >= StudyQuestions.MIN_OPTION_CHARS)
+            assertTrue("an option was invented rather than abbreviated",
+                isRealStep(it.text, longSteps.toSet()))
+        }
+        // The lesson is the whole instruction, so the explanation is never abbreviated.
+        assertTrue(item.explanation.contains(q.answer))
+    }
+
+    /**
+     * ⚠️ **The rule that makes shortening safe.** Two options that truncate to the same text make the
+     * question unanswerable, which is far worse than a long one — so shortening declines and hands
+     * back the originals.
+     *
+     * Not one of the 804 ordering questions the real corpus generates hits this, which is the right
+     * frequency for a safety valve. It is asserted here because it is the only place it can be.
+     *
+     * ⚠️ The shared prefix is 129 characters, and that number is derived rather than chosen: two
+     * options only collide if they are still identical at the cut, so anything shorter than
+     * [StudyQuestions.MAX_OPTION_CHARS] leaves them distinguishable. A first draft of this test shared
+     * 84 characters and passed against the shipped rule for the honest reason that there was no
+     * collision to catch.
+     */
+    @Test
+    fun optionsThatWouldTruncateAlikeAreLeftLong() {
+        val shared = "Put on nitrile gloves and sealed splash goggles before you open anything at all, " +
+            "keep them on until the bench is clear, and then "
+        val twins = listOf(
+            shared + "check the seal against your face by breathing out hard through your nose.",
+            shared + "wipe the bench down with a damp cloth so nothing dry is left to raise dust.",
+            "Decant the acid slowly down a glass rod into the water, never the water into the acid.",
+            "Label the flask with the contents, the concentration and the date before you leave it.",
+            "Rinse the rod and the funnel into the flask so nothing measured is left clinging to them.",
+        )
+        val out = StudyQuestions.shortOptions(twins)
+        assertEquals("shortening made two options look alike, so it should have declined", twins, out)
+    }
+
+    @Test
+    fun optionsAlreadyShortEnoughAreUntouched() {
+        assertEquals(steps, StudyQuestions.shortOptions(steps))
+    }
+
+    // ---- the guide's safety warning ------------------------------------------------------------------
+
+    /**
+     * ⚠️ Long on purpose, and the length is the point of the fixture.
+     *
+     * The real notes run to a median of 448 characters and a third exceed [StudyQuestions.RECALL_CHARS],
+     * so a tidy two-line fixture cannot detect the one defect these tests exist to prevent — a warning
+     * silently cut in half. A first draft used a 168-character note, and truncating the shipped code to
+     * `RECALL_CHARS` left every assertion passing.
+     *
+     * Note also where the load-bearing instruction sits: past the 420th character, exactly as it does
+     * in the corpus, because a safety note tends to build up to its "never do X".
+     */
+    private val note = "Concentrated acids and bases cause severe burns to skin and eyes, and the " +
+        "damage from an alkali is often deeper than it first looks because it keeps saponifying " +
+        "tissue after contact. Wear splash goggles rather than safety glasses, work behind a raised " +
+        "sash, and keep an eyewash within arm's reach before you open any bottle. Rinse any splash " +
+        "for a full twenty minutes under running water and seek medical advice even when the skin " +
+        "looks unmarked. Always add concentrated acid to water, never water to acid: the reaction is " +
+        "strongly exothermic and can boil the mixture out of the vessel and into your face."
+
+    /**
+     * 184 of the 581 bundled guides carry one of these and, until now, not one was ever asked about.
+     */
+    @Test
+    fun aGuidesSafetyWarningBecomesACardThatComesBack() {
+        val q = StudyQuestions.safety("chem", "Acids and Bases", note)!!
+        assertEquals(StudyQuestions.QuestionKind.RECALL, q.kind)
+        assertTrue(q.prompt.contains("Acids and Bases"))
+        assertTrue(q.prompt.contains("safety warning"))
+        // ⚠️ In full. A third of the real notes run past StudyQuestions.RECALL_CHARS, and a fixed cut
+        // would drop the second half of a warning — which is where "never do X" tends to live.
+        assertEquals(note, q.answer)
+        assertTrue(StudyQuestions.isSafety(q))
+        assertEquals(StudyQuestions.SAFETY_HEADING, q.heading)
+    }
+
+    @Test
+    fun theSafetyCardIsOnePerGuideAndKeepsItsIdentity() {
+        val a = StudyQuestions.safety("chem", "Acids and Bases", note)!!
+        val b = StudyQuestions.safety("chem", "Acids and Bases", "  $note  ")!!
+        assertEquals(a.id, b.id)
+        assertEquals(a.answer, b.answer)
+        // Not confusable with any other form's card for the same guide.
+        val other = StudyQuestions.recall("chem", "Acids and Bases", "Dilution", note)
+        assertTrue(a.id != other.id)
+        assertTrue(!StudyQuestions.isSafety(other))
+    }
+
+    @Test
+    fun nothingToWarnAboutMeansNoCard() {
+        assertNull(StudyQuestions.safety("chem", "Acids and Bases", null))
+        assertNull(StudyQuestions.safety("chem", "Acids and Bases", "   "))
+        assertNull(StudyQuestions.safety("chem", "Acids and Bases", "Be careful."))
     }
 }

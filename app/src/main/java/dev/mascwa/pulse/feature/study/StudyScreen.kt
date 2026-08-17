@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
@@ -407,9 +408,18 @@ private fun ChoiceRow(label: String, index: Int, state: ChoiceState, onClick: ()
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(mark, fontFamily = JetBrainsMono, fontSize = 12.sp, color = tint)
-        Text(label, fontFamily = JetBrainsMono, fontSize = 12.sp, color = tint)
+        // Options are already shortened where a step is long (StudyQuestions.shortOptions), but that
+        // deliberately declines rather than make two look alike — so a pathological set can still
+        // arrive long. A hard line limit keeps one option from pushing the rest off the screen.
+        Text(
+            label, fontFamily = JetBrainsMono, fontSize = 12.sp, color = tint,
+            maxLines = CHOICE_MAX_LINES, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
+
+/** Roughly the shortened budget at phone width, with a line in hand. */
+private const val CHOICE_MAX_LINES = 5
 
 private fun formatLabel(format: QuizBuilder.Format): String = when (format) {
     QuizBuilder.Format.STANDARD -> "PICK ONE"
