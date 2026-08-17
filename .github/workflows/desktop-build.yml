@@ -24,6 +24,11 @@ on:
       - ".github/workflows/desktop-build.yml"
   workflow_dispatch:
 
+# Needed to publish the installer to the 'desktop-latest' release. Without it the packaging job builds a
+# perfectly good MSI and then 403s on the upload — the same declaration android-build.yml already carries.
+permissions:
+  contents: write
+
 concurrency:
   group: desktop-build-${{ github.ref }}
   cancel-in-progress: true
@@ -72,7 +77,11 @@ jobs:
         # jpackage is host-targeted: this step is the only way an .msi ever gets produced.
         # gradlew.bat is the native Windows launcher. `./gradlew` also works here (verified on a real
         # windows-latest runner), so this is a clarity choice, not a fix for a breakage.
-        run: .\gradlew.bat :desktop:packageMsi --stacktrace --no-daemon
+        #
+        # The build number is this workflow's own run_number, NOT the Android build's — they are separate
+        # counters, and the in-app updater looks the run up by number in THIS workflow to decide whether
+        # the build finished. Passing the wrong one would have it check an unrelated run.
+        run: .\gradlew.bat :desktop:packageMsi -PdesktopBuild=${{ github.run_number }} --stacktrace --no-daemon
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -80,3 +89,28 @@ jobs:
           name: lcars-desktop-msi
           path: desktop/build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
+
+      - name: Name the installer predictably
+        # jpackage names the file after the package and version (LCARS-1.0.19.msi). The in-app updater
+        # wants a stable asset name so each publish REPLACES the last rather than piling versioned assets
+        # up on a rolling release forever; the version travels in the release name instead, exactly as the
+        # Android APK does.
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem desktop/build/compose/binaries/main/msi/*.msi | Select-Object -First 1
+          if (-not $msi) { throw "packageMsi produced no .msi" }
+          Copy-Item $msi.FullName -Destination "LCARS-desktop.msi" -Force
+
+      - name: Publish MSI to the 'desktop-latest' release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          # ⚠️ Its OWN tag, deliberately not the Android build's `latest`. Both workflows run on the same
+          # pushes, and action-gh-release rewrites the release NAME each time — sharing a tag would mean
+          # whichever finished last overwrote the other's name, and the name is where each updater reads
+          # its build number from. Separate tags, no interference in either direction.
+          tag_name: desktop-latest
+          name: "LCARS desktop — build #${{ github.run_number }}"
+          prerelease: true
+          body: "Windows installer (build #${{ github.run_number }}) from commit ${{ github.sha }}. Installs as an in-place upgrade over a previous build. The app checks this release itself — see ABOUT inside the app."
+          files: LCARS-desktop.msi

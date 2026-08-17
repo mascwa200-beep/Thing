@@ -55,12 +55,19 @@ class HttpClient(
         json.decodeFromString(deserializer, text)
     }
 
-    /** Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?). */
+    /**
+     * Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?).
+     *
+     * [onProgress] receives 0..100 as the transfer runs, and is called only when the whole number changes
+     * so a large download does not push a hundred thousand updates through the UI. It stays silent when
+     * the server sends no Content-Length, because a percentage of an unknown total would be invented.
+     */
     suspend fun download(
         url: String,
         dest: File,
         maxBytes: Long,
         headers: Map<String, String> = emptyMap(),
+        onProgress: (Int) -> Unit = {},
     ): Pair<Long, String?> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
@@ -71,15 +78,24 @@ class HttpClient(
             if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
             val body = resp.body ?: throw IOException("empty response")
             val type = resp.header("Content-Type")
+            val expected = body.contentLength().takeIf { it > 0L }
             dest.outputStream().use { out ->
                 body.byteStream().use { input ->
                     val buf = ByteArray(1 shl 16)
                     var total = 0L
+                    var lastPct = -1
                     var n = input.read(buf)
                     while (n >= 0) {
                         total += n
                         if (total > maxBytes) throw IOException("file exceeds the ${maxBytes / (1024 * 1024)} MB limit")
                         out.write(buf, 0, n)
+                        if (expected != null) {
+                            val pct = ((total * 100) / expected).toInt().coerceIn(0, 100)
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(pct)
+                            }
+                        }
                         n = input.read(buf)
                     }
                     total to type

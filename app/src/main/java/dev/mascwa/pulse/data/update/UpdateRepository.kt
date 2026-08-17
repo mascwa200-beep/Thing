@@ -3,6 +3,7 @@ package dev.mascwa.pulse.data.update
 import android.content.Context
 import dev.mascwa.pulse.BuildConfig
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.telemetry.UpdatePolicy
 import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -92,10 +93,8 @@ class UpdateRepository(
         }
         // The release is a prerelease, so /releases/latest won't return it — fetch it by its tag.
         val rel = http.getJson("$API/releases/tags/$TAG", GhRelease.serializer(), headers)
-        val code = BUILD_NUM.find(rel.name)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: BUILD_NUM.find(rel.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: return UpdateCheck(null, null)
-        val latestName = "1.0.$code"
+        val code = UpdatePolicy.buildNumberOf(rel.name, rel.body) ?: return UpdateCheck(null, null)
+        val latestName = UpdatePolicy.versionName(code)
         if (code <= BuildConfig.VERSION_CODE) return UpdateCheck(latestName, null)
         // A newer build exists. Only offer it once the CI run that produced it is GREEN — never while it's
         // still building (orange) or if it failed. The rolling `latest` release picks up the new APK + run
@@ -106,10 +105,9 @@ class UpdateRepository(
         // Pick the NEWEST .apk — the rolling release can briefly hold a stale asset (e.g. after the
         // published filename changed), and grabbing the first one would serve an old/downgrade build.
         // created_at is ISO-8601, so lexical max == most recent.
-        val asset = rel.assets
-            .filter { it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true) }
-            .maxByOrNull { it.created_at }
-            ?: return UpdateCheck(latestName, null, pending = true)
+        val asset = UpdatePolicy.newestAsset(rel.assets, { it.created_at }) {
+            it.name.endsWith(".apk", true) || it.browser_download_url.endsWith(".apk", true)
+        } ?: return UpdateCheck(latestName, null, pending = true)
         return UpdateCheck(
             latestName,
             UpdateInfo(code, latestName, rel.body.ifBlank { rel.name }, asset.browser_download_url, asset.url),
@@ -118,12 +116,13 @@ class UpdateRepository(
 
     /**
      * Whether the workflow run that produced build [code] is offerable. The shipped build's
-     * `versionCode == github.run_number`, so the run with `run_number == code` is the one that built
-     * this release. Returns **false** ONLY when it's genuinely not ready — still building/queued, or a
-     * hard failure; **true** when completed successfully; **null** for anything else (notably *cancelled*
-     * — concurrency can cancel a run AFTER it already published its APK, and a published APK is a good
-     * build — or a run too old to be in the recent page / the API call failing). The caller suppresses
-     * only on an explicit **false**, so a cancelled-but-published build is still offered.
+     * `versionCode == github.run_number`, so the run with `run_number == code` is the one that built this
+     * release.
+     *
+     * The three-state meaning of the answer is [UpdatePolicy.runVerdict]'s, and is documented there
+     * rather than restated here — two copies of that reasoning is exactly how the phone and the desktop
+     * would come to disagree about when a build is safe to offer. `null` additionally covers the cases
+     * this method owns: a run too old to appear in the recent page, or the API call failing.
      */
     private suspend fun isBuildGreen(code: Int, headers: Map<String, String>): Boolean? {
         // Scope to the build workflow: `run_number` is per-workflow, so querying all runs would let a
@@ -132,12 +131,7 @@ class UpdateRepository(
             http.getJson("$API/actions/workflows/$WORKFLOW/runs?per_page=20", RunList.serializer(), headers)
         }.getOrNull() ?: return null
         val run = runs.workflow_runs.firstOrNull { it.run_number == code } ?: return null
-        return when {
-            run.status != "completed" -> false      // still building / queued
-            run.conclusion == "success" -> true      // green
-            run.conclusion == "failure" -> false     // hard failure
-            else -> null                             // cancelled / neutral / skipped — APK is published, don't suppress
-        }
+        return UpdatePolicy.runVerdict(run.status, run.conclusion)
     }
 
     /** Stream the APK to cache, reporting 0..100 progress. Private repos: fetch the asset API URL with the
@@ -183,6 +177,5 @@ class UpdateRepository(
         const val TAG = "latest"
         // The CI workflow whose run_number == the shipped versionCode (the green-gate looks it up by number).
         private const val WORKFLOW = "android-build.yml"
-        private val BUILD_NUM = Regex("#(\\d+)")
     }
 }

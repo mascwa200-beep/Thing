@@ -55,7 +55,20 @@ fun main() {
             title = "LCARS",
             state = state,
         ) {
-            PulseDesktopApp(settingsStore, libraryRepository, studyStore)
+            PulseDesktopApp(
+                settingsStore,
+                libraryRepository,
+                studyStore,
+                // Handing over to the installer. Flushed the same way the close button does, because an
+                // upgrade that lost the last answered study card would be a poor trade for being current.
+                onQuitForInstall = {
+                    runBlocking {
+                        settingsStore.flushNow()
+                        studyStore.flushNow()
+                    }
+                    exitApplication()
+                },
+            )
         }
     }
 }

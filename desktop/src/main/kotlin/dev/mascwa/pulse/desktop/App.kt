@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.cache.DiskCache
+import dev.mascwa.pulse.desktop.feature.about.AboutScreen
+import dev.mascwa.pulse.desktop.feature.about.AboutViewModel
 import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
 import dev.mascwa.pulse.desktop.feature.library.LibraryViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsScreen
@@ -36,6 +38,7 @@ import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
@@ -53,6 +56,7 @@ enum class Screen(val title: String) {
     STUDY("Study"),
     LIBRARY("Library"),
     SEARCH("Search"),
+    ABOUT("About"),
 }
 
 /**
@@ -67,6 +71,7 @@ fun PulseDesktopApp(
     settings: DesktopSettingsStore,
     library: LibraryRepository,
     studyStore: StudyStore,
+    onQuitForInstall: () -> Unit = {},
 ) {
     PulseDesktopTheme {
         val c = Pulse.colors
@@ -91,6 +96,9 @@ fun PulseDesktopApp(
         val studyVm = remember { StudyViewModel(scope, studyStore) }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
         val searchVm = remember { SearchViewModel(scope, library, studyStore) }
+        val aboutVm = remember {
+            AboutViewModel(scope, DesktopUpdater(HttpClient.create(json), settings), settings)
+        }
 
         // Opening a guide from STUDY or SEARCH means switching screen AND telling the reader what to
         // open — the desktop's equivalent of the Android app's `openRoute`. Hoisted here because it is
@@ -141,6 +149,13 @@ fun PulseDesktopApp(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Screen.SEARCH -> SearchScreen(searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
+                        Screen.ABOUT -> AboutScreen(
+                            vm = aboutVm,
+                            // The installer cannot replace files this process holds open, so handing over
+                            // means actually letting go.
+                            onQuitForInstall = onQuitForInstall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
