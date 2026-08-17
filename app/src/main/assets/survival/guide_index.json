@@ -6405,6 +6405,19 @@
    "file": "guides_federation_timeline.json"
   },
   {
+   "id": "fed-earth-romulan-war",
+   "title": "The Earth-Romulan War",
+   "category": "Federation Timeline",
+   "summary": "The conflict that made the Federation necessary, fought between powers that never saw each other.",
+   "headings": [
+    "Before the Founding",
+    "A War Without a Face",
+    "How It Ended",
+    "What It Established"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -11169,6 +11182,19 @@
    "file": "guides_notable_figures.json"
   },
   {
+   "id": "fed-security-chief",
+   "title": "The Security Chief",
+   "category": "Notable Figures",
+   "summary": "The officer responsible for everyone's safety, in a service that would rather not need one.",
+   "headings": [
+    "The Post",
+    "Away Missions",
+    "Policing Your Own Crew",
+    "The Outsider Version"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "carbohydrates-and-blood-sugar",
    "title": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
@@ -13283,6 +13309,32 @@
    "file": "guides_species_and_civilisations.json"
   },
   {
+   "id": "fed-q-continuum",
+   "title": "The Q Continuum",
+   "category": "Species & Civilisations",
+   "summary": "Beings for whom the laws of physics are optional, and what a setting does with an opponent it cannot fight.",
+   "headings": [
+    "What They Are",
+    "The Trial That Never Closes",
+    "Omnipotence With a Personality Problem",
+    "Why an Unbeatable Antagonist Is Useful"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-founders",
+   "title": "The Founders and the Changelings",
+   "category": "Species & Civilisations",
+   "summary": "Shapeshifters who rule an empire out of fear, and the one of them raised among solids.",
+   "headings": [
+    "Liquid Life",
+    "An Empire Built on Fear",
+    "Detecting Them",
+    "The One Who Was Raised Outside"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "association-football-rules-and-positions",
    "title": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
@@ -13420,6 +13472,19 @@
     "The Ones That Get Cited",
     "Orders That Are Meant to Be Broken",
     "What the Rulebook Is Actually For"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-section-31",
+   "title": "Section 31",
+   "category": "Starfleet & Federation",
+   "summary": "An intelligence service that answers to nobody, and the argument the setting has with itself about it.",
+   "headings": [
+    "The Claim",
+    "The Argument It Makes",
+    "Why It Is Disliked",
+    "The Structural Problem"
    ],
    "file": "guides_starfleet_and_federation.json"
   },
@@ -13837,6 +13902,45 @@
    "file": "guides_warp_and_starship_technology.json"
   },
   {
+   "id": "fed-warp-core",
+   "title": "The Warp Core and the Matter-Antimatter Reaction",
+   "category": "Warp & Starship Technology",
+   "summary": "The reactor at the centre of the ship: what it does, what regulates it, and why it is always about to breach.",
+   "headings": [
+    "The Reaction",
+    "Antimatter as a Problem",
+    "Why It Is Always Nearly Failing",
+    "Dilithium"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-subspace-communications",
+   "title": "Subspace Communications",
+   "category": "Warp & Starship Technology",
+   "summary": "How a message outruns light — and, more importantly, how long it still takes.",
+   "headings": [
+    "Faster Than Light, Not Instant",
+    "The Delay Is the Format",
+    "What Breaks It",
+    "On the Bridge"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-sickbay-technology",
+   "title": "Sickbay Technology",
+   "category": "Warp & Starship Technology",
+   "summary": "How Federation medicine is practised: the instruments, what they can do, and where they stop.",
+   "headings": [
+    "The Instruments: Tricorder, Biobed, Hypospray and Regenerator",
+    "What It Cannot Do",
+    "Sickbay as a Place",
+    "The Emergency Hologram"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
    "id": "the-stratosphere-and-the-ozone-layer",
    "title": "The Stratosphere and the Ozone Layer",
    "category": "Weather",
@@ -14101,6 +14205,32 @@
     "The Landscape as Argument",
     "Cities and Institutions",
     "Visiting"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-qonos",
+   "title": "Qo'noS, the Klingon Homeworld",
+   "category": "Worlds & Stations",
+   "summary": "Qo'noS, also written Qonos and spoken as Kronos: a harsh world and the seat of an empire — geography, the Great Houses, and the politics of the High Council.",
+   "headings": [
+    "The World",
+    "The Great Houses",
+    "The High Council",
+    "Visiting"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-romulus",
+   "title": "Romulus and the Star Empire",
+   "category": "Worlds & Stations",
+   "summary": "The world the Vulcans left behind became: an empire built on secrecy, and a senate nobody quite trusts.",
+   "headings": [
+    "A Vulcan Offshoot",
+    "Secrecy as Statecraft",
+    "The Senate",
+    "The Worlds"
    ],
    "file": "guides_worlds_and_stations.json"
   }

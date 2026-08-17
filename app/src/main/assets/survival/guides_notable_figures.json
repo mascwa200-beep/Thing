@@ -119,6 +119,30 @@
      "body": "Engineering sits at the ship's structural and emotional centre. The bridge is where decisions are made; engineering is where the consequences arrive, usually in the form of a reading climbing toward a limit while someone tries to hold it. That gives the post a distinct relationship to danger. Engineers are the people who stay below during a crisis, work in compartments that are on fire, and are asked to seal a section knowing who is on the other side of the door. The setting's engineering scenes carry a claustrophobic weight the bridge scenes do not. The role's affection for the machine is treated as genuine rather than eccentric. Engineers in this setting talk about their ships as things with tempers and preferences, know the sound a healthy reactor makes, and take damage to the vessel personally. A captain commands the ship; the chief engineer is the one who lives with it."
     }
    ]
+  },
+  {
+   "id": "fed-security-chief",
+   "title": "The Security Chief",
+   "category": "Notable Figures",
+   "summary": "The officer responsible for everyone's safety, in a service that would rather not need one.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's chief of security is responsible for the vessel's internal safety and its physical defence: access control, the armoury, the brig, boarding response, threat assessment and the protection of the crew both aboard and on away missions. On many ships the post is combined with tactical, putting the same officer at the weapons console. It is an awkward job in this particular organisation. Starfleet describes itself as a scientific and diplomatic service, and the security chief is the standing acknowledgement that the description is incomplete. Their professional instinct — assume threat, control access, prepare for the worst — sits at odds with a mission built on approaching the unknown openly. That tension is the role's whole character. A good security chief is the person on the bridge arguing for caution against a room inclined to curiosity, and being right often enough to be listened to."
+    },
+    {
+     "heading": "Away Missions",
+     "body": "Security officers accompany landing parties, and the arrangement is one of the setting's oldest conventions along with its most notorious joke. The officer whose job is to be between the science team and whatever is out there is, structurally, the person the story can afford to lose. The convention has been criticised and largely corrected, and the correction improved the material. A security detail written as competent professionals who occasionally die despite doing everything right is far more affecting than one written as a casualty budget, and the setting's better episodes make the loss land on the officer who ordered them out. Doctrine reflects real caution. Landing parties are armed but set to stun, entry is preceded by scanning, and the security officer's recommendation to withdraw carries genuine weight — which the setting's captains override often enough for the audience to feel the cost when it goes badly."
+    },
+    {
+     "heading": "Policing Your Own Crew",
+     "body": "The less discussed half of the job is internal. A few hundred people confined together for years produce theft, assault, substance problems, breakdowns and occasionally something worse, and the security chief is who deals with it — investigating colleagues, holding them, and giving evidence at their hearings. This makes the post socially isolating in a way the setting has used well. An officer whose duty may require them to arrest the people they eat with cannot be entirely one of the crew, and characters in the role are frequently written as slightly apart, with a professional wariness that reads as coldness until it is needed. It also gives the setting a way to look at its own utopia honestly. A society that has genuinely improved still puts a brig on every ship, and the officer who runs it is the standing evidence that nobody expects the improvement to be total."
+    },
+    {
+     "heading": "The Outsider Version",
+     "body": "The setting has repeatedly filled this post with someone from outside the Federation's comfortable assumptions — a former enemy, a refugee from a war, a shapeshifter, someone raised somewhere that had no illusions. That is not accidental casting. A security chief whose formative experience was occupation, combat or survival brings a different calibration to the question of how much trust is prudent, and their disagreements with an idealistic captain carry weight because they are not theoretical. When such an officer says a situation is a trap, the audience believes them. It also lets the setting examine its own optimism from the inside. An officer who thinks the Federation is naive, serving it loyally anyway, and being proved both right and wrong at different times, is a more searching critique than any external antagonist could deliver."
+    }
+   ]
   }
  ]
 }

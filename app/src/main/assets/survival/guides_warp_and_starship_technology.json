@@ -215,6 +215,78 @@
      "body": "In practice the translator is what makes the setting's central ritual possible. A vessel arrives, hails, and speaks; the other party answers; and within a scene two civilisations that have never met are negotiating. Everything the format is about depends on that happening quickly. Procedure around it is careful. Early contact is conducted with the translator's output treated as provisional, ambiguous renderings are flagged, and officers are trained to watch for the signs that meaning is not arriving — a party agreeing too readily, or reacting to something that was not said. The setting's most quietly optimistic claim is embedded here. It assumes that understanding across genuinely alien minds is possible at all, that the difficulty is technical rather than fundamental, and that two species with nothing in common can still arrive at a sentence they both mean. The device is the setting's argument that talking is worth trying."
     }
    ]
+  },
+  {
+   "id": "fed-warp-core",
+   "title": "The Warp Core and the Matter-Antimatter Reaction",
+   "category": "Warp & Starship Technology",
+   "summary": "The reactor at the centre of the ship: what it does, what regulates it, and why it is always about to breach.",
+   "sections": [
+    {
+     "heading": "The Reaction",
+     "body": "A starship's main power comes from the controlled annihilation of matter and antimatter. Deuterium and antideuterium are injected from opposite ends of a vertical assembly and meet at a reaction chamber in the middle, where their mutual destruction converts mass to energy with an efficiency nothing else available approaches. That energy drives the warp field, the weapons, the shields and everything else. Uncontrolled, this reaction would simply destroy the vessel. What makes it usable is the crystal assembly at the centre, which mediates the reaction and regulates the release — described as the one substance that can be exposed to both streams without being consumed, and therefore the single most valuable thing aboard. The core runs the height of several decks, which is why it is visible from a gallery and why engineering is architecturally the most dramatic space on the ship. A pulsing vertical column is the setting's visual shorthand for a vessel being alive."
+    },
+    {
+     "heading": "Antimatter as a Problem",
+     "body": "Antimatter cannot be replicated and must be manufactured at considerable cost or obtained, which makes fuel a real constraint rather than a formality. It also cannot touch anything, which means it is stored in magnetic containment that must never fail — and a ship running low on power has to keep some of that power for the containment. That dependency produces the setting's most reliable escalation. Damage that reduces power threatens containment; failing containment threatens the ship; and the crew is therefore forced into a sequence of decisions where every option costs power they are trying to preserve. It is a clean piece of engineering-as-drama and it is used constantly. The related failure is the breach: containment lost, the reaction uncontained, and a very short interval before the vessel ceases to exist. Ships are built so that the entire core can be ejected, which saves the ship and strands it — a trade the setting stages as a genuine decision rather than an obvious one."
+    },
+    {
+     "heading": "Why It Is Always Nearly Failing",
+     "body": "The warp core is the setting's most frequently endangered object, to the point of parody. The structural reason is that it is the one system whose failure is unarguably fatal, immediate and visible on a readout, which makes it the perfect clock for an episode. The in-universe justification holds up better than the frequency suggests. The core is operating at the edge of what its materials can survive, in a vessel that is routinely shot at, and every other system depends on it — so damage almost anywhere propagates there eventually. A machine that annihilates matter for a living has very little margin. What the setting does well is make the response technical rather than heroic. The solutions are ejections, containment realignments, controlled shutdowns and manual overrides performed by people who understand the machine, and they are usually costly. A core crisis resolved by courage alone would be a much worse scene."
+    },
+    {
+     "heading": "Dilithium",
+     "body": "The regulating crystal is the setting's most important material and the reason its civilisations have a resource politics at all. It cannot be replicated, occurs naturally in limited places, and is consumed slowly by use — degrading through a lattice fatigue that eventually renders a crystal useless. That single property does an enormous amount of work. It gives powers a reason to want particular star systems, gives mining colonies strategic significance, gives a stranded ship a specific thing to search for, and gives the setting an economy in a society that otherwise has no scarcity. A Federation that can replicate food and clothing still has to go and find this. Later techniques allow crystals to be recrystallised rather than replaced, which eases the constraint without removing it. The setting is careful never to abolish it entirely, because a starship that needed nothing from anywhere would have no reason to stop."
+    }
+   ]
+  },
+  {
+   "id": "fed-subspace-communications",
+   "title": "Subspace Communications",
+   "category": "Warp & Starship Technology",
+   "summary": "How a message outruns light — and, more importantly, how long it still takes.",
+   "sections": [
+    {
+     "heading": "Faster Than Light, Not Instant",
+     "body": "Ordinary radio travels at light speed, which across interstellar distances means a conversation measured in years. Subspace communication sends a signal through the same underlying domain that warp travel exploits, arriving far faster than light and far faster than any ship — which is why a fleet can be coordinated at all. It is not instantaneous, and the setting is careful about that. Messages to distant sectors take hours or days. Real-time conversation is possible within a region and impossible across one. A vessel at the frontier may be weeks of message-time from anyone who could authorise what it is about to do. The infrastructure is relay networks — chains of subspace repeaters extending the practical range, which exist, can be damaged, can be captured, and mark the boundary of where the Federation can be reached quickly. Beyond the last relay, a ship is genuinely alone."
+    },
+    {
+     "heading": "The Delay Is the Format",
+     "body": "This single limitation is what makes the setting work, and it repays being noticed. A captain who could consult headquarters instantly would have no decisions to make; the whole premise of a commander with treaty-making authority rests on the fact that asking would take longer than the situation allows. It also produces the setting's characteristic dramatic device: the captain's log. An officer narrating what they decided and why, into a record that will be read weeks later by people who were not there, is a direct consequence of the communications lag, and it is why the format's central act is explanation rather than reporting. The lag can be closed for effect. A story that establishes a real-time link to headquarters is usually about the loss of discretion that comes with it, and officers in that situation are visibly less free than the ones out of contact."
+    },
+    {
+     "heading": "What Breaks It",
+     "body": "Subspace signals are degraded by the same things that trouble sensors — certain nebulae, radiation, natural phenomena and deliberate jamming — and a vessel that cannot signal is in a specific and recognisable kind of trouble. Distress calls that were sent and never arrived, or arrived too late, are among the setting's more effective openings. Interception is assumed rather than exceptional. Powers listen to each other's traffic, encryption is standard, and a message that must not be read is carried by a ship rather than sent. The existence of couriers in a civilisation with faster-than-light radio is a small detail that tells you a great deal about how much anyone trusts the medium. Emergency channels, distress frequencies and automated beacons exist as a layer beneath the network, on the reasoning that a ship in serious trouble may be able to emit something even if it cannot converse."
+    },
+    {
+     "heading": "On the Bridge",
+     "body": "Practically, subspace communication is why a bridge has a viewscreen with a face on it. Hailing an unknown vessel, opening a channel, and speaking directly is the setting's first move in nearly every encounter, and the technology is what makes talking a plausible opening rather than a formality. The communications post was a bridge station in its own right in the earliest material, with an officer whose profession was signals and languages, and the setting's habit of folding that work into operations later is a genuine loss of texture rather than a simplification. Someone had to open the channel, and it mattered who. The refusal to answer a hail is correspondingly loaded. A vessel that will not respond has said something, and the setting treats the silence as information — usually the last information anyone gets before the situation becomes tactical."
+    }
+   ]
+  },
+  {
+   "id": "fed-sickbay-technology",
+   "title": "Sickbay Technology",
+   "category": "Warp & Starship Technology",
+   "summary": "How Federation medicine is practised: the instruments, what they can do, and where they stop.",
+   "sections": [
+    {
+     "heading": "The Instruments: Tricorder, Biobed, Hypospray and Regenerator",
+     "body": "Federation medicine is conducted with a small set of recurring instruments. The medical tricorder and its detachable hand scanner assess a patient without contact, reading vital signs, tissue damage, toxins and neural activity in seconds. The biobed monitors a patient continuously and displays the same information above them, so that a physician entering the room is briefed before they reach the bedside. Treatment is largely non-invasive. The hypospray delivers medication through the skin without a needle, which removes both the pain and the infection risk of injection. Dermal regenerators close wounds and burns by accelerating tissue growth; osteo-regenerators knit bone. Surgical procedures that would once have required opening a patient are performed with focused fields. The overall effect is a medicine that is quiet, quick and clean. Nothing hurts, very little is cut, and the physician's time is spent on judgement rather than on technique — which is precisely the point the setting is making about what medicine could be."
+    },
+    {
+     "heading": "What It Cannot Do",
+     "body": "The limits are carefully placed and are where every medical story lives. Neurological damage resists regeneration. Unknown pathogens have no treatment until they are understood, which takes time the patient may not have. Genetic conditions, degenerative disease and injuries to the brain are described repeatedly as beyond the instruments. Cross-species medicine is the other standing constraint. A physician treating a mixed crew is working with several incompatible physiologies, and a drug dosed correctly for one may be lethal for another. The setting's medical crises frequently turn on exactly this: the diagnosis is right and the patient is the wrong species for the treatment. And the instruments require a database. A tricorder confronted with something never catalogued produces readings rather than answers, which is why the physician remains a scientist rather than an operator."
+    },
+    {
+     "heading": "Sickbay as a Place",
+     "body": "The ship's sickbay is a small hospital: examination bays, a surgical suite, an intensive area, isolation facilities, a laboratory and a morgue. On larger vessels it is staffed around the clock by a medical department of nurses, technicians and physicians, and it is one of the few compartments designed to keep working when the rest of the ship is not. It is also the ship's one genuinely non-hierarchical space. The chief medical officer's authority within it is absolute regardless of who is on the table, and the setting is consistent about that — a captain in sickbay is a patient, and behaves like one or is told to. Mass-casualty capacity is limited and the setting knows it. A vessel taking serious damage produces more injured than any sickbay can hold, and the scenes of triage in a corridor are among the format's more sobering images precisely because the technology on display is so capable in ordinary circumstances."
+    },
+    {
+     "heading": "The Emergency Hologram",
+     "body": "Later vessels carry a holographic physician: a program with the accumulated knowledge of a large body of medical literature, projected in sickbay and intended for short-term use when the medical staff are dead or overwhelmed. It is a piece of equipment, activated on demand and switched off afterwards. Extended operation turns it into something else. A program run continuously for years accumulates experience, preferences, relationships and opinions, and the setting uses this to run the question it also runs on the holodeck: at what point does a sufficiently capable program acquire a claim on being treated as someone. The medical framing sharpens it. A physician is bound by professional obligation to their patient, and a program that takes that obligation seriously — refusing an order, insisting on a treatment, objecting to being switched off mid-procedure — is doing something the people holding the controls did not design and cannot easily dismiss."
+    }
+   ]
   }
  ]
 }

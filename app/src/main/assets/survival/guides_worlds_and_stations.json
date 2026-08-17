@@ -95,6 +95,54 @@
      "body": "Offworlders on Vulcan are common and never quite comfortable. Federation facilities maintain adjusted environments, and visitors are advised to acclimatise, to respect the water conventions, and to observe the local prohibition on casual physical contact — a matter of real consequence with a touch-telepathic people rather than a point of etiquette. Vulcan hospitality is formal, precise and easily misread as cold. Guests are provided for exactly and not fussed over, questions are answered directly, and the absence of small talk is not disapproval. Visitors who expect warmth read the reception as a rebuff; those who expect precision find it generous. The setting sends its characters there at moments of gravity — a family matter, a rite, a crisis of identity — and the world's difficulty is part of why. Vulcan is somewhere you go to do something serious, and it does not make it easy."
     }
    ]
+  },
+  {
+   "id": "fed-qonos",
+   "title": "Qo'noS, the Klingon Homeworld",
+   "category": "Worlds & Stations",
+   "summary": "Qo'noS, also written Qonos and spoken as Kronos: a harsh world and the seat of an empire — geography, the Great Houses, and the politics of the High Council.",
+   "sections": [
+    {
+     "heading": "The World",
+     "body": "Qo'noS is a world of extremes — violent weather, heavy seismic activity, an axial tilt that produces punishing seasons, and terrain that runs to mountain, volcanic waste and dense forest rather than to anything comfortable. Its skies are frequently overcast and its atmosphere heavier than most humanoids prefer. Klingon culture treats this as a point of pride rather than a hardship. A world that kills the careless is understood to have produced a people worth respecting, and the setting's Klingons describe visitors' discomfort with undisguised satisfaction. The planet lost a moon within recorded history — the disaster that crippled the Empire's energy production and forced the peace with the Federation. The astronomical consequence alone reshaped the world's tides and weather, and the political consequence reshaped the quadrant. It is the rare case where a planetary event and a diplomatic one are the same event."
+    },
+    {
+     "heading": "The Great Houses",
+     "body": "Klingon society organises around houses: extended kin groups holding land, fleets, seats and obligations, headed by a leader whose standing is the house's standing. Individual honour and family honour are not separable, which means one member's disgrace is inherited by relatives who had nothing to do with it, and one member's achievement raises everyone. This produces politics that look feudal and are in fact intensely legalistic. Challenges, claims, inheritances, discommendations and restorations all follow procedure, and a Klingon with a grievance is as likely to pursue it through a council of elders as through a duel. Both are available and both are honourable. House politics also supply the Empire's chronic instability. Houses rise and fall by manoeuvre as much as by combat, alliances are transactional, and a High Council seat is worth a great deal to a family that has one. The setting's Klingon stories are far more often about this than about war."
+    },
+    {
+     "heading": "The High Council",
+     "body": "The Empire is governed from the First City by a High Council of house leaders, headed by a Chancellor. The office is powerful, contested, and historically as likely to change hands by assassination or challenge as by succession — and the culture regards a successful challenge as a legitimate transfer rather than a coup, provided the forms were observed. The setting is candid that this system produces poor government. Chancellors spend their authority holding the Council together, houses obstruct policy for advantage, and the Empire's decline is repeatedly attributed by its own characters to leaders more interested in position than in the state. Honour as a public value coexists with a political culture that rewards its opposite. That gap is the Empire's central subject. Klingons who take the honour code seriously find themselves at odds with the institution that claims it, and the setting's most admired Klingon characters are almost always in that position."
+    },
+    {
+     "heading": "Visiting",
+     "body": "Qo'noS receives outsiders, and the experience is not gentle. Federation visitors report heat, pressure, food that is alive and intended to be, drink that is genuinely dangerous, and a social register in which insult is a form of address and hesitation is read as weakness. Diplomatic missions there are considered demanding postings. Klingon hospitality is real and unmistakably its own. A guest is fed enormously, argued with vigorously, and defended absolutely against anyone else — and a visitor who joins the argument rather than enduring it is regarded far more favourably than one who is polite. The First City is ancient, monumental and built to intimidate, and the setting uses it as the Empire's self-portrait: a civilisation with a very long memory, considerable dignity, and no interest whatever in making anyone comfortable."
+    }
+   ]
+  },
+  {
+   "id": "fed-romulus",
+   "title": "Romulus and the Star Empire",
+   "category": "Worlds & Stations",
+   "summary": "The world the Vulcans left behind became: an empire built on secrecy, and a senate nobody quite trusts.",
+   "sections": [
+    {
+     "heading": "A Vulcan Offshoot",
+     "body": "Romulans and Vulcans share an origin. The Romulans descend from those who rejected the discipline of logic when it was adopted, left their homeworld, and settled two worlds elsewhere — Romulus and its companion. The setting reveals this comparatively late, and the revelation reframes both peoples: the Vulcans as a civilisation whose most famous virtue was a choice made against a real alternative, and the Romulans as what happens when that choice goes the other way. The result is a people with Vulcan physiology and none of Vulcan restraint — passionate, proud, deeply familial, and possessed of the same formidable intellect turned toward advantage rather than toward truth. Physically they are near-identical, which the setting exploits at every opportunity. The relationship between the two is not warm. Vulcans regard the Romulans as a road not taken; Romulans regard Vulcans as relatives who abandoned their nature and then lectured everyone about it."
+    },
+    {
+     "heading": "Secrecy as Statecraft",
+     "body": "The Romulan Star Empire runs on concealment the way other powers run on force. Its worlds are closed, its intentions are stated obliquely, its fleets are cloaked, and its diplomacy assumes that every offer conceals a purpose — including its own. A Romulan negotiating in good faith is doing something their own culture would find slightly embarrassing. The internal instrument of this is the Tal Shiar, an intelligence service whose reach extends into the military, the Senate and private households, and which is feared by Romulans far more than by anyone outside. A state where the security service can remove a senator is a state where nobody's position is secure, and the setting's Romulan characters conduct themselves accordingly. The strategic consequence is that Romulan policy is hard to read from outside and frequently hard to read from inside. Long silences followed by sudden action are characteristic, and the Neutral Zone exists partly because nobody could establish what they wanted for long enough to negotiate about it."
+    },
+    {
+     "heading": "The Senate",
+     "body": "Government is by a Senate headed by a Praetor, with the military as a distinct power centre and the intelligence service as a third. The setting's Romulan politics are consequently triangular, and its plots turn on which of the three is currently ascendant — a military commander who despises the Tal Shiar, a senator manoeuvring against the Praetor, an agent loyal to none of them. Romulan patriotism is genuine and is the thing the intrigue runs on. Officers who conspire do so for the Empire as they understand it, and the setting is careful to show that its Romulan antagonists are not cynics. They are people who believe the state is worth protecting from the people currently running it. That makes the Empire the setting's most usable political antagonist. It cannot be won over by an appeal to shared values, cannot be intimidated, and contains factions who would rather deal with the Federation than with each other — which is the only opening anyone ever gets."
+    },
+    {
+     "heading": "The Worlds",
+     "body": "Romulus is described as green, temperate and beautiful, which is deliberately at odds with the reputation of the people on it. Its capital is monumental, its senate chamber theatrical, and its landscape is one of the few things Romulans discuss with visitors without calculation. The companion world shares the system and much of the culture, and the pairing is used to establish that the Empire is a genuine civilisation with a homeland rather than a fleet with a flag. Beyond them lies a large territory of subject and allied worlds administered with the same combination of competence and suspicion. Later material destroys the system entirely in a stellar catastrophe, scattering the survivors and shattering the Empire's coherence. Whatever a reader's view of that development, it changes the Romulans from a rival power into a diaspora, and everything written about them afterwards is written in that shadow."
+    }
+   ]
   }
  ]
 }
