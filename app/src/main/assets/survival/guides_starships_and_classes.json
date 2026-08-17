@@ -95,6 +95,54 @@
      "body": "For a Federation captain, the Bird-of-Prey is a problem of detection rather than of firepower. Once located it is manageable; the entire engagement therefore turns on the minutes before that, and the setting's countermeasures are correspondingly about finding rather than shooting — sensor sweeps tuned to the faint distortions a cloak cannot help producing, tachyon detection grids, or simply provoking a decloak by presenting a target too good to refuse. For those aboard, service is cramped and unsentimental. The bridge is small, the corridors are narrow, and the culture aboard a Klingon vessel of this size is intensely personal — with a crew that small, the commander knows everyone and everyone knows exactly where they stand. The class also has a strong claim to being the setting's most versatile plot device. It is small enough to be stolen, cheap enough to be plausible in anyone's hands, capable enough to threaten a starship, and characterful enough that its arrival changes the tone of a scene before anyone has spoken."
     }
    ]
+  },
+  {
+   "id": "fed-defiant-class",
+   "title": "The Defiant Class",
+   "category": "Starships & Classes",
+   "summary": "The warship the Federation said it did not build: small, overpowered, and an admission.",
+   "sections": [
+    {
+     "heading": "Built for One Enemy",
+     "body": "The Defiant class was designed for a specific opponent — a collective that assimilates civilisations and had already come close to ending the Federation with a single vessel. The brief was not exploration, not diplomacy and not endurance. It was to destroy something enormous, and everything about the design follows from that. The result is very small and very heavily armed: a compact hull with no saucer, no separate drive section and almost no wasted volume, carrying weapons and shielding sized for a ship several times larger. There are no families, no arboretum and barely a corridor. A crew of a few dozen operates a vessel that can trade fire with capital ships. The class's existence is itself the story. A Federation that describes Starfleet as a scientific and diplomatic service quietly commissioned a pure warship, and the project was shelved when the immediate threat receded rather than cancelled — which is a different thing and everybody involved knew it."
+    },
+    {
+     "heading": "Overpowered, Literally",
+     "body": "The prototype nearly tore itself apart. Its engines and weapons were sized past what the structure could survive, and the setting is unusually specific about this: the ship was overgunned to the point that firing everything risked the hull, and the design had to be detuned before it could be trusted. That detail does a lot of work. It marks the class as the product of fear rather than of careful engineering — a design brief written by people who cared more about stopping something than about whether the ship came back. Federation engineering is normally conservative and this plainly was not. Once corrected, the class became formidable and remained uncomfortable. Long deployments in a vessel with no recreational space and no privacy wear crews down, and officers who serve aboard one after serving aboard something larger describe the difference as a change of profession rather than of posting."
+    },
+    {
+     "heading": "The Cloak Nobody Talks About",
+     "body": "One vessel of the class operates with a cloaking device, supplied by a rival power under a treaty exception negotiated during a period of shared interest. The Federation had signed a treaty forbidding itself cloaking technology, so the arrangement is a loophole with conditions attached — including, in the version the setting stages, an obligation to share intelligence gathered while using it. This is one of the setting's better small ideas because it makes an abstraction concrete. A power that renounced a capability by treaty and then borrowed it under supervision is doing something recognisable, and the discomfort of the officers operating it is the point. It also demonstrates the class's whole character. A ship built in secret, detuned because it was dangerous, and fitted with borrowed technology its own government promised not to use, is the Federation's least idealistic object, and the setting keeps it in view rather than tucking it away."
+    },
+    {
+     "heading": "What It Meant",
+     "body": "In the general war that followed, the class was vindicated in the narrowest sense: it worked, it was produced in numbers, and it did what it was built to do. Fleets of small hard ships turned out to be what the situation required, and the large comfortable explorers took the losses. The setting refuses to treat that as a happy ending. A Federation that has learned to build warships well has learned something it spent a century avoiding, and the officers who welcome the capability are written as being right and as having lost something. The class is therefore the counterpart to the Galaxy class in the database, and the two should be read together. One is what the Federation builds when it expects the peace to hold; the other is what it builds when it has stopped expecting that."
+    }
+   ]
+  },
+  {
+   "id": "fed-shuttlecraft",
+   "title": "Shuttlecraft and Runabouts",
+   "category": "Starships & Classes",
+   "summary": "The small craft: what a starship carries, what they are for, and why they crash so often.",
+   "sections": [
+    {
+     "heading": "The Ship's Boats",
+     "body": "Every starship carries small craft, and the setting distinguishes several sizes. Shuttlepods are minimal — a cockpit, a few seats, short range, sublight or barely warp-capable. Shuttlecraft are the standard: a boxy hull carrying a handful of people and cargo at low warp for days. Runabouts are the largest, effectively small starships with bunks, a laboratory, replicators and modular mission compartments, capable of independent operation for weeks. They exist because a starship is a poor instrument for small jobs. A vessel with a thousand people aboard cannot land, cannot enter a crowded orbit unobtrusively, and cannot be risked in an atmosphere or a debris field for the sake of collecting three passengers. Larger vessels carry a dozen or more, run from a hangar deck with its own crew, traffic control and maintenance cycle. The setting rarely shows that infrastructure, but it is implied by every departure."
+    },
+    {
+     "heading": "What They Are Actually For",
+     "body": "The commonest use is transport where the transporter will not serve — through interference, in a shielded environment, when the destination cannot be scanned, or when arriving by materialising out of the air would be a diplomatic error. A shuttle is also the polite way to arrive somewhere that has not agreed to be beamed into. They also carry cargo, conduct surveys at close range, and act as the ship's eyes somewhere the ship cannot go. Runabouts in particular are used for extended independent missions — two or three officers away for a fortnight, which gives the setting a way to isolate a small group without stranding an entire crew. And they are lifeboats, in the sense that they are the way people get off a vessel that cannot be saved. Escape pods exist, but a shuttle can be flown, which is a considerable difference when the nearest help is a long way off."
+    },
+    {
+     "heading": "Why So Many Are Lost",
+     "body": "Small craft in this setting have a poor survival record, and the joke among viewers is old enough to have become a genre convention. The in-universe reasons are sound as far as they go: a shuttle has a fraction of a starship's shielding, no meaningful armament, limited power and no redundancy, and it is deliberately sent into exactly the situations too hazardous for the ship. The structural reason is that a shuttle is how the setting separates a few characters from their support. Crash one and you have a survival story; disable one and you have a rescue; lose contact with one and you have a mystery. None of those work while the crew has a starship over their heads. Federation practice reflects the risk in ways the setting mentions in passing — flight plans filed, minimum crew rules, requirements to maintain contact — which mostly serve to establish that the rule was broken before the trouble started."
+    },
+    {
+     "heading": "Flying One",
+     "body": "Small craft are flown by qualified officers rather than by a dedicated pilot corps, and shuttle qualification is a routine part of an officer's training. That produces the setting's habit of putting a scientist, a doctor and an engineer in a shuttle together with nobody aboard whose actual profession is flying. Handling is described as demanding in atmosphere and unremarkable in space. Landings are the difficult part, and the setting's shuttles land far more often than its starships, which is much of why they appear in trouble so frequently. The craft themselves are named rather than numbered on most vessels, usually after figures from the sciences or from the ship's own history. It is a small piece of texture that does real work: a shuttle with a name is a thing a crew can lose, and the setting knows it."
+    }
+   ]
   }
  ]
 }

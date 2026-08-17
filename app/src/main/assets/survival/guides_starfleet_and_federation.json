@@ -119,6 +119,54 @@
      "body": "The chain of command is not primarily about obedience. It is about knowing, without discussion, who is responsible when something happens in the next four seconds. A crew that must first establish who decides has already lost the time in which the decision mattered. Starfleet's version of it is unusually consultative by military standards. Officers are expected to argue before the order and comply after it, senior staff meetings exist so that objections are heard while they can still change anything, and a captain who suppresses dissent is treated by the narrative as failing at the job rather than exercising it. The chain is therefore at its most important exactly when it is least comfortable — when a junior officer is right and outranked, when a captain is wrong and knows it, when the person with authority is not the person with the answer. What the institution supplies is a way for all three to be true at once without the ship coming apart."
     }
    ]
+  },
+  {
+   "id": "fed-federation-council",
+   "title": "The Federation Council",
+   "category": "Starfleet & Federation",
+   "summary": "Who actually governs: the civilian body Starfleet answers to, and why that relationship is fraught.",
+   "sections": [
+    {
+     "heading": "The Body",
+     "body": "The Federation Council is the legislature of the United Federation of Planets, seated on Earth, composed of representatives from every member world. It writes Federation law, ratifies treaties, controls the budget, admits new members and confirms the senior appointments in Starfleet. Above it sits a President, elected, who conducts foreign policy and commands the fleet in the way a civilian head of government commands one. Representation is by member world rather than by population, which is a deliberate choice with the obvious consequence: a heavily populated founding world and a recently admitted colony have comparable voices. The arrangement is what makes small members willing to join at all, and it is a standing grievance of the large ones. The Council is portrayed as slow, procedural and cautious. That is the correct depiction of a legislature and the setting occasionally forgets it is not a criticism."
+    },
+    {
+     "heading": "Civilian Control",
+     "body": "Starfleet answers to the Council, and the setting means this seriously. Officers testify before it, admirals are appointed with its consent, and the fleet's budget and mandate come from a civilian body that is not part of it. A Starfleet that decided policy for itself would be a different and much worse organisation, and the setting's most alarming stories are the ones where it nearly does. The relationship is uncomfortable by design. The Council is distant from events it legislates about, sometimes by weeks of travel; captains make binding decisions in minutes that the Council will discover afterwards. Every treaty a captain improvises at a frontier is the Council's problem the following month. The setting's recurring nightmare is an admiralty that has concluded civilians cannot be trusted with a genuine emergency. Attempted coups, unauthorised operations and covert services acting outside oversight all appear, and each is treated as the institution failing rather than as pragmatism."
+    },
+    {
+     "heading": "Membership",
+     "body": "Admission is the Council's most consequential power and the setting's clearest statement of what the Federation thinks it is. Applicants must meet standards: a unified planetary government, no caste-based discrimination, and a level of development sufficient that contact is not itself an interference. Applications are examined at length and refused. The conditions are not neutral and the setting knows it. Requiring a single planetary government pushes applicants toward a particular political shape; requiring the absence of certain social arrangements is a moral judgement enforced by the offer of membership. A coalition that only admits societies resembling itself will keep concluding that its values are universal. Against that, the alternative is a federation that admits anyone and therefore stands for nothing, and the setting stages that argument on the Council floor rather than settling it in narration."
+    },
+    {
+     "heading": "Why It Rarely Appears",
+     "body": "For a body with this much authority, the Council is on screen very little, and the reason is structural. The setting's format is a ship a long way from home, and a story in which the crew can refer a question to the legislature is a story with no decision in it. So the Council mostly appears as a constraint arriving late: an order that makes no sense given what the crew can see, a treaty obligation that forbids the obvious course, a diplomatic priority that outranks the humanitarian one. Officers complain about it in exactly the register that people in any large organisation complain about headquarters. The setting is careful to establish, usually quietly, that the Council is generally right on the questions it is actually positioned to answer, and that a fleet which stopped listening to it would become something the audience should be afraid of. That balance is why the body matters even when it is offstage."
+    }
+   ]
+  },
+  {
+   "id": "fed-general-orders",
+   "title": "Starfleet General Orders and Regulations",
+   "category": "Starfleet & Federation",
+   "summary": "The rulebook: what the standing orders cover, which ones officers actually cite, and what they are for.",
+   "sections": [
+    {
+     "heading": "A Written Institution",
+     "body": "Starfleet runs on written regulation to a degree that surprises people who expect a fleet of explorers to improvise. General Orders are the standing instructions binding every officer; Starfleet Regulations cover conduct, procedure and administration; and both are cited by number in the setting the way case law is cited elsewhere. The habit is not bureaucratic decoration. A fleet whose vessels routinely operate months from any authority needs its officers to carry the institution's judgement with them, and written regulation is how that is done. An officer alone at a frontier consulting a general order is consulting the accumulated conclusions of everyone who faced something similar. Regulations are also revised, and the setting occasionally notes it. A rule that produced a disaster gets rewritten, which means the rulebook is a record of past failures as much as a set of instructions."
+    },
+    {
+     "heading": "The Ones That Get Cited",
+     "body": "The first and most consequential is the non-interference directive, which forbids involvement in the internal development of a civilisation that has not achieved interstellar flight. It has its own entry in this database because it does more work than every other regulation combined. Others recur because they govern moments of maximum stress. There are orders on the preservation of life, on the conditions under which a commanding officer may be relieved, on conduct toward prisoners, on the surrender of a vessel, and on the destruction of one to prevent its capture. There is a standing prohibition on visiting one particular world, on pain of the only death penalty Starfleet retains — a detail that exists mainly to establish that the fleet has one line it will not discuss. Officers also cite regulations at each other as a rhetorical move, which is realistic. A junior officer quoting a regulation number at a superior is doing something socially precise: appealing past the person to the institution."
+    },
+    {
+     "heading": "Orders That Are Meant to Be Broken",
+     "body": "The setting's protagonists violate regulations regularly and are, on the whole, vindicated. That could be lazy — the hero knows better than the rules — and mostly it is not, because the stories are careful about what breaking a rule costs. An officer who violates a general order is required to log it and to answer for it. Hearings happen. Careers are damaged. The setting's most admired captains have records containing genuine reprimands, and the institution's tolerance is presented as a deliberate policy rather than as indulgence: Starfleet would rather have officers who will act and explain afterwards than officers who will not act. What is never treated as acceptable is concealment. The regulation broken openly and defended is the setting's ideal; the regulation broken quietly and hidden is how its villains begin."
+    },
+    {
+     "heading": "What the Rulebook Is Actually For",
+     "body": "The deeper function of the regulations is to make an officer's discretion legible. A captain with sweeping authority and no written framework is simply a person with power; the same captain operating inside a rulebook has a standard they can be measured against, including by themselves. That is why the setting keeps staging scenes in which an officer knows the regulation, states it aloud, and then decides. Saying the rule before departing from it is what separates a judgement from an impulse, and it is why the log entry exists. It also protects people below. Regulations on conduct, on refusing unlawful orders and on the treatment of prisoners exist so that a junior officer facing a superior has something to stand on other than their own nerve. A rulebook is, among other things, a distribution of courage."
+    }
+   ]
   }
  ]
 }

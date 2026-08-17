@@ -662,7 +662,7 @@
    "id": "astro-rockets-and-orbital-mechanics",
    "title": "Rockets and Orbital Mechanics: How to Actually Get to Space and Stay There",
    "category": "Astronomy",
-   "summary": "The physics of why rockets work, why they come in stages, and what it actually costs in velocity to reach orbit, the Moon, or Mars — plus the orbital mechanics that governs everything once you're up there.",
+   "summary": "The physics of why rockets work, why they come in stages, and what it actually costs in velocity to reach orbit, the Moon, or Mars — plus the orbital mechanics that governs everything once you're up there. Worked throughout with real vehicles, the Space Shuttle chief among them.",
    "headings": [
     "Newton's Third Law in a Can: Why Rockets Work Without Air to Push Against",
     "The Tsiolkovsky Rocket Equation: The One Formula That Governs Everything",
@@ -675,7 +675,7 @@
     "Tools, Materials, and Where to Get Them",
     "Step-by-Step: Launch a Model Rocket and Verify the Rocket Equation Yourself",
     "From Launch to Orbit: Gravity Losses, Drag Losses, and the Gravity Turn",
-    "Reentry and Coming Home",
+    "Reentry and Coming Home: Heat Shields and Space Shuttle Tiles",
     "Practical Applications: Satellites, Stations, and Real Launch Economics"
    ],
    "file": "guides_astronomy.json"
@@ -6392,6 +6392,19 @@
    "file": "guides_federation_timeline.json"
   },
   {
+   "id": "fed-khitomer-accords",
+   "title": "The Khitomer Accords",
+   "category": "Federation Timeline",
+   "summary": "How a century of hostility with the Klingon Empire ended, and what it cost the people who ended it.",
+   "headings": [
+    "The Situation",
+    "The Conspiracy",
+    "What Was Signed",
+    "Why It Is the Setting's Favourite Story"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -11130,6 +11143,32 @@
    "file": "guides_notable_figures.json"
   },
   {
+   "id": "fed-first-officer",
+   "title": "The First Officer",
+   "category": "Notable Figures",
+   "summary": "Second in command: the post that runs the ship, argues with the captain, and is not the captain.",
+   "headings": [
+    "The Post",
+    "Arguing With the Captain",
+    "The Question of Promotion",
+    "Why the Format Needs Two"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-chief-engineer",
+   "title": "The Chief Engineer of a Starship",
+   "category": "Notable Figures",
+   "summary": "The officer who keeps the ship alive: what engineering actually does, and why the answer is always a number.",
+   "headings": [
+    "The Post",
+    "The Estimate",
+    "Improvisation as a Speciality",
+    "Down Where the Ship Actually Is"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "carbohydrates-and-blood-sugar",
    "title": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
@@ -13179,6 +13218,71 @@
    "file": "guides_species_and_civilisations.json"
   },
   {
+   "id": "fed-cardassians",
+   "title": "Cardassians",
+   "category": "Species & Civilisations",
+   "summary": "A state that made obedience a virtue and occupation a duty — and then had to live with what it did.",
+   "headings": [
+    "The Union",
+    "Law Without Doubt",
+    "The Occupation",
+    "Ruin and Afterwards"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-bajorans",
+   "title": "Bajorans",
+   "category": "Species & Civilisations",
+   "summary": "A people who survived occupation with their faith intact, and the question of what to do next.",
+   "headings": [
+    "A Very Old Civilisation",
+    "Faith",
+    "After the Occupation",
+    "Why Bajor Matters to the Setting"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-betazoids",
+   "title": "Betazoids",
+   "category": "Species & Civilisations",
+   "summary": "A telepathic people, and what a society looks like when nothing can be hidden.",
+   "headings": [
+    "Telepathy as a Baseline",
+    "A Society Without Concealment",
+    "The Ethics of Reading",
+    "Betazoids in the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-trill",
+   "title": "Trill",
+   "category": "Species & Civilisations",
+   "summary": "A species that carries its own dead: joined life, and what continuity does to a person.",
+   "headings": [
+    "Host and Symbiont",
+    "Who Gets Joined",
+    "The Rule About Previous Lives",
+    "What the Idea Is For"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-humanity",
+   "title": "Humanity in the Federation",
+   "category": "Species & Civilisations",
+   "summary": "How the setting's humans are described from outside, and why the Federation looks like them.",
+   "headings": [
+    "The Species That Kept Volunteering",
+    "What Changed",
+    "The Federation's Accent",
+    "Why Humans Are the Viewpoint"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "association-football-rules-and-positions",
    "title": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
@@ -13294,6 +13398,32 @@
    "file": "guides_starfleet_and_federation.json"
   },
   {
+   "id": "fed-federation-council",
+   "title": "The Federation Council",
+   "category": "Starfleet & Federation",
+   "summary": "Who actually governs: the civilian body Starfleet answers to, and why that relationship is fraught.",
+   "headings": [
+    "The Body",
+    "Civilian Control",
+    "Membership",
+    "Why It Rarely Appears"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-general-orders",
+   "title": "Starfleet General Orders and Regulations",
+   "category": "Starfleet & Federation",
+   "summary": "The rulebook: what the standing orders cover, which ones officers actually cite, and what they are for.",
+   "headings": [
+    "A Written Institution",
+    "The Ones That Get Cited",
+    "Orders That Are Meant to Be Broken",
+    "What the Rulebook Is Actually For"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
    "id": "fed-starship-design",
    "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
    "category": "Starships & Classes",
@@ -13342,6 +13472,32 @@
     "Cloak, and the Cost of It",
     "Small, Cheap and Everywhere",
     "Fighting One, and Fighting In One"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-defiant-class",
+   "title": "The Defiant Class",
+   "category": "Starships & Classes",
+   "summary": "The warship the Federation said it did not build: small, overpowered, and an admission.",
+   "headings": [
+    "Built for One Enemy",
+    "Overpowered, Literally",
+    "The Cloak Nobody Talks About",
+    "What It Meant"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-shuttlecraft",
+   "title": "Shuttlecraft and Runabouts",
+   "category": "Starships & Classes",
+   "summary": "The small craft: what a starship carries, what they are for, and why they crash so often.",
+   "headings": [
+    "The Ship's Boats",
+    "What They Are Actually For",
+    "Why So Many Are Lost",
+    "Flying One"
    ],
    "file": "guides_starships_and_classes.json"
   },
@@ -13629,6 +13785,58 @@
    "file": "guides_warp_and_starship_technology.json"
   },
   {
+   "id": "fed-replicator",
+   "title": "The Replicator",
+   "category": "Warp & Starship Technology",
+   "summary": "Matter on demand: the technology that abolished scarcity, and the limits that keep the setting working.",
+   "headings": [
+    "What It Does",
+    "The Limits, and Why They Exist",
+    "What It Did to Society",
+    "The Uncomfortable Question"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-tricorder",
+   "title": "The Tricorder",
+   "category": "Warp & Starship Technology",
+   "summary": "The handheld instrument that makes an away mission possible, and why it is always failing.",
+   "headings": [
+    "A General-Purpose Sensor",
+    "What It Cannot Do",
+    "The Grammar of the Away Mission",
+    "Sensors at Scale"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-cloaking-device",
+   "title": "The Cloaking Device",
+   "category": "Warp & Starship Technology",
+   "summary": "Invisibility as a weapon, as a treaty question, and as the thing the Federation gave up.",
+   "headings": [
+    "How It Is Described",
+    "The Treaty",
+    "Living Without One",
+    "Who Has One"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-universal-translator",
+   "title": "The Universal Translator",
+   "category": "Warp & Starship Technology",
+   "summary": "The device that makes first contact possible, and the thing it quietly papers over.",
+   "headings": [
+    "The Necessary Convenience",
+    "Where It Fails",
+    "What It Papers Over",
+    "First Contact, Practically"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
    "id": "the-stratosphere-and-the-ozone-layer",
    "title": "The Stratosphere and the Ozone Layer",
    "category": "Weather",
@@ -13880,6 +14088,19 @@
     "Why It Is Unstable by Design",
     "Life Along the Line",
     "When the Line Moves"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-vulcan-world",
+   "title": "Vulcan, the Planet",
+   "category": "Worlds & Stations",
+   "summary": "The world itself: heat, thin air, high gravity, and a landscape that shaped a philosophy.",
+   "headings": [
+    "Conditions",
+    "The Landscape as Argument",
+    "Cities and Institutions",
+    "Visiting"
    ],
    "file": "guides_worlds_and_stations.json"
   }

@@ -119,6 +119,102 @@
      "body": "The holodeck's most serious material is the status of its characters. Simulated people are ordinarily no more real than the scenery, but the technology is capable of producing programs sophisticated enough to reason, to prefer, to object to being switched off, and to ask what they are. The setting takes this seriously rather than dismissing it. Once a program can convincingly argue for its own continuation, the person holding the off switch has a problem that no amount of insisting it is only a program resolves — and the argument is uncomfortably similar to the ones used against every other kind of person the setting's civilisations have historically declined to recognise. It also runs the question the other way, at the occupant. A person who prefers the holodeck's company to the real crew's is doing something the setting treats with sympathy and real concern, because the machine will always be more accommodating than anyone actually alive."
     }
    ]
+  },
+  {
+   "id": "fed-replicator",
+   "title": "The Replicator",
+   "category": "Warp & Starship Technology",
+   "summary": "Matter on demand: the technology that abolished scarcity, and the limits that keep the setting working.",
+   "sections": [
+    {
+     "heading": "What It Does",
+     "body": "A replicator converts energy into matter arranged to a stored pattern, producing food, drink, clothing, tools and spare parts on request. Aboard ship it is the reason a crew can spend years away without carrying years of supplies, and in Federation society at large it is the reason material scarcity is described in the past tense. The technology is closely related to the transporter, which likewise converts matter to a pattern and back. The difference is that the transporter reassembles something that already existed, at the resolution required to preserve a living being, while a replicator builds from a stored template at a coarser resolution that is adequate for a cup of tea and not for a person. Industrial replicators are the same idea at scale — building components, structural elements and machinery — and are significant enough to appear in relief operations and in treaties. A civilisation that can supply another with industrial replicators is offering something closer to an economy than to aid."
+    },
+    {
+     "heading": "The Limits, and Why They Exist",
+     "body": "Replicators cannot produce everything, and each restriction is doing narrative work. Antimatter, latinum and certain complex substances cannot be replicated, which preserves a currency and a fuel that must actually be obtained. Living tissue cannot be produced, which keeps medicine a discipline rather than a vending machine. Several medicines and biological compounds are described as beyond it, which is why a plague can still be a crisis. The pattern resolution limit also explains the running complaint that replicated food is not as good. The setting is consistent about this: characters who cook are respected for it, real ingredients are a luxury, and a meal someone prepared by hand carries a weight the machine cannot supply. Whether the difference is genuinely detectable or is a matter of knowing is left ambiguous, which is the more interesting position. Replication also costs energy, and on a damaged ship or a rationed station that becomes a real constraint — replicator rations are a plot device precisely because they represent scarcity returning to a society that had forgotten it."
+    },
+    {
+     "heading": "What It Did to Society",
+     "body": "The Federation's post-scarcity character rests on this machine. If food, clothing and most goods can be produced on demand, then working for subsistence ends, and with it the greater part of what human economies had been organised around. The setting's claim is that people then pursue craft, service, science and self-improvement, and that this is what abundance is for. Critics inside the setting are given real arguments. Ferengi note that a society which never has to earn anything has not proved much about its virtue. Others observe that the Federation still allocates scarce things — postings, commands, admission, the use of a starship — and that competition simply moved rather than ended. Not every world adopted it equally, and that is deliberate. Colonies, frontier settlements and non-member powers live with genuine scarcity, and a Starfleet officer arriving from a replicator economy to somewhere that has none is one of the setting's standing sources of friction."
+    },
+    {
+     "heading": "The Uncomfortable Question",
+     "body": "The technology raises a problem the setting mostly declines to look at directly: a machine that assembles matter to a pattern could, at sufficient resolution, assemble a person. The transporter demonstrably does exactly that every time it is used. The setting handles this by drawing a technical line — replicator resolution is insufficient for life — and by treating the exceptions as horror stories rather than as opportunities. The episodes in which a pattern is duplicated, preserved or restored from a record are among the setting's most disquieting, and none of them ends with anyone proposing to do it routinely. That reluctance is the honest response. A civilisation with this technology and no prohibition around it would be unrecognisable within a generation, and the setting's decision to keep the machine making cups of tea is what allows its people to remain people."
+    }
+   ]
+  },
+  {
+   "id": "fed-tricorder",
+   "title": "The Tricorder",
+   "category": "Warp & Starship Technology",
+   "summary": "The handheld instrument that makes an away mission possible, and why it is always failing.",
+   "sections": [
+    {
+     "heading": "A General-Purpose Sensor",
+     "body": "A tricorder is a portable scanning and computing device carried on virtually every away mission. It measures — atmosphere, radiation, energy signatures, geology, life signs, structural composition — records what it measures, cross-references against a stored database, and presents a conclusion. Its name refers to the three functions it combines: sensing, recording and computing. Variants exist for particular disciplines. The medical tricorder carries a detachable hand scanner and a diagnostic database, and is the reason a physician can assess a patient without touching them. Engineering models trade biological sensitivity for structural and energy analysis. The device is the practical answer to a question the format raises constantly: how does a landing party know anything about where they have just arrived? Without it, every planet would require a laboratory and a week. With it, an officer can turn in a circle and report."
+    },
+    {
+     "heading": "What It Cannot Do",
+     "body": "The tricorder's limits are as carefully maintained as its capabilities, because an instrument that answered every question would end most stories in the opening minutes. It is defeated by particular mineral deposits, by dense atmospheres, by energy fields, by deliberate jamming, and by anything sufficiently outside its reference library. The last of these is the honest one and the setting uses it well. A tricarder can tell you precisely what it is looking at only when the thing has been catalogued; confronted with something genuinely new, it produces readings rather than answers, and interpreting them is the science officer's job rather than the machine's. Its range is short, its power finite, and it is fragile relative to what it is carried into. A landing party that has lost its tricorders is meaningfully blind, and the setting stages that reversal often enough that the audience feels the dependence."
+    },
+    {
+     "heading": "The Grammar of the Away Mission",
+     "body": "Practically, the tricorder gives the setting a way to deliver exposition that does not sound like exposition. An officer reading an instrument aloud is describing the situation to the audience while doing something a professional would actually do, and the device's limitations let the writer choose exactly how much the characters are allowed to know. The characteristic gesture — sweeping the device across an unknown space and frowning at the result — is the setting's shorthand for competent caution. What distinguishes the good officers is what they do when the reading is ambiguous, which is where the instrument stops helping. It also sets the tone of Federation exploration. A landing party whose first action is to measure rather than to secure the area is telling the audience what kind of organisation this is, before anyone has said a word."
+    },
+    {
+     "heading": "Sensors at Scale",
+     "body": "The tricorder is the handheld end of a continuum. A starship's sensor suite does the same work across enormous distances and with far greater sensitivity, sweeping systems for life signs, mapping planetary composition from orbit, and detecting vessels at ranges measured in light-years for some phenomena and in minutes of warning for others. Shipboard sensors have their own carefully maintained blind spots: they are degraded by nebulae, defeated by cloaking devices, confused by certain radiation and limited by the speed at which their own emissions travel. A ship that could see everything would never be surprised, and surprise is most of the plot. Between the two sits the probe — an expendable sensor package launched to look at something the ship should not approach. Probes are the setting's way of gathering information at a cost, which is a more useful narrative device than gathering it for free."
+    }
+   ]
+  },
+  {
+   "id": "fed-cloaking-device",
+   "title": "The Cloaking Device",
+   "category": "Warp & Starship Technology",
+   "summary": "Invisibility as a weapon, as a treaty question, and as the thing the Federation gave up.",
+   "sections": [
+    {
+     "heading": "How It Is Described",
+     "body": "A cloaking device renders a vessel effectively invisible — not merely to the eye, but to the sensors that matter, by bending emissions and radiation around the hull rather than by hiding a signature. A cloaked ship is not undetectable in principle; it is undetectable by any method the observer happens to be using, which is a narrower and more useful claim. The energy cost is substantial and the strain on the vessel real. Most designs cannot fire while cloaked, because raising weapons or shields requires collapsing the field, and the moment of decloaking is the moment of maximum exposure. That single limitation is what keeps the technology from being an automatic victory. Cloaks also leave traces. Faint distortions, particle emissions and the disturbance a moving mass makes are all described at various points as detectable by an observer who knows what to look for and has prepared to look for it — which is the basis of every countermeasure in the setting."
+    },
+    {
+     "heading": "The Treaty",
+     "body": "The Federation is barred by treaty from developing cloaking technology. The agreement was made with the Romulan Star Empire as part of a wider settlement, and it is one of the setting's most consequential pieces of background: a major power renounced a whole category of capability and then kept the promise for generations. Whether it was a good bargain is genuinely arguable. The Federation gave up an enormous tactical advantage in exchange for a border and a period of quiet, and every subsequent engagement in which a cloaked opponent chooses the moment of battle is the bill arriving. Officers say so aloud. The setting's respect for the agreement is the point. A power that could break a treaty profitably and does not is demonstrating something about itself, and the episodes in which elements of Starfleet quietly try to develop a cloak anyway are treated as scandals rather than as initiative."
+    },
+    {
+     "heading": "Living Without One",
+     "body": "Federation tactical doctrine is shaped by not having it. Its ships must be able to survive being seen, which pushes design toward shields, structural strength and endurance rather than toward the strike-and-vanish pattern its neighbours favour. A Starfleet vessel expects to be found and to still be there afterwards. Detection therefore matters more to the Federation than to anyone else, and its answers are correspondingly inventive: sensor grids tuned to the distortions a cloak cannot suppress, arrangements of ships that triangulate on faint traces, and the simple expedient of presenting a target too tempting to pass up. The setting's cleverest space battles are usually about locating the enemy rather than about out-shooting them. There is also a cultural dimension the setting draws out. A fleet that cannot hide is a fleet that must announce itself, and Starfleet's habit of hailing first, identifying itself and stating its business is not only good manners. It is the doctrine of a navy that was always going to be seen anyway."
+    },
+    {
+     "heading": "Who Has One",
+     "body": "The Romulans are the technology's originators in most accounts and its most sophisticated users, and their designs are described as the best available. The Klingons acquired it during a period of alliance between the two powers, which is the in-universe explanation for a good deal of shared design language between their vessels. Others have it in various forms, and the setting occasionally introduces more advanced versions — able to fire while cloaked, or to pass through solid matter — usually as a temporary crisis rather than as a permanent change to the balance. A capability that removes the trade-off removes the interest. The one Federation exception is a single vessel operating a borrowed device under treaty supervision, which the database covers under the Defiant class. That it required a negotiated exception, with conditions and reporting obligations, is precisely how seriously the setting takes the original promise."
+    }
+   ]
+  },
+  {
+   "id": "fed-universal-translator",
+   "title": "The Universal Translator",
+   "category": "Warp & Starship Technology",
+   "summary": "The device that makes first contact possible, and the thing it quietly papers over.",
+   "sections": [
+    {
+     "heading": "The Necessary Convenience",
+     "body": "The universal translator analyses an unfamiliar language in real time and renders it into one the listener understands, and back again. It is present in ships, in communicators, in badges and eventually as something close to ambient infrastructure, and it is the reason a landing party can converse with a civilisation nobody has ever met. The described method is pattern analysis: identifying structure, matching concepts against a vast comparative database of known languages, and building a working model from a small sample. The setting is vague about how small, and deliberately so — a device that needed a month of recordings would make first contact a very different kind of story. It is the setting's most load-bearing convenience. Without it, every encounter would begin with a linguist and a year, and the format would collapse into something closer to a documentary about fieldwork."
+    },
+    {
+     "heading": "Where It Fails",
+     "body": "The interesting material is in its failures, and the setting has staged several deliberately. A language built entirely from allusion to a shared body of story defeats it completely: the translator renders every word correctly and the meaning does not survive, because the meaning was never in the words. Two parties can hear perfect translations of each other and understand nothing. Concepts with no counterpart in the listener's experience translate badly or not at all, and the setting occasionally shows a translator producing something grammatical and wrong. Telepathic species, species communicating chemically or by pattern, and languages with no spoken form all require different approaches. These failures are the setting's best arguments that translation is not decoding. A device that maps words to words is doing something much simpler than what actually happens when two people understand each other, and the episodes that make that visible are among the more thoughtful things the format has done."
+    },
+    {
+     "heading": "What It Papers Over",
+     "body": "The translator lets the setting avoid a question it would otherwise have to answer constantly: what is lost. Every character speaks fluently to every other, idiom included, which means the audience never experiences the friction of a conversation conducted through an intermediary. That has a cost the setting is occasionally honest about. Characters who speak a language natively — a Klingon reciting in Klingon, a Vulcan using a term with no equivalent — are making a point precisely by refusing the device, and the setting always treats that as significant. Learning a language when a machine would do it for you is presented as an act of respect. There is also a quiet cultural politics in it. A technology that renders everything into the listener's own terms is a technology that lets a powerful civilisation stop noticing that other people think in different shapes, and the setting's better writers have used the translator's silence about that as a subject."
+    },
+    {
+     "heading": "First Contact, Practically",
+     "body": "In practice the translator is what makes the setting's central ritual possible. A vessel arrives, hails, and speaks; the other party answers; and within a scene two civilisations that have never met are negotiating. Everything the format is about depends on that happening quickly. Procedure around it is careful. Early contact is conducted with the translator's output treated as provisional, ambiguous renderings are flagged, and officers are trained to watch for the signs that meaning is not arriving — a party agreeing too readily, or reacting to something that was not said. The setting's most quietly optimistic claim is embedded here. It assumes that understanding across genuinely alien minds is possible at all, that the difficulty is technical rather than fundamental, and that two species with nothing in common can still arrive at a sentence they both mean. The device is the setting's argument that talking is worth trying."
+    }
+   ]
   }
  ]
 }
