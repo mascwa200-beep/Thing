@@ -31,3 +31,8 @@ tools/kb/.next_wave.json
 # expected values when validating the astronomy cores locally — the app never reads them, so they
 # must not end up in the repo (or the APK).
 *.bsp
+
+# Local verification scratch: the harness is tracked, its build output and
+# regenerable inputs are not (index.tsv is derived from guide_index.json).
+scratchpad/**/out/
+scratchpad/kb/index.tsv
