@@ -3859,6 +3859,60 @@ fact). PACKS screen wired as `Routes.STUDY` is, MENU → GUIDES.
    bit twice in one session — once in a test I wrote, once in a pre-existing one that had been
    passing only because two `System.currentTimeMillis()` reads landed on the same millisecond.
 
+### THE WARNINGS THE APP HELD AND NEVER SAID (this session cont., PR #448)
+
+Three slices, all found by measuring rather than reading, all zero subagent spend.
+
+**Safety notes enter the study schedule + an option fits on a phone (`6cab204`, CI 1685 green).**
+`grep` found **no reference to `safetyNote` anywhere** in `core:telemetry` or either `StudyStore` —
+184 of the 581 guides carry one and none was ever taught. `StudyQuestions.safety()` makes one card
+per guide, added **first** in both `teach()` so the per-lesson cap can never drop it. Deliberately a
+`RECALL`, never a graded MCQ: distractors would be other guides' real warnings, and marking a true
+precaution "wrong here" is a hazard. The answer is **never trimmed**, unlike ordinary recall — a
+third of the notes exceed `RECALL_CHARS` and a fixed cut lands where "never do X" lives.
+Also: the ORDER questions shipped an hour earlier put a **median 962 characters on screen** (58%
+over 900). `StudyQuestions.shortOptions` cuts at a sentence boundary with an ellipsis → median 765,
+6% over 900. ⚠️ **The load-bearing rule is that shortening must never make two options look alike**;
+it returns the originals unchanged whenever it would reduce how many distinct options are on offer.
+Real corpus: 804 questions, 0 invented options, 0 freebies, **0 collisions**.
+
+**The answer carries the page's own warning (`1934b43`, CI 1686 green).** `LibraryLookup` — the one
+place that decides what the library says — never read `safetyNote` either. So the console printed
+the poisoning protocol without "not a substitute for calling Poison Control", and `library read`
+(which the persona tells the model to use) never saw what the *outline* carried. Fixed in three
+places; the warning **leads**, matching the reader, which already renders it above the sections.
+⚠️ **Correction to my own first reading:** the curated `EmergencyTriage` table already carries the
+critical do-nots ("do not put anything in their mouth", "do not touch them until the power is off")
+and the voice bypass speaks that table directly — **the first action was never at risk.** Also: four
+of five emergency notes end with "not training and not medical advice" and the console appended it
+unconditionally, so it printed twice.
+
+**An urgent advisory can wake the board (`907f9e7`).** `Oracle.pushWorthy` had no caller since the
+one-notification consolidation, and the ADVISORY row that replaced it never raised the alert at all —
+two judgements of "worth interrupting for", one of them dead. Reading which rules reach that bar is
+what made it small: of four, departures/emergencies/security already alert through their own notice
+and battery is OS-handled, leaving **extreme heat danger with no path at all**. Now YELLOW only,
+never RED, only when nothing above it spoke, keyed on the insight's `family` so a line that rewrites
+itself as the temperature climbs buzzes once.
+
+**⚠️ THE LESSON OF THIS SESSION, on its third and sharpest form: a test that passes proves nothing
+until you have watched it fail.** Three separate tests here were green for the wrong reason.
+1. A collision fixture sharing 84 characters where the cut is at 120 — no collision existed to catch.
+2. A safety-note fixture of 168 characters, so truncating the shipped code to `RECALL_CHARS` changed
+   nothing; and later a 2-sentence fixture where `SPOKEN_SENTENCES` is 2, same failure again.
+3. **New mechanism, and the worst: the negative-test perturbation silently failed to match the
+   source.** A defect that was never applied looks exactly like a rule that holds. Every perturbation
+   script now `assert`s it matched before anything runs.
+Derive the fixture from the shipped rule, and derive its *size* from the real corpus — the notes have
+a median of 448 characters and three sentences, the steps a median of 180.
+
+**Also worth keeping.** A dead-code sweep over `core:telemetry` is only useful if it counts **in-file**
+callers: the first cut reported `StudyProgress.streak`, which is called one line below its own
+definition and displayed on four surfaces. Counting them turned 99 noisy candidates into 31 worth
+reading. Of those, `Geodesy.formatDms` is genuinely dead while `NavScreen` carries its own private
+`dms()` (the better one — it rounds to tenths *before* splitting) — a duplicated definition worth
+converging, left as a follow-up because neither is wrong today.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
