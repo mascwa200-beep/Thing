@@ -8877,6 +8877,28 @@
    "file": "guides_language_and_linguistics.json"
   },
   {
+   "id": "translation-and-interpreting-as-work",
+   "title": "Translation and Interpreting: What a Translator and an Interpreter Actually Do",
+   "category": "Language & Linguistics",
+   "summary": "The two professions and why they are different jobs: what a translator does and what an interpreter does, simultaneous interpreting in the booth and why interpreters work in pairs, consecutive interpreting and its symbolic note-taking system, liaison, community and remote interpreting over the phone and by video, sign language interpreting and Deaf interpreters, court and legal interpreting, medical interpreting and why a family member must never be used, technical, legal, patent and marketing translation with CAT tools and translation memory, subtitling, dubbing and audio description, software, website and game localisation, machine translation and post-editing, how to become a translator or interpreter, and the ethics of accuracy, impartiality and confidentiality.",
+   "headings": [
+    "Two Different Jobs: Translation and Interpreting",
+    "Simultaneous Interpreting: The Booth",
+    "Consecutive Interpreting and the Art of Note-Taking",
+    "Liaison, Community and Remote Interpreting",
+    "Sign Language Interpreting",
+    "Court and Legal Interpreting",
+    "Medical Interpreting",
+    "Technical, Legal and Commercial Translation",
+    "Subtitling, Dubbing and Audiovisual Translation",
+    "Localisation: Software, Games and Websites",
+    "Machine Translation and Post-Editing",
+    "Becoming a Translator or Interpreter",
+    "Ethics: Accuracy, Impartiality and Confidentiality"
+   ],
+   "file": "guides_language_and_linguistics.json"
+  },
+  {
    "id": "theories-of-justice",
    "title": "Theories of Justice",
    "category": "Law & Government",
