@@ -9153,7 +9153,7 @@
    "id": "literary-translation-art-theory-famous-cases",
    "title": "Literary Translation — Art, Theory & Famous Cases",
    "category": "Literature & Writing",
-   "summary": "How literature crosses languages: the history and theory of translation from Cicero to Venuti, the craft as practiced, and famous cases from Homer and the Bible to Proust, Kafka, and the untranslatables.",
+   "summary": "How literature crosses languages: the history and theory of translation from Cicero to Venuti, what literary translators actually do and how the craft is practised, and famous cases from Homer and the Bible to Proust, Kafka, and the untranslatables.",
    "headings": [
     "The Impossible, Necessary Art",
     "Antiquity: The Septuagint, Cicero, and the Birth of Theory",
@@ -10300,7 +10300,7 @@
    "id": "first-aid",
    "title": "First Aid",
    "category": "Medical",
-   "summary": "Bleeding, CPR, shock, burns, fractures and choking.",
+   "summary": "Bleeding, CPR, shock, how to treat a burn or scald, fractures and choking.",
    "headings": [
     "Priorities (DR ABC)",
     "Severe bleeding",
@@ -10308,7 +10308,7 @@
     "Choking",
     "Shock",
     "Recovery position",
-    "Burns",
+    "Burns and scalds — how to treat a burn",
     "Cleaning a wound",
     "Splinting a fracture",
     "Sprains — RICE"
@@ -10445,7 +10445,7 @@
    "id": "med-pediatric-elderly-care-differences",
    "title": "Pediatric and Elderly Care: Why Age Changes the Rules",
    "category": "Medical",
-   "summary": "Explains why the same first-aid technique, drug dose, or 'normal' vital sign that's correct for a healthy adult can be wrong — sometimes dangerously wrong — at either end of the age spectrum, and gives concrete tools for adjusting care accordingly.",
+   "summary": "Explains why the same first-aid technique — CPR on a child or infant included —, drug dose, or 'normal' vital sign that's correct for a healthy adult can be wrong — sometimes dangerously wrong — at either end of the age spectrum, and gives concrete tools for adjusting care accordingly.",
    "headings": [
     "Why the Same Body Doesn't Apply at Every Age",
     "Vital Signs Across the Lifespan — the Numbers That Actually Change",
@@ -10454,7 +10454,7 @@
     "Estimating Weight When You Can't Weigh Them",
     "Elderly Pharmacology — Why the Same Pill Hits Harder",
     "Atypical Presentation — When Illness Doesn't Look Like Illness",
-    "First Aid Technique Changes With Age",
+    "First Aid Technique Changes With Age: CPR on a Child or Infant, Choking and Compressions",
     "Common Misconceptions at Both Ends of Life",
     "Tools & Materials for Observing and Practicing This",
     "Step-by-Step: Building Your Own Age-Aware First Aid Skills",
@@ -10560,6 +10560,28 @@
     "Fluids, and when not to give them",
     "Who is at risk, and the ones people forget",
     "Staying ahead of the heat"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "getting-medical-care",
+   "title": "Getting Medical Care: What Doctors and Nurses Do, and When to See Them",
+   "category": "Medical",
+   "summary": "How to actually use a health service: who does what — doctors, nurses, paramedics, pharmacists and allied professions — what a doctor's job really involves, when to seek help and how urgently, how a hospital emergency department or emergency room triages, getting the most from a short appointment, how diagnoses are made and what tests can and cannot tell you, prescriptions, referrals and second opinions, consent and the right to refuse, your records, how health systems are paid for, and how to raise a concern.",
+   "headings": [
+    "Who Does What: Doctors, Nurses, Paramedics, Pharmacists and the Rest",
+    "What a Doctor Actually Does, and Why Uncertainty Is Normal",
+    "Primary Care and the Generalist's Job",
+    "When to Seek Help, and How Urgently",
+    "Emergency Departments and the Emergency Room: Triage, Waiting, and What They Are For",
+    "Getting the Most Out of a Short Appointment",
+    "How a Diagnosis Is Made, and What Tests Can and Cannot Tell You",
+    "Prescriptions, Pharmacists and Taking Medicines Properly",
+    "Referrals, Specialists, Waiting Lists and Second Opinions",
+    "Consent, Capacity and the Right to Refuse",
+    "Your Records, Results and How to See Them",
+    "How Health Systems Are Paid For, and Why That Changes What You Get",
+    "When Something Goes Wrong: Raising Concerns and Complaints"
    ],
    "file": "guides_medical.json"
   },
@@ -11922,12 +11944,12 @@
    "id": "phys-modern-physics-relativity-quantum",
    "title": "Modern Physics: Special Relativity & Quantum Mechanics, Worked With Real Numbers",
    "category": "Physics",
-   "summary": "How Einstein's relativity and the quantum revolution overturned two centuries of confident classical physics — walked through with the actual equations, the actual experiments, and numbers you can check on a calculator.",
+   "summary": "How Einstein's relativity and the quantum revolution overturned two centuries of confident classical physics — walked through with the actual equations, the actual experiments, and numbers you can check on a calculator. Includes antimatter: what a positron is and what happens when it meets an electron.",
    "headings": [
     "Why classical physics quietly stopped working",
     "Special relativity's two rules — and what they do to time",
     "Length contraction and why 'simultaneous' isn't universal",
-    "E = mc²: mass and energy are the same currency",
+    "E = mc²: mass and energy are the same currency — antimatter and the positron",
     "Light comes in packets: the photoelectric effect",
     "Everything is also a wave: de Broglie matter waves",
     "The uncertainty principle: why electrons don't sit still",
