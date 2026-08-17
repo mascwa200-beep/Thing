@@ -109,6 +109,17 @@ data class OracleSignals(
     val envDescription: String? = null,
     val envAnomaly: String? = null,
     val pressureFallingFast: Boolean = false,
+    // Study — how the bundled library is actually going. Nulls and zeroes mute their own rules, so a
+    // reader who has never studied hears nothing at all from this domain.
+    /** Cards ready to be asked right now. */
+    val reviewsDue: Int = 0,
+    /** Consecutive days of study ending today or yesterday. */
+    val studyStreakDays: Int = 0,
+    /** Whether today is already counted — a streak is only "at risk" if it is not. */
+    val studiedToday: Boolean = false,
+    /** The guide going worst, and how it reads. Null when nothing has enough evidence to judge. */
+    val shakyGuideTitle: String? = null,
+    val shakyGuideDetail: String? = null,
 ) {
     val minutesNow: Int get() = minuteOfDay
     val isNight: Boolean get() = hourOfDay >= 22 || hourOfDay < 6
@@ -120,6 +131,18 @@ object Oracle {
     private const val DRIVE_MPS = 11.0       // ~40 km/h effective urban drive
     private const val ARRIVE_BUFFER_MIN = 5  // be there a few minutes early
     private const val MOVEMENT_THRESHOLD = 0.09f // smoothed motion intensity above which you're "moving"
+
+    /** Fewer than this and the queue is not worth opening the app for. */
+    private const val REVIEWS_WORTH_MENTIONING = 3
+
+    /** One day is not a streak; nothing is lost by letting it lapse. */
+    private const val STREAK_WORTH_PROTECTING = 3
+
+    /** Before this hour the day has plenty left in it and the urgency would be invented. */
+    private const val STREAK_RISK_FROM_HOUR = 19
+
+    /** Past this, going to bed beats a guilt prompt. */
+    private const val STREAK_TOO_LATE_HOUR = 23
 
     private fun minutesUntil(ms: Long, nowMs: Long): Double = (ms - nowMs) / 60_000.0
 
@@ -507,11 +530,74 @@ object Oracle {
         )
     }
 
+    // ---- study ---------------------------------------------------------------------------------------
+
+    /**
+     * A real review queue, at a moment you could actually do it.
+     *
+     * Gated on a queue worth opening the app for — one due card is not news — and on being settled and
+     * awake. "You could study" at any hour, on any backlog, is the kind of advisory people learn to
+     * scroll past, which costs the whole surface its credibility rather than just this line.
+     */
+    private fun reviewsDue(s: OracleSignals): Insight? {
+        if (s.reviewsDue < REVIEWS_WORTH_MENTIONING) return null
+        if (s.isNight || s.movement >= MOVEMENT_THRESHOLD) return null
+        return Insight(
+            id = "study_due", kind = InsightKind.OPPORTUNITY, urgency = Urgency.NOTABLE,
+            title = "${s.reviewsDue} things are due to be asked again",
+            detail = "You're settled — a good few minutes to keep them from slipping.",
+            score = Urgency.NOTABLE.weight * 1000.0 + 10,
+            actionRoute = "study",
+            sources = listOf("study", "perception"),
+        )
+    }
+
+    /**
+     * A streak about to lapse, raised only when there is still time to save it.
+     *
+     * ⚠️ Three gates, and each removes a way this becomes nagging: a streak long enough to be worth
+     * protecting (one day is not a streak), the day not already counted, and **late enough that it is
+     * genuinely at risk**. Firing this at nine in the morning would be inventing urgency about
+     * something with fourteen hours left to happen.
+     */
+    private fun streakAtRisk(s: OracleSignals): Insight? {
+        if (s.studiedToday) return null
+        if (s.studyStreakDays < STREAK_WORTH_PROTECTING) return null
+        if (s.hourOfDay < STREAK_RISK_FROM_HOUR || s.hourOfDay >= STREAK_TOO_LATE_HOUR) return null
+        return Insight(
+            id = "study_streak", kind = InsightKind.REMINDER, urgency = Urgency.NOTABLE,
+            title = "${s.studyStreakDays}-day study streak, and today isn't counted yet",
+            detail = "One question keeps it. It's late enough that it's this or nothing.",
+            score = Urgency.NOTABLE.weight * 1000.0 + s.studyStreakDays,
+            actionRoute = "study",
+            sources = listOf("study", "time"),
+        )
+    }
+
+    /**
+     * The subject going worst, named.
+     *
+     * Ambient on purpose: this is worth knowing, never worth interrupting for. The evidence bar lives
+     * upstream in [StudyProgress.weakest], so anything arriving here has already earned the claim.
+     */
+    private fun studyWeakSpot(s: OracleSignals): Insight? {
+        val title = s.shakyGuideTitle ?: return null
+        return Insight(
+            id = "study_weak", family = "study_weak", kind = InsightKind.PREDICTION, urgency = Urgency.AMBIENT,
+            title = "$title keeps catching you out",
+            detail = s.shakyGuideDetail ?: "Worth another pass when you have a moment.",
+            score = Urgency.AMBIENT.weight * 1000.0 + 8,
+            actionRoute = "study",
+            sources = listOf("study"),
+        )
+    }
+
     private val RULES: List<(OracleSignals) -> Insight?> = listOf(
         ::emergency, ::leaveNow, ::meetingPrep, ::chargeNow,
         ::weatherPrep, ::uvWarn, ::marketMove, ::aurora, ::focusMoment, ::storageCleanup,
         ::windDown, ::habitPrefetch, ::interestPulse, ::stormFront, ::envAnomaly,
         ::heatStress, ::windChillBite, ::gustWarning, ::coldNight, ::fogLikely,
+        ::reviewsDue, ::streakAtRisk, ::studyWeakSpot,
     )
 
     /**
