@@ -88,7 +88,22 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                     }
                     res.isInitialLoading -> LoadingState()
                     res.isError -> ErrorState(res.error ?: "Error", onRetry = { vm.refresh() })
-                    res.data?.places.isNullOrEmpty() -> EmptyState("No ${state.category.title.lowercase()} found here — try zooming out or moving toward a town.")
+                    res.data?.places.isNullOrEmpty() -> EmptyState(
+                        // Says how far it actually looked. The search picks its own radius, so
+                        // "found nothing" is only meaningful alongside the circle it searched.
+                        buildString {
+                            append("No ${state.category.title.lowercase()} found ")
+                            val r = res.data?.searchRadiusMeters ?: 0
+                            if (r > 0) {
+                                append("within ${Geo.formatDistance(r.toDouble())} of you.")
+                            } else {
+                                append("here.")
+                            }
+                            append("\n\nOpenStreetMap coverage varies a lot by area — this means ")
+                            append("nothing is mapped nearby, which is not the same as nothing ")
+                            append("being there.")
+                        },
+                    )
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -110,6 +125,28 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
     }
 }
 
+/**
+ * "Hospital · A&E" / "Doctors' surgery" — the OSM tag in words, or null when there is nothing to add.
+ *
+ * Null rather than a placeholder: a row for a place whose tags we did not get should look like the
+ * old row, not like a row with a blank where the important part goes.
+ */
+private fun placeKindLine(place: Place): String? {
+    val kind = when (place.kind) {
+        "hospital" -> "Hospital"
+        "clinic" -> "Clinic"
+        "doctors" -> "Doctors' surgery"
+        "pharmacy" -> "Pharmacy"
+        "shelter" -> "Shelter"
+        null, "" -> null
+        else -> place.kind.replace('_', ' ').replaceFirstChar { it.uppercase() }
+    }
+    // `emergency=yes` on a hospital is the difference between somewhere that can take you now and
+    // somewhere that cannot, so it earns its place on the row rather than a detail view.
+    val ae = if (place.emergency == "yes") "A&E" else null
+    return listOfNotNull(kind, ae).joinToString(" · ").ifBlank { null }
+}
+
 @Composable
 private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
     val c = Pulse.colors
@@ -121,7 +158,20 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
                     "${Geo.formatDistance(place.distanceMeters)} · ${Geo.cardinal(place.bearing)} (${place.bearing.toInt()}°)",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
                 )
+                // What it actually is, and whether it takes emergencies. Both ride on every result
+                // and were parsed away, so a GP surgery and a hospital with an A&E department used
+                // to be indistinguishable on the row you would read in an emergency.
+                placeKindLine(place)?.let {
+                    Text(
+                        it,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp,
+                        color = if (place.emergency == "yes") c.positive else c.muted,
+                    )
+                }
                 place.address?.let { Text(it, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted) }
+                place.openingHours?.let {
+                    Text("Hours: $it", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint)
+                }
             }
             if (place.phone != null) {
                 IconButton(onClick = onCall) { Icon(Icons.Filled.Call, "Call", tint = c.positive) }

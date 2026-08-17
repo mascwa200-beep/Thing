@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.places
 
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.telemetry.PoiSearch
 import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.util.Geo
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,14 @@ class OverpassRepository(
         }
     }
 
+    /**
+     * Search outward (or inward) until the response is one we can honestly rank.
+     *
+     * Overpass fills a quota in its own order — type, then id — and never by distance, so a quota
+     * that binds hands back an arbitrary slice. [PoiSearch] turns that into a rule: pick the radius
+     * so the quota does not bind, and then every match inside the circle is present and the nearest
+     * of them really are the nearest. See its KDoc for the measurement behind it.
+     */
     private suspend fun load(
         id: String,
         filter: String,
@@ -75,20 +84,62 @@ class OverpassRepository(
         lat: Double,
         lon: Double,
     ): PlacesResult {
+        var radius = PoiSearch.startRadius(radiusMeters)
+        var best: PlacesResult? = null
+        var bestRadius = radius
+        var truncated = false
+
+        repeat(PoiSearch.MAX_PROBES) {
+            val (result, returned) = probe(id, filter, radius, fallbackName, lat, lon)
+            truncated = PoiSearch.capBound(returned)
+            best = result
+            // ⚠️ Kept separately from `radius`, which is about to become the radius we will try
+            // NEXT. Reporting that one would label the data with a circle it never came from.
+            bestRadius = radius
+            val next = PoiSearch.nextRadius(
+                PoiSearch.Probe(radius, returned),
+                maxRadius = radiusMeters,
+            ) ?: return result.copy(truncated = truncated, searchRadiusMeters = radius)
+            radius = next
+        }
+        // Ran out of probes. Whatever the last one gave is the answer, flagged for what it is.
+        return (best ?: PlacesResult(id, lat, lon, emptyList()))
+            .copy(truncated = truncated, searchRadiusMeters = bestRadius)
+    }
+
+    /** One round trip. Returns the parsed places and the raw element count the quota saw. */
+    private suspend fun probe(
+        id: String,
+        filter: String,
+        radiusMeters: Int,
+        fallbackName: String,
+        lat: Double,
+        lon: Double,
+    ): Pair<PlacesResult, Int> {
         val ql = """
             [out:json][timeout:25];
             (
               node$filter(around:$radiusMeters,$lat,$lon);
               way$filter(around:$radiusMeters,$lat,$lon);
             );
-            out center 80;
+            out center ${PoiSearch.HARD_CAP};
         """.trimIndent()
         val url = "https://overpass-api.de/api/interpreter?data=" + URLEncoder.encode(ql, "UTF-8")
         // One gate per host. Overpass is a free community endpoint and the NAV map scans several
         // categories at once; firing them all simultaneously is exactly the behaviour that earns an
         // IP a ban, which this project has already had happen once with another provider.
         val text = gate.withPermit { http.getString(url) }
-        val elements = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject["elements"]?.jsonArray ?: return PlacesResult(id, lat, lon, emptyList())
+        val root = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
+
+        // ⚠️ An Overpass runtime error is HTTP 200 with an `elements: []` and a `remark` saying what
+        // went wrong, so nothing throws and the old code read it as "there is no hospital near you"
+        // — then cached that for six hours. On a safety screen that is the worst possible failure
+        // mode, so a remark is raised as the exception it always was.
+        root["remark"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?.let {
+            throw OverpassRemarkException(it)
+        }
+        val elements = root["elements"]?.jsonArray
+            ?: return PlacesResult(id, lat, lon, emptyList()) to 0
 
         val places = elements.mapNotNull { el ->
             val o = el.jsonObject
@@ -110,14 +161,31 @@ class OverpassRepository(
                 bearing = Geo.bearingDegrees(lat, lon, plat, plon),
                 phone = phone,
                 address = address,
+                // On the wire for 100% of results and thrown away until now, which left a GP
+                // surgery and a major hospital rendering identically on a screen you would read
+                // in an emergency.
+                kind = tags?.get("amenity")?.jsonPrimitive?.contentOrNull
+                    ?: tags?.get("healthcare")?.jsonPrimitive?.contentOrNull,
+                emergency = tags?.get("emergency")?.jsonPrimitive?.contentOrNull,
+                openingHours = tags?.get("opening_hours")?.jsonPrimitive?.contentOrNull,
+                website = (tags?.get("website") ?: tags?.get("contact:website"))
+                    ?.jsonPrimitive?.contentOrNull,
             )
         }
             .distinctBy { "${it.name}_${fmt(it.latitude, 4)}" }
             .sortedBy { it.distanceMeters }
-            .take(40)
+            .take(PoiSearch.WANT)
 
-        return PlacesResult(id, lat, lon, places)
+        return PlacesResult(id, lat, lon, places) to elements.size
     }
+
+    /**
+     * Overpass reported a server-side failure inside a 200 response.
+     *
+     * Thrown so the existing catch in [fetch] serves the previous cache rather than writing an
+     * empty list over it — an outage must not be recorded as "nothing here".
+     */
+    class OverpassRemarkException(remark: String) : Exception("Overpass: $remark")
 
     /** Re-derive distance/bearing from the current location for cached results. */
     private fun recompute(result: PlacesResult, lat: Double, lon: Double): PlacesResult {
