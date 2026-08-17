@@ -68,6 +68,9 @@ MIRRORS: dict[str, str] = {
     # The News vertical's signal stack, ported before this script existed. Brought under the guard now:
     # these are pure logic and must stay identical. (NewsExplainers.kt and Explainer.kt are deliberately
     # NOT here — they are adapted ports, not mirrors; see their headers.)
+    # Live TV news. Both platforms play the same channels and must agree about which are
+    # trustworthy, so the catalogue and its judgements are shared rather than duplicated.
+    f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
     f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
     f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
@@ -78,6 +81,7 @@ MIRRORS: dict[str, str] = {
     # The tests come across too, so the same assertions gate BOTH platforms' CI. Mirroring logic
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
+    f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
     f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",
     f"{CORE_TEST}/StudyQuestionsTest.kt": f"{DESKTOP_TEST}/telemetry/StudyQuestionsTest.kt",
