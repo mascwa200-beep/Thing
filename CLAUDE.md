@@ -3534,6 +3534,63 @@ CURRENT**; MARKETS and WEATHER should say how old what they show is; then online
 rate-limiting, they should say they could not update instead of going quiet. The banner wording is
 unproven and the grace period (`Freshness.GRACE_MS`) is one constant if it proves noisy.
 
+### THE DESKTOP UPDATES ITSELF (this session, PR #445)
+
+Owner: *"keep going autonomously and always in tandem autonomously with the desktop version of the app
+with an automated update system for it as well."* The companion had **no update path at all** — CI built
+an MSI and attached it to the workflow run as an artifact, so a new build meant digging one out of
+GitHub Actions by hand.
+
+**The precondition was a defect.** `packageVersion` was hardcoded `"1.0.0"`, so every build carried the
+same ProductVersion — Windows Installer would have seen a freshly-downloaded MSI as the product already
+installed and declined to upgrade. An updater on top of that downloads, runs, and changes nothing. It
+now comes from `-PdesktopBuild=<run_number>` (the DESKTOP workflow's own counter), and a generated
+`build-info.properties` (→ `update/BuildInfo.kt`) lets the running app say which build it is. A local
+build reports 0 = **unknown provenance**, not "out of date", so it never nags on a dev build.
+
+**Two conflicts designed around, both of which would have failed silently:**
+- ⚠️ **The desktop publishes to its OWN `desktop-latest` tag.** Both workflows run on the same pushes and
+  `softprops/action-gh-release` rewrites the release **name** each time — sharing `latest` would have
+  each publish overwrite the other's name, and **the name is where each updater reads its build number**.
+  *Verified after the fact:* `latest` = "Pulse — debug build #1652" + `app-release.apk`, `desktop-latest`
+  = "LCARS desktop — build #21" + `LCARS-desktop.msi`. Neither clobbered.
+- `desktop-build.yml` had **no `permissions: contents: write`** — it would have built a perfect MSI and
+  403'd on upload.
+
+**The tandem move: one shared decision core, not a second updater.** `core:telemetry/UpdatePolicy.kt`
+(+13 tests, mirrored) owns build-number parsing, the newest-asset pick, and the green gate; the phone's
+`UpdateRepository` **delegates to it** rather than keeping its own copy. ⚠️ The gate is **tri-state and
+the third state is the point**: a run *cancelled after it published* is still offerable, because this
+repo cancels in-flight runs whenever a newer commit lands — which happened to run 1650 during this very
+session. Treating cancelled as not-green would suppress a good build.
+
+**Desktop side:** `update/DesktopUpdater.kt` (release → parse → green-gate against `desktop-build.yml`
+→ newest `.msi` → download via the **asset API URL** with an octet-stream Accept, which is the only
+thing that works for a private repo) and `feature/about/` — the desktop's **first settings surface**:
+installed vs published, download with real progress, INSTALL AND QUIT. `HttpClient.download` gained an
+optional `onProgress` (silent when the server sends no Content-Length — a percentage of an unknown total
+would be invented). Quitting flushes settings + the study deck first.
+
+**Two things the UI says rather than letting them be discovered:** the GitHub token is stored **in plain
+text** (the phone puts its copy behind the secure element; nothing here can), and installing **always**
+prompts — an app is not permitted to replace itself silently. That is the floor, same as the APK's one tap.
+
+**Two build-script errors worth not repeating:** a task **cannot be registered from inside another
+task's configuration block** ("register on task set cannot be executed in the current context"); and a
+`doLast` closure referencing **script-level properties** captures the build script object, which the
+configuration cache refuses to serialise — copy them into locals of the task's own scope first.
+
+**Verification:** 13 policy tests locally, **both load-bearing rules negative-tested** (cancelled→not-green,
+and a missing build number defaulting to 0 — each fails exactly its own test). Version pipeline exercised
+end to end (`-PdesktopBuild=42` → `1.0.42/42`; bare → `1.0.0/0`). Desktop **194 → 207 tests**; 27 mirrors
+current. **And the shipped parser was run against the REAL release strings GitHub returned** — reads
+build 21, picks the real asset.
+
+⚠️ **Owner-verify on Windows — no MSI has ever been built or installed here.** Install build #21, open
+ABOUT (should read 1.0.21), paste a read-only token, CHECK NOW; then after a later push, DOWNLOAD →
+INSTALL AND QUIT and confirm it upgrades **in place** rather than installing a second copy (that is the
+`upgradeUuid` + moving ProductVersion doing its job, and it is the single most important thing to check).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
