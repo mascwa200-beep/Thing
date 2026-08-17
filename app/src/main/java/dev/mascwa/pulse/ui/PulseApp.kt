@@ -209,7 +209,12 @@ fun PulseApp(
             ) { backStackEntry ->
                 val vm: GuidesViewModel = viewModel(factory = factory)
                 val guideId = backStackEntry.arguments?.getString("guide")
-                GuidesScreen(vm, onBack = { navController.popBackStack() }, initialGuideId = guideId)
+                GuidesScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    initialGuideId = guideId,
+                    onOpenStudy = { navController.navigate(Routes.STUDY) },
+                )
             }
             composable(Routes.TOOLS) {
                 val vm: ToolsViewModel = viewModel(factory = factory)
