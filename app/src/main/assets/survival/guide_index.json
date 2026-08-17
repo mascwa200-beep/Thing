@@ -13023,6 +13023,45 @@
    "file": "guides_society_and_culture.json"
   },
   {
+   "id": "fed-vulcans",
+   "title": "Vulcans",
+   "category": "Species & Civilisations",
+   "summary": "A civilisation that chose discipline over extinction: Vulcan biology, the logic tradition, and what the choice cost.",
+   "headings": [
+    "Biology and Homeworld",
+    "The Discipline of Logic",
+    "Society, Ritual and the Cycle",
+    "Vulcans and the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-klingons",
+   "title": "Klingons",
+   "category": "Species & Civilisations",
+   "summary": "A warrior culture written as a real civilisation: honour as law, the Empire's politics, and the long shift from adversary to ally.",
+   "headings": [
+    "Physiology and Temperament",
+    "Honour as a Legal System",
+    "The Empire and Its Politics",
+    "From Adversary to Ally"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-romulans",
+   "title": "Romulans",
+   "category": "Species & Civilisations",
+   "summary": "The Vulcans who refused the reform: an empire built on secrecy, suspicion and patience.",
+   "headings": [
+    "A Common Origin",
+    "The Star Empire",
+    "Character and Contradiction",
+    "The Neutral Zone and After"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "association-football-rules-and-positions",
    "title": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
@@ -13071,6 +13110,45 @@
     "Misconceptions, Edge Cases and Judging It Yourself"
    ],
    "file": "guides_sports_and_fitness.json"
+  },
+  {
+   "id": "fed-united-federation-of-planets",
+   "title": "The United Federation of Planets",
+   "category": "Starfleet & Federation",
+   "summary": "The interstellar union at the centre of the setting: what it is, how it governs, and why it holds together.",
+   "headings": [
+    "What the Federation Is",
+    "How It Governs",
+    "Membership and Its Frictions",
+    "Why It Matters to the Setting"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-starfleet",
+   "title": "Starfleet",
+   "category": "Starfleet & Federation",
+   "summary": "The Federation's combined exploratory, scientific, diplomatic and defensive service — and its deliberate refusal to be simply a navy.",
+   "headings": [
+    "A Service With Four Jobs",
+    "Structure, Rank and Command",
+    "The Academy and the Officer It Wants",
+    "Starfleet in Practice"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-prime-directive",
+   "title": "The Prime Directive",
+   "category": "Starfleet & Federation",
+   "summary": "General Order One: what non-interference actually requires, why it is drawn so absolutely, and the cases that test it.",
+   "headings": [
+    "The Rule Itself",
+    "Why It Is Drawn So Absolutely",
+    "How It Fails in the Field",
+    "What It Says About the Federation"
+   ],
+   "file": "guides_starfleet_and_federation.json"
   },
   {
    "id": "foraging-safety-and-the-universal-rules",
@@ -13289,6 +13367,32 @@
     "Living Heritage, Ownership and the Ethics of Visiting"
    ],
    "file": "guides_visual_arts_and_design.json"
+  },
+  {
+   "id": "fed-warp-drive",
+   "title": "Warp Drive",
+   "category": "Warp & Starship Technology",
+   "summary": "The propulsion that makes the setting possible: what warp actually claims to do, how the machinery is described, and why it has limits.",
+   "headings": [
+    "What Warp Drive Claims to Do",
+    "The Machinery",
+    "Limits, Hazards and Consequences",
+    "Why It Shapes the Stories"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-transporter",
+   "title": "The Transporter",
+   "category": "Warp & Starship Technology",
+   "summary": "Matter transmission: how it is described, what it is used for, and the identity problem it never quite escapes.",
+   "headings": [
+    "How It Is Described to Work",
+    "What It Is Used For",
+    "The Identity Problem",
+    "Why the Limits Matter"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
   },
   {
    "id": "the-stratosphere-and-the-ozone-layer",

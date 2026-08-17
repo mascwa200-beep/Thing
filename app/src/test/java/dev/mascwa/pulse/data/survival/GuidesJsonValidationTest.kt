@@ -32,6 +32,14 @@ class GuidesJsonValidationTest {
         "Literature & Writing", "Language & Linguistics", "Society & Culture", "Archaeology & Anthropology",
         "Law & Government", "Education & Learning", "Music", "Visual Arts & Design", "Games & Recreation",
         "Media & Communication", "Business & Finance", "Economics",
+        // Federation Database — the in-universe reference.
+        "Species & Civilisations",
+        "Starfleet & Federation",
+        "Starships & Classes",
+        "Warp & Starship Technology",
+        "Worlds & Stations",
+        "Federation Timeline",
+        "Notable Figures",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
