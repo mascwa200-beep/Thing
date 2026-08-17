@@ -131,7 +131,7 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp, top = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        if (result.stale) item { StaleBanner(true) }
+                        item { StaleBanner(result) }
                         items(filtered, key = { it.id }) { incident ->
                             IncidentRow(incident) { incident.url?.let { openUrl(context, it) } }
                         }

@@ -94,7 +94,7 @@ private fun FeedList(
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (async.stale) item { StaleBanner(true) }
+            item { StaleBanner(async) }
             items(async.data!!.items.distinctBy { it.url }, key = { it.url }) { item -> ItemRow(item) { openUrl(context, item.url) } }
         }
     }
@@ -113,7 +113,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (async.stale) item { StaleBanner(true) }
+                item { StaleBanner(async) }
                 if (data.tags.isNotEmpty()) {
                     item { LcarsHeaderBar("Trending tags") }
                     item {

@@ -73,7 +73,7 @@ fun FuelBody(vm: FuelViewModel, modifier: Modifier = Modifier) {
                 else -> {
                     val data = state.data
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                        if (state.stale) item { StaleBanner(true) }
+                        item { StaleBanner(state) }
 
                         item { SectionLabel("Energy benchmarks (live)") }
                         items(data?.benchmarks.orEmpty(), key = { "b_${it.id}" }) { q ->

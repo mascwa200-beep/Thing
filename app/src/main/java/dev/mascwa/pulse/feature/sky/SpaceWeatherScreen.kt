@@ -133,7 +133,7 @@ fun SpaceWeatherBody(vm: SpaceWeatherViewModel, modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     val sw = state.data
-                    if (state.stale) item { StaleBanner(true) }
+                    item { StaleBanner(state) }
                     when (tab) {
                         SpaceTab.NOW -> nowTab(sw, c, onExplain)
                         SpaceTab.SUN -> sunTab(sw, c, onExplain)

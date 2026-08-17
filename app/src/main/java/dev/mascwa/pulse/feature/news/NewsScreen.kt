@@ -130,7 +130,7 @@ fun NewsScreen(vm: NewsViewModel) {
                         contentPadding = PaddingValues(12.dp),
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
                     ) {
-                        if (content.stale) item { StaleBanner(true) }
+                        item { StaleBanner(content) }
                         items(distinctArticles, key = { it.url }) { article ->
                             ArticleCard(
                                 article,

@@ -134,7 +134,7 @@ fun MarketsBody(vm: MarketsViewModel, modifier: Modifier = Modifier) {
                     val losers = (all - gainers.toSet()).sortedBy { it.changePercent!! }.take(3)
 
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                        if (watch.stale || crypto.stale) item { StaleBanner(true) }
+                        item { StaleBanner(watch, crypto) }
 
                         MarketMood.summarize(all.mapNotNull { it.changePercent })?.let { mood ->
                             item(key = "mood") { MoodBanner(mood) }

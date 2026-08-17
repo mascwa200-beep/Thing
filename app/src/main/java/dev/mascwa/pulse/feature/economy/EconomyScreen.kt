@@ -69,7 +69,7 @@ fun EconomyBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (dash.stale) item { StaleBanner(true) }
+                    item { StaleBanner(dash) }
                     item {
                         CountryPicker(
                             current = state.country,

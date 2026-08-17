@@ -167,9 +167,11 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                val anyStale = listOf(state.headlines, state.markets, state.weather, state.economy, state.fuel)
-                    .any { it.stale }
-                if (anyStale) item { StaleBanner(true) }
+                // Home aggregates five feeds, so it reports the oldest of them — the page is only as
+                // current as its stalest card.
+                item {
+                    StaleBanner(state.headlines, state.markets, state.weather, state.economy, state.fuel)
+                }
 
                 // Greeting
                 item { Greeting() }
