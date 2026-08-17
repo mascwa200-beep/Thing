@@ -1620,6 +1620,15 @@ private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePa
                     fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.sky,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+                // Where the road actually ends. Amber rather than the readout's cyan, because this
+                // qualifies the numbers directly above it rather than adding to them.
+                readout.reachNote?.let {
+                    Text(
+                        it,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
             }
             if (!readout.viaRoad) {
                 Text("◢ ROUTING…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)

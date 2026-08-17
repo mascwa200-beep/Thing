@@ -2,6 +2,7 @@ package dev.mascwa.pulse.feature.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.RouteReach
 import dev.mascwa.pulse.core.telemetry.RouteProgress
 import dev.mascwa.pulse.core.telemetry.RouteProfile
 import dev.mascwa.pulse.core.telemetry.TrackLog
@@ -73,6 +74,15 @@ data class NavReadout(
     val viaRoad: Boolean,
     /** True-north bearing to the objective, for the relative turn arrow. */
     val bearingDeg: Double,
+    /**
+     * A caveat about where the road actually ends, or null when there is nothing to say.
+     *
+     * Non-null when the routing server had to move the destination a long way to find tarmac — see
+     * [dev.mascwa.pulse.core.telemetry.RouteReach]. The map does draw the objective marker, so the
+     * gold line visibly stops short, but that cue disappears at any real zoom and the numbers beside
+     * it carry no such warning.
+     */
+    val reachNote: String? = null,
 )
 
 class NavViewModel(
@@ -203,23 +213,29 @@ class NavViewModel(
         combine(activeWaypoint, _location, _routeInfo, _route) { wp, loc, info, routePts ->
             if (wp == null || loc == null) return@combine null
             val straight = Geo.distanceMeters(loc.latitude, loc.longitude, wp.latitude, wp.longitude)
+            // ⚠️ A route whose destination the road network cannot reach still arrives as a normal
+            // route with a full distance and ETA — the measured worst case is a confident 28-hour
+            // drive to a point snapped onto another continent. Those numbers describe a journey to
+            // the nearest road, not to the objective, so they are not used as if they did.
+            val usable = info?.takeIf { it.reachesDestination }
             // Live distance remaining along the road route — counts down on every GPS tick without
             // re-routing. Falls back to OSRM's total, then straight-line.
-            val remaining = if (info != null && routePts.size >= 2)
+            val remaining = if (usable != null && routePts.size >= 2)
                 RouteProgress.remainingMeters(routePts, loc.latitude, loc.longitude) else null
-            val meters = remaining ?: info?.distanceMeters ?: straight
+            val meters = remaining ?: usable?.distanceMeters ?: straight
             val etaText = when {
-                info != null && remaining != null && info.distanceMeters > 0 ->
-                    formatEta(info.durationSeconds * (remaining / info.distanceMeters))
-                info != null -> formatEta(info.durationSeconds)
+                usable != null && remaining != null && usable.distanceMeters > 0 ->
+                    formatEta(usable.durationSeconds * (remaining / usable.distanceMeters))
+                usable != null -> formatEta(usable.durationSeconds)
                 else -> null
             }
             NavReadout(
                 label = wp.label,
                 distanceText = Geo.formatDistance(meters),
                 etaText = etaText,
-                viaRoad = info != null,
+                viaRoad = usable != null,
                 bearingDeg = Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude),
+                reachNote = info?.let { RouteReach.describe(it.reach, it.destinationSnapMeters) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

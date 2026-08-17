@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.places
 
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.telemetry.RouteReach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -23,7 +24,23 @@ import java.util.Locale
 class RoutingRepository(private val http: HttpClient) {
 
     @Serializable
-    private data class OsrmResponse(val routes: List<OsrmRoute> = emptyList())
+    private data class OsrmResponse(
+        val routes: List<OsrmRoute> = emptyList(),
+        /**
+         * Where OSRM actually started and finished, which is not where you asked.
+         *
+         * Present on every response and never parsed until now. It is the only thing that
+         * distinguishes a real route from a confident route to somewhere else entirely — see
+         * [RouteReach].
+         */
+        val waypoints: List<OsrmWaypoint> = emptyList(),
+    )
+
+    @Serializable
+    private data class OsrmWaypoint(
+        /** How far the requested coordinate had to move to reach the road network, in metres. */
+        val distance: Double = 0.0,
+    )
 
     @Serializable
     private data class OsrmRoute(
@@ -40,7 +57,21 @@ class RoutingRepository(private val http: HttpClient) {
         val points: List<Pair<Double, Double>>,
         val distanceMeters: Double,
         val durationSeconds: Double,
-    )
+        /**
+         * How far the *destination* had to move to reach a road, or null if the server did not say.
+         *
+         * Only the destination end is kept. The origin snap is the user's own GPS meeting the kerb
+         * and is never interesting; the destination snap is the whole question.
+         */
+        val destinationSnapMeters: Double? = null,
+    ) {
+        /** Whether this route goes where it was asked to, and what to say if not. */
+        val reach: RouteReach.Reach
+            get() = RouteReach.classify(destinationSnapMeters, distanceMeters)
+
+        /** True when the distance and ETA may be shown as reaching the destination. */
+        val reachesDestination: Boolean get() = RouteReach.trustworthy(reach)
+    }
 
     private data class Entry(val route: RoadRoute?, val atMs: Long)
 
@@ -91,7 +122,11 @@ class RoutingRepository(private val http: HttpClient) {
         val osrm = resp.routes.firstOrNull() ?: return null
         // GeoJSON coordinates are [lon, lat]; emit (lat, lon). Need at least two points to draw a line.
         val path = osrm.geometry.coordinates.mapNotNull { c -> if (c.size >= 2) c[1] to c[0] else null }
-        return path.takeIf { it.size >= 2 }?.let { RoadRoute(it, osrm.distance, osrm.duration) }
+        // The destination is the LAST waypoint. Null when the server omitted them, which RouteReach
+        // reads as "no claim either way" rather than as an all-clear.
+        val snap = resp.waypoints.lastOrNull()?.distance?.takeIf { resp.waypoints.size >= 2 }
+        return path.takeIf { it.size >= 2 }
+            ?.let { RoadRoute(it, osrm.distance, osrm.duration, destinationSnapMeters = snap) }
     }
 
     /** Locale.US: these are coordinates, and a comma decimal would split one place into two keys. */
