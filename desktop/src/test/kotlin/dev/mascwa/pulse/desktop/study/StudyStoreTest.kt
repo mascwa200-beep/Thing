@@ -260,19 +260,44 @@ class StudyStoreTest {
     }
 
     /**
-     * Pace decides the grade an objective answer earns, so the three should not come back together —
-     * instant is EASY, laboured is HARD, and the intervals differ accordingly.
+     * Pace decides the grade an objective answer earns — instant is EASY, laboured is HARD, and a
+     * miss is a lapse.
+     *
+     * ⚠️ **What it does NOT decide is the first interval.** [Recall.review] uses a fixed `FIRST_DAYS`
+     * for a first successful review whatever the grade, because a card answered once has no evidence
+     * behind its ease yet. The difference shows up in the *ease*, and only compounds into the
+     * schedule from the third review — which is what
+     * `aHintedAnswerIsStillCorrectButComesBackSooner` measures.
+     *
+     * ⚠️ This test previously asserted `quick.dueAtMs >= laboured.dueAtMs`, which was wrong twice
+     * over. Both intervals are one day, so the comparison was really between two separate
+     * `System.currentTimeMillis()` reads — it passed only while the clock did not tick between the
+     * two calls, and failed on a loaded CI runner where it did. The clock is pinned here so the
+     * assertion is about the schedule rather than about how busy the machine is.
      */
     @Test
     fun howLongAnAnswerTookChangesWhenItComesBack() = runBlocking {
         val s = store()
+        val now = 1_700_000_000_000L
         s.enroll("first aid and emergencies")
-        val made = s.teach(s.syllabus()!!.steps.first().guideId)
-        val quick = s.answer(made[0].id, correct = true, elapsedMs = 2_000)!!
-        val laboured = s.answer(made[1].id, correct = true, elapsedMs = 50_000)!!
-        val wrong = s.answer(made[2].id, correct = false, elapsedMs = 5_000)!!
-        assertTrue("instant should not come back sooner than laboured", quick.dueAtMs >= laboured.dueAtMs)
+        val made = s.teach(s.syllabus()!!.steps.first().guideId, nowMs = now)
+        val quick = s.answer(made[0].id, correct = true, elapsedMs = 2_000, nowMs = now)!!
+        val laboured = s.answer(made[1].id, correct = true, elapsedMs = 50_000, nowMs = now)!!
+        val wrong = s.answer(made[2].id, correct = false, elapsedMs = 5_000, nowMs = now)!!
+
+        // A first success is a fixed gap either way — assert that, rather than a difference that
+        // does not exist yet.
+        assertEquals(Recall.FIRST_DAYS, quick.intervalDays, 0.001)
+        assertEquals(Recall.FIRST_DAYS, laboured.intervalDays, 0.001)
+        assertEquals(quick.dueAtMs, laboured.dueAtMs)
+
+        // The pace IS recorded, in the ease, and that is what diverges the schedule later.
+        assertTrue(
+            "instant should not be judged harder than laboured (${quick.ease} vs ${laboured.ease})",
+            quick.ease > laboured.ease,
+        )
         assertEquals(1, wrong.lapses)
+        assertTrue("a miss must come back sooner than a success", wrong.dueAtMs < quick.dueAtMs)
     }
 
     /** A self-graded answer says how it FELT; putting a right-or-wrong on it would invent a number. */

@@ -28,6 +28,8 @@ import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
 import dev.mascwa.pulse.desktop.feature.library.LibraryViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsScreen
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel
+import dev.mascwa.pulse.desktop.feature.packs.PacksScreen
+import dev.mascwa.pulse.desktop.feature.packs.PacksViewModel
 import dev.mascwa.pulse.desktop.feature.remote.RemoteScreen
 import dev.mascwa.pulse.desktop.feature.remote.RemoteViewModel
 import dev.mascwa.pulse.desktop.feature.search.SearchScreen
@@ -35,6 +37,8 @@ import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
 import dev.mascwa.pulse.desktop.feature.study.StudyScreen
 import dev.mascwa.pulse.desktop.feature.study.StudyViewModel
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.library.PackRepository
+import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
@@ -55,6 +59,7 @@ enum class Screen(val title: String) {
     NEWS("News"),
     STUDY("Study"),
     LIBRARY("Library"),
+    PACKS("Packs"),
     SEARCH("Search"),
     ABOUT("About"),
 }
@@ -70,6 +75,7 @@ enum class Screen(val title: String) {
 fun PulseDesktopApp(
     settings: DesktopSettingsStore,
     library: LibraryRepository,
+    packStore: PackStore,
     studyStore: StudyStore,
     onQuitForInstall: () -> Unit = {},
 ) {
@@ -93,6 +99,9 @@ fun PulseDesktopApp(
         // The library and the deck are passed in, not built here — see the note in Main.kt on why they
         // have to outlive the composition. One instance each, so the resident index and the shard LRU
         // are paid for once across all three screens below.
+        val packsVm = remember {
+            PacksViewModel(scope, PackRepository(HttpClient.create(json), settings, packStore))
+        }
         val studyVm = remember { StudyViewModel(scope, studyStore) }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
         val searchVm = remember { SearchViewModel(scope, library, studyStore) }
@@ -148,6 +157,7 @@ fun PulseDesktopApp(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Screen.PACKS -> PacksScreen(packsVm, Modifier.fillMaxWidth())
                         Screen.SEARCH -> SearchScreen(searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
                         Screen.ABOUT -> AboutScreen(
                             vm = aboutVm,
