@@ -3392,6 +3392,87 @@ lesson is correctly the first row shed**, so the new row shows on a quiet real b
 a lesson should ever lead the collapsed line; a `LESSON`-carrying test-board sample if the owner wants
 to eyeball the new row tag.
 
+### THE DESKTOP LEARNS TOO — the Windows companion moves in tandem (this session, PR #443)
+
+Owner: *"make sure to in tandem with the app, update the desktop version too."* Said twice, so treat it
+as **standing**, not a one-off — see the tandem rule at the end of this section.
+
+The study arc (#442) left the companion a release behind: two screens against the app's ~40, and **no
+copy of the library at all**. Owner chose, via AskUserQuestion: the **desktop teaches on its own**
+(bundled library, its own schedule, fully offline, no phone needed — accepted cost, two schedules that
+drift); scope = **study plus the Computer's other reading surfaces**; **diagrams included** (MSI roughly
+80 MB → 180 MB). Zero subagent spend, as with the seven arcs before it.
+
+**The reason this arc is unusually well verified, and the reason to keep investing here:** `:desktop` is
+the one module in this repo that genuinely **compiles and runs its tests** in the container. Every
+Android arc is CI-compile-gated and render-blind; here the ported cores are *executed*. The 15 store
+tests exercise the whole enrol → teach → answer → restart loop that on Android is only provable on the
+Pixel. **182 desktop tests green locally.**
+
+- **`4cfa66a` the library, bundled.** `processResources { from("app/src/main/assets/survival") }` — a
+  Gradle file copy, **not** a project dependency, so one copy of the content lives in the repo and
+  `:desktop` still touches no AGP/SDK. `LibraryRepository` is the desktop `SurvivalContentRepository`:
+  resident index, shard-lazy `guide(id)` behind a 3-shard LRU, streamed `searchBodies` — same O(one
+  shard) discipline, reading classpath resources instead of Android assets. **The shard list comes from
+  the index**, not a glob, so a stale index is a failure rather than a silently partial library.
+  `LibraryBundleTest` (7) holds that the index loads, its count matches the shards, and **all 343
+  referenced diagrams resolve** — negative-tested by typoing the resource root.
+- **`c9e0579` the mirrors, and a guard that has been missing since Phase A.** 22 pure cores copied with
+  a `// MIRROR OF <path>` banner; `tools/mirror_desktop_cores.py` regenerates them and `--check`s them,
+  and `MirrorDriftTest` fails the build on drift. Negative-tested by perturbing one constant.
+  ⚠️ **Two categories, and conflating them is the trap:** a **strict mirror** must stay byte-identical,
+  an **adapted port** carries an `// ADAPTED PORT` header and deliberately differs. `NewsExplainers`
+  and `Explainer` are the latter — they name SOCIAL tabs and a cloud desk-note the desktop has not got.
+  ⚠️ **A correction I owe the record:** I claimed five News mirrors had "diverged in real code". Proper
+  diffing showed `NewsMarketLink` differed only in **trailing whitespace**, three were identical, and
+  `NewsExplainers`'s difference is the deliberate one above.
+- **`99d58c8` the deck.** Desktop `StudyStore` with the same public API as Android's, shaped like
+  `DesktopSettingsStore` (in-memory authoritative + Mutex + debounced flush + `flushNow`), plus the
+  STUDY screen — today's lesson **and why it was chosen**, questions one at a time with grades only
+  after the answer, the path as a blocky `LcarsFillRow`.
+- **`0c29049` reading and searching.** LIBRARY (supergroup ▸ category rail, guide list, reader with
+  safety note, sections, ingredients/steps, diagrams, provenance) and SEARCH (debounced, ranked, grouped
+  by kind, with the curated `EmergencyTriage` answer above the results). `Diagram.kt` decodes svg via
+  `loadSvgPainter` and the rest via `loadImageBitmap`, **failing soft to the attribution caption** — the
+  single bundled `.gif` is the one format Compose Desktop does not document.
+
+**Two defects worth keeping.**
+1. **The study deck could be lost on close.** `StudyStore` was built inside `remember`, so
+   `onCloseRequest` could not reach it, and `exitApplication()` calls `System.exit(0)` immediately while
+   writes are debounced two seconds — answer a question, close the window, lose the answer. The library
+   and the deck are now owned in `Main.kt` above the composition with a `flushNow()` on close. **Any
+   future desktop store must be hoisted the same way**; the settings store already was, for this reason.
+2. **My assertion was wrong where the ranker was right** — the ninth time this arc-series. It demanded
+   the literal word "water" in the winner, and the right answer to *"how do I purify water"* is
+   *Distillation, Extraction & Purifying Liquids*. The replacement is a table of unambiguous questions
+   paired with words the winner must contain, chosen because **without rarity weighting those exact
+   queries lose** (*"treating a snake bite"* → *Depression: Understanding and Treating It*; *"tie a
+   bowline"* ties with *Association Football Rules*). The habit is unchanged and now unmissable:
+   **compute the expected value from the shipped function on the real corpus before writing the
+   assertion.**
+
+**⚠️ THE TANDEM RULE — standing, for every session after this one.** When a change lands on the phone,
+ask whether the desktop carries the same thing, and move it in the same PR:
+- **Touching a pure core in `core:telemetry` that is mirrored?** Run `python3
+  tools/mirror_desktop_cores.py` and commit the regenerated mirror. `MirrorDriftTest` fails CI otherwise.
+- **Touching `app/src/main/assets/survival/**` (a KB wave) or `data/survival/`?** The desktop bundles
+  and parses those; `desktop-build.yml`'s path filter now triggers on them, so CI re-verifies the bundle.
+- **Adding a reading/knowledge surface** (library, study, search, news) — the desktop is in scope.
+- **Adding a sensor, GPS, notification or telephony surface** — it is not, and saying so plainly beats a
+  half-port. Oracle, Day Ahead, Sensorium, maps, weather, voice and the one notification stay phone-only.
+
+⚠️ **Owner-verify on Windows** — Skiko cannot get a GL context in this container (reproduced four ways),
+so layout is exactly as unprovable here as Android layout is off the Pixel. Checklist: the five-item nav;
+LIBRARY opens a guide and its diagram draws (the one `.gif` should caption rather than break); STUDY
+offers a lesson, TEACH ME asks and the interval line appears; **answer one and close the window
+immediately — reopening must still show it answered** (that is defect 1's regression test); SEARCH finds
+a guide by subject, and *"someone is choking"* puts the action above the results.
+
+**Open/steerable:** no phone↔desktop study sync (the owner chose two independent schedules; the screen
+says so, and syncing would need the remote link's allowlist widened — deliberately untouched); the
+desktop has no settings screen yet, so its few preferences are implicit; MSI size is now ~180 MB by the
+owner's own call.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
