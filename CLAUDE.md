@@ -3658,6 +3658,51 @@ that the four options read clearly and the explanation teaches; that roughly one
 with no options; and after a few days away, that the way back is short and ordered rather than a wall.
 On Windows: the same, plus that answering and closing immediately still shows it answered.
 
+### THE STUDY RECORD REACHES YOU WHERE YOU ARE (this session cont., PR #447)
+
+Owner: *"merge it and keep going autonomously."* #446 merged as `41b9087`; the dev branch was re-synced
+(`git merge origin/main`, my authorship). Then a read-only hunt turned up three findings of one family —
+the record #446 built was almost entirely unread:
+
+| Finding | Evidence |
+|---|---|
+| **`mastery()` had zero callers** on both platforms | `grep '\.mastery('` matched only its own definition |
+| **The Android guide reader had no study entry point** | `LibraryScreen.kt:168` has `STUDY THIS`; `GuidesScreen`/`GuidesViewModel` had no `teach`/`study` match at all |
+| **The Oracle had no study signal** | no `study`/`lesson`/`review` match in `Oracle.kt` or `OracleEngine.kt` |
+
+⚠️ **I wrote `mastery()` in the arc where I recorded "computed and never used" as this repo's recurring
+defect class** (`tempoNudge`, `windKmh`, `NavGuidance.turnHint`, `savedAtMs`). Not a feature idea —
+finishing what the previous arc left dangling. ⚠️ And the reader gap was a **tandem asymmetry in the
+unusual direction: the desktop was ahead of the phone.**
+
+- **The reader (`c52d828`)** — TEACH ME THIS plus the standing line, so reading a guide and being taught it
+  are one act. ⚠️ **The trap: the study strip is folded into the existing header item, not added as its
+  own.** `leadingCount` is what the table of contents scrolls by, so one extra `LazyColumn` item would
+  have sent every jump-to-section one section short — a defect that renders perfectly and only shows up
+  as the reader quietly landing in the wrong place. Nothing is drawn when there is nothing to say
+  (UNSEEN and no-record both collapse to null).
+- **The assistant** — `library read <id>` carries the standing; `composePersona` gains one line following
+  the existing profile → tasks → procedures → ambient digest pattern. Both silent on a blank record; the
+  prompt line costs budget every turn and "nothing studied yet" is not worth paying for.
+- **The Oracle** — `reviewsDue` / `streakAtRisk` / `studyWeakSpot`. ⚠️ The streak rule has **three** gates
+  (long enough, not already done, late enough) because it is the one that most easily becomes nagging;
+  the weak-spot line is AMBIENT and a test asserts it can never be push-worthy. "Studied today" uses the
+  deck's own local-day index — a UTC boundary would flag the streak on the wrong evening abroad.
+  `weakestGuide()` is **Android-only on purpose**: the Oracle is its only caller and the desktop has no
+  Oracle, so mirroring it would add a second callerless method — the very defect being fixed.
+
+**⚠️ A false positive in `tools/android_resolve_check.sh`, found by using it and now documented in the
+script.** Only `core:telemetry` is on its classpath, so an edit that newly references an app-module type
+(`StudyStore`, `LcarsButton`, `container.studyStore`) reports it — and everything reached through it — as
+unresolved. **Pass that type's defining file** and the report goes quiet. A run naming types you know
+exist is telling you to widen the argument list, not that you have a bug. A gate you learn to ignore is
+worse than no gate.
+
+Verified: 29 Oracle tests green locally with **all five gates negative-tested**; desktop 264/264 and 33
+mirrors current (unchanged by design). ⚠️ Render and real-signal behaviour are owner-verify: TEACH ME THIS
+and the standing line in the reader, the study advisories earning their place over a few days, and
+whether the streak nudge feels supportive or naggy (every threshold is a named constant).
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

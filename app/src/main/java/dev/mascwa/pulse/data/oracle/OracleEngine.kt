@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.oracle
 
 import android.os.StatFs
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
+import dev.mascwa.pulse.data.study.localDayIndex
 import dev.mascwa.pulse.core.telemetry.Insight
 import dev.mascwa.pulse.core.telemetry.NetworkKind
 import dev.mascwa.pulse.core.telemetry.Oracle
@@ -125,6 +126,20 @@ object OracleEngine {
                 ?.let { ssid -> home.none { it.equals(ssid, ignoreCase = true) } }
         }.getOrNull()
 
+        // Study — how the bundled library is going. Warm reads on stores that are already loaded, and
+        // every failure leaves the field at its neutral default, which mutes that field's own rules.
+        val study = runCatching { container.studyStore.progress() }.getOrNull()
+        val reviewsDue = runCatching { container.studyStore.dueCount() }.getOrDefault(0)
+        // "Studied today" is decided by the same local-day index the deck itself counts by — deriving a
+        // day boundary here from UTC would tell somebody outside Greenwich their streak was at risk on
+        // the wrong evening.
+        val today = localDayIndex(now)
+        val studiedToday = study != null && study.lastStudiedAtMs > 0L &&
+            localDayIndex(study.lastStudiedAtMs) == today
+        val shaky = runCatching {
+            container.studyStore.weakestGuide()
+        }.getOrNull()
+
         return OracleSignals(
             nowMs = now, hourOfDay = hour, minuteOfDay = minute, dayOfWeek = dow,
             lat = loc?.latitude, lon = loc?.longitude, placeName = loc?.name, speedMps = loc?.speedMps,
@@ -141,6 +156,11 @@ object OracleEngine {
             envDescription = sensed?.describe(),
             envAnomaly = topAnomaly,
             pressureFallingFast = plunging,
+            reviewsDue = reviewsDue,
+            studyStreakDays = study?.streakDays ?: 0,
+            studiedToday = studiedToday,
+            shakyGuideTitle = shaky?.first,
+            shakyGuideDetail = shaky?.second,
         )
     }
 

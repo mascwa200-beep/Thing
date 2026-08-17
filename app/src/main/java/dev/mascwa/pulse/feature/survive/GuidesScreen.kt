@@ -44,10 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
 import dev.mascwa.pulse.data.survival.SUPERGROUPS
 import dev.mascwa.pulse.data.survival.supergroupOf
+import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.LcarsFrame
@@ -70,9 +72,16 @@ private fun rank(e: GuideIndexEntry, q: String): Int {
 }
 
 @Composable
-fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuideId: String? = null) {
+fun GuidesScreen(
+    vm: GuidesViewModel,
+    onBack: (() -> Unit)? = null,
+    initialGuideId: String? = null,
+    onOpenStudy: (() -> Unit)? = null,
+) {
     val entries by vm.index.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+    val mastery by vm.mastery.collectAsStateWithLifecycle()
+    val taught by vm.taught.collectAsStateWithLifecycle()
     val bodyMatches by vm.bodyMatches.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var supergroup by remember { mutableStateOf<String?>(null) } // null = every supergroup
@@ -192,7 +201,14 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
                 }
             }
         } else {
-            GuideReader(sel, Modifier.padding(innerPadding))
+            GuideReader(
+                sel,
+                mastery = mastery,
+                taught = taught,
+                onTeach = { vm.teach() },
+                onOpenStudy = onOpenStudy,
+                modifier = Modifier.padding(innerPadding),
+            )
         }
     }
 }
@@ -200,7 +216,14 @@ fun GuidesScreen(vm: GuidesViewModel, onBack: (() -> Unit)? = null, initialGuide
 /** The single-guide reader: a collapsible table of contents (jump-to-section), a slim read-progress bar,
  *  the safety note (if any), then every section in order. */
 @Composable
-private fun GuideReader(sel: Guide, modifier: Modifier = Modifier) {
+private fun GuideReader(
+    sel: Guide,
+    mastery: StudyProgress.Mastery?,
+    taught: Int?,
+    onTeach: () -> Unit,
+    onOpenStudy: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     val c = Pulse.colors
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -231,6 +254,11 @@ private fun GuideReader(sel: Guide, modifier: Modifier = Modifier) {
                     Text(sel.category.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.accent)
                     Text(sel.summary, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
                         modifier = Modifier.padding(top = 4.dp))
+                    // ⚠️ Folded into THIS item rather than added as its own. `leadingCount` above is what
+                    // the table of contents scrolls by, so a new item would silently send every
+                    // jump-to-section one section short — a defect that renders perfectly and only shows
+                    // up as the reader landing in the wrong place.
+                    StudyStrip(mastery, taught, onTeach, onOpenStudy)
                 }
             }
             item {
@@ -322,6 +350,55 @@ private fun GuideReader(sel: Guide, modifier: Modifier = Modifier) {
 }
 
 /** Renders a bundled offline survival diagram (from `assets/survival/images/`). */
+/**
+ * Reading and being taught, joined.
+ *
+ * These were entirely disconnected surfaces on Android — you could read the whole bundled library and
+ * the study deck would never hear about it, while the desktop reader has had a STUDY THIS button since
+ * it was built. This is the phone catching up.
+ *
+ * ⚠️ [mastery] is null both when there is no record and when the guide is [StudyProgress.Level.UNSEEN],
+ * and then no standing line is drawn at all. A reader that announced "Not started" on each of 581
+ * guides would be saying nothing, loudly.
+ */
+@Composable
+private fun StudyStrip(
+    mastery: StudyProgress.Mastery?,
+    taught: Int?,
+    onTeach: () -> Unit,
+    onOpenStudy: (() -> Unit)?,
+) {
+    val c = Pulse.colors
+    Column(Modifier.padding(top = 10.dp)) {
+        mastery?.let {
+            Text(
+                it.describe(),
+                fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = if (it.level == StudyProgress.Level.SHAKY) c.negative else c.accent,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
+        when {
+            // A one-shot confirmation that says what happened AND where it went — "ready" with no route
+            // is a dead end, since the questions live on a screen two taps away in another section.
+            taught != null && taught > 0 -> {
+                Text(
+                    "$taught question${if (taught == 1) "" else "s"} ready.",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.positive,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                if (onOpenStudy != null) LcarsButton("ANSWER THEM", onClick = onOpenStudy)
+            }
+            // Nothing could be extracted — said plainly rather than left looking like a broken button.
+            taught != null -> Text(
+                "Nothing in this guide could be turned into a question.",
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+            )
+            else -> LcarsButton("TEACH ME THIS", onClick = onTeach)
+        }
+    }
+}
+
 @Composable
 private fun SurvivalDiagram(image: String) {
     Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {

@@ -23,6 +23,14 @@
 # ⚠️ Requires HEAD to be a version whose *own* names resolved — i.e. the last CI-green commit for that
 # file. Comparing against a broken baseline hides the very error you are looking for.
 #
+# ⚠️ **Pass the defining file of any app-module symbol your edit newly references**, or you get a false
+# positive. Only `core:telemetry` is on the classpath here, so an edit that starts calling, say,
+# `StudyStore` or `LcarsButton` reports those (and every member reached through them) as "new" — they
+# are unresolved because their module is absent, not because anything is wrong. Adding
+# `.../data/study/StudyStore.kt` and `.../feature/common/LcarsGeometry.kt` to the argument list resolves
+# them and the report goes quiet. A run that names types you know exist is telling you to widen the
+# argument list, not that you have a bug.
+#
 # ⚠️ The compiler's own -cp needs kotlin-stdlib + trove4j + annotations + kotlinx-coroutines. Omit one
 # and it dies before compiling a line, which looks exactly like a clean pass — hence the explicit
 # did-it-actually-run check below. A silent false pass is worse than no check.

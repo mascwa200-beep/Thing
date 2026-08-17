@@ -49,7 +49,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(PlacesViewModel::class.java) ->
                 PlacesViewModel(c.overpassRepository, c.locationProvider)
             modelClass.isAssignableFrom(GuidesViewModel::class.java) ->
-                GuidesViewModel(c.survivalContentRepository)
+                GuidesViewModel(c.survivalContentRepository, c.studyStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.survive.HabitatViewModel::class.java) ->
                 dev.mascwa.pulse.feature.survive.HabitatViewModel(c.locationProvider)
             modelClass.isAssignableFrom(ToolsViewModel::class.java) ->
@@ -81,6 +81,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                     c.voskSpeech, c.agentOrchestrator, c.knowledgeStore, c.selfEditStore, c.briefingBuilder,
                     c.curiosityEngine, c.approvalGate, c.usageRepository, c.cerebellumStore, c.profileStore,
                     c.taskStore, c.memoryStream, c.procedureStore, c.sensoriumEngine, c.libraryLookup,
+                    c.studyStore,
                 )
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel::class.java) ->
                 dev.mascwa.pulse.feature.jarvis.JarvisSetupViewModel(

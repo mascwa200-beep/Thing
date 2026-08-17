@@ -20,6 +20,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.IntentRouter
 import dev.mascwa.pulse.core.telemetry.JarvisIntent
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.orchestrator.ActionOrchestrator
 import dev.mascwa.pulse.jarvis.orchestrator.CommandStatus
@@ -80,6 +81,7 @@ class JarvisViewModel(
     private val procedureStore: dev.mascwa.pulse.data.procedure.ProcedureStore,
     private val sensorium: dev.mascwa.pulse.data.sensing.SensoriumEngine,
     private val library: dev.mascwa.pulse.data.survival.LibraryLookup,
+    private val studyStore: dev.mascwa.pulse.data.study.StudyStore,
 ) : ViewModel() {
 
     /** The ordered tool names the last agent run used — captured for procedure learning. */
@@ -618,6 +620,24 @@ class JarvisViewModel(
         val procedures = runCatching { procedureStore.digest() }.getOrDefault("")
         if (procedures.isNotBlank()) {
             prompt += "\n\n" + procedures
+        }
+        // How the studying is actually going. The record exists whether or not anyone opens STUDY, and
+        // an assistant that can teach from the library ought to know how its teaching has been landing.
+        // Silent on a blank history — there is nothing to say, and saying it anyway costs prompt budget
+        // on every single turn.
+        val study = runCatching {
+            val p = studyStore.progress()
+            if (!p.hasHistory) "" else buildString {
+                append(StudyProgress.describeStudied(p.studiedMs)).append(" studied")
+                if (p.answered > 0) append(" · ").append(p.describeRatio())
+                if (p.streakDays > 0) append(" · ").append(p.streakDays).append("-day streak")
+                val due = runCatching { studyStore.dueCount() }.getOrDefault(0)
+                if (due > 0) append(" · ").append(due).append(" due for review")
+            }
+        }.getOrDefault("")
+        if (study.isNotBlank()) {
+            prompt += "\n\nHow the user's studying is going (from the on-device study deck; bring it up " +
+                "only when it's relevant, and never as a scolding): " + study
         }
         // The Sensorium's live read — the Computer always knows the room it's speaking into. One line
         // plus any current anomaly; label-derived, never raw sensor data.

@@ -261,12 +261,56 @@ class OracleTest {
         assertTrue(Oracle.divine(base(hour = 6).copy(tempC = 9.0, dewPointC = 1.0)).none { it.id == "fog" })
     }
 
+    // ---- study --------------------------------------------------------------------------------------
+
+    @Test fun aRealReviewQueueIsOfferedWhenYouAreSettledAndAwake() {
+        val settled = base(hour = 14).copy(reviewsDue = 6)
+        assertTrue(Oracle.divine(settled).any { it.id == "study_due" })
+        // One or two due is not news — the app is not worth opening for it.
+        assertTrue(Oracle.divine(base(hour = 14).copy(reviewsDue = 2)).none { it.id == "study_due" })
+        // Mid-walk is not a moment to answer questions.
+        assertTrue(Oracle.divine(settled.copy(movement = 0.4f)).none { it.id == "study_due" })
+        // Nor is the middle of the night.
+        assertTrue(Oracle.divine(settled.copy(hourOfDay = 2)).none { it.id == "study_due" })
+    }
+
+    /**
+     * ⚠️ The rule that most easily becomes nagging, so each gate is asserted separately. Raising a
+     * streak "at risk" at nine in the morning would be inventing urgency about something with fourteen
+     * hours left to happen.
+     */
+    @Test fun aStreakIsOnlyAtRiskWhenItIsBothWorthSavingAndNearlyTooLate() {
+        val evening = base(hour = 20).copy(studyStreakDays = 9, studiedToday = false)
+        assertTrue(Oracle.divine(evening).any { it.id == "study_streak" })
+        // Already done today — nothing is at risk.
+        assertTrue(Oracle.divine(evening.copy(studiedToday = true)).none { it.id == "study_streak" })
+        // Morning: hours left, no urgency to manufacture.
+        assertTrue(Oracle.divine(evening.copy(hourOfDay = 9)).none { it.id == "study_streak" })
+        // A streak of two is not worth a prompt.
+        assertTrue(Oracle.divine(evening.copy(studyStreakDays = 2)).none { it.id == "study_streak" })
+        // Past bedtime, sleep beats the guilt prompt.
+        assertTrue(Oracle.divine(evening.copy(hourOfDay = 23)).none { it.id == "study_streak" })
+    }
+
+    @Test fun theSubjectGoingWorstIsNamedButNeverInterrupts() {
+        val weak = base().copy(shakyGuideTitle = "Knots & Cordage", shakyGuideDetail = "3 of 11 right")
+        val hit = Oracle.divine(weak).byId("study_weak")
+        assertNotNull(hit)
+        assertTrue(hit!!.title.contains("Knots & Cordage"))
+        assertEquals(Urgency.AMBIENT, hit.urgency)
+        // Ambient never warrants a push — this is worth knowing, not worth interrupting for.
+        assertTrue(Oracle.pushWorthy(listOf(hit)).isEmpty())
+    }
+
     @Test fun everyNewRuleStaysSilentOnAnEmptySnapshot() {
         // The whole contract of this engine: a missing signal means the rule does not fire, never
         // that it fires with a made-up default.
         assertTrue(Oracle.divine(base()).isEmpty())
         assertTrue(Oracle.divine(base(hour = 20)).isEmpty())
         assertTrue(Oracle.divine(base(hour = 6)).isEmpty())
+        // Someone who has never studied must hear nothing at all from the study domain — including at
+        // the evening hour the streak rule watches, and while settled, when the queue rule is looking.
+        assertTrue(Oracle.divine(base(hour = 21).copy(movement = 0f)).isEmpty())
     }
 
 }

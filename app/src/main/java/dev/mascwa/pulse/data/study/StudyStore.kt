@@ -566,6 +566,28 @@ class StudyStore(
         return StudyProgress.mastery(guideId, s.attempts.map { it.attempt() }, cards)
     }
 
+    /**
+     * The subject going worst, as a title and a plain-English line — or null when nothing has enough
+     * behind it to say so.
+     *
+     * The evidence bar lives in [StudyProgress.weakest], so anything returned here has already earned
+     * the claim; that is what stops one wrong answer on something barely touched from being named.
+     *
+     * ⚠️ Null when the title cannot be resolved. Attempts outlive their cards — the deck is capped and
+     * evicts — and naming a raw guide id at somebody would be worse than saying nothing.
+     *
+     * Android-only on purpose: the Oracle is the only caller, and the desktop has no Oracle. Mirroring
+     * it there would add a second method with no callers, which is the exact defect this arc exists to
+     * fix rather than repeat.
+     */
+    suspend fun weakestGuide(): Pair<String, String>? {
+        val s = ensureLoaded()
+        val worst = StudyProgress.weakest(s.attempts.map { it.attempt() }, limit = 1).firstOrNull()
+            ?: return null
+        val title = s.cards.firstOrNull { it.guideId == worst.guideId }?.guideTitle ?: return null
+        return title to "${worst.correct} of ${worst.answered} right so far."
+    }
+
     /** The capped, ordered way back after time away, or null when the ordinary screen is right. */
     suspend fun refresher(nowMs: Long = System.currentTimeMillis()): Refresher.Plan? {
         val s = ensureLoaded()

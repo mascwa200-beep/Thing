@@ -2,8 +2,10 @@ package dev.mascwa.pulse.jarvis.agent
 
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.GuideSearch
+import dev.mascwa.pulse.core.telemetry.StudyProgress
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
+import dev.mascwa.pulse.data.study.StudyStore
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
 import dev.mascwa.pulse.data.survival.toSearchEntry
 import kotlinx.coroutines.flow.take
@@ -22,7 +24,10 @@ import kotlinx.coroutines.flow.toList
  *
  * Read-only.
  */
-class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
+class LibraryTool(
+    private val content: SurvivalContentRepository,
+    private val study: StudyStore,
+) : JarvisTool {
     override val name = "library"
     override val usage =
         "library <question> — search the bundled offline guide library (works with no signal). " +
@@ -134,7 +139,13 @@ class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
         val wanted = rest.substringAfter(' ', "").trim()
         val guide = runCatching { content.guide(id) }.getOrNull()
             ?: return "No guide with id \"$id\". Search first with `library <question>`."
-        return if (wanted.isBlank()) outline(guide) else section(guide, wanted)
+        if (wanted.isNotBlank()) return section(guide, wanted)
+        // How the reader has been doing with this guide, when there is anything honest to say. Asked
+        // here rather than in `section`: the outline is "what is this and where do I stand", a section
+        // read is the text itself.
+        val standing = runCatching { study.mastery(id) }.getOrNull()
+            ?.takeIf { it.level != StudyProgress.Level.UNSEEN }
+        return outline(guide, standing)
     }
 
     /**
@@ -144,9 +155,12 @@ class LibraryTool(private val content: SurvivalContentRepository) : JarvisTool {
      * tool result may carry — so reading one means choosing a section first. The safety note is the
      * exception and is always shown: it is the part that matters before any of the rest.
      */
-    private fun outline(g: Guide): String = buildString {
+    private fun outline(g: Guide, standing: StudyProgress.Mastery? = null): String = buildString {
         append(g.title).append("  [").append(g.category).append("]\n")
         append(g.summary.oneLine(400)).append("\n")
+        // Absent when never studied — the model must not be told "Not started" about 581 guides and
+        // start reporting it as if it meant something.
+        standing?.let { append("\nHOW THE USER IS DOING WITH THIS — ").append(it.describe()).append("\n") }
         g.safetyNote?.trim()?.takeIf { it.isNotBlank() }?.let {
             append("\nSAFETY — ").append(it.oneLine(400)).append("\n")
         }

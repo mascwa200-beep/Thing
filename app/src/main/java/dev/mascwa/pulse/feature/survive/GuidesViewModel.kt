@@ -2,6 +2,8 @@ package dev.mascwa.pulse.feature.survive
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.StudyProgress
+import dev.mascwa.pulse.data.study.StudyStore
 import dev.mascwa.pulse.data.survival.Guide
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
 import dev.mascwa.pulse.data.survival.SurvivalContentRepository
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
  */
 class GuidesViewModel(
     private val content: SurvivalContentRepository,
+    private val study: StudyStore,
 ) : ViewModel() {
     private val _index = MutableStateFlow<List<GuideIndexEntry>>(emptyList())
     val index: StateFlow<List<GuideIndexEntry>> = _index.asStateFlow()
@@ -32,6 +35,20 @@ class GuidesViewModel(
     private val _bodyMatches = MutableStateFlow<Set<String>>(emptySet())
     val bodyMatches: StateFlow<Set<String>> = _bodyMatches.asStateFlow()
 
+    /**
+     * How well the open guide is known, or null when nothing can honestly be said about it.
+     *
+     * Null covers both "no record" and [StudyProgress.Level.UNSEEN] — a reader that announces "Not
+     * started" on every one of 581 guides is noise, and the screen should have nothing to render rather
+     * than a line saying nothing.
+     */
+    private val _mastery = MutableStateFlow<StudyProgress.Mastery?>(null)
+    val mastery: StateFlow<StudyProgress.Mastery?> = _mastery.asStateFlow()
+
+    /** How many questions the last "teach me this" produced — a one-shot confirmation, null until used. */
+    private val _taught = MutableStateFlow<Int?>(null)
+    val taught: StateFlow<Int?> = _taught.asStateFlow()
+
     private var searchJob: Job? = null
 
     init {
@@ -42,13 +59,39 @@ class GuidesViewModel(
 
     /** Opens a guide in the reader — parses only that guide's shard. */
     fun open(id: String) {
+        // Cleared first: the previous guide's standing must not linger on this one while it loads.
+        _mastery.value = null
+        _taught.value = null
         viewModelScope.launch {
             runCatching { content.guide(id) }.getOrNull()?.let { _selected.value = it }
+            refreshMastery(id)
         }
+    }
+
+    /**
+     * Turn the open guide into questions — the phone's counterpart of the desktop reader's STUDY THIS.
+     *
+     * Reading and being taught were entirely disconnected surfaces on Android: you could read the whole
+     * bundled library and the study deck would never hear about it.
+     */
+    fun teach() {
+        val id = _selected.value?.id ?: return
+        viewModelScope.launch {
+            val made = runCatching { study.teach(id) }.getOrDefault(emptyList())
+            _taught.value = made.size
+            refreshMastery(id)
+        }
+    }
+
+    private suspend fun refreshMastery(id: String) {
+        val m = runCatching { study.mastery(id) }.getOrNull()
+        _mastery.value = m?.takeIf { it.level != StudyProgress.Level.UNSEEN }
     }
 
     fun closeReader() {
         _selected.value = null
+        _mastery.value = null
+        _taught.value = null
     }
 
     /** Kicks the streamed body-level search for [query]; index-field matching stays in the screen. */

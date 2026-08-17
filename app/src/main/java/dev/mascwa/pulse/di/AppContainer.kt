@@ -475,7 +475,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.WeatherTool(weatherRepository, locationProvider, settingsRepository),
             // The app's own world, which the console could previously only reach by searching the web
             // for what was already sitting in these repositories.
-            dev.mascwa.pulse.jarvis.agent.LibraryTool(survivalContentRepository),
+            dev.mascwa.pulse.jarvis.agent.LibraryTool(survivalContentRepository, studyStore),
             // Retrieval is not teaching. This one decides what to teach and holds the schedule.
             dev.mascwa.pulse.jarvis.agent.StudyTool(studyStore, profileStore, taskStore),
             // One question — "what do I know about X" — over every store at once, so answering it
