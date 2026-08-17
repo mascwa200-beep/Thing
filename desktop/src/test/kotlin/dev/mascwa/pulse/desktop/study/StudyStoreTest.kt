@@ -201,6 +201,156 @@ class StudyStoreTest {
         assertNull(store().syllabus())
     }
 
+    // ---- being asked, and marked --------------------------------------------------------------------
+
+    /**
+     * The claim the whole quiz layer rests on, checked against the **real library** rather than a
+     * fixture — which is the only way to know it holds for the material actually shipped.
+     */
+    @Test
+    fun everyQuestionTheStoreAsksCanBeAnsweredWithExactlyOneDefensibleOption() = runBlocking {
+        val s = store()
+        var built = 0
+        var openRecall = 0
+        // A spread of subjects, so this is not one guide's luck.
+        for (goal in listOf("first aid and emergencies", "cooking and food safety", "stargazing and astronomy")) {
+            s.enroll(goal)
+            for (step in s.syllabus()!!.steps.take(4)) s.teach(step.guideId)
+        }
+        repeat(30) {
+            val ask = s.nextAsk() ?: return@repeat
+            val quiz = ask.quiz
+            if (quiz == null) {
+                openRecall++
+            } else {
+                built++
+                assertEquals("two defensible answers in ${quiz.prompt}", 1, quiz.choices.count { it.correct })
+                assertTrue(quiz.correctIndex >= 0)
+                // Duplicated option text makes one of two identical options unanswerable.
+                assertEquals(quiz.choices.size, quiz.choices.map { it.text }.distinct().size)
+                assertTrue("an empty option", quiz.choices.all { it.text.isNotBlank() })
+            }
+            // Answer it so the queue advances; correctness alternates so accuracy is not degenerate.
+            s.answer(ask.item.question.id, correct = built % 2 == 0)
+        }
+        assertTrue("the real library produced no multiple choice at all", built > 0)
+        // Generation practice must survive alongside recognition — see QuizBuilder.asksOpenRecall.
+        assertTrue("open recall was displaced entirely", openRecall > 0)
+        println("real library: $built multiple choice, $openRecall open recall")
+    }
+
+    /** Marking is objective now, so the record has to remember what actually happened. */
+    @Test
+    fun answeringRecordsWhetherItWasRightAndTheRecordSurvivesARestart() = runBlocking {
+        val path = tmp.root.toPath().resolve("study.json")
+        val first = StudyStore(library, path = path)
+        first.enroll("first aid and emergencies")
+        val made = first.teach(first.syllabus()!!.steps.first().guideId)
+        assertTrue(made.size >= 3)
+        first.answer(made[0].id, correct = true, elapsedMs = 4_000)
+        first.answer(made[1].id, correct = false, elapsedMs = 12_000)
+        first.answer(made[2].id, correct = true, elapsedMs = 40_000)
+        first.flushNow()
+
+        val reopened = StudyStore(library, path = path).progress()
+        assertEquals(3, reopened.answered)
+        assertEquals(2, reopened.correct)
+        assertEquals(1, reopened.incorrect)
+        assertTrue(reopened.describeRatio(), reopened.describeRatio().contains("67%"))
+    }
+
+    /**
+     * Pace decides the grade an objective answer earns, so the three should not come back together —
+     * instant is EASY, laboured is HARD, and the intervals differ accordingly.
+     */
+    @Test
+    fun howLongAnAnswerTookChangesWhenItComesBack() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val made = s.teach(s.syllabus()!!.steps.first().guideId)
+        val quick = s.answer(made[0].id, correct = true, elapsedMs = 2_000)!!
+        val laboured = s.answer(made[1].id, correct = true, elapsedMs = 50_000)!!
+        val wrong = s.answer(made[2].id, correct = false, elapsedMs = 5_000)!!
+        assertTrue("instant should not come back sooner than laboured", quick.dueAtMs >= laboured.dueAtMs)
+        assertEquals(1, wrong.lapses)
+    }
+
+    /** A self-graded answer says how it FELT; putting a right-or-wrong on it would invent a number. */
+    @Test
+    fun aSelfGradedAnswerLeavesTheAccuracyFigureAlone() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val made = s.teach(s.syllabus()!!.steps.first().guideId)
+        s.grade(made.first().id, Recall.Grade.GOOD)
+        val p = s.progress()
+        assertEquals(0, p.answered)
+        // It still counts as having studied — that is a different question from having been right.
+        assertTrue(p.lastStudiedAtMs > 0L)
+    }
+
+    // ---- sittings ---------------------------------------------------------------------------------------
+
+    /** Time credited from evidence of work, never from the span of an open window. */
+    @Test
+    fun aWindowLeftOpenBanksTheWorkDoneInItAndNotTheHours() = runBlocking {
+        val s = store()
+        val start = System.currentTimeMillis() - 8 * 60 * 60 * 1000L
+        s.openSession(nowMs = start)
+        s.enroll("first aid and emergencies")
+        val made = s.teach(s.syllabus()!!.steps.first().guideId)
+        s.answer(made.first().id, correct = true)
+        s.closeSession()
+        val studied = s.progress().studiedMs
+        assertTrue("credited $studied ms for one answer", studied > 0)
+        assertTrue("eight hours were credited to one answer", studied < 60 * 60 * 1000L)
+    }
+
+    /** A window opened and shut with nothing in it is not evidence of anything. */
+    @Test
+    fun anInstantSittingIsNotBanked() = runBlocking {
+        val s = store()
+        val now = System.currentTimeMillis()
+        s.openSession(nowMs = now)
+        s.closeSession(nowMs = now)
+        assertEquals(0L, s.progress().studiedMs)
+    }
+
+    // ---- coming back -------------------------------------------------------------------------------------
+
+    /** No absence, no plan — the ordinary screen is the right answer. */
+    @Test
+    fun thereIsNoWayBackWhenYouNeverLeft() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        s.teach(s.syllabus()!!.steps.first().guideId)
+        assertNull(s.refresher())
+    }
+
+    /**
+     * A month away with a real deck: capped, ordered, and saying what it is holding aside. Exercised
+     * through the store because the interesting part is the join between the deck and the history.
+     */
+    @Test
+    fun aMonthAwayGetsACappedWayBackIntoRealMaterial() = runBlocking {
+        val s = store()
+        val longAgo = System.currentTimeMillis() - 45L * 86_400_000L
+        s.enroll("first aid and emergencies")
+        for (step in s.syllabus()!!.steps.take(6)) s.teach(step.guideId, nowMs = longAgo)
+        // One answered attempt, long ago, so the store knows when you were last here.
+        val first = s.due(nowMs = longAgo, limit = 1).first()
+        s.answer(first.question.id, correct = true, nowMs = longAgo)
+
+        val plan = s.refresher()!!
+        assertTrue("everything was dumped at once", plan.steps.size <= 8)
+        assertTrue(plan.dueTotal >= plan.steps.size)
+        assertTrue("the plan is empty", plan.steps.isNotEmpty())
+        // Every step must point at a card the store actually holds.
+        val held = s.items.value.map { it.card.id }.toSet()
+        plan.steps.forEach { assertTrue("${it.item.card.id} is not held", it.item.card.id in held) }
+        // And each one must be askable.
+        assertNotNull(s.askFor(plan.steps.first().item.card.id))
+    }
+
     /** A corrupt file must not erase what a later write would otherwise save — nor crash the app. */
     @Test
     fun anUnreadableFileIsToleratedRatherThanFatal() = runBlocking {

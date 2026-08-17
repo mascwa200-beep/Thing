@@ -45,6 +45,11 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/Recall.kt": f"{DESKTOP}/telemetry/Recall.kt",
     f"{CORE}/Curriculum.kt": f"{DESKTOP}/telemetry/Curriculum.kt",
     f"{CORE}/DailyLesson.kt": f"{DESKTOP}/telemetry/DailyLesson.kt",
+    # Marking an answer objectively, and knowing how the studying is actually going. Mirrored because
+    # both platforms teach from the same library and must judge it the same way.
+    f"{CORE}/QuizBuilder.kt": f"{DESKTOP}/telemetry/QuizBuilder.kt",
+    f"{CORE}/StudyProgress.kt": f"{DESKTOP}/telemetry/StudyProgress.kt",
+    f"{CORE}/Refresher.kt": f"{DESKTOP}/telemetry/Refresher.kt",
     f"{CORE}/DeviceSearch.kt": f"{DESKTOP}/telemetry/DeviceSearch.kt",
     f"{CORE}/EmergencyTriage.kt": f"{DESKTOP}/telemetry/EmergencyTriage.kt",
     # How old what is on screen is, and why. ElapsedPhrase comes along because Freshness needs it and it
@@ -73,6 +78,9 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/RecallTest.kt": f"{DESKTOP_TEST}/telemetry/RecallTest.kt",
     f"{CORE_TEST}/CurriculumTest.kt": f"{DESKTOP_TEST}/telemetry/CurriculumTest.kt",
     f"{CORE_TEST}/DailyLessonTest.kt": f"{DESKTOP_TEST}/telemetry/DailyLessonTest.kt",
+    f"{CORE_TEST}/QuizBuilderTest.kt": f"{DESKTOP_TEST}/telemetry/QuizBuilderTest.kt",
+    f"{CORE_TEST}/StudyProgressTest.kt": f"{DESKTOP_TEST}/telemetry/StudyProgressTest.kt",
+    f"{CORE_TEST}/RefresherTest.kt": f"{DESKTOP_TEST}/telemetry/RefresherTest.kt",
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
     f"{CORE_TEST}/EmergencyTriageTest.kt": f"{DESKTOP_TEST}/telemetry/EmergencyTriageTest.kt",
     f"{CORE_TEST}/FreshnessTest.kt": f"{DESKTOP_TEST}/telemetry/FreshnessTest.kt",

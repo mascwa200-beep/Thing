@@ -1,4 +1,5 @@
-package dev.mascwa.pulse.core.telemetry
+// MIRROR OF core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry/QuizBuilderTest.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
+package dev.mascwa.pulse.desktop.telemetry
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

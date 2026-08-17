@@ -350,9 +350,12 @@ class StudyStore(
      * item. Refusing both is a real outcome, not a bug — the open-recall path then asks it as written
      * and it stays self-graded, which is honest about what was actually measured.
      */
-    private suspend fun quizFor(item: Item, pool: List<String>, seed: Int): QuizBuilder.QuizItem? =
-        runCatching { QuizBuilder.build(item.question, pool, seed) }.getOrNull()
+    private suspend fun quizFor(item: Item, pool: List<String>, seed: Int): QuizBuilder.QuizItem? {
+        // A minority of reviews are asked with no options at all — see QuizBuilder.asksOpenRecall.
+        if (QuizBuilder.asksOpenRecall(seed)) return null
+        return runCatching { QuizBuilder.build(item.question, pool, seed) }.getOrNull()
             ?: statementQuiz(item, seed)
+    }
 
     /** Every numeric term the guide uses — the near misses a fair option set is drawn from. */
     private suspend fun poolFor(guideId: String): List<String> {

@@ -1,4 +1,5 @@
-package dev.mascwa.pulse.core.telemetry
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/QuizBuilder.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
+package dev.mascwa.pulse.desktop.telemetry
 
 import java.util.Locale
 import kotlin.math.abs
