@@ -3591,6 +3591,73 @@ ABOUT (should read 1.0.21), paste a read-only token, CHECK NOW; then after a lat
 INSTALL AND QUIT and confirm it upgrades **in place** rather than installing a second copy (that is the
 `upgradeUuid` + moving ProductVersion doing its job, and it is the single most important thing to check).
 
+### STUDY, OVERPOWERED — marked answers, a real record, and a way back (this session, PR #446)
+
+Owner: make study *aware* — time actually spent in the app, questions answered, the correct-to-incorrect
+ratio, time away — and use it to run refreshers that bring you back up to speed; whatever is studied
+should be **understood**, checked by many varied multiple-choice tests "designed to mindfuck you but
+actually there to help you"; **both apps**, autonomously, without stopping. Standing credit directive
+still overrides ultracode — **zero subagent spend**, as with the twelve arcs before it.
+
+**The finding that ordered the whole arc:** every answer was **self-graded** (SHOW THE ANSWER → MISSED /
+HARD / GOT IT / EASY), so the app could not know whether you were right and **no storage change would
+have produced a ratio**. Multiple choice is not one of the requests, it is the precondition for the rest.
+
+**"Mindfuck" read as *desirable difficulties*** — the established idea that retrieval which *feels*
+harder produces durable learning. That turns a vibe into a spec with a line in it: near misses, negative
+stems, two options one detail apart, and an occasionally-absent answer are legitimate; ambiguous stems,
+two defensible answers, and trick wording are not. **Every generated item has exactly one defensible
+answer, and the tests assert it across every format.**
+
+Three pure cores (all locally kotlinc+JUnit, **every load-bearing rule negative-tested**):
+- **`QuizBuilder`** (17 tests) — numeric near-miss picks + comprehension items. Distractors must carry
+  the same unit; unitless options must also sit in the same magnitude band; withholding the answer
+  requires the offered values to be a clear distance from it.
+- **`StudyProgress`** (16 tests) — time / answered / accuracy / streak / mastery. ⚠️ **Idle is not
+  study**: a sitting credits wall-clock only up to an allowance that grows with what was done in it, so
+  an app left open all night credits the work, not the hours. Reading has its own larger allowance.
+  Streak anchors on today **or yesterday**. Mastery needs the answers **and** the schedule.
+- **`Refresher`** (14 tests) — ⚠️ **the cap is the feature.** A fortnight away and plain SM-2 hands over
+  the whole backlog, which is the commonest reason a review habit dies. A month away gets a *shorter*
+  plan than a week away, opens with something you can do, holds nothing back silently.
+- **`Recall.gradeFor`** — right or wrong is now known; pace is the only remaining signal, so right but
+  laboured is HARD.
+
+**Four defects worth keeping:**
+1. **The negative form first left three defensible answers** — its wrong answers must be statements the
+   section genuinely makes, so the odd one out stands alone.
+2. **Real-corpus only:** "below pH ______" (4.6) was offered **0.91 and 0.95** — water-activity figures
+   from a nearby paragraph — and withheld 4.6 while listing **4.0**.
+3. **`statementItem` mints its own `questionId`** from the guide and heading. Grading by it would find
+   no card and the answer would **vanish without a trace**, on a path that compiles and looks fine. The
+   card under review is the item, always.
+4. ⚠️ **Open recall was displaced entirely.** Running the store over the **real 581-guide library**, all
+   30 draws produced a multiple choice. Recognising among four is weaker than producing from nothing,
+   and generation is stronger precisely because it is the half the app cannot mark. `QuizBuilder
+   .asksOpenRecall` rations ~1 in 5 back — in QuizBuilder, not either store, so the two platforms cannot
+   ration it differently. Probe now reports 23 recognition / 7 generation.
+
+**Both apps.** Android: store keeps attempts + sittings (open sitting in memory only — persisting a
+start would credit a week to an app killed in the background), MCQ screen, PROGRESS card, REFRESHER
+card, `study progress` tool verb. Desktop: same store API and screen; **264 tests (was 207)**, and 8 new
+store tests exercise what Android CI can only compile — one defensible option over the real library, the
+record surviving a restart, pace changing the return, a self-grade leaving accuracy alone, a window left
+open banking work not hours, a month away yielding a capped plan.
+
+**⚠️ NEW LOCAL GATE — `tools/android_resolve_check.sh`.** The parse-only kotlinc pass finds braces and
+syntax and says **nothing about names**; that gap has cost two CI failures (`Unresolved reference
+'Guide'` here, `'c'` an arc back). Filtering ~95 unresolved names does not work — it **differences**
+instead: compile the file at HEAD, compile it as it stands, report names new to the latter. Platform
+noise cancels exactly. Negative-tested against both historical failures. ⚠️ Baseline must be a version
+whose own names resolved, and the compiler's own `-cp` needs **coroutines** as well as
+stdlib/trove4j/annotations — omit one and it dies before compiling a line, which **looks exactly like a
+clean pass** (an earlier attempt reported success for precisely that reason, so it now asserts it ran).
+
+⚠️ **Owner-verify on the Pixel** (CI compiles, it does not draw): answer a few and watch accuracy move;
+that the four options read clearly and the explanation teaches; that roughly one in five is still asked
+with no options; and after a few days away, that the way back is short and ordered rather than a wall.
+On Windows: the same, plus that answering and closing immediately still shows it answered.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
