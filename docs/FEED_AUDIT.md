@@ -5,7 +5,26 @@ to an independent verifier told to **refute** it. Only what survived is below, c
 verifier's own corrected severity — which moved in both directions.
 
 This file exists because the workflow transcript lives in an ephemeral container. It is a
-**work list, not a record of work done**: nothing here has been fixed.
+**work list**, and the HIGH items on it are now done — see the status table below. Everything at
+medium and cosmetic is still outstanding.
+
+## Status
+
+**All 7 HIGH findings are fixed** (branch `claude/loving-edison-bd65oa`):
+
+| Finding | Commit | How |
+|---|---|---|
+| Midnight sun printed a sunrise of 01:00 | `effe65a` | `core:telemetry/SolarDay.kt` — the two polar sentinels differ by one second, and the old guard caught only one |
+| "Nearest Help" was not nearest | `fd83b9b` | `core:telemetry/PoiSearch.kt` — choose the radius so the server's quota stops binding, instead of raising or removing it |
+| Overpass `remark` cached as "nothing here" | `fd83b9b` | Raised as the exception it always was, so the existing catch serves the previous cache |
+| `amenity` discarded on every result | `fd83b9b` | Row carries the kind, `emergency=yes`, and opening hours |
+| OSRM routed confidently to unreachable places | `6e41930` | `core:telemetry/RouteReach.kt` — parse `waypoints[].distance`; NAV drops the ETA, DayAhead refuses the estimate |
+| Sky outage cached as a quiet sky | `0cd64b5` | Count sub-fetch failures; throw when all fail, never cache a partial |
+| Radio failure identical to an empty result | `0cd64b5` | Two stacked swallows removed; the written retry affordance is reachable at last |
+
+⚠️ **Every one is runtime behaviour CI cannot exercise.** The pure cores are locally tested and
+negative-tested; the wiring is compile-gated only. Aeroplane mode is the quickest way to see most
+of them.
 
 **49 confirmed of 53 raw** across all 7 sources — 7 high, 15 medium, 22 cosmetic. 4 refuted.
 
