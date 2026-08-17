@@ -383,7 +383,7 @@ class StudyStore(
         // Rotated, so re-meeting the card asks about a different sentence of the same section rather
         // than replaying one it has already taught you the answer to.
         val rotated = Math.floorMod(seed, truths.size).let { truths.drop(it) + truths.take(it) }
-        val others = foreignSentences(guide, seed)
+        val others = foreignSentences(guide.category, seed)
         if (others.isEmpty()) return null
         return runCatching {
             QuizBuilder.statementItem(guide.id, guide.title, section.heading, rotated, others, seed)
@@ -397,9 +397,9 @@ class StudyStore(
      * on the same subject can easily also be true of this section, which is the two-defensible-answers
      * failure the whole quiz layer is built to avoid. Category distance is the cheap, reliable proxy.
      */
-    private suspend fun foreignSentences(from: Guide, seed: Int): List<String> {
+    private suspend fun foreignSentences(category: String, seed: Int): List<String> {
         val index = runCatching { content.index() }.getOrNull().orEmpty()
-        val candidates = index.filter { it.category != from.category }
+        val candidates = index.filter { it.category != category }
         if (candidates.isEmpty()) return emptyList()
         val pick = candidates[Math.floorMod(seed, candidates.size)]
         val other = runCatching { content.guide(pick.id) }.getOrNull() ?: return emptyList()
