@@ -13984,6 +13984,27 @@
    "file": "guides_visual_arts_and_design.json"
   },
   {
+   "id": "drawing-colour-and-design",
+   "title": "Drawing, Colour and Design: How to Learn to Draw, Paint and Compose a Picture",
+   "category": "Visual Arts & Design",
+   "summary": "Making pictures, and looking at them: why learning to draw is learning to see and how contour, negative space and gesture drawing get past the symbols in your head, line and shape and value and what light does to form, one-point two-point and three-point perspective plus atmospheric depth, colour theory — hue, saturation and value, why red yellow blue is a convention rather than physics, complementary colours, warm and cool, and limited palettes, composition and the rule of thirds and focal points and thumbnails, watercolour and acrylic and oil and gouache and how each behaves, drawing people with proportion and gesture and facial landmarks, graphic design with typography, hierarchy, grids and accessible contrast, photography and the exposure triangle and light, how to practise and use reference, how to look at a picture properly, and why styles changed once photography existed.",
+   "headings": [
+    "Learning to Draw Is Learning to See",
+    "Line, Shape, Value and the Elements of Art",
+    "Perspective: Vanishing Points and Making Flat Paper Look Deep",
+    "Colour: What Actually Governs It",
+    "Composition: Arranging What the Viewer Sees",
+    "Painting: Media and How They Behave",
+    "Drawing People: Proportion, Gesture and Faces",
+    "Graphic Design: Type, Hierarchy and Layout",
+    "Photography as Picture-Making",
+    "Practice, Reference and Getting Better",
+    "How to Look at Pictures",
+    "A Short History of Seeing, and Why Styles Change"
+   ],
+   "file": "guides_visual_arts_and_design.json"
+  },
+  {
    "id": "fed-warp-drive",
    "title": "Warp Drive",
    "category": "Warp & Starship Technology",
