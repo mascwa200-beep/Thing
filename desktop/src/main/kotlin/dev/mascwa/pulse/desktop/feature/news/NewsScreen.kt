@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -50,8 +51,20 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
     val c = Pulse.colors
 
+    // The feed keeps itself current only while it is the screen being shown. Off it, there is no timer
+    // running at all — see NewsViewModel.setOnScreen.
+    DisposableEffect(Unit) {
+        vm.setOnScreen(true)
+        onDispose { vm.setOnScreen(false) }
+    }
+
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-        LcarsHeaderBar("News", trailing = if (state.articles.isEmpty()) null else "${state.articles.size} STORIES")
+        LcarsHeaderBar(
+            "News",
+            // Said rather than left to be discovered: a page that silently rewrites itself every five
+            // minutes is unsettling; one that says it is live is a feature.
+            trailing = if (state.articles.isEmpty()) null else "LIVE · ${state.articles.size} STORIES",
+        )
 
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
