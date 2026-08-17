@@ -1663,6 +1663,28 @@
    "file": "guides_business_and_finance.json"
   },
   {
+   "id": "employment-and-rights-at-work",
+   "title": "Employment and Your Rights at Work: Contracts, Pay, Leave, Grievances and Dismissal",
+   "category": "Business & Finance",
+   "summary": "What your employment rights actually are and how to use them: employee, worker or self-employed contractor and why the label decides everything, what is in a contract of employment, minimum wage and payslips and unlawful deductions, working time and rest breaks and holiday, sick leave and parental leave, health and safety, discrimination, harassment and reasonable adjustments, how to raise a grievance, disciplinary procedure, notice, redundancy and unfair dismissal, references and non-compete clauses, unions and representation, and the time limits for a claim.",
+   "headings": [
+    "Employee, Worker or Contractor — and Why the Label Decides Everything",
+    "The Contract: What You Are Actually Agreeing To",
+    "Pay: Minimum Wage, Payslips, Deductions and Being Underpaid",
+    "Working Time, Rest Breaks and Holiday",
+    "Sick Leave, Parental Leave and Other Time Off",
+    "Health and Safety at Work",
+    "Discrimination, Harassment and Reasonable Adjustments",
+    "Grievances: Raising a Problem Formally",
+    "Discipline, Performance and the Process That Should Happen",
+    "Dismissal, Notice and Redundancy",
+    "References, Non-Compete Clauses and Restrictive Covenants After Leaving",
+    "Unions, Representation and Collective Bargaining",
+    "Getting Help, Tribunal Time Limits and Enforcing Your Rights"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
    "id": "chem-atoms-elements-periodic-table",
    "title": "Atoms, Elements & the Periodic Table",
    "category": "Chemistry",
