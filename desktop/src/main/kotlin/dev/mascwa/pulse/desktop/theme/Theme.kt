@@ -9,7 +9,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 /** Access the palette anywhere: `Pulse.colors.accent` — the same access pattern as the Android app's own
  *  `Pulse` object, so files ported from the Android app's `feature/common` package that reference
  *  `Pulse.colors` need no internal edits beyond their import line. */
-val LocalNightwire = staticCompositionLocalOf { lcarsPalette }
+val LocalNightwire = staticCompositionLocalOf { tosPalette }
 
 object Pulse {
     val colors: NightwirePalette
@@ -21,7 +21,7 @@ object Pulse {
  *  call sites to stay compatible with). */
 @Composable
 fun PulseDesktopTheme(content: @Composable () -> Unit) {
-    val palette = lcarsPalette
+    val palette = tosPalette
     val scheme = darkColorScheme(
         primary = palette.accent,
         onPrimary = palette.void,

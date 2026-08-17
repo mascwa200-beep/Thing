@@ -53,15 +53,25 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-/** The desktop's screens. Still not enough of them to warrant a navigation library. */
-enum class Screen(val title: String) {
-    REMOTE("Remote"),
-    NEWS("News"),
-    STUDY("Study"),
-    LIBRARY("Library"),
-    PACKS("Packs"),
-    SEARCH("Search"),
-    ABOUT("About"),
+/**
+ * The desktop's screens, each carrying what it is for.
+ *
+ * ⚠️ The rail is the directory here. On the phone that job belongs to a separate flat MENU page,
+ * because a phone cannot keep a directory on screen alongside the content; a desktop can, so making
+ * someone open a page to read the same seven words would be worse, not better. The [description] is
+ * what turns a list of nouns into something navigable by a person who has not memorised it.
+ *
+ * [section] groups the rail, so the shape of the app is legible at a glance rather than being a flat
+ * run of equals.
+ */
+enum class Screen(val title: String, val section: String, val description: String) {
+    REMOTE("Remote", "THIS MACHINE", "Pair with your phone and control it over the local network"),
+    ABOUT("About", "THIS MACHINE", "Which build you are on, and install a newer one"),
+    LIBRARY("Library", "KNOWLEDGE", "Every bundled page, by subject — works offline"),
+    SEARCH("Search", "KNOWLEDGE", "Find a page, or a study card, by what you need"),
+    STUDY("Study", "KNOWLEDGE", "Learn the library a piece a day, and be asked again"),
+    PACKS("Packs", "KNOWLEDGE", "Add more subjects — downloads once, then offline"),
+    NEWS("News", "THE WORLD", "Headlines, refreshed while you watch"),
 }
 
 /**
@@ -120,7 +130,7 @@ fun PulseDesktopApp(
         Surface(color = c.void) {
             Row(Modifier.fillMaxSize()) {
                 Column(
-                    Modifier.width(168.dp).fillMaxHeight().background(c.carbon).padding(vertical = 20.dp),
+                    Modifier.width(216.dp).fillMaxHeight().background(c.carbon).padding(vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
@@ -129,8 +139,26 @@ fun PulseDesktopApp(
                         fontSize = 20.sp, letterSpacing = 4.sp, color = c.accent,
                         modifier = Modifier.padding(start = 14.dp, bottom = 18.dp),
                     )
+                    // Grouped, so the rail reads as the app's shape rather than a flat run of
+                    // equals. `entries` is declaration-ordered and the enum is declared grouped, so
+                    // the headers fall out of one pass with no second list to keep in step.
+                    var lastSection: String? = null
                     Screen.entries.forEach { s ->
-                        LcarsNavItem(s.title, selected = screen == s, onClick = { screen = s })
+                        if (s.section != lastSection) {
+                            lastSection = s.section
+                            Text(
+                                s.section,
+                                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.6.sp,
+                                color = c.faint,
+                                modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 4.dp),
+                            )
+                        }
+                        LcarsNavItem(
+                            s.title,
+                            selected = screen == s,
+                            onClick = { screen = s },
+                            description = s.description,
+                        )
                     }
                     Box(Modifier.weight(1f))
                     Text(
