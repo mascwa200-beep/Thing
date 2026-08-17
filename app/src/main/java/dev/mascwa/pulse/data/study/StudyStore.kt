@@ -486,6 +486,20 @@ class StudyStore(
     }
 
     /**
+     * Close the sitting from a caller that may be going away, on the store's own scope.
+     *
+     * ⚠️ The screen's natural place to do this is disposal, and a view model's scope is cancelled at
+     * almost exactly that moment. Launching the close on `viewModelScope` therefore races its own
+     * cancellation and would silently lose the sitting every time you navigated back out of STUDY —
+     * silently, because a launch into a cancelled scope simply never runs. This store's scope lives as
+     * long as the container, so it cannot be cancelled out from under the caller.
+     */
+    fun endSitting(nowMs: Long = System.currentTimeMillis()) {
+        if (openStartMs <= 0L) return
+        scope.launch { closeSession(nowMs) }
+    }
+
+    /**
      * Note that it has closed, and bank the credited time.
      *
      * Zero-length sittings are dropped rather than stored: a screen opened and immediately left is not

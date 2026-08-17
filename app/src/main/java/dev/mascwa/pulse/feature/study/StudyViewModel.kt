@@ -71,9 +71,15 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
         refresh()
     }
 
-    /** And left: bank it. Time is credited from what was actually done, not from the span. */
+    /**
+     * And left: bank it. Time is credited from what was actually done, not from the span.
+     *
+     * ⚠️ On the STORE's scope, not `viewModelScope`. This is called from the screen's disposal, which
+     * is almost exactly when this view model is cleared — a launch into a scope cancelled a moment
+     * later never runs, so navigating back out of STUDY would silently lose the sitting every time.
+     */
     fun leave() {
-        viewModelScope.launch { runCatching { study.closeSession() } }
+        study.endSitting()
     }
 
     fun refresh() {
