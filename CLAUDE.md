@@ -3983,11 +3983,23 @@ database**. The second half is the one that matters and it found things reading 
   returns the Federation entry, which has a section headed "How It Governs". My probe expectation was
   wrong. **Fourth time this arc.** Check the corpus before writing the assertion.
 
-**Evidenced content gaps, not ranking faults** (each judged by its runner-up being unrelated): the
-corpus has **no guide on translation/linguistics, civic government, workplace policy, the history of
-treaties, or medicine as a profession**. Those five queries reach the lore because nothing else
-answers them. The fix is to write those guides, not to handicap these — a clean, well-scoped
-follow-up.
+**Evidenced content gaps, not ranking faults** (each judged by its runner-up being unrelated). Nine
+ordinary questions reached the lore because nothing in 637 guides answered them.
+
+**One is now closed, and the gap it exposed was worse than a ranking fault.** The `Law & Government`
+shelf held ten guides — theories of justice, liberalism, socialism, conservatism, Marxism, fascism,
+political philosophy — and **nothing on how a government actually works**: no legislature, no
+council, no courts, no elections, no how-a-bill-becomes-law. `how-government-works` (13 sections,
+full-page register, `FULL_PAGE_BASELINE` 8258 → **8271**) closes *senate*, *city council* and
+*standing orders*, and wins parliament / bills / judicial review / civil service / local council
+outright. ⚠️ Two subjects it covers substantially still lost until named in a heading and the
+summary — **proportional representation** (lost to a *proportional reasoning* maths guide) and
+**planning objections**. That is the fifth time this arc that the word a reader types was sitting in
+body text the index never sees; **check for it deliberately on every new guide.**
+
+**Still open (task #179):** translation, workplace policy, treaty history, medicine as a profession,
+antimatter, the mathematical continuum, the Roman empire. Writing them is the fix — and the
+government guide proved it also feeds the full-page target, so it serves task #73 at the same time.
 
 **Open / steerable:** lore waves continue toward 150–200 (46 done, ~4 sections × ~170 words each, the
 recipe is mechanical: staging shard → `kb_pipeline.py` → `ci_parity_lint.py` → ranker probe →
