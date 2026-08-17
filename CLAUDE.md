@@ -4049,6 +4049,86 @@ recipe is mechanical: staging shard → `kb_pipeline.py` → `ci_parity_lint.py`
 tuned for a condensed face, whether the retuned cues land as the original console or merely as lower
 beeps, and the bottom bar's six labels. On Windows: whether the companion now looks like the phone.
 
+### FILLING THE LIBRARY'S REAL HOLES (this session, PR #448)
+
+Owner chose, via AskUserQuestion, to **fix the library's real gaps** ahead of more lore waves, and to
+treat every declared category as a **promise to fill over time** rather than merge or hide thin
+shelves. **Zero subagent spend**, as with every arc since the credit directive.
+
+**What made this arc necessary was the ranker probe, not a plan.** Running the shipped `GuideSearch`
+over the real index after each lore wave kept returning ordinary questions on Star Trek pages — and
+the cause was never the ranking. A 638-guide general-knowledge library genuinely had nothing to
+answer them with. Investigating the shelves turned up worse: **History was twelve historiography
+guides with no history in it**, Medical was clinical with nothing on navigating care, **employment
+had zero mentions across all 638 guides**, and Sports & Fitness was two guides about the offside rule.
+
+**Eleven guides shipped, corpus 637 → 648, full pages → 8401**: how government works, getting
+medical care, employment and rights at work, the Roman world, car basics and roadside problems,
+knife sharpening, translation and interpreting as work, diplomacy and treaties, starting to
+exercise, drawing/colour/design, and infinity and the transfinite. The car and sharpening guides
+closed **both** of the content gaps this file had carried for several sessions. Each is ~13
+sections at 400+ words, each in an **existing** category, so no four-way taxonomy lockstep was
+needed anywhere.
+
+**⚠️ STEP 0 IS NOW MANDATORY AND IT KEEPS PAYING.** Before writing a word, run the leaked query
+against the shard **bodies**, not the index. `GuideIndexEntry` carries only id, title, category,
+summary and headings, so **a subject covered in depth can be completely unfindable**. Antimatter and
+literary translation were both already covered and needed a one-line index fix, not a guide — two
+whole guides saved. The same check, applied to each new guide before commit, caught whetstone, shin
+splints, VO2 max, home gym, vanishing point and warm-up.
+
+**Every ranking fix this arc was one of two shapes, and both are worth recognising instantly:**
+1. **Exact beats stem.** `MIN_STEM = 4` and the stem rule is prefix-based, so a word only matches a
+   longer form if it is a genuine prefix. "The Universal Translator" beat a guide titled
+   "Translation and…"; "Court and Legal Interpreting" beat `how-government-works`, which only ever
+   wrote **"courts"**, sending four of eight court queries to the wrong page; **I wrote
+   "complementaries"**, which cannot stem-match the adjective "complementary" a reader types. The
+   fix is to carry **both forms**, exactly as the astronomy guide's title does after the galaxies
+   incident.
+2. **A title outweighs a heading, and accumulated matches outweigh one good one.** Bare "warm up"
+   loses to global **warming** because that word is in the other guide's *title*. "How do I get fit"
+   loses to the backpacking guide, which has **three** heading hits (Fit Basics, Fitting Your Pack,
+   Building Endurance). ⚠️ **I edited a heading on the theory that naming it would fix the second
+   one, measured it, found it changed nothing, and reverted** — leaving a change that reads as a fix
+   is worse than the miss.
+
+**⚠️ MY SEARCH FIX BROKE A SAFETY PATH, and only a pre-existing guard made it a build failure rather
+than a shipped defect.** Renaming First Aid's "Burns" heading for index visibility broke the
+`EmergencyTriage` route pointing at it (CI run 1702). New local twin: **`tools/kb/check_emergency_routes.py`**,
+negative-tested, run before every commit alongside `ci_parity_lint.py`. **Any heading rename must be
+route-checked**, and it also orphans study cards keyed on guide+heading.
+
+**Knowing when to stop is half of this.** Queries deliberately left missing, each with the reason
+measured rather than assumed: "what is a machete used for" (the word is in no other guide, so this
+is the best answer available); "how to use a plane" (runners-up are Earth's climate and geometry,
+and "using a hand plane on wood" resolves correctly); "watercolour technique", "typography basics"
+and "what is value in art" (each dominated by a generic second word — "watercolour painting",
+"typeface and type", "tonal value drawing" all resolve); "what is sovereignty" and "can my child
+interpret at the doctor" (both return a defensible guide). **Naming a subject the guide genuinely
+covers is legitimate indexing; bending a title to win one artificial query is overfitting.**
+
+**Recipe, unchanged and mechanical:** staging shard → `kb_pipeline.py` → `ci_parity_lint.py` (prints
+the exact `FULL_PAGE_BASELINE` ratchet) → `check_emergency_routes.py` → ranker probe **in both
+directions** → `./gradlew :desktop:build` (the task CI runs, and it re-parses the bundled corpus) →
+commit. Probe harness lives in the session scratchpad's `kb/` — export `guide_index.json` to
+`index.tsv`, compile the shipped `GuideSearch.kt` plus a throwaway `main` with the local kotlinc
+recipe. ⚠️ Aim **~500 words a section**; aiming at the 400 bar reliably produces ~360, which cost a
+full extension pass on the first guide.
+
+**Evidenced gaps found in control lists and recorded rather than chased:** "world war two" returns
+the Roman guide, "what is a passport" returns a business guide, "nuclear power" returns the cell
+nucleus, and "metallurgy" needed a heading rename to stop returning *Reciprocating Saws for
+Demolition Work*. **The approved plan is now complete** — its last item, infinity, shipped; "what is
+infinity" had returned literally nothing from 646 guides. ⚠️ A third instance of title-beats-heading
+appeared there and is worth knowing: **"transfinite" returned dietary trans-fats**, because "trans"
+is a genuine prefix stem of "transfinite" and sat in that guide's *title*.
+
+**Thin shelves, as the owner's standing commitment to fill over time:** Vehicles & Transport, Skills,
+Sports & Fitness and Visual Arts & Design are done. Whatever is thinnest next is the queue.
+
+⚠️ Every guide here is prose I wrote and nobody reviewed. The exercise guide carries a `safetyNote`
+and stays at the level of general public guidance — no individual programming, no medical advice.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
