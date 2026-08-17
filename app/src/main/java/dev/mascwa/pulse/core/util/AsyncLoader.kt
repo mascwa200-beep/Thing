@@ -30,7 +30,20 @@ suspend fun <T> MutableStateFlow<Async<T>>.load(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
-        update { it.copy(loading = false, error = e.toUserMessage()) }
+        update {
+            it.copy(
+                loading = false,
+                error = e.toUserMessage(),
+                // Keeping the previous data on a failed refresh is deliberate, but it used to be
+                // SILENT: screens gate their error on `isError`, which is false while data is present,
+                // and nothing set `stale`, so a failed refresh left yesterday's numbers on screen
+                // looking exactly like a live reading. Marking it here is what lets the UI say so.
+                //
+                // `lastUpdatedEpochMs` is deliberately untouched — it still correctly describes when
+                // the data being shown was obtained, which is precisely what needs reporting.
+                stale = it.data != null || it.stale,
+            )
+        }
     }
 }
 

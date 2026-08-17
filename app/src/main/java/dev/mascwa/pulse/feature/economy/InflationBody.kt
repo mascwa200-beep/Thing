@@ -101,7 +101,7 @@ fun InflationBody(vm: EconomyViewModel, modifier: Modifier = Modifier) {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        if (infl.stale) item { StaleBanner(true) }
+                        item { StaleBanner(infl) }
                         item {
                             CountryPicker(current = state.country, onSelect = { vm.setCountry(it) })
                         }

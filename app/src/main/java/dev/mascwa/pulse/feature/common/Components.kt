@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.core.telemetry.Freshness
+import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
@@ -83,21 +85,74 @@ fun EmptyState(message: String, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The banner for one or more feeds, taken straight off their [Async] states.
+ *
+ * Preferred over the primitive below at every call site: the state already knows whether it is stored,
+ * when it arrived and whether the last refresh threw, so passing it whole removes the chance of pairing
+ * one feed's staleness with another's timestamp.
+ *
+ * With several feeds the **oldest** timestamp is reported — a screen is only as current as its stalest
+ * part — and a failure in any of them counts as a failure.
+ */
 @Composable
-fun StaleBanner(visible: Boolean, modifier: Modifier = Modifier) {
-    // Only surface the "cached data" notice when the device is actually offline.
-    // A fresh disk-cache hit while online is normal and must not trigger this.
-    if (!visible || dev.mascwa.pulse.core.connectivity.LocalIsOnline.current) return
+fun StaleBanner(vararg states: Async<*>, modifier: Modifier = Modifier) = StaleBanner(
+    visible = states.any { it.stale },
+    lastUpdatedEpochMs = Freshness.oldestOf(*states.map { it.lastUpdatedEpochMs }.toLongArray()),
+    refreshFailed = states.any { it.error != null },
+    modifier = modifier,
+)
+
+/**
+ * Says how far the data on screen can be trusted, and how old it is.
+ *
+ * ⚠️ [lastUpdatedEpochMs] is required rather than defaulted. Every `Async` already carries it and it
+ * was being read at exactly one call site in the whole app; a default of zero here would let a site I
+ * missed silently go on saying nothing, which is the bug this is fixing. Making it required means the
+ * compiler enumerates the call sites instead.
+ *
+ * For a screen fed by several sources, pass `Freshness.oldestOf(a, b)` — a screen is only as current as
+ * its stalest part.
+ *
+ * This no longer bails out merely because the device believes it is online: online-and-failing is
+ * precisely the case that used to be invisible.
+ */
+@Composable
+fun StaleBanner(
+    visible: Boolean,
+    lastUpdatedEpochMs: Long,
+    refreshFailed: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    if (!visible) return
+    val reading = Freshness.assess(
+        lastUpdatedMs = lastUpdatedEpochMs,
+        nowMs = System.currentTimeMillis(),
+        online = dev.mascwa.pulse.core.connectivity.LocalIsOnline.current,
+        servingStored = true,
+        refreshFailed = refreshFailed,
+    )
+    if (!reading.worthShowing) return
+    // ⚠️ Online-and-serving-storage is deliberately NOT announced. Every repository caches with its own
+    // max age — half an hour for weather, hours for the economic series — and within it the app treats
+    // that data as current by its own contract. Firing here would put a notice on nearly every screen
+    // open that hit a warm cache, which is how a warning stops being read.
+    //
+    // The honest limit: a repository that internally swallows a failure and falls back to storage past
+    // its own max age looks identical to a warm hit from here — same flags, no error. Distinguishing
+    // them needs the repositories to report it, which is a larger change than this one.
+    if (reading.state == Freshness.State.STORED) return
     val c = Pulse.colors
+    val tint = c.amber
     Row(
         modifier = modifier.fillMaxWidth().background(c.panel).padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(LcarsIcons.CloudOff, null, modifier = Modifier.size(16.dp), tint = c.amber)
+        Icon(LcarsIcons.CloudOff, null, modifier = Modifier.size(16.dp), tint = tint)
         Text(
-            "OFFLINE — SHOWING CACHED DATA",
-            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp, color = c.amber,
+            reading.label.uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 0.5.sp, color = tint,
         )
     }
 }

@@ -123,7 +123,7 @@ fun OrbitalBody(vm: OrbitalViewModel, modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     val d = state.data
-                    if (state.stale) item { StaleBanner(true) }
+                    item { StaleBanner(state) }
                     when (tab) {
                         SkyTab.TONIGHT -> tonightTab(tonight, passes, passesLoading, site != null, c)
                         SkyTab.SATELLITES ->

@@ -1,8 +1,5 @@
 package dev.mascwa.pulse.core.telemetry
 
-import kotlin.math.abs
-import kotlin.math.roundToLong
-
 /**
  * The **temporal reasoning** layer over the [MemoryStream] (Phase 3 of the persistent-agent brief).
  * Every memory is timestamped, so J.A.R.V.I.S. can reason about *when* things happened: how long ago,
@@ -15,14 +12,6 @@ import kotlin.math.roundToLong
  * primitives select and label.
  */
 object TemporalReasoner {
-
-    private const val SECOND = 1_000L
-    private const val MINUTE = 60 * SECOND
-    private const val HOUR = 60 * MINUTE
-    private const val DAY = 24 * HOUR
-    private const val WEEK = 7 * DAY
-    private const val MONTH = 30 * DAY
-    private const val YEAR = 365 * DAY
 
     /** Memories oldest → newest by creation time. */
     fun chronological(memories: List<Memory>): List<Memory> = memories.sortedBy { it.createdMs }
@@ -56,22 +45,7 @@ object TemporalReasoner {
      * A human, calendar-free relative-time phrase for a duration (à la "3 days ago"). Sign-agnostic —
      * pass an absolute elapsed value. Deterministic and unit-tested.
      */
-    fun describeElapsed(elapsedMs: Long): String {
-        val ms = abs(elapsedMs)
-        return when {
-            ms < 45 * SECOND -> "just now"
-            ms < 90 * SECOND -> "a minute ago"
-            ms < 45 * MINUTE -> "${(ms.toDouble() / MINUTE).roundToLong()} minutes ago"
-            ms < 90 * MINUTE -> "an hour ago"
-            ms < 22 * HOUR -> "${(ms.toDouble() / HOUR).roundToLong()} hours ago"
-            ms < 36 * HOUR -> "yesterday"
-            ms < 25 * DAY -> "${(ms.toDouble() / DAY).roundToLong()} days ago"
-            ms < 11 * WEEK -> "${(ms.toDouble() / WEEK).roundToLong()} weeks ago"
-            ms < 320 * DAY -> "${(ms.toDouble() / MONTH).roundToLong()} months ago"
-            ms < 548 * DAY -> "a year ago"
-            else -> "${(ms.toDouble() / YEAR).roundToLong()} years ago"
-        }
-    }
+    fun describeElapsed(elapsedMs: Long): String = ElapsedPhrase.describe(elapsedMs)
 
     /** Relative phrase for a specific memory at [nowMs]. */
     fun describeWhen(memory: Memory, nowMs: Long): String = describeElapsed(elapsedMs(memory, nowMs))

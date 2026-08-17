@@ -169,7 +169,7 @@ private data class WeatherChrome(
  * reachable from every tab without being pinned to the top of all of them.
  */
 private fun LazyListScope.weatherHeader(c: WeatherChrome) {
-    if (c.state.data.stale) item { StaleBanner(true) }
+    item { StaleBanner(c.state.data) }
 
     if (c.showSearch) {
         item { CitySearchField(c.query, c.onQuery) }

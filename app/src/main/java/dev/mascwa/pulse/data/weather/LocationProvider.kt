@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import dev.mascwa.pulse.core.telemetry.Geodesy
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -131,8 +132,17 @@ class LocationProvider(private val context: Context) {
             .maxByOrNull { it.time }
     }
 
+    /**
+     * The fallback name for a place when reverse geocoding cannot supply one — which is exactly the
+     * offline case, since the geocoder needs a connection.
+     *
+     * ⚠️ Not `"%.3f, %.3f".format(...)`. That uses the device locale, so on a comma-decimal one the
+     * label read "48,857, 2,352" — four comma-separated numbers where two were meant, in the string
+     * standing in for the user's location. Same defect as the SOS message carried until recently, and
+     * [Geodesy.formatDecimal] is the utility that fixed it.
+     */
     private fun formatCoords(lat: Double, lon: Double): String =
-        "%.3f, %.3f".format(lat, lon)
+        Geodesy.formatDecimal(lat, lon, decimals = 3)
 
     /** Forward geocode: place/address text -> coordinates. Online-only; null on failure/offline. */
     suspend fun geocode(place: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
