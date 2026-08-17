@@ -351,6 +351,156 @@ class StudyStoreTest {
         assertNotNull(s.askFor(plan.steps.first().item.card.id))
     }
 
+    // ---- the course map and bounded sets --------------------------------------------------------------
+
+    /**
+     * The course map over a real path: every step present, none dropped, and the percentage moving as
+     * real work goes in.
+     *
+     * ⚠️ The bar starting at zero and *staying* there is the failure this pins. Points-weighting exists
+     * so a week of genuine work shows, and a regression to counting only finished skills would leave a
+     * learner looking at 0% for a fortnight — which is the fastest way to make somebody stop.
+     */
+    @Test
+    fun theCourseMapCoversTheWholePathAndMovesAsWorkGoesIn() = runBlocking {
+        val s = store()
+        assertNull("nothing enrolled yet", s.course())
+        s.enroll("first aid and emergencies")
+        val path = s.syllabus()!!
+
+        val fresh = s.course()!!
+        assertEquals(path.steps.size, fresh.total)
+        assertEquals(path.steps.map { it.guideId }, fresh.skills.map { it.guideId })
+        assertEquals("untouched work cannot already be under way", 0, fresh.percent)
+        assertNotNull("a fresh course must still recommend a first step", fresh.nextUp())
+
+        // Teach and answer one skill: the bar must leave zero.
+        val target = path.steps.first().guideId
+        s.teach(target)
+        repeat(4) {
+            val card = s.due(limit = 20).firstOrNull { it.question.guideId == target } ?: return@repeat
+            s.answer(card.question.id, correct = true)
+        }
+        val worked = s.course()!!
+        assertTrue("real work inside a skill did not move the bar", worked.percent > 0)
+        assertTrue(worked.started >= 1)
+        assertTrue("the taught skill holds no cards", worked.skills.first { it.guideId == target }.cards > 0)
+    }
+
+    /** Practice teaches on demand: "work at this" must work on a guide only ever read. */
+    @Test
+    fun practiceOnAnUntaughtSkillTeachesItFirst() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val skill = s.course()!!.skills.first()
+        assertEquals("nothing should be held yet", 0, skill.cards)
+
+        val set = s.practice(skill.guideId, skill.title)!!
+        assertTrue(set.questionIds.isNotEmpty())
+        assertTrue("a set must be smaller than a chore", set.size <= 5)
+        assertTrue("a pass mark of everything makes one slip erase the attempt", set.passMark < set.size)
+        // Every id must be askable, or the session strands on its first question.
+        set.questionIds.forEach { assertNotNull("$it cannot be asked", s.askFor(it)) }
+    }
+
+    /**
+     * A unit test mixes several skills; a challenge spans the course weakest-first.
+     *
+     * ⚠️ The interleaving is the point, not decoration: ten questions from one guide in a row let
+     * context carry you, which is exactly what a test is meant to remove.
+     */
+    @Test
+    fun aUnitTestMixesSkillsAndAChallengeSpansTheCourse() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val course = s.course()!!
+        val unit = course.units().first { it.first != "Other" }
+        // Teach at least two skills in the unit so there is something to interleave.
+        unit.second.take(3).forEach { s.teach(it.guideId) }
+
+        val test = s.unitTest(unit.first)!!
+        assertTrue(test.questionIds.size >= 3)
+        assertEquals(test.questionIds.size, test.questionIds.distinct().size)
+        val guides = test.questionIds.mapNotNull { id -> s.items.value.firstOrNull { it.card.id == id } }
+            .map { it.question.guideId }
+        if (unit.second.take(3).size > 1) {
+            assertTrue("a mixed set drew from a single guide", guides.distinct().size > 1)
+        }
+
+        val challenge = s.challenge()!!
+        assertTrue(challenge.questionIds.isNotEmpty())
+        challenge.questionIds.forEach { assertNotNull(s.askFor(it)) }
+    }
+
+    /** Nothing to draw from means no set at all — never an empty one that strands on question one. */
+    @Test
+    fun aSetIsRefusedRatherThanReturnedEmpty() = runBlocking {
+        val s = store()
+        assertNull("no course, no unit test", s.unitTest("First Aid"))
+        assertNull("no course, no challenge", s.challenge())
+        s.enroll("first aid and emergencies")
+        assertNull("a unit nobody is enrolled in", s.unitTest("Nonexistent Category"))
+        assertNull("nothing taught yet, so nothing to challenge", s.challenge())
+    }
+
+    /**
+     * A hinted right answer is still right, but never earns the top grade.
+     *
+     * ⚠️ This is what stops help from quietly inflating the record: the accuracy figure keeps meaning
+     * "did you get there", while the *schedule* brings a hinted card back soon instead of pushing it
+     * out as though it were known.
+     *
+     * ⚠️ **Three answers, not one, and the reason is the whole test.** [Recall.review] uses fixed gaps
+     * for the first two successful reviews — `FIRST_DAYS` then `SECOND_DAYS` — so a once-answered card
+     * lands on the same interval whatever it was graded, and a single-answer version of this test
+     * passes no matter what [Hints.gradeFor] does. The divergence is in the ease, which compounds:
+     *
+     *   cold, answered fast (EASY×3): 1.0 → 3.0 → 3.0 × 2.8 × 1.3 = 10.92, ease 2.8
+     *   hinted (capped to HARD×3):    1.0 → 3.0 → 3.0 × 2.05 × 0.6 = 3.69, ease 2.05
+     */
+    @Test
+    fun aHintedAnswerIsStillCorrectButComesBackSooner() = runBlocking {
+        val day = 86_400_000L
+        val start = 1_700_000_000_000L
+
+        suspend fun threeAnswers(hintsTaken: Int): Double {
+            val s = store()
+            s.enroll("first aid and emergencies")
+            val guide = s.syllabus()!!.steps.first().guideId
+            s.teach(guide, nowMs = start)
+            val id = s.due(nowMs = start, limit = 1).first().question.id
+            var last = 0.0
+            var at = start
+            repeat(3) { round ->
+                // Fast enough that Recall.gradeFor says EASY, so the cap is the only thing that can
+                // pull it down to HARD.
+                last = s.answer(id, correct = true, elapsedMs = 1_000L, nowMs = at, hintsTaken = hintsTaken)!!
+                    .intervalDays
+                at += (last * day).toLong() + day * (round + 1)
+            }
+            return last
+        }
+
+        val cold = threeAnswers(hintsTaken = 0)
+        val hinted = threeAnswers(hintsTaken = 2)
+
+        assertEquals("cold: 3.0 × 2.8 × 1.3", 10.92, cold, 0.01)
+        assertEquals("hinted: 3.0 × 2.05 × 0.6", 3.69, hinted, 0.01)
+        assertTrue(
+            "help must not schedule a card as though it were known cold",
+            hinted < cold,
+        )
+
+        // And the record still says every one of them was got right — correct stays correct.
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val guide = s.syllabus()!!.steps.first().guideId
+        s.teach(guide)
+        s.answer(s.due(limit = 1).first().question.id, correct = true, elapsedMs = 1_000L, hintsTaken = 3)
+        assertEquals(1, s.progress().correct)
+        assertEquals(0, s.progress().incorrect)
+    }
+
     /** A corrupt file must not erase what a later write would otherwise save — nor crash the app. */
     @Test
     fun anUnreadableFileIsToleratedRatherThanFatal() = runBlocking {

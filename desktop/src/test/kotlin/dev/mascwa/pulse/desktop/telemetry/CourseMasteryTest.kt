@@ -103,6 +103,34 @@ class CourseMasteryTest {
         assertTrue(c.describe(), c.describe().contains("mastered"))
     }
 
+    // ---- units --------------------------------------------------------------------------------------
+
+    /**
+     * ⚠️ A step with no category must still appear. Grouping that silently drops the uncategorised
+     * bucket hides part of the path, and a step the learner never sees is a step they never do.
+     */
+    @Test
+    fun unitsKeepPathOrderAndLoseNoStep() {
+        val steps = listOf(
+            Curriculum.Step("a", "A", "First Aid", "Health", 1, "why"),
+            Curriculum.Step("b", "B", "Water", "Essentials", 2, "why"),
+            Curriculum.Step("c", "C", "First Aid", "Health", 3, "why"),
+            Curriculum.Step("d", "D", "", "", 4, "why"),
+        )
+        val units = CourseMastery.course(Curriculum.Syllabus("goal", steps), emptyMap()).units()
+
+        assertEquals(listOf("First Aid", "Water", CourseMastery.UNCATEGORISED), units.map { it.first })
+        assertEquals(listOf("a", "c"), units[0].second.map { it.guideId })
+        assertEquals(4, units.sumOf { it.second.size })
+    }
+
+    @Test
+    fun everyBandHasItsOwnWord() {
+        val labels = StudyProgress.Level.entries.map { CourseMastery.label(it) }
+        assertEquals(labels.size, labels.distinct().size)
+        assertTrue(labels.none { it.isBlank() })
+    }
+
     @Test
     fun eachSkillSaysWhatToDoAboutItInTheImperative() {
         fun cta(level: StudyProgress.Level, cards: Int, due: Int, taught: Boolean) =

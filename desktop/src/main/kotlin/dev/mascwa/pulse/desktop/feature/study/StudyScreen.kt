@@ -15,13 +15,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import dev.mascwa.pulse.desktop.telemetry.CourseMastery
 import dev.mascwa.pulse.desktop.telemetry.Curriculum
 import dev.mascwa.pulse.desktop.telemetry.DailyLesson
+import dev.mascwa.pulse.desktop.telemetry.Hints
+import dev.mascwa.pulse.desktop.telemetry.PracticeSet
 import dev.mascwa.pulse.desktop.telemetry.QuizBuilder
 import dev.mascwa.pulse.desktop.telemetry.Recall
 import dev.mascwa.pulse.desktop.telemetry.Refresher
@@ -51,10 +55,18 @@ fun StudyScreen(
 ) {
     val state by vm.state.collectAsState()
 
+    val c = Pulse.colors
+    val session = state.session
+
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         LcarsHeaderBar(
-            "Study",
-            trailing = if (state.dueCount > 0) "${state.dueCount} DUE" else null,
+            if (session != null) session.title else "Study",
+            trailing = when {
+                // A bounded set has a finish line, and the header is where it belongs.
+                session != null && state.ask != null -> "${state.sessionAt + 1} OF ${session.size}"
+                state.dueCount > 0 -> "${state.dueCount} DUE"
+                else -> null
+            },
         )
         LcarsBusyBar(state.loading)
 
@@ -64,7 +76,26 @@ fun StudyScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
         ) {
             val ask = state.ask
-            if (ask != null) {
+            val result = state.sessionResult
+            if (result != null) {
+                // A finished set holds the screen until its verdict is read. Dropping straight back to
+                // the queue would make the effort just evaporate.
+                item { ResultCard(result, onDone = { vm.dismissResult() }) }
+            } else if (ask != null) {
+                if (session != null) {
+                    // The finish line, visible from the start — the whole reason a bounded set beats an
+                    // open queue for learning one thing.
+                    item {
+                        LcarsFillRow(
+                            segments = listOf(
+                                state.sessionAt.toFloat() to c.accent,
+                                (session.size - state.sessionAt).toFloat() to c.raise,
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(5.dp),
+                            gap = 1.5.dp,
+                        )
+                    }
+                }
                 item {
                     val quiz = ask.quiz
                     if (quiz != null) {
@@ -73,6 +104,9 @@ fun StudyScreen(
                             picked = state.picked,
                             wasCorrect = state.wasCorrect,
                             scheduled = state.scheduled,
+                            hints = state.hints,
+                            hintsTaken = state.hintsTaken,
+                            onHint = { vm.takeHint() },
                             onChoose = { vm.choose(it) },
                             onNext = { vm.next() },
                             onStop = { vm.endSession() },
@@ -104,7 +138,22 @@ fun StudyScreen(
             }
 
             val syllabus = state.syllabus
-            if (syllabus != null && !syllabus.isEmpty) {
+            val course = state.course
+            if (course != null && !course.isEmpty) {
+                item {
+                    CourseCard(
+                        course = course,
+                        note = syllabus?.note.orEmpty(),
+                        onOpen = onOpenGuide,
+                        onPractise = { vm.practiceSkill(it.guideId, it.title) },
+                        onUnitTest = { vm.startUnitTest(it) },
+                        onChallenge = { vm.startChallenge() },
+                        onAbandon = { vm.abandonGoal() },
+                    )
+                }
+            } else if (syllabus != null && !syllabus.isEmpty) {
+                // The course map is the same path with mastery on it, so this only shows when the
+                // mastery read itself failed — never as a second copy of the same list.
                 item {
                     PathCard(
                         syllabus = syllabus,
@@ -197,6 +246,9 @@ private fun QuizCard(
     picked: Int?,
     wasCorrect: Boolean?,
     scheduled: String?,
+    hints: List<Hints.Hint>,
+    hintsTaken: Int,
+    onHint: () -> Unit,
     onChoose: (Int) -> Unit,
     onNext: () -> Unit,
     onStop: () -> Unit,
@@ -238,6 +290,33 @@ private fun QuizCard(
                     onClick = { onChoose(index) },
                 )
                 Spacer(Modifier.height(8.dp))
+            }
+
+            // Stuck has two outcomes without a ladder — guess, or give up — and both are recorded as a
+            // wrong answer that says more about the hint being missing than about the learner.
+            if (!answered && hints.isNotEmpty()) {
+                hints.take(hintsTaken).forEach { hint ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (hint.isAnswer) "ANSWER" else "HINT ${hint.step}",
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp,
+                        color = if (hint.isAnswer) c.amber else c.sky,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        hint.text,
+                        fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.accent,
+                        modifier = Modifier.widthIn(max = 760.dp),
+                    )
+                }
+                if (hintsTaken < hints.size) {
+                    Spacer(Modifier.height(14.dp))
+                    LcarsButton(
+                        if (hintsTaken == 0) "HINT" else "ANOTHER HINT",
+                        onClick = onHint,
+                        accent = c.sky,
+                    )
+                }
             }
 
             if (answered) {
@@ -457,6 +536,196 @@ private fun QuestionCard(
                 fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted,
                 modifier = Modifier.clickable { onStop() }.padding(vertical = 4.dp),
             )
+        }
+    }
+}
+
+/**
+ * The whole course at once: where you are, what to do next, and every skill with its standing.
+ *
+ * Mastery learning as Khan popularised it — you move on because a skill is demonstrably known, and the
+ * ladder is visible the whole time. Two departures are deliberate and visible here: **nothing is
+ * locked** (every skill is readable and practisable in any order, because this is a reference library
+ * somebody may open in an emergency), and the percentage is **points-weighted**, so a week's real work
+ * inside a skill moves the bar instead of leaving it at zero until something is finished.
+ */
+@Composable
+private fun CourseCard(
+    course: CourseMastery.Course,
+    note: String,
+    onOpen: (String) -> Unit,
+    onPractise: (CourseMastery.Skill) -> Unit,
+    onUnitTest: (String) -> Unit,
+    onChallenge: () -> Unit,
+    onAbandon: () -> Unit,
+) {
+    val c = Pulse.colors
+    val anyCards = course.skills.any { it.cards > 0 }
+    LcarsFrame(Modifier.fillMaxWidth(), accent = c.sky) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    course.goal,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = c.ink,
+                )
+                Text(
+                    "${course.percent}%",
+                    fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.accent,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            LcarsFillRow(
+                segments = listOf(
+                    course.percent.toFloat() to c.accent,
+                    (100 - course.percent).toFloat() to c.raise,
+                ),
+                modifier = Modifier.fillMaxWidth().height(7.dp),
+                gap = 1.5.dp,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(course.describe(), fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+
+            // One recommendation, said in the imperative. A dashboard that only lists is a dashboard
+            // that leaves the choosing to somebody who came here to be taught.
+            course.nextUp()?.let { skill ->
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "NEXT UP",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.muted,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(skill.title, fontFamily = ChakraPetch, fontSize = 15.sp, color = c.ink)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    describeSkill(skill),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = bandColor(skill.level),
+                )
+                Spacer(Modifier.height(10.dp))
+                LcarsButton(skill.callToAction().uppercase(), onClick = { onPractise(skill) })
+            }
+
+            course.units().forEach { (unit, skills) ->
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        unit.uppercase(),
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.sky,
+                    )
+                    // A unit test needs a unit to belong to and questions to draw from; offering one
+                    // that can only come back empty is a button that teaches distrust.
+                    if (unit != CourseMastery.UNCATEGORISED && skills.any { it.cards > 0 }) {
+                        Text(
+                            "UNIT TEST",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
+                            modifier = Modifier.clickable { onUnitTest(unit) }.padding(horizontal = 4.dp),
+                        )
+                    }
+                }
+                skills.forEach { SkillRow(it, onOpen, onPractise) }
+            }
+
+            if (anyCards) {
+                Spacer(Modifier.height(16.dp))
+                LcarsButton("COURSE CHALLENGE", onClick = onChallenge, accent = c.sky)
+            }
+            if (note.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(note, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted)
+            }
+            Spacer(Modifier.height(12.dp))
+            LcarsButton("LEAVE THIS PATH", onClick = onAbandon, accent = c.muted)
+        }
+    }
+}
+
+@Composable
+private fun SkillRow(
+    skill: CourseMastery.Skill,
+    onOpen: (String) -> Unit,
+    onPractise: (CourseMastery.Skill) -> Unit,
+) {
+    val c = Pulse.colors
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            skill.position.toString().padStart(2, '0'),
+            fontFamily = JetBrainsMono, fontSize = 12.sp, color = bandColor(skill.level),
+        )
+        // Reading and practising are both one click, and neither is gated on the other.
+        Column(Modifier.weight(1f).clickable { onOpen(skill.guideId) }) {
+            Text(skill.title, fontFamily = ChakraPetch, fontSize = 14.sp, color = c.ink)
+            Text(
+                describeSkill(skill),
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = bandColor(skill.level),
+            )
+        }
+        Text(
+            skill.callToAction().uppercase(),
+            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
+            modifier = Modifier.clickable { onPractise(skill) }.padding(horizontal = 6.dp, vertical = 4.dp),
+        )
+    }
+}
+
+private fun describeSkill(skill: CourseMastery.Skill): String = buildString {
+    append(CourseMastery.label(skill.level))
+    if (skill.due > 0) append(" · ${skill.due} due")
+}
+
+@Composable
+private fun bandColor(level: StudyProgress.Level): Color {
+    val c = Pulse.colors
+    return when (level) {
+        StudyProgress.Level.UNSEEN -> c.muted
+        StudyProgress.Level.INTRODUCED -> c.sky
+        StudyProgress.Level.SHAKY -> c.negative
+        StudyProgress.Level.LEARNING -> c.amber
+        StudyProgress.Level.SOLID -> c.accent
+        StudyProgress.Level.MASTERED -> c.positive
+    }
+}
+
+/**
+ * How a bounded set went.
+ *
+ * ⚠️ A miss is never phrased as a failure — [PracticeSet.Result.verdict] says what to do about it
+ * instead, because somebody who has just spent real effort needs an instruction, not a grade.
+ */
+@Composable
+private fun ResultCard(result: PracticeSet.Result, onDone: () -> Unit) {
+    val c = Pulse.colors
+    LcarsFrame(Modifier.fillMaxWidth(), accent = if (result.passed) c.positive else c.amber) {
+        Column {
+            Text(
+                if (result.passed) "PASSED" else "NOT YET",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.sp,
+                color = if (result.passed) c.positive else c.amber,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                result.verdict(),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = c.ink,
+                modifier = Modifier.widthIn(max = 760.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            LcarsFillRow(
+                segments = listOf(
+                    result.correct.toFloat() to c.positive,
+                    (result.total - result.correct).toFloat() to c.negative,
+                ),
+                modifier = Modifier.fillMaxWidth().height(7.dp),
+                gap = 1.5.dp,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "${result.percent}% · ${result.passMark} of ${result.total} to pass",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
+            )
+            Spacer(Modifier.height(14.dp))
+            LcarsButton("DONE", onClick = onDone)
         }
     }
 }

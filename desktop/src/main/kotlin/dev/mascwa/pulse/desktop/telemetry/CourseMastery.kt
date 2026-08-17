@@ -82,6 +82,16 @@ object CourseMastery {
         fun dueNow(): List<Skill> = skills.filter { it.due > 0 }.sortedByDescending { it.due }
 
         /**
+         * The course broken into units, in path order — Khan's chapters.
+         *
+         * Lives here rather than in either screen so the two platforms group identically. A skill whose
+         * guide carries no category lands under [UNCATEGORISED] rather than vanishing: a step of the
+         * path that is not shown is a step the learner never does.
+         */
+        fun units(): List<Pair<String, List<Skill>>> =
+            skills.groupBy { it.category.ifBlank { UNCATEGORISED } }.toList()
+
+        /**
          * What to do next, and why — one skill, chosen the way a tutor would.
          *
          * Order of preference: something ready for review, then something shaky, then the first thing
@@ -135,6 +145,25 @@ object CourseMastery {
             started = skills.count { it.level != StudyProgress.Level.UNSEEN },
         )
     }
+
+    /**
+     * The mastery band in a word, for a chip beside a skill.
+     *
+     * Presentation, but shared presentation: both platforms draw the same map, and a band called
+     * "SHAKY" on the phone and "Needs work" on the desktop would be two different verdicts wearing one
+     * scale. The `when` is exhaustive, so adding a band fails to compile rather than shipping blank.
+     */
+    fun label(level: StudyProgress.Level): String = when (level) {
+        StudyProgress.Level.UNSEEN -> "NOT STARTED"
+        StudyProgress.Level.INTRODUCED -> "INTRODUCED"
+        StudyProgress.Level.SHAKY -> "SHAKY"
+        StudyProgress.Level.LEARNING -> "LEARNING"
+        StudyProgress.Level.SOLID -> "SOLID"
+        StudyProgress.Level.MASTERED -> "MASTERED"
+    }
+
+    /** Where a skill lands when its guide carries no category of its own. */
+    const val UNCATEGORISED = "Other"
 
     /**
      * Points per mastery band — the ladder the percentage is weighted by.

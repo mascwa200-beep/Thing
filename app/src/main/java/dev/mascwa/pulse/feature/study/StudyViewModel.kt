@@ -2,8 +2,11 @@ package dev.mascwa.pulse.feature.study
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.CourseMastery
 import dev.mascwa.pulse.core.telemetry.Curriculum
 import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.Hints
+import dev.mascwa.pulse.core.telemetry.PracticeSet
 import dev.mascwa.pulse.core.telemetry.Recall
 import dev.mascwa.pulse.core.telemetry.Refresher
 import dev.mascwa.pulse.core.telemetry.StudyProgress
@@ -50,6 +53,17 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
         val progress: StudyProgress.Snapshot? = null,
         /** Offered only after a real absence with something waiting. */
         val refresher: Refresher.Plan? = null,
+        /** The enrolled course with every skill's standing. Null when nothing is enrolled. */
+        val course: CourseMastery.Course? = null,
+        /** A bounded set in progress — practice, unit test or challenge. Null = the ordinary queue. */
+        val session: PracticeSet.Session? = null,
+        val sessionAt: Int = 0,
+        val sessionCorrect: Int = 0,
+        /** Set once a session finishes; the screen shows the verdict until it is dismissed. */
+        val sessionResult: PracticeSet.Result? = null,
+        /** The hint ladder for the question on screen, and how far up it has been climbed. */
+        val hints: List<Hints.Hint> = emptyList(),
+        val hintsTaken: Int = 0,
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -97,6 +111,7 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
             val suggestions = runCatching { study.suggestedGoals() }.getOrDefault(emptyList())
             val progress = runCatching { study.progress() }.getOrNull()
             val refresher = runCatching { study.refresher() }.getOrNull()
+            val course = runCatching { study.course() }.getOrNull()
             val items = study.items.value
             _state.update {
                 it.copy(
@@ -110,6 +125,7 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
                     learned = items.count { i -> Recall.isLearned(i.card) },
                     progress = progress,
                     refresher = refresher,
+                    course = course,
                 )
             }
         }
@@ -147,6 +163,73 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
         _state.update { it.copy(revealed = true) }
     }
 
+    /** Work at one skill until it holds — the practice loop, not the scheduling queue. */
+    fun practiceSkill(guideId: String, title: String) {
+        viewModelScope.launch {
+            val set = runCatching { study.practice(guideId, title) }.getOrNull() ?: return@launch
+            beginSession(set)
+        }
+    }
+
+    fun startUnitTest(category: String) {
+        viewModelScope.launch { runCatching { study.unitTest(category) }.getOrNull()?.let { beginSession(it) } }
+    }
+
+    fun startChallenge() {
+        viewModelScope.launch { runCatching { study.challenge() }.getOrNull()?.let { beginSession(it) } }
+    }
+
+    private suspend fun beginSession(set: PracticeSet.Session) {
+        _state.update {
+            it.copy(session = set, sessionAt = 0, sessionCorrect = 0, sessionResult = null, scheduled = null)
+        }
+        askSessionQuestion(0)
+    }
+
+    /**
+     * Climb one rung of the hint ladder.
+     *
+     * The count is what the grade and the pass mark read, so it has to be recorded before the answer,
+     * not inferred afterwards.
+     */
+    fun takeHint() {
+        _state.update { if (it.hintsTaken < it.hints.size) it.copy(hintsTaken = it.hintsTaken + 1) else it }
+    }
+
+    private suspend fun askSessionQuestion(index: Int) {
+        val set = _state.value.session ?: return
+        val id = set.questionIds.getOrNull(index)
+        if (id == null) { finishSession(); return }
+        val ask = runCatching { study.askFor(id) }.getOrNull()
+        if (ask == null) {
+            // A card that vanished under us (eviction, a cleared deck) must not strand the session.
+            if (index + 1 < set.size) askSessionQuestion(index + 1) else finishSession()
+            return
+        }
+        shownAtMs = System.currentTimeMillis()
+        _state.update {
+            it.copy(
+                ask = ask, picked = null, wasCorrect = null, revealed = false, sessionAt = index,
+                hints = ask.quiz?.let { q -> Hints.forQuiz(q) }.orEmpty(), hintsTaken = 0,
+            )
+        }
+    }
+
+    private fun finishSession() {
+        val set = _state.value.session ?: return
+        _state.update {
+            it.copy(
+                ask = null, picked = null, wasCorrect = null, hints = emptyList(), hintsTaken = 0,
+                sessionResult = PracticeSet.Result(set.kind, it.sessionCorrect, set.size, set.passMark),
+            )
+        }
+    }
+
+    /** Clear a finished set's verdict and return to the ordinary screen. */
+    fun dismissResult() {
+        _state.update { it.copy(session = null, sessionResult = null, sessionAt = 0, sessionCorrect = 0) }
+    }
+
     /**
      * Commit to one of the options.
      *
@@ -165,8 +248,18 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
             // ⚠️ The CARD's id, never the quiz's. A comprehension item mints its own identifier from
             // the guide and heading it was assembled from, so grading by the quiz's id would find no
             // card and the answer would vanish without a trace. The card under review is the item.
-            val next = runCatching { study.answer(ask.item.question.id, correct, elapsed) }.getOrNull()
-            _state.update { it.copy(scheduled = next?.let { c -> Recall.describeInterval(c.intervalDays) }) }
+            val next = runCatching {
+                study.answer(ask.item.question.id, correct, elapsed, hintsTaken = current.hintsTaken)
+            }.getOrNull()
+            // Inside a bounded set, an answer only counts toward the pass mark if it was not read off
+            // the last hint — otherwise a unit test clears with three taps per question.
+            val counts = Hints.countsTowardPass(correct, current.hints, current.hintsTaken)
+            _state.update {
+                it.copy(
+                    scheduled = next?.let { c -> Recall.describeInterval(c.intervalDays) },
+                    sessionCorrect = if (it.session != null && counts) it.sessionCorrect + 1 else it.sessionCorrect,
+                )
+            }
             refresh()
         }
     }
@@ -191,7 +284,10 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
     /** Move past a marked multiple choice to whatever is next. */
     fun next() {
         viewModelScope.launch {
-            nextQuestion(keepScheduled = true)
+            val st = _state.value
+            // A bounded set walks its own list to its own finish line; only the open-ended review path
+            // falls through to "whatever is due next".
+            if (st.session != null) askSessionQuestion(st.sessionAt + 1) else nextQuestion(keepScheduled = true)
             refresh()
         }
     }
@@ -219,7 +315,13 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun endSession() {
-        _state.update { it.copy(ask = null, picked = null, wasCorrect = null, revealed = false, scheduled = null) }
+        _state.update {
+            it.copy(
+                ask = null, picked = null, wasCorrect = null, revealed = false, scheduled = null,
+                session = null, sessionAt = 0, sessionCorrect = 0, sessionResult = null,
+                hints = emptyList(), hintsTaken = 0,
+            )
+        }
     }
 
     private suspend fun nextQuestion(keepScheduled: Boolean = false) {
@@ -232,6 +334,8 @@ class StudyViewModel(private val container: AppContainer) : ViewModel() {
                 wasCorrect = null,
                 revealed = false,
                 scheduled = if (keepScheduled) it.scheduled else null,
+                hints = next?.quiz?.let { q -> Hints.forQuiz(q) }.orEmpty(),
+                hintsTaken = 0,
             )
         }
     }

@@ -1,8 +1,11 @@
 package dev.mascwa.pulse.desktop.feature.study
 
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.telemetry.CourseMastery
 import dev.mascwa.pulse.desktop.telemetry.Curriculum
 import dev.mascwa.pulse.desktop.telemetry.DailyLesson
+import dev.mascwa.pulse.desktop.telemetry.Hints
+import dev.mascwa.pulse.desktop.telemetry.PracticeSet
 import dev.mascwa.pulse.desktop.telemetry.Recall
 import dev.mascwa.pulse.desktop.telemetry.Refresher
 import dev.mascwa.pulse.desktop.telemetry.StudyProgress
@@ -34,6 +37,17 @@ data class StudyUiState(
     val progress: StudyProgress.Snapshot? = null,
     /** Offered only after a real absence with something waiting. */
     val refresher: Refresher.Plan? = null,
+    /** The enrolled course with every skill's standing. Null when nothing is enrolled. */
+    val course: CourseMastery.Course? = null,
+    /** A bounded set in progress — practice, unit test or challenge. Null = the ordinary queue. */
+    val session: PracticeSet.Session? = null,
+    val sessionAt: Int = 0,
+    val sessionCorrect: Int = 0,
+    /** Set once a session finishes; the screen shows the verdict until it is dismissed. */
+    val sessionResult: PracticeSet.Result? = null,
+    /** The hint ladder for the question on screen, and how far up it has been climbed. */
+    val hints: List<Hints.Hint> = emptyList(),
+    val hintsTaken: Int = 0,
 )
 
 /**
@@ -73,6 +87,7 @@ class StudyViewModel(
             val suggestions = runCatching { store.suggestedGoals() }.getOrDefault(emptyList())
             val progress = runCatching { store.progress() }.getOrNull()
             val refresher = runCatching { store.refresher() }.getOrNull()
+            val course = runCatching { store.course() }.getOrNull()
             val items = store.items.value
             _state.value = _state.value.copy(
                 loading = false,
@@ -85,6 +100,7 @@ class StudyViewModel(
                 learned = items.count { Recall.isLearned(it.card) },
                 progress = progress,
                 refresher = refresher,
+                course = course,
             )
         }
     }
@@ -129,6 +145,70 @@ class StudyViewModel(
         }
     }
 
+    /** Work at one skill until it holds — the practice loop, not the scheduling queue. */
+    fun practiceSkill(guideId: String, title: String) {
+        scope.launch { runCatching { store.practice(guideId, title) }.getOrNull()?.let { beginSession(it) } }
+    }
+
+    fun startUnitTest(category: String) {
+        scope.launch { runCatching { store.unitTest(category) }.getOrNull()?.let { beginSession(it) } }
+    }
+
+    fun startChallenge() {
+        scope.launch { runCatching { store.challenge() }.getOrNull()?.let { beginSession(it) } }
+    }
+
+    private suspend fun beginSession(set: PracticeSet.Session) {
+        _state.value = _state.value.copy(
+            session = set, sessionAt = 0, sessionCorrect = 0, sessionResult = null, scheduled = null,
+        )
+        askSessionQuestion(0)
+    }
+
+    /**
+     * Climb one rung of the hint ladder.
+     *
+     * The count is what the grade and the pass mark read, so it has to be recorded before the answer,
+     * not inferred afterwards.
+     */
+    fun takeHint() {
+        val s = _state.value
+        if (s.hintsTaken < s.hints.size) _state.value = s.copy(hintsTaken = s.hintsTaken + 1)
+    }
+
+    private suspend fun askSessionQuestion(index: Int) {
+        val set = _state.value.session ?: return
+        val id = set.questionIds.getOrNull(index)
+        if (id == null) { finishSession(); return }
+        val ask = runCatching { store.askFor(id) }.getOrNull()
+        if (ask == null) {
+            // A card that vanished under us (eviction, a cleared deck) must not strand the session.
+            if (index + 1 < set.size) askSessionQuestion(index + 1) else finishSession()
+            return
+        }
+        shownAtMs = System.currentTimeMillis()
+        _state.value = _state.value.copy(
+            ask = ask, picked = null, wasCorrect = null, revealed = false, sessionAt = index,
+            hints = ask.quiz?.let { Hints.forQuiz(it) }.orEmpty(), hintsTaken = 0,
+        )
+    }
+
+    private fun finishSession() {
+        val s = _state.value
+        val set = s.session ?: return
+        _state.value = s.copy(
+            ask = null, picked = null, wasCorrect = null, hints = emptyList(), hintsTaken = 0,
+            sessionResult = PracticeSet.Result(set.kind, s.sessionCorrect, set.size, set.passMark),
+        )
+    }
+
+    /** Clear a finished set's verdict and return to the ordinary screen. */
+    fun dismissResult() {
+        _state.value = _state.value.copy(
+            session = null, sessionResult = null, sessionAt = 0, sessionCorrect = 0,
+        )
+    }
+
     /**
      * Commit to one of the options.
      *
@@ -147,9 +227,20 @@ class StudyViewModel(
             // ⚠️ The CARD's id, never the quiz's. A comprehension item mints its own identifier from
             // the guide and heading it was assembled from, so grading by the quiz's id would find no
             // card and the answer would vanish without a trace. The card under review is the item.
-            val next = runCatching { store.answer(ask.item.question.id, correct, elapsed) }.getOrNull()
-            _state.value = _state.value.copy(
+            val next = runCatching {
+                store.answer(ask.item.question.id, correct, elapsed, hintsTaken = current.hintsTaken)
+            }.getOrNull()
+            // Inside a bounded set, an answer only counts toward the pass mark if it was not read off
+            // the last hint — otherwise a unit test clears with three taps per question.
+            val counts = Hints.countsTowardPass(correct, current.hints, current.hintsTaken)
+            val latest = _state.value
+            _state.value = latest.copy(
                 scheduled = next?.let { Recall.describeInterval(it.intervalDays) },
+                sessionCorrect = if (latest.session != null && counts) {
+                    latest.sessionCorrect + 1
+                } else {
+                    latest.sessionCorrect
+                },
             )
             refresh()
         }
@@ -158,7 +249,10 @@ class StudyViewModel(
     /** Move past a marked multiple choice to whatever is next. */
     fun next() {
         scope.launch {
-            nextQuestion(keepScheduled = true)
+            val s = _state.value
+            // A bounded set walks its own list to its own finish line; only the open-ended review path
+            // falls through to "whatever is due next".
+            if (s.session != null) askSessionQuestion(s.sessionAt + 1) else nextQuestion(keepScheduled = true)
             refresh()
         }
     }
@@ -211,6 +305,8 @@ class StudyViewModel(
     fun endSession() {
         _state.value = _state.value.copy(
             ask = null, picked = null, wasCorrect = null, revealed = false, scheduled = null,
+            session = null, sessionAt = 0, sessionCorrect = 0, sessionResult = null,
+            hints = emptyList(), hintsTaken = 0,
         )
     }
 
@@ -223,6 +319,8 @@ class StudyViewModel(
             wasCorrect = null,
             revealed = false,
             scheduled = if (keepScheduled) _state.value.scheduled else null,
+            hints = next?.quiz?.let { Hints.forQuiz(it) }.orEmpty(),
+            hintsTaken = 0,
         )
     }
 }
