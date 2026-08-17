@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.data.orbital
 
+import dev.mascwa.pulse.core.telemetry.SolarDay
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.space.SpaceWeather
 import java.text.SimpleDateFormat
@@ -19,9 +20,23 @@ object SkyDigest {
         val out = mutableListOf<String>()
 
         orbital.sun?.let { s ->
-            val rise = timeOrNull(s.sunriseEpochMs)
-            val set = timeOrNull(s.sunsetEpochMs)
-            if (rise != null || set != null) out += "☀️ Sunrise ${rise ?: "—"} · Sunset ${set ?: "—"}"
+            // Above the Arctic Circle the feed answers with a 1970 sentinel rather than a time, and
+            // the two polar cases differ by one second. Reading them as clock times printed
+            // "Sunrise 01:00 · Sunset 01:00" on a day the Sun never set — while the observatory
+            // screen, working from the on-device Ephemeris, correctly said it does not set at all.
+            when (val day = SolarDay.classify(s.sunriseEpochMs, s.sunsetEpochMs, s.dayLengthSec)) {
+                SolarDay.Kind.NORMAL -> {
+                    val rise = timeOrNull(s.sunriseEpochMs)
+                    val set = timeOrNull(s.sunsetEpochMs)
+                    if (rise != null || set != null) {
+                        out += "☀️ Sunrise ${rise ?: "—"} · Sunset ${set ?: "—"}"
+                    }
+                }
+                SolarDay.Kind.MIDNIGHT_SUN -> SolarDay.describe(day)?.let { out += "☀️ $it" }
+                SolarDay.Kind.POLAR_NIGHT -> SolarDay.describe(day)?.let { out += "🌑 $it" }
+                // Nothing trustworthy to say, so say nothing — the line simply does not appear.
+                SolarDay.Kind.UNKNOWN -> Unit
+            }
         }
 
         out += "${orbital.moon.emoji} ${orbital.moon.phaseName} · ${(orbital.moon.illumination * 100).roundToInt()}% lit"

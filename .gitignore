@@ -34,5 +34,10 @@ tools/kb/.next_wave.json
 
 # Local verification scratch: the harness is tracked, its build output and
 # regenerable inputs are not (index.tsv is derived from guide_index.json).
-scratchpad/**/out/
+# ⚠️ Matched by ARTIFACT TYPE, not directory name — an earlier rule named the output
+# directory (scratchpad/**/out/) and a second script wrote to coreout/ instead, so 540
+# .class files were committed before anyone noticed.
+scratchpad/**/*.class
+scratchpad/**/*.kotlin_module
+scratchpad/**/*.jar
 scratchpad/kb/index.tsv
