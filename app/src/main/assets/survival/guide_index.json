@@ -13539,6 +13539,28 @@
    "file": "guides_sports_and_fitness.json"
   },
   {
+   "id": "starting-to-exercise",
+   "title": "Starting to Exercise: Running, Strength Training, Stretching and Rest",
+   "category": "Sports & Fitness",
+   "summary": "How to get fit and stay fit. How to begin and keep going: why too much too soon is the one mistake everyone makes and how fast tendon and bone really adapt, how to warm up and why static stretching before hard effort is no longer advised, learning to run with run-walk and why easy means conversational, running shoes and cadence and overstriding, strength training and progressive overload and the movement patterns to cover, how many rest days, sleep and recovery and the warning signs of overtraining, swimming and cycling and low-impact options, the different components of fitness and how to judge intensity without a monitor, exercise in childhood and older age and pregnancy and with diabetes, arthritis, back pain or heart disease, how sports skills are actually learned, building a weekly routine you will keep, what equipment and supplements are worth buying, common overuse injuries and when to stop, and what exercise does to the heart, muscle, bone and brain.",
+   "headings": [
+    "Starting From Nothing: The Only Rule That Matters",
+    "How to Warm Up and Cool Down, and What Stretching Actually Does",
+    "Learning to Run",
+    "Strength Training: The Basics That Apply to Everyone",
+    "Rest, Recovery and Overtraining",
+    "Swimming, Cycling and Low-Impact Options",
+    "Fitness Is Several Different Things: Endurance, Strength, Power and VO2 Max",
+    "Exercise Across a Life: Age, Pregnancy and Chronic Conditions",
+    "Sport: Skill, Practice and Getting Better at a Game",
+    "Building a Week That You Will Actually Do",
+    "Equipment, a Home Gym, and Spending Money Sensibly",
+    "Common Injuries — Shin Splints, Runner's Knee, Tendinopathy — and When to Stop",
+    "What Exercise Actually Does to You"
+   ],
+   "file": "guides_sports_and_fitness.json"
+  },
+  {
    "id": "fed-united-federation-of-planets",
    "title": "The United Federation of Planets",
    "category": "Starfleet & Federation",
