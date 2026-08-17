@@ -21,6 +21,14 @@ object StudyQuestions {
 
         /** An open prompt the reader grades themselves against the passage. Never wrong, never fake. */
         RECALL,
+
+        /**
+         * Which step of a procedure comes next.
+         *
+         * The most checkable question the corpus can ask, and for the material richest in procedures —
+         * first aid, food safety, chemistry — knowing the *order* is the entire skill.
+         */
+        ORDER,
     }
 
     /**
@@ -37,6 +45,21 @@ object StudyQuestions {
         val guideId: String,
         val guideTitle: String,
         val heading: String,
+        /**
+         * For [QuestionKind.ORDER]: the other real steps of the **same** procedure, and the only
+         * things a wrong option may ever be.
+         *
+         * ⚠️ This field exists so the safety rule is structural rather than remembered. A caller
+         * cannot hand [QuizBuilder] a fabricated or foreign distractor for a procedure, because the
+         * builder does not consult the caller's pool for this kind at all. Every option a learner
+         * sees is therefore a genuine instruction from the procedure in front of them — merely in
+         * the wrong position. Inventing a plausible-sounding step would put made-up instructions in
+         * front of somebody studying CPR or water purification, which is not a risk worth any
+         * amount of question variety.
+         *
+         * Empty for every other kind. Defaulted, so existing construction sites are unaffected.
+         */
+        val options: List<String> = emptyList(),
     )
 
     // ---- sentence selection -----------------------------------------------------------------------
@@ -134,10 +157,58 @@ object StudyQuestions {
     )
 
     /**
+     * "What comes next" over an ordered procedure.
+     *
+     * ⚠️ Needs [MIN_ORDER_STEPS] steps, because three honest distractors have to exist. A shorter
+     * procedure produces nothing here rather than something weak — its steps still reach the learner
+     * through cloze, which is checkable on its own terms.
+     *
+     * Positions are 1-based in the prompt because that is how the reader saw them on the page.
+     */
+    fun procedure(
+        guideId: String,
+        guideTitle: String,
+        heading: String,
+        steps: List<String>,
+        max: Int = MAX_ORDER_PER_SECTION,
+    ): List<Question> {
+        val clean = steps.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (clean.size < MIN_ORDER_STEPS) return emptyList()
+        return clean.dropLast(1).mapIndexedNotNull { index, current ->
+            val next = clean[index + 1]
+            // Every other step of THIS procedure — all true instructions, merely out of place here.
+            // ⚠️ The step shown in the prompt is excluded as well as the answer. Leaving it in offers
+            // the reader an option they were just told is the *current* step, which is a free
+            // elimination and makes a four-choice question a three-choice one. Found by reading real
+            // generated questions rather than fixtures — every sample had it sitting there as option D.
+            val others = clean.filterIndexed { i, _ -> i != index && i != index + 1 }
+            if (others.size < STANDARD_DISTRACTORS) return@mapIndexedNotNull null
+            Question(
+                id = "order:$guideId:$heading:${index + 1}".take(ID_MAX),
+                kind = QuestionKind.ORDER,
+                prompt = "In \"$guideTitle — $heading\", step ${index + 1} is:\n\n" +
+                    "“$current”\n\nWhat comes next?",
+                answer = next,
+                guideId = guideId,
+                guideTitle = guideTitle,
+                heading = heading,
+                options = others,
+            )
+        }.take(max)
+    }
+
+    /**
      * Questions for one section, best first.
      *
      * Cloze leads because it is checkable; recall always closes the list so a section is never
      * unteachable. Capped because a study prompt is one question, not a worksheet.
+     *
+     * @param steps an ordered procedure, when the section carries one. **404 sections of the bundled
+     *   corpus do, holding 3,298 individual steps, and until this parameter existed not one of them
+     *   produced a question** — the call site had them in hand and dropped them.
+     * @param ingredients a materials or quantities list. Not turned into "which is missing" questions
+     *   on purpose: asserting that something is absent from a materials list is a claim worth getting
+     *   wrong, whereas its lines are dense with doses that cloze handles honestly.
      */
     fun forSection(
         guideId: String,
@@ -145,10 +216,17 @@ object StudyQuestions {
         heading: String,
         body: String,
         max: Int = MAX_PER_SECTION,
+        steps: List<String> = emptyList(),
+        ingredients: List<String> = emptyList(),
     ): List<Question> {
         if (body.isBlank() || heading.isBlank()) return emptyList()
-        val clozes = sentences(body).mapNotNull { cloze(it, guideId, guideTitle, heading) }.take(max - 1)
-        return clozes + recall(guideId, guideTitle, heading, body)
+        val ordering = procedure(guideId, guideTitle, heading, steps)
+        // Steps and materials are sentences too, and they are where the measurements live.
+        val extra = (steps + ingredients).mapNotNull { cloze(it.trim(), guideId, guideTitle, heading) }
+        val clozes = (sentences(body).mapNotNull { cloze(it, guideId, guideTitle, heading) } + extra)
+            .distinctBy { it.id }
+        // Ordering first: it is the only form that tests the sequence, which is the point of a procedure.
+        return (ordering + clozes).take(max - 1) + recall(guideId, guideTitle, heading, body)
     }
 
     private val WHITESPACE = Regex("\\s+")
@@ -190,6 +268,22 @@ object StudyQuestions {
     const val MAX_SENTENCE = 220
 
     const val MAX_PER_SECTION = 3
+
+    /** Wrong options on a four-choice question. */
+    const val STANDARD_DISTRACTORS = 3
+
+    /**
+     * Below this, a procedure cannot be asked about in order.
+     *
+     * **Five**, not four: two steps are spoken for on every question — the one shown in the prompt
+     * and the answer — leaving three to draw distractors from, which is exactly
+     * [STANDARD_DISTRACTORS]. A four-step procedure would have to repeat an option, offer the step
+     * already on screen, or invent one, and inventing is the thing that must never happen.
+     */
+    const val MIN_ORDER_STEPS = 5
+
+    /** A long procedure is still one study prompt, not a worksheet on the whole thing. */
+    const val MAX_ORDER_PER_SECTION = 2
     const val RECALL_SENTENCES = 3
     const val RECALL_CHARS = 420
 

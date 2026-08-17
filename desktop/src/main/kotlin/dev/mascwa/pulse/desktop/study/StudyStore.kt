@@ -96,6 +96,10 @@ class StudyStore(
         val ease: Double = Recall.START_EASE,
         val reps: Int = 0,
         val lapses: Int = 0,
+        /** ⚠️ An ORDER card's sibling steps. Without these it survives a restart as a card
+         *  that can never be turned back into a question — see StudyQuestions.Question.options.
+         *  Defaulted, so saves written before procedures existed still load. */
+        val options: List<String> = emptyList(),
     )
 
     @Serializable
@@ -182,6 +186,7 @@ class StudyStore(
             guideId = guideId,
             guideTitle = guideTitle,
             heading = heading,
+            options = options,
         ),
         card = Recall.Card(id, dueAtMs, intervalDays, ease, reps, lapses),
     )
@@ -199,6 +204,7 @@ class StudyStore(
         ease = card.ease,
         reps = card.reps,
         lapses = card.lapses,
+        options = question.options,
     )
 
     // ---- the enrolled path ---------------------------------------------------------------------------
@@ -255,7 +261,13 @@ class StudyStore(
         val guide = runCatching { library.guide(guideId) }.getOrNull() ?: return emptyList()
         val made = ArrayList<StudyQuestions.Question>(MAX_QUESTIONS_PER_LESSON)
         for (section in guide.sections.take(LESSON_SECTIONS)) {
-            for (q in StudyQuestions.forSection(guide.id, guide.title, section.heading, section.body)) {
+            for (q in StudyQuestions.forSection(
+                guide.id, guide.title, section.heading, section.body,
+                // The section has carried these all along; nobody passed them, so 3,298 steps
+                // across the corpus produced no questions at all.
+                steps = section.steps.orEmpty(),
+                ingredients = section.ingredients.orEmpty(),
+            )) {
                 if (made.size >= MAX_QUESTIONS_PER_LESSON) break
                 made += q
             }

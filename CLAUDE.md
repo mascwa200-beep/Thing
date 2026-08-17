@@ -3817,6 +3817,48 @@ card at phone width, whether four options and the hint ladder read clearly, roug
 five still asked with no options; and on Windows, the News age line resetting on its own after five
 minutes and refreshing on arrival after time on another screen.
 
+### PROCEDURES BECOME QUESTIONS · packs on the phone (this session cont., PR #448)
+
+Owner chose **more educational depth** over spending the content wave. Investigating rather than
+guessing turned up a real gap of this repo's recurring class — structured data present and never
+read. `StudyQuestions.forSection` took only `heading` and `body`; the call site in `StudyStore.teach`
+had the whole `GuideSection` and **dropped `steps` and `ingredients` on the floor**. Measured:
+**404 sections carry 3,298 ordered steps, 239 carry 1,824 material lines, and none of it generated a
+single question** — in a library whose most testable content is procedures, richest in Chemistry,
+Food Safety and First Aid.
+
+- **`QuestionKind.ORDER`** — "step N is …, what comes next?" — reusing the existing MCQ interaction,
+  so no UI changed on either platform. Plus cloze over steps and ingredient lines, where the doses
+  live.
+- ⚠️ **The safety rule is structural, not remembered.** `Question.options` carries the procedure's own
+  sibling steps and `QuizBuilder` **does not consult the caller's pool for this kind at all**, so a
+  wrong option is always a real instruction from the same procedure, merely out of place. Inventing a
+  plausible step would put fabricated instructions in front of somebody working through CPR.
+  Negative-tested: leaking the pool in fails exactly that test.
+- ⚠️ **Two defects found only by reading real generated output**, which is why that step is not
+  optional. First, `MIN_SENTENCE` is 45 and my test fixtures were 30-character lines — my expectation
+  was wrong, not the code (measured after: **73% of real steps and 91% of ingredient lines** clear the
+  bar, so the feature genuinely fires). Second, and worse: **the step shown in the prompt was also
+  offered as an option** — a free elimination, present in every single sample. Fixing it raised
+  `MIN_ORDER_STEPS` 4 → 5, because the shown step and the answer are both spoken for. Cost: 4
+  questions out of 808.
+- **Final corpus run: 804 questions over 404 real sections, 0 unsafe options, 0 freebies.**
+
+**Packs on Android (`0dcd9be`).** Closes the tandem gap, which was open in the unusual direction —
+the desktop was ahead and `PackStore` was inert on the phone. `PackRepository` twins the desktop's,
+`resolve()` kept identical so "a catalog names an asset, never a URL" stays one rule.
+`HttpClient.download` gained an optional `onProgress` (whole-percent changes only; **silent when the
+server states no length**, since a percentage of an unknown total is a number the caller renders as
+fact). PACKS screen wired as `Routes.STUDY` is, MENU → GUIDES.
+
+**⚠️ Two verification lessons, both of which cost real time this session:**
+1. **Verify with `./gradlew :desktop:build`, not `:desktop:test`.** CI runs the former and it is a
+   superset; that gap is exactly how a flaky test reached CI.
+2. **A first-answer card cannot distinguish grades.** `Recall.review` uses a fixed `FIRST_DAYS` for
+   any first success, so a test wanting to see pace in the schedule must review **three** times. This
+   bit twice in one session — once in a test I wrote, once in a pre-existing one that had been
+   passing only because two `System.currentTimeMillis()` reads landed on the same millisecond.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

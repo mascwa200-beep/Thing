@@ -89,6 +89,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/PracticeSetTest.kt": f"{DESKTOP_TEST}/telemetry/PracticeSetTest.kt",
     f"{CORE_TEST}/HintsTest.kt": f"{DESKTOP_TEST}/telemetry/HintsTest.kt",
     f"{CORE_TEST}/QuizBuilderTest.kt": f"{DESKTOP_TEST}/telemetry/QuizBuilderTest.kt",
+    f"{CORE_TEST}/ProcedureQuestionTest.kt": f"{DESKTOP_TEST}/telemetry/ProcedureQuestionTest.kt",
     f"{CORE_TEST}/StudyProgressTest.kt": f"{DESKTOP_TEST}/telemetry/StudyProgressTest.kt",
     f"{CORE_TEST}/RefresherTest.kt": f"{DESKTOP_TEST}/telemetry/RefresherTest.kt",
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",

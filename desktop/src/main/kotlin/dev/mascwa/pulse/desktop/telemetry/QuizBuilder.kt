@@ -190,6 +190,46 @@ object QuizBuilder {
     // ---- building -----------------------------------------------------------------------------------
 
     /**
+     * "What comes next" over a procedure.
+     *
+     * ⚠️ **Distractors come from [StudyQuestions.Question.options] and from nowhere else — the
+     * caller's `pool` is deliberately not consulted.** Every wrong option is therefore a real step of
+     * the same procedure, merely out of place: a learner who misreads one has still read a true
+     * instruction. The alternative — synthesising a plausible-sounding step — would put invented
+     * instructions in front of somebody working through CPR or water purification, and no amount of
+     * question variety is worth that.
+     *
+     * Always [Format.STANDARD]. The clever formats are wrong here: "which is NOT the next step" makes
+     * three true-but-misplaced statements read as endorsements, and withholding the answer would ask
+     * someone to certify that a real step of this very procedure does not belong in it.
+     */
+    private fun ordering(question: StudyQuestions.Question, seed: Int): QuizItem? {
+        val answer = question.answer.trim()
+        if (answer.isEmpty()) return null
+        val wanted = STANDARD_CHOICES - 1
+        val wrong = question.options
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it != answer }
+            .distinct()
+            .toList()
+        // Fewer honest distractors than a fair item needs: no item at all, as everywhere else here.
+        if (wrong.size < wanted) return null
+        // Deterministic pick, so a card asks the same question every time it comes back.
+        val picked = shuffled(wrong, seed).take(wanted)
+        return QuizItem(
+            questionId = question.id,
+            prompt = question.prompt,
+            choices = shuffled(picked.map { Choice(it, false) } + Choice(answer, true), seed),
+            format = Format.STANDARD,
+            guideId = question.guideId,
+            guideTitle = question.guideTitle,
+            heading = question.heading,
+            explanation = "The next step is: $answer",
+        )
+    }
+
+    /**
      * A multiple-choice item for a numeric [question], or null when it cannot be made fairly.
      *
      * Null rather than a degraded item on purpose: an item with one plausible distractor and two
@@ -202,6 +242,7 @@ object QuizBuilder {
         seed: Int,
         sourceSentence: String = "",
     ): QuizItem? {
+        if (question.kind == StudyQuestions.QuestionKind.ORDER) return ordering(question, seed)
         if (question.kind != StudyQuestions.QuestionKind.CLOZE) return null
         val answer = question.answer.trim()
         split(answer) ?: return null
