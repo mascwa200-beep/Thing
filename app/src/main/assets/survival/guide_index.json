@@ -9230,6 +9230,28 @@
    "file": "guides_law_and_government.json"
   },
   {
+   "id": "passports-visas-and-crossing-borders",
+   "title": "Passports, Visas and Crossing a Border: Travel Documents, Entry Rules, Customs and Losing Your Passport Abroad",
+   "category": "Law & Government",
+   "summary": "What a passport is and what it does not entitle you to, how to get and renew one, the validity rules that get people turned away at check-in, visas, the Schengen 90/180 rule and the electronic travel authorisations that are not quite visas, what actually happens at immigration and customs, being refused entry or overstaying, land and sea borders and transit, what to do if your passport is lost or stolen abroad, what a consulate can and cannot do for you, and the rules on dual nationality and travelling with children.",
+   "headings": [
+    "What a passport actually is, and the thing it does not do",
+    "Getting one: the application, the photograph, and the wait",
+    "The validity rules that catch people out",
+    "Visas: what they are, who decides, and the classes you will meet",
+    "Visa-free travel, Schengen limits, and electronic authorisations like ESTA and ETIAS",
+    "Before you go: the preparation that costs an hour and saves a trip",
+    "What actually happens at a border",
+    "Being refused entry, and overstaying",
+    "Customs: what you declare, and what will simply be taken",
+    "Land borders, sea crossings and transit",
+    "Losing your passport abroad",
+    "What a consulate can and cannot do for you",
+    "Dual nationality, second passports, and travelling with children"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
    "id": "hermeneutics-the-art-of-interpretation",
    "title": "Hermeneutics & the Art of Interpretation",
    "category": "Literature & Writing",
