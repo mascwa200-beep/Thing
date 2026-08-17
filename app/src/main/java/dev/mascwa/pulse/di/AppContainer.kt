@@ -251,6 +251,11 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.survival.PackStore(appContext, json)
     }
 
+    /** Browsing and fetching published packs. Only the wire between the format, the archive and the store. */
+    val packRepository: dev.mascwa.pulse.data.survival.PackRepository by lazy {
+        dev.mascwa.pulse.data.survival.PackRepository(http, settingsRepository, packStore, appContext.cacheDir)
+    }
+
     /**
      * What the reader is learning from the bundled library, and when they are next due to be asked.
      *

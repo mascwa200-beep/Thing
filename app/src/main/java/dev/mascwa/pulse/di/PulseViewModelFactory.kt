@@ -112,6 +112,9 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.study.StudyViewModel::class.java) ->
                 dev.mascwa.pulse.feature.study.StudyViewModel(c)
+
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.packs.PacksViewModel::class.java) ->
+                dev.mascwa.pulse.feature.packs.PacksViewModel(c)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T

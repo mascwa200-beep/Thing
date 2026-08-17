@@ -307,6 +307,11 @@ fun PulseApp(
                 )
             }
 
+            composable(Routes.PACKS) {
+                val vm: dev.mascwa.pulse.feature.packs.PacksViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.packs.PacksScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
             composable(Routes.ORACLE) {
                 val vm: dev.mascwa.pulse.feature.oracle.OracleViewModel = viewModel(factory = factory)
@@ -416,6 +421,7 @@ fun PulseApp(
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
+    Routes.PACKS,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
     Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
     Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,

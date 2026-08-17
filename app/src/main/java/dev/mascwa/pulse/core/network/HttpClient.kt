@@ -57,12 +57,20 @@ class HttpClient(
         json.decodeFromString(deserializer, text)
     }
 
-    /** Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?). */
+    /**
+     * Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?).
+     *
+     * @param onProgress 0..100 as the body arrives. **Never called when the server does not state a
+     *   length** — a percentage of an unknown total is a number the caller would render as fact, and
+     *   a bar that races to 90% and stops is worse than one that never appeared. Callers that want to
+     *   show something in that case should say "downloading…" instead.
+     */
     suspend fun download(
         url: String,
         dest: File,
         maxBytes: Long,
         headers: Map<String, String> = emptyMap(),
+        onProgress: (Int) -> Unit = {},
     ): Pair<Long, String?> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
@@ -73,15 +81,26 @@ class HttpClient(
             if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
             val body = resp.body ?: throw IOException("empty response")
             val type = resp.header("Content-Type")
+            val expected = body.contentLength().takeIf { it > 0L }
             dest.outputStream().use { out ->
                 body.byteStream().use { input ->
                     val buf = ByteArray(1 shl 16)
                     var total = 0L
+                    var reported = -1
                     var n = input.read(buf)
                     while (n >= 0) {
                         total += n
                         if (total > maxBytes) throw IOException("file exceeds the ${maxBytes / (1024 * 1024)} MB limit")
                         out.write(buf, 0, n)
+                        if (expected != null) {
+                            val pct = ((total * 100) / expected).toInt().coerceIn(0, 100)
+                            // Only on a whole-percent change: a 64 KB buffer over a large file would
+                            // otherwise call back thousands of times to move the same bar.
+                            if (pct != reported) {
+                                reported = pct
+                                onProgress(pct)
+                            }
+                        }
                         n = input.read(buf)
                     }
                     total to type
