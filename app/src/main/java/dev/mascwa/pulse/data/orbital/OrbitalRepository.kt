@@ -31,7 +31,17 @@ class OrbitalRepository(
     private val ttl = 5 * 60 * 1000L
 
     suspend fun fetch(latitude: Double?, longitude: Double?, force: Boolean): Fetched<OrbitalData> {
-        val key = "orbital_${latitude?.let { "%.2f".format(it) } ?: "na"}"
+        // ⚠️ The key used to carry LATITUDE ONLY, so every place on the same parallel shared one
+        // entry — and the payload includes sunrise and sunset, which are a function of longitude
+        // as much as latitude. Lisbon and Ankara both sit near 39°N and their sunrise times differ
+        // by the better part of two hours; whichever was fetched first was served to the other.
+        // Locale.US because a comma-decimal device otherwise writes a differently-spelled key for
+        // the same place, quietly orphaning the cache when the device language changes.
+        val key = if (latitude != null && longitude != null) {
+            String.format(Locale.US, "orbital_%.2f_%.2f", latitude, longitude)
+        } else {
+            "orbital_na"
+        }
         if (!force) {
             cache.read(key, ttl, OrbitalData.serializer())?.let {
                 // Recompute moon + planets for the current moment even from cache.
