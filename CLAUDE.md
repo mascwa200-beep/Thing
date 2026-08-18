@@ -4492,6 +4492,88 @@ microphone or camera.** Worth eyes first: the ISS line on Home (a direction and 
 silence when the station is low or below 10°), the NAV turn instruction on a real drive, the
 Nearest Help contact links, and the news card no longer repeating its headline.
 
+### THE CHANNEL LIST GOES WORLDWIDE — 5 curated channels become 41 (this session, PR #448)
+
+Owner: *"Add more worldwide free news channels in English."* Three binding AskUserQuestion decisions
+governed it: **broadcaster-own endpoints only** (no distributor tier — so Reuters, Sky News UK,
+Scripps and Cheddar are out), **state media included and clearly labelled**, and **50+ with national
+broadcasters, not just the global networks**. **Zero subagent spend**, as with every arc since the
+credit directive.
+
+**⚠️ THE HEADLINE FINDING, and it is the reusable one: a failure is far more often the endpoint than
+the broadcaster.** Al Jazeera English and NHK World-Japan had shipped `UNVERIFIED` since the feature
+launched, on addresses that answer with a proxy 502. Both play perfectly — Al Jazeera on the host its
+**Arabic sibling** uses (`live-hls-apps-aje-fa` beside the working `...-aja-fa`), NHK on NHK's own
+`masterpl.hls.nhkworld.jp` rather than an Akamai alias. CLAUDE.md and the source both recorded France
+24 as "master 200 → variant 400, looks fine, plays nothing"; that was a **wrong path**, and mirroring
+the Arabic sibling's URL shape produced a 6.4 MB segment first try. TRT World failed a TLS handshake
+on one own host and plays on the other. **Before believing a broadcaster is unreachable, find a
+sibling feed of the same broadcaster and copy its URL shape.**
+
+**⚠️ THE FIRST SWEEP WAS INVALID AND NEARLY SHIPPED AS EVIDENCE — three harness bugs, all mine.**
+It reported 3/170 playing; the corrected harness reports 98/170.
+1. The segment classifier demanded a `0x47` sync byte or `ftyp`/`styp` in the first 12 bytes, so a
+   **200 carrying 1.7 MB of real video** was logged as a failure. Believe HTTP 200 + a body too big
+   to be an error page (~200 B); identify the container best-effort, never require it.
+2. **20 parallel probes** produced widespread `000` — the documented container-proxy pattern. Four
+   concurrent with jitter, and re-probe serially before believing a failure.
+3. **CRLF, again.** HLS playlists are CRLF, so every extracted URL carried a trailing `\r`, curl
+   returned 000, and DW English — a channel known to work — reported as broken. This is the third
+   distinct place this repo has met that trap. `tr -d '\r'` on text, and a *separate* binary fetch so
+   the segment is not stripped.
+Plus two smaller ones found by self-testing: `xxd` does not exist in this container (use
+`od -A n -t x1`), and a 200 with an **empty body** is a transient — measured three times seconds
+apart on the same host, two empty and one good — so it retries once and reports `EMPTY_BODY`
+distinctly rather than condemning the channel as an empty playlist.
+
+**⚠️ Reading the host does not settle provenance; read the whole URL.** Reuters TV is served from an
+ordinary-looking CloudFront distribution whose *path* is `amg00453-reuters-samsunggb`, and both
+published NBC News NOW addresses carry `ads.xumo_channelId`. A host-only blocklist admitted both. A
+test now screens the full URL for distributor markers, so the owner's rule is held by CI rather than
+by whoever is reading the diff.
+
+**⚠️ `langs` in the iptv-org index is the CHANNEL BRAND's languages, not the feed's** — it lists
+English for DW's Arabic service and for Al Jazeera Arabic. Join `tvg-id` (`Channel.cc@FeedId`) to
+`feeds.json` for the real per-feed language. That distinction removed a dozen non-English entries.
+
+**How the 41 were arrived at, because the numbers are the argument:** the news playlist yields 168
+English-feed streams, 98 reach a segment, broadcaster-own leaves ~30; widening from
+`iptv/categories/news.m3u` to the full `api/streams.json` — where the **BBC**, Euronews, CBS News,
+WION, Bloomberg, SABC and TRT all publish on their own origins — brings it to 41.
+**⚠️ That is the ceiling of this source under the owner's own rule, and 41 is short of the 50+ asked
+for.** Going further means admitting distributor platforms or padding with siblings of broadcasters
+already listed (three more CityNews cities, three more CBS local newsrooms). Neither was done
+quietly; the shortfall is stated in the KDoc and was reported to the owner.
+
+**New `Funding` label.** The line between the two funded categories is drawn at exactly one place —
+**whether editorial independence from the funder is set out in law or charter** — so BBC/DW/NHK/
+France 24/TRT/VOA/Arirang/ABC/CBC/SABC are `PUBLIC` and CGTN/RT/Press TV/teleSUR/KTV/**Al Jazeera**
+are `STATE` and say "state-funded" on the row. `COMMERCIAL` renders nothing: a badge on every row is
+a badge nobody reads. The arguable calls (Al Jazeera, TRT, VOA, CNA) are named in the KDoc for the
+owner to overrule, each one line.
+
+**⚠️ `MirrorDriftTest`'s hand-maintained map listed none of the four live-TV files** even though
+`tools/mirror_desktop_cores.py` mirrors them and `desktop-build.yml` never runs its `--check`.
+Growing this list without regenerating would have left the desktop on the old five channels **with
+its own mirrored `LiveChannelsTest` still passing**, because that test is itself the stale mirror.
+Now in the map. **Check that map whenever a new mirror is added — the script and the test are two
+independent statements of the same mapping, which is the point, and only one of them was current.**
+
+**Tests pin the exceptions, not the rule.** The old `theThreeChannelsWalkedToASegmentAreMarkedAsSuch`
+listed the *confirmed* channels, so every addition broke it and told you nothing. What is worth
+catching is an entry shipped **without** the evidence, so the assertion is now the (currently two)
+unverified ids. Plus worldwide spread, the funding label, and the distributor screen.
+
+**⚠️ A negative test of mine reported a guard "asleep" when the guard was fine** — the perturbation
+used `replace(..., 1)` and left the second South Africa entry standing, so the property under test
+was never actually removed. **The perturbation has to break the thing, not merely touch it**, and
+that is a distinct failure mode from the already-recorded "perturbation did not match the source".
+All four guards confirmed after the fix. core 29/29 and desktop 399/399 locally.
+
+⚠️ **Owner-verify on the Pixel and on Windows:** that a spread of the new channels actually play on a
+real network (this container blocks a share of media CDNs, which is why two ship `UNVERIFIED`); that
+a 41-entry rail reads well where five did; and that the funding line is legible at 9sp caption size.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
