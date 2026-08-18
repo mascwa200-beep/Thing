@@ -40,6 +40,14 @@ data class NewsTab(
     val breaking: Boolean = false,
     /** A community source (Lemmy / Hacker News / Mastodon) surfaced as its own News tab, or null. */
     val social: SocialTab? = null,
+    /**
+     * Live television rather than articles.
+     *
+     * The one tab with nothing to fetch — its content comes from a video stream the player opens on
+     * demand, so [NewsViewModel.selectTab] skips the load entirely rather than spinning a refresh
+     * that could never finish and then reporting "no articles found".
+     */
+    val live: Boolean = false,
 )
 
 data class NewsUiState(
@@ -107,6 +115,9 @@ class NewsViewModel(
                     val tabs = buildList {
                         // Breaking leads: the freshest stories across topics, "just reported on".
                         add(NewsTab("BREAKING", "Breaking", null, custom = false, breaking = true))
+                        // Second, because watching a channel is the other thing you reach for when
+                        // something is happening — and it must not displace the lead.
+                        add(NewsTab("LIVE", "Live TV", null, custom = false, live = true))
                         NewsCategory.entries.forEach { add(NewsTab(it.name, it.title, it, false)) }
                         // Community sources, each its own tab (Lemmy · Mastodon · Hacker News).
                         SocialTab.entries.forEach { add(NewsTab("SOCIAL_${it.name}", it.label, null, custom = false, social = it)) }
@@ -241,6 +252,14 @@ class NewsViewModel(
         val i = index.coerceIn(0, tabs.lastIndex)
         val tab = tabs[i]
         _state.update { it.copy(selectedIndex = i, searchMode = false, query = "") }
+
+        // Live television has nothing to fetch. Settling on a loaded-and-empty result rather than
+        // leaving the flow loading is what stops the screen showing a refresh that never finishes,
+        // and the screen renders the player instead of the (correctly) empty article list.
+        if (tab.live) {
+            _state.update { it.copy(content = Async(data = emptyList(), loading = false)) }
+            return
+        }
 
         cache[tab.key]?.takeIf { !force && it.data != null }?.let { cached ->
             _state.update { it.copy(content = cached) }
