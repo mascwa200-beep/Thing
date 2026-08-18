@@ -4362,6 +4362,45 @@ with an independent Python count at exactly 621 and caught all three of the abov
 constructs the symbol outside a composable. When a name you know exists is reported, widen the
 argument list or write the probe; do not shrug.
 
+### THE THIRD SOUND SOURCE, and a way to compile Android here at last (this session cont.)
+
+Found by asking what else the new arbiter should cover: the app makes sound in three ways — radio,
+live video, and the computer's own voice — and **`requestAudioFocus` appeared nowhere in the whole
+app.** The two players get focus from media3 internally; `TextToSpeech` requests none on your behalf
+(that has always been the caller's job), so the computer answered at full volume straight over
+whatever was playing, and neither got quieter. Worse, a phone call could not take the floor: the
+reply carried on over a ringing call.
+
+`feature/media/SpeechFocus.kt` — `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, so speech **ducks** rather
+than stopping (a two-sentence reply is not worth stopping the radio for; that is why this is not
+`MediaFloor`, which is exclusive by design). Acquired in `speak()` before the sound starts and
+released in `fireDone()` — the one method every path that ends an utterance already funnels through,
+which is why the watchdog is cancelled there too. Best-effort throughout: a denied request never
+silences the assistant, so this can improve things or do nothing, but cannot regress. The engine is
+also given `USAGE_ASSISTANT` + `CONTENT_TYPE_SPEECH` attributes, which is what a car head unit or a
+hearing aid reads; volume routing is unchanged.
+
+**⚠️ THE CAPABILITY WORTH REMEMBERING, and it retires a standing assumption in this file: Android
+platform code CAN be compiled here.** The SDK is absent, but **Robolectric publishes the whole
+android.jar to Maven Central** as `org.robolectric:android-all` (~186 MB, API 35 is
+`15-robolectric-13954326`). Put it on kotlinc's target `-cp` and a file whose only non-Kotlin
+dependency is the platform compiles completely — not an approximation of CI's compile, the *same*
+compile, three minutes earlier. Both files above were verified that way before pushing.
+
+`tools/android_compile_check.sh` wraps it, negative-tested against three real mistakes (a
+nonexistent platform method, a wrong constant name, a wrong argument type — all three caught).
+`-l group:artifact:version` adds libraries, resolving AARs by unpacking `classes.jar` (kotlinc
+silently ignores an `.aar` handed to `-cp`). **Honest coverage: 39 of the app's 333 files** import
+`android.*` and nothing else, and compile with no arguments; anything with androidx needs its
+libraries listing, which works but gets impractical for Compose UI. It does not replace
+`android_resolve_check.sh` or CI — it is a stronger gate where it applies. And it compiles; it does
+not run, and knows nothing of resources, the manifest or R8.
+
+⚠️ Owner-verify on the Pixel: play the radio, say "Computer, what's the weather" — the radio should
+drop in volume for the reply and come back after. Whether ducking works *within a single app* (our
+focus request against our own ExoPlayer) is the part only a device can settle; if it does not, the
+result is today's behaviour, not a regression.
+
 ⚠️ **Owner-verify, unavoidably — CI has no screen and this container has no GL context.** On the
 Pixel: that DW and CNA play at all; that starting video visibly stops the radio **and says so**;
 that stopping video leaves the radio free again; the takeover's LIVE tab from the lock screen; and
