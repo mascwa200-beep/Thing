@@ -146,8 +146,23 @@
             </intent-filter>
         </activity>
 
-        <!-- BREAKING NEWS takeover — force-opens (over the lock screen) a cinematic, ad-free, tabbed page of
-             aggregated coverage from trusted free sources on a major detected event. -->
+        <!-- BREAKING NEWS: a floating, partly transparent card carrying ONE story, over whatever you are
+             doing. Non-focusable and non-touch-modal, so the app behind stays fully usable and touches
+             outside the card go straight through to it — you can work around it or drag it aside rather
+             than having to deal with it. Replaces a full-screen takeover that used FLAG_ACTIVITY_CLEAR_TASK
+             and therefore destroyed your place in the app. -->
+        <service
+            android:name=".feature.breaking.BreakingOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="breaking_news_overlay" />
+        </service>
+
+        <!-- The full coverage page — now a destination you CHOOSE from the card above (or from the
+             full-screen-intent notification when "display over other apps" isn't granted), never something
+             forced over what you were reading. -->
         <activity
             android:name=".feature.breaking.BreakingNewsActivity"
             android:exported="false"
