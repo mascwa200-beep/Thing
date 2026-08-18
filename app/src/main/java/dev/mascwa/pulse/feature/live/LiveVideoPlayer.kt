@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.connectivity.LocalIsMetered
 import dev.mascwa.pulse.core.telemetry.LiveChannels
@@ -58,8 +59,9 @@ import dev.mascwa.pulse.ui.theme.Pulse
  * interruption that opens on the lock screen with audio already running is hostile, and "auto-play
  * on Wi-Fi" would make the behaviour differ silently by connection.
  *
- * Leaving the screen stops playback, which is why there is no foreground service: a live stream
- * drawing to a surface nobody can see is data spent on nothing.
+ * Playback ends whenever this stops being on screen — navigating away, pressing home, or the display
+ * going off — which is why there is no foreground service: a live stream drawing to a surface nobody
+ * can see is data spent on nothing.
  */
 @Composable
 fun LiveVideoPlayer(
@@ -96,8 +98,16 @@ fun LiveVideoPlayer(
     }
 
     // The panel owns the playback lifetime: arriving costs nothing, leaving stops the stream.
-    DisposableEffect(Unit) {
-        onDispose { LiveVideoController.stop(context) }
+    //
+    // ⚠️ **Start, not dispose.** Locking the screen or pressing home does NOT dispose a composable —
+    // the Activity stops and the composition survives — so a plain DisposableEffect would have left
+    // the stream running with the screen off: mobile data burning on pixels nobody can see, and the
+    // channel's audio still playing with no notification and no way to stop it short of coming back
+    // into the app. That is precisely the state the radio's foreground service exists to make
+    // legitimate, and video has no such service by design. Ending it here is what makes that design
+    // honest rather than a hole.
+    LifecycleStartEffect(Unit) {
+        onStopOrDispose { LiveVideoController.stop(context) }
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {

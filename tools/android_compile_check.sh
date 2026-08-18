@@ -30,6 +30,11 @@
 #
 #   -l <group:artifact:version>   add a library to the compile classpath (jar or aar, from Maven
 #                                 Central then Google's Maven). Repeatable.
+#
+# ⚠️ A Kotlin Multiplatform artifact's plain AAR contains **only a manifest** — the Android classes
+# live in a separate `-android` variant. `lifecycle-runtime-compose:2.8.7` unpacks to 229 bytes and
+# nothing else; `lifecycle-runtime-compose-android:2.8.7` is the one with the code in it. If a -l
+# resolves but the symbols still do not, try the `-android` suffix before concluding anything.
 set -uo pipefail
 
 G=/opt/gradle-8.14.3/lib
