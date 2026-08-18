@@ -1,7 +1,12 @@
 *.iml
 .gradle/
 # Gradle's own Kotlin-compiler-daemon/session working directory at the repo root — same root cause as the
-# build/ rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
+# build/
+
+# Python bytecode from the tools/ scripts. Same class of gap as the leading-slash `build/` fixed
+# earlier: harmless while nothing here ever ran locally, real now that it does.
+__pycache__/
+*.pyc rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
 .kotlin/
 /local.properties
 /.idea/
