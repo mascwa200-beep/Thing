@@ -15,9 +15,12 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import dev.mascwa.pulse.core.telemetry.MediaFloor
 import dev.mascwa.pulse.data.radio.IcyMetadata
 import dev.mascwa.pulse.data.radio.RadioStation
 import dev.mascwa.pulse.data.radio.StreamResolver
+import dev.mascwa.pulse.feature.media.AudioFloor
+import dev.mascwa.pulse.feature.media.MediaHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -63,11 +66,6 @@ object RadioController {
     /** Live "Artist - Song" for the tuned station (in-band ICY stream metadata), or null when unavailable. */
     private val _nowPlaying = MutableStateFlow<String?>(null)
     val nowPlaying: StateFlow<String?> = _nowPlaying.asStateFlow()
-
-    // A real browser User-Agent for the audio request — picky commercial CDNs (StreamTheWorld/Triton,
-    // iHeart, etc.) refuse the default player UA, so the stream never opens.
-    private const val STREAM_UA =
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     private val scope = CoroutineScope(SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -115,6 +113,9 @@ object RadioController {
 
     fun play(context: Context, station: RadioStation) {
         val app = context.applicationContext
+        // Ask for the speaker first. Two players each handling their own audio focus would simply
+        // fight: the newer wins and the older falls silent while still claiming to be playing.
+        AudioFloor.claim(app, MediaFloor.Owner.RADIO)
         _state.value = RadioState(station, Status.TUNING)
         _nowPlaying.value = null
         // Promote to a foreground service so the stream survives leaving the app (defensive: a denied
@@ -140,10 +141,10 @@ object RadioController {
         releasePlayerInternal()
         runCatching {
             val httpFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent(STREAM_UA)
+                .setUserAgent(MediaHttp.BROWSER_UA)
                 .setAllowCrossProtocolRedirects(true)
-                .setConnectTimeoutMs(20_000)
-                .setReadTimeoutMs(20_000)
+                .setConnectTimeoutMs(MediaHttp.TIMEOUT_MS)
+                .setReadTimeoutMs(MediaHttp.TIMEOUT_MS)
             // NOTE: we deliberately do NOT request ICY metadata (`Icy-MetaData: 1`). On these
             // StreamTheWorld/Triton AAC mounts that header makes the server interleave metadata that
             // ExoPlayer doesn't strip here, breaking the container parse
@@ -228,6 +229,9 @@ object RadioController {
             val app = context.applicationContext
             app.stopService(Intent(app, RadioService::class.java))
         }
+        // Report, not request. Ignored when something else already took the speaker — which is
+        // exactly what happens when this stop was ordered BY that something else.
+        AudioFloor.released(MediaFloor.Owner.RADIO)
     }
 
     /** Poll the tuned station's ICY now-playing title on a separate brief connection — but only for
@@ -255,6 +259,7 @@ object RadioController {
         runOnMain { releasePlayerInternal() }
         _state.value = RadioState(station, Status.ERROR, reason)
         runCatching { app.stopService(Intent(app, RadioService::class.java)) }
+        AudioFloor.released(MediaFloor.Owner.RADIO)
     }
 
     /** Release the player — MUST be called on the main thread (ExoPlayer is single-thread-affine). */

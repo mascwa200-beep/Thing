@@ -107,6 +107,19 @@ class LiveChannelsTest {
         assertEquals("en-ok", LiveChannels.forBreaking(list, language = "fr")?.id)
     }
 
+    @Test fun theCostOfWatchingIsStatedOnlyWhenItIsKnown() {
+        // 920 kbps * 60s / 8 bits / 1e6 = 6.9 MB per minute.
+        assertEquals("about 6.9 MB a minute", LiveChannels.dataRateNote(920_000))
+        // 400 kbps -> exactly 3.0; the tenth is kept so it doesn't read as a rounded-off integer.
+        assertEquals("about 3.0 MB a minute", LiveChannels.dataRateNote(400_000))
+        // 2.5 Mbps -> 18.75, and past ten a tenth of a megabyte is noise.
+        assertEquals("about 19 MB a minute", LiveChannels.dataRateNote(2_500_000))
+        // Format.NO_VALUE is -1: the player has not settled yet, so there is nothing to say. A
+        // fabricated figure under a play button is worse than no figure.
+        assertNull(LiveChannels.dataRateNote(-1))
+        assertNull(LiveChannels.dataRateNote(0))
+    }
+
     @Test fun aBreakingPopUpOpensNothingRatherThanSomethingDead() {
         // ⚠️ The rule that matters most here. A takeover fires at the moment something is happening;
         // spending that on a stream known not to play is worse than showing no video at all.

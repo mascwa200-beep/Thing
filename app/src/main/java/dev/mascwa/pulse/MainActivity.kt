@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
             val settings by app.container.settingsRepository.settings
                 .collectAsStateWithLifecycle(initialValue = AppSettings())
             val online by app.container.connectivityObserver.isOnline.collectAsStateWithLifecycle()
+            val unmetered by app.container.connectivityObserver.isUnmetered.collectAsStateWithLifecycle()
 
             NightwireTheme(accent = settings.accentColor, amoledBlack = settings.amoledBlack) {
                 var acknowledged by remember { mutableStateOf(false) }
@@ -200,6 +201,8 @@ class MainActivity : ComponentActivity() {
                     dev.mascwa.pulse.ui.effects.LocalLcarsAudio provides lcarsAudio,
                     dev.mascwa.pulse.feature.home.LocalJarvisFeedTopic provides settings.jarvisFeedTopic,
                     dev.mascwa.pulse.core.connectivity.LocalIsOnline provides online,
+                    // Metered only when we positively know it — offline is "no idea", not "cellular".
+                    dev.mascwa.pulse.core.connectivity.LocalIsMetered provides (online && !unmetered),
                 ) {
                 // The klaxon. Fires on the way INTO red and nowhere else — once per condition
                 // change, here rather than in the frame, because the frame is per-screen and would
