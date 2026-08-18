@@ -31,6 +31,24 @@ of them.
 Sources: `radio-browser` · `overpass-poi` · `rainviewer` · `osrm-routing` · `orbital-iss-sun` ·
 `news-google-rss` · `social-hn`.
 
+### A later sweep of the three feeds the audit had not probed
+
+Run against live responses after the HIGH remediation landed. **One defect, two clean.**
+
+| Feed | Verdict |
+|---|---|
+| `radio-browser` | ⚠️ **`codec` and `bitrate` parsed off every station and read by nothing** — fixed in `cd84e39`. Present on 100% / 84% of 360 sampled stations. Also checked: `hidebroken=true` genuinely works (0 of 360 came back with `lastcheckok` clear), so there is no dead-station defect there to invent. |
+| `rainviewer` | **Clean.** Everything meaningful is parsed, `nowcast` is excluded deliberately and says why, there is a request floor measured from the last *attempt*, a failed refresh keeps the previous frame, and the frame's timestamp really is rendered — "Scanned 4 minutes ago". |
+| `launch-library` | **Clean, and it refuted my own hypothesis.** I expected `status` to be discarded; it is parsed *and* displayed, and `timeIsFirm` already suppresses a precise time for a soft date. Measured: all 12 TBD launches in a 25-launch sample carry "Month" precision and none carries "Minute", so the existing precision line does convey the doubt. |
+
+⚠️ The one thing still discarded there is `window_start`/`window_end` — 9 of 25 launches publish a
+real window, up to four hours for a Starlink flight, against the single T-0 the app shows. Minor,
+and recorded rather than done.
+
+**A launch that has already flown does appear in the "upcoming" feed** (1 of 25, status `Success`).
+It is shown with its status, so the app is not lying about it — but it is arguably not upcoming, and
+filtering it is a judgement call rather than a defect.
+
 ## The defect class
 
 The same shape the USGS and NWS arcs found, in more places: **the response carries the field, the
