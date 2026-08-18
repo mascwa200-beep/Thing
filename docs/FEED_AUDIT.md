@@ -49,6 +49,24 @@ and recorded rather than done.
 It is shown with its status, so the app is not lying about it — but it is arguably not upcoming, and
 filtering it is a judgement call rather than a defect.
 
+### Seven of the fifteen MEDIUM findings, fixed
+
+Branch `claude/loving-edison-bd65oa`, and each one measured before it was touched.
+
+| Finding | How |
+|---|---|
+| ISS position up to 2,300 km stale against a 1,200 km test | The app already held a CI-tested SGP4 propagator, a Celestrak feed and a `subPoint` with no callers outside its own tests. Measured against the live service from elements 13.9 h old: **0.6 km**. Home and the radar scope now propagate rather than fetch, and the digest says whether the station is visible, glared out or eclipsed |
+| Hacker News: a total failure cached and shown as "Nothing trending right now." | Only a total failure throws now, asked of the results rather than of the list. Mastodon had the same swallow and was not in the audit |
+| …and then could never be retried | `ensureLoaded` treated an empty feed as loaded; `EmptyState` is a plain Box inside a `PullToRefreshBox` whose gesture is pure nested scroll (checked against the shipped material3 1.3.1 classes), so the pull could not fire. Both fixed, and `EmptyState` gained a retry |
+| `time` parsed and never rendered on Social | Shown. Lemmy and Mastodon were not parsing their timestamps at all; a `.SSS` pattern would have stamped Lemmy's six-digit fractions **104 seconds into the future**, measured |
+| The turn arrow is a crow-flies bearing; maneuvers never requested | `steps=true`, a tested `RouteSteps` core, and a real instruction on the banner |
+| The summary printed under every headline is the headline again | ⚠️ Google blocks this container, so the rule deliberately does not depend on the cluster shape — it asks whether the text adds anything to the headline above it |
+| `website`, `email` and `healthcare:speciality` on Overpass | `website` was parsed by the earlier remediation and drawn by nothing. All three now render; every distinct real speciality value in a 400-result sample was run through the shipped formatting |
+
+**Still open at medium:** the description-cluster re-fetch (blocked — Google answers this
+container with a block page), the UTC close-approach time, the two radio findings and the two
+RainViewer ones.
+
 ## The defect class
 
 The same shape the USGS and NWS arcs found, in more places: **the response carries the field, the
