@@ -43,6 +43,10 @@ class RadioBrowserRepository(private val http: HttpClient) {
         // nothing to order by except a distance that does not discriminate. See [StationRanking].
         @SerialName("clickcount") val clickCount: Int = 0,
         val votes: Int = 0,
+        // The directory's stable id, and the language it broadcasts in. Both on every row of every
+        // response measured; neither was declared. See RadioStation for why the id matters.
+        @SerialName("stationuuid") val stationUuid: String = "",
+        val language: String = "",
     )
 
     /** Search radius for "local" geo-sourced stations (200 km ≈ a broadcast region). */
@@ -167,7 +171,10 @@ class RadioBrowserRepository(private val http: HttpClient) {
         return Mapped(
             // codec and bitrate were parsed here and dropped on the floor. They are the two things
             // that say whether a stream is worth the data and whether it will sound like anything.
-            RadioStation(name = title, band = band, streamUrl = stream, codec = codec, kbps = bitrate),
+            RadioStation(
+                name = title, band = band, streamUrl = stream, codec = codec, kbps = bitrate,
+                uuid = stationUuid.trim(), language = language.trim(),
+            ),
             stateKey = state.trim().lowercase(),
         )
     }

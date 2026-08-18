@@ -373,7 +373,13 @@ private fun StationRow(
                 color = if (active) c.accent else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
-                track?.let { "♪ $it" } ?: st.band,
+                // The language goes on the genre line, because in a "near you" list nothing else
+                // distinguishes a station you can understand from one you cannot — and the
+                // directory states it on every row. Dropped while a track is playing: what is on
+                // air now is the more useful thing to know, and this line is a single line.
+                track?.let { "♪ $it" }
+                    ?: listOf(st.band, st.language.uppercase()).filter { it.isNotBlank() }
+                        .joinToString(" · "),
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp,
                 color = if (track != null) c.accent else c.muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp),
