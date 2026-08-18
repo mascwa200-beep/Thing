@@ -27,6 +27,7 @@ import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.desktop.telemetry.Freshness
 import dev.mascwa.pulse.desktop.telemetry.MediaBias
 import dev.mascwa.pulse.desktop.telemetry.NewsInsights
+import dev.mascwa.pulse.desktop.telemetry.NewsSummary
 import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
 import dev.mascwa.pulse.desktop.telemetry.Tone
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
@@ -136,9 +137,11 @@ private fun ArticleCard(article: Article, all: List<Article>) {
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
                 modifier = Modifier.padding(top = 3.dp),
             )
-            if (article.summary.isNotBlank()) {
+            // The same rule as the phone: an aggregator's description opens with the headline,
+            // and printing it here printed the line above it again.
+            NewsSummary.subtitle(article.title, article.summary, article.source)?.let {
                 Text(
-                    article.summary,
+                    it,
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     maxLines = 3, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp),

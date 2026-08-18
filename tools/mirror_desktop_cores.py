@@ -76,6 +76,9 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
     f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
+    # What is worth printing under a headline. Both platforms render the same card, and an
+    # aggregator that repeats the headline in its description must not repeat it on either.
+    f"{CORE}/NewsSummary.kt": f"{DESKTOP}/telemetry/NewsSummary.kt",
     f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
     f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
     f"{CORE}/SocialBuzz.kt": f"{DESKTOP}/telemetry/SocialBuzz.kt",
@@ -90,6 +93,7 @@ MIRRORS: dict[str, str] = {
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
     f"{CORE_TEST}/DataRateTest.kt": f"{DESKTOP_TEST}/telemetry/DataRateTest.kt",
+    f"{CORE_TEST}/NewsSummaryTest.kt": f"{DESKTOP_TEST}/telemetry/NewsSummaryTest.kt",
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
     f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",

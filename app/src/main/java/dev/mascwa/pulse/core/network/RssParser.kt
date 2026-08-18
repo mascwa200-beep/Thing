@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.core.network
 
+import dev.mascwa.pulse.core.telemetry.NewsSummary
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
@@ -107,7 +108,11 @@ object RssParser {
                                 items += RssItem(
                                     title = cleanText(title),
                                     link = link.trim(),
-                                    description = cleanText(stripHtml(description)).take(400),
+                                    // A hard take() lands mid-word about as often as not.
+                                    description = NewsSummary.clip(
+                                        cleanText(stripHtml(description)),
+                                        MAX_DESCRIPTION_CHARS,
+                                    ),
                                     publishedEpochMs = parseDate(pubDate),
                                     sourceName = source?.let { cleanText(it) },
                                     imageUrl = image,
@@ -171,6 +176,9 @@ object RssParser {
     private val IMG_REGEX = Regex("<img[^>]+src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
     private fun extractImageFromHtml(html: String): String? =
         IMG_REGEX.find(html)?.groupValues?.getOrNull(1)?.takeIf { it.startsWith("http") }
+
+    /** The feed blurb is a card subtitle, not an article — two lines at twelve point. */
+    private const val MAX_DESCRIPTION_CHARS = 400
 
     private val TAG_REGEX = Regex("<[^>]*>")
     private fun stripHtml(html: String): String = html.replace(TAG_REGEX, " ")
