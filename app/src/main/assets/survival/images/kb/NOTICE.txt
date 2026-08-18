@@ -1,201 +1,212 @@
 Knowledge-base diagrams — Wikimedia Commons, freely licensed (Public Domain / CC0 / CC BY / CC BY-SA).
 Downloaded for offline use. Per-file source, license and author:
 
-chem-atoms-elements-periodic-table.png  —  Periodic table large.svg  —  CC BY 3.0  —  2012rc
-chem-chemical-bonds-molecules.png  —  Covalent bond hydrogen.svg  —  CC BY-SA 3.0  —  Jacek FH
-chem-acids-bases-ph-buffers.png  —  PH Scale.svg  —  CC BY 3.0  —  Edward Stevens
-bio-the-cell.png  —  Animal cell structure en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz)
-bio-dna-genes-heredity.png  —  DNA chemical structure.svg  —  CC BY-SA 3.0  —  Madprime (talk · contribs)
-bio-human-body-systems.jpg  —  Organ Systems I.jpg  —  CC BY 3.0  —  Connexions
-bio-microbes-viruses-immunity.png  —  Bacterial morphology diagram.svg  —  Public domain  —  Mariana Ruiz LadyofHats
-bio-ecology-ecosystems.png  —  FoodWeb.svg  —  CC0  —  Original:  Thompsma Vector:  Pixelsquid
-phys-motion-forces-newtons-laws.png  —  Newtons cradle animation book 2.gif  —  CC BY-SA 3.0  —  DemonDeLuxe (Dominique Toussaint)
-phys-electricity-and-magnetism.png  —  VFPt cylindrical magnet thumb.svg  —  CC BY-SA 3.0  —  Geek3
+RE-ENCODING NOTICE (applies to every raster file in this folder)
+--------------------------------------------------------------------------
+All raster diagrams are bundled as WebP, re-encoded from the originals at quality 85 and
+scaled down where they exceeded 1280 pixels wide. Nothing is cropped, recoloured, overlaid
+or otherwise altered: the change is one of resolution and file format only, made so the
+corpus fits a phone (68 MB to 31 MB) without changing what the reader sees — the app draws
+these at 260dp on Android and 620dp on the desktop, so the discarded pixels were never
+displayed. Where a licence requires that modifications be indicated, this paragraph is that
+indication. SVG files are bundled unchanged, as vector.
+
+
+chem-atoms-elements-periodic-table.webp  —  Periodic table large.svg  —  CC BY 3.0  —  2012rc
+chem-chemical-bonds-molecules.webp  —  Covalent bond hydrogen.svg  —  CC BY-SA 3.0  —  Jacek FH
+chem-acids-bases-ph-buffers.webp  —  PH Scale.svg  —  CC BY 3.0  —  Edward Stevens
+bio-the-cell.webp  —  Animal cell structure en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz)
+bio-dna-genes-heredity.webp  —  DNA chemical structure.svg  —  CC BY-SA 3.0  —  Madprime (talk · contribs)
+bio-human-body-systems.webp  —  Organ Systems I.jpg  —  CC BY 3.0  —  Connexions
+bio-microbes-viruses-immunity.webp  —  Bacterial morphology diagram.svg  —  Public domain  —  Mariana Ruiz LadyofHats
+bio-ecology-ecosystems.webp  —  FoodWeb.svg  —  CC0  —  Original:  Thompsma Vector:  Pixelsquid
+phys-motion-forces-newtons-laws.webp  —  Newtons cradle animation book 2.gif  —  CC BY-SA 3.0  —  DemonDeLuxe (Dominique Toussaint)
+phys-electricity-and-magnetism.webp  —  VFPt cylindrical magnet thumb.svg  —  CC BY-SA 3.0  —  Geek3
 phys-heat-and-thermodynamics.png  —  Convection.gif  —  CC BY-SA 3.0  —  User:Oni Lukos
-phys-waves-sound-light-optics.png  —  EM spectrum.svg  —  CC BY-SA 3.0  —  Philip Ronan
-math-geometry-measurement.png  —  Pythagorean.svg  —  CC BY-SA 3.0  —  en:User:Wapcaplet
-math-trigonometry.png  —  Circle-trig6.svg  —  CC BY-SA 3.0  —  Original: Steven G. Johnson at English Wikipedia Vector:  Limaner
-math-algebra-language-of-math.png  —  Quadratic formula.svg  —  Public domain  —  Jamie Twells
-math-probability-statistics.png  —  Standard deviation diagram.svg  —  CC BY 2.5  —  M. W. Toews
-med-anatomy-by-system.png  —  Human skeleton front en.svg  —  Public domain  —  LadyofHats Mariana Ruiz Villarreal
-med-vital-signs-assessment.jpg  —  Blood pressure measurement (2009).jpg  —  CC BY-SA 3.0  —  Администрация Волгоградской области
-astro-solar-system-tour.png  —  Planets2013.svg  —  CC BY-SA 3.0  —  WP
-astro-stellar-life-cycles.png  —  HR-diag-no-text-2.svg  —  CC BY-SA 3.0  —  User:Spacepotato
-astro-galaxies-and-cosmology.png  —  Hubble Tuning Fork diagram.svg  —  CC0  —  Cosmogoblin
-astro-celestial-navigation.png  —  Ursa Major constellation map.svg  —  CC BY-SA 3.0  —  Ursa_major_constellation_map.png: Torsten Bronger
+phys-waves-sound-light-optics.webp  —  EM spectrum.svg  —  CC BY-SA 3.0  —  Philip Ronan
+math-geometry-measurement.webp  —  Pythagorean.svg  —  CC BY-SA 3.0  —  en:User:Wapcaplet
+math-trigonometry.webp  —  Circle-trig6.svg  —  CC BY-SA 3.0  —  Original: Steven G. Johnson at English Wikipedia Vector:  Limaner
+math-algebra-language-of-math.webp  —  Quadratic formula.svg  —  Public domain  —  Jamie Twells
+math-probability-statistics.webp  —  Standard deviation diagram.svg  —  CC BY 2.5  —  M. W. Toews
+med-anatomy-by-system.webp  —  Human skeleton front en.svg  —  Public domain  —  LadyofHats Mariana Ruiz Villarreal
+med-vital-signs-assessment.webp  —  Blood pressure measurement (2009).jpg  —  CC BY-SA 3.0  —  Администрация Волгоградской области
+astro-solar-system-tour.webp  —  Planets2013.svg  —  CC BY-SA 3.0  —  WP
+astro-stellar-life-cycles.webp  —  HR-diag-no-text-2.svg  —  CC BY-SA 3.0  —  User:Spacepotato
+astro-galaxies-and-cosmology.webp  —  Hubble Tuning Fork diagram.svg  —  CC0  —  Cosmogoblin
+astro-celestial-navigation.webp  —  Ursa Major constellation map.svg  —  CC BY-SA 3.0  —  Ursa_major_constellation_map.png: Torsten Bronger
 derivative work: Kxx (talk)
-earth-plate-tectonics-earthquakes-volcanoes.png  —  Tectonic plate boundaries.png  —  Public domain  —  Jose F. Vigil. USGS
-earth-water-cycle-hydrology.png  —  Water cycle.png  —  Public domain  —  John M. Even / USGS
-eng-electricity-and-circuits-from-scratch.png  —  Ohm's Law with Voltage source TeX.svg  —  CC0  —  GorillaWarfare
-eng-ohms-and-kirchhoffs-laws.png  —  Ohms law voltage source.svg  —  CC BY-SA 3.0  —  Created by User:Omegatron using Klunky schematic editor, which the creator consi
-phys-energy-work-power-machines.png  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
-astro-telescopes-and-observing.jpg  —  Moon phases en.jpg  —  CC BY-SA 3.0  —  Orion 8
-earth-rocks-minerals-rock-cycle.png  —  Rock cycle nps.PNG  —  Public domain  —  NPS
-eng-electronic-components.jpg  —  Electronic components in Printed Circuit Board.jpg  —  CC BY-SA 3.0  —  Soumyapatra13
-eng-simple-machines-and-structures.png  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
-food-macronutrients-micronutrients-metabolism.jpg  —  Dinner meal - MyPlate 20210810-FNS-UNC-0017.jpg  —  Public domain  —  U.S. Department of Agriculture
-food-preservation-canning-drying-salting-curing.jpg  —  PreservedFood1.jpg  —  Public domain  —  
-phys-motion-forces-newtons-laws.png  —  Free body diagram mod.png  —  Public domain  —  Own work by Studi111 at en.wikipedia
-phys-heat-and-thermodynamics.jpg  —  Heat-transmittance-means2.jpg  —  CC BY-SA 4.0  —  Kmecfiunit, cmglee
-cs-how-computers-work.png  —  Von Neumann Architecture.svg  —  CC BY-SA 3.0  —  Kapooht
-cs-cryptography.png  —  Public key encryption.svg  —  Public domain  —  Davidgothberg
-cs-encoding-compression.png  —  ASCII-Table-wide.svg  —  Public domain  —  ASCII-Table.svg: ZZT32
+earth-plate-tectonics-earthquakes-volcanoes.webp  —  Tectonic plate boundaries.png  —  Public domain  —  Jose F. Vigil. USGS
+earth-water-cycle-hydrology.webp  —  Water cycle.png  —  Public domain  —  John M. Even / USGS
+eng-electricity-and-circuits-from-scratch.webp  —  Ohm's Law with Voltage source TeX.svg  —  CC0  —  GorillaWarfare
+eng-ohms-and-kirchhoffs-laws.webp  —  Ohms law voltage source.svg  —  CC BY-SA 3.0  —  Created by User:Omegatron using Klunky schematic editor, which the creator consi
+phys-energy-work-power-machines.webp  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
+astro-telescopes-and-observing.webp  —  Moon phases en.jpg  —  CC BY-SA 3.0  —  Orion 8
+earth-rocks-minerals-rock-cycle.webp  —  Rock cycle nps.PNG  —  Public domain  —  NPS
+eng-electronic-components.webp  —  Electronic components in Printed Circuit Board.jpg  —  CC BY-SA 3.0  —  Soumyapatra13
+eng-simple-machines-and-structures.webp  —  Simple Machines in Everyday life.png  —  CC BY-SA 4.0  —  Christinelmiller
+food-macronutrients-micronutrients-metabolism.webp  —  Dinner meal - MyPlate 20210810-FNS-UNC-0017.jpg  —  Public domain  —  U.S. Department of Agriculture
+food-preservation-canning-drying-salting-curing.webp  —  PreservedFood1.jpg  —  Public domain  —  
+phys-motion-forces-newtons-laws.webp  —  Free body diagram mod.png  —  Public domain  —  Own work by Studi111 at en.wikipedia
+phys-heat-and-thermodynamics.webp  —  Heat-transmittance-means2.jpg  —  CC BY-SA 4.0  —  Kmecfiunit, cmglee
+cs-how-computers-work.webp  —  Von Neumann Architecture.svg  —  CC BY-SA 3.0  —  Kapooht
+cs-cryptography.webp  —  Public key encryption.svg  —  Public domain  —  Davidgothberg
+cs-encoding-compression.webp  —  ASCII-Table-wide.svg  —  Public domain  —  ASCII-Table.svg: ZZT32
 derivative work: YUFENG HUANG
-cs-algorithms.png  —  Binary search tree.svg  —  Public domain  —  No machine-readable author provided. Dcoetzee assumed (based on copyright claims
-cs-formal-logic.png  —  Venn diagram gr la ru.svg  —  Public domain  —  WatchduckYou can name the author as "T. Piesk", "Tilman Piesk" or "Watchduck".
-psy-brain-memory-attention.png  —  Lobes of the brain NL.svg  —  Public domain  —  Henry Vandyke Carter
-wx-reading-the-sky-clouds.png  —  Cloud types en.svg  —  CC BY-SA 3.0  —  Valentin de Bruyn / Coton / This illustration has been created for Coton, the cl
-wx-severe-weather-storms-tornadoes-hurricanes.jpg  —  Hurricane structure graphic.jpg  —  Public domain  —  
-wx-atmosphere-temperature-humidity-pressure.png  —  Atmosphere layers-en.svg  —  Public domain  —  NOAA &amp; User:Mysid
-wx-forecasting-without-instruments.jpg  —  Cumulonimbus cloud over Africa.jpg  —  Public domain  —  NASA
-geo-map-reading-coordinates-scale.png  —  Latitude and Longitude of the Earth.svg  —  CC0  —  Djexplo
-geo-globe-time-zones-lat-long.png  —  Standard World Time Zones.png  —  Public domain  —  UnaitxuGV, Heitordp and others
-geo-biomes-and-regions.png  —  Vegetation.png  —  CC BY-SA 3.0  —  Ville Koistinen (user Vzb83)
-geo-rivers-mountains-landscapes.png  —  Ashuapmushuan River basin map.png  —  Public domain  —  Global Watersheds (web application): Heberger, Matthew
+cs-algorithms.webp  —  Binary search tree.svg  —  Public domain  —  No machine-readable author provided. Dcoetzee assumed (based on copyright claims
+cs-formal-logic.webp  —  Venn diagram gr la ru.svg  —  Public domain  —  WatchduckYou can name the author as "T. Piesk", "Tilman Piesk" or "Watchduck".
+psy-brain-memory-attention.webp  —  Lobes of the brain NL.svg  —  Public domain  —  Henry Vandyke Carter
+wx-reading-the-sky-clouds.webp  —  Cloud types en.svg  —  CC BY-SA 3.0  —  Valentin de Bruyn / Coton / This illustration has been created for Coton, the cl
+wx-severe-weather-storms-tornadoes-hurricanes.webp  —  Hurricane structure graphic.jpg  —  Public domain  —  
+wx-atmosphere-temperature-humidity-pressure.webp  —  Atmosphere layers-en.svg  —  Public domain  —  NOAA &amp; User:Mysid
+wx-forecasting-without-instruments.webp  —  Cumulonimbus cloud over Africa.jpg  —  Public domain  —  NASA
+geo-map-reading-coordinates-scale.webp  —  Latitude and Longitude of the Earth.svg  —  CC0  —  Djexplo
+geo-globe-time-zones-lat-long.webp  —  Standard World Time Zones.png  —  Public domain  —  UnaitxuGV, Heitordp and others
+geo-biomes-and-regions.webp  —  Vegetation.png  —  CC BY-SA 3.0  —  Ville Koistinen (user Vzb83)
+geo-rivers-mountains-landscapes.webp  —  Ashuapmushuan River basin map.png  —  Public domain  —  Global Watersheds (web application): Heberger, Matthew
 Base map: U.S. Geological
-make-metalworking-forging-heat-tools.jpg  —  Forging.jpg  —  CC BY-SA 3.0  —  Labberté K.J.
-weather-hazards.jpg  —  Weather hazards.jpg  —  CC BY-SA 4.0  —  Siphetha
-nato-phonetic.png  —  NATO Phonetic And Morse Code Alphabet.png  —  Public domain  —  United States Navy
-emergency-frequencies.jpg  —  Airband radio 123.45 121.5 MHz.jpg  —  CC BY-SA 4.0  —  F1jmm
-mindset.jpg  —  SERE- readiness is a mindset (8211483).jpg  —  Public domain  —  U.S. Air Force photo by Airman 1st Class Katie Mullikin
-food.jpg  —  Foraging for Food.jpg  —  CC BY-SA 4.0  —  George Thomas Basden
-cold.jpg  —  Hypothermia Training, Marine Mountain Warfare Center, California USA.jpg  —  CC BY-SA 4.0  —  Adorabutton
-water.jpg  —  Marines set up water purification system 141020-M-OD001-056.jpg  —  Public domain  —  Lance Cpl. Preston McDonald
-shelter.jpg  —  Arctic survival - constructing shelter · 061214-F-4127S-055.JPG  —  Public domain  —  Jonathan Snyder
-emergency-comms.jpg  —  Richard Adams Examines His Survival Radio, 1969.jpg  —  CC BY 2.0  —  Archives Branch, USMC History Division
-wildlife.jpg  —  Black bear grazing, Olympic National Park (52093127902).jpg  —  Public domain  —  USFWS Pacific
-terrain.jpg  —  US Navy 090406-N-6224W-042 SEAL Qualification Training candidates hike through deep snow during a long-range land navigation exercise.jpg  —  Public domain  —  U.S. Navy Photo by Senior Chief Mass Communication Specialist Scott Williams
-hygiene.jpg  —  Handwashing 1 - WASH in schools (Bangladesh) (38435021171).jpg  —  CC BY-SA 2.0  —  SuSanA Secretariat
-urban.jpg  —  FEMA - 41425 - FEMA staff member helps a child learn about disaster preparedness in Colorado.jpg  —  Public domain  —  Barb Sturner
-math-number-sense-arithmetic.png  —  Using-an-Abacus-05.png  —  CC BY-SA 4.0  —  Jccsvq
-med-wound-care-bleeding-infection.jpg  —  Improvised first aid - bandage on leg.jpg  —  CC BY-SA 2.0  —  Greg Younger from Fort Collins, USA
-med-drug-classes-101.jpg  —  Pills and medicines 01.jpg  —  CC BY-SA 4.0  —  BuhaM
-heat.jpg  —  7RAR soldiers evacuate a heat exhaustion casualty during Operation Finschhafen, March 1970.jpg  —  CC0  —  Ward, Peter Anthony
-chem-reactions-equations-stoichiometry.png  —  Chemical Equations.png  —  CC BY-SA 4.0  —  Dharmeshkumar Shah
-med-common-illnesses-red-flags.jpg  —  Doctor examining patients at Vijayawada Floods Medical Camp.jpg  —  CC BY-SA 4.0  —  Legend1306
-earth-soil-formation-and-fertility.jpg  —  Soil Profile Containing an Argillic Horizon.jpg  —  CC0  —  Cjrufe
-earth-reading-the-landscape-field-geology.jpg  —  Exposed geology - geograph.org.uk - 484449.jpg  —  CC BY-SA 2.0  —  Graham Horn
-eng-power-batteries-and-solar.jpg  —  Power backup for solar panels near Leh (4337361606).jpg  —  CC BY-SA 2.0  —  Kiran Jonnalagadda from Bangalore, India
-food-fermentation-science.jpg  —  Sourdough.jpg  —  CC BY 4.0  —  Janus Sandsgaard
-food-cooking-chemistry-heat-maillard-emulsions.jpg  —  DZ6 1892 Seared steak medallions glazed with a tangy berry reduction served with roasted potato wedges a buttered bread triangle and a fresh side salad.jpg  —  CC BY-SA 4.0  —  PattayaPatrol
-food-complete-diet-from-limited-food.jpg  —  USDA Food Pyramid SK.jpg  —  Public domain  —  author of slovak description Ivob
-make-soap-saponification-lye-math.jpg  —  Pouring lye into water to make soap.jpg  —  CC BY-SA 3.0  —  Certified Lye
-make-disinfectants-water-chemistry.jpg  —  Wentworth Falls water chlorination plant.jpg  —  CC BY-SA 2.0  —  2hu4u
-make-distillation-extraction-purifying.png  —  Simple distillation apparatus (bn).svg  —  Public domain  —  Original png by User:Quantockgoblin, SVG (bn) adaptation by User:আফতাবুজ্জামান
-make-adhesives-inks-dyes-compounds.jpg  —  Plant dyeing in Bjørkedal.jpg  —  CC BY-SA 4.0  —  AnneOlaug
-psy-cognitive-biases-decisions.png  —  Prefrontal cortex of the brain.png  —  CC BY-SA 3.0  —  Erik Lundström
-psy-stress-fear-first-aid.jpg  —  Launching ceremony for the Psychological First Aid Helpline for students in Maldives (35).jpg  —  CC BY 4.0  —  The President's Office, Maldives
-wx-seasons-microclimates-local-weather.jpg  —  Autumn (5131288721).jpg  —  CC BY 2.0  —  Yannick Bammert
-geo-natural-resources.jpg  —  View of Manda Pit of Miike Coal Mine near Manda Coal Mine Museum.jpg  —  CC BY-SA 4.0  —  そらみみ (Soramimi)
-chem-everyday-survival-chemistry.png  —  CNX Chem 17 05 Lead.png  —  CC BY 4.0  —  OpenStax
-psy-learn-anything-study.png  —  Leitner system alternative.svg  —  CC0  —  Zirguezi
-psy-communication-persuasion-negotiation.jpg  —  TwoWomenTalkingBodyLanguage.jpg  —  CC BY 2.0  —  Andrew
-cook-food-safety-fundamentals.jpg  —  Pork thermometer.jpg  —  Public domain  —  USDA
-astro-exoplanets-search-for-other-worlds.png  —  Theoretical Transiting Exoplanet Light Curve.svg  —  CC BY-SA 4.0
-astro-rockets-and-orbital-mechanics.jpg  —  Apollo 11 Launch2.jpg  —  Public domain  —  NASA
-astro-the-moon-up-close.jpg  —  Moon phases en.jpg  —  CC BY-SA 3.0
-bio-evolution-natural-selection.png  —  Darwin's finches.png  —  CC BY-SA 4.0
-bio-plant-biology.png  —  Xylem and phloem diagram.svg  —  CC BY-SA 4.0
-bio-animal-behavior-ethology.png  —  Stick tool use by chimpanzees.png  —  CC BY-SA 4.0
-chem-organic-chemistry-basics.jpg  —  Ochem 6 important functional groups.jpg  —  CC BY-SA 4.0
-chem-thermochemistry-energy-reactions.png  —  Bomb Calorimeter Diagram.png  —  CC BY-SA 3.0
-chem-electrochemistry-redox-reactions.png  —  Galvanic Cell Diagram.svg  —  CC BY 3.0
-cs-networking-internet.jpg  —  Network-Switch-Architecture-Diagram.jpeg  —  CC BY-SA 4.0
-cs-databases-relational.png  —  Relational database terms.svg  —  Public domain
-cs-ai-machine-learning-basics.png  —  Neural Network.svg  —  CC0
-earth-climate-system.png  —  Diagram showing the Earth's energy budget, which includes the greenhouse effect (NASA).png  —  Public domain  —  NASA
-earth-glaciers-ice-ages-cryosphere.jpg  —  Ice core extracted at Talos Dome showing an ash layer corresponding to the Toba eruption.jpg  —  CC BY-SA 4.0
-earth-oceans-currents-tides-chemistry.jpg  —  Ocean circulation conveyor belt.jpg  —  Public domain
-eng-materials-science-metals-polymers-ceramics.png  —  Stress strain ductile.svg  —  CC BY 4.0
-eng-fluid-mechanics-and-hydraulics.png  —  Diagram of Bernoulli's principle.png  —  CC BY-SA 3.0
-eng-control-systems-and-feedback.png  —  Simple feedback control loop.svg  —  CC BY-SA 3.0
-geo-population-human-geography.png  —  Population density map of the world.svg  —  CC BY 4.0  —  Our World in Data
-geo-koppen-climate-classification.png  —  Köppen-Geiger Climate Classification Map (1980–2016) no borders.png  —  CC BY-SA 4.0
-geo-cartography-map-projections.png  —  Comparison of Mercator projections.svg  —  CC BY-SA 4.0
-math-calculus-first-principles.png  —  Graph of the function f(x)=x^2 with a tangent line drawn to (2,4).png  —  CC BY-SA 4.0
-math-linear-algebra-vectors-matrices.png  —  Transformation matrix diagram with colours.svg  —  CC BY-SA 4.0
-math-number-theory-primes-cryptography.png  —  Academ Bijection between angles and 12 positions of a clock hand.svg  —  CC BY-SA 3.0  —  Baelde
-med-pediatric-elderly-care-differences.jpg  —  BTape2.jpg  —  CC BY-SA 3.0
-med-chronic-disease-management-home.jpg  —  Blood Glucose Testing.JPG  —  CC BY-SA 3.0
-med-poisoning-overdose-response.png  —  Ansi Z35 1968 Poison Warning Symbol.svg  —  CC0
-food-sports-performance-nutrition.jpg  —  Hydration Station (7084766921).jpg  —  CC BY 2.0
-food-special-diets-without-gaps.jpg  —  Anjuna, Goa, India, Vegan food plate, plant foods.jpg  —  CC BY 4.0
-food-reading-nutrition-labels-claims.png  —  FDA Nutrition Facts Label 2016.png  —  Public domain  —  FDA
-phys-modern-physics-relativity-quantum.jpg  —  Double Slit Experiment - Simplified Diagram.jpg  —  CC BY-SA 4.0
-phys-fluid-statics-buoyancy.png  —  Fluid statics, pressure depth dependence.svg  —  CC0
-phys-nuclear-physics-radioactivity.png  —  Penetrating power of different types of radiation - alpha, beta, gamma and neutrons.svg  —  CC0
-psy-personality-individual-differences.png  —  Big Five Personality Traits Bubble Diagram.svg  —  CC BY-SA 4.0
-psy-motivation-habit-formation.png  —  The habit loop.webp  —  CC BY-SA 4.0
-psy-child-development-stages.jpg  —  Development Sequences of the Human Mind.jpg  —  CC BY-SA 4.0
-astro-the-sun-our-star.png  —  Solar internal structure.svg  —  CC BY-SA 3.0  —  Sakurambobigrocksolid (French translation)
-astro-asteroids-comets-meteors.jpg  —  Anatomy of a comet.jpg  —  Public domain  —  NASA/JPL-Caltech/UMD
-bio-classification-of-life.png  —  Biological classification L Pengo.svg  —  Public domain  —  Peter Halasz (User:Pengo)
-bio-metabolism-cellular-respiration.png  —  Cellular Respiration Simple.png  —  CC BY-SA 4.0  —  Christinelmiller
-chem-states-of-matter-phase-changes.png  —  Phase change - en.svg  —  Public domain  —  Flanker, penubag
-chem-kinetics-and-equilibrium.png  —  Enzyme activation energy.png  —  CC BY-SA 3.0  —  G. Andruk
-cs-operating-systems.png  —  Operating system placement.svg  —  CC BY-SA 3.0  —  Golftheman
-cs-cybersecurity-fundamentals.png  —  CIAJMK1209-en.svg  —  CC BY-SA 4.0  —  Michel Bakni
-archaeological-excavation-methods-and-techniques.jpg  —  Example section drawing to demonstrate stratigraphic relationships.jpg  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
-archaeological-excavation-methods-and-techniques-2.png  —  Example of a simple stratigraphic sequence as visualised using a Harris matrix diagram.png  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
-archaeological-survey-and-site-prospection.jpg  —  A lidar view of Vindolanda.jpg  —  CC BY 4.0  —  Dr John Wells
-archaeological-survey-and-site-prospection-2.jpg  —  3030-mag.jpg  —  Public domain
-history-of-archaeology-as-a-science.jpg  —  Archaeologia Volume 13 D259.png  —  Public domain  —  John Frere (1740-1807)
-history-of-archaeology-as-a-science-2.png  —  Intcal 13 calibration curve.png  —  CC BY-SA 3.0  —  Mike Christie
-membrane-transport-diffusion-osmosis-and-active-transport.png  —  Osmotic pressure on blood cells diagram.svg  —  Public domain  —  LadyofHats
-membrane-transport-diffusion-osmosis-and-active-transport-2.png  —  Scheme sodium-potassium pump-en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
-the-cell-membrane-and-the-fluid-mosaic-model.png  —  Phospholipids aqueous solution structures.svg  —  Public domain  —  Mariana Ruiz Villarreal (LadyofHats)
-the-cell-membrane-and-the-fluid-mosaic-model-2.png  —  Cell membrane detailed diagram en.svg  —  Public domain  —  Mariana Ruiz (LadyofHats)
-dimensional-analysis-and-unit-conversion.png  —  SI Illustration Base Units and Constants Colour Full.svg  —  Public domain  —  BIPM (original), rearranged by User:Cmglee
-dimensional-analysis-and-unit-conversion-2.png  —  Drag coefficient on a sphere vs. Reynolds number - main trends.svg  —  Public domain  —  Anonymous NASA author (ed. Nancy Hall), vectorized by User:Kraaiennest, edited by Olivier Cleynen
-carbon-dioxide-and-the-greenhouse-gases.png  —  Earth's greenhouse effect (US EPA, 2012).png  —  Public domain  —  US EPA
-carbon-dioxide-and-the-greenhouse-gases-2.jpg  —  NASA CO2 Chart.jpg  —  Public domain  —  NASA (Vostok ice core data/J.R. Petit et al.; NOAA Mauna Loa CO2 record)
-climate-arid-drought.jpg  —  Wind-Tower-and-Qanat-Cooling-1.jpg  —  Public domain  —  Williamborg
-climate-arid-drought-2.png  —  Cone of depression - Pumping a well can cause water level lowering.png  —  Public domain  —  Tara Gross (U.S. Geological Survey)
-climate-coastal-maritime.png  —  Surge-en.svg  —  Public domain  —  SuperManu, after Robert Simmon (NASA GSFC)
-climate-coastal-maritime-2.png  —  Ripcurrent.png  —  Public domain  —  National Oceanic and Atmospheric Administration
-silicate-minerals.png  —  SiO4 tetrahedral.svg  —  CC0  —  Hbf878
-silicate-minerals-2.png  —  Silicate structures.png  —  CC BY-SA 3.0  —  Actualist
-automotive-electronics-and-engine-control-units.jpg  —  Rover MEMS 1.6 ECU.jpg  —  CC BY-SA 3.0  —  ColinMB
-automotive-electronics-and-engine-control-units-2.png  —  CAN-Bus Elektrische Zweidrahtleitung.svg  —  CC BY-SA 3.0  —  Stefan-Xp
-cooking-food-safety-power-outage.png  —  Water temperature vs heat added.svg  —  CC BY-SA 4.0  —  Cmglee
-cooking-food-safety-power-outage-2.png  —  Carbon dioxide pressure-temperature phase diagram-en.svg  —  CC0  —  Rifleman 82
-cooking-food-safety-high-risk-eaters.png  —  J Cell Biol 2002 Aug 158(3) 409-14, Figure 1.png  —  CC BY-SA 3.0 US  —  Daniel A. Portnoy, Victoria Auerbuch, Ian J. Glomski (Journal of Cell Biology)
-cooking-food-safety-high-risk-eaters-2.png  —  Toxoplasmosis life cycle en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
-cooking-food-safety-date-labels-recalls.jpg  —  AMS Egg Grading Chart (20170509-AMS-UNK-0001).jpg  —  Public domain  —  USDA Agricultural Marketing Service
-cooking-food-safety-date-labels-recalls-2.jpg  —  Structure of Rhizopus spp.-english.JPG  —  Public domain  —  Timleo
-cooking-food-safety-sanitation-cross-contamination.png  —  Stages of biofilm formation.svg  —  CC BY-SA 4.0  —  Khushairi Amri Kasim
-cooking-food-safety-sanitation-cross-contamination-2.png  —  04 Hegasy Hand Disinfection Wiki EN CCBYSA.png  —  CC BY-SA 4.0  —  Guido Hegasy (Guido4)
-induction-heating-and-industrial-electric-heating.png  —  Skin depth by Zureks.png  —  CC0  —  Zureks
-induction-heating-and-industrial-electric-heating-2.png  —  Induction Heating (PSF).png  —  Public domain (parent PSF plate; derivative also tagged CC BY-SA 4.0)  —  Pearson Scott Foresman
-population-ecology-and-population-growth.png  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
-population-ecology-and-population-growth-2.png  —  Demographic-TransitionOWID.png  —  CC BY 4.0  —  Max Roser (Our World in Data)
-population-regulation-and-density-dependence.png  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
-population-regulation-and-density-dependence-2.png  —  A graph showing the difference between strong and weak Allee effects.svg  —  CC BY-SA 3.0  —  Uscitizenjason
-the-engineering-design-process.png  —  Engineering design process.svg  —  CC BY-SA 2.0  —  Steve Krause
-the-engineering-design-process-2.png  —  Systems Engineering Process II.svg  —  Public domain  —  Leon Osborne, Jeffrey Brummond, Robert Hart, Mohsen Zarean, Steven Conger (FHWA); redrawn by User:Slashme
-geography-of-algeria.jpg  —  Algeria relief location map.jpg  —  CC BY-SA 3.0  —  Eric Gaba (Sting - fr:Sting)
-geography-of-algeria-2.png  —  Algeria map of Köppen climate classification.svg  —  CC BY-SA 4.0  —  Ali Zifan
-hazards-wildfire-evacuation.png  —  Fire triangle.svg  —  CC BY-SA 3.0  —  Gustavb
-hazards-wildfire-evacuation-2.png  —  Propagation model wildfire (English).svg  —  CC BY-SA 3.0  —  Christophe Dang Ngoc Chan, SVG conversion by JBarta
-hazards-earthquake-structural-collapse.jpg  —  LomaPrieta-Marina.jpeg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
-hazards-earthquake-structural-collapse-2.jpg  —  089srUSGSoffFoundation.jpg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
-hazards-hazmat-chemical-spill.png  —  NFPA-704-diamond-standard.svg  —  CC BY-SA 4.0  —  Marcos Rodríguez Bobadilla
-hazards-hazmat-chemical-spill-2.png  —  Gaussian Plume (SVG).svg  —  Public domain (SVG; parent raster CC BY-SA 3.0)  —  BMacZero, after Milton Beychok (Mbeychok)
-phonetics-the-sounds-of-speech.png  —  Ipa-chart-vowels.svg  —  CC BY-SA 4.0  —  Zieben007
-phonetics-the-sounds-of-speech-2.png  —  Source-filter model diagram.svg  —  CC BY-SA 4.0  —  Emflazie
-linguistics-the-scientific-study-of-language.png  —  Constituent structure analysis English sentence.svg  —  CC BY-SA 4.0  —  Chiswick Chap (after AnonMoos)
-linguistics-the-scientific-study-of-language-2.png  —  IndoEuropeanTree.svg  —  CC BY-SA 3.0  —  Multiple authors, first version by Mandrak
-liberalism.jpg  —  Declaration of the Rights of Man and of the Citizen in 1789.jpg  —  Public domain  —  Jean-Jacques-François Le Barbier (attributed); Musée Carnavalet
-liberalism-2.png  —  Separation of powers.png  —  CC0  —  AboutPolitics
-the-history-of-linguistics-p-ini-to-chomsky.jpg  —  IndoEuropeanLanguageFamilyRelationsChart.jpg  —  CC BY-SA 4.0  —  Ordinary Person
-the-history-of-linguistics-p-ini-to-chomsky-2.jpg  —  Phrase structure rules.jpg  —  CC BY-SA 3.0  —  Tjo3ya
-what-political-science-studies.png  —  Political Regime, OWID.svg  —  CC BY 3.0  —  Our World In Data
-what-political-science-studies-2.png  —  Numbers of autocracies and democracies, OWID.svg  —  CC BY 3.0  —  Our World In Data
-literary-theory-the-schools-of-criticism.png  —  Roma jakobson theory.png  —  Public domain  —  Artist2426
-literary-theory-the-schools-of-criticism-2.png  —  Semiotic square2.svg  —  CC0  —  Phlsph7
-tablature-chord-charts-and-lead-sheets.png  —  Guitare exemple tablature la mineur pentatonique.png  —  CC BY-SA 3.0  —  Christophe Dang Ngoc Chan (cdang)
-tablature-chord-charts-and-lead-sheets-2.png  —  Lead Sheet.png  —  CC BY-SA 3.0  —  CharlesGillingham
-music-notation-reading-and-writing-the-staff.png  —  Grand staff labeled notes.svg  —  Public domain  —  Jono4174
-music-notation-reading-and-writing-the-staff-2.png  —  Circle of fifths deluxe 4.svg  —  CC BY-SA 3.0  —  Just plain Bill
-the-history-of-music-notation.jpg  —  Notació gregoriana quadrada.jpg (14th-c. Gregorian chant in square notation, Arxiu Comarcal del Bages)  —  CC BY-SA 3.0  —  Joan
-the-history-of-music-notation-2.jpg  —  Guidonian hand.jpg (medieval Guidonian-hand solmization plate)  —  Public domain  —  unknown medieval scribe
+make-metalworking-forging-heat-tools.webp  —  Forging.jpg  —  CC BY-SA 3.0  —  Labberté K.J.
+weather-hazards.webp  —  Weather hazards.jpg  —  CC BY-SA 4.0  —  Siphetha
+nato-phonetic.webp  —  NATO Phonetic And Morse Code Alphabet.png  —  Public domain  —  United States Navy
+emergency-frequencies.webp  —  Airband radio 123.45 121.5 MHz.jpg  —  CC BY-SA 4.0  —  F1jmm
+mindset.webp  —  SERE- readiness is a mindset (8211483).jpg  —  Public domain  —  U.S. Air Force photo by Airman 1st Class Katie Mullikin
+food.webp  —  Foraging for Food.jpg  —  CC BY-SA 4.0  —  George Thomas Basden
+cold.webp  —  Hypothermia Training, Marine Mountain Warfare Center, California USA.jpg  —  CC BY-SA 4.0  —  Adorabutton
+water.webp  —  Marines set up water purification system 141020-M-OD001-056.jpg  —  Public domain  —  Lance Cpl. Preston McDonald
+shelter.webp  —  Arctic survival - constructing shelter · 061214-F-4127S-055.JPG  —  Public domain  —  Jonathan Snyder
+emergency-comms.webp  —  Richard Adams Examines His Survival Radio, 1969.jpg  —  CC BY 2.0  —  Archives Branch, USMC History Division
+wildlife.webp  —  Black bear grazing, Olympic National Park (52093127902).jpg  —  Public domain  —  USFWS Pacific
+terrain.webp  —  US Navy 090406-N-6224W-042 SEAL Qualification Training candidates hike through deep snow during a long-range land navigation exercise.jpg  —  Public domain  —  U.S. Navy Photo by Senior Chief Mass Communication Specialist Scott Williams
+hygiene.webp  —  Handwashing 1 - WASH in schools (Bangladesh) (38435021171).jpg  —  CC BY-SA 2.0  —  SuSanA Secretariat
+urban.webp  —  FEMA - 41425 - FEMA staff member helps a child learn about disaster preparedness in Colorado.jpg  —  Public domain  —  Barb Sturner
+math-number-sense-arithmetic.webp  —  Using-an-Abacus-05.png  —  CC BY-SA 4.0  —  Jccsvq
+med-wound-care-bleeding-infection.webp  —  Improvised first aid - bandage on leg.jpg  —  CC BY-SA 2.0  —  Greg Younger from Fort Collins, USA
+med-drug-classes-101.webp  —  Pills and medicines 01.jpg  —  CC BY-SA 4.0  —  BuhaM
+heat.webp  —  7RAR soldiers evacuate a heat exhaustion casualty during Operation Finschhafen, March 1970.jpg  —  CC0  —  Ward, Peter Anthony
+chem-reactions-equations-stoichiometry.webp  —  Chemical Equations.png  —  CC BY-SA 4.0  —  Dharmeshkumar Shah
+med-common-illnesses-red-flags.webp  —  Doctor examining patients at Vijayawada Floods Medical Camp.jpg  —  CC BY-SA 4.0  —  Legend1306
+earth-soil-formation-and-fertility.webp  —  Soil Profile Containing an Argillic Horizon.jpg  —  CC0  —  Cjrufe
+earth-reading-the-landscape-field-geology.webp  —  Exposed geology - geograph.org.uk - 484449.jpg  —  CC BY-SA 2.0  —  Graham Horn
+eng-power-batteries-and-solar.webp  —  Power backup for solar panels near Leh (4337361606).jpg  —  CC BY-SA 2.0  —  Kiran Jonnalagadda from Bangalore, India
+food-fermentation-science.webp  —  Sourdough.jpg  —  CC BY 4.0  —  Janus Sandsgaard
+food-cooking-chemistry-heat-maillard-emulsions.webp  —  DZ6 1892 Seared steak medallions glazed with a tangy berry reduction served with roasted potato wedges a buttered bread triangle and a fresh side salad.jpg  —  CC BY-SA 4.0  —  PattayaPatrol
+food-complete-diet-from-limited-food.webp  —  USDA Food Pyramid SK.jpg  —  Public domain  —  author of slovak description Ivob
+make-soap-saponification-lye-math.webp  —  Pouring lye into water to make soap.jpg  —  CC BY-SA 3.0  —  Certified Lye
+make-disinfectants-water-chemistry.webp  —  Wentworth Falls water chlorination plant.jpg  —  CC BY-SA 2.0  —  2hu4u
+make-distillation-extraction-purifying.webp  —  Simple distillation apparatus (bn).svg  —  Public domain  —  Original png by User:Quantockgoblin, SVG (bn) adaptation by User:আফতাবুজ্জামান
+make-adhesives-inks-dyes-compounds.webp  —  Plant dyeing in Bjørkedal.jpg  —  CC BY-SA 4.0  —  AnneOlaug
+psy-cognitive-biases-decisions.webp  —  Prefrontal cortex of the brain.png  —  CC BY-SA 3.0  —  Erik Lundström
+psy-stress-fear-first-aid.webp  —  Launching ceremony for the Psychological First Aid Helpline for students in Maldives (35).jpg  —  CC BY 4.0  —  The President's Office, Maldives
+wx-seasons-microclimates-local-weather.webp  —  Autumn (5131288721).jpg  —  CC BY 2.0  —  Yannick Bammert
+geo-natural-resources.webp  —  View of Manda Pit of Miike Coal Mine near Manda Coal Mine Museum.jpg  —  CC BY-SA 4.0  —  そらみみ (Soramimi)
+chem-everyday-survival-chemistry.webp  —  CNX Chem 17 05 Lead.png  —  CC BY 4.0  —  OpenStax
+psy-learn-anything-study.webp  —  Leitner system alternative.svg  —  CC0  —  Zirguezi
+psy-communication-persuasion-negotiation.webp  —  TwoWomenTalkingBodyLanguage.jpg  —  CC BY 2.0  —  Andrew
+cook-food-safety-fundamentals.webp  —  Pork thermometer.jpg  —  Public domain  —  USDA
+astro-exoplanets-search-for-other-worlds.webp  —  Theoretical Transiting Exoplanet Light Curve.svg  —  CC BY-SA 4.0
+astro-rockets-and-orbital-mechanics.webp  —  Apollo 11 Launch2.jpg  —  Public domain  —  NASA
+astro-the-moon-up-close.webp  —  Moon phases en.jpg  —  CC BY-SA 3.0
+bio-evolution-natural-selection.webp  —  Darwin's finches.png  —  CC BY-SA 4.0
+bio-plant-biology.webp  —  Xylem and phloem diagram.svg  —  CC BY-SA 4.0
+bio-animal-behavior-ethology.webp  —  Stick tool use by chimpanzees.png  —  CC BY-SA 4.0
+chem-organic-chemistry-basics.webp  —  Ochem 6 important functional groups.jpg  —  CC BY-SA 4.0
+chem-thermochemistry-energy-reactions.webp  —  Bomb Calorimeter Diagram.png  —  CC BY-SA 3.0
+chem-electrochemistry-redox-reactions.webp  —  Galvanic Cell Diagram.svg  —  CC BY 3.0
+cs-networking-internet.webp  —  Network-Switch-Architecture-Diagram.jpeg  —  CC BY-SA 4.0
+cs-databases-relational.webp  —  Relational database terms.svg  —  Public domain
+cs-ai-machine-learning-basics.webp  —  Neural Network.svg  —  CC0
+earth-climate-system.webp  —  Diagram showing the Earth's energy budget, which includes the greenhouse effect (NASA).png  —  Public domain  —  NASA
+earth-glaciers-ice-ages-cryosphere.webp  —  Ice core extracted at Talos Dome showing an ash layer corresponding to the Toba eruption.jpg  —  CC BY-SA 4.0
+earth-oceans-currents-tides-chemistry.webp  —  Ocean circulation conveyor belt.jpg  —  Public domain
+eng-materials-science-metals-polymers-ceramics.webp  —  Stress strain ductile.svg  —  CC BY 4.0
+eng-fluid-mechanics-and-hydraulics.webp  —  Diagram of Bernoulli's principle.png  —  CC BY-SA 3.0
+eng-control-systems-and-feedback.webp  —  Simple feedback control loop.svg  —  CC BY-SA 3.0
+geo-population-human-geography.webp  —  Population density map of the world.svg  —  CC BY 4.0  —  Our World in Data
+geo-koppen-climate-classification.webp  —  Köppen-Geiger Climate Classification Map (1980–2016) no borders.png  —  CC BY-SA 4.0
+geo-cartography-map-projections.webp  —  Comparison of Mercator projections.svg  —  CC BY-SA 4.0
+math-calculus-first-principles.webp  —  Graph of the function f(x)=x^2 with a tangent line drawn to (2,4).png  —  CC BY-SA 4.0
+math-linear-algebra-vectors-matrices.webp  —  Transformation matrix diagram with colours.svg  —  CC BY-SA 4.0
+math-number-theory-primes-cryptography.webp  —  Academ Bijection between angles and 12 positions of a clock hand.svg  —  CC BY-SA 3.0  —  Baelde
+med-pediatric-elderly-care-differences.webp  —  BTape2.jpg  —  CC BY-SA 3.0
+med-chronic-disease-management-home.webp  —  Blood Glucose Testing.JPG  —  CC BY-SA 3.0
+med-poisoning-overdose-response.webp  —  Ansi Z35 1968 Poison Warning Symbol.svg  —  CC0
+food-sports-performance-nutrition.webp  —  Hydration Station (7084766921).jpg  —  CC BY 2.0
+food-special-diets-without-gaps.webp  —  Anjuna, Goa, India, Vegan food plate, plant foods.jpg  —  CC BY 4.0
+food-reading-nutrition-labels-claims.webp  —  FDA Nutrition Facts Label 2016.png  —  Public domain  —  FDA
+phys-modern-physics-relativity-quantum.webp  —  Double Slit Experiment - Simplified Diagram.jpg  —  CC BY-SA 4.0
+phys-fluid-statics-buoyancy.webp  —  Fluid statics, pressure depth dependence.svg  —  CC0
+phys-nuclear-physics-radioactivity.webp  —  Penetrating power of different types of radiation - alpha, beta, gamma and neutrons.svg  —  CC0
+psy-personality-individual-differences.webp  —  Big Five Personality Traits Bubble Diagram.svg  —  CC BY-SA 4.0
+psy-motivation-habit-formation.webp  —  The habit loop.webp  —  CC BY-SA 4.0
+psy-child-development-stages.webp  —  Development Sequences of the Human Mind.jpg  —  CC BY-SA 4.0
+astro-the-sun-our-star.webp  —  Solar internal structure.svg  —  CC BY-SA 3.0  —  Sakurambobigrocksolid (French translation)
+astro-asteroids-comets-meteors.webp  —  Anatomy of a comet.jpg  —  Public domain  —  NASA/JPL-Caltech/UMD
+bio-classification-of-life.webp  —  Biological classification L Pengo.svg  —  Public domain  —  Peter Halasz (User:Pengo)
+bio-metabolism-cellular-respiration.webp  —  Cellular Respiration Simple.png  —  CC BY-SA 4.0  —  Christinelmiller
+chem-states-of-matter-phase-changes.webp  —  Phase change - en.svg  —  Public domain  —  Flanker, penubag
+chem-kinetics-and-equilibrium.webp  —  Enzyme activation energy.png  —  CC BY-SA 3.0  —  G. Andruk
+cs-operating-systems.webp  —  Operating system placement.svg  —  CC BY-SA 3.0  —  Golftheman
+cs-cybersecurity-fundamentals.webp  —  CIAJMK1209-en.svg  —  CC BY-SA 4.0  —  Michel Bakni
+archaeological-excavation-methods-and-techniques.webp  —  Example section drawing to demonstrate stratigraphic relationships.jpg  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
+archaeological-excavation-methods-and-techniques-2.webp  —  Example of a simple stratigraphic sequence as visualised using a Harris matrix diagram.png  —  CC BY 4.0  —  The Archaeologist's Guide To Good Practice
+archaeological-survey-and-site-prospection.webp  —  A lidar view of Vindolanda.jpg  —  CC BY 4.0  —  Dr John Wells
+archaeological-survey-and-site-prospection-2.webp  —  3030-mag.jpg  —  Public domain
+history-of-archaeology-as-a-science.webp  —  Archaeologia Volume 13 D259.png  —  Public domain  —  John Frere (1740-1807)
+history-of-archaeology-as-a-science-2.webp  —  Intcal 13 calibration curve.png  —  CC BY-SA 3.0  —  Mike Christie
+membrane-transport-diffusion-osmosis-and-active-transport.webp  —  Osmotic pressure on blood cells diagram.svg  —  Public domain  —  LadyofHats
+membrane-transport-diffusion-osmosis-and-active-transport-2.webp  —  Scheme sodium-potassium pump-en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
+the-cell-membrane-and-the-fluid-mosaic-model.webp  —  Phospholipids aqueous solution structures.svg  —  Public domain  —  Mariana Ruiz Villarreal (LadyofHats)
+the-cell-membrane-and-the-fluid-mosaic-model-2.webp  —  Cell membrane detailed diagram en.svg  —  Public domain  —  Mariana Ruiz (LadyofHats)
+dimensional-analysis-and-unit-conversion.webp  —  SI Illustration Base Units and Constants Colour Full.svg  —  Public domain  —  BIPM (original), rearranged by User:Cmglee
+dimensional-analysis-and-unit-conversion-2.webp  —  Drag coefficient on a sphere vs. Reynolds number - main trends.svg  —  Public domain  —  Anonymous NASA author (ed. Nancy Hall), vectorized by User:Kraaiennest, edited by Olivier Cleynen
+carbon-dioxide-and-the-greenhouse-gases.webp  —  Earth's greenhouse effect (US EPA, 2012).png  —  Public domain  —  US EPA
+carbon-dioxide-and-the-greenhouse-gases-2.webp  —  NASA CO2 Chart.jpg  —  Public domain  —  NASA (Vostok ice core data/J.R. Petit et al.; NOAA Mauna Loa CO2 record)
+climate-arid-drought.webp  —  Wind-Tower-and-Qanat-Cooling-1.jpg  —  Public domain  —  Williamborg
+climate-arid-drought-2.webp  —  Cone of depression - Pumping a well can cause water level lowering.png  —  Public domain  —  Tara Gross (U.S. Geological Survey)
+climate-coastal-maritime.webp  —  Surge-en.svg  —  Public domain  —  SuperManu, after Robert Simmon (NASA GSFC)
+climate-coastal-maritime-2.webp  —  Ripcurrent.png  —  Public domain  —  National Oceanic and Atmospheric Administration
+silicate-minerals.webp  —  SiO4 tetrahedral.svg  —  CC0  —  Hbf878
+silicate-minerals-2.webp  —  Silicate structures.png  —  CC BY-SA 3.0  —  Actualist
+automotive-electronics-and-engine-control-units.webp  —  Rover MEMS 1.6 ECU.jpg  —  CC BY-SA 3.0  —  ColinMB
+automotive-electronics-and-engine-control-units-2.webp  —  CAN-Bus Elektrische Zweidrahtleitung.svg  —  CC BY-SA 3.0  —  Stefan-Xp
+cooking-food-safety-power-outage.webp  —  Water temperature vs heat added.svg  —  CC BY-SA 4.0  —  Cmglee
+cooking-food-safety-power-outage-2.webp  —  Carbon dioxide pressure-temperature phase diagram-en.svg  —  CC0  —  Rifleman 82
+cooking-food-safety-high-risk-eaters.webp  —  J Cell Biol 2002 Aug 158(3) 409-14, Figure 1.png  —  CC BY-SA 3.0 US  —  Daniel A. Portnoy, Victoria Auerbuch, Ian J. Glomski (Journal of Cell Biology)
+cooking-food-safety-high-risk-eaters-2.webp  —  Toxoplasmosis life cycle en.svg  —  Public domain  —  LadyofHats (Mariana Ruiz Villarreal)
+cooking-food-safety-date-labels-recalls.webp  —  AMS Egg Grading Chart (20170509-AMS-UNK-0001).jpg  —  Public domain  —  USDA Agricultural Marketing Service
+cooking-food-safety-date-labels-recalls-2.webp  —  Structure of Rhizopus spp.-english.JPG  —  Public domain  —  Timleo
+cooking-food-safety-sanitation-cross-contamination.webp  —  Stages of biofilm formation.svg  —  CC BY-SA 4.0  —  Khushairi Amri Kasim
+cooking-food-safety-sanitation-cross-contamination-2.webp  —  04 Hegasy Hand Disinfection Wiki EN CCBYSA.png  —  CC BY-SA 4.0  —  Guido Hegasy (Guido4)
+induction-heating-and-industrial-electric-heating.webp  —  Skin depth by Zureks.png  —  CC0  —  Zureks
+induction-heating-and-industrial-electric-heating-2.webp  —  Induction Heating (PSF).png  —  Public domain (parent PSF plate; derivative also tagged CC BY-SA 4.0)  —  Pearson Scott Foresman
+population-ecology-and-population-growth.webp  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
+population-ecology-and-population-growth-2.webp  —  Demographic-TransitionOWID.png  —  CC BY 4.0  —  Max Roser (Our World in Data)
+population-regulation-and-density-dependence.webp  —  Gause's experiment and fitted logistic curves.svg  —  CC0  —  Yapparina
+population-regulation-and-density-dependence-2.webp  —  A graph showing the difference between strong and weak Allee effects.svg  —  CC BY-SA 3.0  —  Uscitizenjason
+the-engineering-design-process.webp  —  Engineering design process.svg  —  CC BY-SA 2.0  —  Steve Krause
+the-engineering-design-process-2.webp  —  Systems Engineering Process II.svg  —  Public domain  —  Leon Osborne, Jeffrey Brummond, Robert Hart, Mohsen Zarean, Steven Conger (FHWA); redrawn by User:Slashme
+geography-of-algeria.webp  —  Algeria relief location map.jpg  —  CC BY-SA 3.0  —  Eric Gaba (Sting - fr:Sting)
+geography-of-algeria-2.webp  —  Algeria map of Köppen climate classification.svg  —  CC BY-SA 4.0  —  Ali Zifan
+hazards-wildfire-evacuation.webp  —  Fire triangle.svg  —  CC BY-SA 3.0  —  Gustavb
+hazards-wildfire-evacuation-2.webp  —  Propagation model wildfire (English).svg  —  CC BY-SA 3.0  —  Christophe Dang Ngoc Chan, SVG conversion by JBarta
+hazards-earthquake-structural-collapse.webp  —  LomaPrieta-Marina.jpeg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
+hazards-earthquake-structural-collapse-2.webp  —  089srUSGSoffFoundation.jpg  —  Public domain  —  J.K. Nakata, U.S. Geological Survey
+hazards-hazmat-chemical-spill.webp  —  NFPA-704-diamond-standard.svg  —  CC BY-SA 4.0  —  Marcos Rodríguez Bobadilla
+hazards-hazmat-chemical-spill-2.webp  —  Gaussian Plume (SVG).svg  —  Public domain (SVG; parent raster CC BY-SA 3.0)  —  BMacZero, after Milton Beychok (Mbeychok)
+phonetics-the-sounds-of-speech.webp  —  Ipa-chart-vowels.svg  —  CC BY-SA 4.0  —  Zieben007
+phonetics-the-sounds-of-speech-2.webp  —  Source-filter model diagram.svg  —  CC BY-SA 4.0  —  Emflazie
+linguistics-the-scientific-study-of-language.webp  —  Constituent structure analysis English sentence.svg  —  CC BY-SA 4.0  —  Chiswick Chap (after AnonMoos)
+linguistics-the-scientific-study-of-language-2.webp  —  IndoEuropeanTree.svg  —  CC BY-SA 3.0  —  Multiple authors, first version by Mandrak
+liberalism.webp  —  Declaration of the Rights of Man and of the Citizen in 1789.jpg  —  Public domain  —  Jean-Jacques-François Le Barbier (attributed); Musée Carnavalet
+liberalism-2.webp  —  Separation of powers.png  —  CC0  —  AboutPolitics
+the-history-of-linguistics-p-ini-to-chomsky.webp  —  IndoEuropeanLanguageFamilyRelationsChart.jpg  —  CC BY-SA 4.0  —  Ordinary Person
+the-history-of-linguistics-p-ini-to-chomsky-2.webp  —  Phrase structure rules.jpg  —  CC BY-SA 3.0  —  Tjo3ya
+what-political-science-studies.webp  —  Political Regime, OWID.svg  —  CC BY 3.0  —  Our World In Data
+what-political-science-studies-2.webp  —  Numbers of autocracies and democracies, OWID.svg  —  CC BY 3.0  —  Our World In Data
+literary-theory-the-schools-of-criticism.webp  —  Roma jakobson theory.png  —  Public domain  —  Artist2426
+literary-theory-the-schools-of-criticism-2.webp  —  Semiotic square2.svg  —  CC0  —  Phlsph7
+tablature-chord-charts-and-lead-sheets.webp  —  Guitare exemple tablature la mineur pentatonique.png  —  CC BY-SA 3.0  —  Christophe Dang Ngoc Chan (cdang)
+tablature-chord-charts-and-lead-sheets-2.webp  —  Lead Sheet.png  —  CC BY-SA 3.0  —  CharlesGillingham
+music-notation-reading-and-writing-the-staff.webp  —  Grand staff labeled notes.svg  —  Public domain  —  Jono4174
+music-notation-reading-and-writing-the-staff-2.webp  —  Circle of fifths deluxe 4.svg  —  CC BY-SA 3.0  —  Just plain Bill
+the-history-of-music-notation.webp  —  Notació gregoriana quadrada.jpg (14th-c. Gregorian chant in square notation, Arxiu Comarcal del Bages)  —  CC BY-SA 3.0  —  Joan
+the-history-of-music-notation-2.webp  —  Guidonian hand.jpg (medieval Guidonian-hand solmization plate)  —  Public domain  —  unknown medieval scribe
