@@ -2,6 +2,8 @@ package dev.mascwa.pulse.data.safety
 
 import dev.mascwa.pulse.core.network.HttpException
 import dev.mascwa.pulse.core.telemetry.SafetyCoverage
+import dev.mascwa.pulse.core.telemetry.CapAlerts
+import dev.mascwa.pulse.core.telemetry.Seismic
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
@@ -12,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,7 +36,9 @@ class SafetyRepository(
     private val ttl = 10 * 60 * 1000L
 
     suspend fun fetch(lat: Double, lon: Double, force: Boolean): Fetched<SafetyResult> {
-        val key = "safety_${"%.2f".format(lat)}_${"%.2f".format(lon)}"
+        // Locale.US so the key is stable: a comma-decimal device would otherwise write a
+        // different key for the same place, and stop finding its own cached result.
+        val key = "safety_" + String.format(Locale.US, "%.2f_%.2f", lat, lon)
         if (!force) {
             cache.read(key, ttl, SafetyResult.serializer())?.let {
                 return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
@@ -122,16 +127,27 @@ class SafetyRepository(
             val mag = props["mag"]?.jsonPrimitive?.doubleOrNull
             val place = props["place"]?.jsonPrimitive?.contentOrNull ?: "Earthquake"
             val time = props["time"]?.jsonPrimitive?.longOrNull ?: 0L
-            val sev = when {
-                (mag ?: 0.0) >= 6.5 -> Severity.EXTREME
-                (mag ?: 0.0) >= 5.5 -> Severity.HIGH
-                (mag ?: 0.0) >= 4.0 -> Severity.MODERATE
-                else -> Severity.LOW
+            // Depth is the third coordinate, not a property, which is how it came to be missed.
+            // It matters more than almost anything else here: in a single day's feed the events
+            // ranged from 1 km to 564 km down, and a 564 km event is barely felt at the surface.
+            val depth = coords.getOrNull(2)?.jsonPrimitive?.doubleOrNull
+            val tsunami = (props["tsunami"]?.jsonPrimitive?.intOrNull ?: 0) == 1
+            val pager = props["alert"]?.jsonPrimitive?.contentOrNull
+            // Grading lives in the CI-tested core, so the notification gate, the map colour and
+            // the list badge cannot drift apart, and so the rules are provable.
+            val sev = when (Seismic.alertLevel(mag, depth, tsunami, pager)) {
+                Seismic.Alert.EXTREME -> Severity.EXTREME
+                Seismic.Alert.HIGH -> Severity.HIGH
+                Seismic.Alert.MODERATE -> Severity.MODERATE
+                Seismic.Alert.LOW -> Severity.LOW
             }
             Incident(
                 id = "usgs_${o["id"]?.jsonPrimitive?.contentOrNull ?: "$ilat$ilon$time"}",
                 type = IncidentType.EARTHQUAKE.name,
-                title = mag?.let { "M%.1f — %s".format(it, place) } ?: place,
+                // Locale.US: a magnitude is a number, and a comma decimal reads as a different
+                // one. RadarRepository renders the same value from the same feed and already
+                // pins it, so without this the two screens disagree on the same earthquake.
+                title = mag?.let { String.format(Locale.US, "M%.1f — %s", it, place) } ?: place,
                 severity = sev.name,
                 latitude = ilat, longitude = ilon,
                 distanceMeters = Geo.distanceMeters(lat, lon, ilat, ilon),
@@ -140,6 +156,13 @@ class SafetyRepository(
                 source = "USGS",
                 url = props["url"]?.jsonPrimitive?.contentOrNull,
                 magnitude = mag,
+                depthKm = depth,
+                tsunami = tsunami,
+                pagerAlert = pager,
+                significance = props["sig"]?.jsonPrimitive?.intOrNull,
+                magType = props["magType"]?.jsonPrimitive?.contentOrNull,
+                feltReports = props["felt"]?.jsonPrimitive?.intOrNull,
+                shakingIntensity = props["mmi"]?.jsonPrimitive?.doubleOrNull,
             )
         }
     }
@@ -187,11 +210,22 @@ class SafetyRepository(
         return features.mapNotNull { f ->
             val props = f.jsonObject["properties"]?.jsonObject ?: return@mapNotNull null
             val event = props["event"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val sev = when (props["severity"]?.jsonPrimitive?.contentOrNull) {
-                "Extreme" -> Severity.EXTREME
-                "Severe" -> Severity.HIGH
-                "Moderate" -> Severity.MODERATE
-                else -> Severity.LOW
+            // CAP grades an alert on three axes and this read one, so a "might happen tomorrow"
+            // watch and a "happening now, we can see it" warning graded identically.
+            val urgency = props["urgency"]?.jsonPrimitive?.contentOrNull
+            val certainty = props["certainty"]?.jsonPrimitive?.contentOrNull
+            val sev = when (CapAlerts.grade(props["severity"]?.jsonPrimitive?.contentOrNull, urgency, certainty)) {
+                CapAlerts.Grade.EXTREME -> Severity.EXTREME
+                CapAlerts.Grade.HIGH -> Severity.HIGH
+                CapAlerts.Grade.MODERATE -> Severity.MODERATE
+                CapAlerts.Grade.LOW -> Severity.LOW
+            }
+            val expires = parseIso(props["expires"]?.jsonPrimitive?.contentOrNull)
+            // The endpoint is called "active", but this result is cached and served from cache for
+            // as long as it is all there is offline. Without this an alert that ended hours ago is
+            // presented as a current danger.
+            if (CapAlerts.hasExpired(expires.takeIf { it > 0L }, System.currentTimeMillis())) {
+                return@mapNotNull null
             }
             Incident(
                 id = "nws_${f.jsonObject["id"]?.jsonPrimitive?.contentOrNull ?: event}",
@@ -203,6 +237,12 @@ class SafetyRepository(
                 bearing = 0.0,
                 timeEpochMs = parseIso(props["effective"]?.jsonPrimitive?.contentOrNull),
                 source = "NWS",
+                // The field that says what to do, present on 78 of 80 live alerts and previously
+                // parsed away — in the safety feature.
+                instruction = CapAlerts.instruction(props["instruction"]?.jsonPrimitive?.contentOrNull),
+                timing = CapAlerts.timing(urgency, certainty),
+                expiresEpochMs = expires.takeIf { it > 0L },
+                areaDescription = props["areaDesc"]?.jsonPrimitive?.contentOrNull?.take(120),
             )
         }
     }

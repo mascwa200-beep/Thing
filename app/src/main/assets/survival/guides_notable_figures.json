@@ -1,0 +1,148 @@
+{
+ "guides": [
+  {
+   "id": "fed-the-starship-captain",
+   "title": "The Starship Captain",
+   "category": "Notable Figures",
+   "summary": "The setting's central role: what the job actually requires, and why so much turns on one person's judgement.",
+   "sections": [
+    {
+     "heading": "The Job",
+     "body": "A starship captain in this setting holds an authority that has no clean modern equivalent. At the range these ships operate, the captain is the ranking military officer, the senior diplomat, the magistrate, and the only representative of their government within reach — and is expected to be all four without instruction, without appeal, and frequently without time. The decisions that reach them are properly political: whether to intervene, whom to recognise, what to promise on their government's behalf, whether a civilisation is ready to be contacted. No rule can be written fine enough to decide those in advance, which is why the service invests so heavily in the judgement of individuals rather than in the specificity of regulations. The counterweight is deliberately built into the crew. A first officer whose job description includes disagreeing, a medical officer with the standing to relieve the captain outright, and an engineer whose assessment of what the ship can survive is the practical ceiling on what the captain may attempt. A captain who has silenced all three is, in this setting, always about to make a serious mistake."
+    },
+    {
+     "heading": "What the Service Actually Rewards",
+     "body": "Starfleet says it wants curiosity restrained by discipline. What it repeatedly rewards is officers who disobey correctly — and the gap between those two is not a writing inconsistency, it is the institution's central problem. A fleet operating beyond recall cannot function without initiative and cannot function on initiative alone. The Academy's most famous exercise is a scenario constructed to be unwinnable, whose purpose is not to test tactics but to observe how a candidate behaves in the presence of certain defeat. Its fame rests on a cadet who rejected its premises and altered it, and on the service commending rather than expelling him — an ambiguity the setting returns to for decades afterwards. The recurring test of a captain is therefore not competence but proportion: knowing which rule is load-bearing. An officer who breaks the Prime Directive to save a world has, in the service's view, done two things — rescued a civilisation, and established that the rule bends for a sufficiently sympathetic case — and the second is treated as the more consequential."
+    },
+    {
+     "heading": "The Recurring Types",
+     "body": "The setting has produced several distinct readings of the role, and they function as arguments with one another rather than as variations on a theme. There is the captain as frontier commander — instinctive, personally brave, inclined to solve a problem by placing himself in the middle of it, and formed by an era when there was nobody else within reach. There is the captain as diplomat and jurist, older, more deliberate, who treats the ship as a chamber and would rather convene a hearing than a boarding party. There is the captain as administrator of a fixed place, who cannot warp away from the consequences and therefore has to live with them. And there is the captain isolated absolutely, cut off from the institution entirely, for whom every regulation has become a choice rather than an order. Each is a different answer to the same question: what should a person with this much discretion be like? The setting declines to pick one, and is better for it."
+    },
+    {
+     "heading": "Why the Role Carries the Setting",
+     "body": "The format depends on a person who can be wrong. A ship that could consult headquarters in real time would have no decisions worth watching, and an institution that had anticipated every situation would need no judgement exercised. So the captain is constructed to be the point where a civilisation's stated values meet a situation those values did not anticipate. When the Federation is tested — by an empire, by a collective, by a rival that trades in profit, by a plague, by a rule that will kill someone — it is tested through one officer standing in a room having to answer. That is why the log entry is the setting's signature device. A captain narrating what they decided and why, aloud, for a record someone else will read, is the format admitting that the decision was arguable and putting the argument on the record anyway."
+    }
+   ]
+  },
+  {
+   "id": "fed-science-officer",
+   "title": "The Science Officer",
+   "category": "Notable Figures",
+   "summary": "The Starfleet officer who makes exploration a profession: what the second chair is actually for.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's science officer heads its scientific departments and is the officer the captain turns to when the question is what something is. In practice the post combines three jobs: running laboratories and specialists, interpreting sensor data in real time on the bridge, and supplying the analysis on which a command decision will be based within the next minute. Aboard many vessels the science officer is also second officer, standing behind the first officer in the command line, which puts a scientist in the command chair often enough to matter. That arrangement is a statement about what kind of organisation Starfleet is: the person who knows what the phenomenon is has standing to decide what to do about it. The characteristic image of the post — an officer bent over a hooded sensor display, reporting without turning around — is a good summary of the job. The science officer is looking at something nobody else on the bridge can see and has to convert it into a sentence the captain can act on."
+    },
+    {
+     "heading": "The Discipline of the Answer",
+     "body": "What distinguishes a good science officer in the setting is not knowledge but calibration. The job requires stating what is known, what is inferred and what is guessed, and keeping the three separate under pressure from a commander who would very much like a single confident sentence. This is why the role so often falls to characters with a cultivated relationship to certainty. An officer who will say \"insufficient data\" to a captain in a crisis is doing the job correctly, and an officer who supplies a probability rather than a reassurance is doing it better still. The setting has a recurring fondness for the precise numerical estimate delivered at an absurd moment, and the joke conceals a real professional virtue. The failure modes are correspondingly specific. A science officer who overstates confidence gets people killed by being believed. One who understates it is useless, because a captain who cannot get an answer will act without one. Learning where that line sits is most of what experience in the post consists of."
+    },
+    {
+     "heading": "The Outsider's Chair",
+     "body": "The setting has a long habit of placing a non-human, or a partly-human, in this role, and it is not an accident. An officer whose species reasons differently from the majority of the crew supplies exactly what the post requires — a perspective from outside the room's assumptions — and supplies it structurally rather than as a matter of personality. This produces the setting's most durable character dynamic: a commander who decides by instinct and conviction, and a science officer who decides by evidence and consistency, each of whom is right often enough that the other cannot simply be overruled. The arrangement is stable because it is not a hierarchy of correctness. It is two incompatible ways of being right, forced to produce one decision. The friction is the point, and the affection underneath it is what makes the friction bearable to watch. Officers in this pairing habitually argue in public and defend each other absolutely in private, which is a fair description of the relationship the setting thinks a good crew is built on."
+    },
+    {
+     "heading": "Why the Role Defines the Format",
+     "body": "A ship that only fought would need no science officer. The post exists because the mission is exploration, and exploration means routinely encountering things nobody has a procedure for. Every episode of the setting that opens with an unexplained reading is, structurally, an episode about this job. It also carries the setting's characteristic optimism about knowledge. The science officer's working assumption is that the phenomenon is comprehensible, that comprehension will suggest a course of action, and that the correct first response to something unknown is to study it rather than to shoot it. When a story ends with an enemy understood instead of destroyed, this is the officer whose method won. That is why the second chair is the one the format cannot do without. The captain supplies the decision, but the science officer supplies the reason there was something worth deciding about."
+    }
+   ]
+  },
+  {
+   "id": "fed-ships-doctor",
+   "title": "The Ship's Doctor",
+   "category": "Notable Figures",
+   "summary": "Sickbay and the one officer who can relieve a captain: medicine as the conscience of the crew.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's chief medical officer runs sickbay and is responsible for the health of everyone aboard, which on a long-range vessel means being simultaneously a general practitioner, a surgeon, an epidemiologist, a psychiatrist and a xenobiologist. There is no referral available. Whatever arrives, the doctor is who it arrives to. The xenobiological part is the hardest and the most distinctive. A mixed crew presents half a dozen incompatible physiologies with different organ placements, blood chemistries, drug tolerances and pain responses, and a treatment that saves one species can kill another. The setting's medical crises are frequently built on exactly this: the correct diagnosis for a human is the wrong one for the patient on the table. Sickbay itself is portrayed as the ship's one genuinely non-hierarchical space. Rank governs everywhere aboard except the room where the doctor is working, and the setting is consistent about that."
+    },
+    {
+     "heading": "The Authority to Relieve",
+     "body": "A chief medical officer may relieve any officer of duty, up to and including the commanding officer, on medical grounds. This is the single most significant check in the Starfleet structure and the only one that runs against the chain of command rather than along it. Its logic is simple and uncomfortable. A commander whose judgement is impaired — by injury, exhaustion, infection, grief or something stranger — is precisely the person least equipped to notice, and the officers beneath them are poorly placed to say so. Someone must be able to make that call from outside the hierarchy, and the doctor is the only officer whose professional standing supports it. The setting stages this repeatedly and never treats it as easy. Exercising the authority means a doctor telling a superior officer, in front of the bridge crew, that they are not fit — knowing that if the assessment is wrong the consequences fall on the ship, and that if it is right they have just made an enemy of someone they will keep working alongside."
+    },
+    {
+     "heading": "The Conscience in the Room",
+     "body": "Beyond the formal authority, the ship's doctor tends to serve as the crew's moral counterweight. A physician's professional obligation runs to the patient in front of them regardless of rank, nationality, species or which side they were on an hour ago, and that obligation is frequently in tension with what the mission requires. The setting uses this deliberately. When a captain is considering something expedient, the doctor is usually the character who says the plain human thing about it — often crudely, often at the worst moment, and generally from a position that cannot be dismissed as naive because the speaker has spent the day dealing with the consequences of the last decision. Doctors in this setting are consequently written as blunt in a way officers in other posts are not permitted to be. The bluntness is licensed by the role: a physician's duty of candour to a patient extends, in the hands of a good writer, into a duty of candour to a commander about what they are about to do."
+    },
+    {
+     "heading": "Instruments and Limits",
+     "body": "Federation medicine is portrayed as extraordinarily capable. Scanners diagnose without incision, bone is knitted and tissue regenerated in minutes, and injuries that would be career-ending elsewhere are an overnight stay. The bedside manner of the technology is a deliberate contrast with contemporary medicine: nothing hurts, nothing is invasive, and the physician spends their time thinking rather than cutting. The limits are where the stories are. Neurological damage, unfamiliar pathogens, diseases with no analogue in any database, and conditions of the mind resist the instruments entirely — and a doctor equipped to fix almost anything experiences the exceptions far more sharply than one who is used to losing. The setting also keeps returning to the point that a doctor with excellent tools still has to decide who to treat first, what to tell a patient, and whether to keep someone alive who has asked not to be. No amount of instrumentation touches those, which is why the post remains a character rather than a console."
+    }
+   ]
+  },
+  {
+   "id": "fed-first-officer",
+   "title": "The First Officer",
+   "category": "Notable Figures",
+   "summary": "Second in command: the post that runs the ship, argues with the captain, and is not the captain.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's first officer is second in command and, in practice, the person who runs the vessel day to day. Duty rosters, department coordination, discipline, readiness, the endless administration of several hundred people in a metal volume — all of it belongs to the first officer, so that the captain's attention is available for the things only a captain can do. The post is also the command line's second link. If the captain is killed, incapacitated or absent, the first officer commands, and everything about their working life is preparation for that possibility. A first officer who does not know the ship as well as the captain does has not done the job. By convention the first officer leads away missions, on the reasoning that the commanding officer should not routinely leave the vessel to walk into an unknown situation. This is a rule the setting's captains break constantly and their first officers object to every time, which is itself a good summary of the relationship."
+    },
+    {
+     "heading": "Arguing With the Captain",
+     "body": "The first officer's most important duty is to tell the captain what nobody else will. A commander surrounded by people who agree is a commander operating on one opinion, and Starfleet's structure deliberately places one officer close enough to argue and senior enough to be heard. The convention is that the argument happens before the decision and in private where it can, and that once the order is given the first officer supports it completely and visibly. An officer who continues to litigate a settled decision in front of the crew has damaged the ship more than any bad order would. The setting's best pairings run on this exactly. A first officer who never objects is useless; one who objects to everything is exhausting; the working relationship is a negotiated understanding of which matters are worth spending the objection on, built up over years and legible to the audience without being explained."
+    },
+    {
+     "heading": "The Question of Promotion",
+     "body": "First officers are, by definition, qualified for command, and the setting keeps asking why a given one has not taken it. The answers are among its more interesting character material: loyalty to a captain, attachment to a particular ship, doubt about one's own judgement, an unwillingness to be the person who decides, or a considered preference for the job actually being done. Declining a command is treated as a real choice with real costs rather than as modesty. Starfleet needs captains, an officer who repeatedly refuses one is spending institutional goodwill, and the setting is honest that some who wait too long stop being offered. It also runs the case where the promotion happens and is not the improvement expected. A superb first officer is not automatically a superb captain, because the skills diverge at exactly the point where the first officer's job stops: someone else's decision becomes yours, and there is nobody left to argue with you."
+    },
+    {
+     "heading": "Why the Format Needs Two",
+     "body": "Structurally, the first officer exists so that command can be shown as a conversation rather than as a pronouncement. A captain alone can only be right or wrong; a captain with someone entitled to disagree can be argued into something, or hold a position under pressure, and the audience gets to watch the reasoning instead of the conclusion. It also distributes the format's moral weight. When a decision is genuinely difficult, the setting can put the two defensible positions in two people who respect each other, which is far better drama than one person soliloquising, and considerably more honest about how hard decisions are actually made. And it supplies the setting's most reliable relationship. Two people who spend years disagreeing professionally, covering for each other absolutely, and trusting each other with a few hundred lives is a bond the format can rest on without ever having to state it, and the best crews in the setting are built outward from it."
+    }
+   ]
+  },
+  {
+   "id": "fed-chief-engineer",
+   "title": "The Chief Engineer of a Starship",
+   "category": "Notable Figures",
+   "summary": "The officer who keeps the ship alive: what engineering actually does, and why the answer is always a number.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "The chief engineer is responsible for everything that makes the vessel a vessel: the warp drive and its reactor, impulse engines, power distribution, life support, structural integrity, computers, and the several thousand systems that have to keep working while everyone else is doing something more visible. Engineering is the ship's largest department and its least glamorous. Most of the work is maintenance, diagnostics and the unromantic business of preventing failures rather than repairing them, conducted by a large staff on rotating watches deep inside the hull. The chief runs that organisation as well as being its most senior technical authority. The post carries genuine independence. A chief engineer who states that a system cannot take another minute of what is being asked of it is exercising professional judgement, and a captain who overrules that is making a decision they will own. The setting stages this often and rarely lets it be free."
+    },
+    {
+     "heading": "The Estimate",
+     "body": "The characteristic exchange of the whole setting is a captain asking how long and an engineer answering with a number. It has become a joke — the padded estimate, the miracle delivered early — and the joke conceals a real professional problem. An engineer's estimate is a commitment made under uncertainty about a system that is currently broken, to a commander who will plan around it, in a situation where being wrong in one direction strands the ship and being wrong in the other wastes time nobody has. Officers develop a personal style: some quote the honest figure and defend it, some quote the worst case and beat it, and the setting is affectionate about both. The related discipline is knowing what to refuse. Engineering is where the physical limits of the ship are actually known, and an engineer who agrees to everything has stopped being useful as a source of information. The good ones say no with a reason attached."
+    },
+    {
+     "heading": "Improvisation as a Speciality",
+     "body": "The setting's engineers are defined by what they do when the correct solution is unavailable. A vessel weeks from any yard, holed, low on power, and carrying no spare for the thing that broke, is the standing situation, and the response is a rebuilt component, a rerouted system or a use of equipment its designers never contemplated. This is presented as craft rather than as improvisation. The engineers who succeed do so because they understand the machinery deeply enough to know which rules are physics and which are convention, and the setting is careful to show them being wrong occasionally, on the ones that were physics. It also produces the setting's most satisfying kind of resolution. A problem solved by someone who knows their equipment better than the antagonist knows theirs is more earned than a problem solved by superior firepower, and the format returns to it constantly."
+    },
+    {
+     "heading": "Down Where the Ship Actually Is",
+     "body": "Engineering sits at the ship's structural and emotional centre. The bridge is where decisions are made; engineering is where the consequences arrive, usually in the form of a reading climbing toward a limit while someone tries to hold it. That gives the post a distinct relationship to danger. Engineers are the people who stay below during a crisis, work in compartments that are on fire, and are asked to seal a section knowing who is on the other side of the door. The setting's engineering scenes carry a claustrophobic weight the bridge scenes do not. The role's affection for the machine is treated as genuine rather than eccentric. Engineers in this setting talk about their ships as things with tempers and preferences, know the sound a healthy reactor makes, and take damage to the vessel personally. A captain commands the ship; the chief engineer is the one who lives with it."
+    }
+   ]
+  },
+  {
+   "id": "fed-security-chief",
+   "title": "The Security Chief",
+   "category": "Notable Figures",
+   "summary": "The officer responsible for everyone's safety, in a service that would rather not need one.",
+   "sections": [
+    {
+     "heading": "The Post",
+     "body": "A starship's chief of security is responsible for the vessel's internal safety and its physical defence: access control, the armoury, the brig, boarding response, threat assessment and the protection of the crew both aboard and on away missions. On many ships the post is combined with tactical, putting the same officer at the weapons console. It is an awkward job in this particular organisation. Starfleet describes itself as a scientific and diplomatic service, and the security chief is the standing acknowledgement that the description is incomplete. Their professional instinct — assume threat, control access, prepare for the worst — sits at odds with a mission built on approaching the unknown openly. That tension is the role's whole character. A good security chief is the person on the bridge arguing for caution against a room inclined to curiosity, and being right often enough to be listened to."
+    },
+    {
+     "heading": "Away Missions",
+     "body": "Security officers accompany landing parties, and the arrangement is one of the setting's oldest conventions along with its most notorious joke. The officer whose job is to be between the science team and whatever is out there is, structurally, the person the story can afford to lose. The convention has been criticised and largely corrected, and the correction improved the material. A security detail written as competent professionals who occasionally die despite doing everything right is far more affecting than one written as a casualty budget, and the setting's better episodes make the loss land on the officer who ordered them out. Doctrine reflects real caution. Landing parties are armed but set to stun, entry is preceded by scanning, and the security officer's recommendation to withdraw carries genuine weight — which the setting's captains override often enough for the audience to feel the cost when it goes badly."
+    },
+    {
+     "heading": "Policing Your Own Crew",
+     "body": "The less discussed half of the job is internal. A few hundred people confined together for years produce theft, assault, substance problems, breakdowns and occasionally something worse, and the security chief is who deals with it — investigating colleagues, holding them, and giving evidence at their hearings. This makes the post socially isolating in a way the setting has used well. An officer whose duty may require them to arrest the people they eat with cannot be entirely one of the crew, and characters in the role are frequently written as slightly apart, with a professional wariness that reads as coldness until it is needed. It also gives the setting a way to look at its own utopia honestly. A society that has genuinely improved still puts a brig on every ship, and the officer who runs it is the standing evidence that nobody expects the improvement to be total."
+    },
+    {
+     "heading": "The Outsider Version",
+     "body": "The setting has repeatedly filled this post with someone from outside the Federation's comfortable assumptions — a former enemy, a refugee from a war, a shapeshifter, someone raised somewhere that had no illusions. That is not accidental casting. A security chief whose formative experience was occupation, combat or survival brings a different calibration to the question of how much trust is prudent, and their disagreements with an idealistic captain carry weight because they are not theoretical. When such an officer says a situation is a trap, the audience believes them. It also lets the setting examine its own optimism from the inside. An officer who thinks the Federation is naive, serving it loyally anyway, and being proved both right and wrong at different times, is a more searching critique than any external antagonist could deliver."
+    }
+   ]
+  }
+ ]
+}

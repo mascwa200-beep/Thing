@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.mascwa.pulse.core.telemetry.BriefSignals
+import dev.mascwa.pulse.core.telemetry.EmergencyAlert
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.OracleMover
+import dev.mascwa.pulse.core.telemetry.StoryLedger
 import dev.mascwa.pulse.core.telemetry.Urgency
 import dev.mascwa.pulse.core.telemetry.TaskBoard
 import dev.mascwa.pulse.core.telemetry.UnifiedBriefComposer
@@ -55,6 +57,13 @@ object BriefEngine {
         var topSource: String? = null
         var emergencyHeadline: String? = null
         var emergencyMajor = false
+        // ⚠️ Two different bars, and conflating them is what put the app permanently into condition
+        // red. `emergencyMajor` also covers a notable death and a historic verdict — worth a card,
+        // not worth an alert condition. Only a STRONG disaster (severity 2) reaches the board's
+        // ALERT row, and even then only as yellow. See EmergencyNews.isMajor and AlertPolicyTest.
+        var emergencySevere = false
+        // Spare headlines for the news row to fall back to when the lead has already been shown.
+        val spareHeadlines = mutableListOf<String>()
         runCatching {
             val top = container.newsRepository.fetchCategory(NewsCategory.TOP, force = forceNews).data
             top.firstOrNull { it.title.isNotBlank() }?.let {
@@ -73,7 +82,12 @@ object BriefEngine {
             if (worst != null) {
                 emergencyHeadline = worst.title
                 emergencyMajor = EmergencyNews.isMajor(worst.title, worst.summary)
+                emergencySevere = EmergencyNews.severity(worst.title, worst.summary) == 2
             }
+            // Everything after the lead, for the ledger to fall back through. Without these the
+            // news row simply vanishes once the lead has been seen, trading a repeating row for an
+            // absent one.
+            spareHeadlines += top.asSequence().drop(1).map { it.title }.filter { it.isNotBlank() }.take(8)
         }
 
         // --- Markets: every quote with a live daily change; the composer applies the user's threshold. ---
@@ -136,13 +150,49 @@ object BriefEngine {
             runCatching { DayAheadEngine.imminentDeparture(container, settings) }.getOrNull()
         } else null
 
+        val advisory = advisory(container, settings)
+
+        // --- A live official emergency alert → the board's ALERT row, in condition RED. ---
+        //
+        // ⚠️ Gathered on every publish, not only when one is first raised. EmergencyWatchService
+        // posts a one-line urgent board the moment it sees one, but that post is explicitly replaced
+        // by "the next routine refresh with the full picture" — so without this the red alert would
+        // vanish from the tray at the next tick while the tornado was still on the ground.
+        var officialAlert: String? = null
+        var officialAlertKey: String? = null
+        if (settings.notifications.emergencyTakeover) {
+            runCatching {
+                val loc = container.locationProvider.current()
+                if (loc != null) {
+                    val live = container.emergencyAlertRepository.active(loc.latitude, loc.longitude)
+                    val worst = live.filter { EmergencyAlert.warrantsTakeover(it, now) }
+                        .maxByOrNull { it.effectiveMs }
+                    if (worst != null) {
+                        officialAlert = EmergencyAlert.summary(worst)
+                        officialAlertKey = worst.id
+                    }
+                }
+            }
+        }
+
+        // ⚠️ Read BEFORE composing, not after: the composer needs to know which stories this board
+        // has already printed, and that is the whole fix for "the notification keeps saying the same
+        // thing". The later read-modify-write still re-reads the newest blob before touching it,
+        // because this file shares `notify_state` with the resident poller and the worker.
+        val state = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
+
         val brief = UnifiedBriefComposer.compose(
             BriefSignals(
                 nowMs = now,
                 topHeadline = topHeadline,
                 topSource = topSource,
+                moreHeadlines = spareHeadlines,
+                seenStories = state.seenStories.toSet(),
                 emergencyHeadline = emergencyHeadline,
                 emergencyMajor = emergencyMajor,
+                emergencySevere = emergencySevere,
+                officialAlert = officialAlert,
+                officialAlertKey = officialAlertKey,
                 movers = movers,
                 moveThresholdPct = prefs.marketMovePercent,
                 tempNow = tempNow,
@@ -172,7 +222,9 @@ object BriefEngine {
                 showMarkets = prefs.showMarketsRow,
                 showWeather = prefs.showWeatherRow,
                 showAgenda = prefs.showAgendaRow,
-                advisory = advisory(container, settings),
+                advisory = advisory?.line,
+                advisoryUrgent = advisory?.urgent == true,
+                advisoryKey = advisory?.key,
                 lesson = lesson(container, pendingTasks.map { it.title }),
                 departureNotice = departure?.first,
                 departureKey = departure?.second,
@@ -186,7 +238,6 @@ object BriefEngine {
             return
         }
 
-        val state = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
         // Local val: urgencyKey is a public property from another module, so it can't smart-cast directly.
         val urgentKey = brief.urgencyKey
         val alertNew = when {
@@ -209,10 +260,24 @@ object BriefEngine {
 
         // Burn the key only when it actually alerted — if urgent alerts were toggled off, the item keeps
         // its right to buzz once the toggle comes back on (an unburned key is a pending alert, not a bug).
-        if (alertNew && urgentKey != null && urgentKey != state.lastUrgentKey) {
+        //
+        // ⚠️ The story is recorded only once it has actually been PRINTED, and only the one that was
+        // printed. Recording what was merely considered would burn stories the reader never saw, and
+        // they would then never be shown at all.
+        val burnKey = alertNew && urgentKey != null && urgentKey != state.lastUrgentKey
+        val shownStory = brief.newsIdentity
+        if (burnKey || shownStory != null) {
             // Read-modify-write the LATEST blob so the other notify_state writers' fields are never clobbered.
             val latest = container.diskCache.readAny(STATE_KEY, NotifyState.serializer())?.value ?: NotifyState()
-            container.diskCache.write(STATE_KEY, latest.copy(lastUrgentKey = urgentKey), NotifyState.serializer())
+            container.diskCache.write(
+                STATE_KEY,
+                latest.copy(
+                    lastUrgentKey = if (burnKey && urgentKey != null) urgentKey else latest.lastUrgentKey,
+                    seenStories = shownStory?.let { StoryLedger.remember(it, latest.seenStories) }
+                        ?: latest.seenStories,
+                ),
+                NotifyState.serializer(),
+            )
         }
     }
 
@@ -231,13 +296,32 @@ object BriefEngine {
      * consumes the caches this pass has already warmed. Best-effort throughout — a failure anywhere
      * mutes the row rather than costing you the board.
      */
-    private suspend fun advisory(container: AppContainer, settings: AppSettings): String? = runCatching {
+    /**
+     * The Oracle's call to action for the board, and whether it is worth announcing.
+     *
+     * @param urgent the insight clears `Oracle.pushWorthy`. Of the rules that reach that bar, a
+     *   departure, a major emergency and a security notice each already have their own alert path,
+     *   so in practice this is extreme heat danger — a health risk that would otherwise be delivered
+     *   as a silent routine row.
+     * @param key the rule's stable family, never the sentence: the text carries live values that
+     *   move through the day, and keying on it would re-buzz on every rewrite.
+     */
+    private data class Advisory(val line: String, val urgent: Boolean, val key: String)
+
+    private suspend fun advisory(container: AppContainer, settings: AppSettings): Advisory? = runCatching {
         val signals = OracleEngine.snapshot(container, settings)
         val top = Oracle.focus(signals) ?: return@runCatching null
         if (top.urgency.weight < Urgency.IMPORTANT.weight) return@runCatching null
-        // The title carries the instruction and the detail carries why — the board wants both, in
-        // that order, because a suggestion without a reason is just noise you learn to ignore.
-        listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — ")
+        Advisory(
+            // The title carries the instruction and the detail carries why — the board wants both, in
+            // that order, because a suggestion without a reason is just noise you learn to ignore.
+            line = listOf(top.title, top.detail).filter { it.isNotBlank() }.joinToString(" — "),
+            // ⚠️ The Oracle's own definition of "worth interrupting for", not a second threshold
+            // written here. Two definitions of that is how the board and the assistant quietly start
+            // disagreeing about what an emergency is.
+            urgent = Oracle.pushWorthy(listOf(top)).isNotEmpty(),
+            key = top.family,
+        )
     }.getOrNull()
 
     /**

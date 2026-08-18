@@ -2,8 +2,10 @@ package dev.mascwa.pulse.feature.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mascwa.pulse.core.telemetry.RouteReach
 import dev.mascwa.pulse.core.telemetry.RouteProgress
 import dev.mascwa.pulse.core.telemetry.RouteProfile
+import dev.mascwa.pulse.core.telemetry.RouteSteps
 import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
@@ -73,6 +75,25 @@ data class NavReadout(
     val viaRoad: Boolean,
     /** True-north bearing to the objective, for the relative turn arrow. */
     val bearingDeg: Double,
+    /**
+     * A caveat about where the road actually ends, or null when there is nothing to say.
+     *
+     * Non-null when the routing server had to move the destination a long way to find tarmac — see
+     * [dev.mascwa.pulse.core.telemetry.RouteReach]. The map does draw the objective marker, so the
+     * gold line visibly stops short, but that cue disappears at any real zoom and the numbers beside
+     * it carry no such warning.
+     */
+    val reachNote: String? = null,
+    /**
+     * The next turn, in words: "Turn right onto The Mall in 170 m".
+     *
+     * ⚠️ Null whenever the road route is not in hand, and deliberately so. Without one the only
+     * direction available is [bearingDeg], which is a straight line to the objective — a real
+     * reading, and not something to dress up as an instruction to turn.
+     */
+    val maneuverText: String? = null,
+    /** The manoeuvre after that, for a "then …" line. Null at the end of the route. */
+    val thenText: String? = null,
 )
 
 class NavViewModel(
@@ -125,9 +146,22 @@ class NavViewModel(
     /** Live precipitation radar. Null frame = the overlay is off or RainViewer had nothing. */
     private val _rain = MutableStateFlow(false)
     val rain: StateFlow<Boolean> = _rain.asStateFlow()
+    /**
+     * The frame currently on the map. During playback this walks the sequence; otherwise it is the
+     * newest. The map effect keys on this and nothing else, so animation needs no change there.
+     */
     private val _rainFrame = MutableStateFlow<RainViewerRepository.RadarFrame?>(null)
     val rainFrame: StateFlow<RainViewerRepository.RadarFrame?> = _rainFrame.asStateFlow()
+
+    /** The whole sequence RainViewer is holding — about two hours at ten-minute steps. */
+    private val _rainFrames = MutableStateFlow<List<RainViewerRepository.RadarFrame>>(emptyList())
+    val rainFrames: StateFlow<List<RainViewerRepository.RadarFrame>> = _rainFrames.asStateFlow()
+
+    private val _rainPlaying = MutableStateFlow(false)
+    val rainPlaying: StateFlow<Boolean> = _rainPlaying.asStateFlow()
+
     private var rainJob: Job? = null
+    private var rainPlayJob: Job? = null
 
     /**
      * Aircraft overhead and recent earthquakes, both drawn on the map.
@@ -203,23 +237,38 @@ class NavViewModel(
         combine(activeWaypoint, _location, _routeInfo, _route) { wp, loc, info, routePts ->
             if (wp == null || loc == null) return@combine null
             val straight = Geo.distanceMeters(loc.latitude, loc.longitude, wp.latitude, wp.longitude)
+            // ⚠️ A route whose destination the road network cannot reach still arrives as a normal
+            // route with a full distance and ETA — the measured worst case is a confident 28-hour
+            // drive to a point snapped onto another continent. Those numbers describe a journey to
+            // the nearest road, not to the objective, so they are not used as if they did.
+            val usable = info?.takeIf { it.reachesDestination }
             // Live distance remaining along the road route — counts down on every GPS tick without
             // re-routing. Falls back to OSRM's total, then straight-line.
-            val remaining = if (info != null && routePts.size >= 2)
+            val remaining = if (usable != null && routePts.size >= 2)
                 RouteProgress.remainingMeters(routePts, loc.latitude, loc.longitude) else null
-            val meters = remaining ?: info?.distanceMeters ?: straight
+            val meters = remaining ?: usable?.distanceMeters ?: straight
             val etaText = when {
-                info != null && remaining != null && info.distanceMeters > 0 ->
-                    formatEta(info.durationSeconds * (remaining / info.distanceMeters))
-                info != null -> formatEta(info.durationSeconds)
+                usable != null && remaining != null && usable.distanceMeters > 0 ->
+                    formatEta(usable.durationSeconds * (remaining / usable.distanceMeters))
+                usable != null -> formatEta(usable.durationSeconds)
                 else -> null
+            }
+            // The next turn, from the router's own step list. Distance covered along the route is
+            // its length minus what is left — RouteProgress projects the position onto the polyline,
+            // so this stays right after a wrong turn instead of counting from where you set off.
+            val guidance = usable?.steps?.let { steps ->
+                val travelled = remaining?.let { (usable.distanceMeters - it).coerceAtLeast(0.0) } ?: 0.0
+                RouteSteps.upcoming(steps, travelled)
             }
             NavReadout(
                 label = wp.label,
                 distanceText = Geo.formatDistance(meters),
                 etaText = etaText,
-                viaRoad = info != null,
+                viaRoad = usable != null,
                 bearingDeg = Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude),
+                reachNote = info?.let { RouteReach.describe(it.reach, it.destinationSnapMeters) },
+                maneuverText = guidance?.full,
+                thenText = guidance?.then?.let { RouteSteps.phrase(it) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -344,14 +393,57 @@ class NavViewModel(
         _rain.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRain = on) } } }
         rainJob?.cancel()
+        rainPlayJob?.cancel()
         if (!on) {
+            _rainFrames.value = emptyList()
             _rainFrame.value = null
+            _rainPlaying.value = false
             return
         }
         rainJob = viewModelScope.launch {
             while (isActive) {
-                _rainFrame.value = runCatching { rainViewer.latest() }.getOrNull()
+                val frames = runCatching { rainViewer.frames() }.getOrNull().orEmpty()
+                if (frames.isNotEmpty()) {
+                    _rainFrames.value = frames
+                    // Land on the newest whenever the sequence is refetched. Holding a playback
+                    // position across a refresh would leave the map on a frame that has aged out.
+                    if (!_rainPlaying.value) _rainFrame.value = frames.last()
+                }
                 delay(5 * 60_000L)
+            }
+        }
+    }
+
+    /**
+     * Run the last two hours of radar as a loop, or stop and settle on the newest frame.
+     *
+     * ⚠️ **The first pass through the loop is jerky and that is inherent, not a bug to chase.** Each
+     * frame is a distinct tile URL, so the first time round every step is a network fetch; once
+     * MapLibre has them cached the loop is smooth. [PLAYBACK_STEP_MS] is set slower than a
+     * television radar loop for that reason — fast enough to read as motion, slow enough that the
+     * first pass is not a slideshow of blank tiles.
+     */
+    fun toggleRainPlayback() {
+        if (_rainPlaying.value) {
+            _rainPlaying.value = false
+            rainPlayJob?.cancel()
+            _rainFrames.value.lastOrNull()?.let { _rainFrame.value = it }
+            return
+        }
+        val frames = _rainFrames.value
+        if (frames.size < 2) return // nothing to animate; leave the single picture alone
+        _rainPlaying.value = true
+        rainPlayJob?.cancel()
+        rainPlayJob = viewModelScope.launch {
+            var i = 0
+            while (isActive) {
+                val seq = _rainFrames.value
+                if (seq.isEmpty()) break
+                _rainFrame.value = seq[i % seq.size]
+                i++
+                // A beat at the end of each loop, so the newest frame is readable rather than
+                // flicking straight back to two hours ago.
+                delay(if (i % seq.size == 0) PLAYBACK_LOOP_PAUSE_MS else PLAYBACK_STEP_MS)
             }
         }
     }
@@ -638,6 +730,14 @@ class NavViewModel(
         compass.stop()
         pollJob?.cancel()
         pollJob = null
+        // A radar loop with nobody watching is pure battery, and unlike the slow frame refresh it
+        // ticks twice a second. Stopping it settles the map on the newest frame, so coming back
+        // shows current rain rather than wherever the loop happened to be.
+        if (_rainPlaying.value) {
+            _rainPlaying.value = false
+            rainPlayJob?.cancel()
+            _rainFrames.value.lastOrNull()?.let { _rainFrame.value = it }
+        }
     }
 
     private companion object {
@@ -649,6 +749,18 @@ class NavViewModel(
         const val PROFILE_SAMPLES = 80
         /** How much the route has to change before the heights are worth asking for again. */
         const val PROFILE_REFRESH_FRACTION = 0.2
+
+        /**
+         * How long each radar frame is held during playback.
+         *
+         * Slower than a broadcast weather loop on purpose: every frame is a separate tile URL, so
+         * the first pass through the sequence is fetching rather than replaying, and a fast loop
+         * would show mostly empty tiles until MapLibre has them.
+         */
+        const val PLAYBACK_STEP_MS = 550L
+
+        /** A beat on the newest frame before the loop restarts two hours ago. */
+        const val PLAYBACK_LOOP_PAUSE_MS = 1_400L
     }
 
     override fun onCleared() {

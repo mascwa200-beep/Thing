@@ -34,6 +34,19 @@ data class UpcomingLaunch(
      * precision the provider never claimed.
      */
     val netPrecision: String = "",
+    /**
+     * The two ends of the launch window, when the feed publishes them — and it publishes them on
+     * every launch measured.
+     *
+     * ⚠️ **[netPrecision] does not cover this and it is easy to think it does.** Precision says how
+     * well the T-0 itself is known; the window says how much room the flight actually has, and the
+     * two come apart completely. Measured live: `Starlink Group 17-50` carries a T-0 of
+     * `03:45:08` at **Second** precision — so [timeIsFirm] is true and the screen prints it to the
+     * second — inside a window running `02:00 → 06:00`. Four hours, entirely invisible. See
+     * [dev.mascwa.pulse.core.telemetry.LaunchWindow].
+     */
+    val windowStartMs: Long? = null,
+    val windowEndMs: Long? = null,
     /** "Go", "TBC", "TBD", "Hold", "Success", "Failure". */
     val status: String = "",
     val statusDetail: String = "",
@@ -91,6 +104,8 @@ class LaunchRepository(
                     orbit = o.str("orbit").orEmpty(),
                     netEpochMs = o.str("net")?.let(::parseIso),
                     netPrecision = o["net_precision"]?.jsonObject?.str("name").orEmpty(),
+                    windowStartMs = o.str("window_start")?.let(::parseIso),
+                    windowEndMs = o.str("window_end")?.let(::parseIso),
                     status = o["status"]?.jsonObject?.str("abbrev").orEmpty(),
                     statusDetail = o["status"]?.jsonObject?.str("name").orEmpty(),
                     imageUrl = o.str("image"),

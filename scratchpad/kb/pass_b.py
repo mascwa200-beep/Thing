@@ -1,0 +1,236 @@
+# -*- coding: utf-8 -*-
+import json
+S=[]
+def sec(h,b): S.append({"heading":h,"body":" ".join(b.split())})
+
+sec("Being refused entry, and overstaying", """
+Refusal of entry is rare and is worth understanding before it happens, because almost nothing about
+the situation works the way people assume.
+
+You can be refused with a valid passport and a valid visa. Common grounds are an inconsistent or
+implausible purpose of visit, insufficient funds, no onward or return ticket, a suspicion that you
+intend to work or to remain, a previous immigration breach anywhere, certain criminal convictions,
+missing documents for the visa class you hold, or an inability to give a coherent account of your
+plans. Some grounds are not about you at all — quotas, alerts, a name resembling one on a watchlist.
+
+At the border you are generally not yet legally in the country, which is the fact that determines
+everything else. Rights that would apply inside the territory — to a lawyer, to a hearing, to appeal
+before removal — very often do not apply at the frontier. You may be held in a secure area for hours
+or overnight. The airline that carried you is usually liable under carrier sanctions to take you back
+at its own expense, which is why airlines check documents so carefully at check-in and why they will
+refuse to board you rather than risk it.
+
+If it happens: stay calm and polite, ask what the ground of refusal is, ask whether a decision notice
+will be given to you in writing, and keep it if it is. Ask to contact your consulate — you are
+entitled to ask, though a consulate cannot overturn the decision. Do not sign anything you have not
+read or cannot understand, and if a document is in a language you do not read, say so and ask for an
+explanation of what you are signing. Refusals often carry a re-entry ban, and the terms of it will be
+in that paperwork.
+
+Overstaying is the other side of the same coin and is far more common, because it is usually
+accidental. The permitted stay is set by the officer or the visa, not by your ticket, and it can be
+shorter than you expect. Consequences escalate with duration: a fine on departure in some countries,
+a re-entry ban measured in years in others, detention and removal at the strict end, and in a few
+places a criminal record. Some countries bar you from any future visa application for a fixed period.
+
+Two habits prevent nearly all of it. Note the exact date your permission expires, from the stamp or
+the electronic record, on the day you arrive — not the date you planned to leave. And if something
+goes wrong and you cannot leave in time, approach the immigration authority before your permission
+expires and ask about an extension. An overstay that you reported and sought to fix is treated very
+differently from one discovered at the airport, and the difference can be the whole of your future
+ability to travel to that country.
+""")
+
+sec("Customs: what you declare, and what will simply be taken", """
+Customs is a separate check from immigration and asks a different question: not whether you may come
+in, but what may come in with you. Many airports use a channel system — green for nothing to declare,
+red for something to declare, and sometimes blue for arrivals from within a customs union. Choosing
+green is a formal legal declaration that you carry nothing requiring one, so walking through it while
+carrying something dutiable is an offence in itself, quite apart from the goods.
+
+Three categories are worth keeping straight.
+
+**Dutiable** goods are legal to bring but attract tax above an allowance: alcohol, tobacco, perfume,
+and general goods above a value threshold that varies enormously by country. Allowances are per
+person and usually cannot be pooled across a family for a single item. Keep receipts for expensive
+things you already owned when you left, particularly cameras and laptops, because on return your own
+country may treat them as purchases abroad. Some countries operate a registration scheme for exactly
+this.
+
+**Restricted** goods need a permit, a prescription, or a declaration. Cash above a threshold —
+commonly the equivalent of ten thousand euros or dollars, counting everything you carry — must be
+declared almost everywhere, and undeclared cash is routinely seized in full. Medicines that are
+controlled substances locally need documentation, as discussed earlier. Firearms and ammunition,
+including single stray cartridges found in a rucksack, are treated with total seriousness. Drones are
+restricted or banned in a surprising number of countries.
+
+**Prohibited** goods are simply not permitted and will be confiscated, with penalties ranging from a
+fine to prosecution: illegal drugs, weapons, counterfeit goods, obscene material by the destination's
+own definition, and anything covered by CITES, the convention on trade in endangered species — which
+catches souvenirs that look innocent, including ivory, coral, some shells and hardwoods, and animal
+products of many kinds.
+
+Biosecurity deserves its own warning because it is where ordinary travellers get fined. Fresh food,
+seeds, plants, soil on hiking boots, honey, meat and dairy are controlled almost everywhere and
+policed with real severity in island nations that have kept diseases and pests out. Australia and New
+Zealand issue on-the-spot fines for an undeclared apple, and the fine applies to failing to declare
+it, not to carrying it — declaring costs you nothing but the item. The rule that saves people is
+simple: if in doubt, declare it. A declared item is at worst confiscated. An undeclared one is an
+offence.
+
+Finally, never carry anything for anyone else. It is the oldest warning in travel because it is the
+oldest method, and "someone asked me to take it" has no standing anywhere.
+""")
+
+sec("Land borders, sea crossings and transit", """
+Air travel is the most standardised way to cross a frontier and therefore the least representative.
+Land and sea crossings behave differently in ways that repeatedly catch out travellers whose
+experience is all airports.
+
+At a land border you frequently deal with two sets of controls in sequence — exit formalities for the
+country you are leaving and entry formalities for the one you are entering — sometimes separated by a
+stretch of road where you are, briefly, in neither. Both sets can refuse you, and being refused entry
+after you have been stamped out is an awkward position that takes patience to resolve. Land posts
+often keep limited hours, close entirely at night or on holidays, and may not accept cards for fees.
+Some accept only cash and only in a particular currency. Some do not process every nationality, and
+some visa types are valid only for arrival by air, which is a rule that exists in more places than
+people expect and is easy to miss.
+
+Vehicles bring their own paperwork. Taking a car across a border can require the registration
+document, proof of insurance valid in the destination, an international driving permit, and in some
+regions a customs document guaranteeing that the vehicle will leave again. Hire cars are frequently
+contractually forbidden from crossing frontiers at all.
+
+Sea crossings vary from the almost invisible — a ferry between neighbouring states inside a common
+travel area — to full immigration and customs control at the port. Cruise passengers are usually
+processed collectively by the ship, which is convenient and produces a specific hazard: your
+permission may be tied to the vessel, so missing the sailing can leave you in a country without valid
+individual status. Private sailors must clear in at a designated port of entry, fly the appropriate
+signal flag, and not land anyone before clearance.
+
+Transit is the single most common oversight in international travel. Changing planes in a country can
+require a transit visa or an electronic authorisation depending on your nationality, on whether you
+must clear immigration to change terminal, and on whether your bags are checked through. Some
+countries require every passenger to formally enter in order to transit at all, which means their
+full entry rules apply to a person who never intended to leave the airport. Others offer generous
+transit arrangements that let you spend a day in the city. The determining questions are your
+nationality, the specific airport, and whether you leave the secure area — and the only reliable
+source is the transit country's own immigration authority, not the airline's booking page.
+
+Airside is not a legal void. You are subject to local law throughout, and being in transit does not
+suspend it.
+""")
+
+sec("Losing your passport abroad", """
+Losing a passport in a foreign country is a bad afternoon, not a catastrophe, and it goes much better
+if you know the sequence.
+
+**Report it.** Go to the local police and report the loss or theft, and get a copy of the report or
+its reference number. Some consulates require it, insurers almost always do, and if the passport is
+later used by someone else the report is what establishes when it left your hands. Report it to your
+own passport authority too — most have an online form, and reporting cancels the document so it
+cannot be misused. That cancellation is irreversible, which matters: a passport reported lost and
+then found in a coat pocket is dead, and travelling on it is an offence.
+
+**Contact your embassy or consulate.** Find the nearest one that provides consular services — not
+every diplomatic mission does — and check their emergency number, because most run an out-of-hours
+line for exactly this. They will want identification of some kind, the police report, a photograph,
+and a fee. This is the moment the copies you made before leaving earn their keep.
+
+What you will usually be issued is an emergency travel document: a limited paper document, valid for
+a single specified journey home or to a specific destination, sometimes with named transit countries
+that you must not deviate from. It is not a replacement passport, and some countries and airlines
+treat it awkwardly, so confirm your route is acceptable before booking. A full replacement passport
+issued abroad generally takes considerably longer and may require the document to be produced in your
+home country and sent out.
+
+Practical points that make the difference. Emergency documents are usually issued for travel, not for
+continuing a holiday, so expect to go home rather than carry on. You will normally need to show your
+onward booking. If your visa for the country you are in was in the lost passport, you may also need
+to obtain a replacement visa or exit permission from the local immigration authority before you can
+leave — this step is frequently forgotten and can add days. Fees are payable and are not usually
+waived.
+
+If everything is gone — passport, cards, phone and money together — the order is police first for the
+report, then your card issuers to freeze accounts, then the consulate. A consulate can help you
+contact family or a bank so that money can be transferred to you, and in genuine destitution some
+governments offer an emergency loan for repatriation, which is repayable and typically comes with the
+restriction that no new passport is issued until you have repaid it.
+""")
+
+sec("What a consulate can and cannot do for you", """
+Consular assistance is widely misunderstood, and the gap between what people expect and what is
+actually offered causes real distress at the worst possible moment. The honest summary is that a
+consulate helps you deal with a situation; it does not remove you from it.
+
+**What they can do.** Issue emergency travel documents when yours is lost or stolen. Contact your
+family or friends on your behalf and help arrange for money to be transferred to you. Provide lists of
+local English-speaking lawyers, doctors, translators and funeral directors — lists, not
+recommendations. Visit you if you are detained or in hospital, and in detention try to ensure you are
+treated no worse than local prisoners and that you understand the process you are in. Help in the
+event of a death abroad with the practical formalities. Provide information and, in a genuine crisis
+such as a natural disaster or civil unrest, coordinate advice and sometimes assisted departure.
+
+**What they cannot do.** They cannot get you out of prison, and they cannot intervene in another
+country's legal system or ask for you to be treated as an exception. They cannot pay your legal fees,
+medical bills, hotel bills or fines, and they cannot buy you a ticket home. They cannot give legal
+advice or investigate a crime. They cannot find you accommodation or a job, or store your luggage.
+They cannot make a foreign government give you a visa or reverse a refusal of entry. And they cannot
+help you with the country whose nationality you also hold, if you are a dual national there — which
+is a limitation with serious consequences and is covered in the next section.
+
+The right of consular access when you are arrested is not merely a courtesy: under the Vienna
+Convention on Consular Relations, a detained foreign national is entitled to have their consulate
+notified if they ask, and to communicate with it. Ask explicitly and ask early, and ask again if
+nothing happens. The right depends on you requesting it in many jurisdictions.
+
+Medical situations are where the expectation gap bites hardest. A consulate cannot pay for your
+treatment and cannot fund a medical evacuation, which can run into six figures. That is what travel
+insurance exists for, and it is the reason to check the medical limit rather than the price when
+buying it.
+
+Two things you can do in advance cost nothing. Register with your government's traveller service if
+one exists, so a consulate knows you are in the country when something happens to the country rather
+than to you. And save the local consulate's address and emergency number offline in your phone before
+you travel, because the moment you need it is very likely to be the moment you cannot get online.
+""")
+
+sec("Dual nationality, second passports, and travelling with children", """
+Holding two nationalities is common and mostly convenient, and it carries specific rules that
+surprise people at borders.
+
+Many countries require their own nationals to enter and leave on that country's passport, regardless
+of what else you hold, and enforce it. Presenting a foreign passport at your other country's border
+can lead to refusal of entry or a fine, on the reasoning that a national does not need a visa and
+cannot claim to be a visitor. The workable habit is to leave and enter each country on that country's
+document, using whichever is appropriate for the airline booking, and to make sure the name in both
+matches your ticket.
+
+Some countries do not recognise dual nationality at all. If you are one of their nationals in their
+eyes — which can be by descent, and can therefore be true of someone who has never lived there and
+does not consider themselves a national — you are treated wholly as theirs while on their territory,
+and your other country's consulate may be refused access to you entirely. Obligations can attach:
+military service is the usual one, and there are countries where a man of a certain age arriving on
+an ancestral nationality can be conscripted. If you may hold a nationality by descent, find out what
+that country's rules are before visiting it. This is the single largest hidden risk in dual
+nationality.
+
+The commercial industry in second passports — citizenship or residence by investment — is legitimate
+in some jurisdictions and heavily marketed everywhere. It is expensive, subject to due diligence, and
+periodically re-evaluated by the countries that grant visa-free access, so the benefit is not a fixed
+asset. Anything advertised as a passport for a few thousand pounds is a fraud, and using a fraudulent
+document is a serious criminal offence in every country you present it to.
+
+Travelling with children has its own paperwork, and it is where an ordinary family holiday can meet a
+hard stop. Because border authorities are watching for child abduction, many countries require
+evidence of parental relationship and, where only one parent is travelling, a consent letter from the
+other — ideally naming the child, the dates, the destination and the accompanying adult, with contact
+details, and in some cases notarised. Some countries require a full birth certificate showing both
+parents. Grandparents, other relatives and family friends travelling with a child should carry
+consent from both parents as a matter of course.
+
+Names cause the rest of it. A parent whose surname differs from the child's — after divorce,
+remarriage, or simply by choice — should carry documentation connecting them, because the officer has
+only what is in front of them, and their caution is entirely appropriate.
+""")
+print(json.dumps(S, ensure_ascii=False))

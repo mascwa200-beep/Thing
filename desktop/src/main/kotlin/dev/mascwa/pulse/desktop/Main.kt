@@ -6,6 +6,8 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.library.PackStore
+import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import kotlinx.coroutines.runBlocking
@@ -21,8 +23,18 @@ private val settingsStore = DesktopSettingsStore()
  * and closing the window within two seconds would silently lose the answer. Same reason the settings
  * store already lives out here.
  */
-private val libraryRepository = LibraryRepository()
+private val packStore = PackStore()
+private val libraryRepository = LibraryRepository(packs = packStore)
 private val studyStore = StudyStore(libraryRepository)
+
+/**
+ * The live-television player, hoisted for the same reason the stores are — and a sharper one.
+ *
+ * `exitApplication()` calls `System.exit(0)` the moment `onCloseRequest` returns. A player built
+ * inside the composition would still be holding a native decoder and an open socket at that point,
+ * with nothing able to reach it to let go.
+ */
+private val livePlayer = LivePlayer()
 
 fun main() {
     // A local file read, not a network call — a one-time blocking read at startup to seed the initial
@@ -54,6 +66,9 @@ fun main() {
                     // a debounce window would make it quietly unreliable.
                     studyStore.flushNow()
                 }
+                // Nothing to save here — this is releasing a native decoder and a live socket before
+                // the process is killed out from under them.
+                livePlayer.dispose()
                 exitApplication()
             },
             title = "LCARS",
@@ -62,7 +77,9 @@ fun main() {
             PulseDesktopApp(
                 settingsStore,
                 libraryRepository,
+                packStore,
                 studyStore,
+                livePlayer,
                 // Handing over to the installer. Flushed the same way the close button does, because an
                 // upgrade that lost the last answered study card would be a poor trade for being current.
                 onQuitForInstall = {
@@ -71,6 +88,7 @@ fun main() {
                         studyStore.closeSession()
                         studyStore.flushNow()
                     }
+                    livePlayer.dispose()
                     exitApplication()
                 },
             )

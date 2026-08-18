@@ -3703,6 +3703,1156 @@ mirrors current (unchanged by design). ⚠️ Render and real-signal behaviour a
 and the standing line in the reader, the study advisories earning their place over a few days, and
 whether the streak nudge feels supportive or naggy (every threshold is a named constant).
 
+### KHAN LEARNING · LIVE DESKTOP NEWS · EXPANSION PACKS (this session, PR #448)
+
+Owner's five-part directive: *"Khan academy inspired for both. Also, add a fuck ton of educational
+features to the library and expand the library 1000 fold and add images … free and high quality and
+don't require internet to load. Also, ensure that this goes for desktop version and mobile version and
+that the desktop version has a live news system that automatically updates everything to have the
+latest of the latest every 5 minutes. Also make sure that it the least resource intensive without
+changing it's looks it functionality or size."* **Zero subagent spend** across the whole arc, as with
+the several before it — the credit directive still overrides ultracode.
+
+**⚠️ Two corrections had to be made before starting, and the owner settled both.**
+
+**A literal 1000× is arithmetic that does not work.** Measured, not estimated: 581 guides · 8,277
+sections · **3.97M words** · **26 MB** of JSON. A thousandfold is ~4 billion words / ~26 GB —
+unshippable in an APK, and generating it is exactly what tripped the weekly limiter four times. Owner
+chose (AskUserQuestion) **expansion packs**: lean core, packs fetched **once**, permanently offline
+after. That is the only shape where "vastly bigger" and "don't change its size" are compatible rather
+than contradictory. Owner also chose **one bounded wave** — machinery first at zero spend, then a
+single capped content wave with headroom left.
+
+**The image claim in this file was wrong, and I wrote it.** It said 343 diagrams covering every guide.
+~~Reality: **45 image files**, reused across 238 guides — **343 of 581 guides have no diagram at all.**~~
+⚠️ **And that correction was wrong too, the same way** — it counted `images/` and missed `images/kb/`.
+The true state, measured: **343 image files, one per referencing section, no reuse at all**; every
+reference resolves and nothing is orphaned. The original claim was closer to right than my
+"correction". The real gap is **413 of 651 guides have no diagram** — which is a content gap, not a
+tooling failure.
+That is the real gap, and I1 remains open.
+
+- **K1 (`6d36eaf`) + K2 (`ae18073`) — the Khan model, both platforms.** `CourseMastery` (a course seen
+  at once; **points-weighted** percentage so a week's real work moves the bar instead of sitting at
+  zero until something finishes), `PracticeSet` (short bounded sets, interleaved unit tests, majority
+  pass mark), `Hints` (rule out → locate → show). Both screens gained a COURSE card (goal, bar, one
+  recommendation in the imperative, skills grouped into units with mastery band + due count + one-tap
+  PRACTISE, UNIT TEST per unit, COURSE CHALLENGE weakest-first) and session chrome ("3 OF 5" over a
+  progress bar, ending on a verdict card). Two departures from Khan are deliberate: **nothing is
+  locked** (a reference library somebody may open in an emergency must never refuse a page), and
+  mastery decays. `CourseMastery.label`/`units()` live in the shared core so the platforms cannot
+  group or name bands differently.
+- **N1 (`94de2dc`) — the desktop News feed keeps itself current, every 5 minutes.** Visibility and
+  category combine into one flow consumed with `collectLatest`, so **off the News screen there is no
+  timer at all** — that is what "least resource intensive" actually buys, versus a
+  `while(true){delay();if(visible)}` that wakes regardless. Background ticks raise no busy bar and a
+  failure leaves the headlines up with `refreshFailed` set rather than replacing a readable page with
+  an error. The tick is **forced** (the repo serves anything under ten minutes from disk, so an
+  unforced five-minute beat is a no-op every other time) and the countdown restarts from the age of
+  what is on screen, so arriving at a tab cached nine minutes ago refreshes on arrival.
+  ⚠️ Honest scoping against "updates everything": it keeps **the feed you are looking at** current, not
+  all fifteen — fifteen requests a tick at one reader is what a rate limiter is for.
+- **P1a (`8b3ae51`) — `core:telemetry/ContentPack.kt`, the pack format.** Three rules carry the
+  weight, all negative-tested: **the bundle wins every collision** (a safety property, not a
+  preference — the bundled corpus is what CI validates and where the emergency protocols live, so a
+  pack able to shadow `first-aid` could replace what somebody reads while performing CPR); **storage
+  names are derived, never taken from the archive** (`../guide_index.json` inside a zip would
+  otherwise land on the bundled catalog — both the file name and the pack id are reduced to a leaf and
+  sanitised); **newer, never merely different** (a rolled-back catalog must not downgrade what is
+  already held, then do it again every launch). Plus `verifies`, `newCount` (what a pack really adds
+  once collisions come off) and size phrasing. `isPackFile` keys on a double underscore and **no
+  bundled shard name contains one** — checked against the real 50-shard corpus.
+- **P1b (`9a35c9f`) — an installed pack IS the library.** The merge is at `index()` in each platform's
+  content repository, so the reader, browse rails, search, study, the daily lesson and the assistant's
+  `library` tool all see one corpus and **not one of them changed**. A pack is a bag of shards and
+  ships **no index of its own** — an index alongside content is a second copy that can disagree with
+  it, and the disagreement shows up only as a guide that lists but will not open; it is derived at
+  install time instead. Both stores install atomically (parse everything → staging → move). A pack
+  whose files have vanished is dropped from the view; an unreadable manifest is tolerated.
+  ⚠️ Bug caught while extracting the bundled index: the derive fallback was calling the now-pack-aware
+  `shardFiles()`, which would have listed every pack guide twice. Split into `bundledShardFiles()`.
+- **P1c (`28e4f5a`) — `PackArchive`, reading a downloaded pack.** Only `*.json` is taken; caps on
+  entry size, total size and count, checked **inside** the read loop so a bomb is stopped rather than
+  read and judged. ⚠️ **The most instructive failure of the arc.** The first cut decoded each 8 KB
+  block as UTF-8, which splits any multi-byte character on a read boundary — silent mojibake in a
+  corpus full of `—`, `°`, `·`. Fixed. Then **the test written to prove it passed against the broken
+  reader**: it tried to *aim* padding at the 8 KB mark, and a boundary lands wherever the inflater
+  decides. Rewritten to rely on **density** (a body that is almost entirely three-byte characters
+  leaves no clean boundary across half a megabyte), then confirmed green as shipped and failing
+  against the perturbed reader. **Writing the test is not the verification; running it against the
+  defect is.**
+
+**Verification, all free.** 13 `ContentPack` + 8 `CourseMastery` core tests locally executed; **323
+desktop tests genuinely run**, including 9 pack tests and 6 archive tests **against the real bundled
+581-guide library** — the claim the whole feature rests on is one of them (install a pack, and its
+guides are listed, openable with their real sections, findable by body text, and in the category rail,
+with no network in the reading path). **Ten rules negative-tested**, each confirmed to fail exactly its
+own test. Android: `tools/android_resolve_check.sh` + CI's "Run unit tests" (green through `9a35c9f`).
+⚠️ **`PackArchive`'s Android twin compiles standalone, fully resolved** — it touches only
+`java.util.zip` and the stdlib, so that is a complete check rather than the usual partial one; worth
+reaching for whenever a new Android file has no Android dependencies.
+
+**E1 — the efficiency pass: measured, and there is nothing there.** Recorded so the next session does
+not re-chase it. Three hypotheses, three negatives, all measured rather than argued:
+- ⚠️ ~~**Images are not heavy.** `du -sh` says 69 MB and that is block-allocation overhead; the sum
+  of the file sizes is **5.5 MB across 44 files**.~~ **THIS WAS WRONG — see the image arc at the end
+  of this file.** The listing covered only `images/` and missed `images/kb/`, which holds **300 of
+  the 343 files**. The real corpus was **68 MB**, the largest thing in the APK's assets by a wide
+  margin. `du -sh` had been right; I overrode a correct measurement with a worse one and drew the
+  opposite conclusion from it.
+- **The shards are not pretty-printed fat.** Minifying all 50 saves **1.2%** (0.32 MB of 25.56 MB) —
+  they already use single-space indent. Not worth fighting the KB pipeline's formatting and making
+  every content diff unreadable for that.
+- **Assets already ship compressed.** No `noCompress` is set, so the 25.56 MB corpus deflates to about
+  **9 MB** in the APK. There is no uncompressed-asset mistake to fix.
+
+The one genuine efficiency change of the arc was N1's *no timer at all off-screen*, already shipped.
+Anything further needs a profiler on the Pixel, not more guessing from here.
+
+**⚠️ Wikimedia Commons returns HTTP 429 to this container.** The shared proxy IP is rate-limited — the
+same class of problem as the Yahoo ban already recorded above. Bulk image sourcing (I1) is **not
+possible from this environment** as things stand; it needs either a different source, a much slower
+paced fetch across sessions, or the owner's own network.
+
+**Open, in priority order.** **P1d** — fetching a pack (catalog + download + a management screen;
+`PackArchive` and both stores are ready, the wire is not) and `tools/kb/build_pack.py` so a pack can be
+produced. **I1** — the real image gap above, blocked on the 429. Then the **one bounded content wave**,
+delivered as a pack rather than into the bundle. The KB wave engine (#73) stays **parked** under the
+credit directive; resuming it is an explicit owner call.
+
+⚠️ **Render is owner-verify throughout — CI compiles, it does not draw.** Worth eyes first: the COURSE
+card at phone width, whether four options and the hint ladder read clearly, roughly one question in
+five still asked with no options; and on Windows, the News age line resetting on its own after five
+minutes and refreshing on arrival after time on another screen.
+
+### PROCEDURES BECOME QUESTIONS · packs on the phone (this session cont., PR #448)
+
+Owner chose **more educational depth** over spending the content wave. Investigating rather than
+guessing turned up a real gap of this repo's recurring class — structured data present and never
+read. `StudyQuestions.forSection` took only `heading` and `body`; the call site in `StudyStore.teach`
+had the whole `GuideSection` and **dropped `steps` and `ingredients` on the floor**. Measured:
+**404 sections carry 3,298 ordered steps, 239 carry 1,824 material lines, and none of it generated a
+single question** — in a library whose most testable content is procedures, richest in Chemistry,
+Food Safety and First Aid.
+
+- **`QuestionKind.ORDER`** — "step N is …, what comes next?" — reusing the existing MCQ interaction,
+  so no UI changed on either platform. Plus cloze over steps and ingredient lines, where the doses
+  live.
+- ⚠️ **The safety rule is structural, not remembered.** `Question.options` carries the procedure's own
+  sibling steps and `QuizBuilder` **does not consult the caller's pool for this kind at all**, so a
+  wrong option is always a real instruction from the same procedure, merely out of place. Inventing a
+  plausible step would put fabricated instructions in front of somebody working through CPR.
+  Negative-tested: leaking the pool in fails exactly that test.
+- ⚠️ **Two defects found only by reading real generated output**, which is why that step is not
+  optional. First, `MIN_SENTENCE` is 45 and my test fixtures were 30-character lines — my expectation
+  was wrong, not the code (measured after: **73% of real steps and 91% of ingredient lines** clear the
+  bar, so the feature genuinely fires). Second, and worse: **the step shown in the prompt was also
+  offered as an option** — a free elimination, present in every single sample. Fixing it raised
+  `MIN_ORDER_STEPS` 4 → 5, because the shown step and the answer are both spoken for. Cost: 4
+  questions out of 808.
+- **Final corpus run: 804 questions over 404 real sections, 0 unsafe options, 0 freebies.**
+
+**Packs on Android (`0dcd9be`).** Closes the tandem gap, which was open in the unusual direction —
+the desktop was ahead and `PackStore` was inert on the phone. `PackRepository` twins the desktop's,
+`resolve()` kept identical so "a catalog names an asset, never a URL" stays one rule.
+`HttpClient.download` gained an optional `onProgress` (whole-percent changes only; **silent when the
+server states no length**, since a percentage of an unknown total is a number the caller renders as
+fact). PACKS screen wired as `Routes.STUDY` is, MENU → GUIDES.
+
+**⚠️ Two verification lessons, both of which cost real time this session:**
+1. **Verify with `./gradlew :desktop:build`, not `:desktop:test`.** CI runs the former and it is a
+   superset; that gap is exactly how a flaky test reached CI.
+2. **A first-answer card cannot distinguish grades.** `Recall.review` uses a fixed `FIRST_DAYS` for
+   any first success, so a test wanting to see pace in the schedule must review **three** times. This
+   bit twice in one session — once in a test I wrote, once in a pre-existing one that had been
+   passing only because two `System.currentTimeMillis()` reads landed on the same millisecond.
+
+### THE WARNINGS THE APP HELD AND NEVER SAID (this session cont., PR #448)
+
+Three slices, all found by measuring rather than reading, all zero subagent spend.
+
+**Safety notes enter the study schedule + an option fits on a phone (`6cab204`, CI 1685 green).**
+`grep` found **no reference to `safetyNote` anywhere** in `core:telemetry` or either `StudyStore` —
+184 of the 581 guides carry one and none was ever taught. `StudyQuestions.safety()` makes one card
+per guide, added **first** in both `teach()` so the per-lesson cap can never drop it. Deliberately a
+`RECALL`, never a graded MCQ: distractors would be other guides' real warnings, and marking a true
+precaution "wrong here" is a hazard. The answer is **never trimmed**, unlike ordinary recall — a
+third of the notes exceed `RECALL_CHARS` and a fixed cut lands where "never do X" lives.
+Also: the ORDER questions shipped an hour earlier put a **median 962 characters on screen** (58%
+over 900). `StudyQuestions.shortOptions` cuts at a sentence boundary with an ellipsis → median 765,
+6% over 900. ⚠️ **The load-bearing rule is that shortening must never make two options look alike**;
+it returns the originals unchanged whenever it would reduce how many distinct options are on offer.
+Real corpus: 804 questions, 0 invented options, 0 freebies, **0 collisions**.
+
+**The answer carries the page's own warning (`1934b43`, CI 1686 green).** `LibraryLookup` — the one
+place that decides what the library says — never read `safetyNote` either. So the console printed
+the poisoning protocol without "not a substitute for calling Poison Control", and `library read`
+(which the persona tells the model to use) never saw what the *outline* carried. Fixed in three
+places; the warning **leads**, matching the reader, which already renders it above the sections.
+⚠️ **Correction to my own first reading:** the curated `EmergencyTriage` table already carries the
+critical do-nots ("do not put anything in their mouth", "do not touch them until the power is off")
+and the voice bypass speaks that table directly — **the first action was never at risk.** Also: four
+of five emergency notes end with "not training and not medical advice" and the console appended it
+unconditionally, so it printed twice.
+
+**An urgent advisory can wake the board (`907f9e7`).** `Oracle.pushWorthy` had no caller since the
+one-notification consolidation, and the ADVISORY row that replaced it never raised the alert at all —
+two judgements of "worth interrupting for", one of them dead. Reading which rules reach that bar is
+what made it small: of four, departures/emergencies/security already alert through their own notice
+and battery is OS-handled, leaving **extreme heat danger with no path at all**. Now YELLOW only,
+never RED, only when nothing above it spoke, keyed on the insight's `family` so a line that rewrites
+itself as the temperature climbs buzzes once.
+
+**⚠️ THE LESSON OF THIS SESSION, on its third and sharpest form: a test that passes proves nothing
+until you have watched it fail.** Three separate tests here were green for the wrong reason.
+1. A collision fixture sharing 84 characters where the cut is at 120 — no collision existed to catch.
+2. A safety-note fixture of 168 characters, so truncating the shipped code to `RECALL_CHARS` changed
+   nothing; and later a 2-sentence fixture where `SPOKEN_SENTENCES` is 2, same failure again.
+3. **New mechanism, and the worst: the negative-test perturbation silently failed to match the
+   source.** A defect that was never applied looks exactly like a rule that holds. Every perturbation
+   script now `assert`s it matched before anything runs.
+Derive the fixture from the shipped rule, and derive its *size* from the real corpus — the notes have
+a median of 448 characters and three sentences, the steps a median of 180.
+
+**Also worth keeping.** A dead-code sweep over `core:telemetry` is only useful if it counts **in-file**
+callers: the first cut reported `StudyProgress.streak`, which is called one line below its own
+definition and displayed on four surfaces. Counting them turned 99 noisy candidates into 31 worth
+reading. Of those, `Geodesy.formatDms` is genuinely dead while `NavScreen` carries its own private
+`dms()` (the better one — it rounds to tenths *before* splitting) — a duplicated definition worth
+converging, left as a follow-up because neither is wrong today.
+
+### THE ORIGINAL-SERIES ARC — the console changes era, and gains a lore library (PR #448)
+
+Owner: *"overpower the interface and design … exactly like the original series Star Trek … and it
+also has like this entire library directory of everything in Star Trek like as if it was actually
+the computer."* Then, twice: *"keep going with the font and more lore waves."* Chose via
+AskUserQuestion: **literal TOS 1966 console**, **original prose written by me**, **~150–200 entries**.
+
+⚠️ **Two blocking facts were surfaced before any work started, and the owner settled both.** LCARS is
+the *1987* console, not the original series — so this is a change of era, not a polish pass. And the
+lore is Paramount's. The IP boundary, restated in every lore commit: **original prose only; no
+Paramount artwork, logos, insignia, screenshots, fonts or copied text; no Memory Alpha content (it is
+CC BY-NC); sounds stay synthesised.** Private, sideloaded, undistributed.
+
+**Zero subagent spend across the whole arc** — the credit directive still overrides ultracode.
+
+**Shipped:** the palette-and-shape substitution (`9180e9a`) that repainted 35+ screens through
+`tosPalette` + `lcarsBlockShape`; the lore taxonomy in four-way lockstep (`705b800`); the location
+readout every screen gained for free from `LocalConsoleSection` (`ac5a8ab`); the desktop's matching
+console with a grouped, described rail (`9e52f04`); the retuned cue table and 1966 boot vocabulary
+(`20d4686`); and then the two below.
+
+**`29a43cc` — the typeface, and the measurement that changed the plan.** Orbitron (OFL, verified from
+`google/fonts` METADATA before downloading) takes display, headline, title and the console chrome.
+Measured with fontTools rather than judged by eye: **Orbitron is 1.86× wider per capital than Antonio**
+(0.815 em vs 0.433) and its capitals are **16% shorter** at the same nominal size (0.720 vs 0.859). So
+every size came down by about a fifth — not by the full width ratio, since cutting for width parity
+would leave a screen title smaller than the labels beneath it.
+- ⚠️ **The bottom nav keeps Antonio, and the reason is arithmetic.** Six labels share the phone's
+  width: each slot is 64.5dp on a 411dp screen and 56dp on a 360dp one, and COMPUTER renders at 37dp
+  condensed and **64dp** in Orbitron. Both faces ship; the NOTICE says why.
+- ⚠️ **Orbitron carries a Reserved Font Name**, so it ships byte-for-byte — not subsetted, not
+  instanced. That is also why the desktop registers **one weight** for variable faces: desktop
+  `Font(resource)` hands bytes to Skia, which instantiates at the *default master* with no axis
+  parameter, so four registrations of one file would be four identical 400s and would stop Compose
+  synthesising bold. Chakra Petch has four real statics and gets all four.
+- **Recon finding that shrank the change:** `MaterialTheme.typography.displayLarge` etc. have **zero
+  call sites**, and Antonio had **6, all in one file**. The app's real heading voice is ChakraPetch
+  (215 sites). So the typeface slice is console chrome only — content headings were left alone.
+- **Desktop tandem, long overdue:** it had rendered in *system sans and monospace* since the module
+  was created. `processResources` now copies `app/src/main/res/font` into the jar (the same trick that
+  bundles the guide library), so one copy of each `.ttf` lives in the repo. ⚠️ **New gate,
+  negative-tested:** `Font(resource=)` resolves at *render* time, so a wrong path compiles and throws
+  on a Windows machine — `BundledFontsTest` asserts every named resource is present and carries a real
+  sfnt signature, and `desktop-build.yml`'s path filter now watches the font directory.
+
+**`254cc80` / `bf74d80` / `fd1ea7e` — the Federation Database, 0 → 46 entries** across seven
+categories under a `Federation Database` supergroup. A lore entry **is** a guide, so it inherits the
+reader, search, device search, study/quizzing, the `library` tool, the desktop browser and packs — no
+new subsystem. Register is ~4 sections of ~170 words (looked up, not worked through), so
+`FULL_PAGE_BASELINE` stays flat at 8258 by design; corpus **595 → 627 guides**.
+
+**⚠️ THE THING THAT MADE THESE WAVES WORTH DOING CAREFULLY: run the shipped `GuideSearch` over the
+real index, in both directions.** Recipe in `scratchpad/kb/` — export the index to TSV, compile
+`GuideSearch.kt` plus a throwaway `main` with the local kotlinc recipe, assert (a) each new entry is
+the top hit for its own subject and (b) **ordinary practical questions do not get pulled into the
+database**. The second half is the one that matters and it found things reading never would:
+- Three entries were unreachable by their own subject because the word lived only in body text, which
+  the index does not carry — "how does assimilation work" missed the Borg entirely.
+- **A defect I introduced:** "what is a galaxy" returned The Galaxy Class ahead of the astronomy guide
+  actually about galaxies, because a title that exact-matches beats one that only stem-matches.
+- **Then my fix broke the plural.** Retitling the astronomy guide to the singular alone dropped
+  "galaxies" from finding its own best answer — one failure traded for another, caught only by
+  re-running the probe instead of assuming the edit was done. The shipped title carries **both** forms.
+- **A defect in the general library:** "how do I fly a space shuttle" beat the rockets guide, which
+  uses the Space Shuttle as its running worked example (boosters, max-Q throttle-down, silica tiles,
+  with real figures) across four sections — every mention in body text, invisible to the index.
+- **And the ranker disagreeing with me, correctly:** "who governs the United Federation of Planets"
+  returns the Federation entry, which has a section headed "How It Governs". My probe expectation was
+  wrong. **Fourth time this arc.** Check the corpus before writing the assertion.
+
+**Evidenced content gaps, not ranking faults** (each judged by its runner-up being unrelated). Nine
+ordinary questions reached the lore because nothing in 637 guides answered them.
+
+**One is now closed, and the gap it exposed was worse than a ranking fault.** The `Law & Government`
+shelf held ten guides — theories of justice, liberalism, socialism, conservatism, Marxism, fascism,
+political philosophy — and **nothing on how a government actually works**: no legislature, no
+council, no courts, no elections, no how-a-bill-becomes-law. `how-government-works` (13 sections,
+full-page register, `FULL_PAGE_BASELINE` 8258 → **8271**) closes *senate*, *city council* and
+*standing orders*, and wins parliament / bills / judicial review / civil service / local council
+outright. ⚠️ Two subjects it covers substantially still lost until named in a heading and the
+summary — **proportional representation** (lost to a *proportional reasoning* maths guide) and
+**planning objections**. That is the fifth time this arc that the word a reader types was sitting in
+body text the index never sees; **check for it deliberately on every new guide.**
+
+### FILLING THE LIBRARY'S HOLES (owner chose this over more lore waves; task #179)
+
+Owner decided via AskUserQuestion: **fix the real gaps first**, and **treat every declared category
+as a promise to fill over time** rather than merging or hiding thin shelves.
+
+**⚠️ STEP 0 — CHECK BEFORE WRITING. It saved two entire guides in one run.** `GuideIndexEntry`
+carries only id, title, category, summary and headings, so a subject covered in depth can be
+completely unfindable. Before writing a guide for a "missing" subject, grep the shard *bodies*:
+- **Antimatter** was fully covered in `phys-modern-physics-relativity-quantum` (positron
+  annihilation, 511 keV gammas) — "what is a positron" returned **nothing at all**. Index fix.
+- **Translation** has a whole guide, `Literary Translation`. "How does translation work" already
+  won; only the agent noun "translator" lost. Index fix. ⚠️ *Interpreting* (spoken) is still a real
+  gap — a different discipline, not the same guide.
+
+**⚠️ THE BURN DEFECT — the sharpest of the session, and it was in the safety content.** First Aid
+had only the plural "burns"; a biology guide has the singular "burn" (burning fuel). Exact beats
+stem, so **"how do I treat a burn" returned cellular respiration**. Same shape: "cpr on a child"
+returned a child-development guide while `med-pediatric-elderly-care-differences` covers it. Both
+fixed by naming the reader's words in a heading.
+
+**⚠️ AND THE FIX BROKE A SAFETY PATH.** Renaming First Aid's "Burns" heading broke the
+`EmergencyTriage` route pointing at it. CI caught it — that guard exists for exactly this. New
+local twin **`tools/kb/check_emergency_routes.py`** (negative-tested): **run it after ANY guide
+heading change.** Editing `EmergencyTriage.kt` also tripped `MirrorDriftTest` — it is a mirrored
+core, so `python3 tools/mirror_desktop_cores.py` is part of that change, not a follow-up.
+
+**⚠️ I under-write full-page sections by 70–90 words, every time.** Both new guides came in at
+335–380 when aiming for 400+. Extend with material that was genuinely missing (CLAUDE.md already
+records that padding to clear the metric is the wrong instinct) — or write ~470 from the start.
+
+**Shipped:** `how-government-works` (the Law & Government shelf held ten guides of political
+philosophy and **nothing on how a government works**), `getting-medical-care` (22 clinical guides,
+nothing on reaching any of it), `employment-and-rights-at-work` (**zero mentions of employment in
+638 guides**). `FULL_PAGE_BASELINE` 8258 → **8297**; corpus 638 → **640**.
+
+**Still open:** interpreting; **actual history** (the History shelf is 12 guides of historiography
+with no history in it); treaties and diplomacy; infinity and the continuum. Then the thin shelves,
+in reader-demand order: **Vehicles & Transport** (2 engine-cycle guides; "car tyre" is a recorded
+unanswerable query), **Skills** (knife sharpening, likewise), Sports & Fitness, Visual Arts & Design.
+
+⚠️ **Guard against overfitting.** Naming a subject the guide genuinely covers is legitimate
+indexing; bending a title to win one artificial query is not. Antimatter and translator still lose
+to lore entries whose *titles* hold the exact noun — left alone deliberately, the right guide is
+visible at second place.
+
+**Open / steerable:** lore waves continue toward 150–200 (46 done, ~4 sections × ~170 words each, the
+recipe is mechanical: staging shard → `kb_pipeline.py` → `ci_parity_lint.py` → ranker probe →
+`./gradlew :desktop:build` → commit). ⚠️ **Everything visual and audible is owner-verify on the Pixel**
+— CI compiles, it does not draw or play. Worth eyes first: whether Orbitron reads at the header sizes
+tuned for a condensed face, whether the retuned cues land as the original console or merely as lower
+beeps, and the bottom bar's six labels. On Windows: whether the companion now looks like the phone.
+
+### FILLING THE LIBRARY'S REAL HOLES (this session, PR #448)
+
+Owner chose, via AskUserQuestion, to **fix the library's real gaps** ahead of more lore waves, and to
+treat every declared category as a **promise to fill over time** rather than merge or hide thin
+shelves. **Zero subagent spend**, as with every arc since the credit directive.
+
+**What made this arc necessary was the ranker probe, not a plan.** Running the shipped `GuideSearch`
+over the real index after each lore wave kept returning ordinary questions on Star Trek pages — and
+the cause was never the ranking. A 638-guide general-knowledge library genuinely had nothing to
+answer them with. Investigating the shelves turned up worse: **History was twelve historiography
+guides with no history in it**, Medical was clinical with nothing on navigating care, **employment
+had zero mentions across all 638 guides**, and Sports & Fitness was two guides about the offside rule.
+
+**Eleven guides shipped, corpus 637 → 648, full pages → 8401**: how government works, getting
+medical care, employment and rights at work, the Roman world, car basics and roadside problems,
+knife sharpening, translation and interpreting as work, diplomacy and treaties, starting to
+exercise, drawing/colour/design, and infinity and the transfinite. The car and sharpening guides
+closed **both** of the content gaps this file had carried for several sessions. Each is ~13
+sections at 400+ words, each in an **existing** category, so no four-way taxonomy lockstep was
+needed anywhere.
+
+**⚠️ STEP 0 IS NOW MANDATORY AND IT KEEPS PAYING.** Before writing a word, run the leaked query
+against the shard **bodies**, not the index. `GuideIndexEntry` carries only id, title, category,
+summary and headings, so **a subject covered in depth can be completely unfindable**. Antimatter and
+literary translation were both already covered and needed a one-line index fix, not a guide — two
+whole guides saved. The same check, applied to each new guide before commit, caught whetstone, shin
+splints, VO2 max, home gym, vanishing point and warm-up.
+
+**Every ranking fix this arc was one of two shapes, and both are worth recognising instantly:**
+1. **Exact beats stem.** `MIN_STEM = 4` and the stem rule is prefix-based, so a word only matches a
+   longer form if it is a genuine prefix. "The Universal Translator" beat a guide titled
+   "Translation and…"; "Court and Legal Interpreting" beat `how-government-works`, which only ever
+   wrote **"courts"**, sending four of eight court queries to the wrong page; **I wrote
+   "complementaries"**, which cannot stem-match the adjective "complementary" a reader types. The
+   fix is to carry **both forms**, exactly as the astronomy guide's title does after the galaxies
+   incident.
+2. **A title outweighs a heading, and accumulated matches outweigh one good one.** Bare "warm up"
+   loses to global **warming** because that word is in the other guide's *title*. "How do I get fit"
+   loses to the backpacking guide, which has **three** heading hits (Fit Basics, Fitting Your Pack,
+   Building Endurance). ⚠️ **I edited a heading on the theory that naming it would fix the second
+   one, measured it, found it changed nothing, and reverted** — leaving a change that reads as a fix
+   is worse than the miss.
+
+**⚠️ MY SEARCH FIX BROKE A SAFETY PATH, and only a pre-existing guard made it a build failure rather
+than a shipped defect.** Renaming First Aid's "Burns" heading for index visibility broke the
+`EmergencyTriage` route pointing at it (CI run 1702). New local twin: **`tools/kb/check_emergency_routes.py`**,
+negative-tested, run before every commit alongside `ci_parity_lint.py`. **Any heading rename must be
+route-checked**, and it also orphans study cards keyed on guide+heading.
+
+**Knowing when to stop is half of this.** Queries deliberately left missing, each with the reason
+measured rather than assumed: "what is a machete used for" (the word is in no other guide, so this
+is the best answer available); "how to use a plane" (runners-up are Earth's climate and geometry,
+and "using a hand plane on wood" resolves correctly); "watercolour technique", "typography basics"
+and "what is value in art" (each dominated by a generic second word — "watercolour painting",
+"typeface and type", "tonal value drawing" all resolve); "what is sovereignty" and "can my child
+interpret at the doctor" (both return a defensible guide). **Naming a subject the guide genuinely
+covers is legitimate indexing; bending a title to win one artificial query is overfitting.**
+
+**Recipe, unchanged and mechanical:** staging shard → `kb_pipeline.py` → `ci_parity_lint.py` (prints
+the exact `FULL_PAGE_BASELINE` ratchet) → `check_emergency_routes.py` → ranker probe **in both
+directions** → `./gradlew :desktop:build` (the task CI runs, and it re-parses the bundled corpus) →
+commit. Probe harness lives in the session scratchpad's `kb/` — export `guide_index.json` to
+`index.tsv`, compile the shipped `GuideSearch.kt` plus a throwaway `main` with the local kotlinc
+recipe. ⚠️ Aim **~500 words a section**; aiming at the 400 bar reliably produces ~360, which cost a
+full extension pass on the first guide.
+
+**Evidenced gaps found in control lists and recorded rather than chased:** "world war two" returns
+the Roman guide, "what is a passport" returns a business guide, "nuclear power" returns the cell
+nucleus, and "metallurgy" needed a heading rename to stop returning *Reciprocating Saws for
+Demolition Work*. **The approved plan is now complete** — its last item, infinity, shipped; "what is
+infinity" had returned literally nothing from 646 guides. ⚠️ A third instance of title-beats-heading
+appeared there and is worth knowing: **"transfinite" returned dietary trans-fats**, because "trans"
+is a genuine prefix stem of "transfinite" and sat in that guide's *title*.
+
+**Thin shelves, as the owner's standing commitment to fill over time:** Vehicles & Transport, Skills,
+Sports & Fitness and Visual Arts & Design are done. Whatever is thinnest next is the queue.
+
+⚠️ Every guide here is prose I wrote and nobody reviewed. The exercise guide carries a `safetyNote`
+and stays at the level of general public guidance — no individual programming, no medical advice.
+
+### THE SAFETY FEEDS WERE BEING HANDED MORE THAN THEY READ (this session, PR #448)
+
+Owner: *"keep going autonomously"* with no direction, so this was **found by hunting**, and the vein
+was the one that produced the ECONOMY-vintage and safety-coverage arcs: the app more confident than
+its data. **Zero subagent spend**, as with every arc since the credit directive.
+
+**Two pending items were re-checked first.** ⚠️ **Task #164 (images) is still blocked, and my earlier
+note was imprecise** — Wikimedia returns **429 on file downloads too**, not only on the API (the
+earlier 400 was a made-up filename). Openverse and NASA both answer 200, but Openverse's CC0 slice
+is decorative stock: a rope *sticker* on a knot-tying guide implies instruction it does not give.
+The instructional diagrams that matter are unreachable from this container's shared IP.
+
+**The find: the same USGS feed is parsed twice at two very different fidelities.**
+`RadarRepository` reads depth, magType, PAGER, tsunami, felt, intensity, significance and review
+status — the RADAR arc did that. `SafetyRepository.usgs()`, which feeds the safety screen, the NAV
+incident layer and **the notification**, read magnitude, place, time, id and url. Measured live: of
+54 events, `tsunami`, `sig`, `magType`, `status` and depth were present on **54/54** and all
+discarded; depth ranged **1.1 km to 564 km**. Severity was magnitude alone, and `RefreshWorker`
+gates the board's ALERT row on HIGH/EXTREME — so a tsunami flag could not influence whether you
+were told. The GDACS parser in the same file already reads its source's own `alertlevel`, so the
+inconsistency was internal.
+
+⚠️ **The reuse check changed the plan and saved a duplicate core.** The plan said "write
+`QuakeSeverity.kt`". `Seismic.kt` already existed — 227 lines, tested, covering magnitude, depth,
+magType, PAGER, Mercalli, felt reports and review status — **used only by the radar screen**. Its
+own KDoc says "the USGS feed carries twenty-six fields per event and the app read three." So the
+work was to *extend* it (tsunami, `alertLevel`, `compactFacts`) and point the safety path at it.
+**Always grep `core:telemetry` for an existing core before writing one.**
+
+**Then the same defect in the weather feed, which the owner picked as the follow-up.** Of 80 live
+NWS alerts the parser discarded `instruction` on **78/80** — the field that says *what to do*, in
+the safety feature — plus `expires` and `urgency`/`certainty` on 80/80. CAP grades on **three**
+axes; the app read one, so a *Severe/Future/Possible* watch graded identically to a
+*Severe/Immediate/Observed* warning. New `CapAlerts` core. An expired alert is now dropped: the
+endpoint is called "active" but the result is cached and served offline indefinitely.
+
+**GDACS and UK crime came back clean** — GDACS already reads `alertlevel` and both coordinates.
+
+**⚠️ THE LESSON OF THIS ARC, and it is about my own tests.** Negative-testing caught that one of my
+four rules was **not tested by its own test**: `anAbsentFieldNeverRaisesTheGrade` compared bare
+against explicit-null, and the perturbation that makes *every* absent PAGER escalate moved both
+sides together, so it passed against a deliberately broken function. **A self-referential assertion
+cannot catch a rule that shifts the whole function** — pin absolute expected values. Six rules
+across the two cores are now negative-tested, each confirmed to fail exactly its own test, with the
+perturbation script asserting it matched before running.
+
+**`tools/android_resolve_check.sh` gained kotlinx-serialization** on its target classpath —
+without it every `@Serializable` app model fails on the annotation and the differencing reports each
+**newly added member** as unresolved, which is the commonest edit there is. ⚠️ Honest scope: it took
+the unresolved count 286 → 285 and **changed no verdict here**, because the false positive I hit
+came through the `AppContainer` chain (the documented case). Proved by compiling a direct `Incident`
+probe: 0 errors. Recorded rather than overclaimed.
+
+**Verification:** 1024 core tests green locally; the shipped grader run over the **live 54-event
+feed** (3 events change grade, all 496–564 km deep with no PAGER, MODERATE → LOW; nothing wrongly
+escalated). ⚠️ `tsunami == 1` was 0 in today's feed, so that path is proven by unit test and **not by
+observation** — say so rather than implying it was seen working.
+
+⚠️ **Owner-verify on the Pixel:** the depth and TSUNAMI line on a safety row at real width, the
+weather alert's instruction text (the most useful line on the row now), and the HAPPENING NOW /
+FORECAST tag. Desktop untouched throughout — no safety feature there, neither core is mirrored, all
+42 mirrors current.
+
+**Open / steerable next:** the remaining unprobed feeds (Radio Browser, Overpass, RainViewer,
+Launch Library); the Federation Database lore waves (56 of 150–200); the evidenced content gaps
+(*"world war two"* → the Roman guide, *"what is a passport"*, *"nuclear power"*).
+
+### THREE SHELVES THAT DID NOT HOLD WHAT THEY ADVERTISED (this session, PR #448)
+
+Owner: *"keep going autonomously."* No direction given, so the three evidenced misses recorded at
+the end of the last arc were closed. **Zero subagent spend on this part**, as with every arc since
+the credit directive — local kotlinc, the ranker probe over the real index, `:desktop:build`, CI.
+
+Each was a shelf whose name promised something it did not contain, which is a more useful thing to
+look for than a missing topic:
+
+| Query | Returned | Because |
+|---|---|---|
+| "nuclear power" | The Cell Nucleus and Nuclear Envelope | `Energy & Environment` held **twelve ecology guides and no energy guide** |
+| "world war two" | The Roman World | `History` held **eleven historiography guides** plus Rome, the Columbian Exchange and diplomacy |
+| "what is a passport" | Testing a Business Idea With Preorders | one mention of "passport" in 649 guides — "passport-sized", in a microprocessor guide |
+
+⚠️ **STEP 0 kept earning its place, and the nuclear case is the sharpest example yet of why it is
+not optional.** `phys-nuclear-physics-radioactivity` covers fission and fusion properly — so the
+lazy read is "index fix, not a guide". The body probe showed it mentions a reactor, a control rod, a
+fuel cycle or a repository *exactly nowhere*. The physics was there and the power station was not.
+Conversely, in the previous arc the same probe **saved two entire guides** (antimatter and literary
+translation were already covered and needed a one-line index fix). Probe the shard bodies before
+writing a word; the answer goes both ways and reading the index alone cannot tell you which.
+
+**651 guides, full pages 8401 → 8440.** Thirteen sections each at ~500 words. Every guide landed in
+an existing category, so no four-way taxonomy lockstep was needed.
+
+**The ranker probe found one regression that I introduced and would never have seen by reading.**
+The nuclear guide took *"how does the electricity grid work"* from the three real grid guides in
+Electronics — 221.18 against 218.76 — on two incidental words: "work" sitting in a control heading
+as an idiom, and "grid" in the closing heading as context. Both reworded; the grid guides are back
+on top and the nuclear guide is out of that result entirely. **Always run the control half.** The
+half that proves the new guide wins its own subject is the easy half and the less informative one.
+
+**Two index-visibility misses of the recurring shape, both in the war guide.** A subject covered at
+length is invisible because `GuideIndexEntry` carries no body text. *"who won the battle of
+stalingrad"* was a three-way tie at m=1 between the war guide, Basic Sewing & Fabric Repair and The
+Transistor; *"why were the atomic bombs dropped on japan"* lost outright to **Shogi: Japanese Chess
+and the Drop Rule**, whose title holds both "Japanese" and "Drop". Five headings now name Stalingrad,
+Pearl Harbor, the Battle of Britain, the Bulge, D-Day, Hiroshima and Nagasaki — all already covered
+in full. Every newly indexed word was then control-probed ("geography of japan", "japanese cooking",
+"travel to britain", "what is an atom", "how do I get to berlin"): all unchanged.
+
+⚠️ **One result reported honestly as a half-fix rather than a fix.** *"how long can I stay in the
+schengen area"* lost outright; naming Schengen in a heading **still** lost, because a heading is
+worth 5 against a title's 10 and three of the query's four words are near-noise that happen to sit
+in other guides' titles ("Stay Put, Get Found"). Adding it to the summary as well wins by **0.56
+points**, which is not a margin anybody should rely on. What actually makes this query work in the
+shipped app is different: "schengen" has a document frequency of **1**, so `distinctiveToken`
+returns it and `searchBodies` finds the guide. **The index-only probe understates the real search
+path whenever the query contains a genuinely rare word** — worth remembering before over-tuning an
+index against a probe that is not the whole system.
+
+**Two wrong results left deliberately alone**, because the probe proved nothing better was
+displaced: *"customs and traditions of a culture"* and *"what is a visa card"* both return the
+passport guide, and the library has **no cultural-etiquette guide and no payment-card guide**.
+Removing "customs" would cost the legitimate *"what can I take through customs"*. Recorded as
+content gaps, not bent around.
+
+**Evidenced gaps found in control lists and recorded rather than chased:** *"how does a wind turbine
+work"* returns Using Terrain for Wind Protection and *"what is a turbine"* returns The Cell's
+Powerhouses **and nothing else** — there is no turbine content in any title, summary or heading in
+the library. Plus cultural etiquette and payment cards, above. A bare *"what was d-day"* reduces to
+the single token "day" and is genuinely unfixable without overfitting; *"d-day normandy landings"*
+resolves.
+
+⚠️ The passport guide carries a **`safetyNote`**, unusually for this library, because unlike the
+rest of the corpus its content has a shelf life — entry rules are set by the destination, differ by
+nationality, and change. The note says to check the destination's own site, and the transit
+country's, every trip.
+
+### LIVE TELEVISION — both platforms (this session, PR #448 cont., V1–V5 all pushed)
+
+Owner's request, queued deliberately behind the feed-audit remediation at their own instruction: an
+**actual live video feed system**, free, easy to embed, quality unimportant, able to **pop up for
+breaking news**. Two binding AskUserQuestion decisions: channel list = **curated official default
+plus an opt-in community catalogue**; desktop player = **both** embedded and detached. Standing
+credit directive still overrides ultracode — **zero subagent spend**, as with every arc since.
+
+**Shipped:** `d441166` the shared catalogue · `b74c9e2` the Android player and the audio arbiter ·
+`5ab71f3` the two Android surfaces · `e9bd4d7` the desktop JavaFX player · `9d25725` the opt-in
+catalogue on both.
+
+- **⚠️ A playlist that answers HTTP 200 is not a playlist that plays.** France 24 and NASA both
+  returned 200 on the master and then failed on the variant (400 / 404) — the same "200 that isn't
+  success" class the safety audit had just found in Overpass. So `LiveChannels.Verification` is a
+  first-class field: DW English, DW Spanish and CNA were each walked master → variant → real MPEG-TS
+  segment; Al Jazeera and NHK ship **UNVERIFIED** because they 502 through *this container's proxy*,
+  which says nothing about a phone on a normal network. Removing them would have been a claim the
+  evidence does not support.
+- **The audio arbiter is the real design work, not the player.** `RadioController` builds its
+  ExoPlayer with `handleAudioFocus = true`; a second such player does not deadlock, it wins, and the
+  radio falls silent while its own state flow still reads ON_AIR and its foreground notification
+  still says so. Nothing observes it — the shape `VoiceMachine` exists for. `core:telemetry/MediaFloor`
+  decides, `feature/media/AudioFloor` performs, and **neither controller knows about the other**
+  (star topology; a third claimant is a change in one file). ⚠️ **`released` is owner-checked and
+  that is load-bearing**: claiming for video issues STOP_RADIO, whose teardown reports its own
+  release *after* the floor moved; honouring that late report would blank the floor mid-playback and
+  the next claim would stop nothing. `AudioFloor` re-enters its own monitor on exactly that path,
+  which a Java monitor allows and the owner check makes harmless.
+- **No new Android dependency.** `media3-exoplayer-hls` was already a direct dep and `StreamResolver`
+  already passed `.m3u8` through untouched — the radio has been HLS-capable the whole time and simply
+  never had a video surface. Attached with a bare `AndroidView { SurfaceView }` +
+  `setVideoSurfaceView`, copying `NavScreen.kt`'s MapLibre interop, so no `media3-ui` and no change to
+  R8 exposure. Every media3 call was **confirmed by `javap` against the published 1.5.1 AAR** rather
+  than recalled — `setForceLowestBitrate`, `clearVideoSurfaceView`, `getVideoFormat`, `Format.bitrate`,
+  `Format.NO_VALUE`.
+- **Three deliberate differences from the radio:** no foreground service (video drawing to a surface
+  nobody can see is data spent on nothing, so leaving the screen ends it); `setForceLowestBitrate`
+  rather than the adaptive ladder; and it asks for the speaker before it plays.
+- **Nothing auto-plays, on any host.** So the data question is a line under the picture rather than a
+  silent behaviour switch, and the figure comes from `player.videoFormat?.bitrate` — measured, never
+  invented. `ConnectivityObserver` gained `isUnmetered`; **`LocalIsMetered` is a positive fact**, so a
+  screen with no provider above it (the takeover Activity) stays silent rather than claiming mobile
+  data on home Wi-Fi.
+- **⚠️ The takeover's LIVE tab is checked BEFORE the coverage gates**, and that ordering is the point:
+  live TV does not depend on the aggregation having worked, and the case where it failed at the moment
+  a takeover fired is exactly when watching a channel is worth most. Below the gates it would have
+  shown "Gathering coverage…" with a good stream one tap away. The takeover's hardcoded palette is
+  handled by swapping `LocalNightwire` for the duration — the same lever used for the old green subtree.
+- **⚠️ THE DESKTOP LANDMINE, defused by reading the artifacts.** `nativeDistributions { modules(...) }`
+  is an explicit jlink allowlist and jpackage strips anything unlisted — a miss surfaces only as a
+  crash on real Windows. `javap -v` on the `module-info.class` inside the shipped jars declares:
+  `javafx.graphics requires jdk.unsupported`, `javafx.swing requires jdk.unsupported.desktop` and
+  `java.datatransfer`. The first two were absent and are now listed; the third is **not** added,
+  because `java --describe-module java.desktop` shows it comes transitively and a redundant entry
+  would read as load-bearing. Also confirmed from the jars: the Windows media jar carries all four
+  natives (jfxmedia/gstreamer-lite/glib-lite/fxplugins), and `HLSConnectionHolder` with its
+  variant-playlist parser is really in there. ~7.9 MB of Windows classifier jars; classifier varies by
+  host so the ubuntu runner still resolves.
+- **Desktop shape:** JavaFX via `JFXPanel` (embeds in Swing; sidesteps the "JavaFX runtime components
+  are missing" check that bites with jars on the classpath). It plays in the page and pops out to a
+  window — JavaFX permits several `MediaView`s over one `MediaPlayer`, so popping out *adds a view*
+  rather than moving the stream, which is why there is no "dock back". ⚠️ The `SwingPanel` sits
+  **outside** the `LazyColumn`: a heavyweight AWT component inside a scrolling list clips against the
+  scroll rather than with it. The player is hoisted in `Main.kt` and disposed on close, same rule as
+  the stores.
+- **⚠️ The catalogue endpoint was chosen by measuring, and it changed the design.**
+  `api/channels.json + api/streams.json` is **13.8 MB** (41,078 channels, needs joining);
+  `iptv/categories/news.m3u` is **215 KB**, already only news, and carries name, country and the
+  catalogue's own warnings. Sixty-four times smaller. 621 of its 943 entries survive the filters
+  (https only, HLS only, `[Geo-blocked]` and `[Not 24/7]` believed). Everything lands COMMUNITY +
+  UNVERIFIED; language is left **blank** rather than guessed from country, since a wrong tag would
+  misdirect `forBreaking`. The raw playlist is cached, not the parsed channels (`LiveChannel` is in
+  `core:telemetry`, which has no serialization dep — and that is the better shape anyway).
+  `AppSettings.communityChannels` / `DesktopSettings.communityChannels`, **default OFF**, with the
+  toggle subtitle saying plainly what the list is.
+
+**⚠️ THE LESSON OF THIS ARC, on its third distinct mechanism: a test that passes proves nothing until
+you have watched it fail.** Three separate things here were green for the wrong reason.
+1. A comment credited `trim()` with handling the playlist's CRLF endings. The perturbation removing
+   it found **nothing** — `lineSequence` splits on `\r\n` already. The comment was wrong, not the code.
+2. The CRLF test itself then passed under a perturbation that *did* leave `\r` on every line, because
+   the fixture ended on a URL — **the one line in a file with no carriage return after it**. Fixtures
+   now carry a trailing CRLF and that perturbation fails seven tests.
+3. `cap` was applied while parsing, so "the first 25" meant file order while the KDoc already claimed
+   alphabetical. Caught by running the shipped parser over the real file, not by reading it.
+
+**Reusable technique, and it keeps paying:** export the real feed, compile the *shipped* core plus a
+throwaway `main` with the local kotlinc recipe, and assert the invariants over real data. It agreed
+with an independent Python count at exactly 621 and caught all three of the above.
+
+**⚠️ The resolve-check's documented false positive fired three times** (`live`, `communityChannels`,
+`LiveCatalogRepository`). Each was proved a cascade — not assumed — by a **typed probe** that reads and
+constructs the symbol outside a composable. When a name you know exists is reported, widen the
+argument list or write the probe; do not shrug.
+
+### THE THIRD SOUND SOURCE, and a way to compile Android here at last (this session cont.)
+
+Found by asking what else the new arbiter should cover: the app makes sound in three ways — radio,
+live video, and the computer's own voice — and **`requestAudioFocus` appeared nowhere in the whole
+app.** The two players get focus from media3 internally; `TextToSpeech` requests none on your behalf
+(that has always been the caller's job), so the computer answered at full volume straight over
+whatever was playing, and neither got quieter. Worse, a phone call could not take the floor: the
+reply carried on over a ringing call.
+
+`feature/media/SpeechFocus.kt` — `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, so speech **ducks** rather
+than stopping (a two-sentence reply is not worth stopping the radio for; that is why this is not
+`MediaFloor`, which is exclusive by design). Acquired in `speak()` before the sound starts and
+released in `fireDone()` — the one method every path that ends an utterance already funnels through,
+which is why the watchdog is cancelled there too. Best-effort throughout: a denied request never
+silences the assistant, so this can improve things or do nothing, but cannot regress. The engine is
+also given `USAGE_ASSISTANT` + `CONTENT_TYPE_SPEECH` attributes, which is what a car head unit or a
+hearing aid reads; volume routing is unchanged.
+
+**⚠️ THE CAPABILITY WORTH REMEMBERING, and it retires a standing assumption in this file: Android
+platform code CAN be compiled here.** The SDK is absent, but **Robolectric publishes the whole
+android.jar to Maven Central** as `org.robolectric:android-all` (~186 MB, API 35 is
+`15-robolectric-13954326`). Put it on kotlinc's target `-cp` and a file whose only non-Kotlin
+dependency is the platform compiles completely — not an approximation of CI's compile, the *same*
+compile, three minutes earlier. Both files above were verified that way before pushing.
+
+`tools/android_compile_check.sh` wraps it, negative-tested against three real mistakes (a
+nonexistent platform method, a wrong constant name, a wrong argument type — all three caught).
+`-l group:artifact:version` adds libraries, resolving AARs by unpacking `classes.jar` (kotlinc
+silently ignores an `.aar` handed to `-cp`). **Honest coverage: 39 of the app's 333 files** import
+`android.*` and nothing else, and compile with no arguments; anything with androidx needs its
+libraries listing, which works but gets impractical for Compose UI. It does not replace
+`android_resolve_check.sh` or CI — it is a stronger gate where it applies. And it compiles; it does
+not run, and knows nothing of resources, the manifest or R8.
+
+⚠️ Owner-verify on the Pixel: play the radio, say "Computer, what's the weather" — the radio should
+drop in volume for the reply and come back after. Whether ducking works *within a single app* (our
+focus request against our own ExoPlayer) is the part only a device can settle; if it does not, the
+result is today's behaviour, not a regression.
+
+⚠️ **Owner-verify, unavoidably — CI has no screen and this container has no GL context.** On the
+Pixel: that DW and CNA play at all; that starting video visibly stops the radio **and says so**;
+that stopping video leaves the radio free again; the takeover's LIVE tab from the lock screen; and
+whether the data-rate line reads as useful or as clutter. On Windows: that a channel plays, the
+pop-out window on a second monitor, and above all **that the MSI's stripped runtime still has what
+JavaFX needs** — `packageMsi` runs on every push here, but a green build is not a running app.
+
+### SIX MORE PLACES THE APP WAS MORE CONFIDENT THAN ITS DATA (this session, PR #448)
+
+Owner: *"keep going autonomously."* No direction, so this was **found by hunting**, working the
+vein that produced the ECONOMY-vintage and safety-coverage arcs and then the seven HIGH audit
+fixes. **Zero subagent spend**, as with every arc since the credit directive — local kotlinc +
+JUnit, live probes, `javap`, and CI.
+
+**The ISS was the sharpest, and it is the recurring defect class in its purest form.** The Home
+digest decided "ISS passing near — N km" from a network position on a five-minute cache. Measured
+by propagating a real element set either side of a live sample: the ground point moves **416 km a
+minute**, so **2,081 km** across that window, against a **1,200 km** threshold — the number could
+be wrong by more than the entire range over which the question has an answer. Meanwhile the app
+already held a CI-tested SGP4 propagator, a Celestrak feed cached 12 h, and a
+`SatellitePasses.subPoint` with **zero callers outside its own tests**. Propagating today's
+elements to the instant of the live sample put the sub-point **0.6 km** from the service's own
+figure and the altitude within **0.0 km**, from elements **13.9 hours old**.
+
+So: `SatellitePasses.sighting()`, with the VISIBLE/DAYLIGHT/ECLIPSED rule factored out of
+`buildPass` so an instant and a pass cannot describe the same sky differently. Home now says
+whether the station is *visible*, *lost in daylight* or *in Earth's shadow* — the middle one
+matters most: 51° up, fully sunlit, and invisible because the Sun is 62° up too. Below 10° it says
+nothing. The radar scope's dot moved onto the same propagator (its failure path serves a cached
+picture with **no age limit at all**), and the network call remains only for a device that has
+never cached a TLE.
+⚠️ `TleRepository.cachedElement` is cache-only **and that is load-bearing**: the scope refreshes
+every twenty seconds, and putting a network call in front of a cached picture would be a worse
+regression than the one being fixed. The observatory and Home keep the elements current; the scope
+reads what they left behind.
+
+**Five more, each measured:**
+- **Social feeds could get permanently stuck.** Hacker News and Mastodon swallowed every sub-fetch,
+  so an outage cached as "Nothing trending right now." — then `ensureLoaded` treated an empty feed
+  as loaded, and the pull gesture **cannot fire** on a non-scrollable `EmptyState`
+  (⚠️ `PullToRefreshModifierNode` implements `NestedScrollConnection` **and nothing else** — read
+  out of the shipped material3 1.3.1 classes). `EmptyState` gained an optional retry, wired at the
+  five call sites that are a fetch outcome; Markets' "watchlist is empty" deliberately did not get
+  one. Story age is shown at last. ⚠️ **Not `SimpleDateFormat`**: Lemmy publishes six fractional
+  digits where Mastodon publishes three, and `.SSS` reads the six-digit form as 104,208 ms — a
+  story stamped **104 seconds into its own future**, measured against a live response.
+- **NAV never asked the router what the road does.** `steps=true` on the same request returns
+  manoeuvre type, modifier, bearing, road name and ref. New `RouteSteps` core (11 tests).
+  ⚠️ Which turn is next is **arithmetic, not proximity** — the nearest-manoeuvre rule is wrong on
+  any route that doubles back. The step list is walked by distance covered, which `RouteProgress`
+  already computes exactly by projecting onto the polyline.
+- **Every news card printed its own headline twice.** ⚠️ Google answers this container with a block
+  page, so `NewsSummary`'s rule deliberately **does not depend on the cluster shape** — it asks
+  whether the text adds anything to the headline above it, which is answerable from the two strings
+  and right whatever the feed sends. Mirrored; the desktop draws the same card. `take(400)` now
+  backs up to a word boundary, but only within the second half of the budget.
+- **A fifth of Nearest Help rows had no way to make contact.** 400 Overpass results around London:
+  **158 carry a website against 110 with a phone** — and `website` had been parsed by the earlier
+  remediation and drawn by nothing. `email` (10/400) and `healthcare:speciality` were unread. Every
+  distinct real speciality value was run through the shipped formatting rather than guessed at.
+  ⚠️ The scheme guard is against a case **not observed** (0 of 158 were schemeless) and the comment
+  says so.
+
+**Verification worth reusing.** Skyfield + DE421 are installed locally and free: sweeping the
+fixture window for the highest instant of each kind produced four real cases (lit-but-drowned-out,
+lit-and-worth-it, lit-but-1.4°-up, and 78° up in shadow over Nairobi) rather than fixtures tidy
+enough to prove nothing. ⚠️ **The look-angle tolerance is stated in metres of cross-range, not
+degrees**, and that is the interesting part: the existing fixtures are thousands of km away, a
+satellite 425 km up is nine times closer, so the same tens of metres subtend nine times the angle.
+Measured across the four: 4–36 m of cross-range, flat, while the angular figure ranges over two
+orders of magnitude.
+
+**Every load-bearing rule was negative-tested** — thirteen perturbations across the arc, each
+confirmed to fail exactly its own guard and nothing else, each script asserting it matched the
+source first.
+
+⚠️ **An expectation of mine was wrong where the code was right, again — the tenth this arc-series.**
+At 900 m along the London route the left turn onto Marlborough Road is *behind* you; the next thing
+to do is the right turn at the end of it. The distance was right and the name was wrong. **Compute
+the expected value from the shipped function on real data before writing the assertion.**
+
+⚠️ **`tools/android_resolve_check.sh`'s documented cascade fired three times** and each was proved
+a false positive with a **typed probe** against stubs, not shrugged at. Note for next time:
+`HttpClient.kt` does not resolve on its own either, so passing it does **not** quiet a report that
+cascades from it — write the probe.
+
+⚠️ **Owner-verify on the Pixel throughout — CI compiles, it does not draw, and it has no GPS,
+microphone or camera.** Worth eyes first: the ISS line on Home (a direction and an elevation, and
+silence when the station is low or below 10°), the NAV turn instruction on a real drive, the
+Nearest Help contact links, and the news card no longer repeating its headline.
+
+### THE CHANNEL LIST GOES WORLDWIDE — 5 curated channels become 41 (this session, PR #448)
+
+Owner: *"Add more worldwide free news channels in English."* Three binding AskUserQuestion decisions
+governed it: **broadcaster-own endpoints only** (no distributor tier — so Reuters, Sky News UK,
+Scripps and Cheddar are out), **state media included and clearly labelled**, and **50+ with national
+broadcasters, not just the global networks**. **Zero subagent spend**, as with every arc since the
+credit directive.
+
+**⚠️ THE HEADLINE FINDING, and it is the reusable one: a failure is far more often the endpoint than
+the broadcaster.** Al Jazeera English and NHK World-Japan had shipped `UNVERIFIED` since the feature
+launched, on addresses that answer with a proxy 502. Both play perfectly — Al Jazeera on the host its
+**Arabic sibling** uses (`live-hls-apps-aje-fa` beside the working `...-aja-fa`), NHK on NHK's own
+`masterpl.hls.nhkworld.jp` rather than an Akamai alias. CLAUDE.md and the source both recorded France
+24 as "master 200 → variant 400, looks fine, plays nothing"; that was a **wrong path**, and mirroring
+the Arabic sibling's URL shape produced a 6.4 MB segment first try. TRT World failed a TLS handshake
+on one own host and plays on the other. **Before believing a broadcaster is unreachable, find a
+sibling feed of the same broadcaster and copy its URL shape.**
+
+**⚠️ THE FIRST SWEEP WAS INVALID AND NEARLY SHIPPED AS EVIDENCE — three harness bugs, all mine.**
+It reported 3/170 playing; the corrected harness reports 98/170.
+1. The segment classifier demanded a `0x47` sync byte or `ftyp`/`styp` in the first 12 bytes, so a
+   **200 carrying 1.7 MB of real video** was logged as a failure. Believe HTTP 200 + a body too big
+   to be an error page (~200 B); identify the container best-effort, never require it.
+2. **20 parallel probes** produced widespread `000` — the documented container-proxy pattern. Four
+   concurrent with jitter, and re-probe serially before believing a failure.
+3. **CRLF, again.** HLS playlists are CRLF, so every extracted URL carried a trailing `\r`, curl
+   returned 000, and DW English — a channel known to work — reported as broken. This is the third
+   distinct place this repo has met that trap. `tr -d '\r'` on text, and a *separate* binary fetch so
+   the segment is not stripped.
+Plus two smaller ones found by self-testing: `xxd` does not exist in this container (use
+`od -A n -t x1`), and a 200 with an **empty body** is a transient — measured three times seconds
+apart on the same host, two empty and one good — so it retries once and reports `EMPTY_BODY`
+distinctly rather than condemning the channel as an empty playlist.
+
+**⚠️ Reading the host does not settle provenance; read the whole URL.** Reuters TV is served from an
+ordinary-looking CloudFront distribution whose *path* is `amg00453-reuters-samsunggb`, and both
+published NBC News NOW addresses carry `ads.xumo_channelId`. A host-only blocklist admitted both. A
+test now screens the full URL for distributor markers, so the owner's rule is held by CI rather than
+by whoever is reading the diff.
+
+**⚠️ `langs` in the iptv-org index is the CHANNEL BRAND's languages, not the feed's** — it lists
+English for DW's Arabic service and for Al Jazeera Arabic. Join `tvg-id` (`Channel.cc@FeedId`) to
+`feeds.json` for the real per-feed language. That distinction removed a dozen non-English entries.
+
+**How the 41 were arrived at, because the numbers are the argument:** the news playlist yields 168
+English-feed streams, 98 reach a segment, broadcaster-own leaves ~30; widening from
+`iptv/categories/news.m3u` to the full `api/streams.json` — where the **BBC**, Euronews, CBS News,
+WION, Bloomberg, SABC and TRT all publish on their own origins — brings it to 41.
+**⚠️ That is the ceiling of this source under the owner's own rule, and 41 is short of the 50+ asked
+for.** Going further means admitting distributor platforms or padding with siblings of broadcasters
+already listed (three more CityNews cities, three more CBS local newsrooms). Neither was done
+quietly; the shortfall is stated in the KDoc and was reported to the owner.
+
+**New `Funding` label.** The line between the two funded categories is drawn at exactly one place —
+**whether editorial independence from the funder is set out in law or charter** — so BBC/DW/NHK/
+France 24/TRT/VOA/Arirang/ABC/CBC/SABC are `PUBLIC` and CGTN/RT/Press TV/teleSUR/KTV/**Al Jazeera**
+are `STATE` and say "state-funded" on the row. `COMMERCIAL` renders nothing: a badge on every row is
+a badge nobody reads. The arguable calls (Al Jazeera, TRT, VOA, CNA) are named in the KDoc for the
+owner to overrule, each one line.
+
+**⚠️ `MirrorDriftTest`'s hand-maintained map listed none of the four live-TV files** even though
+`tools/mirror_desktop_cores.py` mirrors them and `desktop-build.yml` never runs its `--check`.
+Growing this list without regenerating would have left the desktop on the old five channels **with
+its own mirrored `LiveChannelsTest` still passing**, because that test is itself the stale mirror.
+Now in the map. **Check that map whenever a new mirror is added — the script and the test are two
+independent statements of the same mapping, which is the point, and only one of them was current.**
+
+**Tests pin the exceptions, not the rule.** The old `theThreeChannelsWalkedToASegmentAreMarkedAsSuch`
+listed the *confirmed* channels, so every addition broke it and told you nothing. What is worth
+catching is an entry shipped **without** the evidence, so the assertion is now the (currently two)
+unverified ids. Plus worldwide spread, the funding label, and the distributor screen.
+
+**⚠️ A negative test of mine reported a guard "asleep" when the guard was fine** — the perturbation
+used `replace(..., 1)` and left the second South Africa entry standing, so the property under test
+was never actually removed. **The perturbation has to break the thing, not merely touch it**, and
+that is a distinct failure mode from the already-recorded "perturbation did not match the source".
+All four guards confirmed after the fix. core 29/29 and desktop 399/399 locally.
+
+⚠️ **Owner-verify on the Pixel and on Windows:** that a spread of the new channels actually play on a
+real network (this container blocks a share of media CDNs, which is why two ship `UNVERIFIED`); that
+a 41-entry rail reads well where five did; and that the funding line is legible at 9sp caption size.
+
+### THE GUIDE DIAGRAMS COST 68 MB TO SHOW 780 PIXELS (this session, PR #448)
+
+Found while re-probing the long-blocked image task (#164), and it is a correction to my own work
+rather than a new idea. **Zero subagent spend**, as with every arc since the credit directive.
+
+**⚠️ FIRST, TWO ERRORS IN THIS FILE, BOTH MINE, BOTH THE SAME MISTAKE: counting `images/` and
+missing `images/kb/`, which holds 300 of the 343 files.** They are struck through above. The one
+that mattered told the owner the efficiency pass had found nothing in the images — it had found
+5.5 MB where the truth was **68 MB**, and the `du -sh` figure I dismissed as block-allocation
+overhead had been right all along. **When a cheap measurement disagrees with your careful one, the
+careful one is not automatically right.** I nearly repeated it a third time this session, reporting
+"300 missing image files" before checking whether the subdirectory existed.
+
+**The measurement that settled the design, and it is the one worth copying:** what do the readers
+actually draw? `SurvivalDiagram` caps at **260.dp** (780 px on the Pixel) and the desktop `Diagram`
+at **620.dp** (1240 px at 2×). The corpus held 123 files wider than 1200 px, topping out at 1920.
+Every pixel above that was shipped, stored and decoded to be discarded during layout.
+
+**Re-encoded to WebP q85 capped at 1280 px: 68.0 MB → 30.8 MB.** The settings were chosen by
+comparing each original against its re-encode **after both are scaled to the 780 px the phone
+shows** — the only comparison that answers "does this change how it looks":
+
+| | size | RMSE at display size (0–255) |
+|---|---|---|
+| **cap 1280 q85** | −59% | median 2.0 · p90 5.5 · **worst 6.3** |
+| cap 1080 q82 | −67% | median 2.5 · p90 12.3 · **worst 14.1** |
+
+Took the conservative pair: this library is line art and clinical diagrams, where a soft edge loses
+information rather than polish. The 15 SVGs are untouched. **Converting the single GIF fixed a bug** —
+`Diagram.kt` says outright that Compose Desktop has no loader for it, so that diagram had failed soft
+to its caption on every Windows machine since it was bundled and nothing in the build knew.
+
+**⚠️ The NOTICE rewrite was a licensing requirement, not tidiness.** Both files named 194 images each
+by their old extensions, and asserted the works were "unmodified" — in one place "the original upload
+byte-for-byte". After a resize and re-encode that is false. Filenames were repointed by an exact map
+taken from `git status`, **rewriting only our bundled name and never the Commons source filename
+beside it on the same line**, and a prominent re-encoding notice now states exactly what was done,
+which is the indication of changes CC-BY-SA requires. The artwork itself is unaltered.
+
+**New guard: `desktop/…/library/BundledImagesDecodeTest`.** `LibraryBundleTest` proves each file is
+*present*; presence is not decodability, and a format Skia cannot read compiles, packages and ships
+perfectly. It decodes every diagram with the reader's own loader and refuses any wider than either
+reader can display. Both halves negative-tested. It would have caught the GIF.
+
+**⚠️ `tools/kb/optimize_images.py` is re-runnable and idempotent** — files already WebP and within the
+cap are skipped, and it refuses a `foo.png`/`foo.jpg` collision rather than silently overwriting.
+Run it after any image wave.
+
+**#164 is also unblocked, and the record needed refining.** The Commons **API** answers 200 from this
+container; only **`upload.wikimedia.org` file downloads** still 429. **`wsrv.nl` fetches them
+successfully** (verified: real API-resolved URL → 200, 55 KB). So sourcing new diagrams is possible
+again — the proxy is transport only, the licence position is unchanged, and provenance must still be
+recorded per file. The real remaining gap is **413 of 651 guides with no diagram**.
+
+⚠️ **Owner-verify on the Pixel and on Windows:** that the diagrams still look right (they should be
+indistinguishable — the change was measured to be imperceptible at display size, but a screen is the
+only real judge), and that the one former GIF now draws on Windows where it never has.
+
+### STARDATES: THE CORE GETS ITS CALLERS (this session, PR #448)
+
+Owner asked, simply, *"where do you put the stardates?"* The answer was **one place — the boot
+screen** — and `Stardate.format()` had **no caller at all** outside its own test. That is this
+repo's recurring defect class in its purest form (`tempoNudge`, `windKmh`,
+`NavGuidance.turnHint`, `savedAtMs`, `mastery()`), and worse here because the KDoc written at the
+time made the promise explicitly: *"[Stardate] is pure and tested, which is what the header and the
+brief will read too, so the app can never show itself two different stardates."* Neither ever did.
+Owner chose via AskUserQuestion: **all four surfaces** and **both platforms**. **Zero subagent
+spend**, as with every arc since the credit directive.
+
+**One piece of new core: `Stardate.at(epochMs, utcOffsetSeconds)`.** `of()` takes a *decomposed*
+date on purpose — that is what keeps it clock-free and testable — which left the decomposition to
+whoever held the clock, with six surfaces now wanting one.
+
+⚠️ **`utcOffsetSeconds` is load-bearing, not a nicety.** The obvious implementation floor-divides
+epoch milliseconds into days, which is UTC, and **this repo has already shipped that exact bug
+twice**: the observatory computing "tonight's geometry" from UTC midnight so "today's sunset" was
+the wrong day away from Greenwich, and DAY AHEAD writing UTC clock times into four separate lines of
+prose (eleven hours out in Auckland). A stardate is a date said aloud; one that rolls its tenth at
+UTC midnight is wrong for most of the planet. Each platform supplies its own offset in one line.
+
+⚠️ **The civil conversion is hand-rolled (Hinnant, era from 1 March) and deliberately a SECOND
+copy.** `EconomyVintage.civilFromDays` states the same platform-free reason for its own; that one
+yields year and month for a UTC instant where this needs day-of-year, length-of-year and a *local*
+hour, so neither expresses the other without editing a working shipped core for no functional gain.
+The honest safeguard is a test that makes disagreement a build failure — **`StardateCivilDriftTest`**
+sweeps both over ~7,800 days. ⚠️ It is a **separate file from `StardateTest` on purpose**:
+`StardateTest` is mirrored to the desktop, which has no economy screen, so the cross-check inside it
+would not compile there and would not mean anything either.
+
+**The surfaces, all reading ONE hourly coroutine** provided at the app root beside
+`LocalConsoleSection` — the pattern that gave 35 screens a location readout with no screen edited.
+`app/.../ui/StardateClock.kt` owns `LocalStardate` + `ProvideStardate`. Header (`SECTION · 26621.5`,
+the **bare number** — the word "STARDATE" belongs to the boot reveal, where the console introduces
+itself once), Home masthead (it draws its own top bar via `topBarOverride` and so does not inherit
+the header), the expanded notification board, the Computer's context, and the desktop rail footer.
+`BootScreen`'s `java.util.Calendar` block **collapses onto `Stardate.at`**, so this removes a
+duplicate rather than adding a sixth.
+
+⚠️ **Three notification constraints, each already bitten once:** the caption is **chrome, not a
+row** (the five row slots are the payload and `trimToFive()` already sheds real rows when they are
+all spoken for); **expanded only** (the collapsed line is the tray's most crowded surface); and **no
+new channel, no second post** — the one-notification invariant holds. It takes
+`TextAppearance.Compat.Notification.Info` rather than the console amber, as every other body line in
+that layout does: the tray follows the system theme and `#FFB000` is about **1.9:1** on a light one.
+The identity there is carried by the rail and the tag blocks, which are safe because they hardcode
+**black ON a colour** rather than a colour on the tray's own background. (`.Info` was **verified
+present in the shipped androidx.core 1.15.0 AAR's `values.xml`** before use, not recalled.)
+
+⚠️ **The persona line is given to the Computer, not stamped on its replies.** A date prefix on every
+answer is noise and would fight the register the persona rewrite established: this computer answers
+questions, it does not file reports.
+
+**⚠️ THE NEGATIVE-TEST LESSON, on a fourth distinct mechanism.** Of four perturbations, **one guard
+was genuinely asleep**: the leap-day test only covered 29 February, where the post-February day
+shift is not exercised at all, so deleting the shift failed nothing. Dates *later* in a leap year
+(2024-03-01 → doy 61, 2024-12-31 → doy 366) now cover it. The three known ways a green test proves
+nothing are now: the perturbation never matched the source; the perturbation only *touched* the code
+without removing the property; and **the fixture never reached the branch the rule lives in**.
+
+**⚠️ How to prove `tools/android_resolve_check.sh`'s cascade false positive, rather than shrugging.**
+It reported six unresolved names on a brand-new pure-Compose file. `tools/android_compile_check.sh
+-l androidx.compose.runtime:runtime-android:1.7.6 <file> <its core dep>` compiles it **clean**, and
+the same command *without* the `-l` reproduces the six **exactly**. Two things make that decisive:
+the unpacked AAR really carries **643 classes** (not the manifest-only KMP stub the script warns
+about), and the control run is a real failure rather than an absent one. The compose runtime version
+comes from the BOM in `gradle/libs.versions.toml` (2024.12.01 → 1.7.6).
+
+**The header-width risk the plan flagged was measured away, not accepted.** fontTools on the bundled
+`jetbrains_mono_var.ttf` gives an advance of **exactly 0.6 em** (it is monospaced), so at 8sp with
+1.4sp tracking a character is **6.2dp**. The longest section label in the entire directory is
+`YOUR THINGS`, and `YOUR THINGS · 26621.5` is 21 characters → **130dp**, in the same ~230dp column
+where the 16sp title already fits at 203dp. It does not crowd. Recorded at the call site so the next
+person does not re-derive it. (Had it crowded, note that `Alignment.End` + `Ellipsis` would have cut
+the **stardate**, not the section — the opposite of the plan's stated fallback order.)
+
+**Verification, all local and free:** 13 core tests executed; `:desktop:build` green at 413 tests;
+53 mirrors current; CI green on run 1751. ⚠️ **Owner-verify — CI compiles, it does not draw.** Worth
+eyes: the header line at real density, the masthead, and the board caption in the tray — **Settings'
+notification test button posts a sample board**.
+
+**⚠️ AN OPERATIONAL MISTAKE THAT COST A BUILD, worth reading before waiting on CI again.** I fired
+`Bash(run_in_background: true, command: "sleep N")` and then **immediately made the next tool call**
+instead of waiting for its completion notification. A background sleep does not block, so a dozen of
+them simply overlapped and paced nothing: I believed ~70 minutes had passed when the real figure was
+about six. On that false elapsed time I diagnosed a "wedged runner", and pushed a commit to supersede
+a **perfectly healthy** run under `cancel-in-progress`. Two guards against repeating it:
+- **`date -u` is the only clock that counts.** Requested sleep duration proves nothing; measured
+  separately, `sleep` itself is faithful (requested 120s → actual 120s), so the bug was purely my
+  pacing. To actually wait, fire the timer and then **end the turn** — the notification re-invokes you.
+- **Know the real shape of a run before calling one abnormal.** For `android-build.yml`: whole run
+  **~8–10 min**, of which `Run unit tests` is ~2m20s and **`Build release APK` alone is ~7 min**.
+  Anything under about fifteen minutes is ordinary. A frozen `updated_at` on an in-progress run is
+  **normal**, not evidence of a stall — I read it as the opposite.
+
+### ALERTS THAT MEAN SOMETHING — the four-part directive (this session, PR #448)
+
+Owner, in one message: fix every problem ever detected; make the breaking-news popup **a real
+transparent overlay** you can dismiss or work around **without losing the page you were on**;
+stop the in-app **red alert being permanently on** and reserve RED for what a government would
+class a disaster; add **a real emergency alert** that takes the whole screen with a loud alarm
+in Starfleet condition-red style; and **never repeat the same notification text** from a story
+already reported. Plus: be sparing with tokens. Binding AskUserQuestion decisions: everything
+in **one batch**, a **dedicated always-on service** for the watch, the alarm at **full volume
+regardless of silent/DND**, owner is in the **United States**.
+
+**Zero subagent spend, as with every arc since the credit directive.** All four reports were
+real and each had an exact cause:
+
+| Report | Cause, located |
+|---|---|
+| The takeover steals your page | `TakeoverLauncher` launched `BreakingNewsActivity` with `FLAG_ACTIVITY_CLEAR_TASK` — it **wipes the back stack**, so dismissing cannot return you anywhere. Also a full-screen opaque Activity. |
+| Permanent red alert | `UnifiedBrief` set RED from `EmergencyNews.isMajor`, which fired on the literal strings `"breaking:"`, `"just in:"`, `"developing:"`. Google News headlines carry those constantly, and `Theme.kt` then recolours **every screen**. |
+| No real emergency alert | The government data was **already fetched and graded** — `SafetyRepository.nws()` parsed severity, urgency, certainty, expiry and the official `instruction`, and `CapAlerts.grade` already yielded EXTREME. It produced a **yellow line on the board**. |
+| The same text repeats | The board is one fixed id re-posted every refresh; `urgencyKey` dedups the **buzz**, never the **text**, and the NEWS row is "the current top headline". |
+
+⚠️ **One promise that cannot be kept, and the UI does not claim it.** "Fire before the phone's
+own emergency alert" is not achievable by any app: Wireless Emergency Alerts are delivered by
+the modem to the system `CellBroadcastService` and no ordinary app can receive, intercept or
+preempt them. What is real is that NWS publishes the same hazard to `api.weather.gov` as CAP,
+and a ~60 s poll often surfaces it at or before the broadcast — sometimes after.
+
+**What shipped** (`b954bbb`, `3f95bc1`, `87bf2d6`, `ba88507`; CI run 1757 green):
+- **`StoryLedger`** (pure, 9 tests) — a normalised story identity built on `EmergencyNews.topicQuery`
+  plus a bounded seen-ring. `BriefEngine` fills the NEWS row only with a story not already shown,
+  else the next unshown, else **the row is omitted**. Persisted in `NotifyState.seenStories`.
+- **`EmergencyAlert`** (pure, 9 tests) — `Tier` over `CapAlerts.grade`, expiry-aware, deduped by
+  alert id, with a **named-hazard floor** (tornado/tsunami warning, flash-flood emergency) that
+  fires RED even when the severity field is absent, which the live feed does do.
+- **News can never set RED.** `officialAlert` (government-sourced) is now the only news-adjacent
+  RED path beside `securityCritical`; news tops out at YELLOW and only for a STRONG disaster.
+  The three label triggers are gone from `isMajor`.
+- **`BreakingOverlayService`** — a `TYPE_APPLICATION_OVERLAY` window with `FLAG_NOT_FOCUSABLE or
+  FLAG_NOT_TOUCH_MODAL`, so the app behind stays fully usable. Programmatic Views, not Compose
+  (this repo's documented rule for overlay windows). One story, drag to move, ✕ or five minutes
+  to dismiss. `CLEAR_TASK` removed from **both** paths — the launcher and the notification
+  fallback, which is the commoner route because it runs whenever the overlay grant is absent.
+- **`RedAlertActivity` + `EmergencyKlaxon` + `EmergencyWatchService`** — condition-red screen over
+  the lock screen, back disabled, the issuer's `instruction` reproduced **verbatim**; alarm on
+  `STREAM_ALARM` at max with the prior volume **restored on stop**; a 60 s `specialUse` foreground
+  watch, `START_STICKY`, revived by `BootReceiver` and self-healed by `RefreshWorker`.
+
+**Live verification of the grader** against the real NWS feed at five US points: zero false
+alarms (Air Quality → NONE, Extreme Heat Warning → YELLOW, Heat Advisory → ADVISORY, all silent)
+while a Tornado Warning **with the severity field absent** fired RED via the named-hazard floor.
+London → HTTP 400, which is how that endpoint states its own US-only reach. Eleven load-bearing
+rules negative-tested.
+
+⚠️ **THE LESSON OF THIS ARC, and it cost two CI failures.** The second was
+`Function invocation 'lcarsBlockShape(...)' expected` — and it compiled clean locally because
+**I had written the stub from memory as a `val` when the real declaration is a `fun`**. A stub
+that does not match the real declaration does not merely fail to catch a bug, it actively
+asserts the wrong thing is fine. **Derive every stub by copying the real declaration out of the
+source.** (The first failure was `scope?.cancel()` needing `import kotlinx.coroutines.cancel` —
+an extension where `Job.cancel()` is a member; the resolve-check cannot see it because every
+name in that file cascades.)
+
+⚠️ **A capability correction: Compose files CAN be frontend-verified locally.** Compiling a
+`@Composable` without the Compose plugin fails in **backend IR lowering**; reaching that point
+proves the frontend passed. Negative-tested. The older note that Compose UI is impractical to
+check locally is wrong.
+
+### THE SWEEP — the feed audit's remaining MEDIUM findings (same PR, `a2a7431`, `a5423d4`)
+
+Three closed, each measured against a live response first, and one of the "open" items turned
+out already fixed (the close-approach epoch is parsed and rendered with the device zone — the
+audit's own status list was stale).
+
+- **Radio "near you" was sorted by raw distance.** `clickcount` and `votes` are on 181/181
+  stations and neither was declared. The thirty shown spanned 0.20–4.31 km — no discrimination
+  at all, they are one city — while eight had never been played and a 193-click station at
+  5.03 km was cut at distance-rank 35. New `StationRanking` **bands** distance: inside a band it
+  carries no information so popularity orders within it, across bands nearer still wins outright.
+  The limit is applied **after** ordering, which is where the good station was being lost.
+  Also corrected the class doc: `hidebroken=true` is not the liveness guarantee it reads as
+  (14 of 62,497 flagged broken; median last check **214 days** old).
+- **A four-hour launch window behind a T-0 quoted to the second.** `window_start`/`window_end`
+  are published on 6 of 6 sampled launches and neither was parsed. ⚠️ The interaction is the
+  finding: `net_precision` describes how well the T-0 is known and says **nothing** about how
+  much room the flight has, so the existing `timeIsFirm` guard *passes* on a Starlink launch with
+  a second-precise T-0 inside a 02:00–06:00 window. New `LaunchWindow` is deliberately clock-free
+  — it answers how wide and whether that is worth saying, and leaves formatting to the caller's
+  own zone, because rendering UTC beside local times is a mistake this app has already made twice.
+- **Two hours of rain radar, one frame drawn.** RainViewer holds **13 frames over two hours at
+  ten-minute steps** (probed live) and the parser read `past.lastOrNull()`. So the map could show
+  where rain *is* and never whether it is coming or going. The sequence is now kept and looped;
+  ⚠️ **the map effect and `applyRain` are unchanged** — they key on the single displayed frame,
+  so animation falls out of pointing that flow at successive frames. The 550 ms step is slower
+  than a broadcast loop on purpose: each frame is a distinct tile URL, so the first pass is
+  fetching, not replaying.
+
+⚠️ **Three negative tests were green for the wrong reason here, on two distinct mechanisms, and
+one was hiding a bug I had introduced.** `Double.NaN.toInt()` and `(-1.0 / 10_000.0).toInt()` are
+**both zero** in Kotlin, so the absurd-distance test passed with the guard deleted — and the
+guard itself mapped positive infinity to band 0, sorting an *unknown* distance **first** in a
+list headed "near you". It takes a large negative or an infinity to tell the cases apart. The
+other was the recorded "perturbation only touches the code without removing the property":
+`.take(limit)` duplicated is idempotent.
+
+**Still open on the audit, deliberately:** the description-cluster re-fetch is **blocked** (Google
+answers this container with a block page); 22 COSMETIC findings remain unworked. Both KB backlogs
+(#73 waves, #177 lore) stay **parked** under the credit directive — they are content growth, not
+detected defects, and they are what tripped the weekly limiter four times.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot draw a window or sound an alarm.** In
+order: grant "display over other apps", then confirm a breaking story appears as a card over
+another app and **leaves that app usable**; confirm the console is no longer permanently red;
+confirm the same headline never reprints on the board; and for the emergency path, that the
+condition-red screen appears over the lock screen with the alarm at full volume and that
+acknowledging **restores your previous alarm volume**. Then the map's REPLAY chip, the radio
+"near you" list, and the launch window line.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

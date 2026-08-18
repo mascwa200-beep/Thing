@@ -106,20 +106,46 @@ class LcarsAudio {
     }
 
     /**
-     * A cue is a list of (frequency, milliseconds) steps.
+     * One segment of a cue: hold [from] for [ms], or glide from [from] to [to] across it.
      *
-     * The stepped pitch is the whole character of the thing — a console blip is not one note, it is
-     * two or three in quick succession, and the ear reads the interval rather than the pitch.
+     * ⚠️ The glide is why this is a class rather than a pair. The alert klaxon does not *step*
+     * between two pitches, it sweeps between them, and a renderer that can only hold a constant
+     * frequency can produce a two-tone beeper but not a whoop. Everything else still holds, so
+     * [to] defaults to [from] and the ordinary cues read exactly as they did.
+     */
+    private data class Seg(val from: Double, val ms: Int, val to: Double = from)
+
+    /**
+     * A cue is a list of segments.
+     *
+     * ⚠️ **Retuned from the 1987 console to the 1966 one, which is a change of character rather than
+     * of pitch alone.** The later console's blips are bright, and three notes in quick succession —
+     * the ear reads the interval. The original consoles are rounder and lower, usually a single
+     * fuller tone, and their computer "working" sound is a fast trill rather than a rising figure.
+     * So the acknowledgements lose a note and drop roughly an octave, CONFIRM becomes that trill,
+     * and the alert becomes a swept klaxon.
      */
     private fun render(cue: SoundCue): ShortArray {
         val steps = when (cue) {
-            SoundCue.TAP -> listOf(1046.5 to 26, 1396.9 to 34)
-            SoundCue.SELECT -> listOf(880.0 to 30, 1318.5 to 30, 1174.7 to 40)
-            SoundCue.CONFIRM -> listOf(784.0 to 34, 987.8 to 34, 1318.5 to 62)
-            // Downward, which is how a refusal reads without needing to be loud.
-            SoundCue.REJECT -> listOf(392.0 to 60, 261.6 to 90)
-            // The one that is meant to be disliked: a hard two-tone alternation.
-            SoundCue.ALERT -> listOf(740.0 to 90, 493.9 to 90, 740.0 to 90, 493.9 to 110)
+            // One round note, not a rising pair: the button on a 1966 console answers, it does not
+            // announce.
+            SoundCue.TAP -> listOf(Seg(523.3, 58))
+            SoundCue.SELECT -> listOf(Seg(392.0, 34), Seg(587.3, 54))
+            // The "working" trill — a fast alternation, which is what the original computer does
+            // while it is thinking rather than a three-note chime when it finishes.
+            SoundCue.CONFIRM -> listOf(
+                Seg(659.3, 26), Seg(880.0, 26), Seg(659.3, 26), Seg(880.0, 26), Seg(659.3, 40),
+            )
+            // Downward, which is how a refusal reads without needing to be loud. Now a glide rather
+            // than a step, because a fall that slides is unmistakably a negative.
+            SoundCue.REJECT -> listOf(Seg(392.0, 40), Seg(from = 349.2, ms = 150, to = 196.0))
+            // The klaxon: two swept whoops. Still the one cue meant to be disliked.
+            SoundCue.ALERT -> listOf(
+                Seg(from = 440.0, ms = 150, to = 740.0),
+                Seg(from = 740.0, ms = 150, to = 440.0),
+                Seg(from = 440.0, ms = 150, to = 740.0),
+                Seg(from = 740.0, ms = 170, to = 440.0),
+            )
         }
         // Per-cue level. The vocabulary has dynamics on purpose -- a tap is not an alarm -- but the
         // whole set was pitched far too low to hear: 0.5 here against a 0.35 track volume put every
@@ -131,18 +157,35 @@ class LcarsAudio {
             SoundCue.REJECT -> 0.70
             SoundCue.ALERT -> 0.95
         }
-        val total = steps.sumOf { (_, ms) -> ms * RATE / 1000 }
+        val total = steps.sumOf { seg -> seg.ms * RATE / 1000 }
         val out = ShortArray(total)
         var i = 0
-        for ((freq, ms) in steps) {
-            val n = ms * RATE / 1000
+        // ⚠️ **Phase is accumulated, not computed from the sample index.** At a constant frequency
+        // `2πf·s/RATE` and a running phase agree exactly, which is why the old form was right for
+        // every cue that existed before the glide.
+        //
+        // For a sweep it is wrong, and measurably so. The angle `2π·f(s)·s/RATE` differentiates to an
+        // instantaneous frequency of `f(s) + f'(s)·s`, so a segment asked to run 440 -> 740 Hz
+        // actually arrives at **1040 Hz** — it sweeps at double the intended rate and overshoots the
+        // frequency it was told to reach. (It does not click: `f(s)·s` is continuous, so there is no
+        // discontinuity to hear. That was this comment's first claim, and measuring the two forms
+        // refuted it — the max sample-to-sample step is 0.223 against 0.198, no jump at all.)
+        // Accumulating the phase integrates f properly, and carrying it across segment boundaries
+        // removes the discontinuity there as a bonus.
+        var phase = 0.0
+        for (seg in steps) {
+            val n = seg.ms * RATE / 1000
             for (s in 0 until n) {
-                val angle = 2.0 * PI * freq * s / RATE
+                // s.toDouble(), not s: integer division here would hold the frequency at `from` for
+                // the whole segment and silently turn every glide back into a step.
+                val f = if (seg.to == seg.from) seg.from
+                else seg.from + (seg.to - seg.from) * (s.toDouble() / n)
+                phase += 2.0 * PI * f / RATE
                 // Attack and release ramps. Without them each step begins and ends on a
                 // discontinuity, and a discontinuity is a click — which is audible, ugly, and the
                 // usual reason hand-rolled tones sound cheap.
                 val env = envelope(s, n)
-                out[i++] = (sin(angle) * env * Short.MAX_VALUE * gain).toInt().toShort()
+                out[i++] = (sin(phase) * env * Short.MAX_VALUE * gain).toInt().toShort()
             }
         }
         return out

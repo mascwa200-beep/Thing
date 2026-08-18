@@ -1,0 +1,148 @@
+{
+ "guides": [
+  {
+   "id": "fed-earth-and-sol",
+   "title": "Earth and the Sol System",
+   "category": "Worlds & Stations",
+   "summary": "Earth, Sol and the Federation capital: the seat of the Council and Starfleet Command, and the awkwardness of a union of equals headquartered on one member's homeworld.",
+   "sections": [
+    {
+     "heading": "Earth in the Federation",
+     "body": "Earth is one founding member among several, and it is also where the Federation Council sits, where Starfleet Command is headquartered, and where Starfleet Academy trains its officers. That concentration is a standing source of quiet friction: a union of equals whose administrative centre, military headquarters and officer school are all on one member's homeworld invites the charge that it is a human project wearing a wider name, and the charge is made inside the setting more than once. The defence offered is historical accident and convenience rather than principle. Earth was centrally placed among the founding powers, had recently emerged from a period that left it unusually committed to the idea of union, and offered to host. None of which fully answers the objection. Earth itself is described as having been substantially repaired. Its cities are rebuilt, its climate managed, its poverty and its wars ended — a state the setting presents as the outcome of a deliberate century of work following a catastrophe, not as a natural progression."
+    },
+    {
+     "heading": "San Francisco and the Institutions",
+     "body": "The Presidio at San Francisco holds Starfleet Command and the Academy, with the Council seated nearby. The choice of a single terrestrial city for all of it is one of the setting's more consequential pieces of geography, because it means a strike on one place can decapitate the Federation's civil and military leadership simultaneously — a vulnerability the stories exploit more than once. Utopia Planitia, in orbit of Mars, is the Federation's principal shipyard, and the pairing is deliberate: the institution that decides is on one world and the industry that builds is on another, several light-minutes away. The system also holds the Federation's oldest and densest civilian infrastructure — the transport network, the archives, the research institutes — which is why so many episodes that need a hearing, a trial, a court martial or an admiral bring the ship home."
+    },
+    {
+     "heading": "Getting Here From Elsewhere",
+     "body": "Sol is a long way from most of the Federation's frontier, which matters constantly. A ship recalled to Earth is a ship removed from its station for weeks, and an order issued from Earth reaches the frontier already out of date. That lag is the practical reason starship captains hold the discretion they do, and the practical reason the frontier periodically complains that the core legislates for conditions it does not experience. The system is heavily defended and heavily monitored, and the setting treats any breach of it as an emergency of the first order. Sequences in which something hostile reaches Earth orbit are used sparingly and always signal that the situation has exceeded what a starship can resolve."
+    },
+    {
+     "heading": "What Earth Represents",
+     "body": "Within the fiction Earth functions as the argument's exhibit. A civilisation that was, within living historical memory, poor, violent and close to ruining itself is now the administrative centre of an interstellar union — which is offered as evidence that the Federation's optimism is a description of something achieved rather than a hope. The setting is careful not to make that comfortable. The recovery is repeatedly shown to have been hard, contested and recent, and the institutions built on it are shown to be capable of backsliding under pressure. Earth is not written as having transcended its history; it is written as having decided about it, and as having to keep deciding."
+    }
+   ]
+  },
+  {
+   "id": "fed-deep-space-stations",
+   "title": "Starbases and Deep-Space Stations",
+   "category": "Worlds & Stations",
+   "summary": "The fixed points: what a starbase is for, and why a station at a crossroads produces different stories than a ship.",
+   "sections": [
+    {
+     "heading": "What a Starbase Does",
+     "body": "A starbase is the Federation's fixed presence in a region: a repair yard, a supply depot, a hospital, a court, a headquarters and a diplomatic post, usually all at once. Some are orbital structures, some are built on planetary surfaces, and their numbering is a long-running administrative sequence rather than a geographic one. For a starship the starbase is the place where the things a ship cannot do for itself get done: a damaged hull replaced, a crew rotated, a court martial heard, a prisoner transferred, an admiral consulted in person. The recurring narrative use is as punctuation — a ship arriving at a starbase marks the end of a situation, and a ship being ordered to one usually means somebody is in trouble. They are also where the Federation's bureaucracy becomes visible. A starship is a community with a captain; a starbase has departments, records offices, requisition procedures and an administrative culture, and the friction between the two is a reliable source of comedy and of genuine obstruction."
+    },
+    {
+     "heading": "A Station at a Crossroads",
+     "body": "The setting's most fully developed station is one positioned beside a stable passage to an otherwise unreachable region — a fixed point at a genuine strategic crossroads, jointly significant to several powers, and administered by the Federation on behalf of a world that has only recently emerged from occupation. A station cannot leave, and that single constraint changes every story told there. A starship that meets a problem can solve it and move on; a station has to live beside the consequences. Its residents include people who are not Federation citizens, do not share Federation values and have no intention of adopting them, and the administrator's job is therefore politics rather than command. It also inverts the format's usual direction. Instead of a crew travelling out to encounter the galaxy, the galaxy arrives — traders, refugees, spies, pilgrims and fleets — and the drama comes from who has just docked."
+    },
+    {
+     "heading": "Life Aboard",
+     "body": "A large station is a town. It has a promenade of shops and bars, a temple, a school, an infirmary, a security office and a permanent civilian population with no rank and no orders. Children grow up there. Businesses fail there. Somebody has to decide who gets which docking bay. That civilian texture is what distinguishes station stories from ship stories most sharply. Aboard a starship almost everyone is a Starfleet officer under the same discipline; aboard a station most people are not, and the Federation's authority over them is negotiated rather than assumed. The recurring figure of the resident trader who is technically subject to nobody exists to keep testing exactly that boundary."
+    },
+    {
+     "heading": "Why the Fixed Points Matter",
+     "body": "Strategically the stations are what make the Federation a polity rather than a fleet. A civilisation whose only presence in a region is a ship passing through does not actually hold that region; a base with repair capacity, a hospital and a garrison does. Narratively they supply the thing a starship format structurally lacks: consequence. A ship that solves a planet's crisis and warps away never learns what happened next. A station watches the next twenty years of it, and the setting uses that to ask harder questions than the travelling format can — about occupation, about collaboration, about what a principle costs when you cannot leave the people it applies to."
+    }
+   ]
+  },
+  {
+   "id": "fed-neutral-zones",
+   "title": "The Neutral Zones",
+   "category": "Worlds & Stations",
+   "summary": "Bands of space nobody may enter — the Romulan and Klingon Neutral Zones: what they are for, and why the setting keeps returning to them.",
+   "sections": [
+    {
+     "heading": "A Border Made of Emptiness",
+     "body": "A neutral zone is a band of space along a contested frontier that both parties agree to keep empty. Entry by a vessel of either power constitutes an act of war by treaty, without further argument required. The Federation maintains such zones with more than one neighbour, the Romulan one being the most consequential and the Klingon one the most frequently violated before that relationship changed. The device is elegant precisely because it is crude. Two powers unable to agree on anything else can agree on a line, and the emptiness on either side of it means that a violation is unambiguous. There is no need to establish intent when the mere presence of a warship is the offence. Zones are monitored rather than garrisoned. Outposts sit along the boundary watching, and their destruction — a well-established opening move in the setting — is how a long silence becomes a crisis in a single scene."
+    },
+    {
+     "heading": "Why It Is Unstable by Design",
+     "body": "A neutral zone freezes a conflict rather than resolving it. It records that two powers stopped fighting, says nothing about why they were fighting, and leaves every underlying grievance in place with a line drawn over the top. That makes it durable for decades and brittle at the wrong moment. The instability is structural. Both sides must patrol their own edge, which means armed vessels operating within minutes of a tripwire. Both sides run intelligence operations across it, since the emptiness that makes violations obvious also makes surveillance essential. And both sides know that whoever crosses first has the advantage of surprise, which is a permanent incentive nobody can disarm. It also creates a peculiar sort of ignorance. A power that has not seen its neighbour for generations does not know what that neighbour has become — what they now fly, what they now want, or whether the government that signed the treaty still exists. Long neutral zones produce first contact between old enemies, which the setting exploits repeatedly."
+    },
+    {
+     "heading": "Life Along the Line",
+     "body": "The zones are not quite empty of people. Colonies sit near the boundary, sometimes older than the treaty that drew it, occasionally on the wrong side of a line agreed by governments a long way off. Their inhabitants have views about that, and the setting's border stories are frequently about civilians who did not vote for the arrangement they live under. Postings along a neutral zone are the fleet's least glamorous and most nerve-racking. The work is watching an empty screen for years, and the professional hazard is the opposite of boredom's usual one: an officer who has watched nothing happen for a decade may be slow to believe it when something finally does. Trade, smuggling and unsanctioned contact happen anyway, because a line that neither side can physically seal will be crossed by anyone with a small ship and a reason. Much of the setting's frontier colour comes from that traffic."
+    },
+    {
+     "heading": "When the Line Moves",
+     "body": "Neutral zones end in one of three ways. They are overrun, which is war. They are dissolved by agreement, which requires the underlying quarrel to have been settled or overtaken by something larger — the usual something larger being a threat that makes both parties prefer each other to the alternative. Or they simply persist, unresolved, until the powers on either side have changed enough that the original terms mean nothing. The Klingon zone is the setting's example of the second case, dissolved after decades of hostility when circumstances made the alliance obviously preferable. The Romulan one is the example of the third: honoured with rigid formality across a silence long enough for both sides to become strangers, then broken and re-established more than once. What the device gives the setting is a frontier with a permanent question mark on it. Every story set near one starts with the audience already knowing that crossing is unthinkable, which means any reason good enough to consider it is by definition a serious one."
+    }
+   ]
+  },
+  {
+   "id": "fed-vulcan-world",
+   "title": "Vulcan, the Planet",
+   "category": "Worlds & Stations",
+   "summary": "The world itself: heat, thin air, high gravity, and a landscape that shaped a philosophy.",
+   "sections": [
+    {
+     "heading": "Conditions",
+     "body": "Vulcan is hot, arid and heavy. Its surface temperatures are punishing to most humanoids, its atmosphere is thinner than Earth's, and its gravity is appreciably higher — a combination that leaves visitors breathless, dehydrated and tired within hours, and which requires acclimatisation or assistance for anything more than a short stay. The landscape is largely desert: red rock, vast dune fields, mountain ranges and deep canyon systems, with what water there is concentrated and precious. Vegetation is sparse and adapted, and the animal life includes several genuinely dangerous predators. Nothing about the world is gentle. Its sky is notable enough to be a recurring detail. Vulcan's sun is bright and its nights are not dark in the way Earth's are, which the setting uses whenever it wants to make an offworld visitor feel unmistakably elsewhere."
+    },
+    {
+     "heading": "The Landscape as Argument",
+     "body": "Vulcan philosophy is usually explained through its history, and the setting is careful to show that the geography did as much work. A civilisation on a world this hostile, with limited water and violent weather, must cooperate precisely or die, and its ethical tradition treats discipline as survival rather than as virtue for its own sake. The desert also supplies the culture's central metaphor. Its most demanding rite of passage sends an adolescent alone into the wilderness for days with minimal equipment, and the landscape is genuinely capable of killing them. A society that requires this of its children is making a claim about what it thinks people are for. Vulcan monasteries and retreats sit in the least habitable places deliberately. The tradition holds that a mind is trained where the body is uncomfortable, which is an idea with terrestrial parallels and which the setting presents without irony."
+    },
+    {
+     "heading": "Cities and Institutions",
+     "body": "Vulcan settlement is concentrated, ancient and built for the climate: thick walls, deep shade, water managed with the seriousness of a civilisation that has been short of it for millennia. Its architecture is described as austere and monumental, and its cities are old enough that particular buildings have been continuously in use for thousands of years. The world hosts institutions of considerable weight — the Vulcan Science Academy foremost among them, whose standards are formidable and whose rejection of a candidate is a serious matter. A great deal of the Federation's scientific output originates here, and Vulcan expertise is one of the things the coalition was founded to share. There is also a diplomatic establishment of long standing. Vulcan conducted interstellar relations for a century before most of its neighbours, and its embassies, protocols and institutional memory shaped how the Federation does the same."
+    },
+    {
+     "heading": "Visiting",
+     "body": "Offworlders on Vulcan are common and never quite comfortable. Federation facilities maintain adjusted environments, and visitors are advised to acclimatise, to respect the water conventions, and to observe the local prohibition on casual physical contact — a matter of real consequence with a touch-telepathic people rather than a point of etiquette. Vulcan hospitality is formal, precise and easily misread as cold. Guests are provided for exactly and not fussed over, questions are answered directly, and the absence of small talk is not disapproval. Visitors who expect warmth read the reception as a rebuff; those who expect precision find it generous. The setting sends its characters there at moments of gravity — a family matter, a rite, a crisis of identity — and the world's difficulty is part of why. Vulcan is somewhere you go to do something serious, and it does not make it easy."
+    }
+   ]
+  },
+  {
+   "id": "fed-qonos",
+   "title": "Qo'noS, the Klingon Homeworld",
+   "category": "Worlds & Stations",
+   "summary": "Qo'noS, also written Qonos and spoken as Kronos: a harsh world and the seat of an empire — geography, the Great Houses, and the politics of the High Council.",
+   "sections": [
+    {
+     "heading": "The World",
+     "body": "Qo'noS is a world of extremes — violent weather, heavy seismic activity, an axial tilt that produces punishing seasons, and terrain that runs to mountain, volcanic waste and dense forest rather than to anything comfortable. Its skies are frequently overcast and its atmosphere heavier than most humanoids prefer. Klingon culture treats this as a point of pride rather than a hardship. A world that kills the careless is understood to have produced a people worth respecting, and the setting's Klingons describe visitors' discomfort with undisguised satisfaction. The planet lost a moon within recorded history — the disaster that crippled the Empire's energy production and forced the peace with the Federation. The astronomical consequence alone reshaped the world's tides and weather, and the political consequence reshaped the quadrant. It is the rare case where a planetary event and a diplomatic one are the same event."
+    },
+    {
+     "heading": "The Great Houses",
+     "body": "Klingon society organises around houses: extended kin groups holding land, fleets, seats and obligations, headed by a leader whose standing is the house's standing. Individual honour and family honour are not separable, which means one member's disgrace is inherited by relatives who had nothing to do with it, and one member's achievement raises everyone. This produces politics that look feudal and are in fact intensely legalistic. Challenges, claims, inheritances, discommendations and restorations all follow procedure, and a Klingon with a grievance is as likely to pursue it through a council of elders as through a duel. Both are available and both are honourable. House politics also supply the Empire's chronic instability. Houses rise and fall by manoeuvre as much as by combat, alliances are transactional, and a High Council seat is worth a great deal to a family that has one. The setting's Klingon stories are far more often about this than about war."
+    },
+    {
+     "heading": "The High Council",
+     "body": "The Empire is governed from the First City by a High Council of house leaders, headed by a Chancellor. The office is powerful, contested, and historically as likely to change hands by assassination or challenge as by succession — and the culture regards a successful challenge as a legitimate transfer rather than a coup, provided the forms were observed. The setting is candid that this system produces poor government. Chancellors spend their authority holding the Council together, houses obstruct policy for advantage, and the Empire's decline is repeatedly attributed by its own characters to leaders more interested in position than in the state. Honour as a public value coexists with a political culture that rewards its opposite. That gap is the Empire's central subject. Klingons who take the honour code seriously find themselves at odds with the institution that claims it, and the setting's most admired Klingon characters are almost always in that position."
+    },
+    {
+     "heading": "Visiting",
+     "body": "Qo'noS receives outsiders, and the experience is not gentle. Federation visitors report heat, pressure, food that is alive and intended to be, drink that is genuinely dangerous, and a social register in which insult is a form of address and hesitation is read as weakness. Diplomatic missions there are considered demanding postings. Klingon hospitality is real and unmistakably its own. A guest is fed enormously, argued with vigorously, and defended absolutely against anyone else — and a visitor who joins the argument rather than enduring it is regarded far more favourably than one who is polite. The First City is ancient, monumental and built to intimidate, and the setting uses it as the Empire's self-portrait: a civilisation with a very long memory, considerable dignity, and no interest whatever in making anyone comfortable."
+    }
+   ]
+  },
+  {
+   "id": "fed-romulus",
+   "title": "Romulus and the Star Empire",
+   "category": "Worlds & Stations",
+   "summary": "The world the Vulcans left behind became: an empire built on secrecy, and a senate nobody quite trusts.",
+   "sections": [
+    {
+     "heading": "A Vulcan Offshoot",
+     "body": "Romulans and Vulcans share an origin. The Romulans descend from those who rejected the discipline of logic when it was adopted, left their homeworld, and settled two worlds elsewhere — Romulus and its companion. The setting reveals this comparatively late, and the revelation reframes both peoples: the Vulcans as a civilisation whose most famous virtue was a choice made against a real alternative, and the Romulans as what happens when that choice goes the other way. The result is a people with Vulcan physiology and none of Vulcan restraint — passionate, proud, deeply familial, and possessed of the same formidable intellect turned toward advantage rather than toward truth. Physically they are near-identical, which the setting exploits at every opportunity. The relationship between the two is not warm. Vulcans regard the Romulans as a road not taken; Romulans regard Vulcans as relatives who abandoned their nature and then lectured everyone about it."
+    },
+    {
+     "heading": "Secrecy as Statecraft",
+     "body": "The Romulan Star Empire runs on concealment the way other powers run on force. Its worlds are closed, its intentions are stated obliquely, its fleets are cloaked, and its diplomacy assumes that every offer conceals a purpose — including its own. A Romulan negotiating in good faith is doing something their own culture would find slightly embarrassing. The internal instrument of this is the Tal Shiar, an intelligence service whose reach extends into the military, the Senate and private households, and which is feared by Romulans far more than by anyone outside. A state where the security service can remove a senator is a state where nobody's position is secure, and the setting's Romulan characters conduct themselves accordingly. The strategic consequence is that Romulan policy is hard to read from outside and frequently hard to read from inside. Long silences followed by sudden action are characteristic, and the Neutral Zone exists partly because nobody could establish what they wanted for long enough to negotiate about it."
+    },
+    {
+     "heading": "The Senate",
+     "body": "Government is by a Senate headed by a Praetor, with the military as a distinct power centre and the intelligence service as a third. The setting's Romulan politics are consequently triangular, and its plots turn on which of the three is currently ascendant — a military commander who despises the Tal Shiar, a senator manoeuvring against the Praetor, an agent loyal to none of them. Romulan patriotism is genuine and is the thing the intrigue runs on. Officers who conspire do so for the Empire as they understand it, and the setting is careful to show that its Romulan antagonists are not cynics. They are people who believe the state is worth protecting from the people currently running it. That makes the Empire the setting's most usable political antagonist. It cannot be won over by an appeal to shared values, cannot be intimidated, and contains factions who would rather deal with the Federation than with each other — which is the only opening anyone ever gets."
+    },
+    {
+     "heading": "The Worlds",
+     "body": "Romulus is described as green, temperate and beautiful, which is deliberately at odds with the reputation of the people on it. Its capital is monumental, its senate chamber theatrical, and its landscape is one of the few things Romulans discuss with visitors without calculation. The companion world shares the system and much of the culture, and the pairing is used to establish that the Empire is a genuine civilisation with a homeland rather than a fleet with a flag. Beyond them lies a large territory of subject and allied worlds administered with the same combination of competence and suspicion. Later material destroys the system entirely in a stellar catastrophe, scattering the survivors and shattering the Empire's coherence. Whatever a reader's view of that development, it changes the Romulans from a rival power into a diaspora, and everything written about them afterwards is written in that shadow."
+    }
+   ]
+  }
+ ]
+}

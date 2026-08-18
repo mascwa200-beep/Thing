@@ -41,8 +41,13 @@ set -uo pipefail
 G=/opt/gradle-8.14.3/lib
 GC=/root/.gradle/caches/modules-2/files-2.1
 COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar' 2>/dev/null | head -1)
+# kotlinx-serialization too: without it every @Serializable app model fails on the annotation,
+# and the differencing then reports each NEWLY ADDED member of that model as unresolved. That is
+# a pure false positive and it fires on the commonest edit there is — adding a field to a cached
+# data class — so the jar belongs here rather than in a caveat.
+SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.jar' 2>/dev/null | head -1)
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$COR:$G/kotlin-stdlib-2.0.21.jar"
+TARGET_CP="$COR:$SER:$G/kotlin-stdlib-2.0.21.jar"
 
 # The whole pure core, so its types DO resolve — exactly one file in it imports android.*.
 mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')

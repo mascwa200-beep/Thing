@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,6 +27,7 @@ import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.desktop.telemetry.Freshness
 import dev.mascwa.pulse.desktop.telemetry.MediaBias
 import dev.mascwa.pulse.desktop.telemetry.NewsInsights
+import dev.mascwa.pulse.desktop.telemetry.NewsSummary
 import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
 import dev.mascwa.pulse.desktop.telemetry.Tone
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
@@ -50,8 +52,20 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
     val c = Pulse.colors
 
+    // The feed keeps itself current only while it is the screen being shown. Off it, there is no timer
+    // running at all — see NewsViewModel.setOnScreen.
+    DisposableEffect(Unit) {
+        vm.setOnScreen(true)
+        onDispose { vm.setOnScreen(false) }
+    }
+
     Column(modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-        LcarsHeaderBar("News", trailing = if (state.articles.isEmpty()) null else "${state.articles.size} STORIES")
+        LcarsHeaderBar(
+            "News",
+            // Said rather than left to be discovered: a page that silently rewrites itself every five
+            // minutes is unsettling; one that says it is live is a feature.
+            trailing = if (state.articles.isEmpty()) null else "LIVE · ${state.articles.size} STORIES",
+        )
 
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
@@ -123,9 +137,11 @@ private fun ArticleCard(article: Article, all: List<Article>) {
                 fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = c.ink,
                 modifier = Modifier.padding(top = 3.dp),
             )
-            if (article.summary.isNotBlank()) {
+            // The same rule as the phone: an aggregator's description opens with the headline,
+            // and printing it here printed the line above it again.
+            NewsSummary.subtitle(article.title, article.summary, article.source)?.let {
                 Text(
-                    article.summary,
+                    it,
                     fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted,
                     maxLines = 3, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp),

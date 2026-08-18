@@ -146,7 +146,7 @@ object EmergencyTriage {
             label = "Burn",
             firstAction = "Cool the burn under cool running water for twenty minutes. Nothing else on " +
                 "it — no ice, no butter, no cream. Remove tight items before swelling starts.",
-            guideId = "first-aid", section = "Burns",
+            guideId = "first-aid", section = "Burns and scalds — how to treat a burn",
             // Not a bare "burn": that fires on calorie burn and controlled burns. These are all
             // phrasings about a person having been burned.
             cues = listOf(

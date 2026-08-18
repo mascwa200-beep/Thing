@@ -277,6 +277,18 @@ data class NotificationPrefs(
     /** Whether a NEW urgent item (due reminder, major emergency, security/safety notice) may re-post the
      *  board with sound and vibration. Off = the board still updates, just always silently. */
     val urgentAlertsEnabled: Boolean = true,
+    /**
+     * The official-emergency takeover: a full-screen condition-red screen and a full-volume alarm
+     * when a government feed publishes a life-threatening alert covering your location.
+     *
+     * ⚠️ Default ON, and deliberately so — an emergency warning that ships switched off protects
+     * nobody. The alarm plays on the alarm stream regardless of silent or Do Not Disturb, which is
+     * the owner's explicit instruction and the whole point of the feature; this switch turns the
+     * feature off entirely, and there is no per-alert mute.
+     *
+     * ⚠️ Coverage is the feed's, not ours: `api.weather.gov` answers only inside the United States.
+     */
+    val emergencyTakeover: Boolean = true,
 )
 
 /**
@@ -471,6 +483,12 @@ data class AppSettings(
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
+    /** Offer live TV channels from the volunteer-maintained iptv-org catalogue alongside the handful
+     *  of broadcasters' own feeds the app ships with. **Default OFF, and it is a switch rather than a
+     *  silent merge on purpose**: that catalogue is of mixed origin and includes unauthorised
+     *  restreams of channels that are not free to watch, which is the owner's call to make and not
+     *  ours. Costs a ~215 KB fetch, cached for a week. */
+    val communityChannels: Boolean = false,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,

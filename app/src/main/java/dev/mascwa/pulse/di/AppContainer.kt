@@ -154,6 +154,10 @@ class AppContainer(private val appContext: Context) {
     val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
         dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
     }
+    /** The opt-in community TV catalogue. Nothing fetches through this unless the switch is on. */
+    val liveCatalogRepository: dev.mascwa.pulse.data.live.LiveCatalogRepository by lazy {
+        dev.mascwa.pulse.data.live.LiveCatalogRepository(http, diskCache)
+    }
     val marketsRepository: MarketsRepository by lazy {
         MarketsRepository(http, diskCache, settingsRepository)
     }
@@ -226,6 +230,13 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
     }
     /**
+     * Live official alerts for the emergency watch — uncached by design, unlike [safetyRepository].
+     * A warning served from a ten-minute cache is a warning that can be ten minutes late.
+     */
+    val emergencyAlertRepository: dev.mascwa.pulse.data.safety.EmergencyAlertRepository by lazy {
+        dev.mascwa.pulse.data.safety.EmergencyAlertRepository(http)
+    }
+    /**
      * The one place that asks the bundled library whether it has anything to say about a question.
      *
      * Shared by the voice service and the chat console: each having its own copy of "which guide,
@@ -237,7 +248,23 @@ class AppContainer(private val appContext: Context) {
     }
 
     val survivalContentRepository: SurvivalContentRepository by lazy {
-        SurvivalContentRepository(appContext, json)
+        SurvivalContentRepository(appContext, json, packStore)
+    }
+
+    /**
+     * Installed expansion packs.
+     *
+     * Passed into the library repository rather than consulted by anything else: the merge belongs at
+     * the one place that answers "what is in the library", so the reader, search, study and the
+     * assistant's tools see one corpus without knowing packs exist.
+     */
+    val packStore: dev.mascwa.pulse.data.survival.PackStore by lazy {
+        dev.mascwa.pulse.data.survival.PackStore(appContext, json)
+    }
+
+    /** Browsing and fetching published packs. Only the wire between the format, the archive and the store. */
+    val packRepository: dev.mascwa.pulse.data.survival.PackRepository by lazy {
+        dev.mascwa.pulse.data.survival.PackRepository(http, settingsRepository, packStore, appContext.cacheDir)
     }
 
     /**
@@ -255,7 +282,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
     }
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
-        dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
+        dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache, tleRepository)
     }
 
     // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----

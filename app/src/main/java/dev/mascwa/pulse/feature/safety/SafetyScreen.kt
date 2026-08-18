@@ -47,6 +47,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import dev.mascwa.pulse.core.telemetry.Seismic
 
 @Composable
 fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
@@ -126,6 +127,7 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                             SafetyCoverage.describeChecked(states)?.let { append("\n\n").append(it) }
                             SafetyCoverage.explainSilence(states)?.let { append("\n").append(it) }
                         },
+                        onRetry = { vm.refresh() },
                     )
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp, top = 8.dp),
@@ -164,8 +166,13 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
     LcarsFrame(Modifier.fillMaxWidth().clickable { onClick() }, accent = color) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${type.label.uppercase()} · ${severity.name}", fontFamily = JetBrainsMono,
-                    fontSize = 9.sp, color = color)
+                // "HAPPENING NOW" against "FORECAST" is the distinction the app could not draw
+                // before, because it read CAP's severity and ignored urgency and certainty.
+                Text(
+                    listOfNotNull(type.label.uppercase(), severity.name, incident.timing)
+                        .joinToString(" · "),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = color,
+                )
                 Text(Formatters.relativeTime(incident.timeEpochMs), fontFamily = JetBrainsMono,
                     fontSize = 9.sp, color = c.muted)
             }
@@ -175,6 +182,43 @@ private fun IncidentRow(incident: Incident, onClick: () -> Unit) {
                 "${Geo.formatDistance(incident.distanceMeters)} · ${Geo.cardinal(incident.bearing)}" else "Your area"
             Text("$dist · ${incident.source}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.accent,
                 modifier = Modifier.padding(top = 2.dp))
+            // Depth, the tsunami flag and USGS's own impact call — all of it arrives on every
+            // earthquake in the feed and none of it was read until now. Empty for the other
+            // sources, which have no equivalent, so the row is unchanged for them.
+            val facts = Seismic.compactFacts(
+                depthKm = incident.depthKm,
+                tsunami = incident.tsunami,
+                pagerAlert = incident.pagerAlert,
+                magType = incident.magType,
+            )
+            if (facts.isNotEmpty()) {
+                Text(
+                    facts.joinToString("  ·  "),
+                    fontFamily = JetBrainsMono, fontSize = 9.sp,
+                    // A tsunami evaluation is the one fact that should catch the eye on its own.
+                    color = if (incident.tsunami) c.magenta else c.muted,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            // What the issuing authority says to do. It arrives on nearly every weather alert and
+            // was parsed away; in a safety feature it is the most useful line on the row.
+            incident.instruction?.let { what ->
+                Text(
+                    what,
+                    fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            // Size and depth mean little apart; this is the sentence that combines them honestly.
+            incident.magnitude?.let { m ->
+                incident.depthKm?.let { d ->
+                    Text(
+                        Seismic.impact(m, d),
+                        fontFamily = ChakraPetch, fontSize = 11.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
         }
     }
 }

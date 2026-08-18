@@ -49,6 +49,7 @@ object BreakingNewsPulse {
                     notifier = container.notifier,
                     headline = major.title,
                     query = EmergencyNews.topicQuery(major.title),
+                    source = major.source,
                 )
                 firedInterrupt = major.title
                 firedInterruptMs = System.currentTimeMillis()

@@ -578,7 +578,7 @@
   },
   {
    "id": "astro-galaxies-and-cosmology",
-   "title": "Galaxies, the Universe and Cosmology",
+   "title": "Galaxies: What a Galaxy Is, and How the Universe Is Built",
    "category": "Astronomy",
    "summary": "From the anatomy of the Milky Way out to the observable horizon: galaxy types, how astronomers actually measure cosmic distances, Hubble's law and redshift, the three pillars of Big Bang evidence, and the hard observational case for dark matter and dark energy — with formulas, worked calculations and the misconceptions to avoid.",
    "headings": [
@@ -662,7 +662,7 @@
    "id": "astro-rockets-and-orbital-mechanics",
    "title": "Rockets and Orbital Mechanics: How to Actually Get to Space and Stay There",
    "category": "Astronomy",
-   "summary": "The physics of why rockets work, why they come in stages, and what it actually costs in velocity to reach orbit, the Moon, or Mars — plus the orbital mechanics that governs everything once you're up there.",
+   "summary": "The physics of why rockets work, why they come in stages, and what it actually costs in velocity to reach orbit, the Moon, or Mars — plus the orbital mechanics that governs everything once you're up there. Worked throughout with real vehicles, the Space Shuttle chief among them.",
    "headings": [
     "Newton's Third Law in a Can: Why Rockets Work Without Air to Push Against",
     "The Tsiolkovsky Rocket Equation: The One Formula That Governs Everything",
@@ -675,7 +675,7 @@
     "Tools, Materials, and Where to Get Them",
     "Step-by-Step: Launch a Model Rocket and Verify the Rocket Equation Yourself",
     "From Launch to Orbit: Gravity Losses, Drag Losses, and the Gravity Turn",
-    "Reentry and Coming Home",
+    "Reentry and Coming Home: Heat Shields and Space Shuttle Tiles",
     "Practical Applications: Satellites, Stations, and Real Launch Economics"
    ],
    "file": "guides_astronomy.json"
@@ -1659,6 +1659,28 @@
     "Keeping the Analysis Alive: Cadence, Battlecards and Sales Enablement",
     "Legal and Ethical Boundaries of Competitive Intelligence",
     "Failure Modes: How Competitor Analysis Misleads Founders"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "employment-and-rights-at-work",
+   "title": "Employment and Your Rights at Work: Contracts, Pay, Leave, Grievances and Dismissal",
+   "category": "Business & Finance",
+   "summary": "What your employment rights actually are and how to use them: employee, worker or self-employed contractor and why the label decides everything, what is in a contract of employment, minimum wage and payslips and unlawful deductions, working time and rest breaks and holiday, sick leave and parental leave, health and safety, discrimination, harassment and reasonable adjustments, how to raise a grievance, disciplinary procedure, notice, redundancy and unfair dismissal, references and non-compete clauses, unions and representation, and the time limits for a claim.",
+   "headings": [
+    "Employee, Worker or Contractor — and Why the Label Decides Everything",
+    "The Contract: What You Are Actually Agreeing To",
+    "Pay: Minimum Wage, Payslips, Deductions and Being Underpaid",
+    "Working Time, Rest Breaks and Holiday",
+    "Sick Leave, Parental Leave and Other Time Off",
+    "Health and Safety at Work",
+    "Discrimination, Harassment and Reasonable Adjustments",
+    "Grievances: Raising a Problem Formally",
+    "Discipline, Performance and the Process That Should Happen",
+    "Dismissal, Notice and Redundancy",
+    "References, Non-Compete Clauses and Restrictive Covenants After Leaving",
+    "Unions, Representation and Collective Bargaining",
+    "Getting Help, Tribunal Time Limits and Enforcing Your Rights"
    ],
    "file": "guides_business_and_finance.json"
   },
@@ -5622,6 +5644,28 @@
    "file": "guides_energy_and_environment.json"
   },
   {
+   "id": "nuclear-power-and-reactors",
+   "title": "Nuclear Power: How a Reactor Makes Electricity, Uranium Fuel, Radiation, Waste and Cost",
+   "category": "Energy & Environment",
+   "summary": "Nuclear energy from the inside: how a nuclear reactor turns uranium fission into steam and electricity, why the chain reaction is controllable, what the pressurised and boiling water designs actually do, the fuel cycle from ore to fuel assembly, radioactive waste and where it goes, radiation dose in numbers you can compare, what Three Mile Island, Chernobyl and Fukushima each taught, and why the money — not the physics — is the hard part.",
+   "headings": [
+    "A reactor is a kettle with an unusual firebox",
+    "The chain reaction, and the accident of physics that makes it controllable",
+    "Moderation: why the neutrons have to be slowed down",
+    "Control: rods, boron, and the feedback that acts faster than any operator",
+    "The pressurised water reactor, and why most of the world runs one",
+    "Boiling water, heavy water, gas and the designs that took another road",
+    "Decay heat: the problem that does not switch off",
+    "The fuel cycle: from ore in the ground to a bundle in the core",
+    "What comes out: spent fuel, and the honest state of the waste question",
+    "Three accidents, and what each one actually taught",
+    "Radiation dose, in numbers you can actually compare",
+    "What it costs, and why the money is the genuinely hard part",
+    "Where nuclear fits alongside wind and solar"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
    "id": "eng-electricity-and-circuits-from-scratch",
    "title": "Electricity & Circuits From Scratch",
    "category": "Engineering",
@@ -6364,6 +6408,58 @@
     "When it goes wrong: failure modes and recovery"
    ],
    "file": "guides_essentials.json"
+  },
+  {
+   "id": "fed-first-contact-and-founding",
+   "title": "From First Contact to the Founding",
+   "category": "Federation Timeline",
+   "summary": "The century between Earth's first warp flight and the Federation charter, and why the setting treats it as the hinge.",
+   "headings": [
+    "The Flight and the Meeting",
+    "The Difficult Apprenticeship",
+    "The Charter",
+    "Why the Period Is Told and Retold"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "fed-dominion-war",
+   "title": "The Dominion War",
+   "category": "Federation Timeline",
+   "summary": "The conflict that tested whether the Federation's principles were commitments or comforts.",
+   "headings": [
+    "The Adversary",
+    "How It Started",
+    "What the War Did to the Federation",
+    "Afterwards"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "fed-khitomer-accords",
+   "title": "The Khitomer Accords",
+   "category": "Federation Timeline",
+   "summary": "How a century of hostility with the Klingon Empire ended, and what it cost the people who ended it.",
+   "headings": [
+    "The Situation",
+    "The Conspiracy",
+    "What Was Signed",
+    "Why It Is the Setting's Favourite Story"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "fed-earth-romulan-war",
+   "title": "The Earth-Romulan War",
+   "category": "Federation Timeline",
+   "summary": "The conflict that made the Federation necessary, fought between powers that never saw each other.",
+   "headings": [
+    "Before the Founding",
+    "A War Without a Face",
+    "How It Ended",
+    "What It Established"
+   ],
+   "file": "guides_federation_timeline.json"
   },
   {
    "id": "mindset",
@@ -8339,6 +8435,72 @@
    "file": "guides_history.json"
   },
   {
+   "id": "the-roman-world",
+   "title": "The Roman World: The Republic, the Roman Empire, and What They Left Behind",
+   "category": "History",
+   "summary": "A survey of Rome from village to empire and after: how the Republic governed itself, why the army could lose battles and still win wars, Julius Caesar and the civil wars that broke the Republic, Augustus and the invention of the emperor, how a handful of officials ran fifty million people, Roman law and citizenship and why both still matter, daily life, slavery, the engineering, the arrival of Christianity, the third-century crisis and the end of the western empire — and what genuinely survived, as against what merely claims to.",
+   "headings": [
+    "From City to Republic: How Rome Began and How It Governed Itself",
+    "The Roman Army, the Punic Wars against Carthage, and How Rome Actually Conquered",
+    "The Republic Breaks: Land, Civil War, and Julius Caesar's Rise to Power",
+    "Augustus and the Invention of the Emperor",
+    "Running an Empire: Provinces, Roads, Taxes and Cities",
+    "Roman Law, and Why It Still Shapes Yours",
+    "Citizenship: The Idea That Made Rome Different",
+    "Daily Life, Work and the Roman City",
+    "Slavery in the Roman World",
+    "Engineering: Concrete, Aqueducts, Roads and Baths",
+    "Religion, and the Arrival of Christianity",
+    "Crisis, Division and the End of the Western Empire",
+    "What Actually Survived: The Roman Inheritance"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "diplomacy-and-treaties",
+   "title": "Diplomacy and Treaties: Embassies, Negotiation, and How Wars End",
+   "category": "History",
+   "summary": "How states deal with each other and how the modern order was built: what diplomacy is and what a diplomat does, embassies and consulates and high commissions, ambassadors, credentials, agrement and persona non grata, what diplomatic immunity actually covers under the Vienna Conventions and why an embassy is not foreign soil, how a treaty is made from negotiation through signature and ratification to entry into force, reservations and denunciation, the craft of negotiation and mediation, the difference between a ceasefire, an armistice and a peace treaty and how wars really end, Westphalia and sovereignty, the Congress of Vienna, the failure of Versailles, the United Nations and the Security Council veto, arms control and verification, sanctions and summits and soft power, and where international law comes from and what enforces it.",
+   "headings": [
+    "What Diplomacy Is, and What It Is For",
+    "Embassies, Consulates and Who Is Who",
+    "Diplomatic Immunity: What It Actually Covers",
+    "How a Treaty Is Made",
+    "Negotiation: How Agreements Are Actually Reached",
+    "How Wars End: Ceasefires, Armistices and Peace Treaties",
+    "Westphalia and the Idea of the Sovereign State",
+    "Vienna 1815 and the Nineteenth-Century Order",
+    "Versailles 1919 and the Peace That Failed",
+    "1945: The United Nations and the Post-War Architecture",
+    "Arms Control, Verification and Trust",
+    "Modern Diplomacy: Sanctions, Summits and Soft Power",
+    "International Law: What It Is and What Holds It Up"
+   ],
+   "file": "guides_history.json"
+  },
+  {
+   "id": "the-second-world-war",
+   "title": "The Second World War (WWII / WW2, 1939-1945): Causes, Course, the Holocaust, and What It Left",
+   "category": "History",
+   "summary": "World War Two as history rather than legend: why a second general war followed the first within twenty years, how Germany overran Europe and then invaded the Soviet Union, the Eastern Front where the war was mainly decided, the Atlantic and the bombing campaign, the war against Japan in the Pacific, already running since 1937, the Holocaust, occupation and resistance, Normandy and the fall of Berlin, the atomic bombs and the argument about them, what it all cost, and the institutions the survivors built out of the wreckage.",
+   "headings": [
+    "What made another war possible twenty years after the last one",
+    "1939 to 1941: Poland, the fall of France, Dunkirk and the Battle of Britain",
+    "The Eastern Front: Barbarossa, Stalingrad and Kursk, where the war was mainly decided",
+    "The war at sea, and the war in the air",
+    "The Pacific war and Pearl Harbor, already running before 1939",
+    "The Holocaust",
+    "Occupation, collaboration, resistance, and the home fronts",
+    "The Mediterranean: North Africa, Italy, and the war's first Allied turn",
+    "1944 to 1945: D-Day and Normandy, the Battle of the Bulge, and the fall of Berlin",
+    "Hiroshima, Nagasaki and the argument about the atomic bomb",
+    "The cost, and the difficulty of counting it",
+    "Things commonly got wrong about this war",
+    "What the war left"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
@@ -8781,6 +8943,28 @@
    "file": "guides_language_and_linguistics.json"
   },
   {
+   "id": "translation-and-interpreting-as-work",
+   "title": "Translation and Interpreting: What a Translator and an Interpreter Actually Do",
+   "category": "Language & Linguistics",
+   "summary": "The two professions and why they are different jobs: what a translator does and what an interpreter does, simultaneous interpreting in the booth and why interpreters work in pairs, consecutive interpreting and its symbolic note-taking system, liaison, community and remote interpreting over the phone and by video, sign language interpreting and Deaf interpreters, court and legal interpreting, medical interpreting and why a family member must never be used, technical, legal, patent and marketing translation with CAT tools and translation memory, subtitling, dubbing and audio description, software, website and game localisation, machine translation and post-editing, how to become a translator or interpreter, and the ethics of accuracy, impartiality and confidentiality.",
+   "headings": [
+    "Two Different Jobs: Translation and Interpreting",
+    "Simultaneous Interpreting: The Booth",
+    "Consecutive Interpreting and the Art of Note-Taking",
+    "Liaison, Community and Remote Interpreting",
+    "Sign Language Interpreting",
+    "Court and Legal Interpreting",
+    "Medical Interpreting",
+    "Technical, Legal and Commercial Translation",
+    "Subtitling, Dubbing and Audiovisual Translation",
+    "Localisation: Software, Games and Websites",
+    "Machine Translation and Post-Editing",
+    "Becoming a Translator or Interpreter",
+    "Ethics: Accuracy, Impartiality and Confidentiality"
+   ],
+   "file": "guides_language_and_linguistics.json"
+  },
+  {
    "id": "theories-of-justice",
    "title": "Theories of Justice",
    "category": "Law & Government",
@@ -9024,6 +9208,50 @@
    "file": "guides_law_and_government.json"
   },
   {
+   "id": "how-government-works",
+   "title": "How Government Works: Parliaments, Senates, Councils and the Making of Law",
+   "category": "Law & Government",
+   "summary": "A working guide to how states actually govern: the separation of powers, what a legislature does, why there is often a senate or second chamber, how a bill becomes law, what a local council controls and how to object to a planning application, how voting systems from first-past-the-post to proportional representation change the result, what a court does and how the courts work, the civil service, standing orders, federal and unitary structures — and the practical routes to find out and take part.",
+   "headings": [
+    "The Three Powers, and Why They Are Kept Apart",
+    "Legislatures: Assemblies, Parliaments and Congresses",
+    "Why So Many Legislatures Have Two Chambers, and What a Senate Is",
+    "How a Bill Becomes Law",
+    "Committees: Where the Work Actually Happens",
+    "The Executive: Presidents, Prime Ministers and Cabinets",
+    "Local Government: Councils, Mayors, Planning Applications and What They Control",
+    "Elections, First-Past-the-Post and Proportional Representation",
+    "The Courts: What a Court Does, and Judicial Review",
+    "The Civil Service and the Permanent State",
+    "Standing Orders, Procedure and Why Rules of Debate Matter",
+    "Federal, Unitary and Devolved: Who Decides What",
+    "How to Find Out, and How to Take Part"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
+   "id": "passports-visas-and-crossing-borders",
+   "title": "Passports, Visas and Crossing a Border: Travel Documents, Entry Rules, Customs and Losing Your Passport Abroad",
+   "category": "Law & Government",
+   "summary": "What a passport is and what it does not entitle you to, how to get and renew one, the validity rules that get people turned away at check-in, visas, the Schengen 90/180 rule and the electronic travel authorisations that are not quite visas, what actually happens at immigration and customs, being refused entry or overstaying, land and sea borders and transit, what to do if your passport is lost or stolen abroad, what a consulate can and cannot do for you, and the rules on dual nationality and travelling with children.",
+   "headings": [
+    "What a passport actually is, and the thing it does not do",
+    "Getting one: the application, the photograph, and the wait",
+    "The validity rules that catch people out",
+    "Visas: what they are, who decides, and the classes you will meet",
+    "Visa-free travel, Schengen limits, and electronic authorisations like ESTA and ETIAS",
+    "Before you go: the preparation that costs an hour and saves a trip",
+    "What actually happens at a border",
+    "Being refused entry, and overstaying",
+    "Customs: what you declare, and what will simply be taken",
+    "Land borders, sea crossings and transit",
+    "Losing your passport abroad",
+    "What a consulate can and cannot do for you",
+    "Dual nationality, second passports, and travelling with children"
+   ],
+   "file": "guides_law_and_government.json"
+  },
+  {
    "id": "hermeneutics-the-art-of-interpretation",
    "title": "Hermeneutics & the Art of Interpretation",
    "category": "Literature & Writing",
@@ -9079,7 +9307,7 @@
    "id": "literary-translation-art-theory-famous-cases",
    "title": "Literary Translation — Art, Theory & Famous Cases",
    "category": "Literature & Writing",
-   "summary": "How literature crosses languages: the history and theory of translation from Cicero to Venuti, the craft as practiced, and famous cases from Homer and the Bible to Proust, Kafka, and the untranslatables.",
+   "summary": "How literature crosses languages: the history and theory of translation from Cicero to Venuti, what literary translators actually do and how the craft is practised, and famous cases from Homer and the Bible to Proust, Kafka, and the untranslatables.",
    "headings": [
     "The Impossible, Necessary Art",
     "Antiquity: The Septuagint, Cicero, and the Birth of Theory",
@@ -9484,9 +9712,9 @@
    "id": "make-metalworking-forging-heat-tools",
    "title": "Metalworking & Forging: Heat, Metals & Tools",
    "category": "Making",
-   "summary": "The science and craft of shaping metal: what metals and alloys are, forging temperatures and colors, heat treatment (annealing, hardening, tempering), basic tools and joining, plus safety.",
+   "summary": "Practical metallurgy and the craft of shaping metal: what metals, steel and alloys are, steelmaking and carbon content, forging temperatures and colors, heat treatment (annealing, hardening, quenching, tempering), basic tools and joining, plus safety.",
    "headings": [
-    "Metals, Alloys & Key Properties",
+    "Metals, Alloys and Practical Metallurgy: Key Properties",
     "Heat and Forging: Reading the Colors",
     "Heat Treatment: Annealing, Hardening, Tempering",
     "The Basic Toolkit and How Force Shapes Metal",
@@ -9884,6 +10112,28 @@
    "file": "guides_mathematics.json"
   },
   {
+   "id": "infinity-and-the-continuum",
+   "title": "Infinity and the Transfinite: Countable and Uncountable Sets, Limits, and the Continuum",
+   "category": "Mathematics",
+   "summary": "What infinity actually is, and why it is not a number: potential against actual infinity and the two-thousand-year argument about it, comparing sizes by bijection and Hilbert's hotel, why the integers and rationals and even the algebraic numbers are all countable, Cantor's diagonal argument that the real numbers are not and that there is no largest infinity, cardinal numbers and the continuum hypothesis and why it is independent of the standard axioms, ordinals and counting past infinity, how the epsilon-delta definition of a limit lets calculus handle infinity without ever using it, infinite series and convergence and why the harmonic series diverges, Zeno's paradoxes and what really resolves them, infinitesimals from Leibniz through Berkeley's attack to non-standard analysis, points at infinity in projective geometry, singularities in physics and whether the universe is infinite, and the paradoxes of Gabriel's horn, Banach-Tarski and Russell.",
+   "headings": [
+    "Infinity Is Not a Number",
+    "Potential and Actual Infinity: A Two-Thousand-Year Argument",
+    "Counting Without Numbers: Bijection and Hilbert's Hotel",
+    "The Countable Infinities: Integers, Rationals and Algebraic Numbers",
+    "Cantor's Diagonal Argument: Some Infinities Are Bigger",
+    "Cardinals and the Continuum Hypothesis",
+    "Ordinals and Transfinite Induction: Counting Past Infinity",
+    "Limits: How Calculus Handles Infinity Without Using It",
+    "Infinite Series: When an Endless Sum Has a Finite Answer",
+    "Zeno's Paradoxes and What Actually Resolves Them",
+    "Infinitesimals: The Idea That Was Banished and Then Rehabilitated",
+    "Infinity in Geometry, Physics and Cosmology",
+    "Paradoxes of the Infinite"
+   ],
+   "file": "guides_mathematics.json"
+  },
+  {
    "id": "orson-welles-and-citizen-kane",
    "title": "Orson Welles and Citizen Kane",
    "category": "Media & Communication",
@@ -10226,7 +10476,7 @@
    "id": "first-aid",
    "title": "First Aid",
    "category": "Medical",
-   "summary": "Bleeding, CPR, shock, burns, fractures and choking.",
+   "summary": "Bleeding, CPR, shock, how to treat a burn or scald, fractures and choking.",
    "headings": [
     "Priorities (DR ABC)",
     "Severe bleeding",
@@ -10234,7 +10484,7 @@
     "Choking",
     "Shock",
     "Recovery position",
-    "Burns",
+    "Burns and scalds — how to treat a burn",
     "Cleaning a wound",
     "Splinting a fracture",
     "Sprains — RICE"
@@ -10371,7 +10621,7 @@
    "id": "med-pediatric-elderly-care-differences",
    "title": "Pediatric and Elderly Care: Why Age Changes the Rules",
    "category": "Medical",
-   "summary": "Explains why the same first-aid technique, drug dose, or 'normal' vital sign that's correct for a healthy adult can be wrong — sometimes dangerously wrong — at either end of the age spectrum, and gives concrete tools for adjusting care accordingly.",
+   "summary": "Explains why the same first-aid technique — CPR on a child or infant included —, drug dose, or 'normal' vital sign that's correct for a healthy adult can be wrong — sometimes dangerously wrong — at either end of the age spectrum, and gives concrete tools for adjusting care accordingly.",
    "headings": [
     "Why the Same Body Doesn't Apply at Every Age",
     "Vital Signs Across the Lifespan — the Numbers That Actually Change",
@@ -10380,7 +10630,7 @@
     "Estimating Weight When You Can't Weigh Them",
     "Elderly Pharmacology — Why the Same Pill Hits Harder",
     "Atypical Presentation — When Illness Doesn't Look Like Illness",
-    "First Aid Technique Changes With Age",
+    "First Aid Technique Changes With Age: CPR on a Child or Infant, Choking and Compressions",
     "Common Misconceptions at Both Ends of Life",
     "Tools & Materials for Observing and Practicing This",
     "Step-by-Step: Building Your Own Age-Aware First Aid Skills",
@@ -10486,6 +10736,28 @@
     "Fluids, and when not to give them",
     "Who is at risk, and the ones people forget",
     "Staying ahead of the heat"
+   ],
+   "file": "guides_medical.json"
+  },
+  {
+   "id": "getting-medical-care",
+   "title": "Getting Medical Care: What Doctors and Nurses Do, and When to See Them",
+   "category": "Medical",
+   "summary": "How to actually use a health service: who does what — doctors, nurses, paramedics, pharmacists and allied professions — what a doctor's job really involves, when to seek help and how urgently, how a hospital emergency department or emergency room triages, getting the most from a short appointment, how diagnoses are made and what tests can and cannot tell you, prescriptions, referrals and second opinions, consent and the right to refuse, your records, how health systems are paid for, and how to raise a concern.",
+   "headings": [
+    "Who Does What: Doctors, Nurses, Paramedics, Pharmacists and the Rest",
+    "What a Doctor Actually Does, and Why Uncertainty Is Normal",
+    "Primary Care and the Generalist's Job",
+    "When to Seek Help, and How Urgently",
+    "Emergency Departments and the Emergency Room: Triage, Waiting, and What They Are For",
+    "Getting the Most Out of a Short Appointment",
+    "How a Diagnosis Is Made, and What Tests Can and Cannot Tell You",
+    "Prescriptions, Pharmacists and Taking Medicines Properly",
+    "Referrals, Specialists, Waiting Lists and Second Opinions",
+    "Consent, Capacity and the Right to Refuse",
+    "Your Records, Results and How to See Them",
+    "How Health Systems Are Paid For, and Why That Changes What You Get",
+    "When Something Goes Wrong: Raising Concerns and Complaints"
    ],
    "file": "guides_medical.json"
   },
@@ -11063,6 +11335,84 @@
     "GPS as a Tool, Not a Replacement for Map and Compass"
    ],
    "file": "guides_navigation.json"
+  },
+  {
+   "id": "fed-the-starship-captain",
+   "title": "The Starship Captain",
+   "category": "Notable Figures",
+   "summary": "The setting's central role: what the job actually requires, and why so much turns on one person's judgement.",
+   "headings": [
+    "The Job",
+    "What the Service Actually Rewards",
+    "The Recurring Types",
+    "Why the Role Carries the Setting"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-science-officer",
+   "title": "The Science Officer",
+   "category": "Notable Figures",
+   "summary": "The Starfleet officer who makes exploration a profession: what the second chair is actually for.",
+   "headings": [
+    "The Post",
+    "The Discipline of the Answer",
+    "The Outsider's Chair",
+    "Why the Role Defines the Format"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-ships-doctor",
+   "title": "The Ship's Doctor",
+   "category": "Notable Figures",
+   "summary": "Sickbay and the one officer who can relieve a captain: medicine as the conscience of the crew.",
+   "headings": [
+    "The Post",
+    "The Authority to Relieve",
+    "The Conscience in the Room",
+    "Instruments and Limits"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-first-officer",
+   "title": "The First Officer",
+   "category": "Notable Figures",
+   "summary": "Second in command: the post that runs the ship, argues with the captain, and is not the captain.",
+   "headings": [
+    "The Post",
+    "Arguing With the Captain",
+    "The Question of Promotion",
+    "Why the Format Needs Two"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-chief-engineer",
+   "title": "The Chief Engineer of a Starship",
+   "category": "Notable Figures",
+   "summary": "The officer who keeps the ship alive: what engineering actually does, and why the answer is always a number.",
+   "headings": [
+    "The Post",
+    "The Estimate",
+    "Improvisation as a Speciality",
+    "Down Where the Ship Actually Is"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "fed-security-chief",
+   "title": "The Security Chief",
+   "category": "Notable Figures",
+   "summary": "The officer responsible for everyone's safety, in a service that would rather not need one.",
+   "headings": [
+    "The Post",
+    "Away Missions",
+    "Policing Your Own Crew",
+    "The Outsider Version"
+   ],
+   "file": "guides_notable_figures.json"
   },
   {
    "id": "carbohydrates-and-blood-sugar",
@@ -11770,12 +12120,12 @@
    "id": "phys-modern-physics-relativity-quantum",
    "title": "Modern Physics: Special Relativity & Quantum Mechanics, Worked With Real Numbers",
    "category": "Physics",
-   "summary": "How Einstein's relativity and the quantum revolution overturned two centuries of confident classical physics — walked through with the actual equations, the actual experiments, and numbers you can check on a calculator.",
+   "summary": "How Einstein's relativity and the quantum revolution overturned two centuries of confident classical physics — walked through with the actual equations, the actual experiments, and numbers you can check on a calculator. Includes antimatter: what a positron is and what happens when it meets an electron.",
    "headings": [
     "Why classical physics quietly stopped working",
     "Special relativity's two rules — and what they do to time",
     "Length contraction and why 'simultaneous' isn't universal",
-    "E = mc²: mass and energy are the same currency",
+    "E = mc²: mass and energy are the same currency — antimatter and the positron",
     "Light comes in packets: the photoelectric effect",
     "Everything is also a wave: de Broglie matter waves",
     "The uncertainty principle: why electrons don't sit still",
@@ -12894,6 +13244,28 @@
    "file": "guides_skills.json"
   },
   {
+   "id": "sharpening-knives-and-tools",
+   "title": "Sharpening: How to Sharpen a Knife, Axe, Chisel, Scissors and Serrated Blade",
+   "category": "Skills",
+   "summary": "Why a dull blade is the dangerous one, what an edge actually is, bevel angles for every kind of tool, choosing a whetstone and reading grit numbers, water stones, oil stones, diamond plates and sandpaper, finding and removing the burr, sharpening a kitchen knife on a stone step by step, honing steels and stropping, what pull-through and powered sharpeners cost you, axes and machetes, chisels and plane irons and why the flat back comes first, scissors and secateurs and serrated blades, field sharpening on a river stone or the base of a mug, and how to store tools so they stay sharp.",
+   "headings": [
+    "Why a Sharp Edge Is Safer Than a Dull One",
+    "What an Edge Actually Is: Bevels, Angles and Geometry",
+    "Steel, Hardness and What It Means for Sharpening",
+    "The Abrasives: Stones, Diamond, Ceramic and Sandpaper",
+    "Reading the Edge: The Burr, and How to Tell When It Is Sharp",
+    "Sharpening a Kitchen Knife on a Stone",
+    "Honing Steels, Stropping and Keeping an Edge Between Sharpenings",
+    "Pull-Through Sharpeners and Powered Systems: What They Cost You",
+    "Axes, Machetes and Outdoor Tools",
+    "Chisels, Plane Irons and Flat-Back Tools",
+    "Scissors, Secateurs and Serrated Blades",
+    "Field Sharpening Without Proper Kit",
+    "Storage, Care and Making an Edge Last"
+   ],
+   "file": "guides_skills.json"
+  },
+  {
    "id": "feminist-social-theory",
    "title": "Feminist Social Theory",
    "category": "Society & Culture",
@@ -13023,6 +13395,188 @@
    "file": "guides_society_and_culture.json"
   },
   {
+   "id": "fed-vulcans",
+   "title": "Vulcans",
+   "category": "Species & Civilisations",
+   "summary": "A civilisation that chose discipline over extinction: Vulcan biology, the logic tradition, and what the choice cost.",
+   "headings": [
+    "Biology and Homeworld",
+    "The Discipline of Logic",
+    "Society, Ritual and the Cycle",
+    "Vulcans and the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-klingons",
+   "title": "Klingons",
+   "category": "Species & Civilisations",
+   "summary": "A warrior culture written as a real civilisation: honour as law, the Empire's politics, and the long shift from adversary to ally.",
+   "headings": [
+    "Physiology and Temperament",
+    "Honour as a Legal System",
+    "The Empire and Its Politics",
+    "From Adversary to Ally"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-romulans",
+   "title": "Romulans",
+   "category": "Species & Civilisations",
+   "summary": "The Vulcans who refused the reform: an empire built on secrecy, suspicion and patience.",
+   "headings": [
+    "A Common Origin",
+    "The Star Empire",
+    "Character and Contradiction",
+    "The Neutral Zone and After"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-andorians",
+   "title": "Andorians",
+   "category": "Species & Civilisations",
+   "summary": "A cold-world people of martial honour and sensory antennae — and one of the Federation's founding members.",
+   "headings": [
+    "Biology and Homeworld",
+    "A Culture of Formalised Aggression",
+    "Family and the Question of Numbers",
+    "Andorians in the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-tellarites",
+   "title": "Tellarites",
+   "category": "Species & Civilisations",
+   "summary": "The founding member nobody quotes: why a culture that argues constantly is easy to underestimate.",
+   "headings": [
+    "A People Built on Argument",
+    "Engineering, Trade and Craft",
+    "Why the Federation Needed Them",
+    "Tellarites Aboard Ship"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-ferengi",
+   "title": "Ferengi",
+   "category": "Species & Civilisations",
+   "summary": "A civilisation organised entirely around profit — used by the setting as a mirror rather than a joke.",
+   "headings": [
+    "Commerce as a Total System",
+    "Physiology and the Lobes",
+    "The Rules and Their Limits",
+    "The Mirror the Federation Does Not Like"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-borg",
+   "title": "The Borg",
+   "category": "Species & Civilisations",
+   "summary": "A collective that assimilates rather than conquers, and why that is a different kind of threat.",
+   "headings": [
+    "What the Collective Is, and What Assimilation Means",
+    "Why Conventional Tactics Fail",
+    "The Horror Is Not the Machinery",
+    "Origins, Scale and the Problem of Explanation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-cardassians",
+   "title": "Cardassians",
+   "category": "Species & Civilisations",
+   "summary": "A state that made obedience a virtue and occupation a duty — and then had to live with what it did.",
+   "headings": [
+    "The Union",
+    "Law Without Doubt",
+    "The Occupation",
+    "Ruin and Afterwards"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-bajorans",
+   "title": "Bajorans",
+   "category": "Species & Civilisations",
+   "summary": "A people who survived occupation with their faith intact, and the question of what to do next.",
+   "headings": [
+    "A Very Old Civilisation",
+    "Faith",
+    "After the Occupation",
+    "Why Bajor Matters to the Setting"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-betazoids",
+   "title": "Betazoids",
+   "category": "Species & Civilisations",
+   "summary": "A telepathic people, and what a society looks like when nothing can be hidden.",
+   "headings": [
+    "Telepathy as a Baseline",
+    "A Society Without Concealment",
+    "The Ethics of Reading",
+    "Betazoids in the Federation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-trill",
+   "title": "Trill",
+   "category": "Species & Civilisations",
+   "summary": "A species that carries its own dead: joined life, and what continuity does to a person.",
+   "headings": [
+    "Host and Symbiont",
+    "Who Gets Joined",
+    "The Rule About Previous Lives",
+    "What the Idea Is For"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-humanity",
+   "title": "Humanity in the Federation",
+   "category": "Species & Civilisations",
+   "summary": "How the setting's humans are described from outside, and why the Federation looks like them.",
+   "headings": [
+    "The Species That Kept Volunteering",
+    "What Changed",
+    "The Federation's Accent",
+    "Why Humans Are the Viewpoint"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-q-continuum",
+   "title": "The Q Continuum",
+   "category": "Species & Civilisations",
+   "summary": "Beings for whom the laws of physics are optional, and what a setting does with an opponent it cannot fight.",
+   "headings": [
+    "What They Are",
+    "The Trial That Never Closes",
+    "Omnipotence With a Personality Problem",
+    "Why an Unbeatable Antagonist Is Useful"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "fed-founders",
+   "title": "The Founders and the Changelings",
+   "category": "Species & Civilisations",
+   "summary": "Shapeshifters who rule an empire out of fear, and the one of them raised among solids.",
+   "headings": [
+    "Liquid Life",
+    "An Empire Built on Fear",
+    "Detecting Them",
+    "The One Who Was Raised Outside"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "association-football-rules-and-positions",
    "title": "Association Football Rules and Positions",
    "category": "Sports & Fitness",
@@ -13071,6 +13625,210 @@
     "Misconceptions, Edge Cases and Judging It Yourself"
    ],
    "file": "guides_sports_and_fitness.json"
+  },
+  {
+   "id": "starting-to-exercise",
+   "title": "Starting to Exercise: Running, Strength Training, Stretching and Rest",
+   "category": "Sports & Fitness",
+   "summary": "How to get fit and stay fit. How to begin and keep going: why too much too soon is the one mistake everyone makes and how fast tendon and bone really adapt, how to warm up and why static stretching before hard effort is no longer advised, learning to run with run-walk and why easy means conversational, running shoes and cadence and overstriding, strength training and progressive overload and the movement patterns to cover, how many rest days, sleep and recovery and the warning signs of overtraining, swimming and cycling and low-impact options, the different components of fitness and how to judge intensity without a monitor, exercise in childhood and older age and pregnancy and with diabetes, arthritis, back pain or heart disease, how sports skills are actually learned, building a weekly routine you will keep, what equipment and supplements are worth buying, common overuse injuries and when to stop, and what exercise does to the heart, muscle, bone and brain.",
+   "headings": [
+    "Starting From Nothing: The Only Rule That Matters",
+    "How to Warm Up and Cool Down, and What Stretching Actually Does",
+    "Learning to Run",
+    "Strength Training: The Basics That Apply to Everyone",
+    "Rest, Recovery and Overtraining",
+    "Swimming, Cycling and Low-Impact Options",
+    "Fitness Is Several Different Things: Endurance, Strength, Power and VO2 Max",
+    "Exercise Across a Life: Age, Pregnancy and Chronic Conditions",
+    "Sport: Skill, Practice and Getting Better at a Game",
+    "Building a Week That You Will Actually Do",
+    "Equipment, a Home Gym, and Spending Money Sensibly",
+    "Common Injuries — Shin Splints, Runner's Knee, Tendinopathy — and When to Stop",
+    "What Exercise Actually Does to You"
+   ],
+   "file": "guides_sports_and_fitness.json"
+  },
+  {
+   "id": "fed-united-federation-of-planets",
+   "title": "The United Federation of Planets",
+   "category": "Starfleet & Federation",
+   "summary": "The interstellar union at the centre of the setting: what it is, how it governs, and why it holds together.",
+   "headings": [
+    "What the Federation Is",
+    "How It Governs",
+    "Membership and Its Frictions",
+    "Why It Matters to the Setting"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-starfleet",
+   "title": "Starfleet",
+   "category": "Starfleet & Federation",
+   "summary": "The Federation's combined exploratory, scientific, diplomatic and defensive service — and its deliberate refusal to be simply a navy.",
+   "headings": [
+    "A Service With Four Jobs",
+    "Structure, Rank and Command",
+    "The Academy and the Officer It Wants",
+    "Starfleet in Practice"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-prime-directive",
+   "title": "The Prime Directive",
+   "category": "Starfleet & Federation",
+   "summary": "General Order One: what non-interference actually requires, why it is drawn so absolutely, and the cases that test it.",
+   "headings": [
+    "The Rule Itself",
+    "Why It Is Drawn So Absolutely",
+    "How It Fails in the Field",
+    "What It Says About the Federation"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-starfleet-academy",
+   "title": "Starfleet Academy",
+   "category": "Starfleet & Federation",
+   "summary": "Where officers are made: admission, the four years, and the tests that are not about the subject.",
+   "headings": [
+    "Admission",
+    "Four Years, and What They Are For",
+    "The Tests That Are Not About the Subject",
+    "Afterwards"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-rank-and-command",
+   "title": "Starfleet Rank and the Chain of Command",
+   "category": "Starfleet & Federation",
+   "summary": "Who outranks whom, what a rank actually authorises, and why the chain matters most when it is inconvenient.",
+   "headings": [
+    "The Ladder",
+    "What a Rank Authorises",
+    "Succession and the Line",
+    "Why the Chain Holds"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-federation-council",
+   "title": "The Federation Council",
+   "category": "Starfleet & Federation",
+   "summary": "Who actually governs: the civilian body Starfleet answers to, and why that relationship is fraught.",
+   "headings": [
+    "The Body",
+    "Civilian Control",
+    "Membership",
+    "Why It Rarely Appears"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-general-orders",
+   "title": "Starfleet General Orders and Regulations",
+   "category": "Starfleet & Federation",
+   "summary": "The rulebook: what the standing orders cover, which ones officers actually cite, and what they are for.",
+   "headings": [
+    "A Written Institution",
+    "The Ones That Get Cited",
+    "Orders That Are Meant to Be Broken",
+    "What the Rulebook Is Actually For"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-section-31",
+   "title": "Section 31",
+   "category": "Starfleet & Federation",
+   "summary": "An intelligence service that answers to nobody, and the argument the setting has with itself about it.",
+   "headings": [
+    "The Claim",
+    "The Argument It Makes",
+    "Why It Is Disliked",
+    "The Structural Problem"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "fed-starship-design",
+   "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
+   "category": "Starships & Classes",
+   "summary": "The layout of a Starfleet ship — saucer, engineering hull, nacelles, shields and weapons — and why each part is where it is.",
+   "headings": [
+    "The Standard Layout",
+    "Power and Propulsion",
+    "Defence",
+    "What the Design Says"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-constitution-class",
+   "title": "The Constitution Class",
+   "category": "Starships & Classes",
+   "summary": "The heavy cruiser of the first era of deep exploration, and why a five-year mission is the format's founding idea.",
+   "headings": [
+    "The Ship",
+    "The Five-Year Mission",
+    "Command and Crew",
+    "Its Place in the Record"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-galaxy-class",
+   "title": "The Galaxy Class Starship",
+   "category": "Starships & Classes",
+   "summary": "The exploratory flagship: a starship designed on the assumption that peace would hold.",
+   "headings": [
+    "A Ship Built for a Long Peace",
+    "Saucer Separation",
+    "Capability",
+    "Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-bird-of-prey",
+   "title": "The Bird-of-Prey",
+   "category": "Starships & Classes",
+   "summary": "A small, cloaked raider that outlives its era — and the design philosophy behind it.",
+   "headings": [
+    "The Shape and the Name",
+    "Cloak, and the Cost of It",
+    "Small, Cheap and Everywhere",
+    "Fighting One, and Fighting In One"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-defiant-class",
+   "title": "The Defiant Class",
+   "category": "Starships & Classes",
+   "summary": "The warship the Federation said it did not build: small, overpowered, and an admission.",
+   "headings": [
+    "Built for One Enemy",
+    "Overpowered, Literally",
+    "The Cloak Nobody Talks About",
+    "What It Meant"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "fed-shuttlecraft",
+   "title": "Shuttlecraft and Runabouts",
+   "category": "Starships & Classes",
+   "summary": "The small craft: what a starship carries, what they are for, and why they crash so often.",
+   "headings": [
+    "The Ship's Boats",
+    "What They Are Actually For",
+    "Why So Many Are Lost",
+    "Flying One"
+   ],
+   "file": "guides_starships_and_classes.json"
   },
   {
    "id": "foraging-safety-and-the-universal-rules",
@@ -13241,6 +13999,29 @@
    "file": "guides_vehicles_and_transport.json"
   },
   {
+   "id": "car-basics-and-roadside-problems",
+   "title": "Car Basics: Changing a Tyre, Jump-Starting, Breakdowns, Oil and Maintenance",
+   "category": "Vehicles & Transport",
+   "summary": "The practical car guide: what to carry, tyre pressure and tread and what wear is telling you, how to change a wheel safely, punctures and sealant kits and space-savers, jump-starting a flat battery in the right order, where to stop and how not to be hit when you break down, checking oil and coolant and brake fluid, what the warning lights mean, brakes and overheating, driving on ice and in floodwater, servicing and timing belts, electric and hybrid differences, misfuelling, and the checks to make before buying or insuring.",
+   "headings": [
+    "Before Anything Goes Wrong: What to Carry and What to Check",
+    "Tyres: Pressure, Tread, Age and What They Are Telling You",
+    "Changing a Wheel Safely",
+    "Punctures, Sealant Kits and Space-Saver Spares",
+    "A Flat Battery: Jump-Starting Without Damaging Anything",
+    "Breaking Down: Where to Stop and How Not to Be Hit",
+    "Fluids: Oil, Coolant, Brake Fluid and Screenwash",
+    "Warning Lights, Noises and What They Actually Mean",
+    "Brakes, Overheating, and Two Faults Worth Recognising",
+    "Driving in Rain, Ice and Poor Grip",
+    "Servicing, Inspections and Keeping Records",
+    "Electric and Hybrid Vehicles: What Is Different",
+    "Fuel, Filling Up and Getting It Wrong",
+    "Buying, Insuring and the Paperwork That Protects You"
+   ],
+   "file": "guides_vehicles_and_transport.json"
+  },
+  {
    "id": "prehistoric-art-cave-paintings-and-the-origins-of-image-maki",
    "title": "Prehistoric Art: Cave Paintings and the Origins of Image-Making",
    "category": "Visual Arts & Design",
@@ -13289,6 +14070,183 @@
     "Living Heritage, Ownership and the Ethics of Visiting"
    ],
    "file": "guides_visual_arts_and_design.json"
+  },
+  {
+   "id": "drawing-colour-and-design",
+   "title": "Drawing, Colour and Design: How to Learn to Draw, Paint and Compose a Picture",
+   "category": "Visual Arts & Design",
+   "summary": "Making pictures, and looking at them: why learning to draw is learning to see and how contour, negative space and gesture drawing get past the symbols in your head, line and shape and value and what light does to form, one-point two-point and three-point perspective plus atmospheric depth, colour theory — hue, saturation and value, why red yellow blue is a convention rather than physics, complementary colours, warm and cool, and limited palettes, composition and the rule of thirds and focal points and thumbnails, watercolour and acrylic and oil and gouache and how each behaves, drawing people with proportion and gesture and facial landmarks, graphic design with typography, hierarchy, grids and accessible contrast, photography and the exposure triangle and light, how to practise and use reference, how to look at a picture properly, and why styles changed once photography existed.",
+   "headings": [
+    "Learning to Draw Is Learning to See",
+    "Line, Shape, Value and the Elements of Art",
+    "Perspective: Vanishing Points and Making Flat Paper Look Deep",
+    "Colour: What Actually Governs It",
+    "Composition: Arranging What the Viewer Sees",
+    "Painting: Media and How They Behave",
+    "Drawing People: Proportion, Gesture and Faces",
+    "Graphic Design: Type, Hierarchy and Layout",
+    "Photography as Picture-Making",
+    "Practice, Reference and Getting Better",
+    "How to Look at Pictures",
+    "A Short History of Seeing, and Why Styles Change"
+   ],
+   "file": "guides_visual_arts_and_design.json"
+  },
+  {
+   "id": "fed-warp-drive",
+   "title": "Warp Drive",
+   "category": "Warp & Starship Technology",
+   "summary": "The propulsion that makes the setting possible: what warp actually claims to do, how the machinery is described, and why it has limits.",
+   "headings": [
+    "What Warp Drive Claims to Do",
+    "The Machinery",
+    "Limits, Hazards and Consequences",
+    "Why It Shapes the Stories"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-transporter",
+   "title": "The Transporter",
+   "category": "Warp & Starship Technology",
+   "summary": "Matter transmission: how it is described, what it is used for, and the identity problem it never quite escapes.",
+   "headings": [
+    "How It Is Described to Work",
+    "What It Is Used For",
+    "The Identity Problem",
+    "Why the Limits Matter"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-deflector-shields",
+   "title": "Deflector Shields",
+   "category": "Warp & Starship Technology",
+   "summary": "The energy barrier every starship depends on: how it is described to work, and why it always fails by degrees.",
+   "headings": [
+    "What a Shield Is",
+    "Why They Fail Gradually",
+    "Modulation, Adaptation and the Arms Race",
+    "Living Behind Them"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-phasers-and-torpedoes",
+   "title": "Phasers and Photon Torpedoes",
+   "category": "Warp & Starship Technology",
+   "summary": "The standard armament: a directed-energy weapon with a settable intensity, and a warhead that is not conventional at all.",
+   "headings": [
+    "The Phaser",
+    "Stun, and What It Costs",
+    "The Photon Torpedo",
+    "How the Two Are Used Together"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-holodeck",
+   "title": "The Holodeck",
+   "category": "Warp & Starship Technology",
+   "summary": "A room that can be anywhere: how it is described to work, what it is for, and why it keeps going wrong.",
+   "headings": [
+    "What It Does",
+    "What It Is Actually For",
+    "Why It Goes Wrong So Often",
+    "The Question of the People Inside"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-replicator",
+   "title": "The Replicator",
+   "category": "Warp & Starship Technology",
+   "summary": "Matter on demand: the technology that abolished scarcity, and the limits that keep the setting working.",
+   "headings": [
+    "What It Does",
+    "The Limits, and Why They Exist",
+    "What It Did to Society",
+    "The Uncomfortable Question"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-tricorder",
+   "title": "The Tricorder",
+   "category": "Warp & Starship Technology",
+   "summary": "The handheld instrument that makes an away mission possible, and why it is always failing.",
+   "headings": [
+    "A General-Purpose Sensor",
+    "What It Cannot Do",
+    "The Grammar of the Away Mission",
+    "Sensors at Scale"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-cloaking-device",
+   "title": "The Cloaking Device",
+   "category": "Warp & Starship Technology",
+   "summary": "Invisibility as a weapon, as a treaty question, and as the thing the Federation gave up.",
+   "headings": [
+    "How It Is Described",
+    "The Treaty",
+    "Living Without One",
+    "Who Has One"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-universal-translator",
+   "title": "The Universal Translator",
+   "category": "Warp & Starship Technology",
+   "summary": "The device that makes first contact possible, and the thing it quietly papers over.",
+   "headings": [
+    "The Necessary Convenience",
+    "Where It Fails",
+    "What It Papers Over",
+    "First Contact, Practically"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-warp-core",
+   "title": "The Warp Core and the Matter-Antimatter Reaction",
+   "category": "Warp & Starship Technology",
+   "summary": "The reactor at the centre of the ship: what it does, what regulates it, and why it is always about to breach.",
+   "headings": [
+    "The Reaction",
+    "Antimatter as a Problem",
+    "Why It Is Always Nearly Failing",
+    "Dilithium"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-subspace-communications",
+   "title": "Subspace Communications",
+   "category": "Warp & Starship Technology",
+   "summary": "How a message outruns light — and, more importantly, how long it still takes.",
+   "headings": [
+    "Faster Than Light, Not Instant",
+    "The Delay Is the Format",
+    "What Breaks It",
+    "On the Bridge"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "fed-sickbay-technology",
+   "title": "Sickbay Technology",
+   "category": "Warp & Starship Technology",
+   "summary": "How Federation medicine is practised: the instruments, what they can do, and where they stop.",
+   "headings": [
+    "The Instruments: Tricorder, Biobed, Hypospray and Regenerator",
+    "What It Cannot Do",
+    "Sickbay as a Place",
+    "The Emergency Hologram"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
   },
   {
    "id": "the-stratosphere-and-the-ozone-layer",
@@ -13505,6 +14463,84 @@
     "Step-by-Step: Map Your Own Yard or Neighbourhood's Microclimates in One Week"
    ],
    "file": "guides_weather.json"
+  },
+  {
+   "id": "fed-earth-and-sol",
+   "title": "Earth and the Sol System",
+   "category": "Worlds & Stations",
+   "summary": "Earth, Sol and the Federation capital: the seat of the Council and Starfleet Command, and the awkwardness of a union of equals headquartered on one member's homeworld.",
+   "headings": [
+    "Earth in the Federation",
+    "San Francisco and the Institutions",
+    "Getting Here From Elsewhere",
+    "What Earth Represents"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-deep-space-stations",
+   "title": "Starbases and Deep-Space Stations",
+   "category": "Worlds & Stations",
+   "summary": "The fixed points: what a starbase is for, and why a station at a crossroads produces different stories than a ship.",
+   "headings": [
+    "What a Starbase Does",
+    "A Station at a Crossroads",
+    "Life Aboard",
+    "Why the Fixed Points Matter"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-neutral-zones",
+   "title": "The Neutral Zones",
+   "category": "Worlds & Stations",
+   "summary": "Bands of space nobody may enter — the Romulan and Klingon Neutral Zones: what they are for, and why the setting keeps returning to them.",
+   "headings": [
+    "A Border Made of Emptiness",
+    "Why It Is Unstable by Design",
+    "Life Along the Line",
+    "When the Line Moves"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-vulcan-world",
+   "title": "Vulcan, the Planet",
+   "category": "Worlds & Stations",
+   "summary": "The world itself: heat, thin air, high gravity, and a landscape that shaped a philosophy.",
+   "headings": [
+    "Conditions",
+    "The Landscape as Argument",
+    "Cities and Institutions",
+    "Visiting"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-qonos",
+   "title": "Qo'noS, the Klingon Homeworld",
+   "category": "Worlds & Stations",
+   "summary": "Qo'noS, also written Qonos and spoken as Kronos: a harsh world and the seat of an empire — geography, the Great Houses, and the politics of the High Council.",
+   "headings": [
+    "The World",
+    "The Great Houses",
+    "The High Council",
+    "Visiting"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "fed-romulus",
+   "title": "Romulus and the Star Empire",
+   "category": "Worlds & Stations",
+   "summary": "The world the Vulcans left behind became: an empire built on secrecy, and a senate nobody quite trusts.",
+   "headings": [
+    "A Vulcan Offshoot",
+    "Secrecy as Statecraft",
+    "The Senate",
+    "The Worlds"
+   ],
+   "file": "guides_worlds_and_stations.json"
   }
  ]
 }

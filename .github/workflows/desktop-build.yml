@@ -16,6 +16,9 @@ on:
       # guards would only run when desktop/ itself happened to change.
       - "app/src/main/assets/survival/**"
       - "app/src/main/java/dev/mascwa/pulse/data/survival/**"
+      # It bundles the typefaces out of the app's resource directory too, so removing or renaming
+      # one there would break the desktop at render time with nothing in this workflow to catch it.
+      - "app/src/main/res/font/**"
       - "core/telemetry/src/**"
       - "tools/mirror_desktop_cores.py"
       - "settings.gradle.kts"

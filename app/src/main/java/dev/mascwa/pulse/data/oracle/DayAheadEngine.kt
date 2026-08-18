@@ -135,7 +135,12 @@ object DayAheadEngine {
             if (budget <= 0) return null
             budget--
             val r = runCatching { container.routingRepository.route(fromLat, fromLon, toLat, toLon) }.getOrNull()
-            val est = r?.let {
+            // ⚠️ A route to a place the road network does not reach still comes back `Ok` with a
+            // full duration — London to New York returns a confident 28 hours to a point snapped
+            // onto Portugal. Here that number would become a "leave at" alert with no map to reveal
+            // the gap, so an unreachable route is refused and the caller falls through to the
+            // straight-line estimate, which already labels itself as rough.
+            val est = r?.takeIf { it.reachesDestination }?.let {
                 DayAhead.TravelEstimate(
                     seconds = it.durationSeconds.toLong(),
                     meters = it.distanceMeters,

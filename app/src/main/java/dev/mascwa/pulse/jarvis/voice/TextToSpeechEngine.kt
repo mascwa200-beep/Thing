@@ -7,6 +7,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
+import dev.mascwa.pulse.feature.media.SpeechFocus
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -57,6 +58,13 @@ class TextToSpeechEngine(
     /** The backstop that runs [pendingDone] if the engine never calls back at all. */
     @Volatile private var watchdog: Runnable? = null
 
+    /**
+     * The speaker, borrowed for the length of an utterance so other audio ducks and a phone call can
+     * take it back. Held here rather than at the call sites because [speak] and [fireDone] are
+     * already the one place that owns an utterance's lifetime.
+     */
+    private val focus = SpeechFocus(context) { stop() }
+
     init {
         val appContext = context.applicationContext
         engine = TextToSpeech(appContext) { status ->
@@ -76,6 +84,10 @@ class TextToSpeechEngine(
         val cb = pendingDone.getAndSet(null) ?: return
         watchdog?.let(mainHandler::removeCallbacks)
         watchdog = null
+        // Give the speaker back here rather than at each call site: every path that ends an
+        // utterance — the engine, an error, the watchdog, stop(), shutdown() — already funnels
+        // through this one method, which is exactly why the watchdog is cancelled here too.
+        focus.release()
         mainHandler.post(cb)
     }
 
@@ -87,6 +99,10 @@ class TextToSpeechEngine(
             if (gb == TextToSpeech.LANG_MISSING_DATA || gb == TextToSpeech.LANG_NOT_SUPPORTED) return false
         }
         selectVoice(e)
+        // Tag the speech as what it is. A car head unit, a hearing aid or a Bluetooth stack reads
+        // this to decide how to treat the stream; untagged, an assistant reply is indistinguishable
+        // from music. Volume routing does not change — USAGE_ASSISTANT sits on the music stream.
+        runCatching { e.setAudioAttributes(SpeechFocus.SPEECH_ATTRIBUTES) }
         e.setPitch(COMPUTER_PITCH)
         e.setSpeechRate(COMPUTER_RATE)
         return true
@@ -188,6 +204,8 @@ class TextToSpeechEngine(
         val spoken = trimmed.take(MAX_LEN)
         pendingDone.set(onDone)
         armWatchdog(spoken.length)
+        // Before the sound starts, so the duck is already in place rather than arriving a beat late.
+        focus.acquire()
         val res = engine?.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
         if (res != TextToSpeech.SUCCESS) fireDone()
     }

@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CORE = "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry"
 CORE_TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry"
 SURVIVAL = "app/src/main/java/dev/mascwa/pulse/data/survival"
+LIVE = "app/src/main/java/dev/mascwa/pulse/data/live"
 DESKTOP = "desktop/src/main/kotlin/dev/mascwa/pulse/desktop"
 DESKTOP_TEST = "desktop/src/test/kotlin/dev/mascwa/pulse/desktop"
 
@@ -45,6 +46,12 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/Recall.kt": f"{DESKTOP}/telemetry/Recall.kt",
     f"{CORE}/Curriculum.kt": f"{DESKTOP}/telemetry/Curriculum.kt",
     f"{CORE}/DailyLesson.kt": f"{DESKTOP}/telemetry/DailyLesson.kt",
+    # The Khan-model learning layer: a course seen at once, practice sets, and a hint ladder. Both
+    # platforms teach from the same library and must judge and pace it identically.
+    f"{CORE}/ContentPack.kt": f"{DESKTOP}/telemetry/ContentPack.kt",
+    f"{CORE}/CourseMastery.kt": f"{DESKTOP}/telemetry/CourseMastery.kt",
+    f"{CORE}/PracticeSet.kt": f"{DESKTOP}/telemetry/PracticeSet.kt",
+    f"{CORE}/Hints.kt": f"{DESKTOP}/telemetry/Hints.kt",
     # Marking an answer objectively, and knowing how the studying is actually going. Mirrored because
     # both platforms teach from the same library and must judge it the same way.
     f"{CORE}/QuizBuilder.kt": f"{DESKTOP}/telemetry/QuizBuilder.kt",
@@ -62,23 +69,47 @@ MIRRORS: dict[str, str] = {
     # The News vertical's signal stack, ported before this script existed. Brought under the guard now:
     # these are pure logic and must stay identical. (NewsExplainers.kt and Explainer.kt are deliberately
     # NOT here — they are adapted ports, not mirrors; see their headers.)
+    # Live TV news. Both platforms play the same channels and must agree about which are
+    # trustworthy, so the catalogue and its judgements are shared rather than duplicated.
+    # LiveChannels delegates its cost line here, so the mirror does not compile without it.
+    f"{CORE}/DataRate.kt": f"{DESKTOP}/telemetry/DataRate.kt",
+    f"{CORE}/Stardate.kt": f"{DESKTOP}/telemetry/Stardate.kt",
+    f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
+    f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
+    # What is worth printing under a headline. Both platforms render the same card, and an
+    # aggregator that repeats the headline in its description must not repeat it on either.
+    f"{CORE}/NewsSummary.kt": f"{DESKTOP}/telemetry/NewsSummary.kt",
     f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
     f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
     f"{CORE}/SocialBuzz.kt": f"{DESKTOP}/telemetry/SocialBuzz.kt",
     # The library's own models and taxonomy — app-side content, but pure data.
     f"{SURVIVAL}/GuideModels.kt": f"{DESKTOP}/library/GuideModels.kt",
     f"{SURVIVAL}/GuideTaxonomy.kt": f"{DESKTOP}/library/GuideTaxonomy.kt",
+    # The community TV catalogue's fetch-and-cache. A strict mirror rather than a hand-written twin
+    # because both platforms' HttpClient and DiskCache expose the same methods with the same shapes —
+    # so if either ever diverges, this fails to compile rather than quietly drifting.
+    f"{LIVE}/LiveCatalogRepository.kt": f"{DESKTOP}/live/LiveCatalogRepository.kt",
     # The tests come across too, so the same assertions gate BOTH platforms' CI. Mirroring logic
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
+    f"{CORE_TEST}/DataRateTest.kt": f"{DESKTOP_TEST}/telemetry/DataRateTest.kt",
+    f"{CORE_TEST}/StardateTest.kt": f"{DESKTOP_TEST}/telemetry/StardateTest.kt",
+    f"{CORE_TEST}/NewsSummaryTest.kt": f"{DESKTOP_TEST}/telemetry/NewsSummaryTest.kt",
+    f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
+    f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
     f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",
     f"{CORE_TEST}/StudyQuestionsTest.kt": f"{DESKTOP_TEST}/telemetry/StudyQuestionsTest.kt",
     f"{CORE_TEST}/RecallTest.kt": f"{DESKTOP_TEST}/telemetry/RecallTest.kt",
     f"{CORE_TEST}/CurriculumTest.kt": f"{DESKTOP_TEST}/telemetry/CurriculumTest.kt",
     f"{CORE_TEST}/DailyLessonTest.kt": f"{DESKTOP_TEST}/telemetry/DailyLessonTest.kt",
+    f"{CORE_TEST}/ContentPackTest.kt": f"{DESKTOP_TEST}/telemetry/ContentPackTest.kt",
+    f"{CORE_TEST}/CourseMasteryTest.kt": f"{DESKTOP_TEST}/telemetry/CourseMasteryTest.kt",
+    f"{CORE_TEST}/PracticeSetTest.kt": f"{DESKTOP_TEST}/telemetry/PracticeSetTest.kt",
+    f"{CORE_TEST}/HintsTest.kt": f"{DESKTOP_TEST}/telemetry/HintsTest.kt",
     f"{CORE_TEST}/QuizBuilderTest.kt": f"{DESKTOP_TEST}/telemetry/QuizBuilderTest.kt",
+    f"{CORE_TEST}/ProcedureQuestionTest.kt": f"{DESKTOP_TEST}/telemetry/ProcedureQuestionTest.kt",
     f"{CORE_TEST}/StudyProgressTest.kt": f"{DESKTOP_TEST}/telemetry/StudyProgressTest.kt",
     f"{CORE_TEST}/RefresherTest.kt": f"{DESKTOP_TEST}/telemetry/RefresherTest.kt",
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
@@ -92,6 +123,9 @@ MIRRORS: dict[str, str] = {
 PACKAGES = {
     "dev.mascwa.pulse.core.telemetry": "dev.mascwa.pulse.desktop.telemetry",
     "dev.mascwa.pulse.data.survival": "dev.mascwa.pulse.desktop.library",
+    "dev.mascwa.pulse.data.live": "dev.mascwa.pulse.desktop.live",
+    "dev.mascwa.pulse.core.cache": "dev.mascwa.pulse.desktop.cache",
+    "dev.mascwa.pulse.core.network": "dev.mascwa.pulse.desktop.network",
 }
 
 BANNER = "// MIRROR OF {src} — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it"

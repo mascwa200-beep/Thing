@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.social.SocialItem
 import dev.mascwa.pulse.feature.common.EmptyState
@@ -89,7 +90,7 @@ private fun FeedList(
     when {
         async.isInitialLoading -> LoadingState()
         async.isError -> ErrorState(async.error ?: "Error", onRetry)
-        async.data?.items.isNullOrEmpty() -> EmptyState("Nothing trending right now.")
+        async.data?.items.isNullOrEmpty() -> EmptyState("Nothing trending right now.", onRetry = onRetry)
         else -> LazyColumn(
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -106,7 +107,7 @@ private fun MastodonContent(vm: SocialViewModel, context: android.content.Contex
     when {
         async.isInitialLoading -> LoadingState()
         async.isError -> ErrorState(async.error ?: "Error", onRetry = { vm.refresh() })
-        async.data == null -> EmptyState("No trends.")
+        async.data == null -> EmptyState("No trends.", onRetry = { vm.refresh() })
         else -> {
             val data = async.data!!
             LazyColumn(
@@ -138,8 +139,15 @@ private fun ItemRow(item: SocialItem, onClick: () -> Unit) {
     LcarsFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
         Column {
             Text(item.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
-            Text("${item.source} · ${item.meta}", fontFamily = JetBrainsMono, fontSize = 10.sp,
-                color = c.accent, modifier = Modifier.padding(top = 4.dp))
+            // ⚠️ The age was on the model all along and only the News surface ever drew it. A fifth
+            // of a Hacker News top page is routinely several days old, which "trending" does not
+            // suggest — and here the two surfaces rendered the same object differently.
+            val age = item.publishedEpochMs.takeIf { it > 0L }?.let { Formatters.relativeTime(it) }
+            Text(
+                listOfNotNull(item.source, item.meta, age).joinToString(" · "),
+                fontFamily = JetBrainsMono, fontSize = 10.sp,
+                color = c.accent, modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

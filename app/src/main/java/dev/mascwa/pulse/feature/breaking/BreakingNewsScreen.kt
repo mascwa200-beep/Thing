@@ -49,8 +49,12 @@ import dev.mascwa.pulse.data.breaking.BreakingCoverageRepository
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.mascwa.pulse.feature.live.LiveVideoPlayer
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.LocalNightwire
+import dev.mascwa.pulse.ui.theme.Pulse
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -62,7 +66,9 @@ private val INK = Color(0xFFF4ECEC)
 private val INK2 = Color(0xFFB9A9AA)
 private val MUTED = Color(0xFF7C6E6F)
 
-private enum class BTab(val label: String) { COVERAGE("TOP COVERAGE"), LATEST("LATEST"), SOURCES("SOURCES") }
+private enum class BTab(val label: String) {
+    COVERAGE("TOP COVERAGE"), LATEST("LATEST"), LIVE("LIVE TV"), SOURCES("SOURCES")
+}
 
 /**
  * The cinematic BREAKING NEWS page — the way TV/film portray it: a red BREAKING banner with a pulsing LIVE,
@@ -167,6 +173,12 @@ fun BreakingNewsScreen(
         Box(Modifier.fillMaxSize()) {
             val d = data
             when {
+                // ⚠️ Checked BEFORE the coverage gates, and that ordering is the point. Live
+                // television does not depend on the aggregation having worked — and the case where
+                // the aggregation failed, at the moment a takeover fired, is exactly when being able
+                // to just watch a news channel is worth most. Under the gates it would have shown
+                // "Gathering coverage…" instead.
+                tab == BTab.LIVE -> LiveTakeover()
                 loading && d == null -> Center { LoadingBlock() }
                 d == null || d.isEmpty -> Center {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -189,6 +201,26 @@ fun BreakingNewsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * The shared live-television panel, wearing this screen's colours.
+ *
+ * This takeover hardcodes its palette on purpose — it has to render identically with no theme above
+ * it, straight onto the lock screen — while the player reads the app's. Rather than parameterise
+ * every colour the player uses, the palette itself is swapped for the duration, which is the same
+ * lever the app already uses to re-theme a whole subtree.
+ */
+@Composable
+private fun LiveTakeover() {
+    val takeover = Pulse.colors.copy(
+        accent = RED, void = BG, panel = PANEL, ink = INK, ink2 = INK2, muted = MUTED,
+    )
+    CompositionLocalProvider(LocalNightwire provides takeover) {
+        LiveVideoPlayer(
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 28.dp),
+        )
     }
 }
 

@@ -16,9 +16,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
+import java.time.Instant
 
 /**
  * Keyless social-discovery feeds: Lemmy popular (Reddit alternative), Mastodon
@@ -55,6 +53,7 @@ class SocialRepository(
                     url = link,
                     source = "c/$community",
                     meta = "▲ $score · $comments comments",
+                    publishedEpochMs = isoMillis(post["published"]?.jsonPrimitive?.contentOrNull),
                     thumbnail = post["thumbnail_url"]?.jsonPrimitive?.contentOrNull,
                 )
             })
@@ -65,7 +64,7 @@ class SocialRepository(
         val instance = settings.current().mastodonInstance.ifBlank { "mastodon.social" }
         val key = "social_mastodon_$instance"
         return cachedJson(key, force, MastodonTrends.serializer()) {
-            val tags = runCatching {
+            val tagsResult = runCatching {
                 val text = http.getString("https://$instance/api/v1/trends/tags?limit=20")
                 val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
                 arr.mapNotNull { el ->
@@ -75,9 +74,9 @@ class SocialRepository(
                         ?.get("uses")?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
                     TrendTag(name, o["url"]?.jsonPrimitive?.contentOrNull ?: "", uses)
                 }
-            }.getOrDefault(emptyList())
+            }
 
-            val statuses = runCatching {
+            val statusesResult = runCatching {
                 val text = http.getString("https://$instance/api/v1/trends/statuses?limit=20")
                 val arr = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonArray
                 arr.mapNotNull { el ->
@@ -91,11 +90,19 @@ class SocialRepository(
                         title = content.ifBlank { "(media post)" }.take(200),
                         url = link, source = "@$acct",
                         meta = "♥ $favs · ↻ $reblogs",
+                        publishedEpochMs = isoMillis(o["created_at"]?.jsonPrimitive?.contentOrNull),
                     )
                 }
-            }.getOrDefault(emptyList())
+            }
 
-            MastodonTrends(tags, statuses)
+            // ⚠️ Both halves used to swallow, so a total outage produced an empty-but-successful
+            // result — which cachedJson then wrote over the last good one and the screen rendered
+            // as "Nothing trending right now." An outage is not a quiet internet. One half failing
+            // is still real data and is kept.
+            if (tagsResult.isFailure && statusesResult.isFailure) {
+                throw tagsResult.exceptionOrNull() ?: IllegalStateException("mastodon unreachable")
+            }
+            MastodonTrends(tagsResult.getOrDefault(emptyList()), statusesResult.getOrDefault(emptyList()))
         }
     }
 
@@ -107,7 +114,7 @@ class SocialRepository(
                 ListSerializer(Long.serializer()),
             ).take(25)
             // Fetch all item details in parallel (was sequential — a big stall).
-            val items = coroutineScope {
+            val results = coroutineScope {
                 ids.map { id ->
                     async {
                         runCatching {
@@ -119,11 +126,22 @@ class SocialRepository(
                             val comments = o["descendants"]?.jsonPrimitive?.intOrNull ?: 0
                             val time = (o["time"]?.jsonPrimitive?.longOrNull ?: 0L) * 1000L
                             SocialItem(title, link, "Hacker News", "▲ $score · $comments comments", time)
-                        }.getOrNull()
+                        }
                     }
-                }.mapNotNull { it.await() }
+                }.map { it.await() }
             }
-            SocialFeed(items)
+            // ⚠️ Every one of these used to swallow its own failure, so twenty-five dead requests
+            // produced an empty feed with no error — written to the cache as a fact and shown as
+            // "Nothing trending right now." for the rest of the session.
+            //
+            // Only a total failure throws. A story that came back without a title is a *successful*
+            // fetch of something unrenderable (a poll, a deleted item), so "all failed" is asked of
+            // the results rather than of the list, which would also fire on a page of those.
+            if (ids.isNotEmpty() && results.all { it.isFailure }) {
+                throw results.first().exceptionOrNull()
+                    ?: IllegalStateException("hacker news unreachable")
+            }
+            SocialFeed(results.mapNotNull { it.getOrNull() })
         }
     }
 
@@ -148,6 +166,27 @@ class SocialRepository(
 
     private val tagRegex = Regex("<[^>]*>")
     private val wsRegex = Regex("\\s+")
+    /**
+     * An ISO-8601 instant in milliseconds, or 0 when there is not one.
+     *
+     * ⚠️ Not [java.text.SimpleDateFormat]. Lemmy publishes six fractional digits
+     * (`2026-08-16T16:21:45.104208Z`) where Mastodon publishes three, and a `.SSS` pattern reads
+     * the six-digit form as 104,208 milliseconds — a story stamped nearly two minutes into its own
+     * future. [Instant.parse] accepts any number of fractional digits.
+     *
+     * Some Lemmy instances omit the zone designator entirely, which ISO_INSTANT rejects; those
+     * timestamps are UTC by the API's own definition, so a bare one is retried with the Z it
+     * should have carried.
+     */
+    private fun isoMillis(raw: String?): Long {
+        val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return 0L
+        runCatching { return Instant.parse(text).toEpochMilli() }
+        if (!text.endsWith("Z") && !text.contains('+')) {
+            runCatching { return Instant.parse(text + "Z").toEpochMilli() }
+        }
+        return 0L
+    }
+
     private fun stripHtml(s: String) = s.replace(tagRegex, " ").replace("&amp;", "&")
         .replace("&#39;", "'").replace("&quot;", "\"").replace(wsRegex, " ").trim()
 }

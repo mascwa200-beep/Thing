@@ -9,6 +9,18 @@ data class IssPosition(
     val longitude: Double,
     val altitudeKm: Double,
     val velocityKmh: Double,
+    /**
+     * When the service says this fix was taken — not when we asked for it.
+     *
+     * ⚠️ It was on every response and read by nothing, which mattered because the ground point
+     * moves about 416 km a minute. Without it a position pulled from a five-minute cache is
+     * indistinguishable from one taken a second ago, and a reader that draws a conclusion from
+     * either is drawing it from something up to two thousand kilometres out of date.
+     *
+     * Zero means the response did not carry one — defaulted so a cache entry written before this
+     * field existed still decodes.
+     */
+    val timestampMs: Long = 0L,
 )
 
 @Serializable
@@ -32,7 +44,23 @@ data class NeoObject(
     val missDistanceKm: Double?,
     val velocityKmh: Double?,
     val hazardous: Boolean,
+    /**
+     * NASA's own `close_approach_date_full`, which is **UTC** — see [closeApproachEpochMs].
+     *
+     * Kept only so an entry cached before the epoch was parsed still has something to show.
+     */
     val closeApproach: String?,
+    /**
+     * When the approach happens, as an instant.
+     *
+     * ⚠️ On every object in the response and read by nothing, while the string beside it — a UTC
+     * clock time with no zone marker — was printed on a screen where every other time goes through
+     * the device's own locale. Verified against a live response: `close_approach_date_full` of
+     * "2026-Aug-18 05:32" is exactly `epoch_date_close_approach` 1787031120000 rendered in UTC.
+     *
+     * Defaulted, so an entry cached before this existed still decodes.
+     */
+    val closeApproachEpochMs: Long? = null,
 )
 
 @Serializable
@@ -52,6 +80,13 @@ data class OrbitalData(
     val planets: List<Planet> = emptyList(),
     val neos: List<NeoObject> = emptyList(),
     val neoHazardousCount: Int = 0,
+    /**
+     * True when the near-Earth-object fetch failed, so [neos] being empty says nothing.
+     *
+     * Defaulted so a result cached before this field existed still decodes, and defaulted to
+     * `false` because those cached entries were written from successful fetches.
+     */
+    val neosUnavailable: Boolean = false,
     val updatedEpochMs: Long = System.currentTimeMillis(),
 )
 

@@ -99,6 +99,25 @@ object SatellitePasses {
         val cardinal: String get() = Geodesy.cardinal(azimuthDeg)
     }
 
+    /**
+     * The satellite *right now*: where it is, and whether it is worth going outside for.
+     *
+     * A pass answers "when"; this answers "is it up there at this moment", which is a different
+     * question and the one a live position service is usually asked. Carries the same
+     * [PassKind] judgement a pass does, from the same rule — a sighting the sky is too bright for
+     * and a pass the sky is too bright for must not be described differently.
+     */
+    data class Sighting(
+        val noradId: Int,
+        val name: String,
+        val look: LookAngle,
+        val subPoint: SubPoint,
+        val kind: PassKind,
+    ) {
+        /** Above the horizon by enough to actually be seen over buildings and trees. */
+        val worthLookingUp: Boolean get() = look.altitudeDeg >= DEFAULT_MIN_ELEVATION_DEG
+    }
+
     /** The point on the ground the satellite is directly above. */
     data class SubPoint(
         val latitudeDeg: Double,
@@ -243,6 +262,56 @@ object SatellitePasses {
     }
 
     // ---- primitives ------------------------------------------------------------------------
+
+    /**
+     * Where the satellite is at [epochMs], as seen from [site] — null when the element set cannot
+     * be propagated there.
+     *
+     * ⚠️ **This exists so a live position never has to be fetched.** A ground point moves about
+     * 416 km every minute at ISS speed (measured, not assumed: propagating a real element set an
+     * hour either side of a live sample gives 416 km/min), so a position cached for five minutes is
+     * over two thousand kilometres out of date — further than the entire range over which the
+     * question "is it near me" has an answer. Propagating current elements to *this instant* has no
+     * such error, works with no network at all, and was measured against the live service at
+     * **0.6 km on the ground and 0.0 km in altitude** from elements 13.9 hours old.
+     */
+    fun sighting(
+        elements: Sgp4.Elements,
+        site: Site,
+        epochMs: Long,
+    ): Sighting? = sighting(Sgp4.propagator(elements), site, epochMs)
+
+    /** As [sighting], for a propagator that has already been built. */
+    fun sighting(
+        propagator: Sgp4.Propagator,
+        site: Site,
+        epochMs: Long,
+    ): Sighting? {
+        val look = look(propagator, site, epochMs) ?: return null
+        val sub = subPoint(propagator, epochMs) ?: return null
+        val sunAltitude = Ephemeris.sunPosition(site.latitudeDeg, site.longitudeDeg, epochMs)
+            .altitudeDeg
+        return Sighting(
+            noradId = propagator.elements.noradId,
+            name = propagator.elements.name,
+            look = look,
+            subPoint = sub,
+            kind = classify(sunAltitude, look.illumination.isLit),
+        )
+    }
+
+    /**
+     * Whether a satellite above the horizon can actually be seen.
+     *
+     * Shared by [sighting] and [buildPass] on purpose: a pass reports whether the object is lit at
+     * *any* point across it, an instant reports whether it is lit *now*, and everything else about
+     * the judgement is the same. Two copies of this rule would be free to drift.
+     */
+    private fun classify(sunAltitudeDeg: Double, sunlit: Boolean): PassKind = when {
+        sunAltitudeDeg > DARK_ENOUGH_SUN_ALTITUDE_DEG -> PassKind.DAYLIGHT
+        sunlit -> PassKind.VISIBLE
+        else -> PassKind.ECLIPSED
+    }
 
     /** The point on the ground directly beneath the satellite, or null if it cannot be propagated. */
     fun subPoint(propagator: Sgp4.Propagator, epochMs: Long): SubPoint? {
@@ -501,11 +570,7 @@ object SatellitePasses {
 
         val sunAltitude = Ephemeris.sunPosition(site.latitudeDeg, site.longitudeDeg, culminationMs)
             .altitudeDeg
-        val kind = when {
-            sunAltitude > DARK_ENOUGH_SUN_ALTITUDE_DEG -> PassKind.DAYLIGHT
-            anySunlit -> PassKind.VISIBLE
-            else -> PassKind.ECLIPSED
-        }
+        val kind = classify(sunAltitude, anySunlit)
 
         return Pass(
             noradId = propagator.elements.noradId,

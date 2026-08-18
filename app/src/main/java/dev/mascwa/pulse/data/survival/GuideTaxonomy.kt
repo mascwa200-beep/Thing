@@ -15,11 +15,13 @@ const val SUPERGROUP_HUMANITIES = "Humanities"
 const val SUPERGROUP_ARTS = "Arts & Leisure"
 const val SUPERGROUP_WORK = "Work & Money"
 const val SUPERGROUP_REFERENCE = "Reference"
+const val SUPERGROUP_DATABASE = "Federation Database"
 
 /** Every supergroup, in the display order the browse rail renders them. */
 val SUPERGROUPS: List<String> = listOf(
     SUPERGROUP_SCIENCE, SUPERGROUP_MEDICAL, SUPERGROUP_FIELDCRAFT, SUPERGROUP_TECHNICAL,
     SUPERGROUP_HUMANITIES, SUPERGROUP_ARTS, SUPERGROUP_WORK, SUPERGROUP_REFERENCE,
+    SUPERGROUP_DATABASE,
 )
 
 /** Category (as it appears on [Guide.category]) → supergroup. The full 10,000-topic ontology slots every
@@ -82,6 +84,16 @@ val CATEGORY_SUPERGROUP: Map<String, String> = mapOf(
     // Reference
     "Reference" to SUPERGROUP_REFERENCE,
     "Geography" to SUPERGROUP_REFERENCE,
+
+    // Federation Database — the in-universe reference. Authored prose in the ship's-computer
+    // register; homage only, carrying no franchise artwork, insignia or copied text.
+    "Species & Civilisations" to SUPERGROUP_DATABASE,
+    "Starfleet & Federation" to SUPERGROUP_DATABASE,
+    "Starships & Classes" to SUPERGROUP_DATABASE,
+    "Warp & Starship Technology" to SUPERGROUP_DATABASE,
+    "Worlds & Stations" to SUPERGROUP_DATABASE,
+    "Federation Timeline" to SUPERGROUP_DATABASE,
+    "Notable Figures" to SUPERGROUP_DATABASE,
 )
 
 /** Fallback supergroup for a category with no explicit mapping — keeps the rail rendering instead of crashing. */

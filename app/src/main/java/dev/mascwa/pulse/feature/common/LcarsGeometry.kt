@@ -51,42 +51,65 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.mascwa.pulse.core.telemetry.LcarsCodes
+import dev.mascwa.pulse.navigation.LocalConsoleSection
 import dev.mascwa.pulse.notifications.AlertCondition
 import dev.mascwa.pulse.notifications.AlertStatus
+import dev.mascwa.pulse.ui.LocalStardate
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.Antonio
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
-import dev.mascwa.pulse.ui.theme.LocalLcarsBlocks
+import dev.mascwa.pulse.ui.theme.LocalConsoleBlocks
+import dev.mascwa.pulse.ui.theme.Orbitron
 import dev.mascwa.pulse.ui.theme.Pulse
 
 /**
- * Genuine Star-Trek-Okudagram panel geometry — asymmetric elbow-connector silhouettes and swept blocks,
- * replacing the uniform rounded-rectangles/pills the earlier LCARS re-theme was built from (that kit is
- * gone; these took over its call sites wholesale, which is why the signatures echo it) and the same
- * [Pulse.colors] read, so they render in whatever palette is provided. LTR geometry only (layoutDirection is
- * intentionally ignored below) — this app has no RTL-locale requirement today; flagged here rather than
- * silently assumed.
+ * Original-series console geometry — cut plates and mitred elbow connectors, rendered in whatever
+ * palette is provided via [Pulse.colors]. LTR geometry only (layoutDirection is intentionally ignored
+ * below) — this app has no RTL-locale requirement today; flagged here rather than silently assumed.
  *
- * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single swept ROUNDED corner ([lcarsBlockShape]) rather than a
- * notch — safe for arbitrary held content, nothing can clip into a concave corner. The genuinely notched
- * elbow ([rememberLcarsElbow], a real concave L-shape via [GenericShape] — the first use of it in this codebase) is
- * reserved for small solid-color accents with no text inside them ([LcarsHeaderBar]'s lead block,
- * [LcarsDataRow]'s tab-adjacent nub) where a bitten corner can't clip anything readable.
+ * ⚠️ **The `Lcars` prefix on these names is now historical, and deliberately left alone.** The shapes
+ * are 1966, not 1987, but the names describe *function* — a rail, a frame, a header bar, a data row —
+ * and those roles did not change. Renaming the prefix would be a blind mechanical sweep across every
+ * screen in the app for no user-visible gain, and a sweep of exactly that kind has already cost this
+ * project a CI failure. It is a separate, gated slice if it is ever worth doing at all.
+ *
+ * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single CUT corner ([lcarsBlockShape]) rather than a
+ * notch — safe for arbitrary held content, since nothing can clip into a concave corner. The genuinely
+ * notched elbow ([rememberLcarsElbow], a real concave L-shape via [GenericShape]) is reserved for small
+ * solid-colour accents with no text inside them ([LcarsHeaderBar]'s lead block, [LcarsDataRow]'s
+ * tab-adjacent nub), where a bitten corner cannot clip anything readable.
  */
 enum class LcarsCorner { TopStart, TopEnd, BottomStart, BottomEnd }
 
-/** A rectangle with one corner's radius swept large (clamped to half the shorter side, same as any
- *  [RoundedCornerShape]) and the other three left sharp — the asymmetric "one end is a pill cap" LCARS block
- *  silhouette. No [GenericShape] needed; per-corner [RoundedCornerShape] already expresses this. */
+/**
+ * A console plate: a rectangle with one corner cut away at an angle and the other three left sharp.
+ *
+ * ⚠️ **This is the shape that carries the era.** It used to be a [RoundedCornerShape] with one corner
+ * swept into a large pill cap — the 1987 LCARS block. The 1966 consoles are cut, not swept: hard
+ * plates with mitred corners, an angular language rather than a curved one. [CutCornerShape] is the
+ * same per-corner API and the same [Dp] parameter, so every call site keeps its argument and simply
+ * renders angular — which is what makes the whole console change with one edit.
+ *
+ * Clamped to half the shorter side by [CutCornerShape] itself, exactly as the rounded version was.
+ */
 fun lcarsBlockShape(sweep: Dp, corner: LcarsCorner): Shape = when (corner) {
-    LcarsCorner.TopStart -> RoundedCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.TopEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.BottomStart -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
-    LcarsCorner.BottomEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
+    LcarsCorner.TopStart -> CutCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.TopEnd -> CutCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.BottomStart -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
+    LcarsCorner.BottomEnd -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
 }
+
+/**
+ * The "jelly bean" — a full capsule, the 1966 bridge's signature control.
+ *
+ * A percentage rather than a [Dp] so it stays a true stadium at any height without the caller having
+ * to know its own size. Used for the button banks, where a bank of capsules on black is the single
+ * most recognisable thing about the original consoles.
+ */
+val tosCapsule: Shape = RoundedCornerShape(percent = 50)
 
 /**
  * A genuine concave L-shaped notch bitten out of one corner, with the interior (concave) joint filled by a
@@ -109,8 +132,10 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                 addRect(Rect(0f, 0f, w, h))
                 return@GenericShape
             }
-            // Every case sweeps +90° from the arc's start angle to its end angle — derived and verified
-            // analytically (arc endpoints match the adjoining lineTo points exactly) before writing this.
+            // Every case mitres straight across the corner. These were quarter-circle arcs for LCARS;
+            // the 1966 consoles are cut rather than swept, so each arc became a straight line to the
+            // very same end point — derived from the arc's start angle and its +90° sweep, so the
+            // silhouette keeps its exact bounding box and only the joint changes from curved to angular.
             when (corner) {
                 LcarsCorner.TopStart -> {
                     moveTo(s, 0f)
@@ -118,13 +143,13 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, h)
                     lineTo(0f, h)
                     lineTo(0f, s)
-                    arcTo(Rect(0f, 0f, 2 * s, 2 * s), 180f, 90f, false)
+                    lineTo(s, 0f)
                     close()
                 }
                 LcarsCorner.TopEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w - s, 0f)
-                    arcTo(Rect(w - 2 * s, 0f, w, 2 * s), 270f, 90f, false)
+                    lineTo(w, s)
                     lineTo(w, h)
                     lineTo(0f, h)
                     close()
@@ -134,14 +159,14 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, 0f)
                     lineTo(w, h)
                     lineTo(s, h)
-                    arcTo(Rect(0f, h - 2 * s, 2 * s, h), 90f, 90f, false)
+                    lineTo(0f, h - s)
                     close()
                 }
                 LcarsCorner.BottomEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w, 0f)
                     lineTo(w, h - s)
-                    arcTo(Rect(w - 2 * s, h - 2 * s, w, h), 0f, 90f, false)
+                    lineTo(w - s, h)
                     lineTo(0f, h)
                     close()
                 }
@@ -343,7 +368,7 @@ private const val CODE_MIN_WEIGHT = 1.9f
 fun LcarsRail(
     seed: String,
     modifier: Modifier = Modifier,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
     weights: List<Float> = RailWeights,
 ) {
     if (blocks.isEmpty() || weights.isEmpty()) {
@@ -444,18 +469,59 @@ fun LcarsScreenFrame(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    title.uppercase(),
-                    fontFamily = Antonio,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp,
-                    letterSpacing = 2.sp,
-                    color = c.accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f),
-                )
+                // Where you are, above what you are looking at. A 1966 console is banks of unlabelled
+                // colour, which is exactly why this is here: the hardware idiom is the original
+                // series, but a screen that does not say where it sits would make the app harder to
+                // navigate rather than easier, and legibility is not the part being stylised.
+                //
+                // Read from a composition local rather than passed in, so all thirty-five screens
+                // gained it without one of them being edited. Absent for anything the directory does
+                // not list, and the title simply keeps the whole block as it did before.
+                val section = LocalConsoleSection.current
+                // And when, said the way this console says it. One read of a composition local the
+                // app root refreshes on the hour, so all thirty-three framed screens gained a
+                // stardate without one of them being edited — the same trick as the section above.
+                //
+                // The bare number, not `Stardate.stamp`: the word "STARDATE" is the boot reveal's,
+                // where the console introduces itself once. Repeating it on every screen would spend
+                // the header's scarcest resource on a label nobody needs twice.
+                //
+                // Width was measured rather than eyeballed, the same way the title size below was.
+                // JetBrainsMono is monospaced at exactly 0.6 em, so at 8sp with 1.4sp of tracking a
+                // character is 6.2dp; the longest section label in the whole directory is
+                // "YOUR THINGS", and "YOUR THINGS · 26621.5" is 21 characters -> 130dp of the same
+                // ~230dp the 16sp title fits 203dp of. It does not crowd.
+                val stardate = LocalStardate.current
+                val locus = listOfNotNull(section, stardate.takeIf { it.isNotEmpty() })
+                    .joinToString(" · ")
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    if (locus.isNotEmpty()) {
+                        Text(
+                            locus,
+                            fontFamily = JetBrainsMono,
+                            fontSize = 8.sp,
+                            letterSpacing = 1.4.sp,
+                            color = c.muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        title.uppercase(),
+                        fontFamily = Orbitron,
+                        fontWeight = FontWeight.Bold,
+                        // 16sp, not the 19 the condensed face used. Measured over every real screen
+                        // title in the app, the longest lands at 203dp here against roughly 230dp of
+                        // header — where the same string at 19sp would have needed 241dp and simply
+                        // ellipsised. Longer titles still degrade gracefully, as they always did.
+                        fontSize = 16.sp,
+                        letterSpacing = 1.5.sp,
+                        color = c.accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                    )
+                }
                 actions()
             }
         }
@@ -521,10 +587,12 @@ private fun AlertStrip() {
     ) {
         Text(
             if (red) "RED ALERT" else "YELLOW ALERT",
-            fontFamily = Antonio,
+            fontFamily = Orbitron,
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            letterSpacing = 2.sp,
+            // 11sp: the strip is 20dp tall and shares its width with a headline, so the wide face
+            // has to give some back. "YELLOW ALERT" renders at 120dp, leaving the headline the rest.
+            fontSize = 11.sp,
+            letterSpacing = 1.4.sp,
             color = c.void,
             maxLines = 1,
         )
@@ -554,7 +622,7 @@ fun LcarsSegmentBar(
     seed: String,
     modifier: Modifier = Modifier,
     segments: Int = 5,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
 ) {
     if (segments <= 0 || blocks.isEmpty()) {
         Box(modifier)
@@ -610,7 +678,7 @@ data class LcarsNavItem(
 fun LcarsNavBar(
     items: List<LcarsNavItem>,
     modifier: Modifier = Modifier,
-    blocks: List<Color> = LocalLcarsBlocks.current,
+    blocks: List<Color> = LocalConsoleBlocks.current,
 ) {
     if (items.isEmpty() || blocks.isEmpty()) {
         Box(modifier)
@@ -672,8 +740,14 @@ fun LcarsNavBar(
                     letterSpacing = 0.6.sp,
                     color = c.void,
                     maxLines = 1,
-                    // Antonio is condensed, which is most of why six words fit at all. Clipping
-                    // rather than ellipsising: a truncated word still reads, "MARKE…" does not.
+                    // ⚠️ The one place that keeps the condensed face while the rest of the console
+                    // moved to the wide one, and the reason is measurable rather than aesthetic. Six
+                    // labels share the width of the phone, so each slot is 64.5dp on a 411dp screen
+                    // and 56dp on a 360dp one. COMPUTER renders at 37dp in Antonio at 9sp and 64dp
+                    // in Orbitron — inside the slot on one phone and outside it on the other.
+                    //
+                    // Clipping rather than ellipsising: a truncated word still reads, "MARKE…" does
+                    // not.
                     overflow = TextOverflow.Clip,
                     softWrap = false,
                 )
@@ -828,8 +902,8 @@ fun LcarsDialog(
             Column(Modifier.weight(1f).padding(end = 14.dp, top = 14.dp, bottom = 14.dp)) {
                 Text(
                     title.uppercase(),
-                    fontFamily = Antonio, fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp, letterSpacing = 1.5.sp, color = c.accent,
+                    fontFamily = Orbitron, fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp, letterSpacing = 1.2.sp, color = c.accent,
                 )
                 Box(Modifier.padding(top = 10.dp)) { content() }
                 Row(

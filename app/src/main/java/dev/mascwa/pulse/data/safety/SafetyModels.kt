@@ -28,6 +28,43 @@ data class Incident(
     val source: String,
     val url: String? = null,
     val magnitude: Double? = null,
+    /**
+     * The rest of what USGS sends about an earthquake, all of which used to be parsed away.
+     *
+     * Every field is defaulted so a `SafetyResult` cached before they existed still decodes — the
+     * same reason `sourceStates` above is defaulted. A blob without them grades exactly as it did,
+     * because `Seismic.alertLevel` treats absent as no information rather than as safety.
+     *
+     * Only earthquakes populate these; the other three sources have no equivalent.
+     */
+    val depthKm: Double? = null,
+    /**
+     * USGS's tsunami flag. Set when the event is somewhere a tsunami evaluation is warranted, so
+     * it marks an assessment in progress rather than a warning in force — but it is the single
+     * most consequential field in the feed and this app discarded it.
+     */
+    val tsunami: Boolean = false,
+    /** PAGER humanitarian-impact estimate: green, yellow, orange, red. Absent on most events. */
+    val pagerAlert: String? = null,
+    /** USGS's own significance score, folding in magnitude, felt reports and estimated impact. */
+    val significance: Int? = null,
+    /** Which magnitude scale was used. `mb` saturates around 6.5 and understates larger events. */
+    val magType: String? = null,
+    /** How many people filed a "did you feel it" report. */
+    val feltReports: Int? = null,
+    /** Instrumental shaking intensity, Modified Mercalli. */
+    val shakingIntensity: Double? = null,
+    /**
+     * What the issuing authority says to actually do. Weather alerts carry it on nearly every
+     * message and it was parsed away, which is a strange thing for a safety feature to discard.
+     */
+    val instruction: String? = null,
+    /** "HAPPENING NOW" / "LIKELY SOON" / "FORECAST" — from CAP urgency and certainty. */
+    val timing: String? = null,
+    /** When the issuer says this stops applying, so a cached alert is not shown as current. */
+    val expiresEpochMs: Long? = null,
+    /** The counties or zones the alert covers, as the issuer describes them. */
+    val areaDescription: String? = null,
 )
 
 @Serializable

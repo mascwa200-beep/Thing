@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Geodesy
+import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
@@ -481,7 +482,21 @@ private fun LazyListScope.asteroidsTab(d: OrbitalData?, c: NightwirePalette) {
         }
     }
     if (neos.isEmpty()) {
-        item { Hint("No close approaches catalogued for today.", c) }
+        item {
+            // "None today" and "we could not ask" are different statements, and the second one used
+            // to be printed as the first. NASA's shared DEMO_KEY is rate-limited per IP, so this is
+            // a routine outcome rather than a rarity.
+            if (d?.neosUnavailable == true) {
+                Hint(
+                    "Could not reach NASA's close-approach catalogue, so this list is unknown " +
+                        "rather than empty. Adding your own NASA key in Settings avoids the shared " +
+                        "demo key's rate limit.",
+                    c,
+                )
+            } else {
+                Hint("No close approaches catalogued for today.", c)
+            }
+        }
     } else {
         items(neos) { neo -> NeoCard(neo, c) }
     }
@@ -509,7 +524,10 @@ private fun NeoCard(neo: NeoObject, c: NightwirePalette) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            neo.closeApproach?.let {
+            // ⚠️ The epoch, not NASA's string. That string is UTC and carries no zone marker, so
+            // it sat on this screen beside sunrise, pass times and everything else — all rendered
+            // in the device's own zone — with nothing to say it meant a different clock.
+            closeApproachLine(neo)?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
             }
         }
@@ -570,6 +588,19 @@ private fun LaunchCard(launch: UpcomingLaunch, c: NightwirePalette) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            // How much room the flight actually has. This is NOT the same question as how firm the
+            // T-0 is, and the line above cannot answer it: a window of four hours regularly sits
+            // behind a T-0 quoted to the second. See LaunchWindow.
+            LaunchWindow.widthMs(launch.windowStartMs, launch.windowEndMs)
+                ?.takeIf { LaunchWindow.isMeaningful(launch.windowStartMs, launch.windowEndMs) }
+                ?.let { width ->
+                    Text(
+                        "Window ${clockOrDash(launch.windowStartMs)} – ${clockOrDash(launch.windowEndMs)}" +
+                            " · ${LaunchWindow.describeWidth(width)} to fly",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
         }
     }
 }
@@ -617,6 +648,17 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
 
 /** Locale.US for the numeric patterns; the clock deliberately follows the device's own locale. */
 private fun fmt(pattern: String, value: Double): String = String.format(Locale.US, pattern, value)
+
+/**
+ * When an asteroid passes, in the reader's own zone.
+ *
+ * Falls back to NASA's string for an entry cached before the epoch was parsed — and marks it UTC
+ * then, because that is what it is and an unlabelled one is the defect being fixed.
+ */
+private fun closeApproachLine(neo: NeoObject): String? {
+    neo.closeApproachEpochMs?.let { return "Closest ${dateTimeOrDash(it)}" }
+    return neo.closeApproach?.let { "Closest $it UTC" }
+}
 
 private fun clockOrDash(epochMs: Long?): String =
     epochMs?.let { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) } ?: "—"

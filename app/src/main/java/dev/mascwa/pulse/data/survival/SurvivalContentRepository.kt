@@ -1,6 +1,7 @@
 package dev.mascwa.pulse.data.survival
 
 import android.content.Context
+import dev.mascwa.pulse.core.telemetry.ContentPack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -28,16 +29,38 @@ import kotlinx.serialization.json.Json
 class SurvivalContentRepository(
     private val context: Context,
     private val json: Json,
+    /**
+     * Installed expansion packs, or null for a bundle-only library.
+     *
+     * ⚠️ The merge happens **here**, at the one place that answers "what is in the library", so the
+     * reader, search, study and the assistant's tools all see one corpus and none of them needed
+     * changing. A pack that had to be plumbed through every consumer would be a pack that is only
+     * half installed.
+     */
+    private val packs: PackStore? = null,
 ) {
     @Volatile private var cachedIndex: List<GuideIndexEntry>? = null
     @Volatile private var cachedFiles: List<String>? = null
+
+    /** Which pack revision the caches were built from, so installing one invalidates them. */
+    @Volatile private var cachedAtPackRevision: Int = -1
 
     private val shardMutex = Mutex()
     private val shardLru = LinkedHashMap<String, List<Guide>>(8, 0.75f, true)
 
     /** The lightweight catalog index — enough for browse rails, lists and heading-level search. */
     suspend fun index(): List<GuideIndexEntry> {
-        cachedIndex?.let { return it }
+        val revision = packs?.revision ?: 0
+        cachedIndex?.let { if (revision == cachedAtPackRevision) return it }
+        val bundled = bundledIndex()
+        // Bundled first and bundled wins: a pack can add to the library and can never shadow it.
+        val merged = ContentPack.merge(bundled, packs?.indexEntries().orEmpty()) { it.id }
+        cachedAtPackRevision = revision
+        cachedIndex = merged
+        return merged
+    }
+
+    private suspend fun bundledIndex(): List<GuideIndexEntry> {
         return withContext(Dispatchers.IO) {
             runCatching {
                 json.decodeFromString(GuideIndex.serializer(), readAsset(INDEX_FILE)).entries
@@ -45,14 +68,16 @@ class SurvivalContentRepository(
                 // A missing/stale index never breaks the app — derive one by streaming every shard once
                 // (parse, summarize, discard; the shard name is known here, so lazy [guide] still works).
                 // CI keeps the real index in lockstep with the shards, so this is a last resort.
-                shardFiles().flatMap { name ->
+                // ⚠️ Bundled shards only. Packs derive their own rows and are merged by the caller;
+                // deriving them here as well would list every pack guide twice.
+                bundledShardFiles().flatMap { name ->
                     runCatching {
                         json.decodeFromString(GuideBook.serializer(), readAsset(name)).guides.map { g ->
                             GuideIndexEntry(g.id, g.title, g.category, g.summary, g.sections.map { s -> s.heading }, name)
                         }
                     }.getOrDefault(emptyList())
                 }
-            }.also { cachedIndex = it }
+            }
         }
     }
 
@@ -76,7 +101,7 @@ class SurvivalContentRepository(
         val needle = query.trim()
         if (needle.isBlank()) return@flow
         for (name in shardFiles()) {
-            val text = runCatching { readAsset(name) }.getOrNull() ?: continue
+            val text = runCatching { readShard(name) }.getOrNull() ?: continue
             if (!text.contains(needle, ignoreCase = true)) continue
             val ids = runCatching { json.decodeFromString(GuideBook.serializer(), text).guides }
                 .getOrDefault(emptyList())
@@ -97,7 +122,7 @@ class SurvivalContentRepository(
 
     /** Every guides*.json under assets/survival/ (the per-category shards), sorted for determinism.
      *  guide_index.json deliberately does NOT match this prefix+suffix filter. */
-    private suspend fun shardFiles(): List<String> {
+    private suspend fun bundledShardFiles(): List<String> {
         cachedFiles?.let { return it }
         return withContext(Dispatchers.IO) {
             (context.assets.list("survival")
@@ -106,16 +131,33 @@ class SurvivalContentRepository(
         }
     }
 
+    /** Everything the library can read, bundled first — what a full-text scan has to walk. */
+    private suspend fun shardFiles(): List<String> =
+        bundledShardFiles() + packs?.installed().orEmpty().flatMap { it.files }
+
     private suspend fun shard(file: String): List<Guide> = withContext(Dispatchers.IO) {
         shardMutex.withLock {
             shardLru[file] ?: run {
-                val parsed = json.decodeFromString(GuideBook.serializer(), readAsset(file)).guides
+                val parsed = json.decodeFromString(GuideBook.serializer(), readShard(file)).guides
                 shardLru[file] = parsed
                 while (shardLru.size > MAX_RESIDENT_SHARDS) shardLru.remove(shardLru.keys.first())
                 parsed
             }
         }
     }
+
+    /**
+     * A shard's text, from wherever it lives.
+     *
+     * A pack file is recognised by its name rather than by a lookup — the qualification scheme exists
+     * precisely so this routing needs no table and cannot get out of step with what is installed.
+     */
+    private suspend fun readShard(name: String): String =
+        if (ContentPack.isPackFile(name)) {
+            packs?.read(name) ?: error("Expansion pack resource missing: $name")
+        } else {
+            readAsset(name)
+        }
 
     private fun readAsset(name: String): String =
         context.assets.open("survival/$name").bufferedReader().use { it.readText() }

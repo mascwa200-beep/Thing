@@ -44,6 +44,14 @@ data class UnifiedBrief(
     val urgency: BriefUrgency,
     /** Stable identity of the urgent item (so it buzzes once, then updates silently); null when ROUTINE. */
     val urgencyKey: String?,
+    /**
+     * The [StoryLedger] identity of the story this board actually printed, for the caller to persist.
+     *
+     * Null when no NEWS row was rendered. ⚠️ It is deliberately the *chosen* story rather than the
+     * top of the feed: recording what we merely considered would burn stories the reader never saw,
+     * and they would then never be shown at all.
+     */
+    val newsIdentity: String? = null,
 )
 
 /**
@@ -55,8 +63,40 @@ data class BriefSignals(
     // News.
     val topHeadline: String? = null,
     val topSource: String? = null,
+    /**
+     * Further headlines to fall back to when the top one has already been shown.
+     *
+     * Without these the NEWS row simply disappears the moment the lead story goes stale, which
+     * trades a repeating row for an absent one. With them the board keeps finding you something you
+     * have not read.
+     */
+    val moreHeadlines: List<String> = emptyList(),
+    /**
+     * Story identities the board has already shown — see [StoryLedger].
+     *
+     * Empty means "nothing shown yet", which is correct on a first run: everything is new.
+     */
+    val seenStories: Set<String> = emptySet(),
     val emergencyHeadline: String? = null,
     val emergencyMajor: Boolean = false,
+    /**
+     * A STRONG disaster signal ([EmergencyNews.severity] == 2), as distinct from [emergencyMajor].
+     *
+     * ⚠️ The two are not the same bar and conflating them is what broke this. [emergencyMajor] also
+     * covers a notable death and a historic verdict — real news, worth a card, not worth an alert
+     * condition. Only this one raises the board's ALERT row, and only to yellow.
+     */
+    val emergencySevere: Boolean = false,
+    /**
+     * A government-issued emergency alert covering the user's location, already graded.
+     *
+     * The **only** thing besides a critical device-security notice that can put the board — and
+     * therefore the whole app, via `AlertStatus` — into condition red. Comes from [EmergencyAlert]
+     * over a CAP/USGS feed, never from a headline.
+     */
+    val officialAlert: String? = null,
+    /** Stable dedup key for [officialAlert] — the issuer's own alert id, so it buzzes once. */
+    val officialAlertKey: String? = null,
     // Markets.
     val movers: List<OracleMover> = emptyList(),
     val moveThresholdPct: Double = 3.0,
@@ -109,10 +149,31 @@ data class BriefSignals(
      * the call site, which is the only place that knows the insight's urgency, and it is deliberately
      * high so this stays the exceptional sixth row rather than a permanent fixture.
      *
-     * ⚠️ **An advisory never raises the alert condition.** What buzzes the phone is decided by the
-     * notice chain above; a suggestion, however well reasoned, is not an emergency.
+     * ⚠️ **An advisory does not raise the alert condition — unless [advisoryUrgent] says the caller
+     * established it clears the push-worthy bar.** A suggestion, however well reasoned, is not an
+     * emergency; but of the Oracle rules that reach that bar, three already alert through their own
+     * notice above (a departure, a major emergency headline, a security notice) and one does not.
+     * Extreme heat danger would otherwise arrive as a silent routine row, which is the wrong way for
+     * a health risk to be delivered.
      */
     val advisory: String? = null,
+    /**
+     * Whether the advisory clears `Oracle.pushWorthy` — URGENT or CRITICAL.
+     *
+     * The composer still does not reason: the caller owns the bar, as it does for the advisory text
+     * itself. Defaulted false, so every existing caller and every cached blob behaves exactly as
+     * before.
+     */
+    val advisoryUrgent: Boolean = false,
+    /**
+     * Identifies the RULE behind the advisory, not the sentence.
+     *
+     * ⚠️ Same trap as [departureKey]: an advisory's text carries live values — an apparent
+     * temperature that climbs through the afternoon rewrites the line every pass. Keying the alert
+     * on the text would make each rewrite look like a new urgent item and buzz the phone again.
+     * The caller passes the insight's stable family.
+     */
+    val advisoryKey: String? = null,
     /**
      * Today's study item, already chosen by the caller.
      *
@@ -152,7 +213,17 @@ object UnifiedBriefComposer {
         // (it's the one line the user explicitly asked to be interrupted for at this exact moment).
         var urgency = BriefUrgency.ROUTINE
         var urgencyKey: String? = null
+        var chosenStory: String? = null
         val alert: String? = when {
+            // ⚠️ Above the reminder, which is otherwise the one line the user explicitly asked to be
+            // interrupted for. A government emergency alert is the only thing that outranks a
+            // person's own stated intent, because it is the only one where being read late is
+            // measured in lives rather than in inconvenience.
+            !s.officialAlert.isNullOrBlank() -> {
+                urgency = BriefUrgency.RED
+                urgencyKey = "gov:${s.officialAlertKey ?: s.officialAlert.hashCode()}"
+                s.officialAlert.trim()
+            }
             !s.reminderNow.isNullOrBlank() -> {
                 urgency = BriefUrgency.YELLOW; urgencyKey = "rem:${s.reminderNow.hashCode()}"
                 "Reminder — ${s.reminderNow.trim()}"
@@ -161,8 +232,14 @@ object UnifiedBriefComposer {
                 urgency = BriefUrgency.RED; urgencyKey = "sec:${s.securityNotice.hashCode()}"
                 s.securityNotice.trim()
             }
-            !s.emergencyHeadline.isNullOrBlank() && s.emergencyMajor -> {
-                urgency = BriefUrgency.RED; urgencyKey = "news:${s.emergencyHeadline.hashCode()}"
+            // ⚠️ **YELLOW, and never red.** This was the permanent-red-alert defect: it read
+            // `emergencyMajor`, which fires on a notable death and — until this was fixed — on a
+            // headline that merely began with the word "Breaking". Condition red recolours all
+            // thirty-odd screens, so a bar this loose meant the app was always shouting, which is
+            // the same as never shouting. Red now requires a government feed; a news headline, even
+            // a genuine disaster, gets yellow.
+            !s.emergencyHeadline.isNullOrBlank() && s.emergencySevere -> {
+                urgency = BriefUrgency.YELLOW; urgencyKey = "news:${s.emergencyHeadline.hashCode()}"
                 s.emergencyHeadline.trim()
             }
             // Above the other yellows because it is the only one that expires. A safety notice is
@@ -187,15 +264,31 @@ object UnifiedBriefComposer {
         alert?.let { rows += BriefRow(BriefRowKind.ALERT, cap(it, HEADLINE_CAP)) }
 
         // --- NEWS: the emergency headline when it isn't already the ALERT row, else the top story. ---
+        //
+        // ⚠️ **Every candidate is filtered through [StoryLedger] against what the board has already
+        // shown.** The board is one fixed notification id re-posted on every refresh, so before this
+        // a story that stayed top of the feed for six hours reprinted, identically, on every pass —
+        // and the only dedup in the system ([urgencyKey]) governs whether the post *buzzes*, not
+        // what it *says*. When every candidate has already been shown the row is **omitted**, which
+        // is the whole point: falling back to "print the top one anyway" would reinstate the defect.
         if (s.showNews) {
             val alertIsEmergency = alert != null && alert == s.emergencyHeadline?.trim()
-            val newsText = when {
-                !s.emergencyHeadline.isNullOrBlank() && !alertIsEmergency -> s.emergencyHeadline.trim()
-                !s.topHeadline.isNullOrBlank() ->
-                    s.topHeadline.trim() + (s.topSource?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
-                else -> null
+            val candidates = buildList {
+                if (!s.emergencyHeadline.isNullOrBlank() && !alertIsEmergency) add(s.emergencyHeadline.trim())
+                if (!s.topHeadline.isNullOrBlank()) add(s.topHeadline.trim())
+                addAll(s.moreHeadlines.filter { it.isNotBlank() }.map { it.trim() })
             }
-            newsText?.let { rows += BriefRow(BriefRowKind.NEWS, cap(it, NEWS_CAP)) }
+            chosenStory = StoryLedger.firstUnseen(candidates, s.seenStories)
+            chosenStory?.let { chosen ->
+                // The source suffix belongs to the top story only; the emergency headline and the
+                // spares arrive without one attributed to them.
+                val text = if (chosen == s.topHeadline?.trim()) {
+                    chosen + (s.topSource?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: "")
+                } else {
+                    chosen
+                }
+                rows += BriefRow(BriefRowKind.NEWS, cap(text, NEWS_CAP))
+            }
         }
 
         // --- MARKETS: movers past the user's threshold; else the single biggest if it's at least 1%. ---
@@ -210,8 +303,17 @@ object UnifiedBriefComposer {
         if (s.showAgenda) agendaText(s)?.let { rows += BriefRow(BriefRowKind.AGENDA, it) }
 
         // --- ADVISORY: the Oracle's call to action, when the caller judged one worth the space. ---
-        s.advisory?.takeIf { it.isNotBlank() }
-            ?.let { rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP)) }
+        s.advisory?.takeIf { it.isNotBlank() }?.let {
+            rows += BriefRow(BriefRowKind.ADVISORY, cap(it.trim(), ADVISORY_CAP))
+            // ⚠️ Only when nothing above it already spoke, and never RED. An advisory can make a
+            // quiet board announce itself; it cannot outrank a security notice or a major emergency,
+            // and it cannot promote the board to a red alert. The key is the rule's, not the
+            // sentence's, so a line that rewrites itself as conditions move buzzes once.
+            if (s.advisoryUrgent && urgency == BriefUrgency.ROUTINE) {
+                urgency = BriefUrgency.YELLOW
+                urgencyKey = "advisory:${s.advisoryKey ?: it.trim().hashCode()}"
+            }
+        }
 
         // --- LESSON: what to learn today. Last, and first to go when the board fills up. ---
         s.lesson?.takeIf { it.isNotBlank() }
@@ -236,6 +338,7 @@ object UnifiedBriefComposer {
             rows = rows,
             urgency = urgency,
             urgencyKey = if (urgency == BriefUrgency.ROUTINE) null else urgencyKey,
+            newsIdentity = chosenStory?.let { StoryLedger.identity(it) }?.takeIf { it.isNotBlank() },
         )
     }
 

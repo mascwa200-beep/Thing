@@ -26,8 +26,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 HomeViewModel(
                     c.newsRepository, c.marketsRepository, c.weatherRepository,
                     c.economyRepository, c.fuelRepository, c.locationProvider, c.settingsRepository,
-                    c.orbitalRepository, c.spaceWeatherRepository, c.radarRepository, c.selfEditStore,
-                    c.usageRepository, c,
+                    c.orbitalRepository, c.tleRepository, c.spaceWeatherRepository,
+                    c.radarRepository, c.selfEditStore, c.usageRepository, c,
                 )
             modelClass.isAssignableFrom(NewsViewModel::class.java) ->
                 NewsViewModel(
@@ -112,6 +112,9 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.study.StudyViewModel::class.java) ->
                 dev.mascwa.pulse.feature.study.StudyViewModel(c)
+
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.packs.PacksViewModel::class.java) ->
+                dev.mascwa.pulse.feature.packs.PacksViewModel(c)
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
         return vm as T

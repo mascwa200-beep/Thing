@@ -45,6 +45,7 @@ import dev.mascwa.pulse.core.telemetry.MarketLink
 import dev.mascwa.pulse.core.telemetry.MediaBias
 import dev.mascwa.pulse.core.telemetry.NewsExplainers
 import dev.mascwa.pulse.core.telemetry.NewsInsights
+import dev.mascwa.pulse.core.telemetry.NewsSummary
 import dev.mascwa.pulse.core.telemetry.NewsMarketLink
 import dev.mascwa.pulse.core.telemetry.SocialBuzz
 import dev.mascwa.pulse.core.telemetry.Tone
@@ -110,6 +111,9 @@ fun ArticleCard(
     }
 
     // Computed once per article — feeds both the always-visible takeaway line and the expanded detail below.
+    val subtitle = remember(article.url) {
+        NewsSummary.subtitle(article.title, article.summary, article.source)
+    }
     val mood = remember(article.url) { NewsInsights.toneBreakdown(article.title, article.summary) }
     val tags = remember(article.url) { NewsInsights.topics(article.title, article.summary) }
     val cluster = remember(article.url, allArticles) {
@@ -148,9 +152,12 @@ fun ArticleCard(
                     fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
                     color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis,
                 )
-                if (article.summary.isNotBlank()) {
+                // ⚠️ Not `article.summary` directly. An aggregator's description opens with the
+                // article's own headline, so printing it here printed the line above it again —
+                // see [NewsSummary.subtitle], which drops it and keeps whatever follows.
+                subtitle?.let {
                     Text(
-                        article.summary,
+                        it,
                         fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink2,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 5.dp),

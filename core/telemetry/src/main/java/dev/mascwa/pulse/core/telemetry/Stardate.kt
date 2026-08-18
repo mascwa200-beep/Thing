@@ -53,6 +53,80 @@ object Stardate {
     }
 
     /**
+     * The stardate for an instant, as read where the reader is standing.
+     *
+     * [of] takes a decomposed date on purpose, which keeps it clock-free and testable — but it left
+     * the decomposition to whoever held the clock, and the app now shows a stardate on the boot
+     * reveal, every screen header, the Home masthead, the one notification board, the Computer's
+     * context and the desktop's rail. This does that arithmetic once, so each platform supplies only
+     * the instant and its own offset.
+     *
+     * ⚠️ **[utcOffsetSeconds] is load-bearing, not a convenience.** The obvious implementation
+     * floor-divides epoch milliseconds into days, which is UTC, and this codebase has already
+     * shipped that same bug twice: the observatory computed "tonight's geometry" from UTC midnight,
+     * so "today's sunset" was the wrong day for anyone far from Greenwich, and the day-ahead core
+     * wrote UTC clock times into four separate lines of prose — an hour out in Berlin and eleven in
+     * Auckland. A stardate is a date said aloud; one that rolls its tenth at UTC midnight is simply
+     * wrong for most of the planet. The caller supplies its own platform's offset in one line and
+     * the arithmetic stays here, shared and tested.
+     *
+     * ⚠️ **The civil conversion is deliberately hand-rolled, and deliberately a second copy.**
+     * `java.time` would do it, but this core has no platform dependency and [EconomyVintage] states
+     * the same reason for its own `civilFromDays`. That one yields year and month for a UTC instant;
+     * this needs day-of-year, length-of-year and a local hour, so neither can be expressed in terms
+     * of the other without changing a working, shipped core for no functional gain. The honest
+     * safeguard against two implementations drifting is a test that compares them —
+     * `StardateCivilDriftTest` sweeps both over thousands of days and fails the build if they ever
+     * disagree. It is a separate file from `StardateTest` because that one is mirrored to the
+     * desktop, which has no economy screen and so no [EconomyVintage] to compare against.
+     */
+    fun at(epochMs: Long, utcOffsetSeconds: Int): Double {
+        val localMs = epochMs + utcOffsetSeconds * 1000L
+        // floorDiv, not `/`: before 1970 and west of Greenwich the millisecond count goes negative,
+        // and truncating division would round toward zero, i.e. into the following day.
+        val days = Math.floorDiv(localMs, MS_PER_DAY)
+        val msIntoDay = Math.floorMod(localMs, MS_PER_DAY)
+        val (year, dayOfYear) = civilDayOfYear(days)
+        return of(
+            year = year,
+            dayOfYear = dayOfYear,
+            daysInYear = if (isLeap(year)) 366 else 365,
+            hourOfDay = (msIntoDay / 3_600_000L).toInt(),
+        )
+    }
+
+    /** Proleptic Gregorian, the rule the calendar actually uses rather than the every-fourth-year one. */
+    private fun isLeap(year: Int): Boolean = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+
+    /**
+     * Days since 1970-01-01 to (year, 1-based day of year).
+     *
+     * Howard Hinnant's civil-from-days, shifted to an era beginning on 1 March so that the leap day
+     * falls at the end of the era's year and needs no special case mid-calculation.
+     */
+    private fun civilDayOfYear(days: Long): Pair<Int, Int> {
+        val z = days + 719_468
+        val era = Math.floorDiv(z, 146_097L)
+        val doe = z - era * 146_097                                   // 0..146096
+        val yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+        val y = yoe + era * 400
+        val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)             // 0..365, from 1 March
+        val mp = (5 * doy + 2) / 153                                  // 0..11, March = 0
+        val d = doy - (153 * mp + 2) / 5 + 1
+        val m = if (mp < 10) mp + 3 else mp - 9                       // 1..12
+        val year = (if (m <= 2) y + 1 else y).toInt()
+        // Day-of-year from the calendar month, which is what `of` expects.
+        val leap = isLeap(year)
+        val before = CUMULATIVE_DAYS[m.toInt() - 1] + if (leap && m > 2) 1 else 0
+        return year to (before + d.toInt())
+    }
+
+    /** Days elapsed before the start of each month in a common year. */
+    private val CUMULATIVE_DAYS = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
+
+    private const val MS_PER_DAY = 86_400_000L
+
+    /**
      * "26621.5" — one decimal, no grouping, no locale.
      *
      * Built by hand rather than through a formatter because every locale-sensitive `format` call in

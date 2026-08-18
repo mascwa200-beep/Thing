@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +51,8 @@ import dev.mascwa.pulse.feature.settings.SettingsScreen
 import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.feature.weather.WeatherScreen
 import dev.mascwa.pulse.feature.weather.WeatherViewModel
+import dev.mascwa.pulse.navigation.LocalConsoleSection
+import dev.mascwa.pulse.navigation.sectionOf
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.navigation.TOP_DESTINATIONS
 
@@ -104,6 +107,14 @@ fun PulseApp(
             )
         },
     ) { innerPadding ->
+        // Where you are, provided once for the whole NavHost. Every screen's header reads it and no
+        // screen passes it, which is why the readout reached thirty-five screens with no edit to any
+        // of them. Keyed on the live route so it follows navigation without the screens knowing.
+        //
+        // And when you are, by the same route: `ProvideStardate` runs ONE hourly coroutine here
+        // rather than a timer per screen, and the header reads it beside the section name.
+        CompositionLocalProvider(LocalConsoleSection provides sectionOf(currentRoute)) {
+        ProvideStardate {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
@@ -307,6 +318,11 @@ fun PulseApp(
                 )
             }
 
+            composable(Routes.PACKS) {
+                val vm: dev.mascwa.pulse.feature.packs.PacksViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.packs.PacksScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----
             composable(Routes.ORACLE) {
                 val vm: dev.mascwa.pulse.feature.oracle.OracleViewModel = viewModel(factory = factory)
@@ -376,6 +392,8 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
         }
+        }
+        }
     }
 
         // Auto Offline Survival Mode when there's no connection.
@@ -416,6 +434,7 @@ fun PulseApp(
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
+    Routes.PACKS,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
     Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
     Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,

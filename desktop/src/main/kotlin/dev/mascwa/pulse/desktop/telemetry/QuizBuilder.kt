@@ -190,6 +190,57 @@ object QuizBuilder {
     // ---- building -----------------------------------------------------------------------------------
 
     /**
+     * "What comes next" over a procedure.
+     *
+     * ⚠️ **Distractors come from [StudyQuestions.Question.options] and from nowhere else — the
+     * caller's `pool` is deliberately not consulted.** Every wrong option is therefore a real step of
+     * the same procedure, merely out of place: a learner who misreads one has still read a true
+     * instruction. The alternative — synthesising a plausible-sounding step — would put invented
+     * instructions in front of somebody working through CPR or water purification, and no amount of
+     * question variety is worth that.
+     *
+     * Always [Format.STANDARD]. The clever formats are wrong here: "which is NOT the next step" makes
+     * three true-but-misplaced statements read as endorsements, and withholding the answer would ask
+     * someone to certify that a real step of this very procedure does not belong in it.
+     *
+     * Options are shown abbreviated where a step is long, but the [QuizItem.explanation] always
+     * carries the next step in full — short to choose from, complete to learn from.
+     */
+    private fun ordering(question: StudyQuestions.Question, seed: Int): QuizItem? {
+        val answer = question.answer.trim()
+        if (answer.isEmpty()) return null
+        val wanted = STANDARD_CHOICES - 1
+        val wrong = question.options
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it != answer }
+            .distinct()
+            .toList()
+        // Fewer honest distractors than a fair item needs: no item at all, as everywhere else here.
+        if (wrong.size < wanted) return null
+        // Deterministic pick, so a card asks the same question every time it comes back.
+        val picked = shuffled(wrong, seed).take(wanted)
+        // Steps run to a median of 180 characters, so four of them verbatim is a wall to read rather
+        // than a question to answer. Shortened as one set, because whether two options stay
+        // distinguishable is a property of the set — see StudyQuestions.shortOptions, which declines
+        // and hands back the originals rather than produce a question that cannot be answered.
+        val shown = StudyQuestions.shortOptions(listOf(answer) + picked)
+        return QuizItem(
+            questionId = question.id,
+            prompt = question.prompt,
+            choices = shuffled(
+                shown.drop(1).map { Choice(it, false) } + Choice(shown.first(), true),
+                seed,
+            ),
+            format = Format.STANDARD,
+            guideId = question.guideId,
+            guideTitle = question.guideTitle,
+            heading = question.heading,
+            explanation = "The next step is: $answer",
+        )
+    }
+
+    /**
      * A multiple-choice item for a numeric [question], or null when it cannot be made fairly.
      *
      * Null rather than a degraded item on purpose: an item with one plausible distractor and two
@@ -202,6 +253,7 @@ object QuizBuilder {
         seed: Int,
         sourceSentence: String = "",
     ): QuizItem? {
+        if (question.kind == StudyQuestions.QuestionKind.ORDER) return ordering(question, seed)
         if (question.kind != StudyQuestions.QuestionKind.CLOZE) return null
         val answer = question.answer.trim()
         split(answer) ?: return null

@@ -70,8 +70,17 @@ fun ErrorState(
     }
 }
 
+/**
+ * Nothing to show — and, when the caller can offer one, a way to ask again.
+ *
+ * ⚠️ The retry is not decoration. Most of these sit inside a `PullToRefreshBox`, whose gesture is
+ * driven entirely by nested scroll — `PullToRefreshModifierNode` implements `NestedScrollConnection`
+ * and nothing else, checked against the shipped material3 1.3.1 classes. This is a plain `Box` with
+ * nothing scrollable in it, so it produces no scroll deltas and **the pull cannot fire at all**. A
+ * screen that ends up empty for a reason the user could clear had no way out of it.
+ */
 @Composable
-fun EmptyState(message: String, modifier: Modifier = Modifier) {
+fun EmptyState(message: String, modifier: Modifier = Modifier, onRetry: (() -> Unit)? = null) {
     val c = Pulse.colors
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -81,6 +90,15 @@ fun EmptyState(message: String, modifier: Modifier = Modifier) {
                 fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 12.dp),
             )
+            if (onRetry != null) {
+                Text(
+                    "▸ CHECK AGAIN",
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                    letterSpacing = 1.sp, color = c.accent,
+                    modifier = Modifier.padding(top = 16.dp).border(1.dp, c.accent).clickable { onRetry() }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }

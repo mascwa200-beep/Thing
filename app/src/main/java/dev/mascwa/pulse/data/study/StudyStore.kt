@@ -6,8 +6,11 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.mascwa.pulse.core.telemetry.CourseMastery
 import dev.mascwa.pulse.core.telemetry.Curriculum
 import dev.mascwa.pulse.core.telemetry.DailyLesson
+import dev.mascwa.pulse.core.telemetry.Hints
+import dev.mascwa.pulse.core.telemetry.PracticeSet
 import dev.mascwa.pulse.core.telemetry.QuizBuilder
 import dev.mascwa.pulse.core.telemetry.Recall
 import dev.mascwa.pulse.core.telemetry.Refresher
@@ -94,6 +97,10 @@ class StudyStore(
         val ease: Double = Recall.START_EASE,
         val reps: Int = 0,
         val lapses: Int = 0,
+        /** ⚠️ An ORDER card's sibling steps. Without these it survives a restart as a card
+         *  that can never be turned back into a question — see StudyQuestions.Question.options.
+         *  Defaulted, so saves written before procedures existed still load. */
+        val options: List<String> = emptyList(),
     )
 
     @Serializable
@@ -190,6 +197,7 @@ class StudyStore(
             guideId = guideId,
             guideTitle = guideTitle,
             heading = heading,
+            options = options,
         ),
         card = Recall.Card(id, dueAtMs, intervalDays, ease, reps, lapses),
     )
@@ -207,6 +215,7 @@ class StudyStore(
         ease = card.ease,
         reps = card.reps,
         lapses = card.lapses,
+        options = question.options,
     )
 
     // ---- the enrolled path ------------------------------------------------------------------------
@@ -272,8 +281,17 @@ class StudyStore(
     suspend fun teach(guideId: String, nowMs: Long = System.currentTimeMillis()): List<StudyQuestions.Question> {
         val guide = runCatching { content.guide(guideId) }.getOrNull() ?: return emptyList()
         val made = ArrayList<StudyQuestions.Question>(MAX_QUESTIONS_PER_LESSON)
+        // ⚠️ First, so the cap below can never be the reason a guide's warning goes untaught. 184 of
+        // the bundled guides carry one and none of them was ever asked about.
+        StudyQuestions.safety(guide.id, guide.title, guide.safetyNote)?.let { made += it }
         for (section in guide.sections.take(LESSON_SECTIONS)) {
-            for (q in StudyQuestions.forSection(guide.id, guide.title, section.heading, section.body)) {
+            for (q in StudyQuestions.forSection(
+                guide.id, guide.title, section.heading, section.body,
+                // The section has carried these all along; nobody passed them, so 3,298 steps
+                // across the corpus produced no questions at all.
+                steps = section.steps.orEmpty(),
+                ingredients = section.ingredients.orEmpty(),
+            )) {
                 if (made.size >= MAX_QUESTIONS_PER_LESSON) break
                 made += q
             }
@@ -376,6 +394,11 @@ class StudyStore(
      * simply not what this section says. Telling them apart requires having understood it.
      */
     private suspend fun statementQuiz(item: Item, seed: Int): QuizBuilder.QuizItem? {
+        // ⚠️ A safety warning is answered as written, never marked against distractors — see
+        // StudyQuestions.safety. Its heading is synthetic, so without this a guide that happened to
+        // title a section the same way would have its warning quietly replaced by a comprehension
+        // item about that section.
+        if (StudyQuestions.isSafety(item.question)) return null
         val guide = runCatching { content.guide(item.question.guideId) }.getOrNull() ?: return null
         val section = guide.sections.firstOrNull { it.heading == item.question.heading } ?: return null
         val truths = StudyQuestions.sentences(section.body)
@@ -444,6 +467,7 @@ class StudyStore(
         correct: Boolean,
         elapsedMs: Long = 0L,
         nowMs: Long = System.currentTimeMillis(),
+        hintsTaken: Int = 0,
     ): Recall.Card? {
         var updated: Recall.Card? = null
         mutex.withLock {
@@ -451,7 +475,8 @@ class StudyStore(
             val at = s.cards.indexOfFirst { it.id == questionId }
             if (at < 0) return@withLock
             val item = s.cards[at].item()
-            val next = Recall.review(item.card, Recall.gradeFor(correct, elapsedMs), nowMs)
+            // Hints cap the grade but never the correctness — see Hints.gradeFor.
+            val next = Recall.review(item.card, Hints.gradeFor(correct, elapsedMs, hintsTaken), nowMs)
             updated = next
             val cards = s.cards.toMutableList()
             cards[at] = item.copy(card = next).stored()
@@ -525,6 +550,75 @@ class StudyStore(
         }
         scheduleFlush()
     }
+
+
+    // ---- the course, seen at once -------------------------------------------------------------------
+
+    /**
+     * The enrolled path with how well each skill on it is known, or null when nothing is enrolled.
+     *
+     * ⚠️ Attempts are grouped by guide ONCE rather than re-scanned per step. The obvious shape is a
+     * `mastery(step.guideId)` call inside the loop, which re-walks the whole attempt log for every step
+     * — forty steps against a thousand attempts is forty thousand comparisons to draw one screen.
+     */
+    suspend fun course(): CourseMastery.Course? {
+        val syllabus = syllabus() ?: return null
+        val s = ensureLoaded()
+        val attemptsByGuide = s.attempts.map { it.attempt() }.groupBy { it.guideId }
+        val cardsByGuide = s.cards.groupBy { it.guideId }
+        val now = System.currentTimeMillis()
+        val levels = HashMap<String, StudyProgress.Level>()
+        val cardCount = HashMap<String, Int>()
+        val dueCount = HashMap<String, Int>()
+        for (step in syllabus.steps) {
+            val cards = cardsByGuide[step.guideId].orEmpty()
+            cardCount[step.guideId] = cards.size
+            dueCount[step.guideId] = cards.count { it.dueAtMs <= now }
+            levels[step.guideId] = StudyProgress.mastery(
+                step.guideId,
+                attemptsByGuide[step.guideId].orEmpty(),
+                cards.map { it.item().card },
+            ).level
+        }
+        return CourseMastery.course(syllabus, levels, cardCount, dueCount, s.taught.toSet())
+    }
+
+    // ---- practice -----------------------------------------------------------------------------------
+
+    /**
+     * A short set on one skill, teaching it first if it has never been asked.
+     *
+     * Teaching-on-demand matters: "practise this" on a guide you have only read should just work rather
+     * than telling you to go and do something else first.
+     */
+    suspend fun practice(guideId: String, title: String): PracticeSet.Session? {
+        if (ensureLoaded().cards.none { it.guideId == guideId }) teach(guideId)
+        val ids = ensureLoaded().cards.filter { it.guideId == guideId }.map { it.id }
+        return PracticeSet.practice(title, ids)
+    }
+
+    /** A mixed set across one category of the enrolled path. */
+    suspend fun unitTest(category: String): PracticeSet.Session? {
+        val course = course() ?: return null
+        val wanted = course.skills.filter { it.category.equals(category, ignoreCase = true) }.map { it.guideId }.toSet()
+        if (wanted.isEmpty()) return null
+        return PracticeSet.mixed(PracticeSet.Kind.UNIT_TEST, category, questionsByGuide(wanted))
+    }
+
+    /** A mixed set across the whole course, weighted toward what is weakest. */
+    suspend fun challenge(): PracticeSet.Session? {
+        val course = course() ?: return null
+        val order = PracticeSet.challengeOrder(course.skills).map { it.guideId }
+        if (order.isEmpty()) return null
+        // LinkedHashMap so the weakest-first ordering survives into the round-robin.
+        val byGuide = LinkedHashMap<String, List<String>>()
+        val all = questionsByGuide(order.toSet())
+        for (id in order) all[id]?.let { byGuide[id] = it }
+        return PracticeSet.mixed(PracticeSet.Kind.CHALLENGE, course.goal, byGuide)
+    }
+
+    private suspend fun questionsByGuide(guideIds: Set<String>): Map<String, List<String>> =
+        ensureLoaded().cards.filter { it.guideId in guideIds }.groupBy({ it.guideId }, { it.id })
 
     // ---- how it is going ---------------------------------------------------------------------------------
 

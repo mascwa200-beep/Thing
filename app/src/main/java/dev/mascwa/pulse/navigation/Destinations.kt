@@ -54,6 +54,9 @@ object Routes {
     // STUDY — the bundled library taught rather than browsed
     const val STUDY = "study"
 
+    // PACKS — subject packs that join the library once fetched, and read offline thereafter
+    const val PACKS = "packs"
+
     // The Computer (on-device assistant)
     const val JARVIS = "jarvis"
     const val JARVIS_SETUP = "jarvis_setup"

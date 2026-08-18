@@ -32,6 +32,7 @@ import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
+import dev.mascwa.pulse.ui.currentStardateText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -551,9 +552,17 @@ class JarvisViewModel(
         }
         if (found != null) {
             append("\n\n— from \"").append(found.where).append("\" (bundled library) —\n\n")
+            // The page's own warning, above its prose, the way the reader renders it. The first
+            // action above comes from the curated table and already carries the do-nots; this is the
+            // guide's wider caution — when to call, what needs assessment even if it looks fine.
+            found.safety?.let { append("⚠ ").append(it).append("\n\n") }
             append(found.body)
         }
-        append("\n\nThis is written guidance, not training and not medical advice.")
+        // ⚠️ Several protocol pages end their own warning with this exact sentence, so saying it again
+        // underneath reads as a stutter and makes the whole disclaimer easier to skip.
+        if (found?.safety?.contains(NOT_MEDICAL_ADVICE, ignoreCase = true) != true) {
+            append("\n\n").append(NOT_MEDICAL_ADVICE)
+        }
     }
 
     /**
@@ -609,6 +618,15 @@ class JarvisViewModel(
             address = runCatching { settings.current().jarvis.address }.getOrDefault(""),
         )
         var prompt = base
+        // The date, said the way this console says it. Cheap, always available, and the one piece of
+        // context a ship's computer is expected to have to hand — the app has shown a stardate on
+        // the boot reveal since it shipped and the Computer could not have told you what it was.
+        //
+        // ⚠️ Deliberately given to the Computer rather than stamped onto its replies. A date prefix
+        // on every answer is noise, and it would fight the register the persona rewrite established:
+        // this computer answers questions, it does not file reports.
+        prompt += "\n\nThe current stardate is " + currentStardateText() +
+            ". Say it when it is asked for or genuinely relevant; do not stamp it onto every reply."
         val digest = runCatching { profile.digest() }.getOrDefault("")
         if (digest.isNotBlank()) {
             prompt += "\n\nThe user's profile (tailor your help to it; keep it current via the `profile` tool):\n" + digest
@@ -804,6 +822,9 @@ class JarvisViewModel(
     private companion object {
         const val HISTORY_TURNS = 12
         const val TAP_TO_TALK_TIMEOUT_MS = 10_000
+        /** Closes every emergency answer — unless the page's own warning already ends with it. */
+        const val NOT_MEDICAL_ADVICE = "This is written guidance, not training and not medical advice."
+
         // Downscale the long edge of an uploaded image before sending to the vision API (token/cost cap).
         const val MAX_IMAGE_PX = 1024
         // PDF: render at most this many pages to the vision model (cost cap).

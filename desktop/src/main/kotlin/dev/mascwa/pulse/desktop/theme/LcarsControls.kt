@@ -267,6 +267,15 @@ fun LcarsNavItem(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * What this destination is for, in plain English.
+     *
+     * The phone answers "how do I find anything" with a flat directory screen; on a desktop the rail
+     * is always on screen, so the rail IS the directory and there is no reason to make someone open a
+     * separate page to read the same list. A bare seven-word rail was navigable only if you already
+     * knew what the seven words meant.
+     */
+    description: String? = null,
 ) {
     val c = Pulse.colors
     val interaction = remember { MutableInteractionSource() }
@@ -276,27 +285,38 @@ fun LcarsNavItem(
             .fillMaxWidth()
             .hoverable(interaction)
             .clickable { onClick() }
-            .padding(vertical = 3.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .width(if (selected) 8.dp else 4.dp)
-                .height(30.dp)
+                .height(34.dp)
                 .clip(lcarsBlockShape(sweep = 5.dp, corner = LcarsCorner.TopStart))
                 .background(if (selected) c.accent else if (hovered) c.ink2 else c.line),
         )
+        Column(Modifier.padding(start = 10.dp)) {
         Text(
             text.uppercase(),
-            fontFamily = ChakraPetch,
+            fontFamily = Orbitron,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 12.sp,
-            letterSpacing = 1.5.sp,
+            fontSize = 11.sp,
+            letterSpacing = 1.2.sp,
             color = if (selected) c.ink else if (hovered) c.ink2 else c.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 10.dp),
         )
+        if (description != null) {
+            Text(
+                description,
+                fontFamily = JetBrainsMono,
+                fontSize = 9.sp,
+                color = if (selected) c.muted else c.faint,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        }
     }
 }
 

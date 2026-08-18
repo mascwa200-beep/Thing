@@ -118,6 +118,7 @@ import org.maplibre.android.style.sources.RasterDemSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Point
+import dev.mascwa.pulse.core.telemetry.Seismic
 
 // OpenFreeMap: keyless, no-registration vector tiles (OSM data). We load it then recolour every
 // layer into the NIGHTWIRE/cyberpunk look at runtime (red buildings, cyan roads, void background).
@@ -236,6 +237,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val relief by vm.relief.collectAsState()
     val rain by vm.rain.collectAsState()
     val rainFrame by vm.rainFrame.collectAsState()
+    val rainFrames by vm.rainFrames.collectAsState()
+    val rainPlaying by vm.rainPlaying.collectAsState()
     val trafficOn by vm.traffic.collectAsState()
     val seismicOn by vm.seismic.collectAsState()
     val aircraft by vm.aircraft.collectAsState()
@@ -647,6 +650,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             relief = relief,
                             rain = rain,
                             rainFrame = rainFrame,
+                            rainFrames = rainFrames,
+                            rainPlaying = rainPlaying,
                             traffic = trafficOn,
                             aircraftCount = aircraft.size,
                             seismic = seismicOn,
@@ -657,6 +662,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             onBasemap = vm::setBasemap,
                             onRelief = vm::setRelief,
                             onRain = vm::setRain,
+                            onRainPlayback = vm::toggleRainPlayback,
                             onTraffic = vm::setTraffic,
                             onSeismic = vm::setSeismic,
                             onNight = vm::setNight,
@@ -1488,6 +1494,31 @@ private fun IncidentDetailCard(
                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            // Same facts as the safety list, from the same tested core, so the two surfaces
+            // cannot describe one earthquake differently.
+            val facts = Seismic.compactFacts(
+                depthKm = incident.depthKm,
+                tsunami = incident.tsunami,
+                pagerAlert = incident.pagerAlert,
+                magType = incident.magType,
+            )
+            if (facts.isNotEmpty()) {
+                Text(
+                    facts.joinToString("  ·  "),
+                    fontFamily = JetBrainsMono, fontSize = 10.sp,
+                    color = if (incident.tsunami) c.magenta else c.muted,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            incident.magnitude?.let { m ->
+                incident.depthKm?.let { d ->
+                    Text(
+                        Seismic.impact(m, d),
+                        fontFamily = ChakraPetch, fontSize = 12.sp, color = c.ink,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             incident.url?.takeIf { it.isNotBlank() }?.let { url ->
                 Text(
                     "▸ READ THE REPORT",
@@ -1594,6 +1625,34 @@ private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePa
                     fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.sky,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+                // The actual next turn, once the router has told us what the road does. It leads
+                // rather than follows: "Turn right onto The Mall in 170 m" is the instruction, and
+                // the bearing above it is the compass reading that stands in when there is none.
+                readout.maneuverText?.let { text ->
+                    Text(
+                        "▸ ${text.uppercase()}",
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                        color = c.ink, maxLines = 2,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    readout.thenText?.let { then ->
+                        Text(
+                            "then $then",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 1.dp),
+                        )
+                    }
+                }
+                // Where the road actually ends. Amber rather than the readout's cyan, because this
+                // qualifies the numbers directly above it rather than adding to them.
+                readout.reachNote?.let {
+                    Text(
+                        it,
+                        fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
             }
             if (!readout.viaRoad) {
                 Text("◢ ROUTING…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
@@ -1904,6 +1963,8 @@ private fun LayersPanel(
     relief: Boolean,
     rain: Boolean,
     rainFrame: RainViewerRepository.RadarFrame?,
+    rainFrames: List<RainViewerRepository.RadarFrame>,
+    rainPlaying: Boolean,
     traffic: Boolean,
     aircraftCount: Int,
     seismic: Boolean,
@@ -1914,6 +1975,7 @@ private fun LayersPanel(
     onBasemap: (MapLayerCatalog.Basemap) -> Unit,
     onRelief: (Boolean) -> Unit,
     onRain: (Boolean) -> Unit,
+    onRainPlayback: () -> Unit,
     onTraffic: (Boolean) -> Unit,
     onSeismic: (Boolean) -> Unit,
     onNight: (Boolean) -> Unit,
@@ -1982,6 +2044,24 @@ private fun LayersPanel(
             LayerChip("SEISMIC", "Recent quakes, by strength", seismic, c) { onSeismic(!seismic) }
             LayerChip("RELIEF", "Hillshaded terrain", relief, c) { onRelief(!relief) }
             LayerChip("NIGHT", "Where the Sun has set", night, c) { onNight(!night) }
+        }
+        // Whether the rain is coming towards you or going away — which a single frame cannot say,
+        // and which is the only reason anyone opens a rain radar. Hidden unless there is a sequence
+        // to run: one frame is a picture, not a loop.
+        if (rain && rainFrames.size > 1) {
+            val spanMinutes = (rainFrames.last().timeEpochMs - rainFrames.first().timeEpochMs) / 60_000L
+            val position = rainFrames.indexOfFirst { it.timeEpochMs == rainFrame?.timeEpochMs }
+            LayerChip(
+                label = if (rainPlaying) "❚❚ PAUSE" else "▶ REPLAY",
+                detail = if (rainPlaying && position >= 0) {
+                    "${minutesAgo(rainFrames[position].timeEpochMs)} · ${position + 1}/${rainFrames.size}"
+                } else {
+                    "Last ${spanMinutes / 60} h, ${rainFrames.size} scans"
+                },
+                on = rainPlaying,
+                c = c,
+                onClick = onRainPlayback,
+            )
         }
 
         Text(

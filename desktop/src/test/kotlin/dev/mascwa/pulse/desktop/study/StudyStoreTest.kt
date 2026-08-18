@@ -1,8 +1,12 @@
 package dev.mascwa.pulse.desktop.study
 
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.library.PackStore
+import dev.mascwa.pulse.desktop.telemetry.ContentPack
 import dev.mascwa.pulse.desktop.telemetry.DailyLesson
+import dev.mascwa.pulse.desktop.telemetry.QuizBuilder
 import dev.mascwa.pulse.desktop.telemetry.Recall
+import dev.mascwa.pulse.desktop.telemetry.StudyQuestions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -260,19 +264,44 @@ class StudyStoreTest {
     }
 
     /**
-     * Pace decides the grade an objective answer earns, so the three should not come back together —
-     * instant is EASY, laboured is HARD, and the intervals differ accordingly.
+     * Pace decides the grade an objective answer earns — instant is EASY, laboured is HARD, and a
+     * miss is a lapse.
+     *
+     * ⚠️ **What it does NOT decide is the first interval.** [Recall.review] uses a fixed `FIRST_DAYS`
+     * for a first successful review whatever the grade, because a card answered once has no evidence
+     * behind its ease yet. The difference shows up in the *ease*, and only compounds into the
+     * schedule from the third review — which is what
+     * `aHintedAnswerIsStillCorrectButComesBackSooner` measures.
+     *
+     * ⚠️ This test previously asserted `quick.dueAtMs >= laboured.dueAtMs`, which was wrong twice
+     * over. Both intervals are one day, so the comparison was really between two separate
+     * `System.currentTimeMillis()` reads — it passed only while the clock did not tick between the
+     * two calls, and failed on a loaded CI runner where it did. The clock is pinned here so the
+     * assertion is about the schedule rather than about how busy the machine is.
      */
     @Test
     fun howLongAnAnswerTookChangesWhenItComesBack() = runBlocking {
         val s = store()
+        val now = 1_700_000_000_000L
         s.enroll("first aid and emergencies")
-        val made = s.teach(s.syllabus()!!.steps.first().guideId)
-        val quick = s.answer(made[0].id, correct = true, elapsedMs = 2_000)!!
-        val laboured = s.answer(made[1].id, correct = true, elapsedMs = 50_000)!!
-        val wrong = s.answer(made[2].id, correct = false, elapsedMs = 5_000)!!
-        assertTrue("instant should not come back sooner than laboured", quick.dueAtMs >= laboured.dueAtMs)
+        val made = s.teach(s.syllabus()!!.steps.first().guideId, nowMs = now)
+        val quick = s.answer(made[0].id, correct = true, elapsedMs = 2_000, nowMs = now)!!
+        val laboured = s.answer(made[1].id, correct = true, elapsedMs = 50_000, nowMs = now)!!
+        val wrong = s.answer(made[2].id, correct = false, elapsedMs = 5_000, nowMs = now)!!
+
+        // A first success is a fixed gap either way — assert that, rather than a difference that
+        // does not exist yet.
+        assertEquals(Recall.FIRST_DAYS, quick.intervalDays, 0.001)
+        assertEquals(Recall.FIRST_DAYS, laboured.intervalDays, 0.001)
+        assertEquals(quick.dueAtMs, laboured.dueAtMs)
+
+        // The pace IS recorded, in the ease, and that is what diverges the schedule later.
+        assertTrue(
+            "instant should not be judged harder than laboured (${quick.ease} vs ${laboured.ease})",
+            quick.ease > laboured.ease,
+        )
         assertEquals(1, wrong.lapses)
+        assertTrue("a miss must come back sooner than a success", wrong.dueAtMs < quick.dueAtMs)
     }
 
     /** A self-graded answer says how it FELT; putting a right-or-wrong on it would invent a number. */
@@ -349,6 +378,285 @@ class StudyStoreTest {
         plan.steps.forEach { assertTrue("${it.item.card.id} is not held", it.item.card.id in held) }
         // And each one must be askable.
         assertNotNull(s.askFor(plan.steps.first().item.card.id))
+    }
+
+    // ---- the course map and bounded sets --------------------------------------------------------------
+
+    /**
+     * The course map over a real path: every step present, none dropped, and the percentage moving as
+     * real work goes in.
+     *
+     * ⚠️ The bar starting at zero and *staying* there is the failure this pins. Points-weighting exists
+     * so a week of genuine work shows, and a regression to counting only finished skills would leave a
+     * learner looking at 0% for a fortnight — which is the fastest way to make somebody stop.
+     */
+    @Test
+    fun theCourseMapCoversTheWholePathAndMovesAsWorkGoesIn() = runBlocking {
+        val s = store()
+        assertNull("nothing enrolled yet", s.course())
+        s.enroll("first aid and emergencies")
+        val path = s.syllabus()!!
+
+        val fresh = s.course()!!
+        assertEquals(path.steps.size, fresh.total)
+        assertEquals(path.steps.map { it.guideId }, fresh.skills.map { it.guideId })
+        assertEquals("untouched work cannot already be under way", 0, fresh.percent)
+        assertNotNull("a fresh course must still recommend a first step", fresh.nextUp())
+
+        // Teach and answer one skill: the bar must leave zero.
+        val target = path.steps.first().guideId
+        s.teach(target)
+        repeat(4) {
+            val card = s.due(limit = 20).firstOrNull { it.question.guideId == target } ?: return@repeat
+            s.answer(card.question.id, correct = true)
+        }
+        val worked = s.course()!!
+        assertTrue("real work inside a skill did not move the bar", worked.percent > 0)
+        assertTrue(worked.started >= 1)
+        assertTrue("the taught skill holds no cards", worked.skills.first { it.guideId == target }.cards > 0)
+    }
+
+    /** Practice teaches on demand: "work at this" must work on a guide only ever read. */
+    @Test
+    fun practiceOnAnUntaughtSkillTeachesItFirst() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val skill = s.course()!!.skills.first()
+        assertEquals("nothing should be held yet", 0, skill.cards)
+
+        val set = s.practice(skill.guideId, skill.title)!!
+        assertTrue(set.questionIds.isNotEmpty())
+        assertTrue("a set must be smaller than a chore", set.size <= 5)
+        assertTrue("a pass mark of everything makes one slip erase the attempt", set.passMark < set.size)
+        // Every id must be askable, or the session strands on its first question.
+        set.questionIds.forEach { assertNotNull("$it cannot be asked", s.askFor(it)) }
+    }
+
+    /**
+     * A unit test mixes several skills; a challenge spans the course weakest-first.
+     *
+     * ⚠️ The interleaving is the point, not decoration: ten questions from one guide in a row let
+     * context carry you, which is exactly what a test is meant to remove.
+     */
+    @Test
+    fun aUnitTestMixesSkillsAndAChallengeSpansTheCourse() = runBlocking {
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val course = s.course()!!
+        val unit = course.units().first { it.first != "Other" }
+        // Teach at least two skills in the unit so there is something to interleave.
+        unit.second.take(3).forEach { s.teach(it.guideId) }
+
+        val test = s.unitTest(unit.first)!!
+        assertTrue(test.questionIds.size >= 3)
+        assertEquals(test.questionIds.size, test.questionIds.distinct().size)
+        val guides = test.questionIds.mapNotNull { id -> s.items.value.firstOrNull { it.card.id == id } }
+            .map { it.question.guideId }
+        if (unit.second.take(3).size > 1) {
+            assertTrue("a mixed set drew from a single guide", guides.distinct().size > 1)
+        }
+
+        val challenge = s.challenge()!!
+        assertTrue(challenge.questionIds.isNotEmpty())
+        challenge.questionIds.forEach { assertNotNull(s.askFor(it)) }
+    }
+
+    /** Nothing to draw from means no set at all — never an empty one that strands on question one. */
+    @Test
+    fun aSetIsRefusedRatherThanReturnedEmpty() = runBlocking {
+        val s = store()
+        assertNull("no course, no unit test", s.unitTest("First Aid"))
+        assertNull("no course, no challenge", s.challenge())
+        s.enroll("first aid and emergencies")
+        assertNull("a unit nobody is enrolled in", s.unitTest("Nonexistent Category"))
+        assertNull("nothing taught yet, so nothing to challenge", s.challenge())
+    }
+
+    /**
+     * A hinted right answer is still right, but never earns the top grade.
+     *
+     * ⚠️ This is what stops help from quietly inflating the record: the accuracy figure keeps meaning
+     * "did you get there", while the *schedule* brings a hinted card back soon instead of pushing it
+     * out as though it were known.
+     *
+     * ⚠️ **Three answers, not one, and the reason is the whole test.** [Recall.review] uses fixed gaps
+     * for the first two successful reviews — `FIRST_DAYS` then `SECOND_DAYS` — so a once-answered card
+     * lands on the same interval whatever it was graded, and a single-answer version of this test
+     * passes no matter what [Hints.gradeFor] does. The divergence is in the ease, which compounds:
+     *
+     *   cold, answered fast (EASY×3): 1.0 → 3.0 → 3.0 × 2.8 × 1.3 = 10.92, ease 2.8
+     *   hinted (capped to HARD×3):    1.0 → 3.0 → 3.0 × 2.05 × 0.6 = 3.69, ease 2.05
+     */
+    @Test
+    fun aHintedAnswerIsStillCorrectButComesBackSooner() = runBlocking {
+        val day = 86_400_000L
+        val start = 1_700_000_000_000L
+
+        suspend fun threeAnswers(hintsTaken: Int): Double {
+            val s = store()
+            s.enroll("first aid and emergencies")
+            val guide = s.syllabus()!!.steps.first().guideId
+            s.teach(guide, nowMs = start)
+            val id = s.due(nowMs = start, limit = 1).first().question.id
+            var last = 0.0
+            var at = start
+            repeat(3) { round ->
+                // Fast enough that Recall.gradeFor says EASY, so the cap is the only thing that can
+                // pull it down to HARD.
+                last = s.answer(id, correct = true, elapsedMs = 1_000L, nowMs = at, hintsTaken = hintsTaken)!!
+                    .intervalDays
+                at += (last * day).toLong() + day * (round + 1)
+            }
+            return last
+        }
+
+        val cold = threeAnswers(hintsTaken = 0)
+        val hinted = threeAnswers(hintsTaken = 2)
+
+        assertEquals("cold: 3.0 × 2.8 × 1.3", 10.92, cold, 0.01)
+        assertEquals("hinted: 3.0 × 2.05 × 0.6", 3.69, hinted, 0.01)
+        assertTrue(
+            "help must not schedule a card as though it were known cold",
+            hinted < cold,
+        )
+
+        // And the record still says every one of them was got right — correct stays correct.
+        val s = store()
+        s.enroll("first aid and emergencies")
+        val guide = s.syllabus()!!.steps.first().guideId
+        s.teach(guide)
+        s.answer(s.due(limit = 1).first().question.id, correct = true, elapsedMs = 1_000L, hintsTaken = 3)
+        assertEquals(1, s.progress().correct)
+        assertEquals(0, s.progress().incorrect)
+    }
+
+    // ---- the guide's safety warning ------------------------------------------------------------------
+
+    /**
+     * 184 of the bundled guides carry a `safetyNote` and, until this slice, not one was ever asked
+     * about. This is the end-to-end proof against real content: teaching a guide that carries one
+     * schedules it, and it comes back like any other card.
+     */
+    @Test
+    fun teachingAGuideThatCarriesAWarningSchedulesIt() = runBlocking {
+        val warned = library.index().map { it.id }
+            .firstNotNullOf { id -> library.guide(id)?.takeIf { !it.safetyNote.isNullOrBlank() } }
+        val s = store()
+        s.teach(warned.id)
+
+        val card = s.due().firstOrNull { StudyQuestions.isSafety(it.question) }
+        assertNotNull("the guide's safety warning was never made into a card", card)
+        // ⚠️ In full. A third of the real notes exceed StudyQuestions.RECALL_CHARS, and the whole point
+        // of the card is the half of the sentence that says what never to do.
+        assertEquals(warned.safetyNote!!.trim(), card!!.question.answer)
+        assertTrue(card.question.prompt.contains(warned.title))
+    }
+
+    /**
+     * ⚠️ A safety warning is answered as written and never marked against distractors.
+     *
+     * Wrong options would have to be other guides' real warnings, and marking a true precaution
+     * "wrong here" is a hazard. The heading these cards carry is synthetic, so this also proves the
+     * comprehension path cannot reach one by matching it against a same-named real section.
+     */
+    @Test
+    fun aSafetyWarningIsNeverTurnedIntoAMultipleChoice() = runBlocking {
+        val warned = library.index().map { it.id }
+            .firstNotNullOf { id -> library.guide(id)?.takeIf { !it.safetyNote.isNullOrBlank() } }
+        val s = store()
+        s.teach(warned.id)
+        val id = s.due().first { StudyQuestions.isSafety(it.question) }.question.id
+
+        // Answer everything else away so the safety card is what nextAsk offers.
+        var guard = 0
+        while (guard++ < 40) {
+            val ask = s.nextAsk() ?: break
+            if (ask.item.question.id == id) {
+                assertNull("a safety warning was offered as a multiple choice", ask.quiz)
+                return@runBlocking
+            }
+            s.answer(ask.item.question.id, correct = true, elapsedMs = 1_000L)
+        }
+        throw AssertionError("the safety card never came up")
+    }
+
+    /**
+     * ⚠️ The scenario the guard actually exists for, and the only way to reach it.
+     *
+     * [StudyQuestions.SAFETY_HEADING] is synthetic and no bundled guide uses it, so **removing the
+     * guard changes nothing against the bundle** — that was checked, and it is why the test above
+     * cannot stand in for this one. A content pack can introduce a guide that titles a section the
+     * same way, and then the comprehension path would match the warning card against that section and
+     * mark the reader on it. Installing exactly such a pack is what proves the guard works.
+     */
+    @Test
+    fun aPackCannotMakeASafetyWarningGradeableByReusingItsHeading() = runBlocking {
+        val json = Json { ignoreUnknownKeys = true }
+        val packs = PackStore(json, tmp.root.toPath().resolve("packs"))
+        val lib = LibraryRepository(json, packs)
+        packs.install(
+            ContentPack.Pack(
+                id = "collide", title = "Collide", summary = "s", version = 1,
+                sizeBytes = 0L, guideCount = 1, url = "https://example.invalid/collide.zip",
+            ),
+            mapOf(
+                "guides_collide.json" to """
+                {"guides":[{"id":"collide-guide","title":"Colliding Guide","category":"Chemistry",
+                  "summary":"A guide that titles a section the way a safety card is headed.",
+                  "safetyNote":"Never add water to concentrated acid, because the heat of mixing can boil the acid out of the vessel and into your face.",
+                  "sections":[{"heading":"${StudyQuestions.SAFETY_HEADING}",
+                    "body":"Goggles are worn at all times in this room. Gloves are changed between reagents. The fume cupboard sash stays low."}]}]}
+                """.trimIndent(),
+            ),
+        ).getOrThrow()
+
+        val s = StudyStore(lib, path = tmp.root.toPath().resolve("study.json"))
+        s.teach("collide-guide")
+        val id = s.due().first { StudyQuestions.isSafety(it.question) }.question.id
+
+        var guard = 0
+        while (guard++ < 40) {
+            val ask = s.nextAsk() ?: break
+            if (ask.item.question.id == id) {
+                assertNull("a pack's heading turned a safety warning into a graded question", ask.quiz)
+                return@runBlocking
+            }
+            s.answer(ask.item.question.id, correct = true, elapsedMs = 1_000L)
+        }
+        throw AssertionError("the safety card never came up")
+    }
+
+    /**
+     * Steps run to a median of 180 characters, so four verbatim is a wall to read. Options are
+     * shortened; nothing is invented, and the explanation still carries the whole instruction.
+     */
+    @Test
+    fun aProcedureQuestionOffersOptionsShortEnoughToRead() = runBlocking {
+        val s = store()
+        var checked = 0
+        for (row in library.index()) {
+            val guide = library.guide(row.id) ?: continue
+            val section = guide.sections.firstOrNull { (it.steps?.size ?: 0) >= 6 } ?: continue
+            val q = StudyQuestions.procedure(
+                guide.id, guide.title, section.heading, section.steps.orEmpty(),
+            ).firstOrNull() ?: continue
+            val item = QuizBuilder.build(q, pool = emptyList(), seed = 3) ?: continue
+            item.choices.forEach { choice ->
+                assertTrue(
+                    "an option is ${choice.text.length} characters on screen",
+                    choice.text.length <= StudyQuestions.MAX_OPTION_CHARS + StudyQuestions.ELLIPSIS.length,
+                )
+                val body = choice.text.removeSuffix(StudyQuestions.ELLIPSIS).trimEnd()
+                assertTrue(
+                    "an option is not a real step of this procedure: '${choice.text}'",
+                    section.steps.orEmpty().any { it.trim().startsWith(body) },
+                )
+            }
+            assertTrue("the explanation lost the full step", item.explanation.contains(q.answer))
+            if (++checked >= 25) break
+        }
+        assertTrue("no procedure question was found to check", checked > 0)
+        s.clear()
     }
 
     /** A corrupt file must not erase what a later write would otherwise save — nor crash the app. */

@@ -32,6 +32,14 @@ class GuidesJsonValidationTest {
         "Literature & Writing", "Language & Linguistics", "Society & Culture", "Archaeology & Anthropology",
         "Law & Government", "Education & Learning", "Music", "Visual Arts & Design", "Games & Recreation",
         "Media & Communication", "Business & Finance", "Economics",
+        // Federation Database — the in-universe reference.
+        "Species & Civilisations",
+        "Starfleet & Federation",
+        "Starships & Classes",
+        "Warp & Starship Technology",
+        "Worlds & Stations",
+        "Federation Timeline",
+        "Notable Figures",
     )
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
@@ -212,6 +220,6 @@ class GuidesJsonValidationTest {
          *  this number now tracks new guides one-for-one with their section count. Ratchet up as breadth
          *  waves land, never down. `tools/kb/ci_parity_lint.py` prints the value to use; it does not
          *  edit this file, so the bump is a deliberate manual step after every merge. */
-        const val FULL_PAGE_BASELINE = 8258
+        const val FULL_PAGE_BASELINE = 8440
     }
 }

@@ -13,6 +13,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -39,23 +40,49 @@ class OrbitalRepository(
         }
         val nasaKey = settings.current().apiKeys.nasaOrDemo
         return try {
+            // ⚠️ Each sub-fetch used to swallow its own exception, so the outer catch below could
+            // never fire: a total network failure produced an all-empty payload, wrote it over the
+            // previous good cache entry, and returned it as a fresh, non-stale, successful result.
+            // The sky screen then said "No close approaches catalogued for today." The failures are
+            // now counted so the difference between a quiet sky and no answer survives.
+            val failures = mutableListOf<Throwable>()
+            var attempted = 0
             val data = coroutineScope {
-                val issD = async { runCatching { loadIss() }.getOrNull() }
-                val sunD = async {
-                    if (latitude != null && longitude != null)
-                        runCatching { loadSun(latitude, longitude) }.getOrNull() else null
+                val issD = async {
+                    runCatching { loadIss() }.onFailure { failures += it }.getOrNull()
                 }
-                val neoD = async { runCatching { loadNeos(nasaKey) }.getOrDefault(emptyList()) }
-                val neos = neoD.await()
+                val sunD = async {
+                    if (latitude != null && longitude != null) {
+                        runCatching { loadSun(latitude, longitude) }.onFailure { failures += it }.getOrNull()
+                    } else {
+                        null // Not attempted rather than failed — no location is not an outage.
+                    }
+                }
+                val neoD = async {
+                    runCatching { loadNeos(nasaKey) }.onFailure { failures += it }
+                }
+                attempted = if (latitude != null && longitude != null) 3 else 2
+                val neoResult = neoD.await()
+                val neos = neoResult.getOrDefault(emptyList())
                 OrbitalData(
                     iss = issD.await(),
                     sun = sunD.await(),
                     moon = MoonPhase.at(),
                     neos = neos,
                     neoHazardousCount = neos.count { it.hazardous },
+                    // An empty list means "nothing is coming near" only if we actually asked and
+                    // were answered. NASA's DEMO_KEY is rate-limited per IP, so a 429 here is
+                    // routine rather than an exotic offline case.
+                    neosUnavailable = neoResult.isFailure,
                 )
             }
-            cache.write(key, data, OrbitalData.serializer())
+            // Everything failed: this is an outage, not a quiet sky. Throwing hands it to the catch
+            // below, which serves the previous good data — and to AsyncLoader, which already knows
+            // how to mark that stale and show the reason.
+            if (failures.size >= attempted) throw failures.first()
+            // A partial failure must not occupy the cache's five-minute window, or the missing parts
+            // stay missing until it expires. Only a complete answer is worth remembering.
+            if (failures.isEmpty()) cache.write(key, data, OrbitalData.serializer())
             Fetched(withSky(data, latitude, longitude), false)
         } catch (e: Exception) {
             cache.readAny(key, OrbitalData.serializer())?.let {
@@ -80,6 +107,8 @@ class OrbitalRepository(
             longitude = d("longitude") ?: 0.0,
             altitudeKm = d("altitude") ?: 0.0,
             velocityKmh = d("velocity") ?: 0.0,
+            // Seconds since the epoch, and the service's own word for when the fix was taken.
+            timestampMs = d("timestamp")?.let { (it * 1000.0).toLong() } ?: 0L,
         )
     }
 
@@ -114,7 +143,9 @@ class OrbitalRepository(
             val miss = ca?.get("miss_distance")?.jsonObject?.get("kilometers")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
             val vel = ca?.get("relative_velocity")?.jsonObject?.get("kilometers_per_hour")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
             val approach = ca?.get("close_approach_date_full")?.jsonPrimitive?.contentOrNull
-            NeoObject(name, diameter, miss, vel, hazardous, approach)
+            // The instant, so the screen can show it in the reader's own zone rather than in UTC.
+            val approachMs = ca?.get("epoch_date_close_approach")?.jsonPrimitive?.longOrNull
+            NeoObject(name, diameter, miss, vel, hazardous, approach, approachMs)
         }.sortedBy { it.missDistanceKm ?: Double.MAX_VALUE }
     }
 

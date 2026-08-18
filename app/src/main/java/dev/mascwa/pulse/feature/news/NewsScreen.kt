@@ -38,6 +38,7 @@ import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
+import dev.mascwa.pulse.feature.live.LiveVideoPlayer
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
 
@@ -115,7 +116,16 @@ fun NewsScreen(vm: NewsViewModel) {
         },
     ) { innerPadding ->
         val content = state.content
-        PullToRefreshBox(
+        // Live television is not a list of articles and has nothing to pull down for, so it sits
+        // outside the refresh box entirely rather than inside it doing nothing.
+        val liveTab = !state.searchMode && state.tabs.getOrNull(state.selectedIndex)?.live == true
+        if (liveTab) {
+            LiveVideoPlayer(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .padding(12.dp),
+            )
+        } else PullToRefreshBox(
             isRefreshing = content.loading && content.data != null,
             onRefresh = { vm.refresh() },
             modifier = Modifier.padding(innerPadding),
@@ -123,7 +133,7 @@ fun NewsScreen(vm: NewsViewModel) {
             when {
                 content.isInitialLoading -> LoadingState()
                 content.isError -> ErrorState(content.error ?: "Error", onRetry = { vm.refresh() })
-                content.data.isNullOrEmpty() -> EmptyState("No articles found.")
+                content.data.isNullOrEmpty() -> EmptyState("No articles found.", onRetry = { vm.refresh() })
                 else -> {
                     val distinctArticles = content.data!!.distinctBy { it.url }
                     LazyColumn(

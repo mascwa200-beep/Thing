@@ -3,8 +3,8 @@ package dev.mascwa.pulse.desktop.theme
 import androidx.compose.ui.graphics.Color
 
 /** Ported from the Android app's `ui/theme/Color.kt` — trimmed to just the palette shape itself, since
- *  there's no accent-picker/AMOLED-toggle machinery to replicate here: LCARS is the desktop app's one fixed
- *  identity too, same as the Android app's own post-overhaul direction. */
+ *  there's no accent-picker/AMOLED-toggle machinery to replicate here: the console is the desktop app's one
+ *  fixed identity too, same as the Android app's own post-overhaul direction. */
 data class NightwirePalette(
     val accent: Color,
     val void: Color,
@@ -28,24 +28,30 @@ data class NightwirePalette(
     fun trend(positive: Boolean): Color = if (positive) this.positive else this.negative
 }
 
-/** Ported verbatim (same values) from the Android app's `ui/theme/LcarsPalette.kt`. Style/interaction-
- *  language homage only — no franchise branding assets. */
-val lcarsPalette = NightwirePalette(
-    accent = Color(0xFFFF9900),
+/**
+ * The original-series console palette — ported value-for-value from the Android app's
+ * `ui/theme/TosPalette.kt`, so the two consoles cannot drift apart.
+ *
+ * ⚠️ Replaces the LCARS set, and the difference is saturation more than hue: LCARS is a 1987 design
+ * whose signature is pastel laid in swept blocks, while the 1966 bridge is black plates carrying
+ * vivid, nearly primary backlit colour. Homage only — no franchise branding assets.
+ */
+val tosPalette = NightwirePalette(
+    accent = Color(0xFFFFB000),
     void = Color(0xFF000000),
-    carbon = Color(0xFF0A0A0C),
-    panel = Color(0xFF121214),
-    raise = Color(0xFF1C1C1F),
-    line = Color(0xFF3A3A3D),
-    lineSoft = Color(0xFF232326),
-    ink = Color(0xFFF5F5F5),
+    carbon = Color(0xFF08080A),
+    panel = Color(0xFF121216),
+    raise = Color(0xFF1B1B21),
+    line = Color(0xFF3C3C44),
+    lineSoft = Color(0xFF24242B),
+    ink = Color(0xFFF4F4F6),
     ink2 = Color(0xFFFFFFFF),
-    muted = Color(0xFFB8B8BD),
-    faint = Color(0xFF6E6E73),
-    magenta = Color(0xFFFF9999),
-    amber = Color(0xFFFFCC99),
-    positive = Color(0xFF99CC99),
-    negative = Color(0xFFCC6666),
-    violet = Color(0xFFCC99CC),
-    sky = Color(0xFF9999FF),
+    muted = Color(0xFFACACB6),
+    faint = Color(0xFF63636E),
+    magenta = Color(0xFFE0409A),
+    amber = Color(0xFFFFC61A),
+    positive = Color(0xFF24C04A),
+    negative = Color(0xFFE02020),
+    violet = Color(0xFF8A5CE0),
+    sky = Color(0xFF22B8E0),
 )

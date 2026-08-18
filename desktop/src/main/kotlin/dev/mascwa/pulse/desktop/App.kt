@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -26,8 +27,12 @@ import dev.mascwa.pulse.desktop.feature.about.AboutScreen
 import dev.mascwa.pulse.desktop.feature.about.AboutViewModel
 import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
 import dev.mascwa.pulse.desktop.feature.library.LibraryViewModel
+import dev.mascwa.pulse.desktop.feature.live.LiveScreen
+import dev.mascwa.pulse.desktop.feature.live.LiveViewModel
 import dev.mascwa.pulse.desktop.feature.news.NewsScreen
 import dev.mascwa.pulse.desktop.feature.news.NewsViewModel
+import dev.mascwa.pulse.desktop.feature.packs.PacksScreen
+import dev.mascwa.pulse.desktop.feature.packs.PacksViewModel
 import dev.mascwa.pulse.desktop.feature.remote.RemoteScreen
 import dev.mascwa.pulse.desktop.feature.remote.RemoteViewModel
 import dev.mascwa.pulse.desktop.feature.search.SearchScreen
@@ -35,28 +40,47 @@ import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
 import dev.mascwa.pulse.desktop.feature.study.StudyScreen
 import dev.mascwa.pulse.desktop.feature.study.StudyViewModel
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
+import dev.mascwa.pulse.desktop.live.LivePlayer
+import dev.mascwa.pulse.desktop.library.PackRepository
+import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.telemetry.currentStardateText
 import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
+import dev.mascwa.pulse.desktop.theme.Orbitron
 import dev.mascwa.pulse.desktop.theme.LcarsNavItem
 import dev.mascwa.pulse.desktop.theme.Pulse
 import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 
-/** The desktop's screens. Still not enough of them to warrant a navigation library. */
-enum class Screen(val title: String) {
-    REMOTE("Remote"),
-    NEWS("News"),
-    STUDY("Study"),
-    LIBRARY("Library"),
-    SEARCH("Search"),
-    ABOUT("About"),
+/**
+ * The desktop's screens, each carrying what it is for.
+ *
+ * ⚠️ The rail is the directory here. On the phone that job belongs to a separate flat MENU page,
+ * because a phone cannot keep a directory on screen alongside the content; a desktop can, so making
+ * someone open a page to read the same seven words would be worse, not better. The [description] is
+ * what turns a list of nouns into something navigable by a person who has not memorised it.
+ *
+ * [section] groups the rail, so the shape of the app is legible at a glance rather than being a flat
+ * run of equals.
+ */
+enum class Screen(val title: String, val section: String, val description: String) {
+    REMOTE("Remote", "THIS MACHINE", "Pair with your phone and control it over the local network"),
+    ABOUT("About", "THIS MACHINE", "Which build you are on, and install a newer one"),
+    LIBRARY("Library", "KNOWLEDGE", "Every bundled page, by subject — works offline"),
+    SEARCH("Search", "KNOWLEDGE", "Find a page, or a study card, by what you need"),
+    STUDY("Study", "KNOWLEDGE", "Learn the library a piece a day, and be asked again"),
+    PACKS("Packs", "KNOWLEDGE", "Add more subjects — downloads once, then offline"),
+    NEWS("News", "THE WORLD", "Headlines, refreshed while you watch"),
+    LIVE("Live", "THE WORLD", "Television news, in a window of its own"),
 }
 
 /**
@@ -70,7 +94,9 @@ enum class Screen(val title: String) {
 fun PulseDesktopApp(
     settings: DesktopSettingsStore,
     library: LibraryRepository,
+    packStore: PackStore,
     studyStore: StudyStore,
+    livePlayer: LivePlayer,
     onQuitForInstall: () -> Unit = {},
 ) {
     PulseDesktopTheme {
@@ -93,7 +119,21 @@ fun PulseDesktopApp(
         // The library and the deck are passed in, not built here — see the note in Main.kt on why they
         // have to outlive the composition. One instance each, so the resident index and the shard LRU
         // are paid for once across all three screens below.
+        val packsVm = remember {
+            PacksViewModel(scope, PackRepository(HttpClient.create(json), settings, packStore))
+        }
         val studyVm = remember { StudyViewModel(scope, studyStore) }
+        val liveVm = remember {
+            LiveViewModel(
+                scope = scope,
+                player = livePlayer,
+                settings = settings,
+                catalogue = LiveCatalogRepository(
+                    HttpClient.create(json),
+                    DiskCache(json, subdirectory = "live"),
+                ),
+            )
+        }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
         val searchVm = remember { SearchViewModel(scope, library, studyStore) }
         val aboutVm = remember {
@@ -111,19 +151,56 @@ fun PulseDesktopApp(
         Surface(color = c.void) {
             Row(Modifier.fillMaxSize()) {
                 Column(
-                    Modifier.width(168.dp).fillMaxHeight().background(c.carbon).padding(vertical = 20.dp),
+                    Modifier.width(216.dp).fillMaxHeight().background(c.carbon).padding(vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         "LCARS",
-                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp, letterSpacing = 4.sp, color = c.accent,
+                        // The wordmark is the identity element, so it takes the console face first.
+                        fontFamily = Orbitron, fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp, letterSpacing = 3.sp, color = c.accent,
                         modifier = Modifier.padding(start = 14.dp, bottom = 18.dp),
                     )
+                    // Grouped, so the rail reads as the app's shape rather than a flat run of
+                    // equals. `entries` is declaration-ordered and the enum is declared grouped, so
+                    // the headers fall out of one pass with no second list to keep in step.
+                    var lastSection: String? = null
                     Screen.entries.forEach { s ->
-                        LcarsNavItem(s.title, selected = screen == s, onClick = { screen = s })
+                        if (s.section != lastSection) {
+                            lastSection = s.section
+                            Text(
+                                s.section,
+                                fontFamily = JetBrainsMono, fontSize = 8.sp, letterSpacing = 1.6.sp,
+                                color = c.faint,
+                                modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 4.dp),
+                            )
+                        }
+                        LcarsNavItem(
+                            s.title,
+                            selected = screen == s,
+                            onClick = { screen = s },
+                            description = s.description,
+                        )
                     }
                     Box(Modifier.weight(1f))
+                    // The date, said the way the phone says it — from the same mirrored core, so the
+                    // two consoles can never show different stardates for the same moment.
+                    //
+                    // Recomputed on the hour by the same rule as the phone's: the last digit is
+                    // `hour * 10 / 24`, so it can only ever change on an hour boundary. `delay` here
+                    // costs one suspended coroutine for the life of the window.
+                    val stardate by produceState(initialValue = currentStardateText()) {
+                        while (true) {
+                            val now = System.currentTimeMillis()
+                            delay(((now / 3_600_000L + 1) * 3_600_000L - now).coerceAtLeast(1_000L))
+                            value = currentStardateText()
+                        }
+                    }
+                    Text(
+                        stardate,
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,
+                        modifier = Modifier.padding(start = 14.dp, bottom = 2.dp),
+                    )
                     Text(
                         "DESKTOP",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,
@@ -135,6 +212,7 @@ fun PulseDesktopApp(
                     when (screen) {
                         Screen.REMOTE -> RemoteScreen(remoteVm, Modifier.fillMaxWidth())
                         Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
+                        Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
                         Screen.STUDY -> StudyScreen(studyVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
                         Screen.LIBRARY -> LibraryScreen(
                             vm = libraryVm,
@@ -148,6 +226,7 @@ fun PulseDesktopApp(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Screen.PACKS -> PacksScreen(packsVm, Modifier.fillMaxWidth())
                         Screen.SEARCH -> SearchScreen(searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth())
                         Screen.ABOUT -> AboutScreen(
                             vm = aboutVm,

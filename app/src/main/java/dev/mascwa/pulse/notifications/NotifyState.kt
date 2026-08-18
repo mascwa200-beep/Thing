@@ -25,4 +25,22 @@ data class NotifyState(
      * interval of showing calm orange while the tray reads RED ALERT. Owned by BriefEngine.
      */
     val lastCondition: String = "",
+    /**
+     * Normalised identities of the stories the board has already printed — see `StoryLedger`.
+     *
+     * ⚠️ **Not [seenTopUrls], which looks like it would do.** That one belongs to the resident
+     * poller and gates the breaking-news overlay; sharing it would make dismissing an overlay
+     * suppress the board's news row and vice versa. Two different questions, two fields.
+     *
+     * Owned by BriefEngine, bounded by `StoryLedger.MAX`.
+     */
+    val seenStories: List<String> = emptyList(),
+    /**
+     * Official alert ids already raised as a full-screen red alert.
+     *
+     * An alert stays active for its whole life, so without this the one-minute watch would re-sound
+     * the alarm for the same tornado every minute — which is how a person ends up putting the phone
+     * in a drawer during an emergency. Owned by EmergencyWatchService.
+     */
+    val raisedAlertIds: List<String> = emptyList(),
 )

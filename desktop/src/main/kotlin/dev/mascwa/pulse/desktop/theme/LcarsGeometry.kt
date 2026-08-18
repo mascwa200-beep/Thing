@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
  * silhouettes and swept blocks, built on Compose Foundation/UI APIs that Compose Multiplatform for Desktop
  * publishes under the same `androidx.compose.*` package names, which is what makes this direct a port
  * possible at all. Reads [Pulse.colors] (this file's own `theme/Theme.kt`), so it renders in whatever
- * palette is provided — today that's always [lcarsPalette].
+ * palette is provided — today that's always [tosPalette].
  *
  * Panels ([LcarsFrame]/[LcarsStatBlock]) use a single swept ROUNDED corner ([lcarsBlockShape]) rather than a
  * notch — safe for arbitrary held content, nothing can clip into a concave corner. The genuinely notched
@@ -51,15 +51,22 @@ import androidx.compose.ui.unit.sp
  */
 enum class LcarsCorner { TopStart, TopEnd, BottomStart, BottomEnd }
 
-/** A rectangle with one corner's radius swept large (clamped to half the shorter side, same as any
- *  [RoundedCornerShape]) and the other three left sharp — the asymmetric "one end is a pill cap" LCARS block
- *  silhouette. No [GenericShape] needed; per-corner [RoundedCornerShape] already expresses this. */
+/**
+ * A console plate: a rectangle with one corner cut away at an angle, the other three left sharp.
+ *
+ * ⚠️ Mirrors the Android change exactly. This was a [RoundedCornerShape] with one corner swept into a
+ * pill cap — the 1987 LCARS block. The 1966 consoles are cut, not swept. [CutCornerShape] is the same
+ * per-corner API taking the same [Dp], so every call site keeps its argument and renders angular.
+ */
 fun lcarsBlockShape(sweep: Dp, corner: LcarsCorner): Shape = when (corner) {
-    LcarsCorner.TopStart -> RoundedCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.TopEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
-    LcarsCorner.BottomStart -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
-    LcarsCorner.BottomEnd -> RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
+    LcarsCorner.TopStart -> CutCornerShape(topStart = sweep, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.TopEnd -> CutCornerShape(topStart = 0.dp, topEnd = sweep, bottomEnd = 0.dp, bottomStart = 0.dp)
+    LcarsCorner.BottomStart -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = sweep)
+    LcarsCorner.BottomEnd -> CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = sweep, bottomStart = 0.dp)
 }
+
+/** The "jelly bean" — a full capsule, the 1966 bridge's signature control. */
+val tosCapsule: Shape = RoundedCornerShape(percent = 50)
 
 /**
  * A genuine concave L-shaped notch bitten out of one corner, with the interior (concave) joint filled by a
@@ -91,13 +98,13 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, h)
                     lineTo(0f, h)
                     lineTo(0f, s)
-                    arcTo(Rect(0f, 0f, 2 * s, 2 * s), 180f, 90f, false)
+                    lineTo(s, 0f)
                     close()
                 }
                 LcarsCorner.TopEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w - s, 0f)
-                    arcTo(Rect(w - 2 * s, 0f, w, 2 * s), 270f, 90f, false)
+                    lineTo(w, s)
                     lineTo(w, h)
                     lineTo(0f, h)
                     close()
@@ -107,14 +114,14 @@ fun rememberLcarsElbow(notchSize: Dp, corner: LcarsCorner = LcarsCorner.TopStart
                     lineTo(w, 0f)
                     lineTo(w, h)
                     lineTo(s, h)
-                    arcTo(Rect(0f, h - 2 * s, 2 * s, h), 90f, 90f, false)
+                    lineTo(0f, h - s)
                     close()
                 }
                 LcarsCorner.BottomEnd -> {
                     moveTo(0f, 0f)
                     lineTo(w, 0f)
                     lineTo(w, h - s)
-                    arcTo(Rect(w - 2 * s, h - 2 * s, w, h), 0f, 90f, false)
+                    lineTo(w - s, h)
                     lineTo(0f, h)
                     close()
                 }
@@ -158,7 +165,7 @@ fun LcarsHeaderBar(title: String, modifier: Modifier = Modifier, trailing: Strin
         Box(Modifier.height(20.dp).width(44.dp).clip(elbow).background(c.accent))
         Text(
             title.uppercase(),
-            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 2.sp,
+            fontFamily = Orbitron, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.6.sp,
             color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         Canvas(Modifier.weight(1f).height(2.dp)) {

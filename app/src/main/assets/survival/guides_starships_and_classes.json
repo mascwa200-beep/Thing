@@ -1,0 +1,148 @@
+{
+ "guides": [
+  {
+   "id": "fed-starship-design",
+   "title": "Starship Anatomy: How a Federation Vessel Is Laid Out",
+   "category": "Starships & Classes",
+   "summary": "The layout of a Starfleet ship — saucer, engineering hull, nacelles, shields and weapons — and why each part is where it is.",
+   "sections": [
+    {
+     "heading": "The Standard Layout",
+     "body": "Federation starships of most eras share a recognisable arrangement: a broad saucer section carrying the majority of the crew, a secondary hull holding engineering and the bulk stores, and two warp nacelles held clear of both on pylons. The arrangement is not decorative. The nacelles must sit outside the ship's mass to form a stable warp field, and holding them away from the habitable volume is also a safety measure, since the machinery inside them is the most energetic thing aboard. The saucer is where people live. Crew quarters, the bridge, sickbay, laboratories and the recreational spaces are concentrated there, on the reasoning that the section most likely to survive a catastrophe should be the section holding the crew. Several classes can separate the saucer entirely and leave it under impulse power while the drive section fights or flees — a capability that appears rarely and always signals that the situation has become extremely serious. The bridge sits on top rather than buried in the middle, which is frequently pointed out as a tactical absurdity and is defended in-universe on the grounds of sightlines, evacuation and the fact that a ship whose bridge is destroyed can be commanded from a battle bridge below."
+    },
+    {
+     "heading": "Power and Propulsion",
+     "body": "The main engineering hull holds the warp core: a vertical shaft, running through several decks, in which matter and antimatter are combined under the moderation of a crystalline regulator. The energy is routed as plasma through conduits to the nacelles, where field coils shape it into the distortion that moves the ship. Impulse engines handle everything below light speed and are mounted at the rear of the saucer. They are fusion drives rather than reaction-mass rockets in the ordinary sense, and they are what a ship uses for orbital work, docking, and combat at close quarters. Because the core cannot always be brought back under control, it is designed to be ejected — dropped clear of the ship faster than the ship could be evacuated. The ejection sequence is one of the more reliable moments of dread in the setting, because it is the point at which a crew concedes it can no longer save the vessel and is now only trying to survive it."
+    },
+    {
+     "heading": "Defence",
+     "body": "A Federation ship's protection is layered. Deflector shields are the outer layer: a field that absorbs and redistributes incoming energy, described as having a finite capacity that regenerates, which is what makes a battle a contest of attrition rather than a single exchange. Below them is the hull itself, and below that structural integrity fields that keep the ship from tearing itself apart under stress. Armament is conventionally phasers and photon torpedoes: a directed-energy weapon that can be tuned from a stun setting to a cutting beam, and a launched warhead that carries its own matter-antimatter charge. The pairing matters dramatically, because phasers are stopped by shields in a way torpedoes partly are not, and most engagements in the setting are decided by someone finding a way through rather than by raw output. The navigational deflector — the large dish on the front of the secondary hull — is not a weapon and not a shield. Its job is to sweep the ship's path clear of dust and debris, which at warp would otherwise strike with the force of ordnance."
+    },
+    {
+     "heading": "What the Design Says",
+     "body": "The ships are drawn as exploratory vessels that can fight rather than as warships that can explore, and nearly every design decision restates that. A warship does not carry families. A warship does not devote a third of its volume to laboratories, or maintain an arboretum, or build a bridge with a carpet on it. That is why the classes designed explicitly for war read as a departure inside the fiction as well as outside it. When the Federation builds a small, heavily armed vessel with almost no science capacity and no room for civilians, the ship itself is the plot point: it means the institution has concluded that the situation no longer permits its usual answer. The recurring visual argument is the silhouette. A Federation ship is smooth, pale and open; its rivals are angular, dark and armoured. Neither is an accident, and both are making the same point about what the civilisation behind them believes a ship is for."
+    }
+   ]
+  },
+  {
+   "id": "fed-constitution-class",
+   "title": "The Constitution Class",
+   "category": "Starships & Classes",
+   "summary": "The heavy cruiser of the first era of deep exploration, and why a five-year mission is the format's founding idea.",
+   "sections": [
+    {
+     "heading": "The Ship",
+     "body": "The Constitution class is the vessel most associated with the Federation's first great period of deep exploration: a heavy cruiser of a few hundred crew, capable of operating for years beyond resupply, and designed to be the only Federation presence for many light years in any direction. Its layout established the pattern every later class follows — saucer, engineering hull, twin nacelles on pylons — and its proportions are the ones the silhouette is still read against. Perhaps a dozen or so ships of the class were in service at its height, which is a deliberately small number: these were the most capable vessels the Federation had, and losing one was a strategic event rather than an attritional one. The class was refitted substantially partway through its life, in a programme extensive enough that the result is sometimes treated as a separate class. The refit modernised the drive, rearranged the engineering spaces and changed the external lines considerably, and it is a rare example of the setting showing infrastructure being maintained rather than simply replaced."
+    },
+    {
+     "heading": "The Five-Year Mission",
+     "body": "The class is inseparable from the mission profile written for it: five years of continuous operation, charting unexplored space, with a standing instruction to seek out what has not been found and to make contact with what has not been met. That framing is the founding statement of the whole setting and it is worth reading carefully, because it is an instruction to explore rather than to expand, and to contact rather than to claim. Five years is a long time to be beyond help, and the isolation is the point. A ship that could call for instruction would not need a captain who could decide; a ship that could be reinforced within a day would not be a place where the crew's competence is the only thing between them and the vacuum. Every dramatic situation the format produces depends on the distance. It also means the ship is a community rather than a vehicle. Over five years a crew becomes the entirety of each other's society, which is why the relationships aboard carry the weight they do and why the loss of any one of them lands as it does."
+    },
+    {
+     "heading": "Command and Crew",
+     "body": "A Constitution-class command is drawn as the most desirable posting in the service and the loneliest. The captain is simultaneously the ranking military officer, the senior diplomat, the magistrate and, in practice, the head of state for the only piece of the Federation within reach — and is expected to hold all four roles without instruction. The structure around that officer is the setting's most enduring shape: a first officer whose job includes disagreeing, a chief medical officer with the standing to relieve the captain on medical grounds, and a chief engineer whose estimate of what the ship can survive is the practical limit on what the captain may attempt. The three constrain the command in different directions and none of them is decorative. Below them the ship runs on specialists — helm, navigation, communications, sciences, security — organised so that any watch can operate the vessel. The recurring device of the landing party taking the senior officers away from the ship exists precisely because the ship can be left in competent hands."
+    },
+    {
+     "heading": "Its Place in the Record",
+     "body": "More is documented about this class's voyages than about any other, which distorts the record in a way worth naming: the era reads as unusually eventful because the ships that were out there were few and their logs are unusually complete, not because space was busier then. The class also sits at the point where several of the Federation's defining relationships were set. First contacts made in this period established the terms the following century inherited, including some it spent a great deal of effort trying to renegotiate. Decisions taken by individual captains under the Prime Directive in these years became the case law that later officers were taught. By the later eras the surviving ships are museum pieces and training vessels, and the class name carries the weight a famous ship's name always does — which is why it keeps being reissued to new vessels, and why the setting treats that reissue as a burden placed on a crew rather than an honour handed to them."
+    }
+   ]
+  },
+  {
+   "id": "fed-galaxy-class",
+   "title": "The Galaxy Class Starship",
+   "category": "Starships & Classes",
+   "summary": "The exploratory flagship: a starship designed on the assumption that peace would hold.",
+   "sections": [
+    {
+     "heading": "A Ship Built for a Long Peace",
+     "body": "The Galaxy class is the clearest statement the Federation ever made about what it thought the future would be like. Very large, lavishly equipped, and designed for missions measured in years rather than months, it was conceived as a mobile scientific and diplomatic institution that happened to be armed rather than as a warship with laboratories attached. The most conspicuous expression of that philosophy is that families live aboard. Officers on multi-year deployments bring partners and children; there are schools, a barber, gardens and a bar. Critics inside the setting call this indefensible on a vessel that goes armed into unexplored space, and they are not wrong. The counter-argument is that a fleet which sends its best people away for years without their families will not keep its best people, and that a Federation which will not take that risk has already conceded something. The design also assumes a stable strategic environment. When that assumption failed, the class's size and comfort became liabilities that a generation of subsequent designs was built to correct."
+    },
+    {
+     "heading": "Saucer Separation",
+     "body": "The class can divide into two independently operating vessels: the saucer, carrying most of the civilian complement under impulse power, and the drive section retaining warp capability and the bulk of the ship's offensive strength. The intended use is obvious — leave the non-combatants somewhere survivable and take the fight elsewhere. In practice it is used sparingly, and the setting is honest about why. Separation is slow, rejoining is slower and requires calm conditions, and the saucer left behind is a very large target with modest defences and no ability to leave the system. It solves a problem only when there is time to execute it, which is rarely the situation in which one would want it. It remains significant as a design statement. The class was built around the premise that the crew's dependants might have to be evacuated mid-mission, which tells you both that the designers took the danger seriously and that they were unwilling to solve it by leaving the families at home."
+    },
+    {
+     "heading": "Capability",
+     "body": "The class carries an extensive sensor and laboratory suite, a large sickbay, substantial shuttle and industrial-replicator capacity, and enough general-purpose space to be reconfigured for missions its designers never specified — a colony evacuation, a mobile hospital, a negotiation venue requiring neutral ground. That adaptability is the class's real strength and is easy to overlook beside its armament. Militarily it is formidable without being specialised. Heavy phaser arrays, torpedo launchers fore and aft, and shields proportionate to its size make it more than a match for most single opponents, and its size gives it endurance in a sustained engagement. Against a purpose-built warship of comparable era it is at a disadvantage, and against the truly outmatching threats of the period it is simply a large target. Its holodecks, so often treated as a recreational curiosity, are genuine mission equipment: training environments, engineering simulations and forensic reconstructions all run in them. The class's spare capacity is what makes that possible."
+    },
+    {
+     "heading": "Legacy",
+     "body": "The Galaxy class defines an era in the way a flagship should, and the era it defines ended during its own service life. Ships of the class fought in a general war they were not designed for, performed creditably, and took losses that a more cynical design philosophy might have avoided. What followed were smaller, harder ships — vessels with less room, fewer laboratories and far more armament, built by an institution that had stopped assuming the peace would hold. The setting treats that shift as a real loss rather than as maturity, and the Galaxy class is the thing being mourned. Its lasting influence is the demonstration that a ship can be a place rather than a platform. Crews who serve aboard one describe it as somewhere they lived rather than somewhere they were posted, and every later design that bothers with a lounge, a garden or a window is arguing on the Galaxy class's side."
+    }
+   ]
+  },
+  {
+   "id": "fed-bird-of-prey",
+   "title": "The Bird-of-Prey",
+   "category": "Starships & Classes",
+   "summary": "A small, cloaked raider that outlives its era — and the design philosophy behind it.",
+   "sections": [
+    {
+     "heading": "The Shape and the Name",
+     "body": "The Bird-of-Prey is a compact warship characterised by a forward command hull, a broad rear section and two wings that pivot between raised, level and lowered positions. The wing position is conventionally read as posture — raised for attack, level for cruise, lowered for landing — and the vessel can in fact set down on a planetary surface, which very few warships of comparable capability can. The name and the general layout have a complicated history in the setting, having been associated with more than one power before settling as a Klingon design. That ambiguity is usually explained in-universe as technology transfer between allies during a period of cooperation, which is neater than the production history behind it and does no harm. The class exists in several sizes across a long service life, from small scouts to substantially larger vessels sharing the same silhouette. Treating \"Bird-of-Prey\" as a single ship rather than a family of them is the commonest error in describing it."
+    },
+    {
+     "heading": "Cloak, and the Cost of It",
+     "body": "The defining capability is the cloaking device, which renders the vessel effectively invisible to most sensors. The tactical value is enormous: a cloaked raider chooses when an engagement begins, from what range and on what heading, and an enemy that cannot find it cannot defend against it. The cost is the interesting part. A cloaked vessel of this design cannot fire while cloaked, because raising weapons requires dropping the field, and the moment of decloaking is the moment of maximum vulnerability — shields not yet up, position revealed, opponent alerted. The whole tactical doctrine of the class is built around compressing that window: strike first, strike hard, and be gone before a reply is organised. Cloaking is also power-hungry and stresses the vessel's systems, which is why a damaged Bird-of-Prey so often has to choose between hiding and functioning. That trade — invisibility against everything else — is what makes the ship interesting rather than merely powerful."
+    },
+    {
+     "heading": "Small, Cheap and Everywhere",
+     "body": "A Bird-of-Prey carries a small crew, sometimes barely a dozen, which means it is inexpensive to build and inexpensive to lose. An empire that fields them in numbers can accept casualties a Federation admiralty could not, and can put a credible warship in far more places than a fleet of capital vessels would reach. This makes the class the natural instrument of raiding, escort, patrol and covert work, and also the natural vessel for anyone operating outside official sanction. Small crews mean a disaffected commander needs to persuade very few people, and the setting is full of Birds-of-Prey being flown by renegades, mercenaries, exiles and factions of one. Its endurance as a design says something about Klingon engineering priorities. The vessel is not comfortable, not versatile and not survivable in a stand-up fight against anything much larger. It is fast, quiet, deadly at the moment of its choosing, and cheap enough that there is always another one."
+    },
+    {
+     "heading": "Fighting One, and Fighting In One",
+     "body": "For a Federation captain, the Bird-of-Prey is a problem of detection rather than of firepower. Once located it is manageable; the entire engagement therefore turns on the minutes before that, and the setting's countermeasures are correspondingly about finding rather than shooting — sensor sweeps tuned to the faint distortions a cloak cannot help producing, tachyon detection grids, or simply provoking a decloak by presenting a target too good to refuse. For those aboard, service is cramped and unsentimental. The bridge is small, the corridors are narrow, and the culture aboard a Klingon vessel of this size is intensely personal — with a crew that small, the commander knows everyone and everyone knows exactly where they stand. The class also has a strong claim to being the setting's most versatile plot device. It is small enough to be stolen, cheap enough to be plausible in anyone's hands, capable enough to threaten a starship, and characterful enough that its arrival changes the tone of a scene before anyone has spoken."
+    }
+   ]
+  },
+  {
+   "id": "fed-defiant-class",
+   "title": "The Defiant Class",
+   "category": "Starships & Classes",
+   "summary": "The warship the Federation said it did not build: small, overpowered, and an admission.",
+   "sections": [
+    {
+     "heading": "Built for One Enemy",
+     "body": "The Defiant class was designed for a specific opponent — a collective that assimilates civilisations and had already come close to ending the Federation with a single vessel. The brief was not exploration, not diplomacy and not endurance. It was to destroy something enormous, and everything about the design follows from that. The result is very small and very heavily armed: a compact hull with no saucer, no separate drive section and almost no wasted volume, carrying weapons and shielding sized for a ship several times larger. There are no families, no arboretum and barely a corridor. A crew of a few dozen operates a vessel that can trade fire with capital ships. The class's existence is itself the story. A Federation that describes Starfleet as a scientific and diplomatic service quietly commissioned a pure warship, and the project was shelved when the immediate threat receded rather than cancelled — which is a different thing and everybody involved knew it."
+    },
+    {
+     "heading": "Overpowered, Literally",
+     "body": "The prototype nearly tore itself apart. Its engines and weapons were sized past what the structure could survive, and the setting is unusually specific about this: the ship was overgunned to the point that firing everything risked the hull, and the design had to be detuned before it could be trusted. That detail does a lot of work. It marks the class as the product of fear rather than of careful engineering — a design brief written by people who cared more about stopping something than about whether the ship came back. Federation engineering is normally conservative and this plainly was not. Once corrected, the class became formidable and remained uncomfortable. Long deployments in a vessel with no recreational space and no privacy wear crews down, and officers who serve aboard one after serving aboard something larger describe the difference as a change of profession rather than of posting."
+    },
+    {
+     "heading": "The Cloak Nobody Talks About",
+     "body": "One vessel of the class operates with a cloaking device, supplied by a rival power under a treaty exception negotiated during a period of shared interest. The Federation had signed a treaty forbidding itself cloaking technology, so the arrangement is a loophole with conditions attached — including, in the version the setting stages, an obligation to share intelligence gathered while using it. This is one of the setting's better small ideas because it makes an abstraction concrete. A power that renounced a capability by treaty and then borrowed it under supervision is doing something recognisable, and the discomfort of the officers operating it is the point. It also demonstrates the class's whole character. A ship built in secret, detuned because it was dangerous, and fitted with borrowed technology its own government promised not to use, is the Federation's least idealistic object, and the setting keeps it in view rather than tucking it away."
+    },
+    {
+     "heading": "What It Meant",
+     "body": "In the general war that followed, the class was vindicated in the narrowest sense: it worked, it was produced in numbers, and it did what it was built to do. Fleets of small hard ships turned out to be what the situation required, and the large comfortable explorers took the losses. The setting refuses to treat that as a happy ending. A Federation that has learned to build warships well has learned something it spent a century avoiding, and the officers who welcome the capability are written as being right and as having lost something. The class is therefore the counterpart to the Galaxy class in the database, and the two should be read together. One is what the Federation builds when it expects the peace to hold; the other is what it builds when it has stopped expecting that."
+    }
+   ]
+  },
+  {
+   "id": "fed-shuttlecraft",
+   "title": "Shuttlecraft and Runabouts",
+   "category": "Starships & Classes",
+   "summary": "The small craft: what a starship carries, what they are for, and why they crash so often.",
+   "sections": [
+    {
+     "heading": "The Ship's Boats",
+     "body": "Every starship carries small craft, and the setting distinguishes several sizes. Shuttlepods are minimal — a cockpit, a few seats, short range, sublight or barely warp-capable. Shuttlecraft are the standard: a boxy hull carrying a handful of people and cargo at low warp for days. Runabouts are the largest, effectively small starships with bunks, a laboratory, replicators and modular mission compartments, capable of independent operation for weeks. They exist because a starship is a poor instrument for small jobs. A vessel with a thousand people aboard cannot land, cannot enter a crowded orbit unobtrusively, and cannot be risked in an atmosphere or a debris field for the sake of collecting three passengers. Larger vessels carry a dozen or more, run from a hangar deck with its own crew, traffic control and maintenance cycle. The setting rarely shows that infrastructure, but it is implied by every departure."
+    },
+    {
+     "heading": "What They Are Actually For",
+     "body": "The commonest use is transport where the transporter will not serve — through interference, in a shielded environment, when the destination cannot be scanned, or when arriving by materialising out of the air would be a diplomatic error. A shuttle is also the polite way to arrive somewhere that has not agreed to be beamed into. They also carry cargo, conduct surveys at close range, and act as the ship's eyes somewhere the ship cannot go. Runabouts in particular are used for extended independent missions — two or three officers away for a fortnight, which gives the setting a way to isolate a small group without stranding an entire crew. And they are lifeboats, in the sense that they are the way people get off a vessel that cannot be saved. Escape pods exist, but a shuttle can be flown, which is a considerable difference when the nearest help is a long way off."
+    },
+    {
+     "heading": "Why So Many Are Lost",
+     "body": "Small craft in this setting have a poor survival record, and the joke among viewers is old enough to have become a genre convention. The in-universe reasons are sound as far as they go: a shuttle has a fraction of a starship's shielding, no meaningful armament, limited power and no redundancy, and it is deliberately sent into exactly the situations too hazardous for the ship. The structural reason is that a shuttle is how the setting separates a few characters from their support. Crash one and you have a survival story; disable one and you have a rescue; lose contact with one and you have a mystery. None of those work while the crew has a starship over their heads. Federation practice reflects the risk in ways the setting mentions in passing — flight plans filed, minimum crew rules, requirements to maintain contact — which mostly serve to establish that the rule was broken before the trouble started."
+    },
+    {
+     "heading": "Flying One",
+     "body": "Small craft are flown by qualified officers rather than by a dedicated pilot corps, and shuttle qualification is a routine part of an officer's training. That produces the setting's habit of putting a scientist, a doctor and an engineer in a shuttle together with nobody aboard whose actual profession is flying. Handling is described as demanding in atmosphere and unremarkable in space. Landings are the difficult part, and the setting's shuttles land far more often than its starships, which is much of why they appear in trouble so frequently. The craft themselves are named rather than numbered on most vessels, usually after figures from the sciences or from the ship's own history. It is a small piece of texture that does real work: a shuttle with a name is a thing a crew can lose, and the setting knows it."
+    }
+   ]
+  }
+ ]
+}

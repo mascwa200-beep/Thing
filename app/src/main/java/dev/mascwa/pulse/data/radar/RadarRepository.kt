@@ -3,7 +3,10 @@ package dev.mascwa.pulse.data.radar
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
+import dev.mascwa.pulse.core.telemetry.SatellitePasses
+import dev.mascwa.pulse.core.telemetry.Sgp4
 import dev.mascwa.pulse.core.util.Geo
+import dev.mascwa.pulse.data.orbital.TleRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,14 +24,16 @@ import kotlinx.serialization.json.longOrNull
 /**
  * TACNET radar feed. Live aircraft come from the keyless community ADS-B
  * networks (adsb.lol primary, adsb.fi fallback) via a radius query around the
- * device's GPS — both are real feeder data, no key required. The live ISS
- * (wheretheiss.at) and nearby USGS earthquakes are merged in as special
- * contacts. Results are cached briefly so the scope still shows the last
+ * device's GPS — both are real feeder data, no key required. Nearby USGS
+ * earthquakes are merged in as special contacts, and so is the ISS — which is
+ * *propagated on the device* rather than fetched, for the reason in
+ * [issContact]. Results are cached briefly so the scope still shows the last
  * picture (dimmed, "LINK LOST") when the network drops.
  */
 class RadarRepository(
     private val http: HttpClient,
     private val cache: DiskCache,
+    private val tle: TleRepository,
 ) {
     private val ttl = 20 * 1000L          // live-ish; auto-refresh forces past this
     private val fetchNm = 250             // adsb.lol max radius (~463 km)
@@ -38,34 +43,61 @@ class RadarRepository(
         // Locale.US: the default locale renders a comma decimal on much of the planet, which would
         // silently give the same place two different cache keys depending on device settings.
         val key = "radar_${fmt("%.2f", lat)}_${fmt("%.2f", lon)}"
+        // Loaded before anything else so every return below can re-place the ISS at the instant it
+        // is read, whether the picture is fresh, cached, or the last one before the link dropped.
+        val issElements = issElements()
         if (!force) {
             cache.read(key, ttl, RadarData.serializer())?.let {
-                return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
+                return Fetched(recompute(it.value, lat, lon, issElements), true, it.savedAtMs)
             }
         }
         return try {
             val data = coroutineScope {
                 // ISS + quakes are best-effort; the aircraft feed is authoritative so a
                 // genuine network failure propagates and we fall back to the last picture.
-                val issD = async { runCatching { iss() }.getOrNull() }
+                // The ISS is only fetched when there are no elements to propagate from.
+                val issD = async {
+                    if (issElements == null) runCatching { iss() }.getOrNull() else null
+                }
                 val quakeD = async { runCatching { quakes(lat, lon) }.getOrDefault(emptyList()) }
                 val (air, src) = aircraft(lat, lon)
                 val extras = listOfNotNull(issD.await()) + quakeD.await()
                 RadarData(lat, lon, air + extras, source = src)
             }
             cache.write(key, data, RadarData.serializer())
-            Fetched(recompute(data, lat, lon), false)
+            Fetched(recompute(data, lat, lon, issElements), false)
         } catch (e: Exception) {
             cache.readAny(key, RadarData.serializer())?.let {
-                return Fetched(recompute(it.value, lat, lon), true, it.savedAtMs)
+                return Fetched(recompute(it.value, lat, lon, issElements), true, it.savedAtMs)
             }
             throw e
         }
     }
 
-    /** Recompute distance + bearing from the current origin and re-sort. */
-    private fun recompute(d: RadarData, lat: Double, lon: Double): RadarData {
-        val updated = d.contacts.map {
+    /**
+     * Re-place the ISS, then recompute distance + bearing from the current origin and re-sort.
+     *
+     * ⚠️ Distance and bearing were already recomputed on every read "so the plot stays correct even
+     * when served from cache offline" — but that only ever corrected the *observer's* end of the
+     * line. The ISS end was whatever position had been stored, and the failure path serves a cached
+     * picture with no age limit at all, so the dot could be hours out of place while the scope drew
+     * it as a contact. Propagating replaces it with where the station is now.
+     */
+    private fun recompute(
+        d: RadarData,
+        lat: Double,
+        lon: Double,
+        issElements: Sgp4.Elements?,
+    ): RadarData {
+        val propagated = issElements?.let { issContact(it) }
+        val contacts = if (propagated == null) {
+            d.contacts
+        } else {
+            // Replace a stored ISS if there is one, and add it if there is not: a failed position
+            // fetch is no longer a reason for the station to be missing from the scope.
+            d.contacts.filterNot { it.kind == ContactKind.ISS.name } + propagated
+        }
+        val updated = contacts.map {
             it.copy(
                 distanceMeters = Geo.distanceMeters(lat, lon, it.latitude, it.longitude),
                 bearingDeg = Geo.bearingDegrees(lat, lon, it.latitude, it.longitude),
@@ -157,9 +189,48 @@ class RadarRepository(
         return list to src
     }
 
-    // --- Live ISS position (keyless) ---
+    /**
+     * The ISS, worked out on the device rather than asked for.
+     *
+     * The scope's cache is twenty seconds and the failure path has none, while the ground point
+     * moves about 416 km a minute — so a fetched position is between one and many dot-widths wrong
+     * by the time it is drawn. The element set is cached for twelve hours and shared with the
+     * observatory and the Home digest, so this costs no request at all in the ordinary case, has no
+     * age, and works with the link down. Null when the elements cannot be propagated, which leaves
+     * the fetched path as it was.
+     */
+    private fun issContact(elements: Sgp4.Elements): Contact? {
+        val now = System.currentTimeMillis()
+        val propagator = Sgp4.propagator(elements)
+        val sub = SatellitePasses.subPoint(propagator, now) ?: return null
+        val speedKmS = (propagator.propagateAt(now) as? Sgp4.Propagation.Ok)?.state?.speedKmS
+        return Contact(
+            id = "iss",
+            label = "ISS",
+            latitude = sub.latitudeDeg,
+            longitude = sub.longitudeDeg,
+            altitudeM = sub.altitudeKm * 1000.0,
+            groundSpeedKmh = speedKmS?.times(3600.0),
+            detail = "Space Station · $ISS_NORAD_ID",
+            kind = ContactKind.ISS.name,
+        )
+    }
+
+    /**
+     * The station's elements from whatever is already on disk.
+     *
+     * Cache-only on purpose — see [TleRepository.cachedElement]. This runs before every scope
+     * refresh, and a scope that refreshes every twenty seconds must not be held behind a network
+     * call. The observatory and the Home sky digest keep the elements current; on a device that has
+     * never had either open with a connection there is nothing cached, and the fetched position
+     * below still stands in.
+     */
+    private suspend fun issElements(): Sgp4.Elements? =
+        runCatching { tle.cachedElement(ISS_NORAD_ID) }.getOrNull()
+
+    // --- Live ISS position (keyless), used only when there are no elements to propagate ---
     private suspend fun iss(): Contact? {
-        val text = http.getString("https://api.wheretheiss.at/v1/satellites/25544")
+        val text = http.getString("https://api.wheretheiss.at/v1/satellites/$ISS_NORAD_ID")
         val o = withContext(Dispatchers.IO) { http.json.parseToJsonElement(text) }.jsonObject
         fun d(k: String) = o[k]?.jsonPrimitive?.doubleOrNull
         val clat = d("latitude") ?: return null
@@ -170,7 +241,7 @@ class RadarRepository(
             latitude = clat, longitude = clon,
             altitudeM = (d("altitude") ?: 0.0) * 1000.0,
             groundSpeedKmh = d("velocity"),
-            detail = "Space Station · 25544",
+            detail = "Space Station · $ISS_NORAD_ID",
             kind = ContactKind.ISS.name,
         )
     }
@@ -228,6 +299,8 @@ class RadarRepository(
     }
 
     private companion object {
+        /** The station's catalogue number, in the feed URL and in the contact's own detail line. */
+        const val ISS_NORAD_ID = 25544
         const val FEET_TO_M = 0.3048
         const val KNOTS_TO_KMH = 1.852
         val EMERGENCY_SQUAWKS = setOf("7500", "7600", "7700")

@@ -44,6 +44,24 @@ class MirrorDriftTest {
         "telemetry/NewsMarketLink.kt" to "$CORE/NewsMarketLink.kt",
         "telemetry/MediaBias.kt" to "$CORE/MediaBias.kt",
         "telemetry/SocialBuzz.kt" to "$CORE/SocialBuzz.kt",
+        // ⚠️ The live-TV four were mirrored by the script and absent from this map, which is the
+        // exact hole this test exists to close — and it was a live one. Growing the curated channel
+        // list from 5 to 41 without regenerating would have left the desktop showing the old five
+        // **with its own mirrored copy of LiveChannelsTest still passing**, because that test is
+        // itself the stale mirror and would have been asserting against the stale catalogue. Nothing
+        // else in the build looks at these files: `desktop-build.yml` never runs the script's
+        // `--check`, so this map is the only thing standing between a script nobody remembered to
+        // run and two platforms quietly disagreeing about what is on television.
+        "telemetry/LiveChannels.kt" to "$CORE/LiveChannels.kt",
+        "telemetry/M3uCatalog.kt" to "$CORE/M3uCatalog.kt",
+        "telemetry/DataRate.kt" to "$CORE/DataRate.kt",
+        // ⚠️ Its cross-check against `EconomyVintage` lives in a SEPARATE, unmirrored test on the
+        // Android side, deliberately: that core is not mirrored (the companion has no economy
+        // screen), so a cross-check inside the mirrored test would not compile here — and would not
+        // mean anything either, since the property is that two implementations *coexisting in one
+        // module* cannot drift.
+        "telemetry/Stardate.kt" to "$CORE/Stardate.kt",
+        "live/LiveCatalogRepository.kt" to "$LIVE/LiveCatalogRepository.kt",
         "library/GuideModels.kt" to "$SURVIVAL/GuideModels.kt",
         "library/GuideTaxonomy.kt" to "$SURVIVAL/GuideTaxonomy.kt",
     )
@@ -52,6 +70,7 @@ class MirrorDriftTest {
     private val testMirrors = listOf(
         "GuideSearchTest.kt", "LibraryConsultTest.kt", "StudyQuestionsTest.kt", "RecallTest.kt",
         "CurriculumTest.kt", "DailyLessonTest.kt", "DeviceSearchTest.kt", "EmergencyTriageTest.kt",
+        "LiveChannelsTest.kt", "M3uCatalogTest.kt", "DataRateTest.kt", "StardateTest.kt",
     ).associate { "telemetry/$it" to "$CORE_TEST/$it" }
 
     private val all: Map<String, String> get() = mirrors + testMirrors
@@ -119,5 +138,6 @@ class MirrorDriftTest {
         const val CORE = "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry"
         const val CORE_TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry"
         const val SURVIVAL = "app/src/main/java/dev/mascwa/pulse/data/survival"
+        const val LIVE = "app/src/main/java/dev/mascwa/pulse/data/live"
     }
 }

@@ -162,6 +162,91 @@ class LibraryConsultTest {
         assertTrue(block.contains("x".repeat(100)))
     }
 
+    // ---- the page's own warning ----------------------------------------------------------------------
+
+    /**
+     * ⚠️ Four sentences on purpose, with the load-bearing clause in the last one.
+     *
+     * The real notes have a median of three sentences and a p90 of five, so a tidy two-sentence
+     * fixture cannot detect trimming at all: [LibraryConsult.SPOKEN_SENTENCES] is 2, and a first draft
+     * of this test used two sentences and stayed green with the shipped code deliberately truncated.
+     * A warning is exactly the kind of text whose last sentence is the one that matters.
+     */
+    private val note = "Never mix bleach with ammonia or with any acid: the reaction releases " +
+        "chlorine gas, which injures the lungs at concentrations you can survive breathing. " +
+        "Household cleaners are the usual source, and many of them do not say so on the label. " +
+        "Work with a window open and a door open, so there is a through-draught rather than a " +
+        "single vent. Ventilate the room and leave it if you smell chlorine."
+
+    private val body = "Add eight drops of unscented household bleach per gallon of clear water. " +
+        "Stir it and leave it to stand for thirty minutes before drinking. If it does not smell " +
+        "faintly of chlorine, repeat the dose once."
+
+    /**
+     * ⚠️ The warning leads, and this is the whole point of the change.
+     *
+     * 184 of the bundled guides carry one and this path dropped every single one, so a spoken answer
+     * about disinfecting water never mentioned chlorine gas. Leading with it also fails in the right
+     * direction: somebody who stops listening early has heard the part that matters most.
+     */
+    @Test
+    fun theWarningIsSaidBeforeTheAnswerRatherThanAfterIt() {
+        val out = LibraryConsult.spokenAnswer(body, note, "Water Purification")
+        assertTrue("the warning is missing entirely", out.contains("chlorine gas"))
+        assertTrue(
+            "the warning came after the passage, so it can be missed",
+            out.indexOf("chlorine gas") < out.indexOf("eight drops"),
+        )
+        assertTrue(out.contains("Water Purification"))
+    }
+
+    /** A warning cut in half is where the "never do X" clause tends to live. */
+    @Test
+    fun theWarningIsNeverTrimmed() {
+        val out = LibraryConsult.spokenAnswer(body, note, "Water Purification")
+        assertTrue("the warning lost its end", out.contains("leave it if you smell chlorine"))
+        // The passage itself is still cut — reading a section aloud is not an answer to a question.
+        assertFalse(out.contains("repeat the dose once"))
+    }
+
+    /**
+     * ⚠️ Nothing changes for the 397 guides that carry no warning.
+     *
+     * Proving the change is scoped matters as much as proving it works: this path answers every
+     * question the library is consulted about, not only the dangerous ones.
+     */
+    @Test
+    fun aPageWithNoWarningAnswersExactlyAsItAlwaysDid() {
+        val before = LibraryConsult.firstSentences(body) + LibraryConsult.citation("Water Purification")
+        assertEquals(before, LibraryConsult.spokenAnswer(body, null, "Water Purification"))
+        assertEquals(before, LibraryConsult.spokenAnswer(body, "   ", "Water Purification"))
+    }
+
+    /** The note is stored as written prose; spoken aloud it must not carry its line breaks. */
+    @Test
+    fun theWarningIsFlattenedBeforeItIsSpoken() {
+        val out = LibraryConsult.spokenAnswer(body, "Never mix\n  bleach\twith ammonia.", "G")
+        assertTrue(out.contains("Never mix bleach with ammonia."))
+    }
+
+    /** A model answering from the page must not be able to leave the warning out. */
+    @Test
+    fun theGroundingBlockCarriesTheWarningAboveTheProse() {
+        val block = LibraryConsult.groundingBlock("G ▸ S", body, note)
+        assertTrue(block.contains("chlorine gas"))
+        assertTrue(block.contains("repeat it in your answer"))
+        assertTrue(block.indexOf("chlorine gas") < block.indexOf("eight drops"))
+        // And the cap still governs the prose, not the warning.
+        val capped = LibraryConsult.groundingBlock("G ▸ S", "x".repeat(5_000), note, maxChars = 100)
+        assertTrue(capped.contains("chlorine gas"))
+        assertFalse(capped.contains("x".repeat(101)))
+        // Unchanged when there is nothing to warn about.
+        assertEquals(
+            LibraryConsult.groundingBlock("G ▸ S", body),
+            LibraryConsult.groundingBlock("G ▸ S", body, null),
+        )
+    }
+
     @Test
     fun theCitationPointsAtSomethingTheReaderCanGoAndOpen() {
         val c = LibraryConsult.citation("Water Purification")
