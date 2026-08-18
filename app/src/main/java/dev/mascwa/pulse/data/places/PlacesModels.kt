@@ -36,8 +36,22 @@ data class Place(
     val emergency: String? = null,
     /** OSM `opening_hours`, verbatim. Not parsed here; shown so a closed clinic can say so. */
     val openingHours: String? = null,
-    /** A fifth of results carry a website but no phone, so this is the only way to reach them. */
+    /**
+     * A fifth of results carry a website but no phone, so this is the only way to reach them.
+     *
+     * Always carries a scheme — OSM values are often bare hosts, and `ACTION_VIEW` on one of those
+     * resolves to nothing at all.
+     */
     val website: String? = null,
+    /** OSM `email`. Rare (about one result in thirty) and the only channel on some of those. */
+    val email: String? = null,
+    /**
+     * OSM `healthcare:speciality`, verbatim.
+     *
+     * A quarter of results declare one, and about seventy per cent of those are narrow practices —
+     * podiatry, dermatology, fertility — which the row rendered identically to a general surgery.
+     */
+    val speciality: String? = null,
 )
 
 @Serializable

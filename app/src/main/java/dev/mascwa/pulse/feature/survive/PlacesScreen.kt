@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.core.util.dialNumber
 import dev.mascwa.pulse.core.util.openMaps
+import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.places.Place
 import dev.mascwa.pulse.data.places.PlaceCategory
 import dev.mascwa.pulse.feature.common.EmptyState
@@ -145,11 +146,28 @@ private fun placeKindLine(place: Place): String? {
     // `emergency=yes` on a hospital is the difference between somewhere that can take you now and
     // somewhere that cannot, so it earns its place on the row rather than a detail view.
     val ae = if (place.emergency == "yes") "A&E" else null
-    return listOfNotNull(kind, ae).joinToString(" · ").ifBlank { null }
+    // A quarter of results declare a speciality, and most of those are narrow practices — walking
+    // to a podiatrist for a chest pain is the mistake this line exists to prevent.
+    // Values are lower_snake_case and about one in seven carries several separated by semicolons —
+    // `dentist;dentistry;dental_oral_maxillo_facial_surgery` is a real one, which is why only the
+    // first two are kept. Title case rather than sentence case: "Traditional Chinese Medicine".
+    val speciality = place.speciality
+        ?.split(';')
+        ?.mapNotNull { part ->
+            part.trim().split('_', ' ')
+                .filter { it.isNotBlank() }
+                .joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
+                .ifBlank { null }
+        }
+        ?.take(2)
+        ?.joinToString(", ")
+        ?.ifBlank { null }
+    return listOfNotNull(kind, speciality, ae).joinToString(" · ").ifBlank { null }
 }
 
 @Composable
 private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
+    val context = LocalContext.current
     val c = Pulse.colors
     LcarsFrame(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -173,6 +191,23 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
                 place.openingHours?.let {
                     Text("Hours: $it", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint)
                 }
+                // ⚠️ Forty per cent of results carry a website and a fifth carry one with no phone
+                // at all — on those rows the only button was "open in maps", which is a way to walk
+                // there and not a way to ask whether it is worth walking there. The address was
+                // parsed for both of these and neither was ever drawn.
+                if (place.website != null || place.email != null) {
+                    Row(
+                        Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        place.website?.let { url ->
+                            ContactLink("▸ WEBSITE") { openUrl(context, url) }
+                        }
+                        place.email?.let { address ->
+                            ContactLink("▸ EMAIL") { openUrl(context, "mailto:$address") }
+                        }
+                    }
+                }
             }
             if (place.phone != null) {
                 IconButton(onClick = onCall) { Icon(Icons.Filled.Call, "Call", tint = c.positive) }
@@ -180,6 +215,18 @@ private fun PlaceRow(place: Place, onMap: () -> Unit, onCall: () -> Unit) {
             IconButton(onClick = onMap) { Icon(Icons.Filled.Place, "Open in maps", tint = c.accent) }
         }
     }
+}
+
+/** A flat tappable link in the row's own terminal idiom — the screen has no icon for the web. */
+@Composable
+private fun ContactLink(label: String, onClick: () -> Unit) {
+    val c = Pulse.colors
+    Text(
+        label,
+        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 10.sp,
+        letterSpacing = 1.sp, color = c.accent,
+        modifier = Modifier.clickable { onClick() },
+    )
 }
 
 @Composable

@@ -168,8 +168,12 @@ class OverpassRepository(
                     ?: tags?.get("healthcare")?.jsonPrimitive?.contentOrNull,
                 emergency = tags?.get("emergency")?.jsonPrimitive?.contentOrNull,
                 openingHours = tags?.get("opening_hours")?.jsonPrimitive?.contentOrNull,
-                website = (tags?.get("website") ?: tags?.get("contact:website"))
-                    ?.jsonPrimitive?.contentOrNull,
+                website = withScheme(
+                    (tags?.get("website") ?: tags?.get("contact:website"))?.jsonPrimitive?.contentOrNull,
+                ),
+                email = (tags?.get("email") ?: tags?.get("contact:email"))
+                    ?.jsonPrimitive?.contentOrNull?.trim()?.ifBlank { null },
+                speciality = tags?.get("healthcare:speciality")?.jsonPrimitive?.contentOrNull,
             )
         }
             .distinctBy { "${it.name}_${fmt(it.latitude, 4)}" }
@@ -196,6 +200,19 @@ class OverpassRepository(
             )
         }.sortedBy { it.distanceMeters }
         return result.copy(originLat = lat, originLon = lon, places = updated)
+    }
+
+    /**
+     * An OSM website value made openable, or null.
+     *
+     * ⚠️ A guard against a case that was NOT observed rather than one that was: of 158 websites in
+     * a 400-result London sample, every one carried a scheme. But the values are typed by hand, and
+     * `ACTION_VIEW` on a URI without one matches no handler at all — a button that silently does
+     * nothing. Anything already carrying a scheme is left exactly as the mapper wrote it.
+     */
+    private fun withScheme(raw: String?): String? {
+        val v = raw?.trim()?.ifBlank { null } ?: return null
+        return if (v.contains("://") || v.startsWith("mailto:")) v else "https://$v"
     }
 
     private fun buildAddress(tags: kotlinx.serialization.json.JsonObject?): String? {
