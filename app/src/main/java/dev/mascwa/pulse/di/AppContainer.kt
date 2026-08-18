@@ -275,7 +275,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
     }
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
-        dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache)
+        dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache, tleRepository)
     }
 
     // ---- J.A.R.V.I.S. Matrix (on-device assistant) ----

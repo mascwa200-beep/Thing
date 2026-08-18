@@ -96,6 +96,24 @@ class TleRepository(
         elements(group).data.firstOrNull { it.noradId == noradId }
 
     /**
+     * One satellite from whatever is already on disk — never a request, however old the cache is.
+     *
+     * For callers that need elements but must not *initiate* work: the radar scope refreshes every
+     * twenty seconds, and putting a network call in front of a cached picture would hold the whole
+     * plot behind a slow or dead Celestrak. Elements are kept current by the screens that can
+     * afford to wait for them — the observatory and the Home sky digest — and everything else reads
+     * what they left behind.
+     *
+     * ⚠️ Deliberately ignores the freshness window. A TLE hours or even days past its refresh time
+     * is still good to within a few kilometres, which is far better than the alternative here, and
+     * the caller that would rather have current elements should ask for them with [element].
+     */
+    suspend fun cachedElement(noradId: Int, group: Group = Group.STATIONS): Sgp4.Elements? {
+        val stored = cache.readAny("tle_${group.id}", Stored.serializer()) ?: return null
+        return parse(stored.value.text).firstOrNull { it.noradId == noradId }
+    }
+
+    /**
      * Elements are DERIVED from the cached text, not stored as objects. [Sgp4.Elements] lives in
      * `core:telemetry`, which has no serialization dependency and should keep it; re-parsing the
      * text the server sent is cheap and keeps exactly one representation on disk.

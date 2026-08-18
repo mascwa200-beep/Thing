@@ -208,8 +208,7 @@ class HomeViewModel(
      */
     private suspend fun issSighting(lat: Double, lon: Double): SatellitePasses.Sighting? =
         runCatching {
-            val elements = tle.elements(TleRepository.Group.STATIONS).data
-                .firstOrNull { it.noradId == ISS_NORAD_ID } ?: return null
+            val elements = tle.element(ISS_NORAD_ID) ?: return null
             SatellitePasses.sighting(
                 elements,
                 SatellitePasses.Site(lat, lon),
