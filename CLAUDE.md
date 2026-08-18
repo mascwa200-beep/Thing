@@ -3724,7 +3724,12 @@ than contradictory. Owner also chose **one bounded wave** — machinery first at
 single capped content wave with headroom left.
 
 **The image claim in this file was wrong, and I wrote it.** It said 343 diagrams covering every guide.
-Reality: **45 image files**, reused across 238 guides — **343 of 581 guides have no diagram at all.**
+~~Reality: **45 image files**, reused across 238 guides — **343 of 581 guides have no diagram at all.**~~
+⚠️ **And that correction was wrong too, the same way** — it counted `images/` and missed `images/kb/`.
+The true state, measured: **343 image files, one per referencing section, no reuse at all**; every
+reference resolves and nothing is orphaned. The original claim was closer to right than my
+"correction". The real gap is **413 of 651 guides have no diagram** — which is a content gap, not a
+tooling failure.
 That is the real gap, and I1 remains open.
 
 - **K1 (`6d36eaf`) + K2 (`ae18073`) — the Khan model, both platforms.** `CourseMastery` (a course seen
@@ -3789,9 +3794,12 @@ reaching for whenever a new Android file has no Android dependencies.
 
 **E1 — the efficiency pass: measured, and there is nothing there.** Recorded so the next session does
 not re-chase it. Three hypotheses, three negatives, all measured rather than argued:
-- **Images are not heavy.** `du -sh` says 69 MB and that is block-allocation overhead; the sum of the
-  file sizes is **5.5 MB across 44 files**, largest 0.96 MB, 36 of them under 200 KB. Already
-  phone-appropriate. (I asserted the 69 MB figure out loud before checking — measuring is what caught it.)
+- ⚠️ ~~**Images are not heavy.** `du -sh` says 69 MB and that is block-allocation overhead; the sum
+  of the file sizes is **5.5 MB across 44 files**.~~ **THIS WAS WRONG — see the image arc at the end
+  of this file.** The listing covered only `images/` and missed `images/kb/`, which holds **300 of
+  the 343 files**. The real corpus was **68 MB**, the largest thing in the APK's assets by a wide
+  margin. `du -sh` had been right; I overrode a correct measurement with a worse one and drew the
+  opposite conclusion from it.
 - **The shards are not pretty-printed fat.** Minifying all 50 saves **1.2%** (0.32 MB of 25.56 MB) —
   they already use single-space indent. Not worth fighting the KB pipeline's formatting and making
   every content diff unreadable for that.
@@ -4573,6 +4581,64 @@ All four guards confirmed after the fix. core 29/29 and desktop 399/399 locally.
 ⚠️ **Owner-verify on the Pixel and on Windows:** that a spread of the new channels actually play on a
 real network (this container blocks a share of media CDNs, which is why two ship `UNVERIFIED`); that
 a 41-entry rail reads well where five did; and that the funding line is legible at 9sp caption size.
+
+### THE GUIDE DIAGRAMS COST 68 MB TO SHOW 780 PIXELS (this session, PR #448)
+
+Found while re-probing the long-blocked image task (#164), and it is a correction to my own work
+rather than a new idea. **Zero subagent spend**, as with every arc since the credit directive.
+
+**⚠️ FIRST, TWO ERRORS IN THIS FILE, BOTH MINE, BOTH THE SAME MISTAKE: counting `images/` and
+missing `images/kb/`, which holds 300 of the 343 files.** They are struck through above. The one
+that mattered told the owner the efficiency pass had found nothing in the images — it had found
+5.5 MB where the truth was **68 MB**, and the `du -sh` figure I dismissed as block-allocation
+overhead had been right all along. **When a cheap measurement disagrees with your careful one, the
+careful one is not automatically right.** I nearly repeated it a third time this session, reporting
+"300 missing image files" before checking whether the subdirectory existed.
+
+**The measurement that settled the design, and it is the one worth copying:** what do the readers
+actually draw? `SurvivalDiagram` caps at **260.dp** (780 px on the Pixel) and the desktop `Diagram`
+at **620.dp** (1240 px at 2×). The corpus held 123 files wider than 1200 px, topping out at 1920.
+Every pixel above that was shipped, stored and decoded to be discarded during layout.
+
+**Re-encoded to WebP q85 capped at 1280 px: 68.0 MB → 30.8 MB.** The settings were chosen by
+comparing each original against its re-encode **after both are scaled to the 780 px the phone
+shows** — the only comparison that answers "does this change how it looks":
+
+| | size | RMSE at display size (0–255) |
+|---|---|---|
+| **cap 1280 q85** | −59% | median 2.0 · p90 5.5 · **worst 6.3** |
+| cap 1080 q82 | −67% | median 2.5 · p90 12.3 · **worst 14.1** |
+
+Took the conservative pair: this library is line art and clinical diagrams, where a soft edge loses
+information rather than polish. The 15 SVGs are untouched. **Converting the single GIF fixed a bug** —
+`Diagram.kt` says outright that Compose Desktop has no loader for it, so that diagram had failed soft
+to its caption on every Windows machine since it was bundled and nothing in the build knew.
+
+**⚠️ The NOTICE rewrite was a licensing requirement, not tidiness.** Both files named 194 images each
+by their old extensions, and asserted the works were "unmodified" — in one place "the original upload
+byte-for-byte". After a resize and re-encode that is false. Filenames were repointed by an exact map
+taken from `git status`, **rewriting only our bundled name and never the Commons source filename
+beside it on the same line**, and a prominent re-encoding notice now states exactly what was done,
+which is the indication of changes CC-BY-SA requires. The artwork itself is unaltered.
+
+**New guard: `desktop/…/library/BundledImagesDecodeTest`.** `LibraryBundleTest` proves each file is
+*present*; presence is not decodability, and a format Skia cannot read compiles, packages and ships
+perfectly. It decodes every diagram with the reader's own loader and refuses any wider than either
+reader can display. Both halves negative-tested. It would have caught the GIF.
+
+**⚠️ `tools/kb/optimize_images.py` is re-runnable and idempotent** — files already WebP and within the
+cap are skipped, and it refuses a `foo.png`/`foo.jpg` collision rather than silently overwriting.
+Run it after any image wave.
+
+**#164 is also unblocked, and the record needed refining.** The Commons **API** answers 200 from this
+container; only **`upload.wikimedia.org` file downloads** still 429. **`wsrv.nl` fetches them
+successfully** (verified: real API-resolved URL → 200, 55 KB). So sourcing new diagrams is possible
+again — the proxy is transport only, the licence position is unchanged, and provenance must still be
+recorded per file. The real remaining gap is **413 of 651 guides with no diagram**.
+
+⚠️ **Owner-verify on the Pixel and on Windows:** that the diagrams still look right (they should be
+indistinguishable — the change was measured to be imperceptible at display size, but a screen is the
+only real judge), and that the one former GIF now draws on Windows where it never has.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
