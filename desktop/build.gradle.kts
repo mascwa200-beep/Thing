@@ -80,8 +80,30 @@ tasks.processResources {
     from(writeBuildInfo)
 }
 
+// JavaFX, for live television. Declared as plain coordinates rather than through the version catalog
+// because the artifact that matters is the CLASSIFIED one — `javafx-media-21.0.5-win.jar` carries the
+// four native libraries (jfxmedia, gstreamer-lite, glib-lite, fxplugins) that actually decode the
+// stream, and the catalog has no clean way to express a classifier that varies by host.
+//
+// Windows is the target; the linux classifier exists so the module still resolves and compiles on the
+// ubuntu CI runner and here. Confirmed from the shipped Windows jar rather than the documentation:
+// it contains `com/sun/media/jfxmedia/locator/HLSConnectionHolder` with its playlist and
+// variant-playlist parsers, so HLS is real support and not an aspiration.
+val javafxVersion = "21.0.5"
+val javafxPlatform: String = System.getProperty("os.name").lowercase().let {
+    when {
+        it.contains("win") -> "win"
+        it.contains("mac") -> "mac"
+        else -> "linux"
+    }
+}
+
 dependencies {
     implementation(compose.desktop.currentOs)
+    implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
+    implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")
+    implementation("org.openjfx:javafx-media:$javafxVersion:$javafxPlatform")
+    implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
     implementation(compose.material3)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
@@ -105,7 +127,22 @@ compose.desktop {
             // needs the networking, crypto and XML modules. jpackage's jlink step strips anything not
             // listed, and a missing module surfaces only at runtime on a real Windows box — where it would
             // be a crash, not a build failure. Listing them explicitly is what keeps that from happening.
-            modules("java.naming", "java.security.jgss", "java.xml", "jdk.crypto.ec", "java.instrument")
+            //
+            // ⚠️ `jdk.unsupported` and `jdk.unsupported.desktop` are here for JavaFX, and they were
+            // NOT guessed — `javap -v` on the `module-info.class` inside the shipped
+            // javafx-graphics / javafx-swing jars declares exactly these:
+            //
+            //   javafx.graphics  requires java.desktop, java.xml, jdk.unsupported
+            //   javafx.swing     requires java.datatransfer, java.desktop, jdk.unsupported.desktop
+            //
+            // `java.desktop` and `java.xml` are already accounted for, and `java.datatransfer` comes
+            // free (java.desktop requires it transitively — checked with `java --describe-module`).
+            // The two `jdk.unsupported*` ones do not, and a missing module here is invisible until
+            // the MSI runs on a real Windows machine, where it is a crash rather than a build error.
+            modules(
+                "java.naming", "java.security.jgss", "java.xml", "jdk.crypto.ec", "java.instrument",
+                "jdk.unsupported", "jdk.unsupported.desktop",
+            )
 
             windows {
                 // A stable UUID is what lets an installer UPGRADE an existing install instead of sitting
