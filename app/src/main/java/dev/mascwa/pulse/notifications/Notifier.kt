@@ -123,7 +123,12 @@ class Notifier(private val context: Context) {
     fun notifyBreakingInterrupt(headline: String, query: String) {
         if (!canPost()) return
         val intent = Intent(context, dev.mascwa.pulse.feature.breaking.BreakingNewsActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            // ⚠️ FLAG_ACTIVITY_CLEAR_TASK removed — it was here too, on the fallback path. It wipes the
+            // back stack, so tapping this notification and then pressing Back left you nowhere near
+            // what you had been reading. Same defect the overlay rewrite fixed on the direct-launch
+            // path; fixing only one of the two would have left it reachable by the commoner route,
+            // since this is what runs whenever "display over other apps" is not granted.
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
             putExtra(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.EXTRA_HEADLINE, headline)
             putExtra(dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.EXTRA_QUERY, query)
         }

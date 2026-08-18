@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
@@ -167,7 +168,7 @@ fun RedAlertScreen(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .clip(lcarsBlockShape)
+                        .clip(lcarsBlockShape(sweep = 22.dp, corner = LcarsCorner.TopStart))
                         .background(RED)
                         .clickable { onAcknowledge() }
                         .padding(vertical = 18.dp),
@@ -192,7 +193,7 @@ fun RedAlertScreen(
 private fun Tag(text: String, colour: Color) {
     Box(
         Modifier
-            .clip(lcarsBlockShape)
+            .clip(lcarsBlockShape(sweep = 8.dp, corner = LcarsCorner.TopStart))
             .background(colour)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
