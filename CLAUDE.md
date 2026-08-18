@@ -4266,6 +4266,109 @@ rest of the corpus its content has a shelf life — entry rules are set by the d
 nationality, and change. The note says to check the destination's own site, and the transit
 country's, every trip.
 
+### LIVE TELEVISION — both platforms (this session, PR #448 cont., V1–V5 all pushed)
+
+Owner's request, queued deliberately behind the feed-audit remediation at their own instruction: an
+**actual live video feed system**, free, easy to embed, quality unimportant, able to **pop up for
+breaking news**. Two binding AskUserQuestion decisions: channel list = **curated official default
+plus an opt-in community catalogue**; desktop player = **both** embedded and detached. Standing
+credit directive still overrides ultracode — **zero subagent spend**, as with every arc since.
+
+**Shipped:** `d441166` the shared catalogue · `b74c9e2` the Android player and the audio arbiter ·
+`5ab71f3` the two Android surfaces · `e9bd4d7` the desktop JavaFX player · `9d25725` the opt-in
+catalogue on both.
+
+- **⚠️ A playlist that answers HTTP 200 is not a playlist that plays.** France 24 and NASA both
+  returned 200 on the master and then failed on the variant (400 / 404) — the same "200 that isn't
+  success" class the safety audit had just found in Overpass. So `LiveChannels.Verification` is a
+  first-class field: DW English, DW Spanish and CNA were each walked master → variant → real MPEG-TS
+  segment; Al Jazeera and NHK ship **UNVERIFIED** because they 502 through *this container's proxy*,
+  which says nothing about a phone on a normal network. Removing them would have been a claim the
+  evidence does not support.
+- **The audio arbiter is the real design work, not the player.** `RadioController` builds its
+  ExoPlayer with `handleAudioFocus = true`; a second such player does not deadlock, it wins, and the
+  radio falls silent while its own state flow still reads ON_AIR and its foreground notification
+  still says so. Nothing observes it — the shape `VoiceMachine` exists for. `core:telemetry/MediaFloor`
+  decides, `feature/media/AudioFloor` performs, and **neither controller knows about the other**
+  (star topology; a third claimant is a change in one file). ⚠️ **`released` is owner-checked and
+  that is load-bearing**: claiming for video issues STOP_RADIO, whose teardown reports its own
+  release *after* the floor moved; honouring that late report would blank the floor mid-playback and
+  the next claim would stop nothing. `AudioFloor` re-enters its own monitor on exactly that path,
+  which a Java monitor allows and the owner check makes harmless.
+- **No new Android dependency.** `media3-exoplayer-hls` was already a direct dep and `StreamResolver`
+  already passed `.m3u8` through untouched — the radio has been HLS-capable the whole time and simply
+  never had a video surface. Attached with a bare `AndroidView { SurfaceView }` +
+  `setVideoSurfaceView`, copying `NavScreen.kt`'s MapLibre interop, so no `media3-ui` and no change to
+  R8 exposure. Every media3 call was **confirmed by `javap` against the published 1.5.1 AAR** rather
+  than recalled — `setForceLowestBitrate`, `clearVideoSurfaceView`, `getVideoFormat`, `Format.bitrate`,
+  `Format.NO_VALUE`.
+- **Three deliberate differences from the radio:** no foreground service (video drawing to a surface
+  nobody can see is data spent on nothing, so leaving the screen ends it); `setForceLowestBitrate`
+  rather than the adaptive ladder; and it asks for the speaker before it plays.
+- **Nothing auto-plays, on any host.** So the data question is a line under the picture rather than a
+  silent behaviour switch, and the figure comes from `player.videoFormat?.bitrate` — measured, never
+  invented. `ConnectivityObserver` gained `isUnmetered`; **`LocalIsMetered` is a positive fact**, so a
+  screen with no provider above it (the takeover Activity) stays silent rather than claiming mobile
+  data on home Wi-Fi.
+- **⚠️ The takeover's LIVE tab is checked BEFORE the coverage gates**, and that ordering is the point:
+  live TV does not depend on the aggregation having worked, and the case where it failed at the moment
+  a takeover fired is exactly when watching a channel is worth most. Below the gates it would have
+  shown "Gathering coverage…" with a good stream one tap away. The takeover's hardcoded palette is
+  handled by swapping `LocalNightwire` for the duration — the same lever used for the old green subtree.
+- **⚠️ THE DESKTOP LANDMINE, defused by reading the artifacts.** `nativeDistributions { modules(...) }`
+  is an explicit jlink allowlist and jpackage strips anything unlisted — a miss surfaces only as a
+  crash on real Windows. `javap -v` on the `module-info.class` inside the shipped jars declares:
+  `javafx.graphics requires jdk.unsupported`, `javafx.swing requires jdk.unsupported.desktop` and
+  `java.datatransfer`. The first two were absent and are now listed; the third is **not** added,
+  because `java --describe-module java.desktop` shows it comes transitively and a redundant entry
+  would read as load-bearing. Also confirmed from the jars: the Windows media jar carries all four
+  natives (jfxmedia/gstreamer-lite/glib-lite/fxplugins), and `HLSConnectionHolder` with its
+  variant-playlist parser is really in there. ~7.9 MB of Windows classifier jars; classifier varies by
+  host so the ubuntu runner still resolves.
+- **Desktop shape:** JavaFX via `JFXPanel` (embeds in Swing; sidesteps the "JavaFX runtime components
+  are missing" check that bites with jars on the classpath). It plays in the page and pops out to a
+  window — JavaFX permits several `MediaView`s over one `MediaPlayer`, so popping out *adds a view*
+  rather than moving the stream, which is why there is no "dock back". ⚠️ The `SwingPanel` sits
+  **outside** the `LazyColumn`: a heavyweight AWT component inside a scrolling list clips against the
+  scroll rather than with it. The player is hoisted in `Main.kt` and disposed on close, same rule as
+  the stores.
+- **⚠️ The catalogue endpoint was chosen by measuring, and it changed the design.**
+  `api/channels.json + api/streams.json` is **13.8 MB** (41,078 channels, needs joining);
+  `iptv/categories/news.m3u` is **215 KB**, already only news, and carries name, country and the
+  catalogue's own warnings. Sixty-four times smaller. 621 of its 943 entries survive the filters
+  (https only, HLS only, `[Geo-blocked]` and `[Not 24/7]` believed). Everything lands COMMUNITY +
+  UNVERIFIED; language is left **blank** rather than guessed from country, since a wrong tag would
+  misdirect `forBreaking`. The raw playlist is cached, not the parsed channels (`LiveChannel` is in
+  `core:telemetry`, which has no serialization dep — and that is the better shape anyway).
+  `AppSettings.communityChannels` / `DesktopSettings.communityChannels`, **default OFF**, with the
+  toggle subtitle saying plainly what the list is.
+
+**⚠️ THE LESSON OF THIS ARC, on its third distinct mechanism: a test that passes proves nothing until
+you have watched it fail.** Three separate things here were green for the wrong reason.
+1. A comment credited `trim()` with handling the playlist's CRLF endings. The perturbation removing
+   it found **nothing** — `lineSequence` splits on `\r\n` already. The comment was wrong, not the code.
+2. The CRLF test itself then passed under a perturbation that *did* leave `\r` on every line, because
+   the fixture ended on a URL — **the one line in a file with no carriage return after it**. Fixtures
+   now carry a trailing CRLF and that perturbation fails seven tests.
+3. `cap` was applied while parsing, so "the first 25" meant file order while the KDoc already claimed
+   alphabetical. Caught by running the shipped parser over the real file, not by reading it.
+
+**Reusable technique, and it keeps paying:** export the real feed, compile the *shipped* core plus a
+throwaway `main` with the local kotlinc recipe, and assert the invariants over real data. It agreed
+with an independent Python count at exactly 621 and caught all three of the above.
+
+**⚠️ The resolve-check's documented false positive fired three times** (`live`, `communityChannels`,
+`LiveCatalogRepository`). Each was proved a cascade — not assumed — by a **typed probe** that reads and
+constructs the symbol outside a composable. When a name you know exists is reported, widen the
+argument list or write the probe; do not shrug.
+
+⚠️ **Owner-verify, unavoidably — CI has no screen and this container has no GL context.** On the
+Pixel: that DW and CNA play at all; that starting video visibly stops the radio **and says so**;
+that stopping video leaves the radio free again; the takeover's LIVE tab from the lock screen; and
+whether the data-rate line reads as useful or as clutter. On Windows: that a channel plays, the
+pop-out window on a second monitor, and above all **that the MSI's stripped runtime still has what
+JavaFX needs** — `packageMsi` runs on every push here, but a green build is not a running app.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
