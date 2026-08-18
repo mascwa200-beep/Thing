@@ -2,6 +2,7 @@ package dev.mascwa.pulse.data.places
 
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.RouteReach
+import dev.mascwa.pulse.core.telemetry.RouteSteps
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -47,6 +48,38 @@ class RoutingRepository(private val http: HttpClient) {
         val geometry: OsrmGeometry = OsrmGeometry(),
         val distance: Double = 0.0,   // metres along the road
         val duration: Double = 0.0,   // seconds (driving)
+        /**
+         * The turns, one list per pair of waypoints.
+         *
+         * Empty unless the request asks for `steps=true`, which it did not until now — so the map
+         * had a road-snapped line to draw and no idea what any of it meant.
+         */
+        val legs: List<OsrmLeg> = emptyList(),
+    )
+
+    @Serializable
+    private data class OsrmLeg(val steps: List<OsrmStep> = emptyList())
+
+    @Serializable
+    private data class OsrmStep(
+        val maneuver: OsrmManeuver = OsrmManeuver(),
+        /** The road being joined. Blank on an unnamed road, which is common and not an error. */
+        val name: String = "",
+        /** The road's designation, e.g. "A4" — present on some steps only. */
+        val ref: String = "",
+        /** Length of this step: the ground covered before the *next* manoeuvre. */
+        val distance: Double = 0.0,
+    )
+
+    @Serializable
+    private data class OsrmManeuver(
+        val type: String = "",
+        val modifier: String = "",
+        /** `[lon, lat]`, GeoJSON order. */
+        val location: List<Double> = emptyList(),
+        val bearing_after: Double = 0.0,
+        /** Which exit, on a roundabout or rotary. Absent everywhere else. */
+        val exit: Int? = null,
     )
 
     @Serializable
@@ -64,6 +97,8 @@ class RoutingRepository(private val http: HttpClient) {
          * and is never interesting; the destination snap is the whole question.
          */
         val destinationSnapMeters: Double? = null,
+        /** The turns along the way, in order. Empty when the server sent none. */
+        val steps: List<RouteSteps.Step> = emptyList(),
     ) {
         /** Whether this route goes where it was asked to, and what to say if not. */
         val reach: RouteReach.Reach
@@ -117,7 +152,7 @@ class RoutingRepository(private val http: HttpClient) {
         toLon: Double,
     ): RoadRoute? {
         val url = "https://router.project-osrm.org/route/v1/driving/" +
-            "$fromLon,$fromLat;$toLon,$toLat?overview=full&geometries=geojson"
+            "$fromLon,$fromLat;$toLon,$toLat?overview=full&geometries=geojson&steps=true"
         val resp = http.getJson(url, OsrmResponse.serializer())
         val osrm = resp.routes.firstOrNull() ?: return null
         // GeoJSON coordinates are [lon, lat]; emit (lat, lon). Need at least two points to draw a line.
@@ -125,9 +160,25 @@ class RoutingRepository(private val http: HttpClient) {
         // The destination is the LAST waypoint. Null when the server omitted them, which RouteReach
         // reads as "no claim either way" rather than as an all-clear.
         val snap = resp.waypoints.lastOrNull()?.distance?.takeIf { resp.waypoints.size >= 2 }
+        // One leg per pair of waypoints. Only one is ever requested, but flattening is what the
+        // shape means rather than what today's request happens to produce.
+        val steps = osrm.legs.flatMap { leg -> leg.steps }.map { it.toStep() }
         return path.takeIf { it.size >= 2 }
-            ?.let { RoadRoute(it, osrm.distance, osrm.duration, destinationSnapMeters = snap) }
+            ?.let { RoadRoute(it, osrm.distance, osrm.duration, snap, steps) }
     }
+
+    private fun OsrmStep.toStep(): RouteSteps.Step = RouteSteps.Step(
+        type = maneuver.type,
+        modifier = maneuver.modifier,
+        name = name,
+        ref = ref,
+        // GeoJSON order again: [lon, lat].
+        latitude = maneuver.location.getOrNull(1) ?: 0.0,
+        longitude = maneuver.location.getOrNull(0) ?: 0.0,
+        bearingAfterDeg = maneuver.bearing_after,
+        distanceMeters = distance,
+        exit = maneuver.exit,
+    )
 
     /** Locale.US: these are coordinates, and a comma decimal would split one place into two keys. */
     private fun k(v: Double): String = String.format(Locale.US, "%.4f", v)

@@ -1620,6 +1620,25 @@ private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePa
                     fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.sky,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+                // The actual next turn, once the router has told us what the road does. It leads
+                // rather than follows: "Turn right onto The Mall in 170 m" is the instruction, and
+                // the bearing above it is the compass reading that stands in when there is none.
+                readout.maneuverText?.let { text ->
+                    Text(
+                        "▸ ${text.uppercase()}",
+                        fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                        color = c.ink, maxLines = 2,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    readout.thenText?.let { then ->
+                        Text(
+                            "then $then",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 1.dp),
+                        )
+                    }
+                }
                 // Where the road actually ends. Amber rather than the readout's cyan, because this
                 // qualifies the numbers directly above it rather than adding to them.
                 readout.reachNote?.let {

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.core.telemetry.RouteReach
 import dev.mascwa.pulse.core.telemetry.RouteProgress
 import dev.mascwa.pulse.core.telemetry.RouteProfile
+import dev.mascwa.pulse.core.telemetry.RouteSteps
 import dev.mascwa.pulse.core.telemetry.TrackLog
 import dev.mascwa.pulse.core.util.Geo
 import dev.mascwa.pulse.data.objectives.ObjectiveKind
@@ -83,6 +84,16 @@ data class NavReadout(
      * it carry no such warning.
      */
     val reachNote: String? = null,
+    /**
+     * The next turn, in words: "Turn right onto The Mall in 170 m".
+     *
+     * ⚠️ Null whenever the road route is not in hand, and deliberately so. Without one the only
+     * direction available is [bearingDeg], which is a straight line to the objective — a real
+     * reading, and not something to dress up as an instruction to turn.
+     */
+    val maneuverText: String? = null,
+    /** The manoeuvre after that, for a "then …" line. Null at the end of the route. */
+    val thenText: String? = null,
 )
 
 class NavViewModel(
@@ -229,6 +240,13 @@ class NavViewModel(
                 usable != null -> formatEta(usable.durationSeconds)
                 else -> null
             }
+            // The next turn, from the router's own step list. Distance covered along the route is
+            // its length minus what is left — RouteProgress projects the position onto the polyline,
+            // so this stays right after a wrong turn instead of counting from where you set off.
+            val guidance = usable?.steps?.let { steps ->
+                val travelled = remaining?.let { (usable.distanceMeters - it).coerceAtLeast(0.0) } ?: 0.0
+                RouteSteps.upcoming(steps, travelled)
+            }
             NavReadout(
                 label = wp.label,
                 distanceText = Geo.formatDistance(meters),
@@ -236,6 +254,8 @@ class NavViewModel(
                 viaRoad = usable != null,
                 bearingDeg = Geo.bearingDegrees(loc.latitude, loc.longitude, wp.latitude, wp.longitude),
                 reachNote = info?.let { RouteReach.describe(it.reach, it.destinationSnapMeters) },
+                maneuverText = guidance?.full,
+                thenText = guidance?.then?.let { RouteSteps.phrase(it) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
