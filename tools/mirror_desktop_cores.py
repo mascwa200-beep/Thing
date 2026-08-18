@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CORE = "core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry"
 CORE_TEST = "core/telemetry/src/test/java/dev/mascwa/pulse/core/telemetry"
 SURVIVAL = "app/src/main/java/dev/mascwa/pulse/data/survival"
+LIVE = "app/src/main/java/dev/mascwa/pulse/data/live"
 DESKTOP = "desktop/src/main/kotlin/dev/mascwa/pulse/desktop"
 DESKTOP_TEST = "desktop/src/test/kotlin/dev/mascwa/pulse/desktop"
 
@@ -71,6 +72,7 @@ MIRRORS: dict[str, str] = {
     # Live TV news. Both platforms play the same channels and must agree about which are
     # trustworthy, so the catalogue and its judgements are shared rather than duplicated.
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
+    f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
     f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
     f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
@@ -78,10 +80,15 @@ MIRRORS: dict[str, str] = {
     # The library's own models and taxonomy — app-side content, but pure data.
     f"{SURVIVAL}/GuideModels.kt": f"{DESKTOP}/library/GuideModels.kt",
     f"{SURVIVAL}/GuideTaxonomy.kt": f"{DESKTOP}/library/GuideTaxonomy.kt",
+    # The community TV catalogue's fetch-and-cache. A strict mirror rather than a hand-written twin
+    # because both platforms' HttpClient and DiskCache expose the same methods with the same shapes —
+    # so if either ever diverges, this fails to compile rather than quietly drifting.
+    f"{LIVE}/LiveCatalogRepository.kt": f"{DESKTOP}/live/LiveCatalogRepository.kt",
     # The tests come across too, so the same assertions gate BOTH platforms' CI. Mirroring logic
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
+    f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
     f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",
     f"{CORE_TEST}/StudyQuestionsTest.kt": f"{DESKTOP_TEST}/telemetry/StudyQuestionsTest.kt",
@@ -107,6 +114,9 @@ MIRRORS: dict[str, str] = {
 PACKAGES = {
     "dev.mascwa.pulse.core.telemetry": "dev.mascwa.pulse.desktop.telemetry",
     "dev.mascwa.pulse.data.survival": "dev.mascwa.pulse.desktop.library",
+    "dev.mascwa.pulse.data.live": "dev.mascwa.pulse.desktop.live",
+    "dev.mascwa.pulse.core.cache": "dev.mascwa.pulse.desktop.cache",
+    "dev.mascwa.pulse.core.network": "dev.mascwa.pulse.desktop.network",
 }
 
 BANNER = "// MIRROR OF {src} — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it"

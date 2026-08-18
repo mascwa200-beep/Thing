@@ -14,6 +14,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.graphics.Color
@@ -29,6 +32,7 @@ import dev.mascwa.pulse.desktop.theme.LcarsButton
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsGhostButton
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
+import dev.mascwa.pulse.desktop.theme.LcarsTextField
 import dev.mascwa.pulse.desktop.theme.Pulse
 
 /**
@@ -44,8 +48,13 @@ import dev.mascwa.pulse.desktop.theme.Pulse
 @Composable
 fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
+    val community by vm.community.collectAsState()
     val c = Pulse.colors
     val channels = LiveChannels.offer()
+    var filter by remember { mutableStateOf("") }
+
+    // Arriving asks for the catalogue. A no-op unless the switch is on, and a no-op once it is held.
+    LaunchedEffect(Unit) { vm.loadCommunity() }
 
     // Leaving the page stops the stream, unless it has been popped out — see LiveViewModel.onLeave.
     DisposableEffect(Unit) { onDispose { vm.onLeave() } }
@@ -116,6 +125,39 @@ fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
                     onWatch = { vm.watch(channels[i]) },
                     onStop = { vm.stop() },
                 )
+            }
+
+            // The community catalogue, if it has been asked for. Hundreds of entries, so it gets a
+            // filter rather than being poured into the same list as the five curated ones.
+            if (community.isNotEmpty()) {
+                item {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        LcarsHeaderBar("Community", trailing = "${community.size} · UNVERIFIED")
+                        LcarsTextField(
+                            label = "Filter",
+                            value = filter,
+                            onValueChange = { filter = it },
+                            placeholder = "Filter by name or country",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                val shown = community.filter { ch ->
+                    val q = filter.trim().lowercase()
+                    q.isBlank() || ch.name.lowercase().contains(q) || ch.region.lowercase().contains(q)
+                }
+                items(shown.size) { i ->
+                    ChannelCard(
+                        channel = shown[i],
+                        playing = shown[i].id == state.channel?.id &&
+                            state.status != LivePlayer.Status.IDLE,
+                        onWatch = { vm.watch(shown[i]) },
+                        onStop = { vm.stop() },
+                    )
+                }
             }
         }
     }

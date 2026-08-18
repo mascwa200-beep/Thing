@@ -53,6 +53,16 @@ data class DesktopSettings(
     val libraryCategory: String = "",
 
     /**
+     * Offer live TV channels from the volunteer-maintained public catalogue as well as the handful of
+     * broadcasters' own feeds the app ships with.
+     *
+     * ⚠️ Default OFF, and a switch rather than a silent merge on purpose: that catalogue is of mixed
+     * origin and includes unauthorised restreams of channels that are not free to watch. Whose call
+     * that is, is the user's.
+     */
+    val communityChannels: Boolean = false,
+
+    /**
      * A GitHub token with read access, so the app can see its own releases.
      *
      * ⚠️ The repository is private, so there is no anonymous way to read the installer — the phone asks

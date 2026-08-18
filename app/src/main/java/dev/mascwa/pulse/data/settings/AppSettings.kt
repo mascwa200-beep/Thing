@@ -471,6 +471,12 @@ data class AppSettings(
     /** Highest build number we've already auto-prompted to install (dedupe so we don't re-launch the
      *  installer on every open after the user dismisses it). */
     val lastAutoUpdateCode: Int = 0,
+    /** Offer live TV channels from the volunteer-maintained iptv-org catalogue alongside the handful
+     *  of broadcasters' own feeds the app ships with. **Default OFF, and it is a switch rather than a
+     *  silent merge on purpose**: that catalogue is of mixed origin and includes unauthorised
+     *  restreams of channels that are not free to watch, which is the owner's call to make and not
+     *  ours. Costs a ~215 KB fetch, cached for a week. */
+    val communityChannels: Boolean = false,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,

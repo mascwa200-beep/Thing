@@ -17,6 +17,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import dev.mascwa.pulse.PulseApplication
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +72,19 @@ fun LiveVideoPlayer(
     val dataRate by LiveVideoController.dataRate.collectAsStateWithLifecycle()
     val displaced by AudioFloor.note.collectAsStateWithLifecycle()
     val metered = LocalIsMetered.current
+
+    // The opt-in community catalogue, loaded here rather than by each host — this panel is
+    // deliberately self-contained so the News tab and the takeover cannot drift apart, and that
+    // applies to what is on offer as much as to how it looks.
+    var community by remember { mutableStateOf<List<LiveChannel>>(emptyList()) }
+    var filter by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val container = (context.applicationContext as? PulseApplication)?.container ?: return@LaunchedEffect
+        // Read the switch before touching the network. Off means no fetch at all, not a fetch whose
+        // result is then discarded.
+        if (!container.settingsRepository.current().communityChannels) return@LaunchedEffect
+        community = runCatching { container.liveCatalogRepository.channels() }.getOrDefault(emptyList())
+    }
 
     if (channels.isEmpty()) {
         Text(
@@ -116,6 +138,91 @@ fun LiveVideoPlayer(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.amber,
                 modifier = Modifier.clickable { AudioFloor.clearNote() },
             )
+        }
+
+        // Hundreds of community channels are a search box, not a rail. Absent entirely unless the
+        // switch is on, which is why there is no empty state for it.
+        if (community.isNotEmpty()) {
+            CommunityList(
+                channels = community,
+                filter = filter,
+                onFilter = { filter = it },
+                playingId = state.channel?.id,
+                onPick = { LiveVideoController.toggle(context, it) },
+            )
+        }
+    }
+}
+
+/**
+ * The community catalogue: a filter and as much of the list as fits.
+ *
+ * ⚠️ Height-bounded rather than free-growing. This panel is placed inside hosts that do not scroll
+ * (the News tab renders it alone; the takeover puts it in a Box), so an unbounded list of hundreds
+ * would run off the bottom with no way to reach it.
+ */
+@Composable
+private fun CommunityList(
+    channels: List<LiveChannel>,
+    filter: String,
+    onFilter: (String) -> Unit,
+    playingId: String?,
+    onPick: (LiveChannel) -> Unit,
+) {
+    val c = Pulse.colors
+    val shown = remember(channels, filter) {
+        val q = filter.trim().lowercase()
+        if (q.isBlank()) channels
+        else channels.filter { it.name.lowercase().contains(q) || it.region.lowercase().contains(q) }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "COMMUNITY CHANNELS · ${channels.size} · UNVERIFIED",
+            fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.sp, color = c.muted,
+        )
+        BasicTextField(
+            value = filter,
+            onValueChange = onFilter,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink,
+            ),
+            cursorBrush = SolidColor(c.accent),
+            decorationBox = { inner ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(c.raise)
+                        .border(1.dp, c.lineSoft)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                ) {
+                    if (filter.isEmpty()) {
+                        Text(
+                            "Filter by name or country",
+                            fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
+        LazyColumn(
+            Modifier.fillMaxWidth().heightIn(max = 220.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            items(shown, key = { it.id }) { channel ->
+                val on = channel.id == playingId
+                Text(
+                    "${channel.name}  ·  ${channel.region}",
+                    fontFamily = JetBrainsMono, fontSize = 11.sp,
+                    color = if (on) c.accent else c.ink2,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPick(channel) }
+                        .padding(vertical = 6.dp),
+                )
+            }
         }
     }
 }

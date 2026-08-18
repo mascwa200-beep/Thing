@@ -39,6 +39,7 @@ import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
 import dev.mascwa.pulse.desktop.feature.study.StudyScreen
 import dev.mascwa.pulse.desktop.feature.study.StudyViewModel
 import dev.mascwa.pulse.desktop.library.LibraryRepository
+import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
 import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.library.PackRepository
 import dev.mascwa.pulse.desktop.library.PackStore
@@ -119,7 +120,17 @@ fun PulseDesktopApp(
             PacksViewModel(scope, PackRepository(HttpClient.create(json), settings, packStore))
         }
         val studyVm = remember { StudyViewModel(scope, studyStore) }
-        val liveVm = remember { LiveViewModel(livePlayer) }
+        val liveVm = remember {
+            LiveViewModel(
+                scope = scope,
+                player = livePlayer,
+                settings = settings,
+                catalogue = LiveCatalogRepository(
+                    HttpClient.create(json),
+                    DiskCache(json, subdirectory = "live"),
+                ),
+            )
+        }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
         val searchVm = remember { SearchViewModel(scope, library, studyStore) }
         val aboutVm = remember {

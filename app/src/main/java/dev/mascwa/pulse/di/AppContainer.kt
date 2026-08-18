@@ -154,6 +154,10 @@ class AppContainer(private val appContext: Context) {
     val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
         dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
     }
+    /** The opt-in community TV catalogue. Nothing fetches through this unless the switch is on. */
+    val liveCatalogRepository: dev.mascwa.pulse.data.live.LiveCatalogRepository by lazy {
+        dev.mascwa.pulse.data.live.LiveCatalogRepository(http, diskCache)
+    }
     val marketsRepository: MarketsRepository by lazy {
         MarketsRepository(http, diskCache, settingsRepository)
     }

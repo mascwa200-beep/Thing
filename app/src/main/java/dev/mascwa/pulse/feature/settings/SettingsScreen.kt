@@ -704,6 +704,22 @@ fun SettingsScreen(
                 }
             }
 
+            if (vis(SettingsCategory.SECURITY, "live tv television channels community catalogue iptv news video stream")) item {
+                PrefSection("Live television") {
+                    PrefSwitch(
+                        "Community channel catalogue",
+                        "Adds hundreds of news channels from a volunteer-maintained public list, on top " +
+                            "of the handful of broadcasters' own feeds the app ships with. That list is " +
+                            "of mixed origin and includes unauthorised restreams of channels that are " +
+                            "not free to watch — which is why this is a switch and not something the app " +
+                            "decides for you. None of it is verified to work. Costs a small download, " +
+                            "kept for a week.",
+                        checked = s.communityChannels,
+                        onChange = { v -> vm.update { it.copy(communityChannels = v) } },
+                    )
+                }
+            }
+
             if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer")) item {
                 PrefSection("Ambient sensing (Sensorium)") {
                     PrefSwitch(
