@@ -13,8 +13,10 @@ import dev.mascwa.pulse.data.markets.Quote
 import dev.mascwa.pulse.data.news.Article
 import dev.mascwa.pulse.data.news.NewsCategory
 import dev.mascwa.pulse.data.news.NewsRepository
+import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.SkyDigest
+import dev.mascwa.pulse.data.orbital.TleRepository
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.selfedit.ActionType
@@ -83,6 +85,7 @@ class HomeViewModel(
     private val location: LocationProvider,
     private val settings: SettingsRepository,
     private val orbital: OrbitalRepository,
+    private val tle: TleRepository,
     private val space: SpaceWeatherRepository,
     private val radar: RadarRepository,
     private val selfEdit: SelfEditStore,
@@ -191,9 +194,28 @@ class HomeViewModel(
         }
         val orb = runCatching { orbital.fetch(lat, lon, force).data }.getOrNull() ?: return
         val sw = runCatching { space.fetch(false, lat, lon).data }.getOrNull()
-        val lines = SkyDigest.lines(orb, sw, lat, lon)
+        val lines = SkyDigest.lines(orb, sw, lat, lon, sighting = issSighting(lat, lon))
         _state.update { it.copy(skyLines = lines) }
     }
+
+    /**
+     * Where the ISS is in this sky, worked out on the device.
+     *
+     * The element set is cached for twelve hours and shared with the observatory screen, so this is
+     * one request every half day at most and usually none at all — and the answer it gives is for
+     * *now*, not for whenever a position was last fetched. Null when there are no elements to
+     * propagate, which leaves [SkyDigest] to fall back to the fetched position if it is fresh.
+     */
+    private suspend fun issSighting(lat: Double, lon: Double): SatellitePasses.Sighting? =
+        runCatching {
+            val elements = tle.elements(TleRepository.Group.STATIONS).data
+                .firstOrNull { it.noradId == ISS_NORAD_ID } ?: return null
+            SatellitePasses.sighting(
+                elements,
+                SatellitePasses.Site(lat, lon),
+                System.currentTimeMillis(),
+            )
+        }.getOrNull()
 
     /** Live aircraft near the user — only when we have a real device-location origin (otherwise plotting
      *  around a default point would be misleading, so the card stays hidden). */
@@ -230,5 +252,10 @@ class HomeViewModel(
         val flow = MutableStateFlow<Async<WeatherData>>(Async(loading = true))
         viewModelScope.launch { flow.collect { a -> _state.update { it.copy(weather = a) } } }
         flow.load(force) { weather.fetch(lat, lon, name, it) }
+    }
+
+    private companion object {
+        /** The station's catalogue number, and the only object this digest speaks about. */
+        const val ISS_NORAD_ID = 25544
     }
 }

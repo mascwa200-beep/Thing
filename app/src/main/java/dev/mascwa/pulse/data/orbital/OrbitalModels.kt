@@ -9,6 +9,18 @@ data class IssPosition(
     val longitude: Double,
     val altitudeKm: Double,
     val velocityKmh: Double,
+    /**
+     * When the service says this fix was taken — not when we asked for it.
+     *
+     * ⚠️ It was on every response and read by nothing, which mattered because the ground point
+     * moves about 416 km a minute. Without it a position pulled from a five-minute cache is
+     * indistinguishable from one taken a second ago, and a reader that draws a conclusion from
+     * either is drawing it from something up to two thousand kilometres out of date.
+     *
+     * Zero means the response did not carry one — defaulted so a cache entry written before this
+     * field existed still decodes.
+     */
+    val timestampMs: Long = 0L,
 )
 
 @Serializable
