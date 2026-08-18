@@ -128,7 +128,7 @@ fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
             }
 
             // The community catalogue, if it has been asked for. Hundreds of entries, so it gets a
-            // filter rather than being poured into the same list as the five curated ones.
+            // filter rather than being poured into the same list as the curated broadcasters.
             if (community.isNotEmpty()) {
                 item {
                     Column(

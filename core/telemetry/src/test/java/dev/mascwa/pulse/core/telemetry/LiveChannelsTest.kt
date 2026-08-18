@@ -1,5 +1,6 @@
 package dev.mascwa.pulse.core.telemetry
 
+import dev.mascwa.pulse.core.telemetry.LiveChannels.Funding
 import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import dev.mascwa.pulse.core.telemetry.LiveChannels.Provenance
 import dev.mascwa.pulse.core.telemetry.LiveChannels.Verification
@@ -19,7 +20,8 @@ class LiveChannelsTest {
         language: String = "en",
         provenance: Provenance = Provenance.OFFICIAL,
         verification: Verification = Verification.SEGMENT,
-    ) = LiveChannel(id, name, url, language, "Nowhere", provenance, verification)
+        funding: Funding = Funding.COMMERCIAL,
+    ) = LiveChannel(id, name, url, language, "Nowhere", provenance, verification, funding)
 
     @Test fun everyShippedChannelIsAnHlsPlaylistFromItsBroadcaster() {
         assertTrue("the list must not be empty", LiveChannels.CURATED.isNotEmpty())
@@ -32,10 +34,65 @@ class LiveChannelsTest {
         assertEquals("ids must be unique", LiveChannels.CURATED.size, LiveChannels.CURATED.map { it.id }.toSet().size)
     }
 
-    @Test fun theThreeChannelsWalkedToASegmentAreMarkedAsSuch() {
-        // These are the ones a real video segment was retrieved from; the rest are honest unknowns.
-        val confirmed = LiveChannels.CURATED.filter { it.verification == Verification.SEGMENT }.map { it.id }
-        assertEquals(listOf("dw-en", "dw-es", "cna"), confirmed)
+    @Test fun onlyTheNamedExceptionsShipWithoutHavingBeenWalkedToASegment() {
+        // ⚠️ This pins the EXCEPTIONS, not the rule. The earlier version listed the confirmed
+        // channels instead, which meant every single addition to the catalogue broke it for no
+        // reason — and told you nothing, because "we added a channel and it works" is the ordinary
+        // case. What is worth catching is the opposite: an entry shipped WITHOUT the evidence.
+        //
+        // Both below failed here in a way attributable to this machine's outbound proxy — a TLS
+        // certificate that does not name the host it was served from, and a connection reset. Adding
+        // a third means writing down why here, which is the point.
+        val unverified = LiveChannels.CURATED
+            .filter { it.verification != Verification.SEGMENT }
+            .map { it.id }
+            .toSet()
+        assertEquals(setOf("presstv", "news-central"), unverified)
+        assertTrue(
+            "the catalogue is meant to be overwhelmingly verified, not overwhelmingly hopeful",
+            unverified.size * 10 < LiveChannels.CURATED.size,
+        )
+    }
+
+    @Test fun theCatalogueIsActuallyWorldwide() {
+        // "Worldwide" is the whole point of the list, so it is worth CI holding rather than a claim
+        // in a comment that nobody rechecks when entries are pruned.
+        val regions = LiveChannels.CURATED.map { it.region }.toSet()
+        assertTrue("expected many regions, got $regions", regions.size >= 15)
+        for (r in listOf("United Kingdom", "Germany", "Qatar", "Japan", "India", "South Africa",
+                         "Australia", "Canada", "United States", "China")) {
+            assertTrue("$r must be represented", r in regions)
+        }
+        assertTrue(
+            "the list is English-language news; a stray untagged entry is a bug",
+            LiveChannels.CURATED.count { it.language == "en" } * 2 > LiveChannels.CURATED.size,
+        )
+        for (c in LiveChannels.CURATED) {
+            assertTrue("${c.id} must state a language", c.language.isNotBlank())
+            assertTrue("${c.id} must state a region", c.region.isNotBlank())
+        }
+    }
+
+    @Test fun noShippedChannelComesFromADistributorPlatform() {
+        // ⚠️ The owner's binding rule for this catalogue: a broadcaster's own endpoint, never a
+        // third party's re-packaging of it. Encoded here because it is invisible on inspection —
+        // every one of these is a perfectly good stream, so nothing else would catch a regression.
+        //
+        // The PATH matters as much as the host, and that is not a hypothetical: Reuters TV is served
+        // from an ordinary-looking CloudFront distribution whose path reads
+        // "amg00453-reuters-samsunggb", and both published NBC News NOW addresses carry an
+        // "ads.xumo_channelId" parameter. Host-only screening admitted both.
+        val markers = listOf(
+            "amagi.tv", "samsung", "wurl", "tubi.video", "pluto.tv", "xumo", "rakuten",
+            "githubusercontent.com", "github.io", "dai.google.com", "odysee", "distro.tv",
+            "jmp2.uk", "uplynk.com", "zeasn",
+        )
+        for (c in LiveChannels.CURATED) {
+            val url = c.url.lowercase()
+            for (m in markers) {
+                assertFalse("${c.id} is a $m re-packaging, not the broadcaster's own feed", m in url)
+            }
+        }
     }
 
     @Test fun aKnownBrokenChannelIsNeverOfferedHowevrPermissiveTheSettings() {
@@ -88,6 +145,41 @@ class LiveChannelsTest {
             LiveChannels.describe(channel("c", provenance = Provenance.COMMUNITY))
                 .contains("community"),
         )
+    }
+
+    @Test fun whoPaysForTheNewsroomIsStatedWhenItIsWorthStating() {
+        assertEquals(
+            "Nowhere · state-funded · official feed",
+            LiveChannels.describe(channel("s", funding = Funding.STATE)),
+        )
+        assertEquals(
+            "Nowhere · public broadcaster · official feed",
+            LiveChannels.describe(channel("p", funding = Funding.PUBLIC)),
+        )
+        // ⚠️ Commercial says nothing, deliberately: it is the unremarkable case, and a badge on
+        // every row is a badge nobody reads. This also keeps the caption unchanged for the entries
+        // that predate the field.
+        assertEquals("Nowhere · official feed", LiveChannels.describe(channel("c")))
+    }
+
+    @Test fun everyStateFundedChannelInTheCatalogueSaysSo() {
+        val stated = LiveChannels.CURATED
+            .filter { LiveChannels.describe(it).contains("state-funded") }
+            .map { it.id }
+            .toSet()
+        val declared = LiveChannels.CURATED
+            .filter { it.funding == Funding.STATE }
+            .map { it.id }
+            .toSet()
+        assertEquals(declared, stated)
+        // The specific ones, so removing the label from a government broadcaster is a build failure
+        // rather than an edit nobody notices.
+        assertTrue("cgtn" in stated)
+        assertTrue("rt-news" in stated)
+        assertTrue("presstv" in stated)
+        assertTrue("aljazeera-en" in stated)
+        assertFalse("a commercial broadcaster must not be labelled", "gb-news" in stated)
+        assertFalse("a chartered public broadcaster is not the same thing", "bbc-news" in stated)
     }
 
     @Test fun aBreakingPopUpPrefersYourLanguageThenSomethingKnownToWork() {
