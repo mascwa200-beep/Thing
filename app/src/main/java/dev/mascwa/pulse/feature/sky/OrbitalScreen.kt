@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Geodesy
+import dev.mascwa.pulse.core.telemetry.LaunchWindow
 import dev.mascwa.pulse.core.telemetry.SatellitePasses
 import dev.mascwa.pulse.data.orbital.NeoObject
 import dev.mascwa.pulse.data.orbital.OrbitalData
@@ -587,6 +588,19 @@ private fun LaunchCard(launch: UpcomingLaunch, c: NightwirePalette) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            // How much room the flight actually has. This is NOT the same question as how firm the
+            // T-0 is, and the line above cannot answer it: a window of four hours regularly sits
+            // behind a T-0 quoted to the second. See LaunchWindow.
+            LaunchWindow.widthMs(launch.windowStartMs, launch.windowEndMs)
+                ?.takeIf { LaunchWindow.isMeaningful(launch.windowStartMs, launch.windowEndMs) }
+                ?.let { width ->
+                    Text(
+                        "Window ${clockOrDash(launch.windowStartMs)} – ${clockOrDash(launch.windowEndMs)}" +
+                            " · ${LaunchWindow.describeWidth(width)} to fly",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
         }
     }
 }
