@@ -172,6 +172,32 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.Pulse" />
 
+        <!-- OFFICIAL EMERGENCY ALERT — a full-screen condition-red takeover with a full-volume alarm on
+             the alarm stream, raised from a government CAP feed (never from a news headline). Back is
+             deliberately disabled; the acknowledge button is the only way out. Shows over the lock screen
+             and keeps the screen on. -->
+        <activity
+            android:name=".feature.redalert.RedAlertActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Pulse" />
+
+        <!-- The watch that makes the alert above arrive in time: a dedicated always-on poll of the same
+             CAP feed that drives Wireless Emergency Alerts, roughly every minute. It cannot intercept or
+             preempt WEA itself (that reaches the modem via CellBroadcast and no ordinary app can see it) —
+             it is an independent second path to the same source. -->
+        <service
+            android:name=".notifications.EmergencyWatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="official_emergency_alert_watch" />
+        </service>
+
         <!-- Re-arm the periodic refresh worker after a reboot. -->
         <receiver
             android:name=".notifications.BootReceiver"

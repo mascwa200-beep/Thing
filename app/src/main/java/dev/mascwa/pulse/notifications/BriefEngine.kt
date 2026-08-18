@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.mascwa.pulse.core.telemetry.BriefSignals
+import dev.mascwa.pulse.core.telemetry.EmergencyAlert
 import dev.mascwa.pulse.core.telemetry.EmergencyNews
 import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.OracleMover
@@ -151,6 +152,29 @@ object BriefEngine {
 
         val advisory = advisory(container, settings)
 
+        // --- A live official emergency alert → the board's ALERT row, in condition RED. ---
+        //
+        // ⚠️ Gathered on every publish, not only when one is first raised. EmergencyWatchService
+        // posts a one-line urgent board the moment it sees one, but that post is explicitly replaced
+        // by "the next routine refresh with the full picture" — so without this the red alert would
+        // vanish from the tray at the next tick while the tornado was still on the ground.
+        var officialAlert: String? = null
+        var officialAlertKey: String? = null
+        if (settings.notifications.emergencyTakeover) {
+            runCatching {
+                val loc = container.locationProvider.current()
+                if (loc != null) {
+                    val live = container.emergencyAlertRepository.active(loc.latitude, loc.longitude)
+                    val worst = live.filter { EmergencyAlert.warrantsTakeover(it, now) }
+                        .maxByOrNull { it.effectiveMs }
+                    if (worst != null) {
+                        officialAlert = EmergencyAlert.summary(worst)
+                        officialAlertKey = worst.id
+                    }
+                }
+            }
+        }
+
         // ⚠️ Read BEFORE composing, not after: the composer needs to know which stories this board
         // has already printed, and that is the whole fix for "the notification keeps saying the same
         // thing". The later read-modify-write still re-reads the newest blob before touching it,
@@ -167,6 +191,8 @@ object BriefEngine {
                 emergencyHeadline = emergencyHeadline,
                 emergencyMajor = emergencyMajor,
                 emergencySevere = emergencySevere,
+                officialAlert = officialAlert,
+                officialAlertKey = officialAlertKey,
                 movers = movers,
                 moveThresholdPct = prefs.marketMovePercent,
                 tempNow = tempNow,

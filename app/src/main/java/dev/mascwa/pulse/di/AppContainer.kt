@@ -230,6 +230,13 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.safety.SafetyRepository(http, diskCache)
     }
     /**
+     * Live official alerts for the emergency watch — uncached by design, unlike [safetyRepository].
+     * A warning served from a ten-minute cache is a warning that can be ten minutes late.
+     */
+    val emergencyAlertRepository: dev.mascwa.pulse.data.safety.EmergencyAlertRepository by lazy {
+        dev.mascwa.pulse.data.safety.EmergencyAlertRepository(http)
+    }
+    /**
      * The one place that asks the bundled library whether it has anything to say about a question.
      *
      * Shared by the voice service and the chat console: each having its own copy of "which guide,

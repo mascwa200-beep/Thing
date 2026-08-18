@@ -277,6 +277,18 @@ data class NotificationPrefs(
     /** Whether a NEW urgent item (due reminder, major emergency, security/safety notice) may re-post the
      *  board with sound and vibration. Off = the board still updates, just always silently. */
     val urgentAlertsEnabled: Boolean = true,
+    /**
+     * The official-emergency takeover: a full-screen condition-red screen and a full-volume alarm
+     * when a government feed publishes a life-threatening alert covering your location.
+     *
+     * ⚠️ Default ON, and deliberately so — an emergency warning that ships switched off protects
+     * nobody. The alarm plays on the alarm stream regardless of silent or Do Not Disturb, which is
+     * the owner's explicit instruction and the whole point of the feature; this switch turns the
+     * feature off entirely, and there is no per-alert mute.
+     *
+     * ⚠️ Coverage is the feed's, not ours: `api.weather.gov` answers only inside the United States.
+     */
+    val emergencyTakeover: Boolean = true,
 )
 
 /**

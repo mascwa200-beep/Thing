@@ -35,4 +35,12 @@ data class NotifyState(
      * Owned by BriefEngine, bounded by `StoryLedger.MAX`.
      */
     val seenStories: List<String> = emptyList(),
+    /**
+     * Official alert ids already raised as a full-screen red alert.
+     *
+     * An alert stays active for its whole life, so without this the one-minute watch would re-sound
+     * the alarm for the same tornado every minute — which is how a person ends up putting the phone
+     * in a drawer during an emergency. Owned by EmergencyWatchService.
+     */
+    val raisedAlertIds: List<String> = emptyList(),
 )

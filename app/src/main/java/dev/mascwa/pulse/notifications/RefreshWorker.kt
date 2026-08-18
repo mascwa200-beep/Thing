@@ -40,6 +40,14 @@ class RefreshWorker(
             }
         }
 
+        // ⚠️ The emergency watch self-heals here too, and like Sensorium it is ABOVE the notification
+        // gates — deliberately. Whether a life-safety service is running is not a notification
+        // preference, and it must survive both the master switch being off and quiet hours: quiet
+        // hours mean "do not tell me about the news", never "do not tell me the building is on fire".
+        if (settings.notifications.emergencyTakeover) {
+            runCatching { EmergencyWatchService.start(applicationContext) }
+        }
+
         val prefs = settings.notifications
         if (!prefs.masterEnabled) return Result.success()
 

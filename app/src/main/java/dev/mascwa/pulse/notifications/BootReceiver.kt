@@ -52,6 +52,13 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings.remote.enabled) {
                     runCatching { dev.mascwa.pulse.remote.RemoteLinkService.start(context) }
                 }
+                // ⚠️ The emergency watch is revived unconditionally on its own setting, and that
+                // setting defaults ON. Every other service above waits for the user to have opted
+                // in; this one is the exception because the failure mode is a tornado warning that
+                // never arrives after a reboot the owner has long forgotten about.
+                if (settings.notifications.emergencyTakeover) {
+                    runCatching { EmergencyWatchService.start(context) }
+                }
             } finally {
                 pending.finish()
             }

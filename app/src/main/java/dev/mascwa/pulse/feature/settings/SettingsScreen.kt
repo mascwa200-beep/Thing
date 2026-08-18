@@ -607,13 +607,32 @@ fun SettingsScreen(
                         checked = s.notifications.urgentAlertsEnabled, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(urgentAlertsEnabled = v)) } })
                     PrefSwitch(
-                        "Breaking news takeover (full screen)",
-                        subtitle = "On a MAJOR event (a death, a disaster), the full-screen breaking-news page opens by itself — trusted free sources, ad-free.",
+                        "Breaking news card",
+                        subtitle = "On a major event, a card with that one story floats over whatever you're doing. The app behind stays usable — drag it aside or tap ✕.",
                         checked = s.notifications.breakingInterrupt, enabled = on,
                         onChange = { v -> vm.update { it.copy(notifications = it.notifications.copy(breakingInterrupt = v)) } })
+                    // ⚠️ NOT gated on `enabled = on`. The notification master switch means "stop
+                    // telling me about the news"; it has never meant "stop telling me the building
+                    // is on fire", and a life-safety alert must not be switched off as a side effect
+                    // of quietening everything else. This has its own switch and only its own.
+                    PrefSwitch(
+                        "Official emergency alerts (full screen + alarm)",
+                        subtitle = "A government warning for your area takes over the screen and sounds a full-volume alarm, even on silent or Do Not Disturb. Your phone's own emergency alerts work separately and are unaffected. US coverage only — the feed is the National Weather Service.",
+                        checked = s.notifications.emergencyTakeover,
+                        onChange = { v ->
+                            vm.update { it.copy(notifications = it.notifications.copy(emergencyTakeover = v)) }
+                            // Start or stop the watch immediately rather than waiting up to fifteen
+                            // minutes for the worker to notice. Done here rather than in the view
+                            // model because the service needs a Context and the view model has none.
+                            if (v) {
+                                dev.mascwa.pulse.notifications.EmergencyWatchService.start(context)
+                            } else {
+                                dev.mascwa.pulse.notifications.EmergencyWatchService.stop(context)
+                            }
+                        })
                     PrefClickable(
                         "Allow the takeover over other apps",
-                        subtitle = "Grant \"display over other apps\" so the takeover can open mid-use with no tap. Without it, it takes over the lock screen and shows a tap-to-open banner while the phone is in use.",
+                        subtitle = "Grant \"display over other apps\" so the breaking-news card can float over any app, and an emergency alert can take the screen with no tap. Without it both fall back to a full-screen-intent notification.",
                         onClick = {
                             runCatching {
                                 context.startActivity(
