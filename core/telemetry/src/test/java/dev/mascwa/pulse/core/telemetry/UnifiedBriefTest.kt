@@ -107,10 +107,14 @@ class UnifiedBriefTest {
         assertEquals("Major earthquake strikes the coast", b.row(BriefRowKind.NEWS)!!.text)
     }
 
-    @Test fun majorEmergencyIsRedAlertAndNewsFallsBackToTopStory() {
-        val s = routine().copy(emergencyHeadline = "Major earthquake strikes the coast", emergencyMajor = true)
+    @Test fun aSevereDisasterHeadlineIsYellowAndNewsFallsBackToTopStory() {
+        // ⚠️ Was `emergencyMajor` → RED. News can no longer set condition red at all: that bar fired
+        // on any headline beginning "Breaking:", so the app sat permanently red and recoloured every
+        // screen. The gate is now `emergencySevere` (a STRONG disaster), and it tops out at yellow —
+        // red belongs to EmergencyAlert over a government feed. See AlertPolicyTest.
+        val s = routine().copy(emergencyHeadline = "Major earthquake strikes the coast", emergencySevere = true)
         val b = UnifiedBriefComposer.compose(s)!!
-        assertEquals(BriefUrgency.RED, b.urgency)
+        assertEquals(BriefUrgency.YELLOW, b.urgency)
         assertTrue(b.urgencyKey!!.startsWith("news:"))
         assertEquals("Major earthquake strikes the coast", b.row(BriefRowKind.ALERT)!!.text)
         // NEWS doesn't duplicate the alert — it carries the ordinary top story instead.
@@ -179,13 +183,15 @@ class UnifiedBriefTest {
     }
 
     @Test fun aRealEmergencyStillOutranksADeparture() {
+        // The ordering it always asserted is unchanged — a disaster still takes the row from a
+        // departure. Only the condition it raises moved, from red to yellow.
         val s = routine().copy(
             departureNotice = "Leave in 12 min for Dentist", departureKey = "cal_88_1699999200000",
-            emergencyHeadline = "Major earthquake strikes the coast", emergencyMajor = true,
+            emergencyHeadline = "Major earthquake strikes the coast", emergencySevere = true,
         )
         val b = UnifiedBriefComposer.compose(s)!!
         assertEquals("Major earthquake strikes the coast", b.row(BriefRowKind.ALERT)!!.text)
-        assertEquals(BriefUrgency.RED, b.urgency)
+        assertEquals(BriefUrgency.YELLOW, b.urgency)
     }
 
     @Test fun opsNoticeIsAlertRowButStaysRoutine() {
@@ -214,7 +220,7 @@ class UnifiedBriefTest {
     }
 
     @Test fun sameUrgentItemProducesTheSameKey() {
-        val s = routine().copy(emergencyHeadline = "Major earthquake strikes the coast", emergencyMajor = true)
+        val s = routine().copy(emergencyHeadline = "Major earthquake strikes the coast", emergencySevere = true)
         val a = UnifiedBriefComposer.compose(s)!!
         val b = UnifiedBriefComposer.compose(s)!!
         assertEquals(a.urgencyKey, b.urgencyKey)
