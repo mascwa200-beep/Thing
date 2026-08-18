@@ -523,7 +523,10 @@ private fun NeoCard(neo: NeoObject, c: NightwirePalette) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            neo.closeApproach?.let {
+            // ⚠️ The epoch, not NASA's string. That string is UTC and carries no zone marker, so
+            // it sat on this screen beside sunrise, pass times and everything else — all rendered
+            // in the device's own zone — with nothing to say it meant a different clock.
+            closeApproachLine(neo)?.let {
                 Text(it, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
             }
         }
@@ -631,6 +634,17 @@ private fun SourceNote(tab: SkyTab, c: NightwirePalette) {
 
 /** Locale.US for the numeric patterns; the clock deliberately follows the device's own locale. */
 private fun fmt(pattern: String, value: Double): String = String.format(Locale.US, pattern, value)
+
+/**
+ * When an asteroid passes, in the reader's own zone.
+ *
+ * Falls back to NASA's string for an entry cached before the epoch was parsed — and marks it UTC
+ * then, because that is what it is and an unlabelled one is the defect being fixed.
+ */
+private fun closeApproachLine(neo: NeoObject): String? {
+    neo.closeApproachEpochMs?.let { return "Closest ${dateTimeOrDash(it)}" }
+    return neo.closeApproach?.let { "Closest $it UTC" }
+}
 
 private fun clockOrDash(epochMs: Long?): String =
     epochMs?.let { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) } ?: "—"

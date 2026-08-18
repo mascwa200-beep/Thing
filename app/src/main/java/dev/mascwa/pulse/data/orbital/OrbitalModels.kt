@@ -44,7 +44,23 @@ data class NeoObject(
     val missDistanceKm: Double?,
     val velocityKmh: Double?,
     val hazardous: Boolean,
+    /**
+     * NASA's own `close_approach_date_full`, which is **UTC** — see [closeApproachEpochMs].
+     *
+     * Kept only so an entry cached before the epoch was parsed still has something to show.
+     */
     val closeApproach: String?,
+    /**
+     * When the approach happens, as an instant.
+     *
+     * ⚠️ On every object in the response and read by nothing, while the string beside it — a UTC
+     * clock time with no zone marker — was printed on a screen where every other time goes through
+     * the device's own locale. Verified against a live response: `close_approach_date_full` of
+     * "2026-Aug-18 05:32" is exactly `epoch_date_close_approach` 1787031120000 rendered in UTC.
+     *
+     * Defaulted, so an entry cached before this existed still decodes.
+     */
+    val closeApproachEpochMs: Long? = null,
 )
 
 @Serializable

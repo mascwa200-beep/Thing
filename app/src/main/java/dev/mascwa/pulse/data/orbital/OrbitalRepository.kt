@@ -13,6 +13,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -142,7 +143,9 @@ class OrbitalRepository(
             val miss = ca?.get("miss_distance")?.jsonObject?.get("kilometers")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
             val vel = ca?.get("relative_velocity")?.jsonObject?.get("kilometers_per_hour")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()
             val approach = ca?.get("close_approach_date_full")?.jsonPrimitive?.contentOrNull
-            NeoObject(name, diameter, miss, vel, hazardous, approach)
+            // The instant, so the screen can show it in the reader's own zone rather than in UTC.
+            val approachMs = ca?.get("epoch_date_close_approach")?.jsonPrimitive?.longOrNull
+            NeoObject(name, diameter, miss, vel, hazardous, approach, approachMs)
         }.sortedBy { it.missDistanceKm ?: Double.MAX_VALUE }
     }
 
