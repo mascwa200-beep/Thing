@@ -223,6 +223,20 @@ class NavViewModel(
      *  empty when nothing is tracked or routing failed (the screen falls back to a straight line). */
     private val _route = MutableStateFlow<List<Pair<Double, Double>>>(emptyList())
     val route: StateFlow<List<Pair<Double, Double>>> = _route.asStateFlow()
+
+    /**
+     * Why there is no road route yet — which an empty [route] on its own cannot say.
+     *
+     * ⚠️ A routing failure used to be indistinguishable from one in progress, permanently. The
+     * fetch swallowed its exception, left the list empty, and the banner reads an empty list as
+     * "ROUTING…", so an unreachable destination, a rate-limited server and a genuine no-route all
+     * displayed as work still happening — for as long as you looked at it. The map has always
+     * fallen back to a straight line; it simply never admitted that is what you are seeing.
+     */
+    enum class RouteState { NONE, RESOLVING, READY, UNAVAILABLE }
+
+    private val _routeState = MutableStateFlow(RouteState.NONE)
+    val routeState: StateFlow<RouteState> = _routeState.asStateFlow()
     /** Road distance + driving duration for the active route (null until/unless routing resolves). */
     private val _routeInfo = MutableStateFlow<RoutingRepository.RoadRoute?>(null)
     private var lastRouteWpId: String? = null
@@ -295,6 +309,7 @@ class NavViewModel(
             combine(activeWaypoint, _location) { wp, loc -> wp to loc }.collectLatest { (wp, loc) ->
                 if (wp == null || loc == null) {
                     _route.value = emptyList()
+                    _routeState.value = RouteState.NONE
                     _routeInfo.value = null
                     _profile.value = null
                     profiledWpId = null
@@ -305,19 +320,29 @@ class NavViewModel(
                 }
                 // A different objective: drop the previous path at once so the old road route never
                 // lingers on the map while the new one is computed (we redraw only when it resolves).
-                if (wp.id != lastRouteWpId) { _route.value = emptyList(); _routeInfo.value = null }
+                if (wp.id != lastRouteWpId) {
+                    _route.value = emptyList()
+                    _routeInfo.value = null
+                    _routeState.value = RouteState.RESOLVING
+                }
                 val movedFar = lastRouteStart?.let {
                     Geo.distanceMeters(it.latitude, it.longitude, loc.latitude, loc.longitude) > 60
                 } ?: true
                 if (wp.id == lastRouteWpId && !movedFar && _route.value.isNotEmpty()) return@collectLatest
                 delay(350) // debounce GPS chatter before hitting the routing server
+                _routeState.value = RouteState.RESOLVING
                 val r = runCatching { routing.route(loc.latitude, loc.longitude, wp.latitude, wp.longitude) }.getOrNull()
                 if (r != null && r.points.size >= 2) {
                     _route.value = r.points
                     _routeInfo.value = r
+                    _routeState.value = RouteState.READY
                     lastRouteWpId = wp.id
                     lastRouteStart = loc
                     refreshProfile(wp.id, r.points, r.distanceMeters)
+                } else {
+                    // Unreachable, rate-limited, or genuinely no road between here and there. The
+                    // straight line stays on the map; the banner now says that is what it is.
+                    _routeState.value = RouteState.UNAVAILABLE
                 }
             }
         }

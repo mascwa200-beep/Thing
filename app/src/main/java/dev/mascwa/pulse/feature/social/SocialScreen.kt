@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.util.Formatters
 import dev.mascwa.pulse.core.util.openUrl
@@ -139,6 +140,14 @@ private fun ItemRow(item: SocialItem, onClick: () -> Unit) {
     LcarsFrame(Modifier.fillMaxWidth().clickable { onClick() }) {
         Column {
             Text(item.title, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = c.ink)
+            // A self-post IS its text. Without this an Ask HN row was a headline and a score.
+            item.body?.let { text ->
+                Text(
+                    text, fontFamily = ChakraPetch, fontSize = 12.sp, lineHeight = 17.sp,
+                    color = c.ink2, maxLines = 4, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             // ⚠️ The age was on the model all along and only the News surface ever drew it. A fifth
             // of a Hacker News top page is routinely several days old, which "trending" does not
             // suggest — and here the two surfaces rendered the same object differently.

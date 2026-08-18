@@ -123,9 +123,25 @@ class SocialRepository(
                             val title = o["title"]?.jsonPrimitive?.contentOrNull ?: return@runCatching null
                             val link = o["url"]?.jsonPrimitive?.contentOrNull ?: "https://news.ycombinator.com/item?id=$id"
                             val score = o["score"]?.jsonPrimitive?.intOrNull ?: 0
-                            val comments = o["descendants"]?.jsonPrimitive?.intOrNull ?: 0
                             val time = (o["time"]?.jsonPrimitive?.longOrNull ?: 0L) * 1000L
-                            SocialItem(title, link, "Hacker News", "▲ $score · $comments comments", time)
+                            // Three fields that were arriving on every item and being dropped.
+                            val author = o["by"]?.jsonPrimitive?.contentOrNull
+                            val kind = o["type"]?.jsonPrimitive?.contentOrNull
+                            val body = o["text"]?.jsonPrimitive?.contentOrNull
+                                ?.let(::stripHtml)?.takeIf { it.isNotBlank() }
+                            // ⚠️ A paid `job` post carries no `descendants` at all, so defaulting to
+                            // zero rendered it as a discussion nobody had replied to. It is not a
+                            // discussion; say what it is instead of inventing a comment count.
+                            val meta = buildString {
+                                append("▲ $score")
+                                if (kind == "job") {
+                                    append(" · job")
+                                } else {
+                                    append(" · ${o["descendants"]?.jsonPrimitive?.intOrNull ?: 0} comments")
+                                }
+                                author?.let { append(" · by $it") }
+                            }
+                            SocialItem(title, link, "Hacker News", meta, time, body = body)
                         }
                     }
                 }.map { it.await() }

@@ -296,7 +296,10 @@ class NewsViewModel(
     }
 
     private fun SocialItem.toArticle(cat: String): Article = Article(
-        title = title, url = url, summary = meta, source = source,
+        // ⚠️ The summary is the post's own text where there is one. It used to be the vote count
+        // unconditionally, so an Ask HN thread — which is nothing BUT its text — arrived here as a
+        // title and "▲ 412 · 88 comments", with the actual question discarded.
+        title = title, url = url, summary = body ?: meta, source = source,
         publishedEpochMs = publishedEpochMs, imageUrl = thumbnail, category = cat,
     )
 
