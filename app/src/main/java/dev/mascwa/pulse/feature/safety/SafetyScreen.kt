@@ -127,6 +127,7 @@ fun SafetyScreen(vm: SafetyViewModel, onBack: (() -> Unit)? = null) {
                             SafetyCoverage.describeChecked(states)?.let { append("\n\n").append(it) }
                             SafetyCoverage.explainSilence(states)?.let { append("\n").append(it) }
                         },
+                        onRetry = { vm.refresh() },
                     )
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp, top = 8.dp),

@@ -103,6 +103,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
                             append("nothing is mapped nearby, which is not the same as nothing ")
                             append("being there.")
                         },
+                        onRetry = { vm.refresh() },
                     )
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),

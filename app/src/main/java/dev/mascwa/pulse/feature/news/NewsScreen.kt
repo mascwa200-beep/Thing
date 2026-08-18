@@ -133,7 +133,7 @@ fun NewsScreen(vm: NewsViewModel) {
             when {
                 content.isInitialLoading -> LoadingState()
                 content.isError -> ErrorState(content.error ?: "Error", onRetry = { vm.refresh() })
-                content.data.isNullOrEmpty() -> EmptyState("No articles found.")
+                content.data.isNullOrEmpty() -> EmptyState("No articles found.", onRetry = { vm.refresh() })
                 else -> {
                     val distinctArticles = content.data!!.distinctBy { it.url }
                     LazyColumn(

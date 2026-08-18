@@ -39,13 +39,24 @@ class SocialViewModel(
 
     fun refresh() = ensureLoaded(_tab.value, force = true)
 
+    /**
+     * Load a tab unless it already holds something worth showing.
+     *
+     * ⚠️ "Worth showing" used to mean non-null, and an empty feed is non-null. So once a tab had
+     * settled on nothing — which a swallowed outage could produce — leaving the tab and coming back
+     * never reloaded it, and the only other way in was a pull gesture that a non-scrollable empty
+     * state cannot deliver. The feed stayed empty for the life of the view model.
+     *
+     * Re-asking is cheap: the repository serves from a ten-minute disk cache, so a genuinely quiet
+     * feed costs a disk read per visit rather than a request.
+     */
     private fun ensureLoaded(tab: SocialTab, force: Boolean) {
         when (tab) {
-            SocialTab.LEMMY -> if (force || _lemmy.value.data == null)
+            SocialTab.LEMMY -> if (force || _lemmy.value.data?.items.isNullOrEmpty())
                 viewModelScope.launch { _lemmy.load(force) { repo.lemmy(it) } }
-            SocialTab.MASTODON -> if (force || _mastodon.value.data == null)
+            SocialTab.MASTODON -> if (force || _mastodon.value.data.let { it == null || (it.tags.isEmpty() && it.statuses.isEmpty()) })
                 viewModelScope.launch { _mastodon.load(force) { repo.mastodon(it) } }
-            SocialTab.HN -> if (force || _hn.value.data == null)
+            SocialTab.HN -> if (force || _hn.value.data?.items.isNullOrEmpty())
                 viewModelScope.launch { _hn.load(force) { repo.hackerNews(it) } }
         }
     }
