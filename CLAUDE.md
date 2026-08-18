@@ -4640,6 +4640,88 @@ recorded per file. The real remaining gap is **413 of 651 guides with no diagram
 indistinguishable — the change was measured to be imperceptible at display size, but a screen is the
 only real judge), and that the one former GIF now draws on Windows where it never has.
 
+### STARDATES: THE CORE GETS ITS CALLERS (this session, PR #448)
+
+Owner asked, simply, *"where do you put the stardates?"* The answer was **one place — the boot
+screen** — and `Stardate.format()` had **no caller at all** outside its own test. That is this
+repo's recurring defect class in its purest form (`tempoNudge`, `windKmh`,
+`NavGuidance.turnHint`, `savedAtMs`, `mastery()`), and worse here because the KDoc written at the
+time made the promise explicitly: *"[Stardate] is pure and tested, which is what the header and the
+brief will read too, so the app can never show itself two different stardates."* Neither ever did.
+Owner chose via AskUserQuestion: **all four surfaces** and **both platforms**. **Zero subagent
+spend**, as with every arc since the credit directive.
+
+**One piece of new core: `Stardate.at(epochMs, utcOffsetSeconds)`.** `of()` takes a *decomposed*
+date on purpose — that is what keeps it clock-free and testable — which left the decomposition to
+whoever held the clock, with six surfaces now wanting one.
+
+⚠️ **`utcOffsetSeconds` is load-bearing, not a nicety.** The obvious implementation floor-divides
+epoch milliseconds into days, which is UTC, and **this repo has already shipped that exact bug
+twice**: the observatory computing "tonight's geometry" from UTC midnight so "today's sunset" was
+the wrong day away from Greenwich, and DAY AHEAD writing UTC clock times into four separate lines of
+prose (eleven hours out in Auckland). A stardate is a date said aloud; one that rolls its tenth at
+UTC midnight is wrong for most of the planet. Each platform supplies its own offset in one line.
+
+⚠️ **The civil conversion is hand-rolled (Hinnant, era from 1 March) and deliberately a SECOND
+copy.** `EconomyVintage.civilFromDays` states the same platform-free reason for its own; that one
+yields year and month for a UTC instant where this needs day-of-year, length-of-year and a *local*
+hour, so neither expresses the other without editing a working shipped core for no functional gain.
+The honest safeguard is a test that makes disagreement a build failure — **`StardateCivilDriftTest`**
+sweeps both over ~7,800 days. ⚠️ It is a **separate file from `StardateTest` on purpose**:
+`StardateTest` is mirrored to the desktop, which has no economy screen, so the cross-check inside it
+would not compile there and would not mean anything either.
+
+**The surfaces, all reading ONE hourly coroutine** provided at the app root beside
+`LocalConsoleSection` — the pattern that gave 35 screens a location readout with no screen edited.
+`app/.../ui/StardateClock.kt` owns `LocalStardate` + `ProvideStardate`. Header (`SECTION · 26621.5`,
+the **bare number** — the word "STARDATE" belongs to the boot reveal, where the console introduces
+itself once), Home masthead (it draws its own top bar via `topBarOverride` and so does not inherit
+the header), the expanded notification board, the Computer's context, and the desktop rail footer.
+`BootScreen`'s `java.util.Calendar` block **collapses onto `Stardate.at`**, so this removes a
+duplicate rather than adding a sixth.
+
+⚠️ **Three notification constraints, each already bitten once:** the caption is **chrome, not a
+row** (the five row slots are the payload and `trimToFive()` already sheds real rows when they are
+all spoken for); **expanded only** (the collapsed line is the tray's most crowded surface); and **no
+new channel, no second post** — the one-notification invariant holds. It takes
+`TextAppearance.Compat.Notification.Info` rather than the console amber, as every other body line in
+that layout does: the tray follows the system theme and `#FFB000` is about **1.9:1** on a light one.
+The identity there is carried by the rail and the tag blocks, which are safe because they hardcode
+**black ON a colour** rather than a colour on the tray's own background. (`.Info` was **verified
+present in the shipped androidx.core 1.15.0 AAR's `values.xml`** before use, not recalled.)
+
+⚠️ **The persona line is given to the Computer, not stamped on its replies.** A date prefix on every
+answer is noise and would fight the register the persona rewrite established: this computer answers
+questions, it does not file reports.
+
+**⚠️ THE NEGATIVE-TEST LESSON, on a fourth distinct mechanism.** Of four perturbations, **one guard
+was genuinely asleep**: the leap-day test only covered 29 February, where the post-February day
+shift is not exercised at all, so deleting the shift failed nothing. Dates *later* in a leap year
+(2024-03-01 → doy 61, 2024-12-31 → doy 366) now cover it. The three known ways a green test proves
+nothing are now: the perturbation never matched the source; the perturbation only *touched* the code
+without removing the property; and **the fixture never reached the branch the rule lives in**.
+
+**⚠️ How to prove `tools/android_resolve_check.sh`'s cascade false positive, rather than shrugging.**
+It reported six unresolved names on a brand-new pure-Compose file. `tools/android_compile_check.sh
+-l androidx.compose.runtime:runtime-android:1.7.6 <file> <its core dep>` compiles it **clean**, and
+the same command *without* the `-l` reproduces the six **exactly**. Two things make that decisive:
+the unpacked AAR really carries **643 classes** (not the manifest-only KMP stub the script warns
+about), and the control run is a real failure rather than an absent one. The compose runtime version
+comes from the BOM in `gradle/libs.versions.toml` (2024.12.01 → 1.7.6).
+
+**The header-width risk the plan flagged was measured away, not accepted.** fontTools on the bundled
+`jetbrains_mono_var.ttf` gives an advance of **exactly 0.6 em** (it is monospaced), so at 8sp with
+1.4sp tracking a character is **6.2dp**. The longest section label in the entire directory is
+`YOUR THINGS`, and `YOUR THINGS · 26621.5` is 21 characters → **130dp**, in the same ~230dp column
+where the 16sp title already fits at 203dp. It does not crowd. Recorded at the call site so the next
+person does not re-derive it. (Had it crowded, note that `Alignment.End` + `Ellipsis` would have cut
+the **stardate**, not the section — the opposite of the plan's stated fallback order.)
+
+**Verification, all local and free:** 13 core tests executed; `:desktop:build` green at 413 tests;
+53 mirrors current. ⚠️ **Owner-verify — CI compiles, it does not draw.** Worth eyes: the header line
+at real density, the masthead, and the board caption in the tray — **Settings' notification test
+button posts a sample board**.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,

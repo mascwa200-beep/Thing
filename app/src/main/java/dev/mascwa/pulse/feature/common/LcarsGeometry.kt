@@ -485,6 +485,12 @@ fun LcarsScreenFrame(
                 // The bare number, not `Stardate.stamp`: the word "STARDATE" is the boot reveal's,
                 // where the console introduces itself once. Repeating it on every screen would spend
                 // the header's scarcest resource on a label nobody needs twice.
+                //
+                // Width was measured rather than eyeballed, the same way the title size below was.
+                // JetBrainsMono is monospaced at exactly 0.6 em, so at 8sp with 1.4sp of tracking a
+                // character is 6.2dp; the longest section label in the whole directory is
+                // "YOUR THINGS", and "YOUR THINGS · 26621.5" is 21 characters -> 130dp of the same
+                // ~230dp the 16sp title fits 203dp of. It does not crowd.
                 val stardate = LocalStardate.current
                 val locus = listOfNotNull(section, stardate.takeIf { it.isNotEmpty() })
                     .joinToString(" · ")
