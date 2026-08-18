@@ -137,7 +137,12 @@ class RadioBrowserRepository(private val http: HttpClient) {
         val title = name.trim()
         if (stream.isBlank() || title.isBlank() || !stream.startsWith("http")) return null
         val band = buildBand()
-        return Mapped(RadioStation(name = title, band = band, streamUrl = stream), stateKey = state.trim().lowercase())
+        return Mapped(
+            // codec and bitrate were parsed here and dropped on the floor. They are the two things
+            // that say whether a stream is worth the data and whether it will sound like anything.
+            RadioStation(name = title, band = band, streamUrl = stream, codec = codec, kbps = bitrate),
+            stateKey = state.trim().lowercase(),
+        )
     }
 
     /** A short "band" tag: top genre tags, else the state/country. */

@@ -71,6 +71,8 @@ MIRRORS: dict[str, str] = {
     # NOT here — they are adapted ports, not mirrors; see their headers.)
     # Live TV news. Both platforms play the same channels and must agree about which are
     # trustworthy, so the catalogue and its judgements are shared rather than duplicated.
+    # LiveChannels delegates its cost line here, so the mirror does not compile without it.
+    f"{CORE}/DataRate.kt": f"{DESKTOP}/telemetry/DataRate.kt",
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
     f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
@@ -87,6 +89,7 @@ MIRRORS: dict[str, str] = {
     # The tests come across too, so the same assertions gate BOTH platforms' CI. Mirroring logic
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
+    f"{CORE_TEST}/DataRateTest.kt": f"{DESKTOP_TEST}/telemetry/DataRateTest.kt",
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
     f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",

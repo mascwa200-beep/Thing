@@ -185,21 +185,12 @@ object LiveChannels {
      * playlist's advertised bandwidth is the variant's ceiling rather than what was chosen. Asking
      * the player after it has settled is the only figure that is measured.
      *
-     * Megabytes are the decimal kind (10⁶), because that is the unit a mobile allowance is sold in.
-     * Returns null for the absent-value sentinel and anything non-positive — a made-up number under
-     * a play button is worse than no number.
+     * ⚠️ Delegates to [DataRate] rather than doing the arithmetic here. The radio asks the same
+     * question of the station directory's published rate, and two screens quoting a different cost
+     * for the same stream would mean one of them is wrong — the duplicated-definition mistake this
+     * repository has corrected several times already.
      */
-    fun dataRateNote(bitsPerSecond: Int): String? {
-        if (bitsPerSecond <= 0) return null
-        val mbPerMinute = bitsPerSecond * 60.0 / 8.0 / 1_000_000.0
-        val figure = if (mbPerMinute < 10) {
-            val tenths = Math.round(mbPerMinute * 10).toInt()
-            "${tenths / 10}.${tenths % 10}"
-        } else {
-            Math.round(mbPerMinute).toString()
-        }
-        return "about $figure MB a minute"
-    }
+    fun dataRateNote(bitsPerSecond: Int): String? = DataRate.describe(bitsPerSecond)
 
     /**
      * Which channel a breaking-news pop-up should open, or null if there is nothing worth opening.

@@ -60,6 +60,8 @@ import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
+import dev.mascwa.pulse.core.connectivity.LocalIsMetered
+import dev.mascwa.pulse.core.telemetry.DataRate
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -126,6 +128,18 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
                     tuned?.band ?: "LOCAL & FREE LISTENER-SUPPORTED STREAMS",
                     fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp, color = c.accent,
                 )
+                // What the listening costs, on the one connection where it costs anything. Shown
+                // here and not on every row: twenty stations each restating the same sentence is
+                // noise, and the figure only becomes a decision once something is actually playing.
+                if (state.status == RadioController.Status.ON_AIR && LocalIsMetered.current) {
+                    DataRate.describeKilobits(tuned?.kbps ?: 0)?.let { cost ->
+                        Text(
+                            "$cost · on mobile data",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, letterSpacing = 1.sp,
+                            color = c.amber, modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
                 // Live now-playing track (ICY metadata) when the tuned station is on air.
                 if (state.status == RadioController.Status.ON_AIR && !nowPlaying.isNullOrBlank()) {
                     Text(
@@ -363,6 +377,15 @@ private fun StationRow(
                 fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.6.sp,
                 color = if (track != null) c.accent else c.muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        // Right-aligned rather than appended to the genre line: that line is maxLines=1 and
+        // ellipsised, so a long genre would have truncated exactly the part worth reading.
+        DataRate.quality(st.codec, st.kbps)?.let { q ->
+            Text(
+                q,
+                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.4.sp, color = c.muted,
+                maxLines = 1, modifier = Modifier.padding(start = 8.dp),
             )
         }
         Text(
