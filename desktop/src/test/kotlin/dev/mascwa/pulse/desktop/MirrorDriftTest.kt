@@ -55,6 +55,12 @@ class MirrorDriftTest {
         "telemetry/LiveChannels.kt" to "$CORE/LiveChannels.kt",
         "telemetry/M3uCatalog.kt" to "$CORE/M3uCatalog.kt",
         "telemetry/DataRate.kt" to "$CORE/DataRate.kt",
+        // ⚠️ Its cross-check against `EconomyVintage` lives in a SEPARATE, unmirrored test on the
+        // Android side, deliberately: that core is not mirrored (the companion has no economy
+        // screen), so a cross-check inside the mirrored test would not compile here — and would not
+        // mean anything either, since the property is that two implementations *coexisting in one
+        // module* cannot drift.
+        "telemetry/Stardate.kt" to "$CORE/Stardate.kt",
         "live/LiveCatalogRepository.kt" to "$LIVE/LiveCatalogRepository.kt",
         "library/GuideModels.kt" to "$SURVIVAL/GuideModels.kt",
         "library/GuideTaxonomy.kt" to "$SURVIVAL/GuideTaxonomy.kt",
@@ -64,7 +70,7 @@ class MirrorDriftTest {
     private val testMirrors = listOf(
         "GuideSearchTest.kt", "LibraryConsultTest.kt", "StudyQuestionsTest.kt", "RecallTest.kt",
         "CurriculumTest.kt", "DailyLessonTest.kt", "DeviceSearchTest.kt", "EmergencyTriageTest.kt",
-        "LiveChannelsTest.kt", "M3uCatalogTest.kt", "DataRateTest.kt",
+        "LiveChannelsTest.kt", "M3uCatalogTest.kt", "DataRateTest.kt", "StardateTest.kt",
     ).associate { "telemetry/$it" to "$CORE_TEST/$it" }
 
     private val all: Map<String, String> get() = mirrors + testMirrors

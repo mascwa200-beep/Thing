@@ -54,6 +54,7 @@ import dev.mascwa.pulse.core.telemetry.LcarsCodes
 import dev.mascwa.pulse.navigation.LocalConsoleSection
 import dev.mascwa.pulse.notifications.AlertCondition
 import dev.mascwa.pulse.notifications.AlertStatus
+import dev.mascwa.pulse.ui.LocalStardate
 import dev.mascwa.pulse.ui.effects.HapticCue
 import dev.mascwa.pulse.ui.effects.SoundCue
 import dev.mascwa.pulse.ui.effects.rememberLcarsCue
@@ -477,10 +478,20 @@ fun LcarsScreenFrame(
                 // gained it without one of them being edited. Absent for anything the directory does
                 // not list, and the title simply keeps the whole block as it did before.
                 val section = LocalConsoleSection.current
+                // And when, said the way this console says it. One read of a composition local the
+                // app root refreshes on the hour, so all thirty-three framed screens gained a
+                // stardate without one of them being edited — the same trick as the section above.
+                //
+                // The bare number, not `Stardate.stamp`: the word "STARDATE" is the boot reveal's,
+                // where the console introduces itself once. Repeating it on every screen would spend
+                // the header's scarcest resource on a label nobody needs twice.
+                val stardate = LocalStardate.current
+                val locus = listOfNotNull(section, stardate.takeIf { it.isNotEmpty() })
+                    .joinToString(" · ")
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    if (section != null) {
+                    if (locus.isNotEmpty()) {
                         Text(
-                            section,
+                            locus,
                             fontFamily = JetBrainsMono,
                             fontSize = 8.sp,
                             letterSpacing = 1.4.sp,

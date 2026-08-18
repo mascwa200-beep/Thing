@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.telemetry.currentStardateText
 import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
@@ -57,6 +59,7 @@ import dev.mascwa.pulse.desktop.theme.PulseDesktopTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 
 /**
  * The desktop's screens, each carrying what it is for.
@@ -180,6 +183,24 @@ fun PulseDesktopApp(
                         )
                     }
                     Box(Modifier.weight(1f))
+                    // The date, said the way the phone says it — from the same mirrored core, so the
+                    // two consoles can never show different stardates for the same moment.
+                    //
+                    // Recomputed on the hour by the same rule as the phone's: the last digit is
+                    // `hour * 10 / 24`, so it can only ever change on an hour boundary. `delay` here
+                    // costs one suspended coroutine for the life of the window.
+                    val stardate by produceState(initialValue = currentStardateText()) {
+                        while (true) {
+                            val now = System.currentTimeMillis()
+                            delay(((now / 3_600_000L + 1) * 3_600_000L - now).coerceAtLeast(1_000L))
+                            value = currentStardateText()
+                        }
+                    }
+                    Text(
+                        stardate,
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,
+                        modifier = Modifier.padding(start = 14.dp, bottom = 2.dp),
+                    )
                     Text(
                         "DESKTOP",
                         fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp, color = c.faint,

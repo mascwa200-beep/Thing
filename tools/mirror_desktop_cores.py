@@ -73,6 +73,7 @@ MIRRORS: dict[str, str] = {
     # trustworthy, so the catalogue and its judgements are shared rather than duplicated.
     # LiveChannels delegates its cost line here, so the mirror does not compile without it.
     f"{CORE}/DataRate.kt": f"{DESKTOP}/telemetry/DataRate.kt",
+    f"{CORE}/Stardate.kt": f"{DESKTOP}/telemetry/Stardate.kt",
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
     f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
@@ -93,6 +94,7 @@ MIRRORS: dict[str, str] = {
     # without mirroring its tests would leave the desktop copy unexercised — which is the state the
     # drift this script exists to prevent grew in.
     f"{CORE_TEST}/DataRateTest.kt": f"{DESKTOP_TEST}/telemetry/DataRateTest.kt",
+    f"{CORE_TEST}/StardateTest.kt": f"{DESKTOP_TEST}/telemetry/StardateTest.kt",
     f"{CORE_TEST}/NewsSummaryTest.kt": f"{DESKTOP_TEST}/telemetry/NewsSummaryTest.kt",
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
     f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",

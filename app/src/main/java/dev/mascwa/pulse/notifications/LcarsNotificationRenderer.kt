@@ -7,6 +7,7 @@ import dev.mascwa.pulse.R
 import dev.mascwa.pulse.core.telemetry.BriefRowKind
 import dev.mascwa.pulse.core.telemetry.BriefUrgency
 import dev.mascwa.pulse.core.telemetry.UnifiedBrief
+import dev.mascwa.pulse.ui.currentStardateText
 
 /**
  * Renders a [UnifiedBrief] into the two RemoteViews of the one LCARS notification (collapsed + expanded).
@@ -49,6 +50,11 @@ object LcarsNotificationRenderer {
 
     fun expanded(context: Context, brief: UnifiedBrief): RemoteViews {
         val rv = RemoteViews(context.packageName, R.layout.notification_lcars_big)
+        // When the board was drawn. Computed here rather than carried on UnifiedBrief because the
+        // brief is a pure core with no clock, and because a tray notification is re-rendered from
+        // the same brief on every post — reading the clock at render time is what keeps the caption
+        // honest rather than showing the stardate of whenever the board was first composed.
+        rv.setTextViewText(R.id.lcars_stardate, "STARDATE " + currentStardateText())
         brief.rows.take(ROWS.size).forEachIndexed { i, row ->
             val (rowId, tagId, textId) = ROWS[i]
             rv.setViewVisibility(rowId, View.VISIBLE)

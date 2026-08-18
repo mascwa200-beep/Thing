@@ -21,6 +21,29 @@
         android:importantForAccessibility="no"
         android:background="@color/lcars_row_news" />
 
+    <!-- When the board was drawn, said the way this console says it.
+
+         Deliberately chrome rather than a row: the five row slots below are the board's whole
+         payload and UnifiedBrief.trimToFive() already sheds real rows when they are all spoken for,
+         so a stardate must never cost one. Deliberately the EXPANDED view only, too — the collapsed
+         line is the tray's most crowded surface and already carries the headline plus the optional
+         temperature chip.
+
+         ⚠️ It takes the compat appearance rather than the console amber, which every other body line
+         here does too. The tray follows the system theme, and #FFB000 on a light background is about
+         1.9:1 — the identity in this layout is carried by the rail and the colour-block tags, which
+         are safe because they hardcode BLACK ON a colour rather than a colour on the tray's own. -->
+    <TextView
+        android:id="@+id/lcars_stardate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="9sp"
+        android:letterSpacing="0.12"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Info" />
+
     <LinearLayout
         android:id="@+id/lcars_row1"
         android:layout_width="match_parent"

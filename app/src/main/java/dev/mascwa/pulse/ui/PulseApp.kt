@@ -110,7 +110,11 @@ fun PulseApp(
         // Where you are, provided once for the whole NavHost. Every screen's header reads it and no
         // screen passes it, which is why the readout reached thirty-five screens with no edit to any
         // of them. Keyed on the live route so it follows navigation without the screens knowing.
+        //
+        // And when you are, by the same route: `ProvideStardate` runs ONE hourly coroutine here
+        // rather than a timer per screen, and the header reads it beside the section name.
         CompositionLocalProvider(LocalConsoleSection provides sectionOf(currentRoute)) {
+        ProvideStardate {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
@@ -387,6 +391,7 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.security.SecurityAuditViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.security.SecurityAuditScreen(vm, onBack = { navController.popBackStack() })
             }
+        }
         }
         }
     }

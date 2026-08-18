@@ -32,6 +32,7 @@ import dev.mascwa.pulse.jarvis.inference.LocalInferenceEngine
 import dev.mascwa.pulse.jarvis.voice.TextToSpeechEngine
 import dev.mascwa.pulse.jarvis.voice.VoskListener
 import dev.mascwa.pulse.jarvis.voice.VoskSpeech
+import dev.mascwa.pulse.ui.currentStardateText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -617,6 +618,15 @@ class JarvisViewModel(
             address = runCatching { settings.current().jarvis.address }.getOrDefault(""),
         )
         var prompt = base
+        // The date, said the way this console says it. Cheap, always available, and the one piece of
+        // context a ship's computer is expected to have to hand — the app has shown a stardate on
+        // the boot reveal since it shipped and the Computer could not have told you what it was.
+        //
+        // ⚠️ Deliberately given to the Computer rather than stamped onto its replies. A date prefix
+        // on every answer is noise, and it would fight the register the persona rewrite established:
+        // this computer answers questions, it does not file reports.
+        prompt += "\n\nThe current stardate is " + currentStardateText() +
+            ". Say it when it is asked for or genuinely relevant; do not stamp it onto every reply."
         val digest = runCatching { profile.digest() }.getOrDefault("")
         if (digest.isNotBlank()) {
             prompt += "\n\nThe user's profile (tailor your help to it; keep it current via the `profile` tool):\n" + digest

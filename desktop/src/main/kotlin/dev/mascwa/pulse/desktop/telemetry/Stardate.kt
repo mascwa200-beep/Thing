@@ -1,4 +1,5 @@
-package dev.mascwa.pulse.core.telemetry
+// MIRROR OF core/telemetry/src/main/java/dev/mascwa/pulse/core/telemetry/Stardate.kt — regenerate with tools/mirror_desktop_cores.py; MirrorDriftTest holds it
+package dev.mascwa.pulse.desktop.telemetry
 
 /**
  * The date, said the way a ship's computer would say it.

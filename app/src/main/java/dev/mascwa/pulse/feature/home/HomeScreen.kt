@@ -56,6 +56,7 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
 import dev.mascwa.pulse.feature.oracle.urgencyColor
 import dev.mascwa.pulse.navigation.Routes
+import dev.mascwa.pulse.ui.LocalStardate
 import dev.mascwa.pulse.ui.theme.NightwirePalette
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.mascwa.pulse.feature.common.SectionBar
@@ -128,6 +129,17 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                             "OS 2.7", fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp,
                             color = c.muted, modifier = Modifier.padding(start = 8.dp, bottom = 3.dp),
                         )
+                        // Home draws its own masthead via `topBarOverride`, so it short-circuits the
+                        // shared frame and does not inherit the header's stardate. Same composition
+                        // local, same one hourly coroutine — just read here too, in the version
+                        // caption's own treatment so it reads as part of the plate.
+                        val stardate = LocalStardate.current
+                        if (stardate.isNotEmpty()) {
+                            Text(
+                                stardate, fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp,
+                                color = c.muted, modifier = Modifier.padding(start = 8.dp, bottom = 3.dp),
+                            )
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Fixed mis-wiring: Search opens Search and the bell opens Advisories — the two

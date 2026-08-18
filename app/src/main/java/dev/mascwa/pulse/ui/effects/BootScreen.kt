@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.Stardate
+import dev.mascwa.pulse.ui.currentStardate
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -110,25 +111,19 @@ private fun generateBootLog(): List<String> {
 }
 
 /**
- * The boot reveal's stardate, now read from the shared core rather than computed here.
+ * The boot reveal's stardate, read from the shared core — decomposition and all.
  *
- * The scale is unchanged — this is the same number the boot has always shown. What moved is where
- * it is decided: [Stardate] is pure and tested, which is what the header and the brief will read
- * too, so the app can never show itself two different stardates. Its own two defects went with it:
- * the old form divided by a fixed 365 and drifted through a leap year, and formatted through the
- * default locale.
+ * The scale is unchanged; this is the same number the boot has always shown. What moved is where it
+ * is decided. The promise in the previous version of this comment — that the header and the brief
+ * would read the same core so the app could never show itself two different stardates — is finally
+ * kept, and the calendar arithmetic that used to live here went with it: this function's own
+ * `java.util.Calendar` block was the second implementation of it, and [Stardate.at] is now the only
+ * one on either platform.
+ *
+ * The boot reveal keeps [Stardate.stamp], with the word spelled out. Everywhere else uses the bare
+ * number: this is the one moment the console introduces itself.
  */
-private fun starfleetStardate(): String {
-    val cal = java.util.Calendar.getInstance()
-    return Stardate.stamp(
-        Stardate.of(
-            year = cal.get(java.util.Calendar.YEAR),
-            dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR),
-            daysInYear = cal.getActualMaximum(java.util.Calendar.DAY_OF_YEAR),
-            hourOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY),
-        ),
-    )
-}
+private fun starfleetStardate(): String = Stardate.stamp(currentStardate())
 
 // Deliberately unhurried (~half the old pace) so the message can actually be read.
 private const val BOOT_MS = 8800
