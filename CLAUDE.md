@@ -4718,9 +4718,23 @@ person does not re-derive it. (Had it crowded, note that `Alignment.End` + `Elli
 the **stardate**, not the section — the opposite of the plan's stated fallback order.)
 
 **Verification, all local and free:** 13 core tests executed; `:desktop:build` green at 413 tests;
-53 mirrors current. ⚠️ **Owner-verify — CI compiles, it does not draw.** Worth eyes: the header line
-at real density, the masthead, and the board caption in the tray — **Settings' notification test
-button posts a sample board**.
+53 mirrors current; CI green on run 1751. ⚠️ **Owner-verify — CI compiles, it does not draw.** Worth
+eyes: the header line at real density, the masthead, and the board caption in the tray — **Settings'
+notification test button posts a sample board**.
+
+**⚠️ AN OPERATIONAL MISTAKE THAT COST A BUILD, worth reading before waiting on CI again.** I fired
+`Bash(run_in_background: true, command: "sleep N")` and then **immediately made the next tool call**
+instead of waiting for its completion notification. A background sleep does not block, so a dozen of
+them simply overlapped and paced nothing: I believed ~70 minutes had passed when the real figure was
+about six. On that false elapsed time I diagnosed a "wedged runner", and pushed a commit to supersede
+a **perfectly healthy** run under `cancel-in-progress`. Two guards against repeating it:
+- **`date -u` is the only clock that counts.** Requested sleep duration proves nothing; measured
+  separately, `sleep` itself is faithful (requested 120s → actual 120s), so the bug was purely my
+  pacing. To actually wait, fire the timer and then **end the turn** — the notification re-invokes you.
+- **Know the real shape of a run before calling one abnormal.** For `android-build.yml`: whole run
+  **~8–10 min**, of which `Run unit tests` is ~2m20s and **`Build release APK` alone is ~7 min**.
+  Anything under about fifteen minutes is ordinary. A frozen `updated_at` on an in-progress run is
+  **normal**, not evidence of a stall — I read it as the opposite.
 
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
