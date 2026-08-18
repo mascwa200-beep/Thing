@@ -237,6 +237,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val relief by vm.relief.collectAsState()
     val rain by vm.rain.collectAsState()
     val rainFrame by vm.rainFrame.collectAsState()
+    val rainFrames by vm.rainFrames.collectAsState()
+    val rainPlaying by vm.rainPlaying.collectAsState()
     val trafficOn by vm.traffic.collectAsState()
     val seismicOn by vm.seismic.collectAsState()
     val aircraft by vm.aircraft.collectAsState()
@@ -648,6 +650,8 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             relief = relief,
                             rain = rain,
                             rainFrame = rainFrame,
+                            rainFrames = rainFrames,
+                            rainPlaying = rainPlaying,
                             traffic = trafficOn,
                             aircraftCount = aircraft.size,
                             seismic = seismicOn,
@@ -658,6 +662,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                             onBasemap = vm::setBasemap,
                             onRelief = vm::setRelief,
                             onRain = vm::setRain,
+                            onRainPlayback = vm::toggleRainPlayback,
                             onTraffic = vm::setTraffic,
                             onSeismic = vm::setSeismic,
                             onNight = vm::setNight,
@@ -1958,6 +1963,8 @@ private fun LayersPanel(
     relief: Boolean,
     rain: Boolean,
     rainFrame: RainViewerRepository.RadarFrame?,
+    rainFrames: List<RainViewerRepository.RadarFrame>,
+    rainPlaying: Boolean,
     traffic: Boolean,
     aircraftCount: Int,
     seismic: Boolean,
@@ -1968,6 +1975,7 @@ private fun LayersPanel(
     onBasemap: (MapLayerCatalog.Basemap) -> Unit,
     onRelief: (Boolean) -> Unit,
     onRain: (Boolean) -> Unit,
+    onRainPlayback: () -> Unit,
     onTraffic: (Boolean) -> Unit,
     onSeismic: (Boolean) -> Unit,
     onNight: (Boolean) -> Unit,
@@ -2036,6 +2044,24 @@ private fun LayersPanel(
             LayerChip("SEISMIC", "Recent quakes, by strength", seismic, c) { onSeismic(!seismic) }
             LayerChip("RELIEF", "Hillshaded terrain", relief, c) { onRelief(!relief) }
             LayerChip("NIGHT", "Where the Sun has set", night, c) { onNight(!night) }
+        }
+        // Whether the rain is coming towards you or going away — which a single frame cannot say,
+        // and which is the only reason anyone opens a rain radar. Hidden unless there is a sequence
+        // to run: one frame is a picture, not a loop.
+        if (rain && rainFrames.size > 1) {
+            val spanMinutes = (rainFrames.last().timeEpochMs - rainFrames.first().timeEpochMs) / 60_000L
+            val position = rainFrames.indexOfFirst { it.timeEpochMs == rainFrame?.timeEpochMs }
+            LayerChip(
+                label = if (rainPlaying) "❚❚ PAUSE" else "▶ REPLAY",
+                detail = if (rainPlaying && position >= 0) {
+                    "${minutesAgo(rainFrames[position].timeEpochMs)} · ${position + 1}/${rainFrames.size}"
+                } else {
+                    "Last ${spanMinutes / 60} h, ${rainFrames.size} scans"
+                },
+                on = rainPlaying,
+                c = c,
+                onClick = onRainPlayback,
+            )
         }
 
         Text(

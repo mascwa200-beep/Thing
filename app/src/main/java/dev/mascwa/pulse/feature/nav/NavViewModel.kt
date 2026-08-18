@@ -146,9 +146,22 @@ class NavViewModel(
     /** Live precipitation radar. Null frame = the overlay is off or RainViewer had nothing. */
     private val _rain = MutableStateFlow(false)
     val rain: StateFlow<Boolean> = _rain.asStateFlow()
+    /**
+     * The frame currently on the map. During playback this walks the sequence; otherwise it is the
+     * newest. The map effect keys on this and nothing else, so animation needs no change there.
+     */
     private val _rainFrame = MutableStateFlow<RainViewerRepository.RadarFrame?>(null)
     val rainFrame: StateFlow<RainViewerRepository.RadarFrame?> = _rainFrame.asStateFlow()
+
+    /** The whole sequence RainViewer is holding — about two hours at ten-minute steps. */
+    private val _rainFrames = MutableStateFlow<List<RainViewerRepository.RadarFrame>>(emptyList())
+    val rainFrames: StateFlow<List<RainViewerRepository.RadarFrame>> = _rainFrames.asStateFlow()
+
+    private val _rainPlaying = MutableStateFlow(false)
+    val rainPlaying: StateFlow<Boolean> = _rainPlaying.asStateFlow()
+
     private var rainJob: Job? = null
+    private var rainPlayJob: Job? = null
 
     /**
      * Aircraft overhead and recent earthquakes, both drawn on the map.
@@ -380,14 +393,57 @@ class NavViewModel(
         _rain.value = on
         viewModelScope.launch { runCatching { settings.update { s -> s.copy(navRain = on) } } }
         rainJob?.cancel()
+        rainPlayJob?.cancel()
         if (!on) {
+            _rainFrames.value = emptyList()
             _rainFrame.value = null
+            _rainPlaying.value = false
             return
         }
         rainJob = viewModelScope.launch {
             while (isActive) {
-                _rainFrame.value = runCatching { rainViewer.latest() }.getOrNull()
+                val frames = runCatching { rainViewer.frames() }.getOrNull().orEmpty()
+                if (frames.isNotEmpty()) {
+                    _rainFrames.value = frames
+                    // Land on the newest whenever the sequence is refetched. Holding a playback
+                    // position across a refresh would leave the map on a frame that has aged out.
+                    if (!_rainPlaying.value) _rainFrame.value = frames.last()
+                }
                 delay(5 * 60_000L)
+            }
+        }
+    }
+
+    /**
+     * Run the last two hours of radar as a loop, or stop and settle on the newest frame.
+     *
+     * ⚠️ **The first pass through the loop is jerky and that is inherent, not a bug to chase.** Each
+     * frame is a distinct tile URL, so the first time round every step is a network fetch; once
+     * MapLibre has them cached the loop is smooth. [PLAYBACK_STEP_MS] is set slower than a
+     * television radar loop for that reason — fast enough to read as motion, slow enough that the
+     * first pass is not a slideshow of blank tiles.
+     */
+    fun toggleRainPlayback() {
+        if (_rainPlaying.value) {
+            _rainPlaying.value = false
+            rainPlayJob?.cancel()
+            _rainFrames.value.lastOrNull()?.let { _rainFrame.value = it }
+            return
+        }
+        val frames = _rainFrames.value
+        if (frames.size < 2) return // nothing to animate; leave the single picture alone
+        _rainPlaying.value = true
+        rainPlayJob?.cancel()
+        rainPlayJob = viewModelScope.launch {
+            var i = 0
+            while (isActive) {
+                val seq = _rainFrames.value
+                if (seq.isEmpty()) break
+                _rainFrame.value = seq[i % seq.size]
+                i++
+                // A beat at the end of each loop, so the newest frame is readable rather than
+                // flicking straight back to two hours ago.
+                delay(if (i % seq.size == 0) PLAYBACK_LOOP_PAUSE_MS else PLAYBACK_STEP_MS)
             }
         }
     }
@@ -674,6 +730,14 @@ class NavViewModel(
         compass.stop()
         pollJob?.cancel()
         pollJob = null
+        // A radar loop with nobody watching is pure battery, and unlike the slow frame refresh it
+        // ticks twice a second. Stopping it settles the map on the newest frame, so coming back
+        // shows current rain rather than wherever the loop happened to be.
+        if (_rainPlaying.value) {
+            _rainPlaying.value = false
+            rainPlayJob?.cancel()
+            _rainFrames.value.lastOrNull()?.let { _rainFrame.value = it }
+        }
     }
 
     private companion object {
@@ -685,6 +749,18 @@ class NavViewModel(
         const val PROFILE_SAMPLES = 80
         /** How much the route has to change before the heights are worth asking for again. */
         const val PROFILE_REFRESH_FRACTION = 0.2
+
+        /**
+         * How long each radar frame is held during playback.
+         *
+         * Slower than a broadcast weather loop on purpose: every frame is a separate tile URL, so
+         * the first pass through the sequence is fetching rather than replaying, and a fast loop
+         * would show mostly empty tiles until MapLibre has them.
+         */
+        const val PLAYBACK_STEP_MS = 550L
+
+        /** A beat on the newest frame before the loop restarts two hours ago. */
+        const val PLAYBACK_LOOP_PAUSE_MS = 1_400L
     }
 
     override fun onCleared() {
