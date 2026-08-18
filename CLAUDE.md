@@ -4408,6 +4408,90 @@ whether the data-rate line reads as useful or as clutter. On Windows: that a cha
 pop-out window on a second monitor, and above all **that the MSI's stripped runtime still has what
 JavaFX needs** — `packageMsi` runs on every push here, but a green build is not a running app.
 
+### SIX MORE PLACES THE APP WAS MORE CONFIDENT THAN ITS DATA (this session, PR #448)
+
+Owner: *"keep going autonomously."* No direction, so this was **found by hunting**, working the
+vein that produced the ECONOMY-vintage and safety-coverage arcs and then the seven HIGH audit
+fixes. **Zero subagent spend**, as with every arc since the credit directive — local kotlinc +
+JUnit, live probes, `javap`, and CI.
+
+**The ISS was the sharpest, and it is the recurring defect class in its purest form.** The Home
+digest decided "ISS passing near — N km" from a network position on a five-minute cache. Measured
+by propagating a real element set either side of a live sample: the ground point moves **416 km a
+minute**, so **2,081 km** across that window, against a **1,200 km** threshold — the number could
+be wrong by more than the entire range over which the question has an answer. Meanwhile the app
+already held a CI-tested SGP4 propagator, a Celestrak feed cached 12 h, and a
+`SatellitePasses.subPoint` with **zero callers outside its own tests**. Propagating today's
+elements to the instant of the live sample put the sub-point **0.6 km** from the service's own
+figure and the altitude within **0.0 km**, from elements **13.9 hours old**.
+
+So: `SatellitePasses.sighting()`, with the VISIBLE/DAYLIGHT/ECLIPSED rule factored out of
+`buildPass` so an instant and a pass cannot describe the same sky differently. Home now says
+whether the station is *visible*, *lost in daylight* or *in Earth's shadow* — the middle one
+matters most: 51° up, fully sunlit, and invisible because the Sun is 62° up too. Below 10° it says
+nothing. The radar scope's dot moved onto the same propagator (its failure path serves a cached
+picture with **no age limit at all**), and the network call remains only for a device that has
+never cached a TLE.
+⚠️ `TleRepository.cachedElement` is cache-only **and that is load-bearing**: the scope refreshes
+every twenty seconds, and putting a network call in front of a cached picture would be a worse
+regression than the one being fixed. The observatory and Home keep the elements current; the scope
+reads what they left behind.
+
+**Five more, each measured:**
+- **Social feeds could get permanently stuck.** Hacker News and Mastodon swallowed every sub-fetch,
+  so an outage cached as "Nothing trending right now." — then `ensureLoaded` treated an empty feed
+  as loaded, and the pull gesture **cannot fire** on a non-scrollable `EmptyState`
+  (⚠️ `PullToRefreshModifierNode` implements `NestedScrollConnection` **and nothing else** — read
+  out of the shipped material3 1.3.1 classes). `EmptyState` gained an optional retry, wired at the
+  five call sites that are a fetch outcome; Markets' "watchlist is empty" deliberately did not get
+  one. Story age is shown at last. ⚠️ **Not `SimpleDateFormat`**: Lemmy publishes six fractional
+  digits where Mastodon publishes three, and `.SSS` reads the six-digit form as 104,208 ms — a
+  story stamped **104 seconds into its own future**, measured against a live response.
+- **NAV never asked the router what the road does.** `steps=true` on the same request returns
+  manoeuvre type, modifier, bearing, road name and ref. New `RouteSteps` core (11 tests).
+  ⚠️ Which turn is next is **arithmetic, not proximity** — the nearest-manoeuvre rule is wrong on
+  any route that doubles back. The step list is walked by distance covered, which `RouteProgress`
+  already computes exactly by projecting onto the polyline.
+- **Every news card printed its own headline twice.** ⚠️ Google answers this container with a block
+  page, so `NewsSummary`'s rule deliberately **does not depend on the cluster shape** — it asks
+  whether the text adds anything to the headline above it, which is answerable from the two strings
+  and right whatever the feed sends. Mirrored; the desktop draws the same card. `take(400)` now
+  backs up to a word boundary, but only within the second half of the budget.
+- **A fifth of Nearest Help rows had no way to make contact.** 400 Overpass results around London:
+  **158 carry a website against 110 with a phone** — and `website` had been parsed by the earlier
+  remediation and drawn by nothing. `email` (10/400) and `healthcare:speciality` were unread. Every
+  distinct real speciality value was run through the shipped formatting rather than guessed at.
+  ⚠️ The scheme guard is against a case **not observed** (0 of 158 were schemeless) and the comment
+  says so.
+
+**Verification worth reusing.** Skyfield + DE421 are installed locally and free: sweeping the
+fixture window for the highest instant of each kind produced four real cases (lit-but-drowned-out,
+lit-and-worth-it, lit-but-1.4°-up, and 78° up in shadow over Nairobi) rather than fixtures tidy
+enough to prove nothing. ⚠️ **The look-angle tolerance is stated in metres of cross-range, not
+degrees**, and that is the interesting part: the existing fixtures are thousands of km away, a
+satellite 425 km up is nine times closer, so the same tens of metres subtend nine times the angle.
+Measured across the four: 4–36 m of cross-range, flat, while the angular figure ranges over two
+orders of magnitude.
+
+**Every load-bearing rule was negative-tested** — thirteen perturbations across the arc, each
+confirmed to fail exactly its own guard and nothing else, each script asserting it matched the
+source first.
+
+⚠️ **An expectation of mine was wrong where the code was right, again — the tenth this arc-series.**
+At 900 m along the London route the left turn onto Marlborough Road is *behind* you; the next thing
+to do is the right turn at the end of it. The distance was right and the name was wrong. **Compute
+the expected value from the shipped function on real data before writing the assertion.**
+
+⚠️ **`tools/android_resolve_check.sh`'s documented cascade fired three times** and each was proved
+a false positive with a **typed probe** against stubs, not shrugged at. Note for next time:
+`HttpClient.kt` does not resolve on its own either, so passing it does **not** quiet a report that
+cascades from it — write the probe.
+
+⚠️ **Owner-verify on the Pixel throughout — CI compiles, it does not draw, and it has no GPS,
+microphone or camera.** Worth eyes first: the ISS line on Home (a direction and an elevation, and
+silence when the station is low or below 10°), the NAV turn instruction on a real drive, the
+Nearest Help contact links, and the news card no longer repeating its headline.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
