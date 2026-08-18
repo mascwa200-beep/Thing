@@ -63,9 +63,22 @@ Branch `claude/loving-edison-bd65oa`, and each one measured before it was touche
 | The summary printed under every headline is the headline again | ⚠️ Google blocks this container, so the rule deliberately does not depend on the cluster shape — it asks whether the text adds anything to the headline above it |
 | `website`, `email` and `healthcare:speciality` on Overpass | `website` was parsed by the earlier remediation and drawn by nothing. All three now render; every distinct real speciality value in a 400-result sample was run through the shipped formatting |
 
-**Still open at medium:** the description-cluster re-fetch (blocked — Google answers this
-container with a block page), the UTC close-approach time, the two radio findings and the two
-RainViewer ones.
+**Still open at medium:** the description-cluster re-fetch, and only that. It is **blocked** —
+Google answers this container with a block page, so the cluster cannot be examined from here.
+
+⚠️ **This list was itself stale, and one entry on it was already fixed.** The close-approach time
+is parsed from `epoch_date_close_approach` and rendered through the screen's device-zone
+formatter; `closeApproachLine` prefers the epoch and falls back to the UTC string only when the
+epoch is absent. Check the code before working an audit item, not the status table.
+
+The remaining four were closed on `claude/loving-edison-bd65oa`, each re-probed live first:
+
+| Finding | Commit | How |
+|---|---|---|
+| Radio "near you" ranked by raw distance | `a2a7431` | `core:telemetry/StationRanking.kt` — distance is **banded**, because a 0.20–4.31 km spread does not discriminate; popularity orders within a band, nearer still wins across bands, and the limit is applied after ordering |
+| `hidebroken=true` presented as a liveness guarantee | `a2a7431` | Class doc corrected against a live measurement: 14 of 62,497 flagged broken, median last check 214 days old. `RadioController.failPermanently` is the real signal |
+| RainViewer: 12 of 13 frames discarded | `a5423d4` | The sequence is kept and looped behind a REPLAY chip. The map effect and `applyRain` are unchanged — they key on the displayed frame, so animation is just pointing that flow at successive frames |
+| Launch `window_start`/`window_end` discarded | `a2a7431` | `core:telemetry/LaunchWindow.kt` — and the reason it is not minor: `net_precision` says how well the T-0 is known and nothing about how much room the flight has, so a second-precise T-0 sits inside a four-hour window with the existing guard passing |
 
 ## The defect class
 

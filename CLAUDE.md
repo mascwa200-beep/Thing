@@ -4736,6 +4736,123 @@ a **perfectly healthy** run under `cancel-in-progress`. Two guards against repea
   Anything under about fifteen minutes is ordinary. A frozen `updated_at` on an in-progress run is
   **normal**, not evidence of a stall — I read it as the opposite.
 
+### ALERTS THAT MEAN SOMETHING — the four-part directive (this session, PR #448)
+
+Owner, in one message: fix every problem ever detected; make the breaking-news popup **a real
+transparent overlay** you can dismiss or work around **without losing the page you were on**;
+stop the in-app **red alert being permanently on** and reserve RED for what a government would
+class a disaster; add **a real emergency alert** that takes the whole screen with a loud alarm
+in Starfleet condition-red style; and **never repeat the same notification text** from a story
+already reported. Plus: be sparing with tokens. Binding AskUserQuestion decisions: everything
+in **one batch**, a **dedicated always-on service** for the watch, the alarm at **full volume
+regardless of silent/DND**, owner is in the **United States**.
+
+**Zero subagent spend, as with every arc since the credit directive.** All four reports were
+real and each had an exact cause:
+
+| Report | Cause, located |
+|---|---|
+| The takeover steals your page | `TakeoverLauncher` launched `BreakingNewsActivity` with `FLAG_ACTIVITY_CLEAR_TASK` — it **wipes the back stack**, so dismissing cannot return you anywhere. Also a full-screen opaque Activity. |
+| Permanent red alert | `UnifiedBrief` set RED from `EmergencyNews.isMajor`, which fired on the literal strings `"breaking:"`, `"just in:"`, `"developing:"`. Google News headlines carry those constantly, and `Theme.kt` then recolours **every screen**. |
+| No real emergency alert | The government data was **already fetched and graded** — `SafetyRepository.nws()` parsed severity, urgency, certainty, expiry and the official `instruction`, and `CapAlerts.grade` already yielded EXTREME. It produced a **yellow line on the board**. |
+| The same text repeats | The board is one fixed id re-posted every refresh; `urgencyKey` dedups the **buzz**, never the **text**, and the NEWS row is "the current top headline". |
+
+⚠️ **One promise that cannot be kept, and the UI does not claim it.** "Fire before the phone's
+own emergency alert" is not achievable by any app: Wireless Emergency Alerts are delivered by
+the modem to the system `CellBroadcastService` and no ordinary app can receive, intercept or
+preempt them. What is real is that NWS publishes the same hazard to `api.weather.gov` as CAP,
+and a ~60 s poll often surfaces it at or before the broadcast — sometimes after.
+
+**What shipped** (`b954bbb`, `3f95bc1`, `87bf2d6`, `ba88507`; CI run 1757 green):
+- **`StoryLedger`** (pure, 9 tests) — a normalised story identity built on `EmergencyNews.topicQuery`
+  plus a bounded seen-ring. `BriefEngine` fills the NEWS row only with a story not already shown,
+  else the next unshown, else **the row is omitted**. Persisted in `NotifyState.seenStories`.
+- **`EmergencyAlert`** (pure, 9 tests) — `Tier` over `CapAlerts.grade`, expiry-aware, deduped by
+  alert id, with a **named-hazard floor** (tornado/tsunami warning, flash-flood emergency) that
+  fires RED even when the severity field is absent, which the live feed does do.
+- **News can never set RED.** `officialAlert` (government-sourced) is now the only news-adjacent
+  RED path beside `securityCritical`; news tops out at YELLOW and only for a STRONG disaster.
+  The three label triggers are gone from `isMajor`.
+- **`BreakingOverlayService`** — a `TYPE_APPLICATION_OVERLAY` window with `FLAG_NOT_FOCUSABLE or
+  FLAG_NOT_TOUCH_MODAL`, so the app behind stays fully usable. Programmatic Views, not Compose
+  (this repo's documented rule for overlay windows). One story, drag to move, ✕ or five minutes
+  to dismiss. `CLEAR_TASK` removed from **both** paths — the launcher and the notification
+  fallback, which is the commoner route because it runs whenever the overlay grant is absent.
+- **`RedAlertActivity` + `EmergencyKlaxon` + `EmergencyWatchService`** — condition-red screen over
+  the lock screen, back disabled, the issuer's `instruction` reproduced **verbatim**; alarm on
+  `STREAM_ALARM` at max with the prior volume **restored on stop**; a 60 s `specialUse` foreground
+  watch, `START_STICKY`, revived by `BootReceiver` and self-healed by `RefreshWorker`.
+
+**Live verification of the grader** against the real NWS feed at five US points: zero false
+alarms (Air Quality → NONE, Extreme Heat Warning → YELLOW, Heat Advisory → ADVISORY, all silent)
+while a Tornado Warning **with the severity field absent** fired RED via the named-hazard floor.
+London → HTTP 400, which is how that endpoint states its own US-only reach. Eleven load-bearing
+rules negative-tested.
+
+⚠️ **THE LESSON OF THIS ARC, and it cost two CI failures.** The second was
+`Function invocation 'lcarsBlockShape(...)' expected` — and it compiled clean locally because
+**I had written the stub from memory as a `val` when the real declaration is a `fun`**. A stub
+that does not match the real declaration does not merely fail to catch a bug, it actively
+asserts the wrong thing is fine. **Derive every stub by copying the real declaration out of the
+source.** (The first failure was `scope?.cancel()` needing `import kotlinx.coroutines.cancel` —
+an extension where `Job.cancel()` is a member; the resolve-check cannot see it because every
+name in that file cascades.)
+
+⚠️ **A capability correction: Compose files CAN be frontend-verified locally.** Compiling a
+`@Composable` without the Compose plugin fails in **backend IR lowering**; reaching that point
+proves the frontend passed. Negative-tested. The older note that Compose UI is impractical to
+check locally is wrong.
+
+### THE SWEEP — the feed audit's remaining MEDIUM findings (same PR, `a2a7431`, `a5423d4`)
+
+Three closed, each measured against a live response first, and one of the "open" items turned
+out already fixed (the close-approach epoch is parsed and rendered with the device zone — the
+audit's own status list was stale).
+
+- **Radio "near you" was sorted by raw distance.** `clickcount` and `votes` are on 181/181
+  stations and neither was declared. The thirty shown spanned 0.20–4.31 km — no discrimination
+  at all, they are one city — while eight had never been played and a 193-click station at
+  5.03 km was cut at distance-rank 35. New `StationRanking` **bands** distance: inside a band it
+  carries no information so popularity orders within it, across bands nearer still wins outright.
+  The limit is applied **after** ordering, which is where the good station was being lost.
+  Also corrected the class doc: `hidebroken=true` is not the liveness guarantee it reads as
+  (14 of 62,497 flagged broken; median last check **214 days** old).
+- **A four-hour launch window behind a T-0 quoted to the second.** `window_start`/`window_end`
+  are published on 6 of 6 sampled launches and neither was parsed. ⚠️ The interaction is the
+  finding: `net_precision` describes how well the T-0 is known and says **nothing** about how
+  much room the flight has, so the existing `timeIsFirm` guard *passes* on a Starlink launch with
+  a second-precise T-0 inside a 02:00–06:00 window. New `LaunchWindow` is deliberately clock-free
+  — it answers how wide and whether that is worth saying, and leaves formatting to the caller's
+  own zone, because rendering UTC beside local times is a mistake this app has already made twice.
+- **Two hours of rain radar, one frame drawn.** RainViewer holds **13 frames over two hours at
+  ten-minute steps** (probed live) and the parser read `past.lastOrNull()`. So the map could show
+  where rain *is* and never whether it is coming or going. The sequence is now kept and looped;
+  ⚠️ **the map effect and `applyRain` are unchanged** — they key on the single displayed frame,
+  so animation falls out of pointing that flow at successive frames. The 550 ms step is slower
+  than a broadcast loop on purpose: each frame is a distinct tile URL, so the first pass is
+  fetching, not replaying.
+
+⚠️ **Three negative tests were green for the wrong reason here, on two distinct mechanisms, and
+one was hiding a bug I had introduced.** `Double.NaN.toInt()` and `(-1.0 / 10_000.0).toInt()` are
+**both zero** in Kotlin, so the absurd-distance test passed with the guard deleted — and the
+guard itself mapped positive infinity to band 0, sorting an *unknown* distance **first** in a
+list headed "near you". It takes a large negative or an infinity to tell the cases apart. The
+other was the recorded "perturbation only touches the code without removing the property":
+`.take(limit)` duplicated is idempotent.
+
+**Still open on the audit, deliberately:** the description-cluster re-fetch is **blocked** (Google
+answers this container with a block page); 22 COSMETIC findings remain unworked. Both KB backlogs
+(#73 waves, #177 lore) stay **parked** under the credit directive — they are content growth, not
+detected defects, and they are what tripped the weekly limiter four times.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot draw a window or sound an alarm.** In
+order: grant "display over other apps", then confirm a breaking story appears as a card over
+another app and **leaves that app usable**; confirm the console is no longer permanently red;
+confirm the same headline never reprints on the board; and for the emergency path, that the
+condition-red screen appears over the lock screen with the alarm at full volume and that
+acknowledging **restores your previous alarm volume**. Then the map's REPLAY chip, the radio
+"near you" list, and the launch window line.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
