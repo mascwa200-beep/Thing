@@ -5489,3 +5489,57 @@ continuous mic claimant** beside the wake loop and the Sensorium's sips, so `Voi
 a single-AudioRecord fan-out would be better and is a bigger refactor, recorded rather than silently
 degrading the wake word) → **U1** the screen (live transcript, flagged fallacies with counter-arguments and
 citations, purge control, Settings toggle default OFF).
+
+### R1 — the rolling transcript, and a correction to the plan (this session cont.)
+
+⚠️ **The plan and the section above both said Room was "catalogued but entirely unused — no `@Entity`,
+no `RoomDatabase`, not even a dependency line". That is wrong.** `core:database` has had
+`JarvisDatabase`/`JarvisDao`/`JarvisEntities` all along, with KSP already applied and the Room deps
+already declared. R1 was therefore a much smaller job than planned, and the right one was to add to
+that module rather than stand up a second Room setup in `:app`.
+
+**But NOT to that database.** `JarvisDatabase` is built with `fallbackToDestructiveMigration()`, which
+its own comment accepts because the state it held was small and regenerable. It is no longer only
+that: it now carries `knowledge_docs`, the documents the **user** ingested for retrieval. Adding a
+table means bumping the version, and bumping the version destroys them. So the transcript gets its
+own database, for that reason and a second one that matters more: **a one-tap purge of a separate
+file is `deleteDatabase()`**, which removes the bytes, where deleting rows from a shared table leaves
+them in freed SQLite pages until something reuses or vacuums them. `PRAGMA secure_delete = ON` is set
+on open, which narrows that window but does not close it — hence the file delete.
+
+- **`TranscriptDatabase`** (`core:database`) — one entity, one DAO, its own file. The count-based trim
+  is keyed on `id NOT IN (newest :keep by at_ms)` rather than a computed offset, so a transcriber that
+  emits a late chunk out of order cannot evict something newer than itself.
+- **`TranscriptSeal`** (`:app`) — ⚠️ **deliberately a separate file with no Android imports at all**, so
+  the one consequential rule is held by a test that actually runs rather than by whoever next edits the
+  file. Returning a plain `Sealed` rather than the Room entity is what buys that: what gets tested is
+  the decision, not the table it lands in. **A row that cannot be encrypted is not stored** — the
+  tempting reading of a null cipher is "keep it anyway, it never leaves the device", but a device with
+  no working keystore is precisely where a plaintext row is most likely to be read by something else.
+  And the policy runs BEFORE the cipher, so a refused utterance never reaches the keystore at all.
+- **`TranscriptStore`** (`:app`) — applies the Keystore cipher (`SecretCrypto` is app-module, so this
+  layer exists for exactly that), enforces both halves of the retention bound, and purges.
+  ⚠️ **The db handle is NOT `by lazy`** — `purge()` closes it and deletes the file, and a lazy would
+  keep handing out the closed instance forever after, every later `record` throwing on a handle whose
+  file no longer exists. Nulled on purge, rebuilt on next use.
+- ⚠️ **Timestamps are not encrypted and that is a real if small leak** — they reveal when speech
+  happened and how much, though not a word of what was said. Stated rather than glossed: pruning is by
+  age and count, and a store that had to decrypt every row to prune would either hold keys open longer
+  or fail to enforce its own retention. The retention bound is worth more than the metadata it costs.
+
+**Verification, all local:** 5 seal tests executed on the JVM, both load-bearing rules negative-tested
+(a plaintext fallback and screening-after-the-cipher each fail exactly their own test); and the whole
+storage path — Room database, policy, seal, `SecretCrypto`, store, plus a typed probe constructing it
+exactly as `AppContainer` does and exercising every public method — **type-checks clean against the
+real platform classes and the real Room jars** via `tools/android_compile_check.sh`.
+
+⚠️ **Two verification notes worth keeping.** `android_compile_check.sh` prints a `curl 404` per
+artifact it tries on Maven Central before falling back to Google's maven — that noise is expected and
+is NOT a failure; proven by a probe showing that when a library genuinely is absent, its imports are
+reported unresolved. And `android_resolve_check.sh` flagged `TranscriptStore` on the `AppContainer`
+edit, which is its documented cascade (core-only classpath); settled by the typed probe above, not by
+shrugging.
+
+**Wired into `AppContainer` as a lazy**, so nothing is created until the interrogator is switched on —
+a user who never enables it never has a transcript database on disk. Nothing calls `record` yet; its
+consumer is the A1 service, which is the next slice.

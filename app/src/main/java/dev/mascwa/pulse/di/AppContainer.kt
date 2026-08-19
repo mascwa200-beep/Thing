@@ -441,6 +441,21 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.sensing.SensorFusionController(appContext)
     }
 
+    /**
+     * The acoustic interrogator's rolling transcript.
+     *
+     * ⚠️ Its own Room database, not a table in the shared one — see [TranscriptDatabase] for the two
+     * reasons, both load-bearing: bumping the shared database's version destroys the user's ingested
+     * knowledge docs, and a one-tap purge of a separate file removes the bytes rather than leaving
+     * them in freed SQLite pages.
+     *
+     * `by lazy`, so nothing is created until the interrogator is actually switched on: a user who
+     * never enables it never has a transcript database on disk at all.
+     */
+    val transcriptStore: dev.mascwa.pulse.data.interrogator.TranscriptStore by lazy {
+        dev.mascwa.pulse.data.interrogator.TranscriptStore(appContext)
+    }
+
     /** Learned normality + the 48 h event log (baseline must survive restarts or anomaly detection
      *  restarts amnesiac). */
     val sensoriumStore: dev.mascwa.pulse.data.sensing.SensoriumStore by lazy {
