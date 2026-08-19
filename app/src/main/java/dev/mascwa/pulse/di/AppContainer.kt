@@ -625,6 +625,9 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.OpenLinkTool(appContext),
             dev.mascwa.pulse.jarvis.agent.TorchTool(appContext),
             dev.mascwa.pulse.jarvis.agent.ClipboardTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.PlayMediaTool(
+                appContext, mediaExtractor, sponsorBlockRepository, settingsRepository,
+            ),
         )
     }
     /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user

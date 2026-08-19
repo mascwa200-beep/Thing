@@ -176,3 +176,64 @@ class ClipboardTool(private val context: Context) : JarvisTool {
         return "Copied to the clipboard."
     }
 }
+
+/**
+ * Play a video or track address through the on-demand player, by request.
+ *
+ * ⚠️ **Audio-only, deliberately.** A tool call has no screen attached — the request usually arrives
+ * by voice or from the console mid-conversation — so the video rendition would decode pixels nobody
+ * is looking at. Audio-only also rides the keep-alive foreground service, so what the Computer
+ * starts keeps playing when the conversation ends. The Viewscreen (MENU ▸ SOUND) is where the
+ * picture lives.
+ *
+ * The skip database is consulted under exactly the same rule as the screen: only when the user's
+ * sponsor-skip switch is on. A tool must not have looser privacy than the button it mirrors.
+ */
+class PlayMediaTool(
+    private val context: Context,
+    private val extractor: dev.mascwa.pulse.data.media.MediaExtractor,
+    private val sponsor: dev.mascwa.pulse.data.media.SponsorBlockRepository,
+    private val settings: dev.mascwa.pulse.data.settings.SettingsRepository,
+) : JarvisTool {
+    override val name = "play"
+    override val usage = "play <url|pause|resume|stop> — play a video/track address (audio, background), or control playback"
+
+    override suspend fun run(arg: String): String {
+        val a = arg.trim()
+        when (a.lowercase()) {
+            "" -> return "Give me an address to play, or pause/resume/stop."
+            "stop" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.stop(context)
+                return "Playback stopped."
+            }
+            "pause" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.pause()
+                return "Paused."
+            }
+            "resume" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.resume()
+                return "Resuming."
+            }
+        }
+        return when (val r = extractor.resolve(a)) {
+            is dev.mascwa.pulse.core.telemetry.MediaResolution.Refused ->
+                dev.mascwa.pulse.core.telemetry.MediaResolution.say(r.reason) +
+                    if (r.detail.isNotBlank()) " (${r.detail})" else ""
+            is dev.mascwa.pulse.core.telemetry.MediaResolution.Ready -> {
+                val segments = if (settings.current().sponsorSkip) {
+                    val id = r.item.id.ifBlank { extractor.videoId(a) }
+                    if (id.isBlank()) emptyList()
+                    else dev.mascwa.pulse.core.telemetry.SponsorSegments.usable(
+                        runCatching { sponsor.segments(id) }.getOrDefault(emptyList()),
+                        dev.mascwa.pulse.core.telemetry.SponsorSegments.Policy(),
+                    )
+                } else emptyList()
+                dev.mascwa.pulse.feature.theater.OnDemandController.play(
+                    context, r.item, segments, audioOnly = true,
+                )
+                val skips = if (segments.isEmpty()) "" else " ${segments.size} flagged segments will be skipped."
+                "Playing ${r.item.title.ifBlank { "it" }} — audio, in the background.$skips"
+            }
+        }
+    }
+}

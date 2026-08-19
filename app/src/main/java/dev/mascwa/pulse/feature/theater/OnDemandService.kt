@@ -119,7 +119,14 @@ class OnDemandService : Service() {
         private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_ONDEMAND
         const val ACTION_STOP = "dev.mascwa.pulse.ondemand.STOP"
 
-        /** Start the keep-alive. Called from a foreground context (the Viewscreen), so allowed. */
+        /**
+         * Start the keep-alive, best-effort.
+         *
+         * From the Viewscreen this is a foreground start and always allowed. From the `play` tool
+         * it can be a background start (a voice request with no visible activity), which Android
+         * 12+ may refuse — the runCatching makes that a degraded keep-alive rather than a crash:
+         * playback still runs for as long as the process lives, it just is not pinned.
+         */
         fun start(context: Context) {
             runCatching {
                 context.startForegroundService(Intent(context, OnDemandService::class.java))
