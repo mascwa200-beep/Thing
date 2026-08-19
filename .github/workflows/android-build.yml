@@ -18,6 +18,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ⚠️ ITS OWN JOB, NOT A STEP IN `build`, AND THAT IS THE WHOLE POINT.
+  #
+  # whisper.cpp and llama.cpp must carry the same ggml sync or only one of them can link, and which
+  # llama build number that is cannot be worked out from a machine that cannot reach GitHub —
+  # guessing has been wrong three times in three different ways. So the runner is asked.
+  #
+  # A step inside `build` would bury its answer several hundred lines deep, behind 214 lines of ninja
+  # output and the test run, which is expensive to read back. A separate job has its own short log.
+  # It also runs in parallel, so it costs the build nothing, and `continue-on-error` means a probe
+  # that fails can never hold up a release.
+  #
+  # Delete this job once a matching pin is recorded in the build job's TAG.
+  ggml-probe:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Which llama.cpp tags carry whisper's ggml
+        run: |
+          set +e
+          # The whisper pin is read out of this very workflow rather than repeated, so the probe
+          # cannot drift from the tag the build actually uses.
+          wt=$(grep -oE 'TAG="v[0-9.]+"' .github/workflows/android-build.yml | head -1 | sed 's/TAG="//; s/"//')
+          test -n "$wt" || { echo "could not read the whisper tag out of the workflow"; exit 0; }
+          echo "whisper.cpp pin: $wt"
+
+          ref=$(mktemp -d)
+          git clone --quiet --depth 1 --filter=blob:none --sparse -b "$wt" \
+            https://github.com/ggml-org/whisper.cpp "$ref" || { echo "whisper clone failed"; exit 0; }
+          ( cd "$ref" && git sparse-checkout set ggml/include >/dev/null 2>&1 )
+          test -d "$ref/ggml/include" || { echo "no ggml/include in whisper at $wt"; exit 0; }
+          echo "whisper ggml headers: $(ls "$ref/ggml/include" | tr '\n' ' ')"
+          echo
+
+          repo=https://github.com/ggml-org/llama.cpp
+          tags=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'b*' | sed 's#.*refs/tags/##')
+          echo "llama.cpp: $(echo "$tags" | wc -l) build tags, newest $(echo "$tags" | head -1)"
+
+          # A geometric spread rather than a bisection, deliberately: "matches" is NOT monotonic in
+          # the tag number — only a window of builds carries any given sync — so a midpoint test
+          # would mean nothing. The spread locates the window; one more round pins it exactly.
+          for i in 1 25 50 100 200 400 800 1600; do
+            t=$(echo "$tags" | sed -n "${i}p")
+            [ -n "$t" ] || continue
+            d=$(mktemp -d)
+            if ! git clone --quiet --depth 1 --filter=blob:none --sparse -b "$t" "$repo" "$d" 2>/dev/null; then
+              echo "  [$i] $t  clone failed"; rm -rf "$d"; continue
+            fi
+            ( cd "$d" && git sparse-checkout set ggml/include >/dev/null 2>&1 )
+            if [ ! -d "$d/ggml/include" ]; then
+              echo "  [$i] $t  no ggml/include at this tag"
+            elif diff -r -q "$d/ggml/include" "$ref/ggml/include" >/dev/null 2>&1; then
+              echo "  [$i] $t  ==> MATCHES whisper $wt — pin the build job to this"
+            else
+              n=$(diff -r -q "$d/ggml/include" "$ref/ggml/include" 2>&1 | wc -l)
+              echo "  [$i] $t  differs in $n header(s)"
+            fi
+            rm -rf "$d"
+          done
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -197,50 +259,6 @@ jobs:
             # adding a second way to express the same thing.
             rm -rf app/src/main/cpp/llama.cpp
           fi
-
-      - name: Find a llama.cpp tag whose ggml matches whisper's
-        # ⚠️ DIAGNOSTIC ONLY — never fails the build, never changes what is compiled.
-        #
-        # The two projects have to carry the same ggml sync or only one of them can link. Which
-        # llama build number that is cannot be worked out from here: this container cannot reach
-        # GitHub, and guessing has already cost three rounds (b4600 had the new model API and the old
-        # cache API; b5000 agreed on ggml_backend_sched_new and disagreed about GGML_KQ_MASK_PAD).
-        #
-        # So the runner is asked instead. Each candidate is fetched with --filter=blob:none --sparse
-        # over ggml/include alone, which is a few kilobytes rather than the ~50 MB tree, and its
-        # headers are compared against the whisper tree already checked out. A geometric spread
-        # rather than a bisection, deliberately: "matches" is not monotonic in the tag number — only
-        # a WINDOW of llama builds carries any given sync — so a midpoint test would be meaningless.
-        #
-        # Delete this step once a matching pin is recorded in the TAG above.
-        continue-on-error: true
-        run: |
-          set +e
-          ref=app/src/main/cpp/whisper.cpp/ggml/include
-          test -d "$ref" || { echo "no whisper ggml headers to compare against"; exit 0; }
-          repo=https://github.com/ggml-org/llama.cpp
-          tags=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'b*' | sed 's#.*refs/tags/##')
-          total=$(echo "$tags" | wc -l)
-          echo "llama.cpp has $total build tags; newest is $(echo "$tags" | head -1)"
-          for i in 1 25 50 100 200 400 800; do
-            t=$(echo "$tags" | sed -n "${i}p")
-            [ -n "$t" ] || continue
-            d=$(mktemp -d)
-            if ! git clone --quiet --depth 1 --filter=blob:none --sparse -b "$t" "$repo" "$d" 2>/dev/null; then
-              echo "  [$i] $t  clone failed"; rm -rf "$d"; continue
-            fi
-            ( cd "$d" && git sparse-checkout set ggml/include >/dev/null 2>&1 )
-            if [ ! -d "$d/ggml/include" ]; then
-              echo "  [$i] $t  no ggml/include at this tag"
-            elif diff -r -q "$d/ggml/include" "$ref" >/dev/null 2>&1; then
-              echo "  [$i] $t  ✅ MATCHES whisper's ggml — pin TAG to this"
-            else
-              n=$(diff -r -q "$d/ggml/include" "$ref" 2>&1 | wc -l)
-              echo "  [$i] $t  differs ($n header differences)"
-            fi
-            rm -rf "$d"
-          done
-          echo "(diagnostic only — the build above is unaffected)"
 
       - name: Run unit tests
         run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
