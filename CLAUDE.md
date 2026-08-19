@@ -5844,3 +5844,106 @@ mid-sentence was reported as `NO_CLAIM` — a statement about content nothing ha
 was green at the time and a blind bump trades a working state for an unknown one. The params fields
 it sets are long-stable. Transcription quality on the newer release is owner-verify like everything
 else here.
+
+### THE READER — a DOM decimator, on both platforms (this session, PR #449)
+
+Owner's four-feature directive, feature 2: *"implement a DOM decimator using Jsoup."* Feature 1 (the
+acoustic interrogator) shipped green first; this is the next in the owner's own enumeration.
+**Zero subagent spend**, as with every arc since the credit directive — local kotlinc + JUnit, live
+`curl` probes, `javap`, `./gradlew :desktop:build`, and CI.
+
+`core:telemetry/Readability.kt` (+24 tests) strips a page to what was written and emits typed blocks,
+so the renderer never sees markup. `:app` gets a `ReaderRepository`, a `ReaderScreen` and a routed tap
+on the news card; the desktop gets the mirrored core, a READ action and a reader pane. jsoup is the
+one third-party parser `core:telemetry` takes — it is pure logic over a parsed document, which is what
+that module is for, and plain JVM, so the desktop mirror needs only the same dependency line.
+
+**⚠️ THE MOST IMPORTANT OUTPUT IS THE VERDICT, NOT THE ARTICLE.** Most pages will not yield one and
+they all fail identically: something came back, it parsed perfectly, and it is not the article. A
+paywall, a consent wall, a script-rendered page, an index and a redirect stub are indistinguishable by
+tag structure, so every extraction carries an `Outcome` and a sentence naming why — the same
+discipline as `Rebuttal.Provenance`.
+
+**⚠️ GOOGLE NEWS LINKS CANNOT BE READ, AND THAT IS A PROPERTY OF THE FEED, NOT A BUG TO FIX.** Measured
+before any code: the `.../rss/articles/CBMi…` token decodes to a short protobuf holding an opaque
+`AU_yqL…` id with **no plaintext URL** (0 of 8 sampled), and following the link does **not** redirect to
+the publisher — it lands on `news.google.com/home`. Resolving it needs a signed call to an undocumented
+endpoint that would break silently. So `Readability.canRead` is **public**, and the news card routes the
+tap with it: readable links open the reader, Google links keep opening the browser, which works. One
+rule, two consumers — the screen picks the destination and the extraction explains itself with the same
+function.
+
+**⚠️ THE MEASUREMENT THAT KILLED A RULE BEFORE IT SHIPPED.** The obvious index-vs-article discriminator
+is headline links per paragraph. Measured across the corpus, the ranges **overlap completely**: a real
+Associated Press article scored **3.33**, higher than every index page in the set, while LWN's index
+scored **0.22**, lower than every article but one. No threshold exists, so none was invented — the word
+floor does the work, and the residual limit is recorded in the KDoc so nobody re-derives it.
+"Declares itself an article" (`og:type`, JSON-LD, `article:published_time`) was false for **all ten**
+non-articles — and also for a Gutenberg book and an LWN piece, so it is a positive signal that can
+never be a gate.
+
+**Every defect came from running it over real fetched pages, not from the tests.** Recipe in
+`scratchpad/reader/` — fetch a spread with a browser user agent, keep the failure cases (an index, a
+401, a 404, a redirect stub), and run the shipped core over them.
+- **A byline that was a URL.** `article:author` is a *profile URL* by OpenGraph's specification and AP
+  returns exactly that. Values that do not look like a name are passed over and the writer's name comes
+  from JSON-LD. ⚠️ The extent of that value is found by **matching brackets**, because a fixed window
+  wide enough to clear AP's nested job title also reaches the `publisher` object and would attribute
+  every story to the wire service. Negative-tested with an author object that has no `name` at all.
+- **A security-advisory table as the opening paragraph**, every cell run together, because `descend()`
+  stepped inside it and `walk()` reads children.
+- **The same defect in general form**: descending into a dominant `<p>` discarded the subheadings, list
+  and pictures after it. The rule is now *never step into something that is itself content*, and
+  `OPAQUE_TO_DESCENT` is **derived from** `HANDLED_TAGS` rather than restated — the first version stated
+  it twice and drifted immediately (`table` in one, `p` in neither).
+- **A grey placeholder instead of the photograph.** `src` is tried **last**: on a lazy-loading page it
+  holds a spacer and the real address is in `srcset`. And a `<figure>` takes the first `<img>` that
+  yields a usable address, not the first `<img>` — BBC emits a placeholder then the real one.
+
+**⚠️ TWO REAL ERRORS CAUGHT BEFORE CI, BOTH WORTH RECOGNISING AGAIN.**
+1. `Readability.hostOf` was `internal`, so `:app` could not see it — the cross-module visibility trap.
+   Every core member the new screens touch was then audited mechanically, not just the one that broke.
+2. `tools/android_resolve_check.sh` had **no jsoup on its classpath**, so once the core took that
+   dependency the WHOLE core failed to compile there and every member of every core type cascaded into
+   its report — it named `Extraction.wordCount`, `meta` and `truncated` as unresolved while the real
+   build compiles them clean. **A new false-positive mechanism for that tool: a missing dependency of
+   the CORE, not of the file under test.** Fixed, with a note to add the next core dependency there too.
+   The residual report was settled with a **typed probe**, per the recorded discipline, not shrugged at.
+
+**⚠️ A LOCAL CAPABILITY RECOVERED, AND THE REASON IS NOT OBVIOUS.** `./gradlew :desktop:build` began
+failing with "SDK location not found". Not a regression — the version-catalog edit invalidated the
+configuration cache, which forced Gradle to configure `:app` for the first time in this container.
+**`./gradlew :desktop:build --configure-on-demand --no-configuration-cache`** configures only what
+`:desktop` needs and works. CI is unaffected: its ubuntu runner has the SDK. And `--rerun-tasks` is
+still required when what changed lives outside the module, or `MirrorDriftTest` replays a stale pass.
+
+**Tandem.** `Readability` is a strict mirror (both maps updated in lockstep — the script's and
+`MirrorDriftTest`'s, which is what its completeness assertion exists to force); the repository is an
+**adapted port** with a banner, because the two name different `HttpClient`s and byte-equality is not
+the goal. `core/telemetry/src/**` was already in the desktop workflow's path filter. Desktop went
+**438 → 462 tests**. The desktop card previously had **no way to open an article at all**, so this
+closed a gap as well as porting one.
+
+**Verification:** 24 core tests executed locally; **all nine load-bearing rules negative-tested**, each
+perturbation asserted to have matched the source first — ⚠️ **one was asleep on the first pass** (the
+wall-ordering guard: my perturbation only *touched* the code without removing the property, mechanism
+#2 of the recorded four), and a rewritten one fails exactly that test. The HTTP layer, the repository
+and the core compile clean against the real Android platform classes via
+`tools/android_compile_check.sh`. `:desktop:build` green.
+
+⚠️ **My own expectation was wrong where the code was right, again** — I asserted two headings against a
+fixture with one `<h2>`. Roughly the thirteenth in this arc-series. **Compute the expected value from
+the shipped function before writing the assertion.** And ⚠️ my probe's chrome-leak list reproduced the
+very substring trap the extractor is guarded against: "Advertisement" fired on Wikipedia's espresso
+article describing *a 1922 advertisement for an espresso machine*, and "Sign in" on prose. **The
+harness needs the same care as the thing it checks.**
+
+⚠️ **Owner-verify on the Pixel and on Windows — CI compiles, it does not draw.** Tap a Hacker News or
+social story (a real publisher URL) and check the article reads cleanly with its picture, byline and
+time-to-read; tap a Google News story and check it still opens the browser as before; find a paywalled
+one and check it says so rather than showing the wall. On Windows: the READ button on a card that has
+one, and whether the reading measure is comfortable at full-screen width.
+
+**Open / steerable:** the reader is reachable only from a news card — the assistant could hand it a URL
+too; images on the desktop are named rather than drawn (no image pipeline in that module); and the
+owner's features 3 (Media3 + SponsorBlock) and 4 (bundled-Python yt-dlp) remain deferred.
