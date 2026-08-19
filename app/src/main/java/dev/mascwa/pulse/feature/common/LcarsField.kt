@@ -27,6 +27,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.mascwa.pulse.ui.effects.HapticCue
+import dev.mascwa.pulse.ui.effects.SoundCue
+import dev.mascwa.pulse.ui.effects.rememberLcarsCue
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
