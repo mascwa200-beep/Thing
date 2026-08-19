@@ -19,6 +19,15 @@ build/
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# The acoustic interrogator's native upstreams. CI shallow-clones whisper.cpp and llama.cpp at a
+# pinned tag into app/src/main/cpp/ before Gradle runs — they are never vendored, because a git
+# submodule needs a pinned commit SHA and the development container cannot reach GitHub to obtain
+# one. Listed BEFORE those clone steps exist, deliberately: `git add -A` has already swept one
+# stray file into a commit this session, and a multi-megabyte C++ tree is the same mistake with a
+# much worse blast radius.
+app/src/main/cpp/whisper.cpp/
+app/src/main/cpp/llama.cpp/
 *.apk
 *.aab
 *.keystore

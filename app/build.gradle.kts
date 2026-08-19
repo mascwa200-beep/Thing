@@ -22,6 +22,23 @@ android {
     namespace = "dev.mascwa.pulse"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
+    // ⚠️ Pinned, and pinned to the SAME string the CI workflow feeds sdkmanager. AGP otherwise picks
+    // a default that varies with the AGP version, and a runner that has some other NDK installed
+    // fails with a message about the missing one rather than about anything real. The two must be
+    // edited together; there is no gate that notices if they drift.
+    ndkVersion = "27.0.12077973"
+
+    // The acoustic interrogator's native layer. See src/main/cpp/CMakeLists.txt for why this starts
+    // as a single trivial file: nothing in this repository has ever compiled native code, and the
+    // development container can neither cross compile nor reach the upstreams, so the first build
+    // of anything here happens on CI with no local gate.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     defaultConfig {
         applicationId = "dev.mascwa.pulse"
         minSdk = libs.versions.minSdk.get().toInt()

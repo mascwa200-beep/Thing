@@ -37,6 +37,10 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          # The acoustic interrogator compiles native code (whisper.cpp / llama.cpp are coming).
+          # ⚠️ The NDK string must match `ndkVersion` in app/build.gradle.kts exactly — AGP looks for
+          # that one and reports only that it is missing, never that a different one is present.
+          sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -52,6 +56,23 @@ jobs:
         # for PGO-style AOT) but kept on the same package id + debug keystore as before, so it updates in
         # place. The run number is the versionCode so each build out-versions the last (no downgrades).
         run: ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
+
+      - name: Verify the native layer packaged
+        # ⚠️ This is the ONLY gate on the native build, and it has to live here.
+        # `:app:testDebugUnitTest` runs on the host JVM, so it cannot load an arm64-v8a .so — a unit
+        # test asserting NativeBridge.available would fail on a perfectly good build and pass on one
+        # where CMake silently produced nothing. What actually proves the toolchain worked is the
+        # library being inside the shipped APK, for the target ABI, so that is what is asserted.
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "inspecting $apk"
+          if unzip -l "$apk" | grep -q "lib/arm64-v8a/liblcarsnative.so"; then
+            unzip -l "$apk" | grep "lib/arm64-v8a/" || true
+          else
+            echo "FAIL: liblcarsnative.so is not in the APK — the CMake build produced nothing."
+            unzip -l "$apk" | grep "lib/" || echo "(no native libraries at all)"
+            exit 1
+          fi
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
