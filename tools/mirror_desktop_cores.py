@@ -75,6 +75,9 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/DataRate.kt": f"{DESKTOP}/telemetry/DataRate.kt",
     f"{CORE}/Stardate.kt": f"{DESKTOP}/telemetry/Stardate.kt",
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
+    # The lineup: which channel is on which number, and what a remote does to it. Shared because a
+    # channel number that differs between the phone and the desktop is worse than no number at all.
+    f"{CORE}/ChannelLineup.kt": f"{DESKTOP}/telemetry/ChannelLineup.kt",
     f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
     # What is worth printing under a headline. Both platforms render the same card, and an
@@ -97,6 +100,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/StardateTest.kt": f"{DESKTOP_TEST}/telemetry/StardateTest.kt",
     f"{CORE_TEST}/NewsSummaryTest.kt": f"{DESKTOP_TEST}/telemetry/NewsSummaryTest.kt",
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
+    f"{CORE_TEST}/ChannelLineupTest.kt": f"{DESKTOP_TEST}/telemetry/ChannelLineupTest.kt",
     f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
     f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",

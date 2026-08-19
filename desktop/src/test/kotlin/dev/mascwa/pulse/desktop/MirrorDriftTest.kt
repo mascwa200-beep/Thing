@@ -87,6 +87,7 @@ class MirrorDriftTest {
         // `--check`, so this map is the only thing standing between a script nobody remembered to
         // run and two platforms quietly disagreeing about what is on television.
         "telemetry/LiveChannels.kt" to "$CORE/LiveChannels.kt",
+        "telemetry/ChannelLineup.kt" to "$CORE/ChannelLineup.kt",
         "telemetry/M3uCatalog.kt" to "$CORE/M3uCatalog.kt",
         "telemetry/DataRate.kt" to "$CORE/DataRate.kt",
         // ⚠️ Its cross-check against `EconomyVintage` lives in a SEPARATE, unmirrored test on the
@@ -104,7 +105,8 @@ class MirrorDriftTest {
     private val testMirrors = listOf(
         "GuideSearchTest.kt", "LibraryConsultTest.kt", "StudyQuestionsTest.kt", "RecallTest.kt",
         "CurriculumTest.kt", "DailyLessonTest.kt", "DeviceSearchTest.kt", "EmergencyTriageTest.kt",
-        "LiveChannelsTest.kt", "M3uCatalogTest.kt", "DataRateTest.kt", "StardateTest.kt",
+        "LiveChannelsTest.kt", "ChannelLineupTest.kt", "M3uCatalogTest.kt",
+        "DataRateTest.kt", "StardateTest.kt",
         "ContentPackTest.kt", "CourseMasteryTest.kt", "PracticeSetTest.kt", "HintsTest.kt",
         "QuizBuilderTest.kt", "ProcedureQuestionTest.kt", "StudyProgressTest.kt", "RefresherTest.kt",
         "FreshnessTest.kt", "UpdatePolicyTest.kt", "NewsSummaryTest.kt",
