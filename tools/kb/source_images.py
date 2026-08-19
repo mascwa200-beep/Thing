@@ -157,12 +157,40 @@ NOT_SUBJECT = re.compile(
     re.I,
 )
 # Wikipedia article chrome: maintenance banners, portal icons, licence marks. Never the subject.
+#
+# ⚠️ **Every pattern here is written against norm(), and the reason is a measured failure.** This
+# list used to spell its two commonest targets `symbol_` and `text_document`, with underscores,
+# while the API hands back `File:Symbol category class.svg` and `File:Text document with red
+# question mark.svg`, with spaces. So neither could ever fire, and those two maintenance icons were
+# chosen for **20 of 268 guides** on a real run with the blocklist meant to stop them sitting right
+# there. A blocklist that cannot match is worse than no blocklist, because it reads as protection.
+#
+# The second block is the portal and WikiProject furniture the first run met and nothing covered:
+# a voting box on "how markets coordinate", the psi glyph on four memory guides, a globe on three
+# more. These are template images — they appear on an article because a navbox put them there, not
+# because the article is about them.
 WIKI_CHROME = re.compile(
+    # unchanged, except that every `_` became a space — see the note above. Hyphens are literal in
+    # a Commons filename and are deliberately left alone; widening them to `[- ]` would start
+    # refusing real subjects (`lock ` would take a canal lock, `edit ` an edit-distance figure).
     r"(commons[- ]logo|wiki[a-z]*[- ]logo|wiki letter|wikipedia|wiktionary|wikiquote|wikisource|"
-    r"wikidata|wikibooks|wikinews|wikiversity|wikivoyage|question[ _]book|stub|sound-icon|"
-    r"ambox|imbox|edit-|padlock|lock-|symbol_|nuvola|crystal|oojs|portal|folder_|disambig|"
-    r"merge-|split-|text_document|magnify-clip|red_pencil|emblem-|increase2?\.svg|decrease2?\.svg|"
-    r"steady2?\.svg|yes_check|x_mark|star_(full|empty|half))",
+    r"wikidata|wikibooks|wikinews|wikiversity|wikivoyage|wikiproject|wikimedia commons|"
+    # ⚠️ `lock-` used to stand bare here and refused `Canal lock-gate operation.svg`. Wikipedia's
+    # page-protection glyphs are named for their colour, so naming the colours keeps the icons out
+    # without taking canal locks, lock washers or lock stitches with them. Found by writing the
+    # control case, not by reading the pattern.
+    r"question book|stub|sound-icon|ambox|imbox|edit-|padlock|"
+    r"lock-(green|red|blue|silver|gray|grey|orange|purple|yellow|black|white|icon)|"
+    r"symbol |nuvola|crystal|oojs|"
+    r"portal|folder |disambig|merge-|split-|text document|magnify-clip|red pencil|emblem-|"
+    r"increase2?\.svg|decrease2?\.svg|steady2?\.svg|yes check|x mark|star (full|empty|half)|"
+    # portal and WikiProject furniture the first real run met and nothing covered. Each is a
+    # template image: it is on the article because a navbox put it there, not because the article
+    # is about it. Kept narrow on purpose — `noun-`, `asterisk` and `compass rose` were considered
+    # and dropped, because this library really does hold guides on noun phrases and on reading a
+    # compass rose. Anything decorative but ambiguously named is the evidence floor's job, not this
+    # list's.
+    r"voting box|global thinking|\bpsi\d|disc plain|animation disc|gnome-|oxygen480)",
     re.I,
 )
 
@@ -253,16 +281,35 @@ def subject_query(guide) -> str:
 # the six gates
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 
+def file_key(file_title: str) -> str:
+    """
+    "File:Foo_bar.svg" -> "foo bar.svg". Canonical spelling, extension KEPT.
+
+    ⚠️ **Nothing may pattern-match a raw API title, and this function exists because something did.**
+    Commons treats spaces and underscores as the same character in a title and the API returns
+    SPACES, so a pattern written with an underscore can never fire. Every filename rule here went
+    through the normaliser except [WIKI_CHROME], which was applied to the raw title while spelling
+    its two commonest targets `symbol_` and `text_document` — so on a real run
+    `File:Symbol category class.svg` and `File:Text document with red question mark.svg` were
+    chosen for 20 of 268 guides, past a blocklist naming both.
+
+    The extension is kept because three chrome rules key on it (`increase2.svg` and its siblings are
+    the arrow glyphs in financial infoboxes, and the bare words are far too common to match alone).
+    [file_stem] drops it for the rules that must not see it.
+    """
+    name = file_title.split(":", 1)[1] if ":" in file_title else file_title
+    return re.sub(r"[\s_]+", " ", name).strip().lower()
+
+
 def file_stem(file_title: str) -> str:
     """
-    "File:Foo bar.svg" -> "foo bar".
+    "File:Foo bar.svg" -> "foo bar". Canonical, extension dropped.
 
     ⚠️ Both halves matter. Leaving the namespace prefix on lets the literal word "file" satisfy the
     subject gate, which is exactly how "Secondary Model.svg" was accepted; leaving the extension on
     lets "svg"/"png" do the same.
     """
-    stem = file_title.split(":", 1)[1] if ":" in file_title else file_title
-    return re.sub(r"\.[A-Za-z0-9]{2,4}$", "", stem).replace("_", " ").lower()
+    return re.sub(r"\.[a-z0-9]{2,4}$", "", file_key(file_title))
 
 
 def is_english(file_title: str) -> bool:
@@ -317,7 +364,7 @@ def teaches(file_title: str, mime: str, categories: list[str], source: str = "co
     What is refused everywhere: logos, crests, posters, portraits, clip art, mascots, and the
     maintenance icons Wikipedia hangs on its own articles. Those are never the subject.
     """
-    if NOT_SUBJECT.search(file_stem(file_title)) or WIKI_CHROME.search(file_title):
+    if NOT_SUBJECT.search(file_stem(file_title)) or WIKI_CHROME.search(file_key(file_title)):
         return False
     if source == "wikipedia":
         return True
@@ -418,7 +465,7 @@ def wikipedia_candidates(query: str, vocab: set[str], freq: collections.Counter,
         if not (len(hits) >= 2 or rare or (len(hits) == 1 and len(vocab) <= 3)):
             continue                       # this article is not about the guide's subject
         images = [im["title"] for im in page.get("images", [])
-                  if not WIKI_CHROME.search(im["title"])]
+                  if not WIKI_CHROME.search(file_key(im["title"]))]
         if images and len(hits) > best_hits:
             best, best_hits, best_title = images[:limit], len(hits), article
     return best, best_title
@@ -465,75 +512,178 @@ def image_details(file_titles: list[str]) -> dict:
     return out
 
 
+BOILERPLATE_USES = 50      # above this a file is furniture, not a picture of anything
+_usage_cache: dict[str, bool] = {}
+
+
+def is_boilerplate(file_title: str) -> bool:
+    """
+    Is this file used across so much of Wikimedia that it cannot be about any one subject?
+
+    A genuine diagram is used on a handful of pages; a template glyph is used on tens of thousands.
+    Measured: `Climate change feedbacks.svg` 10 uses, `Harris matrix example.svg` 4, against
+    `Symbol category class.svg` and `Text document with red question mark.svg` at well over a
+    hundred each. That is the one signal here that does not depend on my guessing filenames in
+    advance, which is what every other chrome rule does.
+
+    ⚠️ **ONE TITLE PER REQUEST, AND THE OBVIOUS OPTIMISATION INVERTS THE ANSWER.** `globalusage`
+    can ride the batched [image_details] call for free — and `gulimit` is a budget shared across
+    ALL titles in the batch, so the API spends it on the first pages and reports **zero** for the
+    rest. Measured, batched, in exactly this order::
+
+        File:Climate change feedbacks.svg              gu=10   <- a real diagram
+        File:Harris matrix example.svg                 gu=4    <- a real diagram
+        File:Psi2.svg                                  gu=46
+        File:Symbol category class.svg                 gu=0    <- chrome, reads as unused
+        File:Text document with red question mark.svg  gu=0    <- chrome, reads as unused
+
+    A threshold over that batch rejects the diagrams and keeps the chrome. Do not batch this.
+
+    The cost is bounded by asking only about a candidate that has already won its guide, and by the
+    cache: chrome repeats, so the fourteenth sighting of an icon is free. A failed lookup answers
+    False — an unreachable API must not start refusing good files.
+    """
+    key = file_key(file_title)
+    if key in _usage_cache:
+        return _usage_cache[key]
+    doc = api(COMMONS, prop="globalusage", gulimit=BOILERPLATE_USES + 1, titles=file_title)
+    verdict = False
+    if doc:
+        pages = list((doc.get("query") or {}).get("pages", {}).values())
+        uses = len(pages[0].get("globalusage", [])) if pages else 0
+        verdict = uses > BOILERPLATE_USES or "continue" in doc
+    _usage_cache[key] = verdict
+    return verdict
+
+
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 # choosing
 # ════════════════════════════════════════════════════════════════════════════════════════════════
+
+def evidence(file_title: str, categories, vocab, freq) -> list[str]:
+    """
+    The positive reasons to believe this file belongs to this guide. Empty means none.
+
+    ⚠️ **This is the gate the first run had no equivalent of, and its absence was the single
+    largest source of wrong pictures.** Being reachable from the right Wikipedia article is
+    *necessary* evidence, not *sufficient*: an article carries navboxes, infoboxes and gallery
+    tangents, so "on the page" admits anything anybody hung there. Measured, with no floor at all:
+
+        File:Maler der Grabkammer des Sennudem 001.jpg  ->  "Cover Crops and Green Manures"
+
+    a German-titled Egyptian tomb painting, on a guide about green manures. Turing's blue plaque,
+    the ENIAC historical marker, a tourist photograph of the Giza pyramids and a `3 watt power LED`
+    on *the integrated circuit* all arrived by exactly the same route, each with a bare score of
+    100 and not one thing said for it.
+
+    Three kinds of evidence count, in descending strength: an editor filing it under a diagram
+    category, the guide's own vocabulary in the filename, and the filename calling itself a
+    diagram. Any one is enough — requiring two was tried against the first run's real output and
+    threw away genuine figures whose names are Latin or German roots the guide never uses
+    (`Osmose en.svg` IS the osmosis diagram).
+    """
+    out = []
+    if any(DIAGRAM_CATEGORIES.search(c) for c in categories):
+        out.append("diagram-category")
+    hits = subject_hits(file_title, vocab, freq)
+    if hits:
+        out.append("names:" + "/".join(sorted(hits)[:3]))
+    if DIAGRAM_WORDS.search(file_stem(file_title)):
+        out.append("diagram-word")
+    return out
+
 
 def score(file_title: str, info, categories, vocab, freq, source_rank: int) -> int:
     """
     Higher is better. Only reached by candidates that already passed every gate, so this is about
     picking the BEST survivor rather than about safety.
+
+    ⚠️ **Format is a tiebreak and never a reason, and it used to be the loudest signal here.** SVG
+    scored +25, above every relevance bonus — and Wikipedia's portal and maintenance icons are all
+    SVG. That is not merely how chrome survived, it is how chrome *won*: `Symbol category class.svg`
+    totalled 125 and outranked real diagrams on fourteen different guides. The bonus is now smaller
+    than a single named subject word, so a crisp irrelevant file can no longer beat a relevant one.
     """
     s = 100 - source_rank * 20                                    # Wikipedia beats category beats search
     s += 12 * len(subject_hits(file_title, vocab, freq))          # more of the subject named
-    if info.get("mime") == "image/svg+xml":
-        s += 25                                                   # crisp at any size, and tiny
     if any(DIAGRAM_CATEGORIES.search(c) for c in categories):
         s += 20                                                   # an editor called it a diagram
     if DIAGRAM_WORDS.search(file_stem(file_title)):
         s += 10
     if re.search(r"[-_ ]en([-_. ]|$)", file_stem(file_title)):
         s += 8                                                    # the explicitly-English variant
+    if info.get("mime") == "image/svg+xml":
+        s += 6                                                    # crisp at any size, and tiny
     return s
 
 
-def choose(guide, freq, verbose=True):
-    """Walk the source ladder; return the best gate-passing candidate, or None."""
+def survivors(source, titles, rank, vocab, freq, taken):
+    """
+    Every candidate from one source that clears every gate, best first, plus the categories seen.
+
+    ⚠️ **One function, because there used to be two.** The Wikipedia pass and the two fallback
+    passes each carried their own copy of the same six-line gate sequence, so a gate added to one
+    silently did not exist in the others — and a duplicated definition is a mistake this repository
+    has now corrected in six places. The evidence floor and the distinctness rule are both new, and
+    neither could have been added safely to a shape that says the same thing twice.
+    """
+    seen_cats: list[str] = []
+    titles = [t for t in titles
+              if is_english(t) and on_subject(t, vocab, freq, source) and file_key(t) not in taken]
+    if not titles:
+        return [], seen_cats
+    out = []
+    for title, (info, cats) in image_details(titles).items():
+        seen_cats = cats or seen_cats
+        ok, licence = acceptable_licence(info)
+        if not ok or watermarked(cats):
+            continue
+        if not teaches(title, str(info.get("mime", "")), cats, source):
+            continue
+        if info.get("width", 0) < MIN_SOURCE_WIDTH and info.get("mime") != "image/svg+xml":
+            continue
+        why = evidence(title, cats, vocab, freq)
+        if not why:
+            continue
+        out.append((score(title, info, cats, vocab, freq, rank), title, info, cats, licence, source, why))
+    out.sort(key=lambda c: -c[0])
+    return out, seen_cats
+
+
+def choose(guide, freq, taken=None, verbose=True):
+    """
+    Walk the source ladder; return the best gate-passing candidate, or None.
+
+    [taken] holds the files already given to earlier guides in this run. ⚠️ Without it, one file is
+    handed to several guides: measured on the first real run, 18 files covered 59 guides, so sibling
+    guides showed the same picture and the same bytes were stored twice under two names.
+    """
+    taken = taken if taken is not None else set()
     vocab = vocabulary(guide)
     query = subject_query(guide)
     wiki_titles, article = wikipedia_candidates(query, vocab, freq)
     if verbose and article:
         print(f"      · article: {article}")
-    ladder = [("wikipedia", wiki_titles)]
-    best = None
-    seen_cats: list[str] = []
 
-    for rank, (source, titles) in enumerate(ladder):
-        titles = [t for t in titles if is_english(t) and on_subject(t, vocab, freq, source)]
-        if not titles:
-            continue
-        for title, (info, cats) in image_details(titles).items():
-            seen_cats = cats or seen_cats
-            ok, licence = acceptable_licence(info)
-            if not ok or watermarked(cats) or not teaches(title, str(info.get("mime", "")), cats, source):
-                continue
-            if info.get("width", 0) < MIN_SOURCE_WIDTH and info.get("mime") != "image/svg+xml":
-                continue
-            cand = (score(title, info, cats, vocab, freq, rank), title, info, cats, licence, source)
-            if best is None or cand[0] > best[0]:
-                best = cand
-        if best:
-            return best
+    found, seen_cats = survivors("wikipedia", wiki_titles, 0, vocab, freq, taken)
+    if not found:
+        # Fall through: siblings of whatever the article gave, then a blind search.
+        for rank, (source, titles) in enumerate(
+            [("commons-category", commons_category_candidates(seen_cats)),
+             ("commons-search", commons_search_candidates(query))], start=1
+        ):
+            found, _ = survivors(source, titles, rank, vocab, freq, taken)
+            if found:
+                break
 
-    # Fall through: siblings of whatever the article gave, then a blind search.
-    for rank, (source, titles) in enumerate(
-        [("commons-category", commons_category_candidates(seen_cats)),
-         ("commons-search", commons_search_candidates(query))], start=1
-    ):
-        titles = [t for t in titles if is_english(t) and on_subject(t, vocab, freq, source)]
-        if not titles:
-            continue
-        for title, (info, cats) in image_details(titles).items():
-            ok, licence = acceptable_licence(info)
-            if not ok or watermarked(cats) or not teaches(title, str(info.get("mime", "")), cats, source):
-                continue
-            if info.get("width", 0) < MIN_SOURCE_WIDTH and info.get("mime") != "image/svg+xml":
-                continue
-            cand = (score(title, info, cats, vocab, freq, rank), title, info, cats, licence, source)
-            if best is None or cand[0] > best[0]:
-                best = cand
-        if best:
-            return best
+    # The boilerplate check costs a request, so it is asked only of a candidate that has already
+    # won, and only until one answers. Its cache makes every repeat free, which matters precisely
+    # because template glyphs are the files that repeat.
+    for cand in found:
+        if not is_boilerplate(cand[1]):
+            return cand
+        if verbose:
+            print(f"      · {cand[1][5:][:48]} is template furniture, not a picture of anything")
     return None
 
 
@@ -647,6 +797,42 @@ def selftest() -> int:
         ("File:Thermoluminescence curves.svg",
          {"thermoluminescence"}, "image/svg+xml", [], "commons-search", True,
          "a single hit, but the word is rare enough in the corpus to carry the match alone"),
+        # ⚠️ THE UNDERSCORE CASES. Every one of these was CHOSEN on a real 268-guide run, past a
+        # blocklist that named it, because WIKI_CHROME was matched against the raw API title while
+        # spelling itself with underscores. They are written here with the SPACES the API actually
+        # returns, so a regression to the underscore spelling fails immediately.
+        ("File:Symbol category class.svg",
+         {"prices", "information", "markets"}, "image/svg+xml", [], "wikipedia", False,
+         "the maintenance icon taken by 14 guides — spelled `symbol_` in the list that names it"),
+        ("File:Text document with red question mark.svg",
+         {"secondary", "market", "research"}, "image/svg+xml", [], "wikipedia", False,
+         "the unreferenced-article icon taken by 6 guides — spelled `text_document`"),
+        ("File:Symbol_category_class.svg",
+         {"prices", "information"}, "image/svg+xml", [], "wikipedia", False,
+         "the same file under Commons' other spelling — both must be refused, not one"),
+        # The portal furniture nothing covered at all.
+        ("File:A coloured voting box.svg",
+         {"markets", "coordinate", "planner"}, "image/svg+xml", [], "wikipedia", False,
+         "a portal icon on 'how markets coordinate without a planner'"),
+        ("File:Psi2.svg",
+         {"memory", "episodic", "semantic"}, "image/svg+xml", [], "wikipedia", False,
+         "the psychology portal glyph, taken by four separate memory guides"),
+        ("File:Global thinking.svg",
+         {"global", "thinking"}, "image/svg+xml", [], "wikipedia", False,
+         "⚠️ names TWO vocabulary words, so only the chrome list can refuse it"),
+        # ⚠️ Controls for the chrome list, because it was widened and a blocklist that over-matches
+        # is the other half of the same defect. Each of these contains a chrome pattern's stem.
+        ("File:Compass rose diagram.svg",
+         {"compass", "rose", "navigation"}, "image/svg+xml", [], "commons-search", True,
+         "control: 'compass rose' was considered for the chrome list and dropped — this library "
+         "genuinely teaches reading one"),
+        ("File:Noun phrase tree diagram.svg",
+         {"noun", "phrase", "grammar"}, "image/svg+xml", [], "commons-search", True,
+         "control: `noun-` was considered and dropped — there are real linguistics guides"),
+        ("File:Canal lock-gate operation.svg",
+         {"canal", "lock", "gate"}, "image/svg+xml", [], "commons-search", True,
+         "control: the chrome list keeps `lock-` hyphenated; widening it to `lock[- ]` would "
+         "start refusing canal locks"),
     ]
     # ⚠️ The not-subject list is checked separately and in BOTH directions, because a real wave
     # showed it failing each way: compounds slipped through (Foodlogo2 onto a food-spoilage guide)
@@ -676,7 +862,50 @@ def selftest() -> int:
     print(f"  {'ok  ' if not ns_bad else 'FAIL'} not-subject list: "
           f"{len(ns_reject)} reject + {len(ns_accept)} accept cases")
 
-    bad = ns_bad
+    # ── the evidence floor ──────────────────────────────────────────────────────────────────────
+    # ⚠️ Checked separately because it is the only gate that can refuse a file every OTHER gate
+    # accepts, which is exactly the hole the first run fell through: a picture on the right article,
+    # correctly licensed, not chrome, not watermarked, and with nothing whatever said for it.
+    # Every reject below was really assigned to the guide named beside it.
+    ev_cases = [
+        ("File:Maler der Grabkammer des Sennudem 001.jpg",
+         {"cover", "crops", "green", "manures"}, [], False,
+         "a German-titled Egyptian tomb painting on 'Cover Crops and Green Manures'"),
+        ("File:Alan Turing 78 High Street Hampton blue plaque.jpg",
+         {"turing", "foundations", "computer", "science"}, [], True,
+         "⚠️ ACCEPTED on purpose: it names Turing. The floor asks for evidence, not for taste — "
+         "a wall plaque about the right man is weak, and refusing it needs a rule that would also "
+         "refuse every portrait-of-the-subject diagram in the corpus"),
+        ("File:ENIAC Pennsylvania state historical marker.jpg",
+         {"world", "wide", "origins", "evolution"}, [], False,
+         "a roadside marker on 'The World Wide Web: Origins and Evolution' — names nothing"),
+        ("File:3 watt power LED after removing phosphor.jpg",
+         {"integrated", "circuit", "moore"}, [], False,
+         "an LED photograph on 'The Integrated Circuit and Moore's Law'"),
+        ("File:All Gizah Pyramids.jpg",
+         {"archaeoastronomy", "ancient", "skywatchers"}, [], False,
+         "a tourist photograph on archaeoastronomy"),
+        ("File:Climate change feedbacks.svg",
+         {"climate", "feedback", "loops"}, [], True,
+         "control: names the subject twice, and was a correct pick on the same run"),
+        ("File:Osmose en.svg",
+         {"osmosis", "osmotic", "pressure"}, ["Category:Osmosis diagrams"], True,
+         "control: names NOTHING the guide says — 'osmose' is the French root — and is kept "
+         "purely because an editor filed it under a diagram category. ⚠️ This is why the floor "
+         "takes any ONE of three signals rather than requiring a name"),
+        ("File:Harris matrix example.svg",
+         {"stratigraphy", "harris", "matrix"}, [], True,
+         "control: names the subject"),
+    ]
+    ev_bad = 0
+    for title, vocab, cats, must_pass, why in ev_cases:
+        got = bool(evidence(title, cats, vocab, freq))
+        ok = got == must_pass
+        ev_bad += 0 if ok else 1
+        print(f"  {'ok  ' if ok else 'FAIL'} {'evidence' if got else 'nothing ':<9}"
+              f"(want {'evidence' if must_pass else 'nothing'})  {title[5:][:44]:<44} {why[:70]}")
+
+    bad = ns_bad + ev_bad
     for title, vocab, mime, cats, source, must_pass, why in cases:
         passed = (is_english(title)
                   and on_subject(title, vocab, freq, source)
@@ -710,24 +939,45 @@ def main() -> int:
     todo.sort(key=lambda g: (g.get("category", ""), g["id"]))
     print(f"{len(todo)} guides without a diagram (lore categories excluded)\n")
 
-    taken, skipped = [], []
+    # Files already spoken for. A picture that explains one guide is rarely the best picture for
+    # its neighbour, and two guides showing the same figure reads as a bug rather than as economy.
+    #
+    # ⚠️ Seeded from NOTICE.txt's source URLs, NOT from the image directory. The obvious seed is
+    # `os.listdir(KB_IMAGES)`, and it is inert: those names are guide ids (`climate-feedback-loops
+    # .svg`) while this set is compared against Commons titles (`climate change feedbacks.svg`).
+    # It would look exactly like protection and could never match one thing — the same shape as the
+    # underscore bug this whole pass exists to fix. The NOTICE genuinely records the Commons file
+    # each diagram came from, for the 193 entries that carry a source line; the rest predate the
+    # convention, so cross-run distinctness is real but not total, and that is stated rather than
+    # implied.
+    claimed: set[str] = set()
+    if os.path.exists(NOTICE):
+        with open(NOTICE, encoding="utf-8") as fh:
+            for m in re.finditer(r"commons\.wikimedia\.org/wiki/File:(\S+)", fh.read()):
+                claimed.add(file_key(urllib.parse.unquote(m.group(1))))
+
+    matched, skipped = [], []
     for guide in todo[: args.limit]:
         print(f"  {guide['id']}  [{guide.get('category')}]")
-        best = choose(guide, freq)
+        best = choose(guide, freq, claimed)
         if not best:
             print("      SKIP — nothing cleared the gates")
             skipped.append(guide["id"])
             continue
-        sc, title, info, cats, licence, source = best
+        sc, title, info, cats, licence, source, why = best
+        claimed.add(file_key(title))
         author = strip_html(info.get("extmetadata", {}).get("Artist", {}).get("value"))[:100]
-        print(f"      ✓ [{source} {sc}] {title[:56]}\n        {licence} · {author[:44]}")
-        taken.append((guide, title, info, cats, licence, author, source, sc))
+        print(f"      ✓ [{source} {sc}] {title[:56]}\n        {licence} · {author[:40]}"
+              f"\n        because: {', '.join(why)}")
+        matched.append((guide, title, info, cats, licence, author, source, sc, why))
 
-    print(f"\n{len(taken)} matched, {len(skipped)} skipped")
+    print(f"\n{len(matched)} matched, {len(skipped)} skipped")
     if args.report:
+        # `why` rides the report because the report is what gets re-read by hand afterwards, and
+        # "what was said for this file" is the question that reading is trying to answer.
         json.dump([{"guide": g["id"], "title": g["title"], "file": t, "licence": l,
-                    "author": a, "source": s, "score": sc}
-                   for g, t, i, c, l, a, s, sc in taken], open(args.report, "w"), indent=1)
+                    "author": a, "source": s, "score": sc, "why": w}
+                   for g, t, i, c, l, a, s, sc, w in matched], open(args.report, "w"), indent=1)
         print(f"report -> {args.report}")
     if not args.apply:
         print("dry run — pass --apply to fetch and patch")
@@ -735,7 +985,7 @@ def main() -> int:
 
     os.makedirs(KB_IMAGES, exist_ok=True)
     touched, notice_lines = {}, []
-    for guide, title, info, cats, licence, author, source, sc in taken:
+    for guide, title, info, cats, licence, author, source, sc, why in matched:
         mime = str(info.get("mime", ""))
         svg = mime == "image/svg+xml"
         raw = get(info["url"] if svg else (info.get("thumburl") or info["url"]), binary=True)
