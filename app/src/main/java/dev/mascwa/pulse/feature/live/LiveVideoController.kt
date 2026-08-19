@@ -184,6 +184,13 @@ object LiveVideoController {
                     if (_state.value.channel?.id != channel.id) return
                     when (playbackState) {
                         Player.STATE_READY -> {
+                            // ⚠️ The retry budget is spent per OUTAGE, not per tune. Playing again
+                            // means the outage that spent it is over, so the count goes back to zero.
+                            // Without this the counter only ever reset in `startPlayer`, so a channel
+                            // left on for hours accumulated across unrelated blips: the first two
+                            // recovered, and the third — no less recoverable than the first — was
+                            // treated as permanent and released the player.
+                            retries = 0
                             _state.value = LiveState(channel, Status.PLAYING)
                             watchDataRate(channel)
                         }
@@ -206,9 +213,28 @@ object LiveVideoController {
         }.onFailure { failPermanently(channel, it.message) }
     }
 
-    /** Network/IO errors are worth a retry; parse, decoder and bad-HTTP errors are not. */
+    /**
+     * Network/IO errors are worth a retry; parse, decoder and bad-HTTP errors are not.
+     *
+     * ⚠️ **`BEHIND_LIVE_WINDOW` is named explicitly because it is the one recoverable live error that
+     * does not live in the IO range.** A live HLS manifest is a sliding window; a stall, a brief
+     * background, or a network hiccup can leave the playback position behind the oldest segment the
+     * server still publishes, and the player reports code 1002. It is the commonest interruption a
+     * long-running live stream suffers and it recovers completely — but 1002 sits below the 2000..2002
+     * IO band, so it was falling through to [failPermanently], releasing the player and leaving an
+     * error on screen for a channel that was perfectly fine a second later.
+     *
+     * The existing recovery path is already the correct handling and needs no seek: `setMediaItem`
+     * delegates to `setMediaItems(list, resetPosition = true)` (confirmed in the shipped media3 1.5.1
+     * bytecode), so re-preparing discards the stale position rather than returning to it.
+     *
+     * Named rather than folded into a wider range on purpose — widening upward would also sweep in
+     * `ERROR_CODE_TIMEOUT` (1003) and `ERROR_CODE_FAILED_RUNTIME_CHECK` (1004), which are not
+     * recoverable by re-preparing and would just spend the budget before failing anyway.
+     */
     private fun isTransient(error: PlaybackException): Boolean =
-        error.errorCode in
+        error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+            error.errorCode in
             PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
     private fun retryOrFail(app: Context, channel: LiveChannel, reason: String) {
