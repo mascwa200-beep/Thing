@@ -171,7 +171,7 @@ object Readability {
             )
         }
 
-        val interstitial = interstitialNote(baseUrl)
+        val interstitial = unreadableReason(baseUrl)
         val doc = runCatching { Jsoup.parse(html, baseUrl) }.getOrNull()
             ?: return Extraction(
                 Outcome.NOT_ARTICLE, Strategy.NONE, Meta(), emptyList(), 0,
@@ -742,14 +742,23 @@ object Readability {
     // ---- Verdicts -------------------------------------------------------------------------------
 
     /**
-     * Hosts that serve a redirect stub rather than an article, keyed on what this app's feeds use.
+     * Why this URL can never yield an article, before a byte is fetched — or null if it might.
      *
      * Named specifically rather than guessed at: Google News RSS is where most of this app's stories
      * come from, and its `<link>` can never be read (see the class KDoc). Saying so precisely is
      * worth more than a generic failure, because the user can act on it — the browser resolves the
      * redirect perfectly well.
+     *
+     * ⚠️ **Public because the caller needs the same answer BEFORE deciding where a tap goes.** Most
+     * of the news feed is Google links, so sending every tap to the reader would replace a browser
+     * that works with a polite refusal. One definition, two consumers: the screen picks the
+     * destination with it, and [extract] explains itself with it. Two copies of this rule would
+     * drift the first time a shortener was added to one of them.
      */
-    private fun interstitialNote(baseUrl: String): String? {
+    fun canRead(url: String): Boolean = unreadableReason(url) == null
+
+
+    fun unreadableReason(baseUrl: String): String? {
         val host = hostOf(baseUrl) ?: return null
         return when {
             host == "news.google.com" ->
@@ -760,7 +769,8 @@ object Readability {
         }
     }
 
-    internal fun hostOf(url: String): String? {
+    /** The host, without scheme, port, credentials or a leading `www.`. Public — callers label with it. */
+    fun hostOf(url: String): String? {
         val afterScheme = url.substringAfter("://", "").ifEmpty { return null }
         val host = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
             .substringAfterLast('@').substringBefore(':')

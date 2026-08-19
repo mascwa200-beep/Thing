@@ -151,6 +151,10 @@ class AppContainer(private val appContext: Context) {
     val newsAnalysisEngine: dev.mascwa.pulse.data.news.NewsAnalysisEngine by lazy {
         dev.mascwa.pulse.data.news.NewsAnalysisEngine(inferenceEngine, settingsRepository)
     }
+    /** Fetches a page and hands it to the DOM decimator. */
+    val readerRepository: dev.mascwa.pulse.data.reader.ReaderRepository by lazy {
+        dev.mascwa.pulse.data.reader.ReaderRepository(http)
+    }
     val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
         dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
     }

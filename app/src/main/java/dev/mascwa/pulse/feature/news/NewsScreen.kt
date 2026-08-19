@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.mascwa.pulse.core.telemetry.Readability
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
@@ -44,7 +45,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewsScreen(vm: NewsViewModel) {
+fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)? = null) {
     val state by vm.state.collectAsStateWithLifecycle()
     val analyses by vm.analyses.collectAsStateWithLifecycle()
     val coverageByUrl by vm.coverageByUrl.collectAsStateWithLifecycle()
@@ -146,7 +147,18 @@ fun NewsScreen(vm: NewsViewModel) {
                                 article,
                                 pulse = state.marketPulse,
                                 allArticles = distinctArticles,
-                                onClick = { openUrl(context, article.url) },
+                                // ⚠️ ROUTED, NOT ALWAYS THE READER. Most of this feed is Google
+                                // News links, which are redirect stubs the decimator can never read
+                                // — sending those to the reader would replace a browser that works
+                                // with a polite refusal. The rule lives in Readability so the
+                                // screen and the extraction cannot disagree about it.
+                                onClick = {
+                                    if (onRead != null && Readability.canRead(article.url)) {
+                                        onRead(article.title, article.url)
+                                    } else {
+                                        openUrl(context, article.url)
+                                    }
+                                },
                                 analysis = analyses[article.url],
                                 onNeedsAnalysis = vm::ensureAnalyzed,
                                 coverage = coverageByUrl[article.url],

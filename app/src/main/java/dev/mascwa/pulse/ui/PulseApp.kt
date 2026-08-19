@@ -147,7 +147,12 @@ fun PulseApp(
             }
             composable(Routes.NEWS) {
                 val vm: NewsViewModel = viewModel(factory = factory)
-                NewsScreen(vm)
+                NewsScreen(vm) { title, url ->
+                    navController.navigate(
+                        "${Routes.READER}?url=${android.net.Uri.encode(url)}" +
+                            "&title=${android.net.Uri.encode(title)}",
+                    )
+                }
             }
             composable(Routes.MARKETS) {
                 val marketsVm: MarketsViewModel = viewModel(factory = factory)
@@ -313,6 +318,25 @@ fun PulseApp(
                 val vm: dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.interrogator.InterrogatorScreen(
                     vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // ⚠️ The URL is a QUERY argument and is encoded at every call site. A URL contains
+            // slashes and question marks — the characters a route pattern is parsed with — so a
+            // path argument would split the route apart. Navigation decodes it once on the way in.
+            composable(
+                "${Routes.READER}?url={url}&title={title}",
+                arguments = listOf(
+                    navArgument("url") { defaultValue = "" },
+                    navArgument("title") { defaultValue = "" },
+                ),
+            ) { backStackEntry ->
+                val vm: dev.mascwa.pulse.feature.reader.ReaderViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.reader.ReaderScreen(
+                    vm,
+                    url = backStackEntry.arguments?.getString("url").orEmpty(),
+                    fallbackTitle = backStackEntry.arguments?.getString("title").orEmpty(),
                     onBack = { navController.popBackStack() },
                 )
             }

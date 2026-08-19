@@ -106,6 +106,9 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository, c.rainViewerRepository, c.radarRepository, c.trackStore, c.elevationRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.reader.ReaderViewModel::class.java) ->
+                dev.mascwa.pulse.feature.reader.ReaderViewModel(c)
+
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
                 dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sensorium.SensoriumViewModel::class.java) ->
