@@ -4859,3 +4859,124 @@ session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), pus
 open a draft PR → `main`, verify green, merge.
 Honor the constraints above (human-gate for self-code, protected paths, commit trailers, no model id in
 artifacts, on-device verification for anything CI can't prove — esp. R8, the HUD-on-glasses, and voice).
+
+### THE GATES THAT COULD NOT FIRE (this session, PR on `claude/loving-edison-bd65oa`)
+
+Owner: *"recomplete the image wave and then ensure that everything for Android build and desktop
+build is perfectly fine with no bugs whatsoever — overpower your search effectively to ensure that
+there are no bugs in your findings whatsoever."* **Zero subagent spend**, as with every arc since
+the credit directive.
+
+**One shape accounts for almost everything found: a check that reads like protection and cannot
+fire.** Six of them, in code I had written as recently as an hour earlier.
+
+**The image wave was still wrong and had to be discarded twice.** Reading the run's real output
+rather than its code:
+
+| defect | evidence |
+|---|---|
+| `WIKI_CHROME` spelled its two commonest targets `symbol_` and `text_document`, with **underscores**, while the API returns **spaces** | those two maintenance icons were chosen for **20 of 268 guides**, past a blocklist naming both |
+| `score()` gave SVG **+25**, above every relevance signal, and portal glyphs are all SVG | not how chrome survived — how chrome *won*, totalling 125 and outranking real diagrams on fourteen guides |
+| `choose()` had **no evidence floor**; a Wikipedia-sourced candidate starts at 100 | a German-titled Egyptian tomb painting became the diagram for *Cover Crops and Green Manures*, alongside Turing's blue plaque, the ENIAC historical marker and a photo of Giza |
+| no distinctness rule | 18 files covered **59 guides** — siblings showing the same picture, the same bytes stored twice |
+
+`file_key()` is now the normaliser nothing may skip, `evidence()` is the floor, format is a
+tiebreak, and `is_boilerplate()` is the one rule that does not depend on guessing filenames.
+Replaying the 268 selections refuses **96** where the shipped code refused 14.
+
+⚠️ **THE BOILERPLATE GATE TOOK THREE ATTEMPTS AND MEASUREMENT KILLED THE FIRST TWO.**
+
+    file                                     uses  wikis  article-space
+    Harris matrix example.svg                   4      3      2   diagram
+    Climate change feedbacks.svg               10      8      8   diagram
+    Animal cell structure en.svg               82     48      3   diagram
+    Supply-and-demand.svg                     151     65      6   diagram
+    Diagram human cell nucleus multilang.svg  189     72     10   diagram
+    A coloured voting box.svg                >500      3     23   chrome
+    Psi2.svg                                 >500      9    233   chrome
+    Text document with red question mark     >500      7    479   chrome
+    Symbol category class.svg                >500      1      0   chrome
+
+A threshold of **50 rejects the best diagrams** — a canonical illustration is used a few times on
+each of *many* wikis because it is the picture of that subject in every language, so counting raw
+uses punishes a diagram for being good. A live run refused `Animal cell structure en.svg`.
+Then **"used in article space" fails too**: maintenance icons ride templates that sit on articles,
+and the unreferenced-article glyph has **479** article-space uses. What works is the raw count at
+**500**, two and a half times above the busiest real diagram measured, which is also the API's
+ceiling for `gulimit`, so the continuation token *is* the overflow.
+
+⚠️ **And `globalusage` must be queried ONE TITLE AT A TIME.** It rides the batched metadata call
+for free and `gulimit` is a budget shared across the whole batch, so the API spends it on the
+first pages and reports **zero** for the rest — a threshold over that batch rejects the diagrams
+and keeps the chrome. Exactly inverted. Do not batch it.
+
+**Three build gates that did not exist**, each negative-tested by breaking the corpus:
+- `BundledImagesTest` (app) — no orphans, every raster a real image ≤1280 px, every vector real
+  SVG. Rasters are checked by parsing the **WebP container header**, because the corpus is entirely
+  WebP and `javax.imageio` has no WebP reader; the parser was validated against Pillow on all 328
+  files and on generated VP8L/VP8X samples, since only VP8 is present and an unexercised branch is
+  an unchecked one.
+- `BundledSvgDiagramsParseTest` (desktop) — `BundledImagesDecodeTest` excludes SVGs from **both**
+  its tests, which was defensible at 15 vectors and is not when a wave is more than half SVG.
+- **The orphan gate found 59 files referenced by nothing**, shipping into the APK and the desktop
+  jar with every check green — the residue of the aborted wave. `source_images.py` now flushes
+  shard edits and provenance every ten diagrams instead of once at the end, so an interruption
+  cannot strand them again.
+
+⚠️ **The SVG test earned itself on its first run: Skia cannot parse `circadian-clock.svg` at all**
+("Can't wrap nullptr"). The Sleep guide's clock diagram had drawn nothing on every Windows machine
+since it was bundled — the same silent failure as the corpus's one `.gif`, invisible for the same
+reason. Both it and `female-reproductive.svg` were rendered to WebP at 1280 px (981 kB → 93 kB,
+456 kB → 76 kB), which fixed the render and removed the size exemption entirely. Before converting,
+the question "can rounding make them smaller safely?" was **answered rather than assumed**:
+rendered before and after with cairosvg at every precision from one to six decimals and compared
+pixel by pixel — one is only identical at five decimals where it saves 17%, the other at none.
+NOTICE.txt now says what was done, because both are CC BY-SA and its re-encoding paragraph
+promised "SVG files are bundled unchanged, as vector".
+
+**Nine parsed fields that nothing read**, each answered on merit rather than swept: the ISS
+altitude is **surfaced** (the digest's own KDoc claimed the fallback could not know it, which is
+how a discarded field stays discarded — nobody looks for what a comment says is absent); orbital
+speed **deleted** (within a per-cent of 27,600 km/h on every pass ever flown); `originLat`/
+`originLon` **deleted** from three models, where they were worse than inert because they name an
+origin the distances beside them were *not* computed from; RainViewer's `nowcast` no longer parsed,
+with the decision moved to the declaration. Left alone deliberately, with the audit's own
+reasoning: the ISS `visibility` string, `is_sentry_object`, and the twilight fields.
+
+**⚠️ MIRRORDRIFTTEST WAS WATCHING 31 OF 53 MIRRORS.** Missing: the whole expansion-pack format, the
+entire Khan learning layer, QuizBuilder, StudyProgress, Refresher, UpdatePolicy, Freshness,
+ElapsedPhrase, NewsSummary. Its KDoc explains the map is hand-kept "on purpose: two independent
+statements" — right, and working in one direction only, the direction that does not happen. A
+mirror is created by *running the script*, so the script's map is updated and the test's is
+forgotten, and a forgotten entry is silent: the mirror exists, the desktop compiles, nothing ever
+compares it again. The independence is kept and a completeness assertion now requires both lists to
+name the same set.
+
+**And the guard was worth nothing without its trigger**: `desktop-build.yml`'s `paths:` filter
+listed `data/survival` and not `data/live`, so editing the mirrored `LiveCatalogRepository.kt` ran
+no desktop build at all. The test now asserts every mirror source is covered by the filter.
+
+⚠️ **That assertion was itself broken twice before it was right, and both ways are worth knowing.**
+`Regex.escape(glob)` returns a `\Q…\E` literal block, so `.replace("*", ...)` substitutes nothing
+and every path comes back uncovered — it failed loudly and listed all 53 files, which reads exactly
+like a real finding. **A broken check that fails is more persuasive than one that passes.** Then the
+negative test reported the guard asleep when it was not: `:desktop:test` reads `core/telemetry`, the
+app's packages and now a workflow file, none of which Gradle knows are inputs, so the task stays up
+to date and replays its previous result. **Use `--rerun-tasks` when what you changed lives outside
+the module.** CI is unaffected — a fresh runner has nothing to be up to date with.
+
+**Finally, the tools this session leaned on were themselves negative-tested**, since three of my own
+checks had already turned out broken: `mirror_desktop_cores.py --check` notices drifted *content*
+(not just a missing file), `ci_parity_lint.py` notices a blank `safetyNote`, and
+`check_emergency_routes.py` notices a renamed heading. All three detect what they claim.
+
+**Local recipe added:** `scratchpad/imgtest/run.sh` runs an `:app`-module JVM test with no Android
+SDK — kotlinx-serialization on **both** the target classpath and (with coroutines) the compiler's
+own `-cp`, plus `-Xplugin=kotlin-serialization-compiler-plugin-embeddable`. Pass the core files the
+test transitively needs; repository classes drag in `HttpClient`/`DiskCache` and are the point to
+stop and let CI compile.
+
+⚠️ **Operational trap, hit twice:** `pgrep -f <pattern>` matches the **calling shell's own command
+line** when that line contains the pattern. A `while pgrep -f "…"; do sleep; done` poll loop never
+terminates, and `kill $(pgrep -f "…")` kills the shell issuing it — which happened here. Use
+`ps -eo pid,cmd | awk '/pattern/ && !/awk/'`.
