@@ -12,7 +12,17 @@ or otherwise altered: the change is one of resolution and file format only, made
 corpus fits a phone (68 MB to 31 MB) without changing what the reader sees — the app draws
 these at 260dp on Android and 620dp on the desktop, so the discarded pixels were never
 displayed. Where a licence requires that modifications be indicated, this paragraph is that
-indication. SVG files are bundled unchanged, as vector.
+indication. SVG files are bundled unchanged, as vector, with two exceptions.
+
+Two diagrams that were originally vector are bundled as WebP instead:
+circadian-clock.webp and female-reproductive.webp. They were rendered from the original
+SVG at 1280 pixels wide and composited onto a white background, which is the same
+background the rest of the line art in this folder already carries. The change was made
+because the desktop reader's renderer could not parse circadian-clock.svg at all — it drew
+nothing and fell back to a caption — and because at 981 kB and 456 kB the two were far
+heavier than the drawings warranted; as raster they are 93 kB and 76 kB. As above, no
+cropping, recolouring or overlay: only resolution and file format. The Commons "File:"
+links recorded below still point at the original vector works.
 
 
   reef-knot.webp, clove-hitch.webp, two-half-hitches.webp, taut-line-hitch.webp
@@ -41,7 +51,7 @@ here and inline in the guide text; the artwork is unaltered (see the re-encoding
 Clinical reproductive-anatomy diagrams for the Sexual Health guide
 (labelled medical schematics, artwork unaltered):
 
-  female-reproductive.svg — "Scheme female reproductive system"
+  female-reproductive.webp — "Scheme female reproductive system"
       by CDC / Mysid — public domain, Wikimedia Commons
   male-reproductive.svg — "Human male reproductive system"
       by Wumingbai — CC BY-SA 4.0, Wikimedia Commons
@@ -54,7 +64,7 @@ original upload where noted, to keep the bundle size reasonable; artwork itself 
   sleep-hypnogram.svg — "Hypnogram of sleep between midnight and 6.30 am"
       by RazerM — CC BY-SA 3.0, Wikimedia Commons
       https://commons.wikimedia.org/wiki/File:Sleep_Hypnogram.svg
-  circadian-clock.svg — "Overview of biological circadian clock in humans"
+  circadian-clock.webp — "Overview of biological circadian clock in humans"
       by YassineMrabet (fixed by Addicted04) — CC BY-SA 3.0, Wikimedia Commons
       https://commons.wikimedia.org/wiki/File:Biological_clock_human.svg
   vaccine-antibody-structure.svg — "Schematic diagram of an antibody (immunoglobulin)"

@@ -99,7 +99,6 @@ class BundledImagesTest {
         val problems = mutableListOf<String>()
         for (name in referenced()) {
             if (!name.endsWith(".svg", ignoreCase = true)) continue
-            if (name in OVERSIZE_LEGACY_VECTORS) continue
             val f = File(imagesDir(), name)
             if (!f.isFile) continue
             val bytes = f.readBytes()
@@ -124,28 +123,20 @@ class BundledImagesTest {
         /** Android draws a diagram at 260.dp (780 px at density 3); the desktop at 620.dp. */
         const val MAX_DISPLAY_PX = 1280
 
-        /** Matches `MAX_SVG_BYTES` in tools/kb/source_images.py. */
-        const val MAX_SVG_BYTES = 400_000
-
         /**
-         * Two hand-curated vectors that predate the bar, exempt by name and by measurement.
+         * Matches `MAX_SVG_BYTES` in tools/kb/source_images.py.
          *
-         * ⚠️ **Named rather than accommodated by raising the bar, because the bar is doing real
-         * work on everything else.** These are 981 kB and 452 kB, both far over, and both have been
-         * drawing correctly on the device for months. The question was whether they could be made
-         * smaller safely, and it was answered rather than assumed: rounding their coordinates —
-         * they carry 62,555 and 23,294 numbers with five or more decimal places — was rendered
-         * before and after with cairosvg at 1280 px and compared pixel by pixel at every precision
-         * from one to six decimals. `female-reproductive` is only pixel-identical at five decimals,
-         * where it saves 17%; `circadian-clock` is not pixel-identical at **any** of them, so its
-         * bulk is genuine path data rather than editor residue. There is no safe saving to take.
-         *
-         * So the honest reading is that `MAX_SVG_BYTES` governs what an image wave may *add* from
-         * an untrusted source, which is where an unbounded file would actually arrive from. A third
-         * oversize vector still fails this test, which is the point of listing two rather than
-         * relaxing the number.
+         * ⚠️ **Two vectors used to be over this and are not exempted — they were converted.** The
+         * bar was written for what an image wave may *add*, and applying it to two hand-curated
+         * legacy files looked at first like a case for an allowlist. Then the desktop's new
+         * `BundledSvgDiagramsParseTest` reported that Skia could not parse `circadian-clock.svg` at
+         * **all** ("Can't wrap nullptr"), so that diagram had been failing to a caption on every
+         * Windows machine since it was bundled — the same silent failure as the `.gif`, invisible
+         * for the same reason: SVGs were excluded from the desktop tests. Both were rendered to
+         * WebP at 1280 px, which fixes the render and takes them from 981 kB and 456 kB to 93 kB
+         * and 76 kB. There is nothing left to exempt, which is the better outcome than a list.
          */
-        val OVERSIZE_LEGACY_VECTORS = setOf("circadian-clock.svg", "female-reproductive.svg")
+        const val MAX_SVG_BYTES = 400_000
 
         private fun u8(b: ByteArray, i: Int) = b[i].toInt() and 0xFF
 
