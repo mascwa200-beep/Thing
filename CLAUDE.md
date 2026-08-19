@@ -5282,3 +5282,65 @@ a tray: that a live channel or radio station recovers from a drop instead of sho
 the wake word survives a reply being interrupted by another spoken line; that the Sensorium's Stop
 button stays stopped and ARM brings it back; that the scanner's notification and a breaking card can
 both be on screen at once; and that tapping the radio notification lands on the radio.
+
+### THE IMAGE WAVE FINISHED, AND HALF ITS PICKS WERE WRONG (this session cont., PR #449)
+
+Pass 2 completed: **163 guides considered, 35 pictures chosen, 119 skipped**. Corpus **559
+diagrams, 454 of 651 guides illustrated**. But the number that matters is the one the hand
+re-read produced: **16 of the 31 picks that survived the gates were defensible, and 15 were not.**
+
+**Two distinct failure modes, and only one is gateable.**
+
+⚠️ **1. Graphical fragments passed as diagrams, because the vector check had no floor.**
+`pixels_ok` floors rasters at 600 px and always has; the SVG branch had a CEILING only. Three
+reached the shipped corpus: `Shogi da22.svg` is a **9×9 canvas holding one diagonal line** — a
+board-tile piece — bundled as the sole illustration of a guide on shogi problems; a sibling is a
+line and a triangle; `Gd&t regardlessoffeaturesize.svg` is one 64×64 notation glyph standing in
+for a whole guide on geometric tolerancing.
+
+⚠️ **Two measures I tried first were wrong, and only running them over the real corpus showed
+it.** Canvas dimensions: `the-cell-nucleus-and-nuclear-envelope.svg` declares 56×43 and carries
+95 kB of detail, because a vector's canvas is arbitrary. Element count alone: it threw out
+`torque-and-rotational-equilibrium.svg`, seven kilobytes of path data drawn as four complex
+paths. **The rule is poor by BOTH — under 6 drawing elements AND under 1000 bytes.** Measured
+across all 93 bundled vectors, that refuses exactly the three fragments with the nearest genuine
+diagram an order of magnitude clear. Enforced in three places that cannot drift:
+`source_images.pixels_ok` refuses at selection, `BundledImagesTest` fails the build, and
+`check_images.py` **reads both constants out of source_images.py** rather than restating them —
+a local gate with a looser floor would pass everything CI rejects. Both gates negative-tested
+against a planted 9×9 one-element fragment in a hardlinked corpus copy.
+
+⚠️ **2. Cross-domain keyword collisions, which NO size rule can catch.** This is the bigger
+finding and the reason the hand re-read is not optional:
+
+    The Otto Cycle            <- Ottonian dynasty genealogy       ("Otto")
+    Intervals (music theory)  <- a guitarist from the BAND Intervals
+    How Blood Circulates      <- Roosevelt's African safari       ("heart of Africa")
+    Percentages               <- a 1908 cytomorphosis monograph   ("problem")
+    Household Hazard Risk     <- a statistical sampling nomogram  ("risk")
+    Grammatical Categories    <- a Russian town's 500th anniversary
+    Sizing a Shelter          <- prehistoric caves                ("shelter")
+    Dietary Minerals          <- a plant leaf with magnesium deficiency
+    Choosing Hardwoods        <- a measurement grid
+
+plus six on-topic but decorative rather than instructional (a Confucius portrait, a trading-floor
+photo for market equilibrium, a stock photo of someone studying, a vintage canned-food
+advertisement, a health-spending chart on a guide about navigating care, a nationalism icon on
+conservatism) — removed for the same reason Turing's blue plaque went in pass 1: **a picture that
+illustrates nothing is worse than a blank space, because it claims to explain.** One more,
+`Rainbow-diagram-ROYGBIV.svg` on *How Human Memory Works*, is a real diagram of the wrong subject
+matched through the ROY G. BIV mnemonic — deliberately NOT gateable, since a size rule pretending
+to judge relevance would be the worse mistake.
+
+⚠️ **Honest reading of the yield.** Pass 2 ran over the population pass 1 could not resolve an
+article for — the hardest guides in the corpus — and the article-resolution fix raised how often
+the sourcer finds SOMETHING without raising how often it finds the right thing. The evidence
+floor screens provenance and the boilerplate gate screens chrome; neither can see that "Otto"
+means two unrelated things. **Before commissioning another wave, that is the gap to close** —
+some check that the candidate's own subject overlaps the guide's, not merely a shared token.
+
+**The recipe, unchanged:** run the wave through the Bash tool's `run_in_background` (never
+`nohup … &`, which gets reaped), then `check_images.py` → `ci_parity_lint.py` →
+`check_emergency_routes.py` → **hand-read every pick as `guide id <- Commons file title`** →
+`remove_images.py` for the wrong ones → commit. The hand read is the step that finds everything
+above; the gates only find shape.
