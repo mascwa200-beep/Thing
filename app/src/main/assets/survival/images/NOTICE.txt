@@ -3349,3 +3349,19 @@ kb/conservatism.svg
     File:Australian Conservatism Flags Symbol.svg
     CC0 — Hstoops
     https://commons.wikimedia.org/wiki/File%3AAustralian_Conservatism_Flags_Symbol.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fascism.svg
+    File:Fasces lictoriae.svg
+    Public domain — F l a n k e r
+    https://commons.wikimedia.org/wiki/File%3AFasces_lictoriae.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/marxism-communism.webp
+    File:The Soviet Union 1988 CPA 5971 stamp (70th birth anniversary of Nelson Mandela, South African anti-apartheid revolutionary, political leader and philanthropist).jpg
+    Public domain — USSR Post
+    https://commons.wikimedia.org/wiki/File%3AThe_Soviet_Union_1988_CPA_5971_stamp_%2870th_birth_anniversary_of_Nelson_Mandela%2C_South_African_anti-apartheid_revolutionary%2C_political_leader_and_philanthropist%29.jpg
