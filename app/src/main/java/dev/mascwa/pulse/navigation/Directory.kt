@@ -54,7 +54,7 @@ val GROUPS = listOf(
     MenuGroup("SOUND", { it.amber }, listOf(
         MenuEntry("Radio", "Local and internet stations, plays in the background", Routes.RADIO),
         MenuEntry("Music", "Your Spotify player", Routes.MUSIC),
-        MenuEntry("Viewscreen", "Paste a video or track address and play it", Routes.VIEWSCREEN),
+        MenuEntry("Theater", "Browse, search and watch — no links needed", Routes.VIEWSCREEN),
     )),
     MenuGroup("YOUR THINGS", { it.violet }, listOf(
         MenuEntry("Advisories", "The Computer's best next moves for you", Routes.ORACLE),

@@ -322,9 +322,20 @@ fun PulseApp(
                 )
             }
 
-            composable(Routes.VIEWSCREEN) {
+            // ⚠️ `play` is a QUERY argument, encoded at call sites (the reader-route rule: a URL
+            // carries the characters route patterns are parsed with). Plain `viewscreen`
+            // navigations and every existing deep-link still match — the base-route handling
+            // below strips `?` before comparing.
+            composable(
+                "${Routes.VIEWSCREEN}?play={play}",
+                arguments = listOf(navArgument("play") { defaultValue = "" }),
+            ) { backStackEntry ->
                 val vm: dev.mascwa.pulse.feature.theater.ViewscreenViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.theater.ViewscreenScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.theater.ViewscreenScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    playAddress = backStackEntry.arguments?.getString("play")?.takeIf { it.isNotBlank() },
+                )
             }
 
             // ⚠️ The URL is a QUERY argument and is encoded at every call site. A URL contains
