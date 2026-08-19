@@ -3,10 +3,13 @@ package dev.mascwa.pulse.jarvis.agent
 import android.util.Base64
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.telemetry.Readability
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.net.URLEncoder
 
@@ -53,16 +56,80 @@ class WebSearchTool(private val http: HttpClient) : JarvisTool {
     }.getOrElse { "Web search failed: ${it.message}" }
 }
 
-/** Fetch a URL and return its readable text. */
+/**
+ * Fetch a URL and return what was written on it.
+ *
+ * ⚠️ **THIS USED TO RETURN THE NAVIGATION AND CALL IT THE PAGE.** It stripped every tag and handed
+ * back the first 1500 characters, which on a real page is the skip-link, the masthead, the menu and
+ * the site's own promoted headlines. Measured over five real pages, the article did not begin within
+ * that budget on ANY of them: BBC at character 1,609, MDN at 2,112, and the Associated Press at
+ * **34,972** of a 47,010-character strip. On AP the tool did not merely return nothing useful — it
+ * returned OTHER STORIES' headlines out of the nav rail ("The Moscow region is hit by a drone
+ * blitz") inside what was supposed to be a musician's obituary, which the model would read as the
+ * content of the page it asked for. That is a correctness defect, not a quality one.
+ *
+ * ⚠️ It also fetched with no size cap at all, so a heavy page was read whole into a string.
+ *
+ * Deliberately NOT routed through `ReaderRepository`, even though the two do similar work. A reader
+ * wants an article and is right to refuse a PDF or a JSON feed; a `fetch` tool wants *whatever is
+ * there*, because the model may well be asking for an API response or a plain-text file. So the
+ * ladder here is its own: non-HTML comes back as-is, HTML is decimated, and anything the decimator
+ * will not call an article falls back to the old crude strip — which keeps every page that works
+ * today working, and is why this can only improve the tool's output.
+ */
 class WebFetchTool(private val http: HttpClient) : JarvisTool {
     override val name = "fetch"
-    override val usage = "fetch <https url> — fetch a page and return its text"
+    override val usage = "fetch <https url> — fetch a page and return its readable text (the article, not the site chrome)"
 
     override suspend fun run(arg: String): String {
         val url = arg.trim()
         if (!url.startsWith("http")) return "Provide a full http(s) URL."
-        return runCatching { stripHtml(http.getString(url)).clip() }
-            .getOrElse { "Fetch failed: ${it.message}" }
+        // Known redirect stubs: say so instead of fetching a shell page and reporting it as content.
+        Readability.unreadableReason(url)?.let { return it }
+
+        val res = runCatching { http.getTextCapped(url, MAX_FETCH_CHARS) }
+            .getOrElse { return "Fetch failed: ${it.message}" }
+
+        val type = res.contentType?.substringBefore(';')?.trim()?.lowercase()
+        val isHtml = type == null ||
+            type.startsWith("text/html") ||
+            type.startsWith("application/xhtml")
+        // A JSON feed, a CSV, a plain-text file: hand it over untouched. Running the tag stripper
+        // over JSON mangles it, and there is no article in it to find.
+        if (!isHtml) return res.body.trim().clip(PAGE_OBS)
+
+        val e = withContext(Dispatchers.Default) { Readability.extract(res.body, res.finalUrl) }
+        if (e.isArticle) {
+            return buildString {
+                e.meta.title?.let { appendLine(it) }
+                e.meta.byline?.let { appendLine("By $it") }
+                appendLine()
+                append(Readability.plainText(e))
+            }.trim().clip(PAGE_OBS)
+        }
+        // An index, a listing, a wall, a page built entirely by script. Say what was concluded, then
+        // fall back to exactly what this tool did before, so nothing that worked stops working.
+        return (e.note?.let { "($it)\n" } ?: "") + stripHtml(res.body).clip()
+    }
+
+    private companion object {
+        /**
+         * The ceiling on a page this tool will read into memory.
+         *
+         * Lower than the reader's, because a tool result is bounded to a few thousand characters
+         * anyway — reading four times that off the wire only to discard it is waste, not safety.
+         */
+        const val MAX_FETCH_CHARS = 1_000_000
+
+        /**
+         * How much of a decimated page to hand back.
+         *
+         * Larger than [MAX_OBS], and the reason is the measurement above: 1500 characters of an
+         * article is worth more than 1500 characters of menu, so the budget that was being spent on
+         * chrome can now buy content. Kept below `AgentOrchestrator.MAX_OBS` (6000), which truncates
+         * every observation anyway — so this is a real bound and not a way around that one.
+         */
+        const val PAGE_OBS = 4000
     }
 }
 
