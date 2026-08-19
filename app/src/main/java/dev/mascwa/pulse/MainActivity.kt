@@ -241,8 +241,13 @@ class MainActivity : ComponentActivity() {
                             startRoute = pendingRouteState.value,
                             isOnline = online,
                             onRouteVisit = { route ->
-                                app.container.usageRepository.record(route)
-                                app.container.usageRepository.log("nav", route)
+                                // ⚠️ The BASE route, not the pattern. currentRoute hands over the
+                                // route PATTERN — "survival?guide={guide}" — and recording that
+                                // verbatim mints junk usage keys that never match FeatureCatalog,
+                                // so those features could never be counted or recommended.
+                                val base = route.substringBefore('?')
+                                app.container.usageRepository.record(base)
+                                app.container.usageRepository.log("nav", base)
                             },
                             onStartRouteConsumed = { pendingRouteState.value = null },
                         )

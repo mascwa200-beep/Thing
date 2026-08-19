@@ -78,8 +78,31 @@ class UsageRepository(
             val loaded = raw
                 ?.let { runCatching { json.decodeFromString(Stored.serializer(), it).features }.getOrNull() }
                 ?: emptyMap()
-            HashMap(loaded).also { cache = it }
+            HashMap(foldLegacyKeys(loaded)).also { cache = it }
         }
+    }
+
+    /**
+     * One-time repair of the pattern-key bug: visits used to be recorded under the raw route
+     * PATTERN ("survival?guide={guide}"), minting junk keys that never matched a real feature.
+     * Each `?`-bearing key's history merges into its base route — counts add, hour histograms add
+     * element-wise, the newer last-visit wins — so nothing a user did is thrown away.
+     */
+    private fun foldLegacyKeys(loaded: Map<String, Feature>): Map<String, Feature> {
+        if (loaded.keys.none { '?' in it }) return loaded
+        val folded = HashMap<String, Feature>()
+        for ((key, f) in loaded) {
+            val base = key.substringBefore('?')
+            val cur = folded[base]
+            folded[base] = if (cur == null) f else Feature(
+                count = cur.count + f.count,
+                lastEpochMs = maxOf(cur.lastEpochMs, f.lastEpochMs),
+                hours = List(24) { i ->
+                    (cur.hours.getOrElse(i) { 0 }) + (f.hours.getOrElse(i) { 0 })
+                },
+            )
+        }
+        return folded
     }
 
     private suspend fun ensureLogLoaded(): ArrayDeque<LogEntry> = mutex.withLock {
