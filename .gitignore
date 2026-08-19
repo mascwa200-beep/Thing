@@ -64,3 +64,8 @@ tools/**/_*_TEMP.py
 # Regenerable local verification input: the fallacy sweep extracts this from the bundled guide
 # shards with tools-side Python. The harness is tracked; what it derives is not.
 scratchpad/fallacy/prose.txt
+
+# Measurement corpora pulled from live APIs for local validation — large, regenerable, and not
+# content the app ships. The harnesses that read them ARE committed; the data they read is not.
+scratchpad/**/sb_*.json
+scratchpad/**/corpus.tsv
