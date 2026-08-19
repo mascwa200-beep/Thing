@@ -309,7 +309,14 @@ fun LiveVideoPlayer(
         // 41-channel lineup needs 948dp for — **two of fourteen rows visible**, which is the exact
         // hunting this screen exists to abolish. Measured rather than eyeballed. Here it gets the
         // panel's 388x699 and shows twelve of the fourteen.
-        if (guideOpen) {
+        //
+        // ⚠️ **`&& !fullscreen`, because the dialog draws its own copy.** Without it, opening the
+        // guide while full screen composed TWO of them: the dialog's, which you can see and use,
+        // and this one underneath, invisible behind an opaque full-screen window. A lazy grid only
+        // composes what fits, so the waste is a viewport of tiles rather than the whole lineup —
+        // but it is still a live, focusable UI including the community filter's own text field,
+        // sitting where nothing can reach it. One condition, and only one of them exists again.
+        if (guideOpen && !fullscreen) {
             Guide(
                 lineup = lineup,
                 playing = current?.number,

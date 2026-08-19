@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -136,11 +136,24 @@ fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
             .padding(horizontal = 24.dp)
             .focusRequester(focus)
             .focusable()
-            // ⚠️ Consumed only for keys the box actually uses, and only on KeyDown. Swallowing
-            // everything would take the text field's own typing away from it, and reacting to both
-            // down and up would key every digit twice.
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            // ⚠️ **`onKeyEvent`, NOT `onPreviewKeyEvent`, and the difference is the whole bug.**
+            // A preview handler runs in the pass that travels from the ROOT DOWN to the focused
+            // element, before that element sees anything — confirmed by disassembling
+            // `FocusOwnerImpl.dispatchKeyEvent` in the shipped compose-ui 1.7.3, where both
+            // `onPreKeyEvent` invocations precede both `onKeyEvent` ones. So this handler, sitting
+            // on the outermost Column, took every digit before the filter field below could have
+            // it: typing `24` into "filter the community directory" changed channel twice and
+            // entered nothing. 8 of the 41 curated names carry a digit (France 24, i24NEWS, NDTV
+            // 24x7, CBS News 24/7 …) and the community directory has ~620 more, so "24" is close to
+            // the most natural thing anyone would type there.
+            //
+            // `onKeyEvent` runs in the pass that starts at the focused element and bubbles UP, so a
+            // focused text field consumes its own typing and this is reached only when nothing else
+            // wanted the key — which is exactly what the comment here always claimed.
+            //
+            // Still KeyDown only: reacting to both edges would key every digit twice.
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val digit = DIGIT_KEYS[event.key]
                 when {
                     digit != null -> {
