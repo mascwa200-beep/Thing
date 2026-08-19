@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,11 +30,13 @@ import dev.mascwa.pulse.desktop.telemetry.Freshness
 import dev.mascwa.pulse.desktop.telemetry.MediaBias
 import dev.mascwa.pulse.desktop.telemetry.NewsInsights
 import dev.mascwa.pulse.desktop.telemetry.NewsSummary
+import dev.mascwa.pulse.desktop.telemetry.Readability
 import dev.mascwa.pulse.desktop.telemetry.NewsMarketLink
 import dev.mascwa.pulse.desktop.telemetry.Tone
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsBusyBar
+import dev.mascwa.pulse.desktop.theme.LcarsButton
 import dev.mascwa.pulse.desktop.theme.LcarsChip
 import dev.mascwa.pulse.desktop.theme.LcarsFillRow
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
@@ -51,6 +55,15 @@ import dev.mascwa.pulse.desktop.theme.Pulse
 fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
     val c = Pulse.colors
+    val reading by vm.reading.collectAsState()
+
+    // The reader REPLACES the feed rather than sitting beside it. A window this wide could hold both,
+    // but a story being read wants the whole measure — a column of body text next to a column of
+    // headlines is two things competing for the same attention.
+    reading?.let { article ->
+        ReaderPane(vm, article, modifier)
+        return
+    }
 
     // The feed keeps itself current only while it is the screen being shown. Off it, there is no timer
     // running at all — see NewsViewModel.setOnScreen.
@@ -112,14 +125,24 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(state.articles, key = { it.url }) { article ->
-                ArticleCard(article, state.articles)
+                ArticleCard(
+                    article,
+                    state.articles,
+                    canRead = vm.canRead(article),
+                    onRead = { vm.read(article) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ArticleCard(article: Article, all: List<Article>) {
+private fun ArticleCard(
+    article: Article,
+    all: List<Article>,
+    canRead: Boolean = false,
+    onRead: () -> Unit = {},
+) {
     val c = Pulse.colors
     val mood = NewsInsights.toneBreakdown(article.title, article.summary)
     val topics = NewsInsights.topics(article.title, article.summary)
@@ -180,6 +203,16 @@ private fun ArticleCard(article: Article, all: List<Article>) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            // ⚠️ Shown only when it will work. Most of this feed is Google News redirect stubs,
+            // and a button that is always there and usually apologises teaches people to ignore it.
+            if (canRead) {
+                LcarsButton(
+                    "READ",
+                    onRead,
+                    modifier = Modifier.padding(top = 8.dp),
+                    accent = Pulse.colors.sky,
+                )
+            }
         }
     }
 }
@@ -219,3 +252,135 @@ private fun takeaway(tone: Tone, impactLabel: String, linkCount: Int): String {
 
 /** Matches the Android app's scale so a story looks the same on both. */
 private const val MOOD_SCALE = 6
+
+
+/**
+ * A story with the page taken off it.
+ *
+ * ⚠️ Deliberately the same block vocabulary and the same honest verdict as the phone, because the
+ * judgement comes from the same mirrored core. What differs is only the measure: a desktop window is
+ * wide, so the body is held to a readable column rather than run edge to edge.
+ */
+@Composable
+private fun ReaderPane(vm: NewsViewModel, article: Article, modifier: Modifier = Modifier) {
+    val c = Pulse.colors
+    val busy by vm.readerBusy.collectAsState()
+    val e by vm.extraction.collectAsState()
+
+    Column(modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+        LcarsHeaderBar("Reader", trailing = article.source.uppercase())
+        Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LcarsButton("BACK TO THE FEED", { vm.closeReader() })
+        }
+
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Text(
+                e?.meta?.title?.takeIf { it.isNotBlank() } ?: article.title,
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 24.sp,
+                color = c.ink, modifier = Modifier.widthIn(max = READING_MEASURE),
+            )
+            val detail = listOfNotNull(
+                e?.meta?.siteName ?: Readability.hostOf(article.url)?.uppercase(),
+                e?.meta?.byline,
+                e?.takeIf { it.isArticle }?.let { "${(it.wordCount + 219) / 220} MIN READ" },
+            ).joinToString("  ·  ")
+            if (detail.isNotBlank()) {
+                Text(
+                    detail, fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+
+            when {
+                busy -> LcarsBusyBar(true, Modifier.fillMaxWidth().padding(top = 16.dp))
+
+                e == null -> Unit
+
+                e!!.isArticle -> Column(
+                    Modifier.padding(top = 14.dp).widthIn(max = READING_MEASURE),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    e!!.blocks.forEach { ReaderBlock(it) }
+                    if (e!!.truncated) {
+                        Text(
+                            "This is a long page and only the first part was kept.",
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+                        )
+                    }
+                }
+
+                else -> LcarsFrame(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Column {
+                        Text(
+                            when (e!!.outcome) {
+                                Readability.Outcome.BLOCKED -> "BLOCKED"
+                                Readability.Outcome.THIN -> "NOT MUCH THERE"
+                                else -> "NOT AN ARTICLE"
+                            },
+                            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.amber,
+                        )
+                        Text(
+                            e!!.note ?: "This page did not give up an article.",
+                            fontFamily = ChakraPetch, fontSize = 15.sp, color = c.ink,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The measure a column of body text is held to.
+ *
+ * Long lines are hard to track back to the start of the next one; typographic advice puts the
+ * comfortable range near 60-80 characters, which at this size lands about here. A desktop window is
+ * far wider than that, so this is a constraint rather than a size.
+ */
+private val READING_MEASURE = 760.dp
+
+@Composable
+private fun ReaderBlock(block: Readability.Block) {
+    val c = Pulse.colors
+    when (block) {
+        is Readability.Block.Paragraph ->
+            Text(block.text, fontFamily = ChakraPetch, fontSize = 16.sp, lineHeight = 26.sp, color = c.ink)
+
+        is Readability.Block.Heading -> Text(
+            block.text, fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+            fontSize = when (block.level.coerceIn(1, 6)) {
+                1, 2 -> 20.sp
+                3 -> 18.sp
+                else -> 16.sp
+            },
+            color = c.accent, modifier = Modifier.padding(top = 6.dp),
+        )
+
+        is Readability.Block.Quote -> Text(
+            block.text, fontFamily = ChakraPetch, fontSize = 16.sp, lineHeight = 26.sp, color = c.ink2,
+            modifier = Modifier.padding(start = 14.dp),
+        )
+
+        is Readability.Block.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            block.items.forEachIndexed { i, item ->
+                Text(
+                    (if (block.ordered) "${i + 1}.  " else "\u25aa  ") + item,
+                    fontFamily = ChakraPetch, fontSize = 15.sp, lineHeight = 23.sp, color = c.ink,
+                )
+            }
+        }
+
+        // ⚠️ Images are named, not drawn. Loading a remote picture needs an image pipeline this
+        // module does not carry, and inventing one for a caption's worth of value would be the
+        // wrong trade — saying a picture was there is honest and costs nothing.
+        is Readability.Block.Image -> Text(
+            block.caption?.let { "[image] $it" } ?: "[image]",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+        )
+
+        is Readability.Block.Code -> Text(
+            block.text, fontFamily = JetBrainsMono, fontSize = 12.sp, lineHeight = 18.sp, color = c.ink2,
+        )
+    }
+}

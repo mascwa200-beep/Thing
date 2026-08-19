@@ -46,6 +46,43 @@ class HttpClient(
         }
     }
 
+    /** A text response, with where it actually came from. */
+    data class TextResponse(val body: String, val finalUrl: String, val contentType: String?)
+
+    /**
+     * Fetch text, giving up past [maxChars], and report the URL the response really came from.
+     *
+     * ⚠️ Two things [getString] does not do, both of which matter for an arbitrary web page rather
+     * than a known feed: a page has no size a caller can assume, and the final URL is not the
+     * requested one — an http→https hop or a canonical redirect is routine, and resolving a page's
+     * relative images against the address that was asked for points them at the wrong host.
+     */
+    suspend fun getTextCapped(
+        url: String,
+        maxChars: Int,
+        headers: Map<String, String> = emptyMap(),
+    ): TextResponse = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .headers(defaultHeaders(headers).toHeaders())
+            .get()
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
+            val body = resp.body ?: throw java.io.IOException("empty response")
+            val sb = StringBuilder()
+            body.charStream().use { reader ->
+                val buf = CharArray(1 shl 15)
+                var n = reader.read(buf)
+                while (n >= 0 && sb.length < maxChars) {
+                    sb.appendRange(buf, 0, minOf(n, maxChars - sb.length))
+                    n = reader.read(buf)
+                }
+            }
+            TextResponse(sb.toString(), resp.request.url.toString(), resp.header("Content-Type"))
+        }
+    }
+
     suspend fun <T> getJson(
         url: String,
         deserializer: DeserializationStrategy<T>,

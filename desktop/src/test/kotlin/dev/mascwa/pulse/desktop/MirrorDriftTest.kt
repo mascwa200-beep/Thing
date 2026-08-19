@@ -76,6 +76,7 @@ class MirrorDriftTest {
         "telemetry/Refresher.kt" to "$CORE/Refresher.kt",
         // How old what is on screen is, and when a published build is safe to offer.
         "telemetry/Freshness.kt" to "$CORE/Freshness.kt",
+        "telemetry/Readability.kt" to "$CORE/Readability.kt",
         "telemetry/ElapsedPhrase.kt" to "$CORE/ElapsedPhrase.kt",
         "telemetry/UpdatePolicy.kt" to "$CORE/UpdatePolicy.kt",
         // ⚠️ The live-TV four were mirrored by the script and absent from this map, which is the
@@ -109,7 +110,7 @@ class MirrorDriftTest {
         "DataRateTest.kt", "StardateTest.kt",
         "ContentPackTest.kt", "CourseMasteryTest.kt", "PracticeSetTest.kt", "HintsTest.kt",
         "QuizBuilderTest.kt", "ProcedureQuestionTest.kt", "StudyProgressTest.kt", "RefresherTest.kt",
-        "FreshnessTest.kt", "UpdatePolicyTest.kt", "NewsSummaryTest.kt",
+        "FreshnessTest.kt", "UpdatePolicyTest.kt", "NewsSummaryTest.kt", "ReadabilityTest.kt",
     ).associate { "telemetry/$it" to "$CORE_TEST/$it" }
 
     private val all: Map<String, String> get() = mirrors + testMirrors

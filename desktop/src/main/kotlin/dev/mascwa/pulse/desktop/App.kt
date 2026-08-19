@@ -45,6 +45,7 @@ import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.library.PackRepository
 import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.telemetry.currentStardateText
@@ -107,13 +108,18 @@ fun PulseDesktopApp(
         val remoteVm = remember { RemoteViewModel(scope, settings) }
         val json = remember { HttpClient.defaultJson() }
         val newsVm = remember {
+            // ⚠️ One client for both, deliberately. It carries the disk cache, which is what makes
+            // re-opening an article inside its cache window cost no request — the reader keeps no
+            // cache of its own for exactly that reason.
+            val newsHttp = HttpClient.create(json, AppPaths.dataDir.toFile())
             NewsViewModel(
                 scope = scope,
                 repository = NewsRepository(
-                    http = HttpClient.create(json, AppPaths.dataDir.toFile()),
+                    http = newsHttp,
                     cache = DiskCache(json, subdirectory = "news"),
                 ),
                 settings = settings,
+                reader = ReaderRepository(newsHttp),
             )
         }
         // The library and the deck are passed in, not built here — see the note in Main.kt on why they

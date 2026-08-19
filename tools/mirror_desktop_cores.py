@@ -62,6 +62,9 @@ MIRRORS: dict[str, str] = {
     # How old what is on screen is, and why. ElapsedPhrase comes along because Freshness needs it and it
     # was split out of TemporalReasoner precisely so this could travel without the memory stream.
     f"{CORE}/Freshness.kt": f"{DESKTOP}/telemetry/Freshness.kt",
+    # The DOM decimator. jsoup is plain JVM, so the desktop reads a web page with exactly the same
+    # rules the phone does — a story that strips well on one strips identically on the other.
+    f"{CORE}/Readability.kt": f"{DESKTOP}/telemetry/Readability.kt",
     f"{CORE}/ElapsedPhrase.kt": f"{DESKTOP}/telemetry/ElapsedPhrase.kt",
     # When a published build is safe to offer. Shared so the phone and the desktop cannot come to
     # disagree about it — the tri-state green gate has an edge that cost real debugging once.
@@ -119,6 +122,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
     f"{CORE_TEST}/EmergencyTriageTest.kt": f"{DESKTOP_TEST}/telemetry/EmergencyTriageTest.kt",
     f"{CORE_TEST}/FreshnessTest.kt": f"{DESKTOP_TEST}/telemetry/FreshnessTest.kt",
+    f"{CORE_TEST}/ReadabilityTest.kt": f"{DESKTOP_TEST}/telemetry/ReadabilityTest.kt",
     f"{CORE_TEST}/UpdatePolicyTest.kt": f"{DESKTOP_TEST}/telemetry/UpdatePolicyTest.kt",
 }
 

@@ -3,7 +3,9 @@ package dev.mascwa.pulse.desktop.feature.news
 import dev.mascwa.pulse.desktop.news.Article
 import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.desktop.news.NewsRepository
+import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.telemetry.Readability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,9 +46,59 @@ class NewsViewModel(
     private val scope: CoroutineScope,
     private val repository: NewsRepository,
     private val settings: DesktopSettingsStore,
+    private val reader: ReaderRepository? = null,
 ) {
     private val _state = MutableStateFlow(NewsUiState())
     val state: StateFlow<NewsUiState> = _state.asStateFlow()
+
+    // ---- The reader --------------------------------------------------------------------------
+    //
+    // Kept here rather than in a screen `remember` for the reason the settings store is hoisted out
+    // of the composition: state that survives a recomposition and outlives the widget that started
+    // it belongs to something that is not the widget. Switching to another screen and back should
+    // not silently re-fetch a page that is already read.
+
+    private val _reading = MutableStateFlow<Article?>(null)
+
+    /** The story being read, or null for the list. */
+    val reading: StateFlow<Article?> = _reading.asStateFlow()
+
+    private val _extraction = MutableStateFlow<Readability.Extraction?>(null)
+    val extraction: StateFlow<Readability.Extraction?> = _extraction.asStateFlow()
+
+    private val _readerBusy = MutableStateFlow(false)
+    val readerBusy: StateFlow<Boolean> = _readerBusy.asStateFlow()
+
+    private var readJob: Job? = null
+
+    /**
+     * Can this story be read here at all?
+     *
+     * ⚠️ The same rule the phone routes taps with, from the same mirrored core — most of this feed
+     * is Google News links, which are redirect stubs no decimator can read. A READ button that is
+     * always offered and usually apologises is worse than one that appears when it will work.
+     */
+    fun canRead(article: Article): Boolean = reader != null && Readability.canRead(article.url)
+
+    fun read(article: Article) {
+        if (!canRead(article)) return
+        val repo = reader ?: return
+        readJob?.cancel()
+        _reading.value = article
+        _extraction.value = null
+        readJob = scope.launch {
+            _readerBusy.value = true
+            _extraction.value = runCatching { repo.read(article.url) }.getOrNull()
+            _readerBusy.value = false
+        }
+    }
+
+    fun closeReader() {
+        readJob?.cancel()
+        _reading.value = null
+        _extraction.value = null
+        _readerBusy.value = false
+    }
 
     private var job: Job? = null
 
