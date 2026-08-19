@@ -3780,3 +3780,11 @@ kb/the-mesosphere-and-thermosphere.webp
     File:Earth's atmosphere.svg
     CC BY-SA 3.0 — Kelvinsong
     https://commons.wikimedia.org/wiki/File%3AEarth%27s_atmosphere.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/soil-texture-structure-and-tilth.webp
+    File:Soil profile.svg
+    CC BY-SA 4.0 — Tomáš Kebert &amp; umimeto.org
+    https://commons.wikimedia.org/wiki/File%3ASoil_profile.svg
