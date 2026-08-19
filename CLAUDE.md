@@ -6031,3 +6031,36 @@ through the standard pipeline (`kb_pipeline.py` / `merge_new_guides.py` → `ci_
 `args-is-a-string` trap bit once (`typeof args === 'string' ? JSON.parse(args) : args` guard is in the
 scripts, but the FIRST launch passed a filename instead of the topics array and threw at the guard —
 zero agents spent, relaunched with the array inline).
+
+### KB CONTENT — two waves merged this session (Fable ultracode workflows)
+
+Two content waves landed and merged through the standard pipeline. **Corpus 651 → 762 guides;
+FULL_PAGE_BASELINE 8440 → 9214.**
+
+- **Federation Database lore wave (`d33e7b0`, lore 46→102):** 56 in-universe entries across all seven
+  shelves (8 timeline · 8 species · 8 Starfleet institutions · 8 technologies · 8 ship classes · 8
+  worlds · 8 roles). Original prose in the ship's-computer register — homage only, no Memory Alpha
+  text, no franchise art. The reference register is shorter than a full page, so it did NOT move the
+  baseline. Merged via `guides_incoming.json` → `kb_pipeline.py` (NOT `merge_new_guides.py`, whose
+  `KNOWN_CATEGORIES` omits the lore shelves and whose `MIN_WORDS=1500` would reject the short
+  register — lore's authoritative gate is `ci_parity_lint.py`, which reads categories from the Kotlin
+  source). Ranker probe over the real 707-guide index: 24/24 sampled entries win their own subject,
+  0 new leaks (the one "shield" match is a pre-existing content gap — no general shield guide).
+- **KB breadth wave (`d257a66`, +55 full-page guides, +774 full pages):** one new guide per category
+  across all 49, each 13–15 sections at 460+ words (diesel cycle, Maillard reaction, electron
+  configuration, hemostasis, circular motion, contour lines, grounding/earthing, SAR planning, …).
+  Ranker probe: 20/20 sampled new guides win their own subject, emergency/practical queries unchanged.
+- ⚠️ **Wave-completion lessons (both banked):** (1) `kb_pipeline.py` expects each `guides*.json` to be
+  `{"guides":[...]}`, NOT a bare array — wrap `guides_incoming.json` accordingly. (2) A writer that
+  **loses its connection mid-response drops its guide**; the gate reports it MISSING. I wrote the
+  dropped `router-basics-for-home-woodwork` directly (14 sections, power-tool `safetyNote`) and
+  expanded every section over the 400-word bar to match the corpus norm — the documented alternative
+  is to drop it and let it re-emit next wave. (3) Two writers omitted `summary`; the gate catches
+  blank/missing summaries and I synthesised them from the guide content. (4) The dynamic-workflow
+  `args`-as-a-string trap bit once — the FIRST launch passed a filename instead of the topics array
+  and threw at the guard (0 agents spent); relaunched with the array inline.
+- **Both waves desktop-tandem verified:** `:desktop:test --tests "*LibraryBundle*"` BUILD SUCCESSFUL
+  against the 762-guide corpus (the companion copies `assets/survival` via `processResources`).
+- **Standing:** the KB engine continues toward 10,000 full pages (9214/10,000 now) and the lore toward
+  150–200 (102 now) — both are multi-session, dispatched as Fable ultracode mega-waves against pending
+  manifest topics when subagent budget allows.
