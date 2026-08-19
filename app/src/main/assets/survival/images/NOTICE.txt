@@ -2389,3 +2389,171 @@ kb/real-gases-and-the-van-der-waals-equation.webp
     File:Tr vs Pitzer factor.png
     CC BY-SA 4.0 — John H. Lienhard IV
     https://commons.wikimedia.org/wiki/File%3ATr_vs_Pitzer_factor.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-feedback-loops.webp
+    File:The methane climate feedback loop for natural ecosystems.jpg
+    CC BY-SA 4.0 — Joshua Dean
+    https://commons.wikimedia.org/wiki/File%3AThe_methane_climate_feedback_loop_for_natural_ecosystems.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-models-and-projections.webp
+    File:Global Climate Model.png
+    Public domain — NOAA
+    https://commons.wikimedia.org/wiki/File%3AGlobal_Climate_Model.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-sensitivity-and-radiative-forcing.svg
+    File:Climate sensitivity diagram.svg
+    CC BY-SA 4.0 — Femkemilene
+    https://commons.wikimedia.org/wiki/File%3AClimate_sensitivity_diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/global-warming-causes-and-evidence.svg
+    File:1979- Radiative forcing - climate change - global warming - EPA NOAA.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A1979-_Radiative_forcing_-_climate_change_-_global_warming_-_EPA_NOAA.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/milankovitch-cycles-and-orbital-forcing.svg
+    File:Vostok Petit data.svg
+    CC BY-SA 3.0 — Original: Unknown Vector: Autopilot
+    https://commons.wikimedia.org/wiki/File%3AVostok_Petit_data.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ocean-acidification.svg
+    File:Carbonate system of seawater.svg
+    Public domain — Karbonatsystem Meerwasser de.svg: User:BeAr / derivative work: Meiyuchang
+    https://commons.wikimedia.org/wiki/File%3ACarbonate_system_of_seawater.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/paleoclimatology-reading-past-climates.svg
+    File:Holocene Temperature Variations (2026).svg
+    CC BY-SA 4.0 — Dawei20
+    https://commons.wikimedia.org/wiki/File%3AHolocene_Temperature_Variations_%282026%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/permafrost-thaw-and-the-carbon-feedback.svg
+    File:Carbon cycle-cute diagram.svg
+    Public domain — Original: Kevin Saff Vector: FischX
+    https://commons.wikimedia.org/wiki/File%3ACarbon_cycle-cute_diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/sea-level-rise-and-its-causes.svg
+    File:2015-2100 Impacts of global warming on glaciers and sea level rise.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A2015-2100_Impacts_of_global_warming_on_glaciers_and_sea_level_rise.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-antarctic-and-greenland-ice-sheets.svg
+    File:20201210 Antarctica ice mass variation - NASA GRACE-en.svg
+    CC BY-SA 4.0 — Employee(s) of NASA, U.S. government, in the ordinary course of their employment duties.
+    https://commons.wikimedia.org/wiki/File%3A20201210_Antarctica_ice_mass_variation_-_NASA_GRACE-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-programming-languages.webp
+    File:Fortran acs cover.jpeg
+    Public domain — original uploader was en:User:Muhandis
+    https://commons.wikimedia.org/wiki/File%3AFortran_acs_cover.jpeg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-the-internet-and-arpanet.webp
+    File:Arpanet map 1973.jpg
+    Public domain — ARPANET
+    https://commons.wikimedia.org/wiki/File%3AArpanet_map_1973.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-the-personal-computer.webp
+    File:77 68 home computer under development.jpg
+    CC BY-SA 3.0 — see source
+    https://commons.wikimedia.org/wiki/File%3A77_68_home_computer_under_development.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-video-game-consoles.webp
+    File:TeleGames-Atari-Pong.jpg
+    CC BY-SA 3.0 — Evan-Amos
+    https://commons.wikimedia.org/wiki/File%3ATeleGames-Atari-Pong.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-eniac-and-the-first-electronic-computers.webp
+    File:Two women operating ENIAC (full resolution).jpg
+    Public domain — Unidentified U.S. Army photographer
+    https://commons.wikimedia.org/wiki/File%3ATwo_women_operating_ENIAC_%28full_resolution%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-home-computer-era.webp
+    File:Altair 8800 Computer.jpg
+    Public domain — Swtpc6800 en:User:Swtpc6800 Michael Holley
+    https://commons.wikimedia.org/wiki/File%3AAltair_8800_Computer.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-integrated-circuit-and-moore-s-law.webp
+    File:3 watt power LED after removing phosphor.jpg
+    CC BY-SA 4.0 — Ashkananisi7
+    https://commons.wikimedia.org/wiki/File%3A3_watt_power_LED_after_removing_phosphor.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-microprocessor-revolution.svg
+    File:Z80 arch.svg
+    CC BY-SA 3.0 — Appaloosa
+    https://commons.wikimedia.org/wiki/File%3AZ80_arch.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-transistor-and-the-birth-of-modern-electronics.webp
+    File:IGBT Cross Section.jpg
+    Public domain — Wefoij at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3AIGBT_Cross_Section.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-unix-story-and-its-legacy.svg
+    File:Operating systems used on top 500 supercomputers.svg
+    Public domain — Benedikt.Seidl
+    https://commons.wikimedia.org/wiki/File%3AOperating_systems_used_on_top_500_supercomputers.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-world-wide-web-origins-and-evolution.webp
+    File:CERN web corridor.jpg
+    CC BY-SA 4.0 — Lupus sat
+    https://commons.wikimedia.org/wiki/File%3ACERN_web_corridor.jpg
