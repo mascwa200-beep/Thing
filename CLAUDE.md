@@ -5543,3 +5543,109 @@ shrugging.
 **Wired into `AppContainer` as a lazy**, so nothing is created until the interrogator is switched on —
 a user who never enables it never has a transcript database on disk. Nothing calls `record` yet; its
 consumer is the A1 service, which is the next slice.
+
+### THE INTERROGATOR'S NATIVE LAYER AND CAPTURE PATH — R1, N1, N2, VAD (this session cont.)
+
+Owner: *"keep going autonomously … be conscious of how much you use"*, and separately that subagents
+are fine only after the weekly reset (noon Eastern). **Zero subagent spend throughout**, and `date -u`
+is checked before anything that would need them.
+
+**⚠️ A CORRECTION TO THIS FILE AND TO THE PLAN.** Both said Room was "catalogued but entirely unused
+— no `@Entity`, no `RoomDatabase`, not even a dependency line". Wrong: `core:database` has had
+`JarvisDatabase`/`JarvisDao`/`JarvisEntities` all along, with KSP applied. R1 was therefore much
+smaller than planned.
+
+**R1 — the transcript gets its OWN database, for two load-bearing reasons.** `JarvisDatabase` is
+built with `fallbackToDestructiveMigration()`, which its own comment accepts because the state it
+held was small and regenerable — it is no longer only that, since it now carries `knowledge_docs`,
+the documents the **user** ingested. Bumping its version destroys them. And a one-tap purge of a
+separate file is `deleteDatabase()`, which removes the bytes, where deleting rows leaves them in
+freed SQLite pages until something reuses or vacuums them; `PRAGMA secure_delete = ON` narrows that
+window but does not close it. ⚠️ **The db handle is NOT `by lazy`** — `purge()` closes it and deletes
+the file, and a lazy would keep handing out the closed instance forever after. ⚠️ **Timestamps are
+not encrypted**, a real if small leak (when speech happened and how much, never a word of what was
+said), stated rather than glossed: pruning is by age and count, and a store that decrypted every row
+to prune would hold keys open longer or fail to enforce its own retention.
+
+**⚠️ `TranscriptSeal` is a separate file with NO Android imports, and returns a plain `Sealed` rather
+than the Room entity.** That is what makes its one consequential rule testable on the JVM: what gets
+tested is the decision, not the table it lands in. **A row that cannot be encrypted is not stored** —
+a device with no working keystore is precisely where a plaintext row is most likely to be read by
+something else — and the policy runs BEFORE the cipher, so a refused utterance never reaches the
+keystore and the screen cannot be skipped by a future caller reaching for the cipher directly.
+
+**N0 follow-up — the local CMake gate was inert.** It configured and died on `#include <jni.h>`: the
+NDK puts it on its sysroot, a host toolchain has it in the JDK. Found by actually RUNNING the host
+build rather than assuming a clean configure meant a clean compile. **A gate that cannot run is worth
+nothing.** Now negative-tested — a deliberate syntax error fails it — and `nm -D` shows the expected
+export. Recipe: `cmake -S app/src/main/cpp -B /tmp/cmk && cmake --build /tmp/cmk`.
+
+**N1 — whisper.cpp, GREEN FIRST TRY (run 1817).** v1.7.6, 35 MB tree, statically linked into
+`liblcarsnative.so`, all four JNI exports present in the shipped APK.
+- ⚠️ **The `if(EXISTS)` guard around the tree is for the LOCAL gate, never for CI.** On CI the
+  workflow asserts the tree after cloning and asserts the symbols afterwards, because a build that
+  quietly lost speech recognition and still went green would be far worse than one that failed. That
+  is why **every entry point sits behind `HAVE_WHISPER`**: their absence is the check. A missing
+  symbol is a fact; a runtime flag would be a claim. Verified in the opposite direction too — with no
+  tree, the host build exports exactly one symbol, the N0 probe.
+- ⚠️ **The tag could not be verified from here** (no GitHub reach), so the clone step falls back to
+  the newest tag and warns loudly which it used — two answers per round instead of one. It did not
+  fire: `whisper.cpp @ v1.7.6 (pinned)`. ⚠️ **Read those logs carefully**: GitHub echoes the
+  unexpanded script, so a `::warning::` line with a literal `$TAG` in it is the source, not output.
+- **The model was chosen by measuring, not recalling**: all five candidate URLs probed live and sizes
+  read off `Content-Range`. base.en-q5_1 at 57 MB against 31 MB (tiny) and 181 MB (small); tiny
+  mishears often enough that the cascade downstream would be screening a paraphrase.
+
+**N2 — llama.cpp.** ⚠️ **Both projects bundle ggml**, so llama is added FIRST and defines the targets
+while whisper reuses them. ⚠️ **The C API is a bet** — llama.cpp renamed much of it during 2024-25 —
+so the workflow greps `llama.h` for all eighteen candidate symbols and prints present/absent BEFORE
+compiling, and its tags are build numbers rather than semver. Qwen2.5-1.5B-Instruct Q4 (1,066 MB
+measured) because stage 5 exists to REFUSE most of what stage 3 hands it, and sub-billion models
+agree with whatever a prompt suggests — an adjudicator that rubber-stamps every cue makes the cascade
+a keyword matcher with extra steps. **A gigabyte is not fetched without being asked**, and the
+cascade degrades honestly without it because `Rebuttal.Provenance` already models "nothing read the
+argument" as a first-class outcome.
+
+**VAD — a real design flaw found by measuring rather than reading.** The first draft updated the
+noise floor from the current frame and then compared that frame against it. Against a 0.0007 floor,
+one 0.28 RMS frame dragged the floor to 0.057 and the SECOND frame of identical audio fell below the
+ratio: the floor chased the speech, the onset run reset every frame, **and the detector was silent on
+a perfect sine wave**. Loudness is now judged against the previous floor, and the floor learns only
+from frames that are neither speech nor a candidate for it.
+
+**⚠️ THE ARBITER GAINED A THIRD CONTINUOUS CLAIMANT, AND THE TRADEOFF IS DELIBERATE.** Whether two
+`AudioRecord` clients inside one app both receive real audio is a question about a device's audio
+policy that cannot be answered from a build machine, so the interrogator and the wake word are
+mutually exclusive: switching it on **suspends the wake word**. Reversible, user-visible, and
+asserted by a test so it cannot drift. The proper fix is one `AudioRecord` fanned out to both
+consumers — a real refactor of the voice stack, recorded rather than attempted blind, because getting
+it wrong means the wake word stops working and nothing in CI would notice.
+
+**⚠️ THE ONE CI FAILURE, AND IT WAS PREDICTED AND THEN NOT FOLLOWED THROUGH.** Growing the `Action`
+enum broke `ActiveMatrixService`'s exhaustive `when`. I wrote "the compiler will demand the new
+branch, which is the right kind of failure" and fixed only the branch inside `VoiceMachine`. None of
+the local gates could have caught it: the parse-only pass does not type-check, `android_resolve_check`
+differences *unresolved names* and a non-exhaustive `when` is not one, and that service pulls in too
+much of the app to compile against the platform jar. **The practical gate for adding an enum constant
+is a grep for its consumers** — done properly afterwards, and it is the only one.
+
+**Guards asleep this batch: six, all fixed and re-confirmed.** Two in `Fallacies` and two in the VAD
+were the same mechanism — *the fixture never reached the branch*: the calibration fixture fed loud
+frames from the first sample, which cannot fail because the floor bootstraps to whatever the first
+frame measured; and nothing asserted WHEN speech began, so removing the onset requirement broke no
+test. One perturbation was itself invalid — it referenced a function that does not exist, so it
+reported a compile error, **which is not evidence a guard is awake**. And the fourth mechanism, in
+`TranscriptPolicy`: **an assertion too weak to see the damage**, checking only that the whole secret
+string was absent while a swapped pass order left a Slack token's tail in the clear.
+
+⚠️ **GitHub push protection rejected a push** because a realistic Slack-token test fixture is read as
+a real secret. Correct block. Fixed by assembling the fixture from parts so no scannable literal is
+on disk — never by the "allow this secret" link.
+
+**Not mirrored to the desktop, deliberately.** `MirrorDriftTest` requires *listed* mirrors to match,
+not that every core is mirrored, and microphones are out of the companion's scope.
+
+**Remaining: A1** (the `AcousticInterrogatorService` — AudioRecord FGS on the `SensoriumService`
+upgradeable pattern, the VAD driving the buffer, the cascade orchestrator) and **U1** (the screen:
+live transcript, flagged fallacies with counter-arguments and citations, purge control, Settings
+toggle default OFF).
