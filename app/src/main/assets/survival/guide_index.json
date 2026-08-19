@@ -226,6 +226,53 @@
    "file": "guides_agriculture_and_gardening.json"
   },
   {
+   "id": "contour-farming-terracing-and-strip-cropping",
+   "title": "Contour Farming, Terracing and Strip Cropping",
+   "category": "Agriculture & Gardening",
+   "summary": "How to farm sloping land without losing the soil: laying out contour lines, building and maintaining terraces, strip cropping, bunds, swales and living barriers, with the history and the numbers behind each practice.",
+   "headings": [
+    "Why Slopes Lose Soil: How Water Erosion Strips Farmland",
+    "What Contour Farming Is and Why Working Across the Slope Helps",
+    "Finding the Level Line: A-Frames, Water Levels and GPS",
+    "Keyline Design: Keypoints, Ridges and Spreading Water",
+    "Terraces Through History: Rice Paddies, Andean Platforms and Stone Walls",
+    "Types of Terraces: Bench, Broadbase, Narrow-Base and Fanya Juu",
+    "Building a Small Bench Terrace by Hand, Step by Step",
+    "Strip Cropping: Alternating Row Crops and Cover Across the Slope",
+    "Grassed Waterways, Filter Strips and Field Borders",
+    "Contour Bunds, Stone Lines, Swales and Water Harvesting",
+    "Living Barriers: Vetiver Hedges, Alley Cropping and SALT",
+    "Maintenance: Keeping Terraces and Contour Systems Working",
+    "Machinery and Safety on Sloping Ground",
+    "Choosing the Right Practice for Your Slope, Rainfall and Budget"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
+   "id": "mulching-materials-methods-and-timing",
+   "title": "Mulching: Materials, Methods and Timing",
+   "category": "Agriculture & Gardening",
+   "summary": "What mulch actually does for soil, how to choose between wood chips, straw, leaves, compost, stone, plastic and living mulches, how deep to lay each one, how to calculate quantities, and when in the year to apply and pull back mulch.",
+   "headings": [
+    "What Mulch Does: Moisture, Weeds, Temperature and Soil Life",
+    "Choosing a Mulch: Organic Versus Inorganic Materials",
+    "Wood Chips, Bark and Arborist Chips",
+    "Straw, Hay and Grass Clippings",
+    "Leaves, Leaf Mold and Pine Needles",
+    "Compost as Mulch and the No-Dig Approach",
+    "Gravel, Stone and Other Inorganic Mulches",
+    "Plastic Film and Landscape Fabric",
+    "Living Mulches and Cover Crops",
+    "How Deep to Mulch and How Much to Buy",
+    "How to Apply Mulch Step by Step",
+    "Timing Through the Year: Spring, Summer, Fall and Winter",
+    "Mulching the Vegetable Garden",
+    "Mulching Trees, Shrubs and Perennial Beds",
+    "Mulch Problems and Myths: Nitrogen Tie-Up, Sour Mulch, Termites and Fungi"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
    "id": "archaeological-excavation-methods-and-techniques",
    "title": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
@@ -533,6 +580,52 @@
     "Automated Detection and the Problem of Scale",
     "Ethics, Access and Who the Data Belongs To",
     "Limits, Failure Modes and Misinterpretation"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "ground-penetrating-radar-and-geophysical-survey",
+   "title": "Ground-Penetrating Radar and Geophysical Survey",
+   "category": "Archaeology & Anthropology",
+   "summary": "How archaeologists see beneath the ground without digging: ground-penetrating radar, magnetometry, earth resistance and electromagnetic survey, how each method works, when it fails, how surveys are laid out and processed, and famous discoveries made this way.",
+   "headings": [
+    "Seeing Beneath the Soil: What Geophysical Survey Does for Archaeology",
+    "How Ground-Penetrating Radar Works: Pulses, Echoes and Travel Time",
+    "Antenna Frequency: The Trade-Off Between Depth and Detail",
+    "Reading a Radargram: Hyperbolas, Layers and False Echoes",
+    "Soils and Site Conditions: When Radar Works and When It Fails",
+    "From Radargram to Map: Processing and Time Slices",
+    "Magnetometry: Mapping Ditches, Hearths and Kilns by Their Magnetic Ghosts",
+    "Earth Resistance Survey: Finding Walls and Ditches with Electrical Current",
+    "Electromagnetic Induction, Susceptibility and Metal Detection",
+    "Planning and Walking a Survey Grid",
+    "Famous Discoveries: Falerii Novi, the Gjellestad Ship and Stonehenge's Hidden Landscape",
+    "Beyond Archaeology: Graves, Utilities, Voids and Forensics",
+    "Ground-Truthing: Tying Anomalies to the Real Ground",
+    "Limits, Ethics and Good Practice in Survey Work"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "underwater-and-maritime-archaeology",
+   "title": "Underwater and Maritime Archaeology",
+   "category": "Archaeology & Anthropology",
+   "summary": "How archaeologists find, excavate, record and conserve shipwrecks, sunken cities and drowned landscapes, from side-scan sonar and diver excavation to raising the Mary Rose and the Vasa, plus the law that separates science from treasure hunting.",
+   "headings": [
+    "What Underwater and Maritime Archaeology Actually Study",
+    "How Shipwreck Sites Form and Change Over Time",
+    "Why Water Preserves and Destroys: Anoxia, Shipworm and Corrosion",
+    "Finding Sites: Side-Scan Sonar, Magnetometers and Sub-Bottom Profilers",
+    "Excavating Underwater: Airlifts, Dredges, Grids and Trowels",
+    "Recording and Mapping: From Tape Measures to Photogrammetry",
+    "Conserving Waterlogged Finds: PEG, Freeze-Drying and Electrolysis",
+    "Raising Whole Ships: The Mary Rose and the Vasa",
+    "Ancient Wrecks of the Mediterranean: Uluburun, Antikythera and Kyrenia",
+    "Deep-Water Archaeology: ROVs, AUVs and Wrecks Beyond Diving",
+    "Sunken Cities and Drowned Landscapes: Port Royal, Thonis-Heracleion and Doggerland",
+    "Law, Ethics and Treasure Hunting: Who Owns a Wreck?",
+    "Maritime Archaeology on the Shore: Harbors, Fish Traps, Logboats and Landing Places",
+    "Getting Involved: Training, Careers and Avocational Archaeology"
    ],
    "file": "guides_archaeology_and_anthropology.json"
   },
@@ -921,6 +1014,52 @@
     "Baade's Correction: The Universe Doubles in Size",
     "From the Debate to the Modern Distance Ladder",
     "What the Episode Teaches: Error, Authority and Honest Uncertainty"
+   ],
+   "file": "guides_astronomy.json"
+  },
+  {
+   "id": "nicolaus-copernicus-life-and-work",
+   "title": "Nicolaus Copernicus: Life and Work",
+   "category": "Astronomy",
+   "summary": "The life of the astronomer who moved the Earth: Copernicus's education, his church career in Frombork, the problems with Ptolemy he set out to fix, the argument of De revolutionibus, its reception, and how his heliocentric idea grew into the Copernican revolution.",
+   "headings": [
+    "The World Copernicus Was Born Into",
+    "Education in Krakow and Italy: Law, Medicine and the Stars",
+    "The Canon of Frombork: Duties, Income and Daily Life",
+    "The Sky He Inherited: Aristotle, Ptolemy and the Earth-Centered Cosmos",
+    "What Was Wrong: Equants, Calendars and the Itch for Reform",
+    "The Commentariolus: A Universe Sketched in Forty Pages",
+    "Thirty Years of Silence: Why He Waited",
+    "De revolutionibus orbium coelestium: The Book of 1543",
+    "Osiander's Preface and How the Book Was First Read",
+    "The Evidence Gap: Parallax, Physics and Why Doubt Was Reasonable",
+    "Copernicus the Economist, Physician and Administrator",
+    "From Copernicus to Kepler, Galileo and Newton",
+    "Legacy: The Copernican Principle and the Grave Found in 2005",
+    "Reading Copernicus Today: Editions, Museums and What to Look For"
+   ],
+   "file": "guides_astronomy.json"
+  },
+  {
+   "id": "the-telescope-a-history",
+   "title": "The Telescope: A History",
+   "category": "Astronomy",
+   "summary": "The story of the telescope from the spectacle shops of 1608 to the James Webb Space Telescope: how refractors, reflectors, radio dishes and space observatories were invented, who built them, what each generation discovered, and how the instruments actually work.",
+   "headings": [
+    "Before the Telescope: What the Naked Eye Could and Could Not See",
+    "Middelburg, 1608: Spectacle Makers and the First Patent Application",
+    "Galileo's Improvements and the Nights That Changed Astronomy",
+    "How a Refracting Telescope Works: Lenses, Focal Length and Magnification",
+    "The Age of Very Long Telescopes: Huygens, Hevelius and Aerial Tubes",
+    "Newton's Reflector and the Mirror Alternative",
+    "The Achromatic Lens: Chester Moore Hall, John Dollond and the Refractor Reborn",
+    "William Herschel: Giant Reflectors and the Discovery of Uranus",
+    "The Leviathan of Parsonstown and the Discovery of Spiral Nebulae",
+    "The Great Refractors: Clark Lenses from Dearborn to Yerkes",
+    "Glass Mirrors and Mountaintops: Mount Wilson, Hubble's Universe and Palomar",
+    "Radio Telescopes: Listening to the Sky from Jansky to the Event Horizon Telescope",
+    "Telescopes in Space: Hubble, the Great Observatories and the James Webb",
+    "Segmented Mirrors, Adaptive Optics and Today's Giant Telescopes"
    ],
    "file": "guides_astronomy.json"
   },
@@ -1442,6 +1581,52 @@
    "file": "guides_biology.json"
   },
   {
+   "id": "lysosomes-and-cellular-digestion",
+   "title": "Lysosomes and Cellular Digestion",
+   "category": "Biology",
+   "summary": "What lysosomes are and how cells digest and recycle material: the acid interior and its enzymes, how cargo arrives by endocytosis, phagocytosis and autophagy, what happens in lysosomal storage diseases, and how lysosomes signal, age and get studied.",
+   "headings": [
+    "The Cell's Stomach: What Lysosomes Are and What They Do",
+    "Christian de Duve and the Discovery of the Lysosome",
+    "An Acid Bath: pH, Proton Pumps and Why the Interior Is Hostile",
+    "Acid Hydrolases: The Enzymes That Take Everything Apart",
+    "The Mannose-6-Phosphate Pathway: How Enzymes Find the Lysosome",
+    "The Lysosomal Membrane: Why the Stomach Does Not Digest Itself",
+    "Endocytosis and Endosome Maturation: Cargo from Outside the Cell",
+    "Phagocytosis: How White Blood Cells Eat and Digest Microbes",
+    "Autophagy: The Cell Eating Itself to Stay Alive",
+    "When Digestion Fails: Lysosomal Storage Diseases",
+    "The Lysosome as Command Center: mTORC1, TFEB and Nutrient Signaling",
+    "Secretory Lysosomes and Lysosome-Related Organelles",
+    "Lysosomes in Aging, Neurodegeneration and Cancer",
+    "How Scientists Study Lysosomes: From Centrifuges to Live-Cell Dyes"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
+   "id": "peroxisomes-and-cellular-detoxification",
+   "title": "Peroxisomes and Cellular Detoxification",
+   "category": "Biology",
+   "summary": "What peroxisomes are, how they use catalase and oxidase enzymes to make and destroy hydrogen peroxide, how they break down very-long-chain fatty acids and build ether lipids, and what happens in peroxisomal disorders such as Zellweger syndrome and adrenoleukodystrophy.",
+   "headings": [
+    "What Peroxisomes Are and Why Cells Need Them",
+    "Discovery of the Peroxisome: Microbodies and Christian de Duve",
+    "Structure of a Peroxisome: Single Membrane, Enzyme Matrix, and Crystalline Core",
+    "Catalase and Hydrogen Peroxide: The Central Chemistry",
+    "Peroxisomal Oxidases: The Enzymes That Make Hydrogen Peroxide",
+    "Beta-Oxidation of Very-Long-Chain Fatty Acids",
+    "Alpha-Oxidation, Phytanic Acid, and Branched-Chain Fats",
+    "Plasmalogens and Ether Lipid Synthesis",
+    "Detoxifying Alcohol, Aldehydes, and Other Small Molecules",
+    "Peroxisome Biogenesis: PEX Genes, Peroxins, and Protein Import",
+    "Growth, Division, and Pexophagy: Controlling Peroxisome Numbers",
+    "Plant Peroxisomes: Glyoxysomes and Photorespiration",
+    "Peroxisomal Disorders: Zellweger Spectrum, X-Linked Adrenoleukodystrophy, and Refsum Disease",
+    "Reactive Oxygen Species, Redox Signaling, and How Peroxisomes Compare with Mitochondria and Lysosomes"
+   ],
+   "file": "guides_biology.json"
+  },
+  {
    "id": "how-to-validate-a-business-idea",
    "title": "How to Validate a Business Idea",
    "category": "Business & Finance",
@@ -1681,6 +1866,52 @@
     "References, Non-Compete Clauses and Restrictive Covenants After Leaving",
     "Unions, Representation and Collective Bargaining",
     "Getting Help, Tribunal Time Limits and Enforcing Your Rights"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "choosing-a-legal-business-structure",
+   "title": "Choosing a Legal Business Structure",
+   "category": "Business & Finance",
+   "summary": "How to choose between a sole proprietorship, partnership, LLC, S corporation, C corporation, nonprofit, or cooperative: what each structure costs, how each is taxed, what liability protection really covers, and how to form or change an entity.",
+   "headings": [
+    "Why Your Business Structure Matters",
+    "Sole Proprietorship: The Default for a Single Owner",
+    "General Partnerships: The Default for Two or More Owners",
+    "Limited Partnerships (LP) and Limited Liability Partnerships (LLP)",
+    "The Limited Liability Company (LLC): Flexibility with a Liability Shield",
+    "How LLCs Are Taxed: Disregarded Entities, Partnerships, and Elections",
+    "C Corporations: Structure, Stock, and Double Taxation",
+    "S Corporations: The Pass-Through Election and Its Limits",
+    "Nonprofits, Benefit Corporations, and Cooperatives",
+    "Liability Protection and Piercing the Corporate Veil",
+    "Comparing Taxes Across Structures: Self-Employment Tax, Payroll, Distributions, and the QBI Deduction",
+    "Paperwork, Fees, and Ongoing Compliance for Each Structure",
+    "Raising Money: How Lenders and Investors See Each Structure",
+    "Forming Your Entity Step by Step, and Changing Structure Later"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "choosing-a-profitable-niche",
+   "title": "Choosing a Profitable Niche",
+   "category": "Business & Finance",
+   "summary": "How to pick a niche market that can actually support a business: reading demand signals, sizing the market, studying competitors, testing cheaply, and checking the unit economics before you commit.",
+   "headings": [
+    "What a Niche Is and Why Niches Matter",
+    "Why Narrow Beats Broad When You Are Small",
+    "Reading Demand Signals Before You Build Anything",
+    "Sizing a Market: Big Enough to Pay, Small Enough to Win",
+    "Studying the Competition Without Being Scared Off",
+    "How a Niche Pays: Monetization Models Compared",
+    "Mining Your Own Skills, Problems, and Unfair Advantages",
+    "Keyword and Search Research for Niche Selection",
+    "Validating a Niche With Small, Cheap Tests",
+    "Unit Economics: Margins, Price Points, and Repeat Purchases",
+    "Positioning: Being the Obvious Choice for Someone Specific",
+    "Trends, Fads, and Durable Niches",
+    "Common Niche-Picking Mistakes and How to Avoid Them",
+    "Commit, Pivot, or Quit: Making the Call"
    ],
    "file": "guides_business_and_finance.json"
   },
@@ -2205,6 +2436,53 @@
    "file": "guides_chemistry.json"
   },
   {
+   "id": "electron-configuration-and-atomic-orbitals",
+   "title": "Electron Configuration and Atomic Orbitals",
+   "category": "Chemistry",
+   "summary": "How electrons are arranged in atoms: quantum numbers, the shapes of s, p, d, and f orbitals, the aufbau principle, Pauli exclusion, Hund's rule, how to write electron configurations for atoms and ions, the exceptions like chromium and copper, and how configurations explain the periodic table and magnetism.",
+   "headings": [
+    "From Bohr Orbits to Orbitals: Why Electrons Are Not Tiny Planets",
+    "The Four Quantum Numbers: n, l, ml, and ms",
+    "Shells, Subshells, and Orbitals: How the Address System Nests",
+    "The Shapes of s, p, d, and f Orbitals, and Their Nodes",
+    "Shielding, Penetration, and Effective Nuclear Charge",
+    "The Aufbau Principle and the Filling Order of Subshells",
+    "The Pauli Exclusion Principle and Electron Spin",
+    "Hund's Rule and Why Electrons Spread Out Before Pairing",
+    "Writing an Electron Configuration Step by Step",
+    "Noble Gas Shorthand and Core Versus Valence Electrons",
+    "Exceptions to the Filling Order: Chromium, Copper, and Friends",
+    "Electron Configurations of Ions and Isoelectronic Series",
+    "Electron Configuration and the Shape of the Periodic Table",
+    "Evidence and Consequences: Magnetism, Spectroscopy, and a Preview of Bonding"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
+   "id": "the-quantum-mechanical-model-of-the-atom",
+   "title": "The Quantum Mechanical Model of the Atom",
+   "category": "Chemistry",
+   "summary": "How physicists went from the failed classical atom to the modern quantum model: photons, matter waves, the Schrodinger equation, orbitals, quantum numbers, electron spin, and why the periodic table has the shape it does.",
+   "headings": [
+    "Why the Classical Atom Failed",
+    "Blackbody Radiation and Planck's Quantum",
+    "The Photoelectric Effect and the Photon",
+    "Atomic Line Spectra: The Evidence Written in Light",
+    "The Bohr Model: Triumph and Limits",
+    "Matter Waves: de Broglie's Bold Hypothesis",
+    "The Heisenberg Uncertainty Principle",
+    "The Schrodinger Equation and the Wavefunction",
+    "Orbitals and Probability: What Replaced the Orbit",
+    "The Quantum Numbers n, l, and ml",
+    "Electron Spin and the Pauli Exclusion Principle",
+    "The Shapes of s, p, d, and f Orbitals",
+    "Many-Electron Atoms: Shielding, Penetration, and Effective Nuclear Charge",
+    "Electron Configurations and the Aufbau Principle",
+    "How the Quantum Model Explains the Periodic Table"
+   ],
+   "file": "guides_chemistry.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -2685,6 +2963,29 @@
     "Models, Projections and Their Uncertainties",
     "Living on Thawing Ground",
     "What Can Be Done, and What Cannot"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "climate-tipping-points",
+   "title": "Climate Tipping Points",
+   "category": "Climate",
+   "summary": "What climate tipping points are and where they sit: ice sheets, the Atlantic circulation, the Amazon, permafrost, coral reefs and monsoons, the feedbacks that drive them, the warming thresholds scientists estimate, and what crossing one would mean.",
+   "headings": [
+    "What a Climate Tipping Point Is and Is Not",
+    "Feedback Loops: The Engines Behind Tipping Points",
+    "The Greenland Ice Sheet",
+    "The West Antarctic Ice Sheet and Marine Ice Instability",
+    "The Atlantic Meridional Overturning Circulation",
+    "Amazon Rainforest Dieback",
+    "Permafrost Thaw and the Carbon It Holds",
+    "Arctic Sea Ice and Abrupt Regional Change",
+    "Coral Reefs: The First Global Casualty",
+    "Monsoons, Boreal Forests, and Other Candidate Elements",
+    "Cascades: How One Tipping Element Can Push Another",
+    "Early Warning Signals: Can We See a Tipping Point Coming?",
+    "Temperature Thresholds: What the Numbers Say",
+    "What Tipping Points Mean for Planning and Policy"
    ],
    "file": "guides_climate.json"
   },
@@ -3267,6 +3568,29 @@
    "file": "guides_computing.json"
   },
   {
+   "id": "history-of-apple-inc",
+   "title": "History of Apple Inc.",
+   "category": "Computing",
+   "summary": "The story of Apple from the 1976 garage startup through the Apple II, the Macintosh, near-bankruptcy in the 1990s, the return of Steve Jobs, the iPod and iPhone revolutions, and the Tim Cook era of services and Apple silicon.",
+   "headings": [
+    "The Garage Years: Jobs, Wozniak, and the Apple I",
+    "The Apple II and the Personal Computer Boom",
+    "Going Public: The 1980 IPO and the New Silicon Valley Wealth",
+    "Xerox PARC, the Lisa, and the Road to the Macintosh",
+    "1984: The Macintosh Arrives",
+    "The Sculley Years: Peak and Drift",
+    "The Fall: Spindler, Amelio, and the Brink of Bankruptcy",
+    "The Return of Jobs and the Turnaround",
+    "Mac OS X and the Apple Stores",
+    "The iPod and iTunes: A Thousand Songs in Your Pocket",
+    "The iPhone: Reinventing the Phone",
+    "The App Store, the iPad, and the Post-PC Era",
+    "The Cook Era: Services, Scale, and New Categories",
+    "Why Apple Mattered: Design, Integration, and Legacy"
+   ],
+   "file": "guides_computing_2.json"
+  },
+  {
    "id": "cook-food-safety-fundamentals",
    "title": "Food Safety & Kitchen Safety Fundamentals",
    "category": "Cooking — Food Safety",
@@ -3706,6 +4030,30 @@
    "file": "guides_cooking_food_safety.json"
   },
   {
+   "id": "infectious-dose-and-individual-susceptibility",
+   "title": "Infectious Dose and Individual Susceptibility",
+   "category": "Cooking — Food Safety",
+   "summary": "How many microbes it takes to make you sick, why that number is different for norovirus, Salmonella and Listeria, and why the same contaminated meal sickens one person and spares another.",
+   "headings": [
+    "What an Infectious Dose Is — and Why It Is Never Just One Number",
+    "Why Infectious Doses Differ So Much Between Pathogens",
+    "Low-Dose Pathogens: Norovirus, Shigella, E. coli O157 and the Parasites",
+    "Higher-Dose Pathogens: Salmonella, Campylobacter, Clostridium perfringens and Vibrio",
+    "Toxin Producers: Why Dose Means Something Different for Staph and Bacillus cereus",
+    "The Food Matrix Effect: How Fat, Chocolate and Dry Foods Slash the Effective Dose",
+    "Stomach Acid: The Body's First Barrier and the Drugs That Lower It",
+    "Who Is More Susceptible: The Vulnerable Groups at a Glance",
+    "Infants and Young Children: Small Bodies, Immature Defenses",
+    "Older Adults: Immunosenescence, Fading Acid and Higher Stakes",
+    "Pregnancy: Why Listeria and Toxoplasma Dominate the Advice",
+    "Immune Compromise and Chronic Disease: When the Dose Curve Shifts Furthest",
+    "Dose as Probability: The Single-Hit Model and Why There Is No Safe Threshold",
+    "Why Some People at the Same Meal Get Sick and Others Do Not",
+    "Putting Dose Logic to Work in the Kitchen"
+   ],
+   "file": "guides_cooking_food_safety.json"
+  },
+  {
    "id": "conduction-convection-and-radiant-heat",
    "title": "Conduction, Convection and Radiant Heat",
    "category": "Cooking — Techniques",
@@ -3999,6 +4347,29 @@
     "Pressure, Enzymes and Other Accelerants",
     "Failure Modes and How to Read Them",
     "Limits, Contested Claims and What Is Genuinely Unknown"
+   ],
+   "file": "guides_cooking_techniques.json"
+  },
+  {
+   "id": "the-maillard-reaction-explained-for-cooks",
+   "title": "The Maillard Reaction Explained for Cooks",
+   "category": "Cooking — Techniques",
+   "summary": "Why browning makes food taste good: the chemistry of the Maillard reaction in plain language, and the practical levers — heat, dryness, pH, sugars and time — that control browning in meat, bread, vegetables, dairy and coffee.",
+   "headings": [
+    "What the Maillard Reaction Is and Why Browned Food Tastes Better",
+    "Maillard Versus Caramelization: Two Different Kinds of Browning",
+    "The Chemistry in Plain Terms: From First Contact to Melanoidins",
+    "Temperature: Why the Action Happens Between 140 and 180 Degrees Celsius",
+    "Moisture: The Boiling Ceiling and the Case for Dry Surfaces",
+    "pH: Why Baking Soda Speeds Browning and Acid Slows It",
+    "Ingredients That Brown Well: Reducing Sugars, Amino Acids and Added Fuel",
+    "Meat and the Sear: Crust Building, Fond, and the Myth of Sealing Juices",
+    "Bread, Pastry and the Baker's Crust",
+    "Vegetables and Onions: Roasting, Sautéing and the Slow Sweet Build",
+    "Dairy and Confectionery: Browned Butter, Dulce de Leche and Toasted Milk",
+    "Coffee, Chocolate, Grains and the Roasted Pantry",
+    "Practical Levers: A Working Checklist for More (or Less) Browning",
+    "When Browning Goes Wrong: Burnt Flavors, Smoke Points and Acrylamide"
    ],
    "file": "guides_cooking_techniques.json"
   },
@@ -4514,6 +4885,30 @@
    "file": "guides_earth_science.json"
   },
   {
+   "id": "jade-nephrite-jadeite-and-ornamental-stone",
+   "title": "Jade — Nephrite, Jadeite and Ornamental Stone",
+   "category": "Earth Science",
+   "summary": "What jade actually is — the two distinct minerals nephrite and jadeite — how each forms, where it is mined, why it is so tough, what the colors mean, its history in China, Mesoamerica and New Zealand, and how to tell real jade from imitations and treatments.",
+   "headings": [
+    "Two Minerals, One Name: What Jade Actually Is",
+    "Nephrite: Chemistry, Structure and Properties of the Tough Jade",
+    "Jadeite: Chemistry, Structure and Properties of the Rare Jade",
+    "Why Jade Is So Tough: Microstructure, Toughness Versus Hardness",
+    "How Jadeite Forms: Subduction Zones and High-Pressure Fluids",
+    "How Nephrite Forms: Serpentinite Contacts and Replaced Dolomite",
+    "Where Jade Is Found: A World Map of Deposits and Producers",
+    "Jade Colors and What Causes Them: From Imperial Green to Mutton-Fat White",
+    "Jade in China: From Liangzhu Ritual Objects to the Han Jade Suits",
+    "Jade in Mesoamerica, New Zealand and Prehistoric Europe",
+    "Imperial Green and the Modern Market: Qing Fashion to Auction Records",
+    "Real or Not: Treatments, Type A-B-C Jadeite and the Common Imitations",
+    "Grading and Value: Color, Translucency, Texture and Craft",
+    "Working Jade: How the Unbreakable Stone Is Actually Carved",
+    "Ornamental Stones That Trade as Jade: Serpentine, Maw-Sit-Sit and Friends"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
    "id": "scarcity-choice-and-opportunity-cost",
    "title": "Scarcity, Choice and Opportunity Cost",
    "category": "Economics",
@@ -4813,6 +5208,29 @@
    "file": "guides_economics.json"
   },
   {
+   "id": "income-and-cross-price-elasticities",
+   "title": "Income and Cross-Price Elasticities",
+   "category": "Economics",
+   "summary": "How demand responds to changes in income and to changes in the prices of other goods: normal, inferior and luxury goods, Engel's law, substitutes and complements, worked calculations, and how businesses, courts and governments use these elasticities in practice.",
+   "headings": [
+    "What Elasticity Measures and Why Economists Lean on It",
+    "Income Elasticity of Demand: Definition, Formula and Interpretation",
+    "Normal Goods: Necessities, Luxuries and the Line at One",
+    "Inferior Goods: When Rising Income Cuts Demand",
+    "Engel Curves and Engel's Law: The Oldest Regularity in Economics",
+    "Measuring Income Elasticity in Practice: Data, Horizons and Traps",
+    "Cross-Price Elasticity of Demand: Definition and the Meaning of the Sign",
+    "Substitutes in Depth: From Weak Rivals to Near-Perfect Interchangeability",
+    "Complements in Depth: Goods That Travel Together and the Businesses Built on Them",
+    "Worked Examples: Calculating Both Elasticities Step by Step",
+    "Elasticities in the Courtroom: Market Definition, SSNIP and the Cellophane Fallacy",
+    "Business Applications: Pricing, Portfolios, Cannibalization and Forecasting",
+    "Public Policy Applications: Taxes, Subsidies, Energy and Development",
+    "Pitfalls and Fine Print: Ceteris Paribus, Identification and Shifting Relationships"
+   ],
+   "file": "guides_economics.json"
+  },
+  {
    "id": "how-human-memory-works-encoding-to-retrieval",
    "title": "How Human Memory Works: Encoding to Retrieval",
    "category": "Education & Learning",
@@ -5056,6 +5474,30 @@
     "Designing an assessment that uses both deliberately",
     "How each format fails in the wild",
     "Limits, contested ground and what to do with uncertainty"
+   ],
+   "file": "guides_education_and_learning.json"
+  },
+  {
+   "id": "cognitive-load-theory-for-learners",
+   "title": "Cognitive Load Theory for Learners",
+   "category": "Education & Learning",
+   "summary": "Why learning feels hard, how working memory limits what you can take in at once, and how to study, take notes and use worked examples so your effort actually builds lasting knowledge.",
+   "headings": [
+    "What Cognitive Load Theory Says and Why Learners Should Care",
+    "Working Memory: The Bottleneck in All Learning",
+    "Long-Term Memory and Schemas: Where Knowledge Actually Lives",
+    "Intrinsic Load: The Difficulty Built Into the Material",
+    "Extraneous Load: Wasted Effort You Can Eliminate",
+    "Germane Load: The Effort That Builds Understanding",
+    "Element Interactivity: Why Some Topics Feel Impossible",
+    "The Worked Example Effect: Study Solutions Before Solving Problems",
+    "Split-Attention and Redundancy: Formatting That Helps or Hurts",
+    "The Modality Effect: Using Ears and Eyes Together",
+    "The Expertise Reversal Effect: Why Advice Changes as You Improve",
+    "Managing Load in Practice: Chunking, Sequencing and Pre-Training",
+    "Study Techniques That Respect Your Working Memory",
+    "Measuring and Noticing Cognitive Overload in Yourself",
+    "Criticisms, Limits and How to Use the Theory Wisely"
    ],
    "file": "guides_education_and_learning.json"
   },
@@ -5350,6 +5792,29 @@
     "Testing, commissioning and living with settings",
     "How protection fails, and how failures become blackouts",
     "Arc flash, limits, and a grid that is changing underneath the theory"
+   ],
+   "file": "guides_electronics.json"
+  },
+  {
+   "id": "grounding-and-earthing-systems",
+   "title": "Grounding and earthing systems",
+   "category": "Electronics",
+   "summary": "How electrical grounding and earthing work: earth electrodes, soil resistance, TN and TT systems, neutral versus ground, bonding, GFCIs and RCDs, lightning and surge protection, ground loops in electronics, and how to test an earthing system.",
+   "headings": [
+    "What Grounding and Earthing Mean and Why They Matter",
+    "How Electric Shock Happens: Body Current, Touch Voltage and Thresholds",
+    "The Fault Loop: Why Low Impedance Trips Breakers Fast",
+    "Earth Electrodes: Rods, Plates, Rings and Concrete-Encased Electrodes",
+    "Soil Resistivity: The Ground Is Not a Perfect Conductor",
+    "Measuring Earth Resistance: Fall of Potential and Clamp Testers",
+    "System Earthing Arrangements: TN-S, TN-C-S, TT and IT",
+    "Neutral Versus Ground: Two Conductors With One Origin",
+    "Bonding: Keeping Everything at the Same Potential",
+    "RCDs and GFCIs: Catching the Current That Leaks Away",
+    "Lightning Protection and Surge Earthing",
+    "Signal Grounding, Ground Loops and Noise in Electronics",
+    "Static Electricity and Earthing in Hazardous and Sensitive Places",
+    "Common Faults, Testing and What Home Wiring Actually Does"
    ],
    "file": "guides_electronics.json"
   },
@@ -5662,6 +6127,29 @@
     "Radiation dose, in numbers you can actually compare",
     "What it costs, and why the money is the genuinely hard part",
     "Where nuclear fits alongside wind and solar"
+   ],
+   "file": "guides_energy_and_environment.json"
+  },
+  {
+   "id": "decomposition-and-detritivores",
+   "title": "Decomposition and Detritivores",
+   "category": "Energy & Environment",
+   "summary": "How dead plants and animals are broken down and recycled: the roles of bacteria, fungi, earthworms and arthropod detritivores, what controls decay speed, nutrient and carbon cycling, dead wood and carrion habitats, and how composting puts decomposition to work.",
+   "headings": [
+    "What Decomposition Is and Why Ecosystems Depend on It",
+    "Detritivores, Decomposers and Scavengers: Who Does What",
+    "The Stages of Decay: From Fresh Litter to Stable Humus",
+    "Bacteria: The Invisible Majority of Decay",
+    "Fungi: The Great Wood Rotters",
+    "Earthworms: Engineers of the Soil",
+    "Arthropod Detritivores: Millipedes, Woodlice, Springtails and Mites",
+    "Aquatic Decomposition: Shredders, Collectors and the Detritus Food Web",
+    "The Chemistry of Litter: Carbon-to-Nitrogen Ratios and Lignin",
+    "Climate and Moisture: What Controls Decay Speed",
+    "Nutrient Cycling: How Decay Feeds New Growth",
+    "Dead Wood and Carrion: Special Habitats of Decay",
+    "Decomposition and the Carbon Cycle: Soils, Peat and Climate",
+    "Composting: Putting Decomposition to Work at Home"
    ],
    "file": "guides_energy_and_environment.json"
   },
@@ -6103,6 +6591,29 @@
    "file": "guides_engineering.json"
   },
   {
+   "id": "structural-analysis-trusses-beams-and-frames",
+   "title": "Structural analysis: trusses, beams and frames",
+   "category": "Engineering",
+   "summary": "How engineers work out the forces inside structures: loads, supports and reactions, equilibrium, truss analysis by the method of joints and sections, shear and bending moment diagrams for beams, bending stress and deflection, frames, indeterminate structures, and buckling.",
+   "headings": [
+    "What Structural Analysis Does: From Loads to Internal Forces",
+    "Loads on Structures: Dead, Live, Snow, Wind and Earthquake",
+    "Supports and Reactions: Pins, Rollers and Fixed Ends",
+    "Equilibrium: The Three Equations That Govern Every Plane Structure",
+    "Determinacy and Stability: Counting Unknowns Before Solving",
+    "Trusses: How Triangles Turn Loads into Pure Push and Pull",
+    "The Method of Joints: Solving a Truss Node by Node",
+    "The Method of Sections and Zero-Force Members",
+    "Beams: Shear Force and Bending Moment Diagrams",
+    "Bending Stress and Section Shape: The Flexure Formula",
+    "Deflection and Serviceability: How Much Bending Is Too Much",
+    "Frames: Rigid Joints and Combined Actions",
+    "Indeterminate Structures: Redundancy and How Engineers Solve Them",
+    "Buckling and Failure: Why Compression Is Treacherous"
+   ],
+   "file": "guides_engineering.json"
+  },
+  {
    "id": "water",
    "title": "Water",
    "category": "Essentials",
@@ -6406,6 +6917,29 @@
     "Ground-dwelling and stinging hazards",
     "Recognising illness after exposure",
     "When it goes wrong: failure modes and recovery"
+   ],
+   "file": "guides_essentials.json"
+  },
+  {
+   "id": "rockfall-and-avalanche-terrain-awareness",
+   "title": "Rockfall and Avalanche Terrain Awareness",
+   "category": "Essentials",
+   "summary": "How to recognize rockfall and avalanche terrain, read the daily and seasonal cycles that drive both hazards, understand snowpack weak layers and slope angle, avoid terrain traps and human-factor mistakes, and travel and rescue safely in the mountains.",
+   "headings": [
+    "Why Terrain Awareness Matters More Than Gear",
+    "How Rockfall Happens: Freeze-Thaw, Water, and Triggers",
+    "Reading Rockfall Terrain: Gullies, Couloirs, Cliff Bands, and Talus",
+    "Timing Travel Around Rockfall: Daily and Seasonal Cycles",
+    "Avalanche Types: Loose Snow, Slab, Wet, Glide, and Cornice Fall",
+    "Slope Angle: The 30 to 45 Degree Sweet Spot",
+    "The Snowpack: Layers, Weak Layers, and Persistent Grains",
+    "Weather as the Architect: Storms, Wind Loading, and Rapid Warming",
+    "Terrain Traps: Gullies, Trees, Cliffs, and Deep Burial Zones",
+    "Reading an Avalanche Forecast and the Danger Scale",
+    "Human Factors and Heuristic Traps: Why Experienced People Get Caught",
+    "Safe Travel Protocols: Spacing, Islands of Safety, and Exposure Control",
+    "Rescue Gear and Companion Rescue: Transceiver, Probe, and Shovel",
+    "Trip Planning, Decision Points, and Turnaround Discipline"
    ],
    "file": "guides_essentials.json"
   },
@@ -6890,6 +7424,29 @@
    "file": "guides_foundations.json"
   },
   {
+   "id": "building-a-personal-survival-doctrine",
+   "title": "Building a Personal Survival Doctrine",
+   "category": "Foundations",
+   "summary": "How to build a personal survival doctrine: ordering priorities with the rule of threes, assessing real risks, training skills before buying gear, layering equipment from pockets to home, making family communication plans, and keeping the whole system practiced and up to date.",
+   "headings": [
+    "What a Survival Doctrine Is and Why Checklists Are Not Enough",
+    "The Rule of Threes: Ordering Survival Priorities",
+    "Risk Assessment: Probability, Consequence, and Your Real Exposure",
+    "An Honest Inventory of Skills, Health, and Resources",
+    "The Psychology of Survival: Stress, Denial, and the First Ten Minutes",
+    "Decision Frameworks: STOP, OODA, and Pre-Made Decisions",
+    "PACE Planning: Primary, Alternate, Contingency, Emergency",
+    "Layered Gear: Pockets, Pack, Vehicle, and Home",
+    "Skills Before Stuff: Training and Deliberate Practice",
+    "Fitness as the First Survival Tool",
+    "Scenario Planning for Your Region and Your Real Life",
+    "Communication and Family Protocols",
+    "Home Reserves: Water, Food, Power, and Sanitation",
+    "Keeping the Doctrine Alive: Drills, Review Cycles, and Revision"
+   ],
+   "file": "guides_foundations.json"
+  },
+  {
    "id": "abstract-strategy-games-and-their-families",
    "title": "Abstract Strategy Games and Their Families",
    "category": "Games & Recreation",
@@ -7110,6 +7667,29 @@
     "Janggi Compared with Xiangqi and International Chess",
     "Common Mistakes, Failure Modes, and How to Recover",
     "Etiquette, Competition, Handicaps, and the Modern Game"
+   ],
+   "file": "guides_games_and_recreation.json"
+  },
+  {
+   "id": "makruk-thai-chess-and-its-origins",
+   "title": "Makruk: Thai Chess and Its Origins",
+   "category": "Games & Recreation",
+   "summary": "A complete guide to makruk, the Thai form of chess: its history and origins, the board and pieces, all the rules including pawn promotion and the counting rules, opening and endgame strategy, how it compares to Western chess and its Southeast Asian cousins, and how to start playing.",
+   "headings": [
+    "What Makruk Is: Thailand's Own Chess",
+    "Origins and History: From Chaturanga to Siam",
+    "The Board and the Starting Position",
+    "The Pieces and Their Moves: Khun, Met, and Khon",
+    "The Pieces and Their Moves: Ma, Rua, and Bia",
+    "Pawn Promotion and the Bia Ngai",
+    "Check, Checkmate, Stalemate, and How Games End",
+    "The Counting Rules: Makruk's Endgame Clock Explained",
+    "Opening Principles in Makruk",
+    "Middlegame Strategy: Maneuvering, Pawn Play, and the Slow Attack",
+    "Endgame Technique: Where Makruk Games Are Won",
+    "Makruk and Its Cousins: Ouk Chatrang, Sittuyin, Shogi, and Western Chess",
+    "Makruk Culture in Thailand: Cafes, Tournaments, and the Living Game",
+    "Learning Makruk: A Practical Path for Beginners"
    ],
    "file": "guides_games_and_recreation.json"
   },
@@ -7566,6 +8146,29 @@
    "file": "guides_geography.json"
   },
   {
+   "id": "geography-of-the-republic-of-the-congo",
+   "title": "Geography of the Republic of the Congo",
+   "category": "Geography",
+   "summary": "The physical and human geography of the Republic of the Congo (Congo-Brazzaville): its location and borders, coastal plain, Mayombe mountains, Niari valley, Bateke Plateau, the Congo River and the northern swamp forests and peatlands, climate, wildlife and national parks, cities, resources, and transport.",
+   "headings": [
+    "Where the Republic of the Congo Sits: Location, Size, and Borders",
+    "Congo and Congo: Telling the Two Republics Apart",
+    "The Coastal Plain and the Atlantic Shore",
+    "The Mayombe Massif: Forested Mountains Behind the Coast",
+    "The Niari Valley: The Country's Agricultural Corridor",
+    "The Chaillu Massif and the Southern Highlands",
+    "The Bateke Plateau: Sands, Savannas, and Gorges",
+    "The Cuvette: Swamp Forests of the Northern Congo Basin",
+    "The Congo River and Its Right-Bank Tributaries",
+    "Climate: Equatorial Rains and the Curious Southern Dry Season",
+    "Rainforests, Savannas, and the Peatlands Carbon Question",
+    "Wildlife and National Parks: Gorillas, Elephants, and the Protected Estate",
+    "Cities and Population: Brazzaville, Pointe-Noire, and an Urban Nation",
+    "Resources, Economy, and Transport: Oil, Timber, and the Congo-Ocean Railway"
+   ],
+   "file": "guides_geography.json"
+  },
+  {
    "id": "weather-hazards",
    "title": "Weather Hazards",
    "category": "Hazards",
@@ -7902,6 +8505,29 @@
     "Amending the Map: LOMA, LOMR, and the Appeal Process",
     "What Flood Maps Do Not Show",
     "Flood Mapping Beyond the United States"
+   ],
+   "file": "guides_hazards.json"
+  },
+  {
+   "id": "floodwater-contamination-and-health-risks",
+   "title": "Floodwater Contamination and Health Risks",
+   "category": "Hazards",
+   "summary": "What is actually in floodwater, the infections and illnesses it can cause, and how to protect yourself while wading, drinking, eating, and cleaning up after a flood.",
+   "headings": [
+    "What Floodwater Really Contains: More Than Rain",
+    "Sewage in the Water: Bacteria, Viruses and Parasites",
+    "Chemicals in Floodwater: Fuel, Solvents, Pesticides and Heavy Metals",
+    "Cuts and Scrapes: Wound Infections from Floodwater Contact",
+    "Diarrheal Disease After Floods: How Outbreaks Start and Spread",
+    "Leptospirosis: The Flood Disease Carried in Animal Urine",
+    "Mosquitoes and Standing Water: The Late Wave of Vector-Borne Disease",
+    "Mold After the Water Recedes: Respiratory Risks and Hidden Growth",
+    "Drinking Water Safety: Boil Orders, Bleach and Flooded Wells",
+    "Food Safety When Floodwater Reaches the Kitchen: Keep or Throw",
+    "Wading and Driving: Protective Gear and Safe Movement in Flood Zones",
+    "Cleaning and Disinfecting a Flooded Home Without Making Yourself Sick",
+    "Higher-Risk Groups: Children, Pregnancy, Older Adults and Weakened Immunity",
+    "Warning Signs: When Floodwater Exposure Needs a Doctor"
    ],
    "file": "guides_hazards.json"
   },
@@ -8262,6 +8888,29 @@
    "file": "guides_health.json"
   },
   {
+   "id": "tooth-decay-and-cavities",
+   "title": "Tooth Decay and Cavities",
+   "category": "Health",
+   "summary": "How cavities form, the stages of tooth decay from white spot to abscess, and what actually prevents it: fluoride, brushing and flossing technique, diet, saliva, sealants, and dental treatment options.",
+   "headings": [
+    "What Tooth Decay Is and Why It Is So Common",
+    "Tooth Anatomy: Enamel, Dentin, Pulp and Roots",
+    "Plaque and the Bacteria That Cause Cavities",
+    "The Acid Attack: Demineralization and Remineralization",
+    "From White Spot to Abscess: The Stages of a Cavity",
+    "Toothache, Sensitivity and Other Warning Signs",
+    "Fluoride: How a Simple Ion Strengthens and Repairs Teeth",
+    "Brushing Your Teeth Properly: Technique, Timing and Tools",
+    "Flossing and Cleaning Between the Teeth",
+    "Diet and Sugar: The Foods That Cause and Prevent Cavities",
+    "Saliva and Dry Mouth: The Defense You Never Notice",
+    "Cavities in Children: Baby Teeth, Bottles and Sealants",
+    "How Dentists Treat Decay: Fillings, Crowns and Root Canals",
+    "A Daily Prevention Plan That Actually Works"
+   ],
+   "file": "guides_health.json"
+  },
+  {
    "id": "primary-and-secondary-sources-in-history",
    "title": "Primary and Secondary Sources in History",
    "category": "History",
@@ -8616,6 +9265,29 @@
    "file": "guides_history.json"
   },
   {
+   "id": "global-trade-networks-in-history",
+   "title": "Global Trade Networks in History",
+   "category": "History",
+   "summary": "How trade networks connected the world from the Bronze Age to container shipping: the Silk Roads, Indian Ocean and trans-Saharan routes, the spice and silver trades, the Atlantic system, and the goods, ideas, and diseases that traveled with the merchants.",
+   "headings": [
+    "Why Trade Networks Made World History",
+    "The Oldest Exchanges: Obsidian, Lapis Lazuli and Bronze Age Tin",
+    "The Silk Roads: Caravans, Oases and Relay Trade Across Eurasia",
+    "Monsoon Winds and the Indian Ocean Trading World",
+    "Gold and Salt: The Trans-Saharan Caravan Trade",
+    "A Sea of Merchants: Phoenicians, Greeks and the Roman Mediterranean",
+    "Venice, Genoa and the Medieval Spice Business",
+    "The Hanseatic League: Herring, Timber and the Northern Trade Web",
+    "The Age of Exploration: Portugal, Spain and the Ocean Routes",
+    "The Columbian Exchange: Crops, Animals and Disease Between Hemispheres",
+    "Silver, Sugar and Slaves: The Atlantic System",
+    "Tea, Opium and the China Trade",
+    "Steam, Telegraph and Suez: The First Globalization",
+    "The Box and the Chip: Containerization and Modern Supply Chains"
+   ],
+   "file": "guides_history.json"
+  },
+  {
    "id": "diagnosing-before-replacing-a-repair-method",
    "title": "Diagnosing Before Replacing: A Repair Method",
    "category": "Home & Repair",
@@ -8812,6 +9484,51 @@
     "Failure Modes and Troubleshooting"
    ],
    "file": "guides_home_and_repair.json"
+  },
+  {
+   "id": "router-basics-for-home-woodwork",
+   "title": "Router Basics for Home Woodwork",
+   "category": "Home & Repair",
+   "summary": "How to use a woodworking router safely and well: fixed-base versus plunge, choosing and setting bits, cut depth, feed direction, edge profiling, grooves and dados, template routing, the router table, and safe habits.",
+   "headings": [
+    "What a Router Is and What It Does",
+    "Fixed-Base and Plunge Routers Compared",
+    "Router Bits: Types and Anatomy",
+    "Setting Cut Depth Safely",
+    "Feed Direction and Why It Matters",
+    "Edge Profiling and Decorative Mouldings",
+    "Grooves, Dados, and Rabbets",
+    "Template and Pattern Routing",
+    "The Router Table",
+    "Choosing Bit Speed for Diameter",
+    "Preventing Tear-Out and Burn Marks",
+    "Freehand Routing, Signs, and Inlay",
+    "Guide Bushings, Fences, and Jigs",
+    "Maintenance, Care, and Safe Habits"
+   ],
+   "file": "guides_home_and_repair.json"
+  },
+  {
+   "id": "discourse-conversation-analysis",
+   "title": "Discourse & Conversation Analysis",
+   "category": "Language & Linguistics",
+   "summary": "How real talk and text are organized and how to study them: what discourse analysis and conversation analysis are, turn-taking, adjacency pairs, preference, repair, openings and closings, the Jefferson transcription system, cohesion and coherence, speech acts and politeness, critical discourse analysis, institutional talk, and how to record and analyze conversation yourself.",
+   "headings": [
+    "What Discourse Analysis and Conversation Analysis Study",
+    "Origins: Sacks, Schegloff, Jefferson, and Ethnomethodology",
+    "Turn-Taking: Turns, TCUs, and Transition-Relevance Places",
+    "Adjacency Pairs and Sequence Organization",
+    "Preference Organization: Preferred and Dispreferred Responses",
+    "Repair: How Speakers Fix Trouble in Talk",
+    "Openings and Closings: Getting Into and Out of Conversation",
+    "The Jefferson Transcription System: Writing Talk Down",
+    "Cohesion and Coherence: What Makes a Text Hang Together",
+    "Speech Acts, Implicature, and Politeness",
+    "Critical Discourse Analysis: Language and Power",
+    "Institutional Talk: Courtrooms, Classrooms, Clinics, and Calls",
+    "Doing Your Own Analysis: Recording, Ethics, and Method"
+   ],
+   "file": "guides_language_and_linguistics.json"
   },
   {
    "id": "semantics-the-study-of-meaning",
@@ -9078,6 +9795,29 @@
     "Ethics: Accuracy, Impartiality and Confidentiality"
    ],
    "file": "guides_language_and_linguistics.json"
+  },
+  {
+   "id": "sovereignty-the-state",
+   "title": "Sovereignty & the State",
+   "category": "Law & Government",
+   "summary": "What sovereignty means and how states work: the classical theory from Bodin and Hobbes, the Westphalian system, internal and external sovereignty, recognition and statehood, popular and parliamentary sovereignty, federalism, nations versus states, unrecognized states, international law and intervention, pooled sovereignty in the EU, and indigenous sovereignty.",
+   "headings": [
+    "What Sovereignty Means and Why It Matters",
+    "Bodin, Hobbes, and the Classical Doctrine of Sovereignty",
+    "Westphalia and the System of Sovereign States",
+    "Internal Sovereignty and the Monopoly on Legitimate Force",
+    "External Sovereignty: Recognition and the Criteria of Statehood",
+    "Popular Sovereignty and the Social Contract",
+    "Parliamentary Sovereignty and Constitutional Supremacy",
+    "Federalism: Dividing Sovereignty Between Center and States",
+    "Nation, State, and Nation-State: Peoples and Their Polities",
+    "Failed States, Contested States, and Unrecognized States",
+    "Sovereignty and International Law: Treaties, Intervention, and Human Rights",
+    "Pooled Sovereignty: The European Union and Globalization",
+    "Indigenous Sovereignty and Tribal Nations",
+    "Sovereignty Under Pressure: Borders, Money, Data, and the Future of the State"
+   ],
+   "file": "guides_law_and_government.json"
   },
   {
    "id": "theories-of-justice",
@@ -9367,6 +10107,29 @@
    "file": "guides_law_and_government.json"
   },
   {
+   "id": "marxist-political-literary-criticism",
+   "title": "Marxist & Political Literary Criticism",
+   "category": "Literature & Writing",
+   "summary": "How to read literature politically: what Marxist criticism asks of a text, base and superstructure, ideology and commodity fetishism, the major theorists from Lukacs and Brecht through Benjamin, Adorno, Gramsci, Althusser, Williams, Eagleton, and Jameson, and a practical method for doing a political reading along with the tradition's limits.",
+   "headings": [
+    "What Marxist Literary Criticism Asks of a Text",
+    "Base and Superstructure: Marx's Model of Culture",
+    "Ideology and False Consciousness in Literature",
+    "Commodity Fetishism and Reification",
+    "Georg Lukacs: Realism, Totality, and the Historical Novel",
+    "Brecht, Epic Theatre, and Committed Form",
+    "Walter Benjamin: Aura, Reproduction, and the Angel of History",
+    "Adorno, Horkheimer, and the Culture Industry",
+    "Gramsci and Hegemony: Culture as Consent",
+    "Althusser, Interpellation, and Symptomatic Reading",
+    "Raymond Williams and Cultural Materialism",
+    "Eagleton and Jameson: Ideology of Form and the Political Unconscious",
+    "Political Criticism Beyond Marx: Feminist, Postcolonial, and New Historicist Extensions",
+    "Doing a Marxist Reading: A Working Method and Honest Limits"
+   ],
+   "file": "guides_literature_and_writing.json"
+  },
+  {
    "id": "hermeneutics-the-art-of-interpretation",
    "title": "Hermeneutics & the Art of Interpretation",
    "category": "Literature & Writing",
@@ -9594,6 +10357,29 @@
     "Studying Literature in Practice, and Common Misconceptions"
    ],
    "file": "guides_literature_and_writing.json"
+  },
+  {
+   "id": "board-foot-measurement-and-timber-grading",
+   "title": "Board Foot Measurement and Timber Grading",
+   "category": "Making",
+   "summary": "How lumber is measured, graded, and sold: what a board foot is and how to calculate it, nominal versus actual sizes, the quarter system for hardwood thickness, NHLA hardwood grades and softwood structural grades, reading grade stamps, defects, moisture content, log scaling rules, and how to estimate and buy wood for a project.",
+   "headings": [
+    "What a Board Foot Is and Why Lumber Is Sold by Volume",
+    "Calculating Board Feet: The Formula and Worked Examples",
+    "Nominal Versus Actual Dimensions in Softwood Lumber",
+    "The Quarter System: 4/4, 5/4, and 8/4 Hardwood Thicknesses",
+    "Hardwood Lumber Grades: FAS, Selects, and the Common Grades",
+    "Clear Cuttings, Surface Measure, and How NHLA Grading Actually Works",
+    "Softwood Grading: Structural Grades and Appearance Grades",
+    "Reading a Softwood Grade Stamp",
+    "Defects That Decide Grade: Knots, Wane, Checks, Splits, and Warp",
+    "Moisture Content, Kiln Drying, and Wood Movement",
+    "Log Scaling: Doyle, Scribner, and International 1/4-Inch Rules",
+    "Buying Lumber: Pricing per Board Foot, Waste Factors, and Project Estimates",
+    "Sheet Goods, Linear Feet, Cords, and Other Ways Wood Is Sold",
+    "Putting It Together: From Log to Project, a Working Fluency"
+   ],
+   "file": "guides_making.json"
   },
   {
    "id": "quartersawn-riftsawn-and-flatsawn-boards",
@@ -9842,6 +10628,29 @@
     "Reading Grain Structure: Why Hammering Direction Matters"
    ],
    "file": "guides_making.json"
+  },
+  {
+   "id": "roots-radicals-and-surds",
+   "title": "Roots, Radicals and Surds",
+   "category": "Mathematics",
+   "summary": "What square roots, cube roots and higher roots mean, how to simplify radicals and work with surds, how to rationalize denominators, and how to estimate roots by hand.",
+   "headings": [
+    "What a Root Is: Squares, Square Roots and the Radical Sign",
+    "Cube Roots, Fourth Roots and Higher nth Roots",
+    "What Makes a Number a Surd: Rational and Irrational Roots",
+    "Perfect Squares, Perfect Cubes and Recognizing Them Quickly",
+    "Simplifying Radicals: Pulling Out Square Factors",
+    "Adding and Subtracting Surds: Like Terms Under the Radical",
+    "Multiplying Radicals and Expanding Brackets",
+    "Dividing Radicals and Rationalizing a Simple Denominator",
+    "Rationalizing with Conjugates: Two-Term Denominators",
+    "Fractional Exponents: Writing Roots as Powers",
+    "Estimating Roots by Hand: Bounds, Averaging and the Babylonian Method",
+    "Solving Equations with Radicals and Checking for False Solutions",
+    "Why the Square Root of 2 Is Irrational: A Classic Proof",
+    "Where Roots Show Up: Geometry, Physics and Everyday Formulas"
+   ],
+   "file": "guides_mathematics.json"
   },
   {
    "id": "negative-numbers-and-the-integers",
@@ -10249,6 +11058,29 @@
    "file": "guides_mathematics.json"
   },
   {
+   "id": "alfred-hitchcock-and-the-thriller",
+   "title": "Alfred Hitchcock and the Thriller",
+   "category": "Media & Communication",
+   "summary": "Alfred Hitchcock's life and films, how he built suspense with the camera, editing, sound and the MacGuffin, his major thrillers from The 39 Steps to Psycho, and how his methods shaped the modern thriller.",
+   "headings": [
+    "Who Alfred Hitchcock Was: Life and Career at a Glance",
+    "The British Years: Silent Film and the Birth of a Style",
+    "The 39 Steps, The Lady Vanishes and the British Thrillers",
+    "Moving to Hollywood: Selznick, Rebecca and a New Scale",
+    "Suspense Versus Surprise: The Bomb Under the Table",
+    "The MacGuffin: Why the Secret Plans Never Matter",
+    "The Camera as Narrator: Point of View and the Subjective Shot",
+    "Editing and Montage: The Psycho Shower Scene",
+    "Sound, Silence and Bernard Herrmann's Music",
+    "The Wrong Man, Guilt and Hitchcock's Recurring Themes",
+    "Stars, Blondes and the Director's Treatment of Actresses",
+    "The Great 1950s Run: Rear Window, Vertigo and North by Northwest",
+    "Psycho, The Birds and the Late Career",
+    "Hitchcock's Legacy: How the Thriller Learned Its Grammar"
+   ],
+   "file": "guides_media_and_communication.json"
+  },
+  {
    "id": "orson-welles-and-citizen-kane",
    "title": "Orson Welles and Citizen Kane",
    "category": "Media & Communication",
@@ -10396,6 +11228,29 @@
     "What Endures, and Why"
    ],
    "file": "guides_media_and_communication.json"
+  },
+  {
+   "id": "hemostasis-and-the-blood-clotting-cascade",
+   "title": "Hemostasis and the Blood Clotting Cascade",
+   "category": "Medical",
+   "summary": "How bleeding stops: vascular spasm, platelets and the platelet plug, the clotting factors and the intrinsic, extrinsic and common pathways, how clots are controlled and dissolved, and what goes wrong in hemophilia, thrombosis and other clotting disorders.",
+   "headings": [
+    "What Hemostasis Is: How Bleeding Stops",
+    "The Blood Vessel's First Response: Vascular Spasm and the Endothelium",
+    "Platelets: Small Cells with a Big Job",
+    "Primary Hemostasis: Platelet Adhesion, Activation and Aggregation",
+    "The Clotting Factors: A Numbered Cast of Characters",
+    "The Intrinsic Pathway and Contact Activation",
+    "The Extrinsic Pathway and Tissue Factor",
+    "The Common Pathway: Thrombin, Fibrinogen and Fibrin",
+    "The Cell-Based Model: How Clotting Really Happens in the Body",
+    "Keeping Clotting in Check: Antithrombin, Protein C and Protein S",
+    "Fibrinolysis: How the Body Dissolves a Clot",
+    "When Clotting Fails: Hemophilia, von Willebrand Disease and Low Platelets",
+    "When Clotting Goes Too Far: Thrombosis, DVT and Pulmonary Embolism",
+    "Testing and Treating: PT, INR, aPTT and Blood-Thinning Drugs"
+   ],
+   "file": "guides_medical.json"
   },
   {
    "id": "how-blood-circulates-through-the-body",
@@ -10877,6 +11732,29 @@
    "file": "guides_medical.json"
   },
   {
+   "id": "using-trekking-poles-effectively",
+   "title": "Using Trekking Poles Effectively",
+   "category": "Movement",
+   "summary": "How to choose, size and adjust trekking poles, use the straps correctly, and pole efficiently on flat ground, uphill, downhill, sidehills, stream crossings, snow and scree, plus maintenance, repairs and common mistakes.",
+   "headings": [
+    "Why Use Trekking Poles: What They Actually Do for Your Body",
+    "Anatomy of a Trekking Pole: Shafts, Grips, Locks, Tips and Baskets",
+    "Choosing Poles: Telescoping, Folding, Fixed Length and What to Prioritize",
+    "Setting the Right Length: The 90-Degree Rule and When to Break It",
+    "Wrist Straps: The Most Misused Part of the Pole",
+    "Basic Technique on Flat Ground: Rhythm and the Alternating Swing",
+    "Going Uphill: Shorten, Plant and Push",
+    "Going Downhill: Lengthen, Brace and Save Your Knees",
+    "Sidehills, Switchbacks and Uneven Ground",
+    "Stream Crossings and Wet Footing: Poles as a Third and Fourth Leg",
+    "Snow, Sand and Scree: Baskets, Braking and Soft-Ground Technique",
+    "Heavy Packs, Camp Chores and Trekking-Pole Shelters",
+    "Care, Cleaning and Field Repairs: Keeping Poles Working",
+    "Common Mistakes, Trail Etiquette and When to Put the Poles Away"
+   ],
+   "file": "guides_movement.json"
+  },
+  {
    "id": "uphill-walking-technique-and-breathing",
    "title": "Uphill Walking Technique and Breathing",
    "category": "Movement",
@@ -11070,6 +11948,30 @@
    "file": "guides_movement.json"
   },
   {
+   "id": "triads-seventh-chords-and-chord-building",
+   "title": "Triads, Seventh Chords and Chord Building",
+   "category": "Music",
+   "summary": "How chords are built from intervals: the four triad qualities, diatonic chords in a key, inversions, seventh chords, chord symbols, voicings and extensions, and how to learn to hear and play them.",
+   "headings": [
+    "Intervals: The Raw Material of Every Chord",
+    "What a Triad Is: Root, Third and Fifth",
+    "The Four Triad Qualities: Major, Minor, Diminished and Augmented",
+    "Building Triads on Every Scale Degree: Diatonic Harmony",
+    "Roman Numerals: Naming Chords by Their Place in the Key",
+    "Inversions: When the Root Is Not the Lowest Note",
+    "Seventh Chords: Adding a Fourth Note to the Stack",
+    "The Five Common Seventh Chord Qualities and How to Spell Them",
+    "The Dominant Seventh: The Chord That Drives Music Forward",
+    "Chord Symbols and Lead-Sheet Notation: Reading the Shorthand",
+    "Voicing, Doubling and Spacing: Turning a Chord Into Sound",
+    "Extended Chords: Ninths, Elevenths and Thirteenths",
+    "Suspended Chords, Added Tones and Other Non-Tertian Colors",
+    "Chord Building on Piano and Guitar: From Formula to Fingers",
+    "Training Your Ear to Recognize Triads and Seventh Chords"
+   ],
+   "file": "guides_music.json"
+  },
+  {
    "id": "scales-keys-and-the-circle-of-fifths",
    "title": "Scales, Keys and the Circle of Fifths",
    "category": "Music",
@@ -11258,6 +12160,29 @@
     "The Digital Era and the Limits of Notation"
    ],
    "file": "guides_music.json"
+  },
+  {
+   "id": "interpreting-contour-lines-on-the-ground",
+   "title": "Interpreting Contour Lines on the Ground",
+   "category": "Navigation",
+   "summary": "How to read contour lines on a topographic map and match them to real terrain: slope steepness, ridges, valleys, saddles, summits, cliffs, slope shape and aspect, plus terrain association, handrails, contouring and common mistakes.",
+   "headings": [
+    "What a Contour Line Actually Is",
+    "Contour Intervals, Index Lines and Working Out Heights",
+    "Slope Steepness: What the Spacing of the Lines Tells You",
+    "Ridges and Spurs: Contours That Point Downhill",
+    "Valleys, Draws and Reentrants: Contours That Point Uphill",
+    "Saddles, Cols and Passes: The Low Points Between High Ground",
+    "Summits, Knolls and Closed Depressions: Reading the Rings",
+    "Cliffs, Crags and Very Steep Ground: When the Lines Crowd Together",
+    "Convex and Concave Slopes: Why the Shape of a Slope Matters",
+    "Aspect of Slope: Which Way the Ground Faces and Why It Matters",
+    "Terrain Association: Matching the Map to the Ground as You Move",
+    "Handrails, Catching Features and Attack Points: Contours as a Route Plan",
+    "Contouring: Traveling the Hillside Without Losing Height",
+    "Common Contour-Reading Mistakes and How to Practice Out of Them"
+   ],
+   "file": "guides_navigation.json"
   },
   {
    "id": "measuring-distance-on-a-map-accurately",
@@ -11642,6 +12567,29 @@
    "file": "guides_notable_figures.json"
   },
   {
+   "id": "protein-how-much-you-need-and-where-to-get-it",
+   "title": "Protein: How Much You Need and Where to Get It",
+   "category": "Nutrition",
+   "summary": "What protein does in the body, how many grams you actually need at different ages and activity levels, how animal and plant sources compare, protein quality scores, timing, supplements, label reading, and how to build meals that reach your target.",
+   "headings": [
+    "What Protein Is and What It Does in Your Body",
+    "Amino Acids: Essential, Non-Essential and Why Leucine Gets Special Attention",
+    "How Much You Need: The Baseline Numbers and What They Mean",
+    "When You Need More: Training, Aging, Pregnancy, Illness and Weight Loss",
+    "Protein Quality: Complete Proteins, Limiting Amino Acids and the Scoring Systems",
+    "Animal Sources: Meat, Poultry, Fish, Eggs and Dairy in Real Portions",
+    "Plant Sources: Legumes, Soy, Grains, Nuts and the New Meat Alternatives",
+    "Combining Plant Proteins: Complementation, Vegetarian and Vegan Planning",
+    "Timing and Distribution: Spreading Protein Across the Day",
+    "Protein for Muscle: What Training Adds and What the Evidence Shows",
+    "Protein and Weight Management: Satiety, Thermic Effect and Preserving Muscle",
+    "Protein Powders and Supplements: What They Are, When They Help and How to Choose",
+    "Reading Labels and Counting Your Protein Without Obsession",
+    "Can You Eat Too Much? Kidneys, Bones, Satiety Limits and Sensible Ceilings"
+   ],
+   "file": "guides_nutrition.json"
+  },
+  {
    "id": "carbohydrates-and-blood-sugar",
    "title": "Carbohydrates and Blood Sugar",
    "category": "Nutrition",
@@ -11977,6 +12925,29 @@
    "file": "guides_nutrition.json"
   },
   {
+   "id": "metaethics-the-nature-of-moral-truth",
+   "title": "Metaethics — The Nature of Moral Truth",
+   "category": "Philosophy",
+   "summary": "What metaethics asks and why it matters: whether moral claims can be true, moral realism and its rivals, error theory, expressivism, constructivism, relativism, divine command theory, evolutionary debunking, moral knowledge, moral motivation, and the problem of deep disagreement.",
+   "headings": [
+    "What Metaethics Asks: A Different Question From Ethics",
+    "Cognitivism and Non-Cognitivism: Do Moral Sentences State Facts?",
+    "Moral Realism: The Case That Moral Truths Exist Independently of Us",
+    "Naturalist Realism: Moral Facts as Natural Facts",
+    "Moore's Open Question Argument and Non-Natural Realism",
+    "Error Theory: Morality as a Systematic Mistake",
+    "Expressivism: From Ayer's Emotivism to Blackburn and Gibbard",
+    "Constructivism: Moral Truth as What Reason Builds",
+    "Moral Relativism: Truth That Varies by Standpoint",
+    "Divine Command Theory and the Euthyphro Dilemma",
+    "Evolutionary Debunking: Does Darwin Undermine Moral Knowledge?",
+    "Moral Knowledge: Intuitions, Self-Evidence and Reflective Equilibrium",
+    "Moral Motivation: Internalism, Externalism and the Humean Theory",
+    "Deep Disagreement, Convergence and Where the Debate Stands"
+   ],
+   "file": "guides_philosophy.json"
+  },
+  {
    "id": "women-in-the-history-of-philosophy",
    "title": "Women in the History of Philosophy",
    "category": "Philosophy",
@@ -12138,6 +13109,29 @@
     "Why Philosophy Matters"
    ],
    "file": "guides_philosophy.json"
+  },
+  {
+   "id": "circular-motion-and-centripetal-force",
+   "title": "Circular Motion and Centripetal Force",
+   "category": "Physics",
+   "summary": "Why things move in circles and what force keeps them there: the formulas a = v²/r and F = mv²/r, period and angular velocity, centrifugal force explained honestly, and worked examples from cars on curves and banked racetracks to roller coaster loops, satellites, centrifuges, and the hammer throw.",
+   "headings": [
+    "What Circular Motion Is and Why It Always Needs a Force",
+    "Uniform Circular Motion: Constant Speed but Constantly Changing Velocity",
+    "Centripetal Acceleration and the Formula a = v²/r",
+    "Centripetal Force Is a Role, Not a New Kind of Force",
+    "Period, Frequency, and Angular Velocity",
+    "Centrifugal Force: What You Really Feel in a Turning Car",
+    "Cars on Flat Curves: Friction Supplies the Centripetal Force",
+    "Banked Curves: Highways, Racetracks, and Turning Aircraft",
+    "Vertical Circles: Roller Coasters, Water Buckets, and Apparent Weight",
+    "Orbits: Gravity as the Centripetal Force for Satellites and the Moon",
+    "Centrifuges, Spin Dryers, and the Limits of Spinning Machinery",
+    "The Conical Pendulum, Swing Rides, and the Hammer Throw",
+    "Non-Uniform Circular Motion: Speeding Up and Slowing Down on a Curve",
+    "Common Misconceptions and a Problem-Solving Checklist"
+   ],
+   "file": "guides_physics.json"
   },
   {
    "id": "rotational-dynamics-and-moment-of-inertia",
@@ -12410,6 +13404,29 @@
    "file": "guides_physics.json"
   },
   {
+   "id": "reading-a-county-hazard-mitigation-plan",
+   "title": "Reading a County Hazard Mitigation Plan",
+   "category": "Preparedness",
+   "summary": "How to find your county's hazard mitigation plan and actually read it: what the risk assessment, hazard profiles, flood maps, critical facility lists, and mitigation action tables mean, and how to use the county's own analysis to make decisions about your household's insurance, retrofits, and preparedness.",
+   "headings": [
+    "What a Hazard Mitigation Plan Is and Why Your County Wrote One",
+    "Where to Find Your County's Plan and Which Version Counts",
+    "The Legal Backbone: The Disaster Mitigation Act of 2000 and FEMA Approval",
+    "How the Plan Is Organized: A Map of the Typical Chapters",
+    "Hazard Identification: What Your County Says Can Hurt You",
+    "Reading the Risk Assessment: Probability, Extent, and Ranking Methods",
+    "The Flood Sections: Floodplains, FIRMs, Repetitive Losses, and the NFIP",
+    "Wildfire, Wind, Winter, Drought, and the Other Hazard Profiles",
+    "Critical Facilities and Infrastructure: What the County Worries About Protecting",
+    "The Mitigation Strategy: Goals, Alternatives, and What Actually Gets Funded",
+    "Reading the Action Tables: Priority, Cost, Lead Agency, and Status",
+    "Using the Plan for Your Own Address and Household Decisions",
+    "The Planning Process Chapter: Who Was at the Table and Why It Matters",
+    "Plan Maintenance, Five-Year Updates, and How to Get Involved"
+   ],
+   "file": "guides_preparedness.json"
+  },
+  {
    "id": "setting-realistic-preparedness-planning-horizons",
    "title": "Setting Realistic Preparedness Planning Horizons",
    "category": "Preparedness",
@@ -12572,6 +13589,29 @@
     "Sustaining a Neighborhood Group Over Time"
    ],
    "file": "guides_preparedness.json"
+  },
+  {
+   "id": "phobias-and-how-to-overcome-them",
+   "title": "Phobias and How to Overcome Them",
+   "category": "Psychology",
+   "summary": "What a phobia is and how it differs from ordinary fear, how phobias start and what keeps them going, and the treatments that work: graded exposure and fear ladders, cognitive techniques, applied tension for blood and needle phobia, and when to seek professional help for yourself or a child.",
+   "headings": [
+    "What a Phobia Is and What It Is Not",
+    "How Common Phobias Are and Who Gets Them",
+    "The Fear System: What Happens in Your Brain and Body",
+    "How Phobias Start: Conditioning, Observation, and Evolutionary Preparedness",
+    "The Five Kinds of Specific Phobia and the Names People Use",
+    "The Blood, Injection, and Injury Exception: Fainting and Applied Tension",
+    "Avoidance and Safety Behaviors: The Engine That Keeps a Phobia Running",
+    "Exposure Therapy: Why Facing the Fear Works When Nothing Else Does",
+    "Building a Fear Ladder: The Graded Exposure Hierarchy Step by Step",
+    "Doing Exposure Well: The Rules That Make Practice Actually Count",
+    "Cognitive Techniques: Working on the Thoughts That Feed the Fear",
+    "Panic Sensations and Interoceptive Exposure: Making Peace With Your Own Body",
+    "When and How to Get Professional Help, and What Treatment Is Like",
+    "Helping a Child With a Phobia, and Keeping Your Gains for Good"
+   ],
+   "file": "guides_psychology.json"
   },
   {
    "id": "social-anxiety-disorder",
@@ -12863,6 +13903,30 @@
    "file": "guides_psychology.json"
   },
   {
+   "id": "si-prefixes-from-quecto-to-quetta",
+   "title": "SI Prefixes From Quecto to Quetta",
+   "category": "Reference",
+   "summary": "The complete set of 24 metric prefixes from quecto (10^-30) to quetta (10^30): the full table with symbols, where each name comes from, the rules for writing and combining them, the kilobyte-versus-kibibyte confusion, everyday examples at every scale, and how to convert between prefixes without mistakes.",
+   "headings": [
+    "What SI Prefixes Are and Why the Metric System Needs Them",
+    "The Complete Table: All 24 Prefixes, Symbols, and Powers of Ten",
+    "How the System Grew: From the French Revolution to 2022",
+    "The Large Prefixes: Kilo, Mega, Giga, and Tera in Daily Life",
+    "The Giant Prefixes: Peta, Exa, Zetta, Yotta, Ronna, and Quetta",
+    "The Small Prefixes: Milli, Micro, Nano, and Pico Under the Microscope",
+    "The Vanishing Point: Femto, Atto, Zepto, Yocto, Ronto, and Quecto",
+    "The Middle Four: Deca, Hecto, Deci, and Centi and Why They Persist",
+    "Where the Prefix Names Come From: Etymology of All 24",
+    "The Rules: Writing, Capitalization, and Combining Prefixes Correctly",
+    "The Kilogram Oddity: A Prefix Baked Into a Base Unit",
+    "Kilobytes, Kibibytes, and the Computing Confusion",
+    "A Feel for Every Scale: Anchors From Quecto to Quetta",
+    "Converting Between Prefixes Without Mistakes: A Practical Method",
+    "Common Mistakes, Edge Cases, and Questions People Actually Ask"
+   ],
+   "file": "guides_reference.json"
+  },
+  {
    "id": "the-metre-definition-history-and-realisation",
    "title": "The Metre: Definition, History and Realisation",
    "category": "Reference",
@@ -13021,6 +14085,29 @@
    "file": "guides_reference.json"
   },
   {
+   "id": "prehistoric-religion-burials-figurines-and-the-first-temples",
+   "title": "Prehistoric Religion — Burials, Figurines and the First Temples",
+   "category": "Religion & Mythology",
+   "summary": "How archaeologists read burials, cave art, Venus figurines, plastered skulls and monuments like Gobekli Tepe and Stonehenge for evidence of religion before writing — what the finds actually show, what remains disputed, and why it matters.",
+   "headings": [
+    "What Counts as Religion Before Writing — the Evidence Problem",
+    "Ochre, Beads and the First Symbols",
+    "Neanderthal Burials — Shanidar and La Chapelle-aux-Saints",
+    "The Deep Deposits — Sima de los Huesos and Rising Star",
+    "Rich Burials of the Ice Age — Sungir and Dolni Vestonice",
+    "Painted Caves as Sacred Places",
+    "The Shamanism Hypothesis and Its Critics",
+    "Venus Figurines — Willendorf, Hohle Fels and What They Might Mean",
+    "Hybrid Beings — the Lion Man and the Sorcerer",
+    "Gobekli Tepe — the First Temples",
+    "Catalhoyuk — Ritual Inside the House",
+    "Plastered Skulls and the Cult of Ancestors",
+    "Megaliths and the Sky — Newgrange and Stonehenge",
+    "Reading the Evidence — Cautions, Theories and What It All Suggests"
+   ],
+   "file": "guides_religion_and_mythology.json"
+  },
+  {
    "id": "ritual-how-sacred-actions-work",
    "title": "Ritual — How Sacred Actions Work",
    "category": "Religion & Mythology",
@@ -13160,6 +14247,30 @@
     "Why the Question Matters and Where It Leads"
    ],
    "file": "guides_religion_and_mythology.json"
+  },
+  {
+   "id": "search-and-rescue-planning-cycle",
+   "title": "Search and Rescue Planning Cycle",
+   "category": "Rescue",
+   "summary": "How a land search for a missing person is actually planned and run: taking the first report, fixing the last known point, using lost person behavior statistics, building and segmenting a search area, probability of area and detection, choosing tactics, briefing and debriefing teams, running operational periods, managing clues, and deciding when to scale back.",
+   "headings": [
+    "Why a Search Is an Emergency — the Planning Cycle at a Glance",
+    "First Notice — Taking the Initial Report",
+    "The Last Known Point, the Point Last Seen and the Initial Planning Point",
+    "Investigation — Building the Subject Profile",
+    "Lost Person Behavior — What the Statistics Say",
+    "Reflex Tasks — Containment and the Hasty Search",
+    "Building the Search Area — Theoretical, Statistical and Deductive Methods",
+    "Probability of Area — Dividing Belief Across the Map",
+    "Segmenting the Map — Making the Area Searchable",
+    "Probability of Detection, Coverage and the Arithmetic of Success",
+    "Choosing Tactics — Grids, Corridors, Dogs, Trackers and Aircraft",
+    "Assignments, Briefing and Debriefing — the Field Half of the Cycle",
+    "Operational Periods, ICS and the Planning P",
+    "Clue Management — Running the Search on Evidence",
+    "Scaling Back, Suspension and Learning From the Search"
+   ],
+   "file": "guides_rescue.json"
   },
   {
    "id": "incident-command-system-for-rescue",
@@ -13331,6 +14442,29 @@
    "file": "guides_rescue.json"
   },
   {
+   "id": "the-figure-eight-stopper-knot",
+   "title": "The Figure Eight Stopper Knot",
+   "category": "Skills",
+   "summary": "How to tie, dress, inspect and untie the figure eight stopper knot, when to choose it over the overhand, its climbing and sailing relatives — the figure eight on a bight and the follow-through tie-in — plus how knots weaken rope, common mistakes, and stronger stoppers like the Ashley and stevedore.",
+   "headings": [
+    "What a Stopper Knot Does and Why the Figure Eight Is the Default",
+    "Rope Words First — Working End, Standing Part, Bight and Tail",
+    "Tying the Basic Figure Eight Stopper Knot, Step by Step",
+    "Dressing and Setting — Making the Knot Its Best Shape",
+    "Figure Eight or Overhand — Choosing Between Them",
+    "The Figure Eight on a Bight — an Instant Strong Loop",
+    "The Figure Eight Follow-Through — the Climber's Tie-In",
+    "Inspecting the Knot — Checks That Catch Mistakes",
+    "How Knots Affect Rope Strength",
+    "Stopper Knots Afloat — Sailing and Boat Uses",
+    "Stopper Knots at Height — Climbing, Rappelling and Rescue",
+    "Common Mistakes and How Figure Eights Fail",
+    "Untying After Load and Dealing With a Jammed Knot",
+    "Relatives of the Figure Eight — Stevedore, Ashley and Directional Eights"
+   ],
+   "file": "guides_skills.json"
+  },
+  {
    "id": "double-overhand-and-barrel-knots",
    "title": "Double Overhand and Barrel Knots",
    "category": "Skills",
@@ -13491,6 +14625,30 @@
     "Storage, Care and Making an Edge Last"
    ],
    "file": "guides_skills.json"
+  },
+  {
+   "id": "postmodern-poststructuralist-social-thought",
+   "title": "Postmodern & Poststructuralist Social Thought",
+   "category": "Society & Culture",
+   "summary": "What postmodernism and poststructuralism actually claim: Saussure and structuralism, Derrida and deconstruction, Foucault on power and discourse, Lyotard on grand narratives, Baudrillard on hyperreality, Barthes, Deleuze and Guattari, Butler and performativity, postcolonial thought, how these ideas spread through the social sciences, and the major criticisms from Habermas to the Sokal hoax.",
+   "headings": [
+    "What Postmodern and Poststructuralist Mean — and How They Differ",
+    "The Structuralist Background — Saussure, Levi-Strauss and the Science of Signs",
+    "The Break of 1966 — Structure, Sign and Play",
+    "Jacques Derrida — Deconstruction and Differance",
+    "Michel Foucault — Discourse, Knowledge and Power",
+    "Discipline, the Panopticon and Biopolitics",
+    "Jean-Francois Lyotard — the End of Grand Narratives",
+    "Jean Baudrillard — Simulacra and Hyperreality",
+    "Roland Barthes — Mythologies and the Death of the Author",
+    "Deleuze and Guattari — Rhizomes, Assemblages and Desire",
+    "Feminist and Queer Extensions — Kristeva, Irigaray, Cixous and Butler",
+    "Postcolonial Turns — Said, Spivak and Bhabha",
+    "How the Ideas Spread Through the Social Sciences",
+    "The Critics — Habermas, the Sokal Hoax and the Case Against",
+    "What Survived — the Legacy Today"
+   ],
+   "file": "guides_society_and_culture.json"
   },
   {
    "id": "feminist-social-theory",
@@ -13914,6 +15072,28 @@
     "The One Who Was Raised Outside"
    ],
    "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "football-formations-and-tactical-systems",
+   "title": "Football Formations and Tactical Systems",
+   "category": "Sports & Fitness",
+   "summary": "How football formations like 4-4-2, 4-3-3 and 3-5-2 actually work, where they came from, and how tactical systems such as pressing, counter-attacking and possession play decide matches.",
+   "headings": [
+    "What a Formation Is and What It Is Not",
+    "Reading the Numbers: The Grammar of 4-4-2, 4-3-3 and 4-2-3-1",
+    "The Pyramid: 2-3-5 and the Victorian Origins of Team Shape",
+    "The WM: Herbert Chapman and the 1925 Offside Revolution",
+    "Catenaccio and the Libero: The Art of the Door-Bolt",
+    "Total Football: Ajax, Cruyff and the Idea of Universal Players",
+    "The 4-4-2: Two Banks of Four and the Power of Compactness",
+    "The 4-3-3 and the Midfield Triangle",
+    "The 4-2-3-1 and the Age of the Number Ten",
+    "Back Threes and Wing-Backs: 3-5-2, 3-4-3 and the Back Five",
+    "Out of Possession: Pressing, Blocks and the Counter-Press",
+    "In Possession: Positional Play, Tiki-Taka and Direct Football",
+    "Choosing a System: Matchups, Player Fit and In-Game Management"
+   ],
+   "file": "guides_sports_and_fitness.json"
   },
   {
    "id": "association-football-rules-and-positions",
@@ -14394,6 +15574,29 @@
    "file": "guides_starships_and_classes.json"
   },
   {
+   "id": "using-a-botanical-key-to-identify-plants",
+   "title": "Using a Botanical Key to Identify Plants",
+   "category": "Sustenance",
+   "summary": "How to identify a plant using a botanical (dichotomous) key: reading couplets, the vocabulary of leaves, flowers and stems, working from a specimen to a species name, and the cautions a forager must keep in mind.",
+   "headings": [
+    "What a Botanical Key Is and Why Foragers Learn to Use One",
+    "How a Dichotomous Key Works: Couplets, Leads and Elimination",
+    "The Language of Botany: Why the Vocabulary Exists and How to Learn It",
+    "Leaf Shapes and Margins: Ovate, Lanceolate, Serrate and Their Kin",
+    "Leaf Arrangement and Attachment: Opposite, Alternate, Whorled and Basal",
+    "Simple Versus Compound Leaves: One of the Commonest Forks in the Key",
+    "Flower Anatomy: Sepals, Petals, Stamens and Pistils",
+    "Flower Counts and Symmetry: Fours, Fives, Threes and What They Reveal",
+    "Inflorescences: Umbels, Racemes, Spikes and Composite Heads",
+    "Stems, Hairs, Sap and Smell: Vegetative and Sensory Characters",
+    "Working the Key in the Field: A Step-by-Step Method",
+    "When the Key Goes Wrong: Common Mistakes and How to Recover",
+    "Family Shortcuts: Recognizing Mustards, Mints, Carrots, Roses and Asters",
+    "From Identification to the Plate: Verification Before You Ever Eat a Plant"
+   ],
+   "file": "guides_sustenance.json"
+  },
+  {
    "id": "foraging-safety-and-the-universal-rules",
    "title": "Foraging Safety and the Universal Rules",
    "category": "Sustenance",
@@ -14512,6 +15715,28 @@
    "file": "guides_sustenance.json"
   },
   {
+   "id": "the-diesel-cycle-explained",
+   "title": "The Diesel Cycle Explained",
+   "category": "Vehicles & Transport",
+   "summary": "How a diesel engine works: the diesel (compression-ignition) cycle, how it differs from the petrol Otto cycle, why it is more efficient, and where diesel engines are used. Covers compression ignition, the four strokes, thermal efficiency and real-world engines.",
+   "headings": [
+    "Rudolf Diesel and the Problem He Set Out to Solve",
+    "Compression Ignition: The Idea at the Heart of the Cycle",
+    "The Four Strokes of a Diesel Engine, One by One",
+    "The Ideal Diesel Cycle: Reading the Pressure-Volume Diagram",
+    "Compression Ratio: Why Diesels Squeeze So Much Harder",
+    "The Cutoff Ratio: Constant-Pressure Heat and What It Costs",
+    "Thermal Efficiency: Diesel Versus Otto by the Numbers",
+    "Fuel Injection: From Air Blast to Common Rail",
+    "Diesel Fuel Itself: Cetane, Energy Density and Cold Weather",
+    "Turbocharging and Intercooling: Why Diesels Love Boost",
+    "The Dual Cycle: What Real Engines Actually Do",
+    "Emissions: Soot, NOx and the Aftertreatment Stack",
+    "Living With a Diesel: Glow Plugs, Maintenance and Common Failures"
+   ],
+   "file": "guides_vehicles_and_transport.json"
+  },
+  {
    "id": "how-a-two-stroke-engine-works",
    "title": "How a Two-Stroke Engine Works",
    "category": "Vehicles & Transport",
@@ -14583,6 +15808,28 @@
     "Buying, Insuring and the Paperwork That Protects You"
    ],
    "file": "guides_vehicles_and_transport.json"
+  },
+  {
+   "id": "ancient-egyptian-art",
+   "title": "Ancient Egyptian Art",
+   "category": "Visual Arts & Design",
+   "summary": "The art of ancient Egypt from the Narmer Palette to Tutankhamun's gold mask: what the paintings, statues and reliefs were for, the grid and conventions behind their distinctive look, and how the style changed across three thousand years.",
+   "headings": [
+    "Art That Was Never Meant to Be Seen: Purpose Before Beauty",
+    "Three Thousand Years in Outline: Kingdoms, Dynasties and Dates",
+    "The Palette of Narmer: The Rulebook's First Page",
+    "The Canon of Proportions: Drawing the Body on a Grid",
+    "The Composite View: Why the Figures Look the Way They Do",
+    "Registers, Hierarchy of Scale and How to Read a Wall",
+    "Old Kingdom Art: The Age of the Pyramids",
+    "Middle Kingdom Art: The Careworn Faces of Kings",
+    "New Kingdom Art: Empire, Temples and the Painted Tomb",
+    "The Amarna Revolution: Akhenaten, Nefertiti and a Broken Canon",
+    "Tutankhamun's Treasure and the Ramesside Return to Tradition",
+    "Materials, Pigments and Techniques: How the Work Was Made",
+    "Writing, the Book of the Dead and the Long Afterlife of Egyptian Art"
+   ],
+   "file": "guides_visual_arts_and_design.json"
   },
   {
    "id": "prehistoric-art-cave-paintings-and-the-origins-of-image-maki",
@@ -14922,6 +16169,28 @@
     "The Emergency Hologram"
    ],
    "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "atmospheric-circulation-and-global-wind-belts",
+   "title": "Atmospheric Circulation and Global Wind Belts",
+   "category": "Weather",
+   "summary": "How the sun, the spin of the Earth and the arrangement of land and sea organize the atmosphere into trade winds, westerlies, jet streams and monsoons, and why those wind belts decide where deserts, rainforests and storm tracks sit.",
+   "headings": [
+    "Why the Atmosphere Circulates: Uneven Solar Heating",
+    "The Hadley Cell and the Intertropical Convergence Zone",
+    "Trade Winds: The Steady Easterlies of the Tropics",
+    "Subtropical Highs and the Horse Latitudes",
+    "The Ferrel Cell and the Prevailing Westerlies",
+    "The Polar Cells and the Polar Easterlies",
+    "The Coriolis Effect: Why Winds Curve",
+    "Jet Streams: Rivers of Air Aloft",
+    "The Polar Front, Rossby Waves and Mid-Latitude Storms",
+    "Monsoons: Seasonal Wind Reversals",
+    "Local Winds: Sea Breezes, Mountain Winds and Famous Named Winds",
+    "El Niño, La Niña and the Walker Circulation",
+    "How Wind Belts Shape Deserts, Rainforests and Ocean Currents"
+   ],
+   "file": "guides_weather.json"
   },
   {
    "id": "the-stratosphere-and-the-ozone-layer",
