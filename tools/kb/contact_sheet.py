@@ -51,15 +51,74 @@ def corpus() -> list[dict]:
 
 
 def provenance() -> dict[str, tuple[str, str]]:
-    """image path -> (licence-and-author line, Commons page). Parsed out of NOTICE.txt."""
-    notice = os.path.join(IMAGES, "NOTICE.txt")
-    if not os.path.exists(notice):
-        return {}
+    """
+    image path -> (licence-and-author line, Commons page).
+
+    ⚠️ **There are TWO notice files in TWO formats, and reading only one is a real defect this
+    tool shipped with.** `images/NOTICE.txt` carries the four-line blocks the current sourcer
+    writes (path / source title / licence — author / URL); `images/kb/NOTICE.txt` carries the
+    earlier waves' one-line `file — source — licence — author` entries, with no URL and a bare
+    filename rather than a path. Parsing only the first matched **19 of 362** diagrams, so every
+    other card on the sheet would have read "bundled before the provenance convention" — which is
+    exactly wrong for the 300 images whose attribution is sitting in the other file, and it would
+    have made the licence column useless on the one page anybody actually reads them on.
+    """
     out: dict[str, tuple[str, str]] = {}
-    text = open(notice, encoding="utf-8").read()
-    # The wave writes four-line blocks: path / source title / licence — author / URL.
-    for m in re.finditer(r"^(kb/\S+)\n\s+(.+)\n\s+(.+)\n\s+(https?://\S+)", text, re.M):
-        out[m.group(1)] = (f"{m.group(3)} · {m.group(2)}", m.group(4))
+
+    top = os.path.join(IMAGES, "NOTICE.txt")
+    if os.path.exists(top):
+        text = open(top, encoding="utf-8").read()
+        for m in re.finditer(r"^(kb/\S+)\n\s+(.+)\n\s+(.+)\n\s+(https?://\S+)", text, re.M):
+            out[m.group(1)] = (f"{m.group(3)} · {m.group(2)}", m.group(4))
+
+    # ⚠️ And a THIRD format, in the same top-level file: the original survival diagrams are
+    # recorded as an indented entry whose description wraps over several lines, then a
+    # `by <author> — <licence>` line, then the source URL. 183 of the corpus is in this shape.
+    if os.path.exists(top):
+        text = open(top, encoding="utf-8").read()
+        entry = re.compile(r"^  (\S+\.(?:webp|svg|png|jpe?g|gif)) — ", re.M)
+        marks = list(entry.finditer(text))
+        for i, m in enumerate(marks):
+            chunk = text[m.end():marks[i + 1].start() if i + 1 < len(marks) else len(text)]
+            by = re.search(r"^\s+by (.+?) — (.+?)(?:,\s*Wikimedia Commons)?\s*$", chunk, re.M)
+            url = re.search(r"(https?://\S+)", chunk)
+            if by:
+                out.setdefault(m.group(1), (f"{by.group(2)} · {by.group(1)}",
+                                            url.group(1) if url else ""))
+            elif url or " — " in chunk[:200]:
+                lic = re.search(r"\(([^)]*(?:public domain|CC[ -]|PD)[^)]*)\)", chunk, re.I)
+                out.setdefault(m.group(1), (lic.group(1) if lic else "see NOTICE.txt",
+                                            url.group(1) if url else ""))
+
+    kb = os.path.join(IMAGES, "kb", "NOTICE.txt")
+    if os.path.exists(kb):
+        text = open(kb, encoding="utf-8").read()
+        # ⚠️ The author field is OPTIONAL here — 35 entries carry only `file — source — licence`,
+        # and requiring four fields silently dropped every one of them.
+        for m in re.finditer(
+                r"^(\S+\.(?:webp|svg|png|jpe?g|gif))\s+—\s+(.+?)\s+—\s+([^—]+?)(?:\s+—\s+(.+))?$",
+                text, re.M):
+            who = f" · {m.group(4)}" if m.group(4) else ""
+            # first writer wins: the four-line blocks carry a source URL, these do not
+            out.setdefault("kb/" + m.group(1), (f"{m.group(3)}{who} · {m.group(2)}", ""))
+
+    # ⚠️ Last resort, and it is a VERIFICATION rather than a guess. The oldest diagrams are
+    # covered by a shared paragraph — "the knot illustrations … are scanned engravings from the
+    # 1911 Encyclopaedia Britannica … PUBLIC DOMAIN" — with the files listed as a comma-separated
+    # run. Structuring that with a regex would mean inventing a per-file licence; confirming the
+    # filename really appears in a notice does not, and anything left over after this genuinely
+    # has no record and should be shouted about on the page.
+    for path in (top, kb):
+        if not os.path.exists(path):
+            continue
+        text = open(path, encoding="utf-8").read()
+        for root, _, files in os.walk(IMAGES):
+            for f in files:
+                if f == "NOTICE.txt":
+                    continue
+                rel = os.path.relpath(os.path.join(root, f), IMAGES).replace(os.sep, "/")
+                if rel not in out and f not in out and f in text:
+                    out[rel] = ("attribution recorded in NOTICE.txt", "")
     return out
 
 
@@ -142,7 +201,11 @@ def main() -> int:
         if uri is None:
             missing.append(r["image"])
             continue
-        licence, page = prov.get(r["image"], ("bundled before the provenance convention", ""))
+        # ⚠️ Path first, then bare filename. The notices identify a file by NAME; a guide
+        # identifies it by path relative to images/, so `kb/ada-lovelace-….webp` and the
+        # `ada-lovelace-….webp` entry recording it are the same file under two spellings.
+        licence, page = prov.get(r["image"]) or prov.get(os.path.basename(r["image"])) \
+            or ("⚠️ no provenance entry", "")
         prov_html = html.escape(licence)
         if page:
             prov_html += f' · <a href="{html.escape(page)}">source</a>'
