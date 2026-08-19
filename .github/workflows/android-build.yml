@@ -43,66 +43,72 @@ jobs:
           wrepo=https://github.com/ggml-org/whisper.cpp
           lrepo=https://github.com/ggml-org/llama.cpp
 
-          # The whisper pin is read out of this very workflow rather than repeated, so the probe
-          # cannot drift from the tag the build actually uses.
-          wpin=$(grep -oE 'TAG="v[0-9.]+"' .github/workflows/android-build.yml | head -1 | sed 's/TAG="//; s/"//')
-          echo "whisper pin in the build job: ${wpin:-<none>}"
-
-          # ⚠️ The first version of this probe searched ONE axis — llama tags against a fixed whisper
-          # — and every candidate differed, by monotonically fewer headers the further back it went
-          # (19 at the newest, 14 at b8058). That is the shape you get when the FIXED side is the old
-          # one, so searching the other axis matters at least as much.
+          # ⚠️ WHAT THE PREVIOUS TWO ROUNDS ESTABLISHED, so this one does not re-derive it.
           #
-          # ⚠️ And a perfect match may not exist at all: both projects vendor ggml from ggml-org/ggml
-          # rather than from each other, so their header sets can differ permanently. The actual diff
-          # for the closest pair is printed below, because "Only in ..." lines mean a different FILE
-          # SET (never reconcilable by moving a pin) while content differences mean a version skew
-          # (which a pin can fix). Those two want completely different responses.
-          wtags=$(git ls-remote --tags --refs --sort=-v:refname "$wrepo" 'v*' | sed 's#.*refs/tags/##')
-          ltags=$(git ls-remote --tags --refs --sort=-v:refname "$lrepo" 'b*' | sed 's#.*refs/tags/##')
-          wnew=$(printf '%s\n' "$wtags" | sed -n 1p)
-          lnew=$(printf '%s\n' "$ltags" | sed -n 1p)
-          echo "whisper: $(printf '%s\n' "$wtags" | wc -l) tags, newest $wnew"
-          echo "llama:   $(printf '%s\n' "$ltags" | wc -l) tags, newest $lnew"
-          echo
+          # Both curves are V-shaped, with a clear minimum, and the minimum MOVES with the whisper
+          # tag — which is what says the two are genuinely tracking one ggml lineage rather than
+          # diverging permanently:
+          #
+          #   whisper v1.7.6:  b10499=19  b9867=18  b8058=14  b5845=4   b4760=7   b3560=16
+          #   whisper v1.9.2:  b10499=3   b9867=6   b8058=11  b5845=18
+          #
+          # And the three files still differing at newest-vs-newest — ggml-backend.h, ggml-rpc.h,
+          # ggml.h — are CONTENT differences with no "Only in ..." lines at all. The file sets are
+          # identical. That distinction is the whole finding: a differing file set could never be
+          # reconciled by moving a pin, and a version skew can.
+          #
+          # So a matching pair exists, and it sits just below b10499. This sweeps that neighbourhood
+          # finely against whisper's newest tag.
+          wtag=v1.9.2
+          echo "reference: whisper $wtag"
 
-          fetch() { # repo tag destdir -> ggml/include populated, or non-zero
+          fetch() {
             git clone --quiet --depth 1 --filter=blob:none --sparse -b "$2" "$1" "$3" 2>/dev/null || return 1
             ( cd "$3" && git sparse-checkout set ggml/include >/dev/null 2>&1 )
             [ -d "$3/ggml/include" ]
           }
 
-          # Reference side A: the whisper tag the build currently uses.
-          refA=$(mktemp -d); fetch "$wrepo" "$wpin" "$refA" || echo "  (could not fetch whisper $wpin)"
-          # Reference side B: the newest whisper tag.
-          refB=$(mktemp -d); fetch "$wrepo" "$wnew" "$refB" || echo "  (could not fetch whisper $wnew)"
+          ref=$(mktemp -d)
+          fetch "$wrepo" "$wtag" "$ref" || { echo "could not fetch whisper $wtag"; exit 0; }
 
-          probe() { # label ref llamaTag
+          ltags=$(git ls-remote --tags --refs --sort=-v:refname "$lrepo" 'b*' | sed 's#.*refs/tags/##')
+          hit=""
+          for i in 1 10 20 40 60 80 110 140 180 220 280 340 400; do
+            t=$(printf '%s\n' "$ltags" | sed -n "${i}p"); [ -n "$t" ] || continue
             d=$(mktemp -d)
-            if ! fetch "$lrepo" "$3" "$d"; then echo "  $1 vs $3  (fetch failed)"; rm -rf "$d"; return; fi
-            if diff -r -q "$d/ggml/include" "$2/ggml/include" >/dev/null 2>&1; then
-              echo "  $1 vs $3  ==> IDENTICAL — pin the build to this pair"
+            if ! fetch "$lrepo" "$t" "$d"; then echo "  [$i] $t  (fetch failed)"; rm -rf "$d"; continue; fi
+            if diff -r -q "$d/ggml/include" "$ref/ggml/include" >/dev/null 2>&1; then
+              echo "  [$i] $t  ==> IDENTICAL to whisper $wtag"
+              [ -z "$hit" ] && hit="$t"
             else
-              n=$(diff -r -q "$d/ggml/include" "$2/ggml/include" 2>&1 | wc -l)
-              echo "  $1 vs $3  differs in $n"
+              echo "  [$i] $t  differs in $(diff -r -q "$d/ggml/include" "$ref/ggml/include" 2>&1 | wc -l)"
             fi
             rm -rf "$d"
-          }
+          done
+          echo
+          if [ -n "$hit" ]; then
+            echo "PIN THIS PAIR:  whisper $wtag  +  llama $hit"
+          else
+            echo "no exact match in this window — widen the sweep"
+          fi
 
-          echo "whisper $wpin (current pin) against a spread of llama tags:"
-          for i in 1 400 1600 3200 4000 4800 5600; do
-            t=$(printf '%s\n' "$ltags" | sed -n "${i}p"); [ -n "$t" ] && probe "[$i] $wpin" "$refA" "$t"
-          done
+          # ⚠️ Bumping whisper to $wtag also moves the transcription C API under whisper_jni.cpp, so
+          # check its symbols BEFORE the pin changes rather than discovering it in a build. Same
+          # lesson as the llama KV-reset rename, which cost a round precisely because nothing looked
+          # first.
           echo
-          echo "whisper $wnew (newest) against the same spread:"
-          for i in 1 400 1600 3200; do
-            t=$(printf '%s\n' "$ltags" | sed -n "${i}p"); [ -n "$t" ] && probe "[$i] $wnew" "$refB" "$t"
-          done
-          echo
-          echo "what the newest-vs-newest difference actually IS:"
-          d=$(mktemp -d)
-          if fetch "$lrepo" "$lnew" "$d"; then
-            diff -r -q "$d/ggml/include" "$refB/ggml/include" 2>&1 | sed 's/^/    /' | head -25
+          echo "whisper $wtag API probe (symbols whisper_jni.cpp calls):"
+          full=$(mktemp -d)
+          if git clone --quiet --depth 1 --filter=blob:none --sparse -b "$wtag" "$wrepo" "$full" 2>/dev/null; then
+            ( cd "$full" && git sparse-checkout set include >/dev/null 2>&1 )
+            h="$full/include/whisper.h"
+            for sym in whisper_init_from_file_with_params whisper_context_default_params \
+                       whisper_full whisper_full_default_params whisper_full_n_segments \
+                       whisper_full_get_segment_text whisper_free whisper_print_system_info; do
+              if grep -q "\b$sym\b" "$h" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
+            done
+          else
+            echo "  (could not fetch whisper headers)"
           fi
 
   build:
