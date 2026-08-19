@@ -768,6 +768,22 @@ fun SettingsScreen(
                         onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(cameraSensing = v)) } },
                     )
                     PrefSwitch(
+                        "Acoustic interrogator",
+                        "Records speech continuously, transcribes it on-device, and questions weak " +
+                            "reasoning. The transcript is encrypted and kept for a day; the wake word " +
+                            "stands down while this runs. Off unless you turn it on.",
+                        checked = s.sensing.interrogator,
+                        onChange = { v ->
+                            vm.update { it.copy(sensing = it.sensing.copy(interrogator = v)) }
+                            // ⚠️ Stop is honoured from here, but START is not: the microphone
+                            // foreground-service type can only be armed from a visible activity that
+                            // holds RECORD_AUDIO, and Settings has no way to ask for it. Turning it on
+                            // here arms the setting; the Interrogator screen's LISTEN button is what
+                            // actually opens the microphone, and it requests the permission first.
+                            if (!v) dev.mascwa.pulse.data.interrogator.AcousticInterrogatorService.stop(context)
+                        },
+                    )
+                    PrefSwitch(
                         "Radio density (crowd sense)",
                         "WiFi and Bluetooth scan bursts as a people-density signal. WiFi counts need " +
                             "Location on; nothing is ever connected to.",

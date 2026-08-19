@@ -51,6 +51,9 @@ object Routes {
     // SENSORIUM — the ambient environment scanner (the ship's senses)
     const val SENSORIUM = "sensorium"
 
+    // The acoustic interrogator — continuous speech capture, transcription and fallacy screening.
+    const val INTERROGATOR = "interrogator"
+
     // STUDY — the bundled library taught rather than browsed
     const val STUDY = "study"
 

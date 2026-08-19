@@ -309,6 +309,14 @@ fun PulseApp(
                 dev.mascwa.pulse.feature.sensorium.SensoriumScreen(vm, onBack = { navController.popBackStack() })
             }
 
+            composable(Routes.INTERROGATOR) {
+                val vm: dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.interrogator.InterrogatorScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             composable(Routes.STUDY) {
                 val vm: dev.mascwa.pulse.feature.study.StudyViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.study.StudyScreen(
@@ -434,6 +442,7 @@ fun PulseApp(
 private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
+    Routes.INTERROGATOR,
     Routes.PACKS,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
     Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
