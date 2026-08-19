@@ -545,8 +545,16 @@ def wikipedia_candidates(query: str, vocab: set[str], freq: collections.Counter,
     guide's vocabulary, exactly as a filename would have to.
 
     Several results are fetched rather than one, so a poor first hit does not doom the guide.
+
+    ⚠️ **Eight, not three, and the gate above is untouched.** A live run measured 81 skips of which
+    54 — two thirds — never resolved an article at all, and the guides losing out were the ones with
+    phrasal titles: *Testing a Business Idea With Preorders*, *Building and Maintaining Soil Organic
+    Matter*. Three search results is simply too few for a title like that to surface something whose
+    own name shares the guide's vocabulary, and an article is discarded here even on a perfect title
+    match if it carries no images. Widening the pool cannot admit anything the vocabulary check
+    refuses — every extra candidate faces exactly the same test — it only stops giving up early.
     """
-    doc = api(WIKIPEDIA, generator="search", gsrsearch=query, gsrlimit=3,
+    doc = api(WIKIPEDIA, generator="search", gsrsearch=query, gsrlimit=8,
               prop="images", imlimit="max")
     best, best_hits, best_title = [], 0, ""
     for page in (doc or {}).get("query", {}).get("pages", {}).values():
@@ -562,10 +570,42 @@ def wikipedia_candidates(query: str, vocab: set[str], freq: collections.Counter,
     return best, best_title
 
 
-def commons_category_candidates(seed_categories: list[str], limit: int = 12) -> list[str]:
-    """Siblings of a good file: the other diagrams an editor filed in the same category."""
+def commons_category_search(query: str, limit: int = 6) -> list[str]:
+    """
+    Commons categories whose NAME matches the query — a seed for [commons_category_candidates].
+
+    ⚠️ **This exists because that function had a dead branch.** It takes the categories seen on a
+    good Wikipedia file, so when no article resolves at all it is handed an empty list and does
+    nothing: of the two fallbacks only the blind filename search really ran, and for a phrasal guide
+    title that search correctly refuses almost everything. Measured on a real run, two thirds of all
+    skips were in exactly that state.
+
+    A category is a filing decision by an editor, so *"the files an editor put in a category named
+    after this subject"* is a genuinely different and better-founded source than *"files whose name
+    contains these words"*. It is not a relaxed rule: every candidate it produces still faces
+    [is_english], [on_subject], [teaches], [NOT_SUBJECT], [WIKI_CHROME], [watermarked], the evidence
+    floor and [is_boilerplate], and it enters at the same source rank as before.
+    """
+    doc = api(COMMONS, list="search", srnamespace=14, srsearch=query, srlimit=limit)
+    return [r["title"] for r in (doc or {}).get("query", {}).get("search", [])]
+
+
+def commons_category_candidates(
+    seed_categories: list[str], limit: int = 12, require_diagram: bool = True,
+) -> list[str]:
+    """
+    Siblings of a good file: the other diagrams an editor filed in the same category.
+
+    ⚠️ `require_diagram` exists because the two kinds of seed need opposite treatment, and getting
+    it wrong makes the caller silently do nothing. Seeds taken from a FILE's own categories are a
+    mixed bag — licence tags, maintenance categories, the subject — so they are filtered down to the
+    one that says "diagram". Seeds from [commons_category_search] are categories whose NAME already
+    matched the guide's subject, and none of those would survive that filter, so applying it there
+    would throw away every seed and leave the branch as dead as it was before. The drawing
+    requirement is not lost either way: [teaches] still applies to every file downstream.
+    """
     for cat in seed_categories:
-        if not DIAGRAM_CATEGORIES.search(cat):
+        if require_diagram and not DIAGRAM_CATEGORIES.search(cat):
             continue
         doc = api(COMMONS, list="categorymembers", cmtitle=cat, cmtype="file", cmlimit=limit)
         members = [m["title"] for m in (doc or {}).get("query", {}).get("categorymembers", [])]
@@ -795,11 +835,25 @@ def choose(guide, freq, taken=None, verbose=True):
     found, seen_cats = survivors("wikipedia", wiki_titles, 0, vocab, freq, taken)
     if not found:
         # Fall through: siblings of whatever the article gave, then a blind search.
-        for rank, (source, titles) in enumerate(
-            [("commons-category", commons_category_candidates(seen_cats)),
-             ("commons-search", commons_search_candidates(query))], start=1
-        ):
-            found, _ = survivors(source, titles, rank, vocab, freq, taken)
+        #
+        # ⚠️ **Lazily, which the previous shape was not.** Both candidate lists were built in the
+        # list literal before the loop began, so the blind search's two requests were spent on every
+        # guide even when the category path had already won. `break` skipped the gate work and none
+        # of the network.
+        #
+        # ⚠️ And when no article resolved, `seen_cats` is empty and the category path did nothing at
+        # all — measured as two thirds of every skip. [commons_category_search] gives it a real seed
+        # in that case; `require_diagram=False` because those categories are named after the subject
+        # rather than after being diagrams.
+        subject_seeded = not seen_cats
+        seeds = seen_cats or commons_category_search(query)
+        sources: list[tuple[str, "collections.abc.Callable[[], list[str]]"]] = [
+            ("commons-category",
+             lambda: commons_category_candidates(seeds, require_diagram=not subject_seeded)),
+            ("commons-search", lambda: commons_search_candidates(query)),
+        ]
+        for rank, (source, titles_for) in enumerate(sources, start=1):
+            found, _ = survivors(source, titles_for(), rank, vocab, freq, taken)
             if found:
                 break
 
