@@ -34,6 +34,7 @@ class NotifIdTest {
         "FGS_SENSORIUM" to NotifId.FGS_SENSORIUM,
         "FGS_EMERGENCY_WATCH" to NotifId.FGS_EMERGENCY_WATCH,
         "FGS_BREAKING_OVERLAY" to NotifId.FGS_BREAKING_OVERLAY,
+        "FGS_INTERROGATOR" to NotifId.FGS_INTERROGATOR,
         "FGS_RADIO" to NotifId.FGS_RADIO,
     )
 
