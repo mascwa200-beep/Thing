@@ -5180,3 +5180,105 @@ cannot be rendered here.
 emergency: that a red alert keeps sounding and leaves your alarm volume where you left it; that a
 newer takeover replaces what is on screen; that the emergency watch says so when location is off;
 the new diagrams on the light card; and on Windows, typing a digit into the channel filter.
+
+### SIX MORE, FOUND BY FOLLOWING RESOURCES AND ENUMERATING IDENTIFIERS (this session cont., PR #449)
+
+Owner's standing order: keep going autonomously. With the plan's named targets exhausted, the hunt
+moved to two techniques rather than a list, and both paid. **Zero subagent spend**, as with every arc
+since the credit directive — local kotlinc + JUnit, `javap` against shipped jars,
+`tools/android_compile_check.sh`, `tools/android_resolve_check.sh`, and CI.
+
+**Technique 1 — follow a resource through every claimant.** Who opens it, who releases it, who else
+wants it.
+1. **A live stream treats its commonest recoverable error as fatal** (`LiveVideoController`,
+   `RadioController` — identical shape, so both). `isTransient` is
+   `errorCode in ERROR_CODE_IO_UNSPECIFIED..ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT`; confirmed
+   against the shipped media3 1.5.1 bytecode that is **2000..2002**, and
+   `ERROR_CODE_BEHIND_LIVE_WINDOW` is **1002** — below it. A sliding HLS window leaves the position
+   behind the oldest published segment after any stall, which is the ordinary interruption a live
+   stream suffers and recovers from completely. It was going to `failPermanently`: player released,
+   error on screen, re-tune by hand. ⚠️ **No seek needed** — `setMediaItem(item)` delegates to
+   `setMediaItems(list, resetPosition = true)` (read from `BasePlayer`'s bytecode), so re-preparing
+   already discards the stale position. Named rather than folded into a wider range: widening would
+   sweep in `ERROR_CODE_TIMEOUT` (1003) and `FAILED_RUNTIME_CHECK` (1004), which do not recover.
+   Second defect in the same two files: `retries` reset only in `startPlayer`, i.e. **per tune, not
+   per outage**, so a station left on all evening recovered from two drops and treated the third —
+   no less recoverable — as permanent. Now resets on every `STATE_READY`.
+2. **A replaced reply drops the callback that re-arms the wake word** (`TextToSpeechEngine`).
+   `speak()` is documented as "replacing anything already being spoken" and did it with
+   `pendingDone.set(onDone)`. ⚠️ **My recollection that `UtteranceProgressListener.onStop` delegates
+   to `onDone` for backward compatibility was WRONG** — it compiles to a bare `return`, so a flushed
+   utterance reports nothing and the displaced callback was simply lost. Of five call sites exactly
+   one passes a real callback: `speakThen`, which puts the arbiter into SPEAKING *before* speaking
+   and needs the callback to bring it out. Losing it strands the arbiter — the phone stops answering
+   to its name until the service restarts, verbatim the failure `armWatchdog` exists to prevent, by a
+   route the watchdog cannot see because a callback *did* run. Same defect that was patched once at a
+   single call site (the battery warning's `!capturing` guard); fixed at the root now. **Chained, not
+   run at replacement time** — the caller waits for the computer to stop *talking*, and it has not.
+3. **The Sensorium can hear the computer and conclude there are people around.** `micBusy` was wired
+   to `consoleActive`, which is tap-to-talk only, while the sampler's own note claimed it covered the
+   wake word. ⚠️ That claim is **corrected rather than implemented** — the wake loop listens
+   essentially always, so yielding to it would make the ears permanently deaf. What was genuinely
+   missing is the speaker: a sip during a spoken reply hears the phone itself, YAMNet labels it
+   `speech`, and that distils to "voices around you" — feeding the scene read, the ORACLE rules, and
+   the *learned* per-hour baseline, which would come to believe 3 a.m. is normally noisy because that
+   is when a question got answered.
+4. **The Sensorium's Stop button undid itself.** `stopSelf()` only, while `RefreshWorker` restarts
+   the service every run and `BootReceiver` after every reboot — so it came back within a worker
+   period with the Settings switch still reading ON. Now switches `sensing.enabled` off, the same
+   shape as the game overlay's dismiss. ⚠️ That fix would have created a quieter defect on its own —
+   ARM would start the service and the loop would stand it straight back down — so ARM turns the
+   feature back on first. The write runs on `PulseApplication.appScope` (now readable) because
+   `onDestroy` cancels the service's own scope as soon as its teardown finishes.
+
+**Technique 2 — enumerate a whole class of identifier and compare the numbers to each other.** Every
+notification id; then every PendingIntent request code. Both classes had silent collisions.
+5. **Two foreground services shared notification id 7401** — `SensoriumService` and
+   `BreakingOverlayService`, both untagged, both able to run at once. Each replaced the other's
+   notification, and whichever stopped first removed the survivor's, leaving a service holding the
+   camera and microphone with nothing on screen to say so or stop it. **And the sweep's keep-list was
+   missing 7401 and 7402 entirely**, so `sweepLegacyOnce` cancelled the ongoing notification of two
+   running services on the first board post of every process. Same shape as the mirror-map gap: two
+   independent statements of one fact, one of which gets updated. Both came from ids living as
+   private constants in eight files; they now live in `NotifId`, the sweep derives its keep set from
+   it, and **`NotifIdTest`** (app module, pure Kotlin) fails the build on a collision, on a foreground
+   id missing from the keep set, or on the keep set drifting from the registry. All three guards
+   negative-tested, each perturbation asserted to have matched the source first.
+6. **Tapping the radio notification opened Home.** ⚠️ `Intent.filterEquals` compares action,
+   categories, component, data, identifier, package and type — **decompiled from android.jar, because
+   the question turns entirely on what it does NOT compare: the extras.** RadioService's "open" used
+   request code 0 with `Intent(MainActivity) + EXTRA_ROUTE`; five other places build request code 0
+   with a bare `Intent(MainActivity)` and `FLAG_UPDATE_CURRENT`, so they are one PendingIntent and
+   the last one built wins the extras. The Sensorium rebuilds its extras-free copy every three
+   minutes, so this was a certainty rather than a race. Request code is now the (unique) notification
+   id — the trick `notifyBreakingInterrupt` already used. The other five stay at 0 deliberately: they
+   all mean "just open the app" and carry nothing. The rule, and exactly how it stops holding, is
+   written on `NotifId`.
+
+**Checked and found clean, so nobody re-chases them:** `AudioFloor` (the re-entrant `@Synchronized`
+reasoning is correct — state moves to the new owner before `STOP_RADIO`, so the nested `released` is
+a no-op by owner check); `AmbientCameraSampler`'s `unbindAll` (the AR screen is gone, so it is the
+only CameraX client and has nothing to fight); the emergency watch's `notify_state` read-modify-write
+and its `startActivity` **exception** path.
+
+⚠️ **One finding reported rather than fixed, because fixing it is an owner-level design call.**
+`RedAlertActivity` — the emergency takeover — has exactly ONE launch site: a background
+`startActivity` from `EmergencyWatchService`. There is **no full-screen-intent path for it at all**;
+the only FSI in `Notifier` belongs to breaking news. So the *less* critical path has the two-rung
+ladder `TakeoverLauncher` documents ("overlay grant, else full-screen intent, which is the platform
+ceiling without that permission"), and the tornado warning has only the rung that needs an optional
+permission nothing checks. A background activity start is normally *dropped, not thrown*, so the
+`runCatching` cannot notice. Adding the fallback means a second takeover channel, which brushes the
+one-notification invariant — the owner's call, not a silent change.
+
+⚠️ **New capability worth reusing:** `tools/android_compile_check.sh` handles third-party AARs well —
+`-l androidx.media3:media3-common:1.5.1 -l …exoplayer -l …datasource -l com.google.guava:guava:… -l
+androidx.annotation:annotation-experimental:1.4.1` plus the project's own sources gave a **complete,
+zero-error type-check** of both media controllers. It stops being practical only where the app's
+resource/`R`/`MainActivity` subtree gets pulled in.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it does not play a stream, open a microphone, or draw
+a tray: that a live channel or radio station recovers from a drop instead of showing an error; that
+the wake word survives a reply being interrupted by another spoken line; that the Sensorium's Stop
+button stays stopped and ARM brings it back; that the scanner's notification and a breaking card can
+both be on screen at once; and that tapping the radio notification lands on the radio.
