@@ -25,6 +25,7 @@ import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.telemetry.VoiceMachine
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.console
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.interrogator
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.micFailed
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.settle
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.speaking
@@ -32,6 +33,7 @@ import dev.mascwa.pulse.core.telemetry.VoiceMachine.wakeHeard
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.wants
 import dev.mascwa.pulse.core.telemetry.WakePhrase
 import dev.mascwa.pulse.data.jarvis.db.Speaker
+import dev.mascwa.pulse.feature.media.MicFloor
 import dev.mascwa.pulse.jarvis.JarvisPersona
 import dev.mascwa.pulse.jarvis.agent.AgentOrchestrator
 import dev.mascwa.pulse.jarvis.inference.ChatTurn
@@ -278,8 +280,20 @@ class ActiveMatrixService : Service() {
             Log.i(TAG, "startWakeWord: model ready, entering wake loop")
             // Seed the arbiter with the console's current claim BEFORE taking the mic, so a wake
             // session is never opened underneath a console that already holds it — then start.
-            voice = voice.copy(console = vosk.consoleActive.value)
+            voice = voice.copy(console = vosk.consoleActive.value, interrogating = MicFloor.interrogating.value)
             perform(voice.wants(true), vosk)
+
+            // ⚠️ ITS OWN LAUNCH, because the console collector below never returns — a second
+            // `collect` written after it would compile, read as wired, and never run a line.
+            // Nothing here decides anything: the claim goes into the tested arbiter and whatever it
+            // returns is performed, so "the interrogator outranks the wake word but yields to the
+            // console" stays one rule in one place.
+            voiceScope.launch {
+                MicFloor.interrogating.collect { on ->
+                    if (on) update("Paused — the interrogator has the mic.")
+                    perform(voice.interrogator(on), vosk)
+                }
+            }
             // The console and the wake loop share one recogniser; the arbiter decides who holds it.
             // The first replayed emission is therefore a no-op, which is what idempotence buys.
             vosk.consoleActive.collect { inConsole ->

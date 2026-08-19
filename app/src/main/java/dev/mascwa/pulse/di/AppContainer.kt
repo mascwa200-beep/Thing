@@ -456,6 +456,30 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.data.interrogator.TranscriptStore(appContext)
     }
 
+    /** Offline transcription. `by lazy` for the same reason as above: no model is fetched until used. */
+    val whisperEngine: dev.mascwa.pulse.data.interrogator.WhisperEngine by lazy {
+        dev.mascwa.pulse.data.interrogator.WhisperEngine(appContext, http)
+    }
+
+    /**
+     * The interrogator's adjudicator.
+     *
+     * ⚠️ **A LOCAL ENGINE, PINNED, AND NEVER [inferenceEngine].** That router prefers the cloud
+     * whenever an API key is set, so wiring the interrogator through it would ship ambient
+     * conversation — other people's conversation — to a third party the moment a key exists. The
+     * whole feature's privacy rests on this one line staying as it is.
+     */
+    val llamaEngine: dev.mascwa.pulse.data.interrogator.LlamaEngine by lazy {
+        dev.mascwa.pulse.data.interrogator.LlamaEngine(appContext, http)
+    }
+
+    /** Stages 1–6: transcribe, record, screen, reference, adjudicate, compose. */
+    val interrogatorCascade: dev.mascwa.pulse.data.interrogator.InterrogatorCascade by lazy {
+        dev.mascwa.pulse.data.interrogator.InterrogatorCascade(
+            whisperEngine, transcriptStore, libraryLookup, llamaEngine,
+        )
+    }
+
     /** Learned normality + the 48 h event log (baseline must survive restarts or anomaly detection
      *  restarts amnesiac). */
     val sensoriumStore: dev.mascwa.pulse.data.sensing.SensoriumStore by lazy {

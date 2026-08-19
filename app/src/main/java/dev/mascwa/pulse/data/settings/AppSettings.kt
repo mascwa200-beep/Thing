@@ -335,6 +335,17 @@ data class SensingSettings(
     val rememberEvents: Boolean = true,
     /** Battery %, discharging, below which the whole stack stands down (heartbeat only). */
     val standDownBatteryPct: Int = 9,
+    /**
+     * The acoustic interrogator: continuous speech capture, offline transcription to a rolling
+     * encrypted log, and fallacy screening against the offline library.
+     *
+     * ⚠️ **DEFAULT OFF, and it is the only sensing switch that is.** The rest of this group produces
+     * text labels from sound and light and keeps nothing; this one writes down what was actually
+     * said, which can include people who did not choose to be recorded. It also takes the microphone
+     * outright, so the wake word stands down while it runs. Neither of those should begin because an
+     * app updated.
+     */
+    val interrogator: Boolean = false,
 )
 
 /**

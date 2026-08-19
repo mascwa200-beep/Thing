@@ -59,4 +59,11 @@
     <string name="gate_detected">Detected device: %1$s</string>
     <string name="gate_continue">Continue anyway</string>
     <string name="gate_exit">Exit</string>
+    <!-- The acoustic interrogator (opt-in; default off). -->
+    <string name="interrogator_title">Acoustic interrogator</string>
+    <string name="interrogator_channel">Acoustic interrogator</string>
+    <string name="interrogator_listening">Listening · transcribed and screened on this device</string>
+    <string name="interrogator_no_model">Speech model unavailable — check storage and the network, then try again.</string>
+    <string name="interrogator_no_mic">Could not open the microphone — another app may be holding it.</string>
+    <string name="interrogator_stop">Stop</string>
 </resources>

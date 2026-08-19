@@ -240,6 +240,7 @@ object NotifId {
     const val FGS_SENSORIUM = 7401
     const val FGS_EMERGENCY_WATCH = 7402
     const val FGS_BREAKING_OVERLAY = 7403
+    const val FGS_INTERROGATOR = 7411
     const val FGS_RADIO = 4201
 
     /** Every id a sweep must never touch: the board, the takeover, and each service's ongoing. */
@@ -247,6 +248,7 @@ object NotifId {
         BRIEF, TAKEOVER,
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
+        FGS_INTERROGATOR,
     )
 
     /**
@@ -269,5 +271,6 @@ object NotifId {
     val FOREGROUND: Set<Int> = setOf(
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
+        FGS_INTERROGATOR,
     )
 }
