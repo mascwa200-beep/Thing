@@ -304,6 +304,13 @@ class ActiveMatrixService : Service() {
             VoiceMachine.Action.START_WAKE -> voiceScope.launch { startWakeRecognizer(vosk) }
             VoiceMachine.Action.START_COMMAND -> voiceScope.launch { startCommandRecognizer(vosk) }
             VoiceMachine.Action.RELEASE_MIC -> voiceScope.launch { releaseMic(vosk) }
+            // ⚠️ The interrogator is taking the microphone, and this service's whole job on that
+            // action is to get out of the way. `START_INTERROGATOR` deliberately does not also carry
+            // `RELEASE_MIC` — see the KDoc on the action — because starting an owner has always
+            // implicitly stopped the previous one. That was invisible while the only two owners
+            // shared a single recogniser; the interrogator uses a different recorder, so the release
+            // has to be spelled out here or two clients would hold the microphone at once.
+            VoiceMachine.Action.START_INTERROGATOR -> voiceScope.launch { releaseMic(vosk) }
         }
     }
 
