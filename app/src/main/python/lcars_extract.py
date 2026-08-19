@@ -270,3 +270,132 @@ def video_id(url: str) -> str:
         return m.group(1) if m else ""
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _flat_item(e) -> dict | None:
+    """Normalize one extract_flat entry, or None when it is not a listable video.
+
+    ⚠️ Flat entries are the least stable shape yt-dlp emits — measured on the real service, `url`
+    may be a full watch URL or a bare id, `duration` may be None (shorts, live), and the thumbnail
+    may be a scalar `thumbnail`, a `thumbnails` list (best-quality-last), or absent entirely. Trust
+    nothing; every field is read defensively and the fallbacks are stated per field.
+    """
+    try:
+        if not isinstance(e, dict):
+            return None
+        vid = str(e.get("id") or "")
+        page = str(e.get("url") or e.get("webpage_url") or "")
+        if page and not page.startswith("http"):
+            # A bare id in `url` — the flat youtube extractor does this. Rebuild the watch URL.
+            page = "https://www.youtube.com/watch?v={}".format(page)
+        if not page and re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+            page = "https://www.youtube.com/watch?v={}".format(vid)
+        title = str(e.get("title") or "")
+        if not page or not title or title == "[Deleted video]" or title == "[Private video]":
+            return None
+        thumb = ""
+        thumbs = e.get("thumbnails")
+        if isinstance(thumbs, list) and thumbs:
+            thumb = str((thumbs[-1] or {}).get("url") or "")
+        if not thumb:
+            thumb = str(e.get("thumbnail") or "")
+        if not thumb and re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+            # YouTube's stable per-id thumbnail host — a valid fallback for exactly this service.
+            thumb = "https://i.ytimg.com/vi/{}/hqdefault.jpg".format(vid)
+        try:
+            duration = float(e.get("duration") or 0)
+        except Exception:  # noqa: BLE001 - a non-numeric duration is "not stated"
+            duration = 0.0
+        try:
+            views = int(e.get("view_count") or 0)
+        except Exception:  # noqa: BLE001
+            views = 0
+        return {
+            "id": vid,
+            "title": title,
+            "duration": duration,
+            "uploader": str(e.get("uploader") or e.get("channel") or ""),
+            "thumbnail": thumb,
+            "page": page,
+            "live": e.get("live_status") == "is_live",
+            "views": views,
+        }
+    except Exception:  # noqa: BLE001 - one malformed entry must never sink the page
+        return None
+
+
+def _browse(target: str, limit: int) -> str:
+    """Shared flat listing run. Returns JSON {"items":[...]} or {"error","kind"}. Never raises.
+
+    ⚠️ THE OPTS ARE BUILT FRESH, NOT COPIED FROM resolve()'s — and that is load-bearing, not style.
+    resolve() sets `noplaylist=True`, which collapses a playlist to its first entry; a search result
+    IS a playlist, so copying that flag silently truncates a 25-result search to one item. resolve()
+    also sets `format`, which is meaningless without per-video extraction and errors on flat entries
+    under some yt-dlp versions. What browse needs is `extract_flat`: one cheap round trip that lists
+    without resolving any stream — resolving happens later, on the one item that gets tapped.
+    """
+    try:
+        from yt_dlp import YoutubeDL
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": "{}: {}".format(type(exc).__name__, exc), "kind": "UNAVAILABLE"})
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        # ⚠️ Same privacy reason as resolve(): a failure line carries the TARGET, and a search query
+        # is viewing history exactly as a URL is. Nothing may reach stderr → logcat → the diagnostic
+        # uploader's bundles.
+        "logger": _Silent(),
+        "noprogress": True,
+        "cachedir": False,
+        "extract_flat": "in_playlist",
+        "playlist_items": "1:{}".format(limit),
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(target, download=False)
+    except Exception as exc:  # noqa: BLE001 - the classification IS the product
+        return json.dumps({"error": str(exc)[:400], "kind": _classify(exc)})
+
+    if not info:
+        return json.dumps({"error": "the listing returned nothing", "kind": "NO_STREAM"})
+    entries = [x for x in (info.get("entries") or []) if x]
+    # Some tab extractors return a playlist OF playlists (section shelves). Flatten exactly one
+    # level and no more — deeper nesting is a page shape we do not understand, not data to guess at.
+    flat = []
+    for x in entries:
+        if isinstance(x, dict) and x.get("_type") == "playlist":
+            flat.extend(y for y in (x.get("entries") or []) if y)
+        else:
+            flat.append(x)
+    items = []
+    for x in flat:
+        item = _flat_item(x)
+        if item:
+            items.append(item)
+        if len(items) >= limit:
+            break
+    if not items:
+        return json.dumps({"error": "nothing listable in the result", "kind": "NO_STREAM"})
+    return json.dumps({"items": items})
+
+
+def search(query: str, limit: str = "25") -> str:
+    """Search for videos, returning a flat JSON listing. Never raises.
+
+    ⚠️ `limit` arrives as a STRING because PythonRuntime's contract is string in, string out —
+    marshalling an int across JNI is a conversion whose failure mode is a runtime exception on a
+    device. Clamped to 1..50; an unparseable value falls back to 25 rather than failing the search.
+
+    NO trending() sibling exists, deliberately: YouTube retired /feed/trending (it redirects to the
+    home page — measured, not assumed), so "what to show before anyone types" is the Kotlin side's
+    job, built from searches over what the app already knows.
+    """
+    q = (query or "").strip()
+    if not q:
+        return json.dumps({"error": "empty query", "kind": "UNSUPPORTED"})
+    try:
+        n = max(1, min(50, int(limit)))
+    except Exception:  # noqa: BLE001
+        n = 25
+    return _browse("ytsearch{}:{}".format(n, q), n)
