@@ -2960,10 +2960,6 @@ kb/engineering-project-management.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/geometric-dimensioning-and-tolerancing.svg
-    File:Gd&t regardlessoffeaturesize.svg
-    Public domain — Sarang
-    https://commons.wikimedia.org/wiki/File%3AGd%26t_regardlessoffeaturesize.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3056,18 +3052,10 @@ kb/shogi-japanese-chess-and-the-drop-rule.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/shogi-openings-static-and-ranging-rook.svg
-    File:Shogi ddlh22.svg
-    CC BY-SA 4.0 — me
-    https://commons.wikimedia.org/wiki/File%3AShogi_ddlh22.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/tsume-shogi-and-japanese-chess-problems.svg
-    File:Shogi da22.svg
-    CC BY-SA 4.0 — me
-    https://commons.wikimedia.org/wiki/File%3AShogi_da22.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3840,10 +3828,6 @@ kb/market-equilibrium-and-how-prices-clear.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/how-human-memory-works-encoding-to-retrieval.svg
-    File:Rainbow-diagram-ROYGBIV.svg
-    CC BY-SA 3.0 — Oren neu dag
-    https://commons.wikimedia.org/wiki/File%3ARainbow-diagram-ROYGBIV.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3948,3 +3932,19 @@ kb/marxism-communism.webp
     File:Map of Marxist–Leninist states.png
     Public domain — GOLDIEM J
     https://commons.wikimedia.org/wiki/File%3AMap_of_Marxist%E2%80%93Leninist_states.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/narratology-how-stories-are-told.webp
+    File:Memento Timeline.png
+    CC BY-SA 3.0 — Dr Steve Aprahamian
+    https://commons.wikimedia.org/wiki/File%3AMemento_Timeline.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/choosing-hardwoods-for-furniture-projects.webp
+    File:120 grid (scale).jpg
+    CC BY-SA 4.0 — Woodsurfsc
+    https://commons.wikimedia.org/wiki/File%3A120_grid_%28scale%29.jpg

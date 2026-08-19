@@ -102,6 +102,14 @@ MAX_SVG_BYTES = 400_000    # a pathological SVG can stall a phone renderer; a di
 MAX_SVG_RENDER_BYTES = 1_200_000
 MIN_SOURCE_WIDTH = 600
 
+# The vector counterpart of MIN_SOURCE_WIDTH — see pixels_ok for the measurement that placed it.
+# A vector's canvas is arbitrary, so what is counted is how much is actually drawn.
+MIN_SVG_ELEMENTS = 6
+MIN_SVG_BYTES = 1_000     # ...unless it is byte-rich instead; see pixels_ok for both measurements
+SVG_ELEMENT_RE = re.compile(
+    r"<(?:path|circle|rect|line|polyline|polygon|ellipse|text|image|use)\b", re.I
+)
+
 # ⚠️ **The same two numbers live in three places, in two languages, and only one of them decides
 # what actually gets written.** This module bundles the file; `BundledImagesTest` (app) and
 # `BundledSvgDiagramsParseTest` (desktop) refuse it. They agree today — 1280 and 400_000 on all
@@ -533,6 +541,39 @@ def pixels_ok(raw: bytes, mime: str) -> tuple[bool, str]:
 
     An SVG is vector, so it is checked by size and well-formedness instead of by decoding. One over
     [MAX_SVG_BYTES] is not discarded outright — see [render_svg], which the caller tries first.
+
+    ⚠️ **The vector branch had an upper bound and no lower one, and the raster branch below has both.**
+    That asymmetry let graphical FRAGMENTS through as though they were diagrams. Three reached the
+    shipped corpus: `File:Shogi da22.svg` is a **9x9 canvas containing one diagonal line** — a piece
+    of a board-tile set, bundled as the sole illustration of a guide on shogi problems — its sibling
+    `Shogi ddlh22.svg` is a line and a triangle, and `Gd&t regardlessoffeaturesize.svg` is a single
+    64x64 notation glyph standing in for a whole guide on geometric tolerancing.
+
+    ⚠️ **Canvas dimensions are the wrong measure and were tried first.** A vector's canvas is
+    arbitrary: `the-cell-nucleus-and-nuclear-envelope.svg` declares 56x43 and carries 95 kB of
+    detail. What separates a diagram from a fragment is how much is actually drawn. Measured across
+    all 93 bundled SVGs, sorted by drawing-element count:
+
+        1 element   151 B   Shogi da22                     <- fragment
+        2 elements  180 B   Shogi ddlh22                   <- fragment
+        2 elements  381 B   Gd&t regardlessoffeaturesize    <- glyph
+        4 elements 6980 B   Diagram of a ball ... equilibrium  <- A REAL DIAGRAM
+        7 elements  453 B   Rainbow-diagram-ROYGBIV         <- a real diagram, wrong subject
+       10 elements 1309 B   Supply and demand curves        <- the smallest by element count
+       20..77 elements      everything else
+
+    ⚠️ **An element floor ALONE is also wrong, and only running it over the real corpus showed it.**
+    The first cut refused anything under [MIN_SVG_ELEMENTS] and threw out the equilibrium diagram:
+    seven kilobytes of path data expressed as four complex `<path>`s. Element count measures how many
+    strokes there are, not how much drawing is in them.
+
+    So a file has to be poor by BOTH measures to be refused — under [MIN_SVG_ELEMENTS] strokes AND
+    under [MIN_SVG_BYTES]. Either kind of richness is enough. That refuses all three fragments (none
+    over 400 B) and keeps every real diagram, with the nearest survivor an order of magnitude clear.
+
+    It deliberately does NOT catch the rainbow: seven elements is a perfectly good drawing, it is
+    simply about the wrong thing. Relevance is what the subject gates and the hand re-read are for,
+    and a size floor pretending to judge it would be the worse mistake.
     """
     if mime == "image/svg+xml":
         if len(raw) > MAX_SVG_BYTES:
@@ -540,7 +581,10 @@ def pixels_ok(raw: bytes, mime: str) -> tuple[bool, str]:
         head = raw[:4096].lstrip()
         if not (head.startswith(b"<?xml") or head.startswith(b"<svg") or b"<svg" in raw[:4096]):
             return False, "not an svg"
-        return True, "svg"
+        drawn = len(SVG_ELEMENT_RE.findall(raw.decode("utf-8", "replace")))
+        if drawn < MIN_SVG_ELEMENTS and len(raw) < MIN_SVG_BYTES:
+            return False, f"vector too sparse to be a diagram: {drawn} element(s), {len(raw)} B"
+        return True, f"svg ({drawn} elements)"
     from PIL import Image
     try:
         img = Image.open(io.BytesIO(raw))

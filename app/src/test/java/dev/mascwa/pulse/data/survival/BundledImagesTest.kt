@@ -110,11 +110,25 @@ class BundledImagesTest {
                     problems += "$name: no <svg> root in the first 2 kB"
                 bytes.size > MAX_SVG_BYTES ->
                     problems += "$name: ${bytes.size / 1024} kB"
+                // ⚠️ **This branch is the floor, and its absence shipped three defects.** The vector
+                // check had a ceiling only, while rasters below are floored by width — so graphical
+                // FRAGMENTS passed as diagrams. `Shogi da22.svg` is a 9x9 canvas holding one
+                // diagonal line, a piece of a board-tile set, and it was the sole illustration of a
+                // whole guide; a sibling and a lone 64x64 notation glyph did the same.
+                //
+                // Poor by BOTH measures, because either alone is wrong: element count throws out a
+                // real 7 kB diagram drawn as four complex paths, and byte count throws out a lean
+                // but complete one. tools/kb/source_images.py carries the measurement over all
+                // bundled vectors that placed these two numbers, and tools/kb/check_images.py reads
+                // them straight out of it so the local gate and this one cannot disagree.
+                bytes.size < MIN_SVG_BYTES &&
+                    SVG_ELEMENT.findAll(String(bytes, Charsets.UTF_8)).count() < MIN_SVG_ELEMENTS ->
+                    problems += "$name: too sparse to be a diagram (${bytes.size} B)"
             }
         }
         assertTrue(
-            "vectors that are not SVG, or heavy enough to stall a phone renderer: " +
-                "${problems.take(8)} (${problems.size} total)",
+            "vectors that are not SVG, heavy enough to stall a phone renderer, or too sparse to be " +
+                "a diagram at all: ${problems.take(8)} (${problems.size} total)",
             problems.isEmpty(),
         )
     }
@@ -137,6 +151,15 @@ class BundledImagesTest {
          * and 76 kB. There is nothing left to exempt, which is the better outcome than a list.
          */
         const val MAX_SVG_BYTES = 400_000
+
+        /** The vector floor. Kept in step with tools/kb/source_images.py, which reads these
+         *  names; see the check that uses them for the measurement that placed them. */
+        const val MIN_SVG_BYTES = 1_000
+        const val MIN_SVG_ELEMENTS = 6
+        val SVG_ELEMENT = Regex(
+            "<(?:path|circle|rect|line|polyline|polygon|ellipse|text|image|use)\\b",
+            RegexOption.IGNORE_CASE,
+        )
 
         private fun u8(b: ByteArray, i: Int) = b[i].toInt() and 0xFF
 

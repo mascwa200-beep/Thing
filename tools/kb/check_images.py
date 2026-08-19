@@ -33,6 +33,11 @@ import os
 import re
 import sys
 
+SVG_ELEMENT_RE = re.compile(r"<(?:path|circle|rect|line|polyline|polygon|ellipse|text|image|use)\b", re.I)
+
+
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
@@ -51,6 +56,24 @@ GATE_TEST = os.path.join(
     ROOT, "app", "src", "test", "java", "dev", "mascwa", "pulse",
     "data", "survival", "BundledImagesTest.kt",
 )
+
+
+def vector_floor() -> tuple[int, int]:
+    """`MIN_SVG_ELEMENTS` and `MIN_SVG_BYTES`, read out of the sourcer that enforces them.
+
+    ⚠️ Read, never restated — the same rule this file already follows for the Kotlin size limits,
+    and for the same reason: two numbers meaning one thing drift, and here the drift would be
+    silent in the worse direction. A gate with a lower floor than the sourcer accepts every
+    fragment the sourcer would have refused, which is precisely the hole being closed.
+    """
+    src = open(os.path.join(HERE, "source_images.py"), encoding="utf-8").read()
+    out = []
+    for name in ("MIN_SVG_ELEMENTS", "MIN_SVG_BYTES"):
+        m = re.search(rf"^{name}\s*=\s*([\d_]+)", src, re.M)
+        if not m:
+            raise SystemExit(f"cannot read {name} out of source_images.py")
+        out.append(int(m.group(1).replace("_", "")))
+    return out[0], out[1]
 
 
 def limits() -> tuple[int, int]:
@@ -121,6 +144,7 @@ def notices() -> str:
 
 def main() -> int:
     max_px, max_svg = limits()
+    min_els, min_bytes = vector_floor()
     ref, disk = referenced(), on_disk()
     notice = notices()
     fail = 0
@@ -151,6 +175,17 @@ def main() -> int:
                 shape.append(f"{rel}: no <svg> root in the first 2 kB")
             elif len(b) > max_svg:
                 shape.append(f"{rel}: {len(b) // 1024} kB > {max_svg // 1024} kB")
+            else:
+                # ⚠️ The vector check had a ceiling and no floor, so graphical FRAGMENTS counted as
+                # diagrams: a 9x9 canvas holding one diagonal line — a shogi board-tile piece —
+                # shipped as the sole illustration of a whole guide, and two more like it. Rasters
+                # were always floored by width; vectors were not. Poor by BOTH measures is the test,
+                # because element count alone throws out a real 7 kB diagram drawn as four complex
+                # paths, and byte count alone throws out a lean but complete one. See
+                # source_images.pixels_ok for the measurement over all 93 bundled vectors.
+                drawn = len(SVG_ELEMENT_RE.findall(b.decode("utf-8", "replace")))
+                if drawn < min_els and len(b) < min_bytes:
+                    shape.append(f"{rel}: too sparse to be a diagram — {drawn} element(s), {len(b)} B")
         else:
             w = webp_width(b)
             if w is None:
