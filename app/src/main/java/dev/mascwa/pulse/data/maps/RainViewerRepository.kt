@@ -28,8 +28,16 @@ class RainViewerRepository(private val http: HttpClient) {
     @Serializable
     private data class Index(val host: String = "", val radar: Radar = Radar())
 
+    /**
+     * ⚠️ `nowcast` is deliberately not declared, and the decision belongs here rather than in prose
+     * elsewhere. RainViewer publishes a forecast sequence beside the observed one, and this app's
+     * rain layer is labelled by the age of the picture — so drawing a prediction under that label
+     * would be presenting a guess as a scan. It used to be parsed into this class and read by
+     * nothing anywhere in the repository, which reads like an oversight rather than a choice.
+     * Not parsing it is the same behaviour and says what was decided.
+     */
     @Serializable
-    private data class Radar(val past: List<Frame> = emptyList(), val nowcast: List<Frame> = emptyList())
+    private data class Radar(val past: List<Frame> = emptyList())
 
     @Serializable
     private data class Frame(val time: Long = 0L, val path: String = "")

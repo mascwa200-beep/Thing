@@ -116,7 +116,6 @@ class OrbitalRepository(
             latitude = d("latitude") ?: 0.0,
             longitude = d("longitude") ?: 0.0,
             altitudeKm = d("altitude") ?: 0.0,
-            velocityKmh = d("velocity") ?: 0.0,
             // Seconds since the epoch, and the service's own word for when the fix was taken.
             timestampMs = d("timestamp")?.let { (it * 1000.0).toLong() } ?: 0L,
         )

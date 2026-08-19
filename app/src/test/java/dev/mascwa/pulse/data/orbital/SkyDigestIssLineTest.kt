@@ -36,7 +36,6 @@ class SkyDigestIssLineTest {
             latitude = 40.7128,
             longitude = -74.0060,
             altitudeKm = 420.0,
-            velocityKmh = 27_580.0,
             timestampMs = timestampMs,
         ),
         moon = moon,
@@ -55,7 +54,7 @@ class SkyDigestIssLineTest {
     @Test fun aFreshFetchedPositionIsStillUsed() {
         // Nothing about the fallback's judgement changed; only its precondition did.
         val line = issLineOf(overhead(t0 - 5_000L))
-        assertEquals("🛰️ ISS passing near — 0 km from its ground point", line)
+        assertEquals("🛰️ ISS passing near — 0 km from its ground point, 420 km up", line)
     }
 
     @Test fun aPositionOlderThanTheDistanceItCouldHaveTravelledSaysNothing() {
@@ -84,7 +83,7 @@ class SkyDigestIssLineTest {
         val sighting = SatellitePasses.sighting(iss, nyc, at(1990))!!
         // The fetched position is both stale AND on the other side of the planet; neither matters.
         val data = OrbitalData(
-            iss = IssPosition(-40.0, 100.0, 420.0, 27_580.0, timestampMs = t0 - 600_000L),
+            iss = IssPosition(-40.0, 100.0, 420.0, timestampMs = t0 - 600_000L),
             moon = moon,
         )
         assertEquals(

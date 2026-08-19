@@ -172,8 +172,6 @@ data class Contact(
 
 @Serializable
 data class RadarData(
-    val originLat: Double,
-    val originLon: Double,
     val contacts: List<Contact> = emptyList(),
     val source: String = "",      // which feed answered (adsb.lol / adsb.fi)
     val updatedEpochMs: Long = System.currentTimeMillis(),

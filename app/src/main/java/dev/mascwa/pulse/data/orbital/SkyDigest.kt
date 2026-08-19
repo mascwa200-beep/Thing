@@ -95,10 +95,21 @@ object SkyDigest {
     /**
      * What to say about the ISS, or nothing.
      *
-     * Prefers the propagated [sighting], which knows how high the station is and whether sunlight
-     * is falling on it — the two facts that decide whether there is any point going outside. The
-     * fetched position is a fallback with neither, and is used only while it is fresh enough to
+     * Prefers the propagated [sighting], which knows where in the sky to look and whether sunlight
+     * is falling on the station — the two facts that decide whether there is any point going
+     * outside. The fetched position knows neither, and is used only while it is fresh enough to
      * mean anything.
+     *
+     * ⚠️ This used to say the fallback did not know how high the station is either, and that was
+     * wrong in a way worth recording: `altitude` is in the response, is parsed into
+     * [IssPosition.altitudeKm], and was then read by nothing. A doc claiming a limitation the model
+     * does not actually have is how a discarded field stays discarded — nobody goes looking for
+     * what the comment says is not there. It varies with each reboost, between roughly 400 and
+     * 420 km, so it is a real number rather than a constant dressed up as one.
+     *
+     * Orbital speed is not shown, and that is the other half of the same judgement: it sits within
+     * a per-cent of 27,600 km/h on every pass ever flown, so printing it on every line would be
+     * decoration. [IssPosition] no longer carries it.
      */
     private fun issLine(
         orbital: OrbitalData,
@@ -133,7 +144,8 @@ object SkyDigest {
         if (nowMs - iss.timestampMs > FETCHED_FIX_USABLE_MS) return null
         val km = Geo.distanceMeters(lat, lon, iss.latitude, iss.longitude) / 1000.0
         if (km >= NEAR_GROUND_RANGE_KM) return null
-        return "🛰️ ISS passing near — ${km.roundToInt()} km from its ground point"
+        val up = iss.altitudeKm.takeIf { it > 0.0 }?.let { ", ${it.roundToInt()} km up" }.orEmpty()
+        return "🛰️ ISS passing near — ${km.roundToInt()} km from its ground point$up"
     }
 
     private fun timeOrNull(epochMs: Long?): String? {

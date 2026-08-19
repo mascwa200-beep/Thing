@@ -69,8 +69,6 @@ data class Incident(
 
 @Serializable
 data class SafetyResult(
-    val originLat: Double,
-    val originLon: Double,
     val incidents: List<Incident>,
     /**
      * What each source did on this fetch, keyed by `SafetyCoverage.Source` name.

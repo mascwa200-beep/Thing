@@ -87,7 +87,7 @@ class SafetyRepository(
                 .sortedWith(compareBy({ it.distanceMeters }, { -it.timeEpochMs }))
                 .take(60)
             val result = SafetyResult(
-                lat, lon, incidents,
+                incidents,
                 sourceStates = states.entries.associate { (k, v) -> k.name to v.name },
             )
             cache.write(key, result, SafetyResult.serializer())
@@ -111,7 +111,7 @@ class SafetyRepository(
                 bearing = Geo.bearingDegrees(lat, lon, it.latitude, it.longitude),
             )
         }.sortedBy { it.distanceMeters }
-        return r.copy(originLat = lat, originLon = lon, incidents = updated)
+        return r.copy(incidents = updated)
     }
 
     // --- USGS earthquakes (GeoJSON, global, keyless) ---
