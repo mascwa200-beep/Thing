@@ -18,99 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ⚠️ ITS OWN JOB, NOT A STEP IN `build`, AND THAT IS THE WHOLE POINT.
-  #
-  # whisper.cpp and llama.cpp must carry the same ggml sync or only one of them can link, and which
-  # llama build number that is cannot be worked out from a machine that cannot reach GitHub —
-  # guessing has been wrong three times in three different ways. So the runner is asked.
-  #
-  # A step inside `build` would bury its answer several hundred lines deep, behind 214 lines of ninja
-  # output and the test run, which is expensive to read back. A separate job has its own short log.
-  # It also runs in parallel, so it costs the build nothing, and `continue-on-error` means a probe
-  # that fails can never hold up a release.
-  #
-  # Delete this job once a matching pin is recorded in the build job's TAG.
-  ggml-probe:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Which pin pair carries one ggml
-        run: |
-          set +e
-          wrepo=https://github.com/ggml-org/whisper.cpp
-          lrepo=https://github.com/ggml-org/llama.cpp
-
-          # ⚠️ WHAT THE PREVIOUS TWO ROUNDS ESTABLISHED, so this one does not re-derive it.
-          #
-          # Both curves are V-shaped, with a clear minimum, and the minimum MOVES with the whisper
-          # tag — which is what says the two are genuinely tracking one ggml lineage rather than
-          # diverging permanently:
-          #
-          #   whisper v1.7.6:  b10499=19  b9867=18  b8058=14  b5845=4   b4760=7   b3560=16
-          #   whisper v1.9.2:  b10499=3   b9867=6   b8058=11  b5845=18
-          #
-          # And the three files still differing at newest-vs-newest — ggml-backend.h, ggml-rpc.h,
-          # ggml.h — are CONTENT differences with no "Only in ..." lines at all. The file sets are
-          # identical. That distinction is the whole finding: a differing file set could never be
-          # reconciled by moving a pin, and a version skew can.
-          #
-          # So a matching pair exists, and it sits just below b10499. This sweeps that neighbourhood
-          # finely against whisper's newest tag.
-          wtag=v1.9.2
-          echo "reference: whisper $wtag"
-
-          fetch() {
-            git clone --quiet --depth 1 --filter=blob:none --sparse -b "$2" "$1" "$3" 2>/dev/null || return 1
-            ( cd "$3" && git sparse-checkout set ggml/include >/dev/null 2>&1 )
-            [ -d "$3/ggml/include" ]
-          }
-
-          ref=$(mktemp -d)
-          fetch "$wrepo" "$wtag" "$ref" || { echo "could not fetch whisper $wtag"; exit 0; }
-
-          ltags=$(git ls-remote --tags --refs --sort=-v:refname "$lrepo" 'b*' | sed 's#.*refs/tags/##')
-          hit=""
-          for i in 1 10 20 40 60 80 110 140 180 220 280 340 400; do
-            t=$(printf '%s\n' "$ltags" | sed -n "${i}p"); [ -n "$t" ] || continue
-            d=$(mktemp -d)
-            if ! fetch "$lrepo" "$t" "$d"; then echo "  [$i] $t  (fetch failed)"; rm -rf "$d"; continue; fi
-            if diff -r -q "$d/ggml/include" "$ref/ggml/include" >/dev/null 2>&1; then
-              echo "  [$i] $t  ==> IDENTICAL to whisper $wtag"
-              [ -z "$hit" ] && hit="$t"
-            else
-              echo "  [$i] $t  differs in $(diff -r -q "$d/ggml/include" "$ref/ggml/include" 2>&1 | wc -l)"
-            fi
-            rm -rf "$d"
-          done
-          echo
-          if [ -n "$hit" ]; then
-            echo "PIN THIS PAIR:  whisper $wtag  +  llama $hit"
-          else
-            echo "no exact match in this window — widen the sweep"
-          fi
-
-          # ⚠️ Bumping whisper to $wtag also moves the transcription C API under whisper_jni.cpp, so
-          # check its symbols BEFORE the pin changes rather than discovering it in a build. Same
-          # lesson as the llama KV-reset rename, which cost a round precisely because nothing looked
-          # first.
-          echo
-          echo "whisper $wtag API probe (symbols whisper_jni.cpp calls):"
-          full=$(mktemp -d)
-          if git clone --quiet --depth 1 --filter=blob:none --sparse -b "$wtag" "$wrepo" "$full" 2>/dev/null; then
-            ( cd "$full" && git sparse-checkout set include >/dev/null 2>&1 )
-            h="$full/include/whisper.h"
-            for sym in whisper_init_from_file_with_params whisper_context_default_params \
-                       whisper_full whisper_full_default_params whisper_full_n_segments \
-                       whisper_full_get_segment_text whisper_free whisper_print_system_info; do
-              if grep -q "\b$sym\b" "$h" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
-            done
-          else
-            echo "  (could not fetch whisper headers)"
-          fi
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -154,7 +61,11 @@ jobs:
           # tag and says loudly which one it used. That turns a wrong guess into the answer inside a
           # single ~25 minute round instead of two, and the fallback cannot drift silently because
           # it warns every time it fires. Pin whatever it reports.
-          TAG="v1.7.6"
+          # ⚠️ MEASURED, NOT CHOSEN. This tag and the llama build below are a MATCHED PAIR: their
+          # vendored ggml headers are byte-identical, which is the only condition under which both
+          # projects can link into one .so. A CI probe swept both tag axes to find it — see the
+          # commit that pinned them for the numbers. Moving either one alone will break the other.
+          TAG="v1.9.2"
           if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
             echo "whisper.cpp @ $TAG (pinned)"
           else
@@ -180,16 +91,19 @@ jobs:
           # ⚠️ llama.cpp tags are build numbers (b4600), NOT semver, so the pattern differs from
           # whisper's. Same fallback-and-warn shape and the same reason: this pin could not be
           # verified from a machine that cannot reach GitHub.
-          # ⚠️ THE PIN IS CONSTRAINED BY WHISPER'S, NOT CHOSEN FREELY — see the ggml compatibility
-          # step below. Both projects vendor ggml and only one copy may exist in the shipped .so, so
-          # the two tags have to carry the same ggml generation. b4600 did not: whisper v1.7.6 calls
-          # ggml_backend_sched_new with six arguments and b4600's ggml declares five. b5000 is a
-          # later sync and is certain to exist (llama tags are sequential build numbers, long past
-          # this one), which removes the does-the-tag-resolve risk from this round.
+          # ⚠️ THE OTHER HALF OF A MATCHED PAIR — see the whisper TAG above, and do not move one
+          # without re-running the search for the other.
           #
-          # Bumping is cheap now in a way it was not before: the KV-reset API is detected from the
-          # header at configure time rather than assumed, so a newer tag needs no source edit.
-          TAG="b5000"
+          # Both projects vendor ggml and only one copy may exist in the shipped .so, so the two tags
+          # must carry the same ggml sync. Three rounds of inferring which build that was were wrong
+          # in three different ways, so it was measured instead. Against whisper v1.9.2:
+          #
+          #   b10499=3  b10455=2  b10443=2  b10417=2  b10358=1  b10322=1
+          #   b10276 == b10241 == b10197 IDENTICAL      b10141=1  b10021=3  b9945=5  b9867=6
+          #
+          # A contiguous window of identical builds, which is exactly what "one ggml sync spans a
+          # range of build numbers" predicts. b10276 is the newest of that window.
+          TAG="b10276"
           if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
             echo "llama.cpp @ $TAG (pinned)"
           else
