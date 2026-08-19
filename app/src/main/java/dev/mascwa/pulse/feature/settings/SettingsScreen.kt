@@ -111,7 +111,6 @@ fun SettingsScreen(
     var watchlistCollapsed by rememberSaveable { mutableStateOf(false) }
     var feedsCollapsed by rememberSaveable { mutableStateOf(false) }
     var mutedCollapsed by rememberSaveable { mutableStateOf(false) }
-    var imageSitesCollapsed by rememberSaveable { mutableStateOf(false) }
 
     fun notificationsAllowed(): Boolean =
         android.os.Build.VERSION.SDK_INT < 33 ||
@@ -983,35 +982,10 @@ fun SettingsScreen(
                 }
             }
 
-            // ----- Image search sites -----
-            if (vis(SettingsCategory.CONTENT, "image search site url")) collapsibleHeader("Image search sites", imageSitesCollapsed) { imageSitesCollapsed = !imageSitesCollapsed }
-            if (vis(SettingsCategory.CONTENT, "image search site url") && !imageSitesCollapsed) {
-                item {
-                    Text(
-                        "Sites you've added on the Images screen (a %s is replaced with your keyword).",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-                itemsIndexed(s.customImageSites) { i, site ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                        IconButton(onClick = {
-                            vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(LcarsIcons.Delete, "Remove") }
-                    }
-                }
-                item {
-                    AddTextRow("Add image site URL") { url ->
-                        if (url.startsWith("http")) {
-                            vm.update { it.copy(customImageSites = (it.customImageSites + url.trim()).distinct()) }
-                        }
-                    }
-                }
-            }
+            // The "Image search sites" section lived here until it was found to be a ZOMBIE: it
+            // edited AppSettings.customImageSites, which fed the Images screen deleted long ago —
+            // a settings surface inviting configuration of a feature that no longer exists. The
+            // field itself stays (property names are a data contract; old blobs still carry it).
 
             // ----- Optional API keys -----
             if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google brave search web")) item {

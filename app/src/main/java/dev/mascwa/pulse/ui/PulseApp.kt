@@ -193,12 +193,22 @@ fun PulseApp(
                 val vm: WeatherViewModel = viewModel(factory = factory)
                 WeatherScreen(vm)
             }
-            composable(Routes.SETTINGS) {
+            // The category is a query argument (the `survival?guide=` precedent: defaultValue keeps
+            // a bare "settings" matching), so a deep surface can land on the right category —
+            // "settings?cat=notifications" opens Settings AT Notifications. This is what finally
+            // feeds SettingsScreen's initialCategory parameter, which had zero callers.
+            composable(
+                "${Routes.SETTINGS}?cat={cat}",
+                arguments = listOf(navArgument("cat") { defaultValue = "" }),
+            ) { entry ->
                 val vm: SettingsViewModel = viewModel(factory = factory)
+                val catArg = entry.arguments?.getString("cat").orEmpty()
                 SettingsScreen(
                     vm,
                     onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } },
                     onOpenSecurityAudit = { navController.navigate(Routes.SECURITY_AUDIT) { launchSingleTop = true } },
+                    initialCategory = dev.mascwa.pulse.feature.settings.SettingsCategory.entries
+                        .firstOrNull { it.name.equals(catArg, ignoreCase = true) },
                     onBack = { navController.popBackStack() },
                 )
             }
