@@ -38,11 +38,7 @@ import dev.mascwa.pulse.feature.common.StaleBanner
 fun EconomyScreen(vm: EconomyViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Economy",
-        navigationIcon = {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         EconomyBody(vm, Modifier.padding(innerPadding))
     }

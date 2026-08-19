@@ -52,9 +52,7 @@ fun ToolsScreen(vm: ToolsViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Survival Tools",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Column(
             Modifier.padding(innerPadding).padding(16.dp).fillMaxWidth(),

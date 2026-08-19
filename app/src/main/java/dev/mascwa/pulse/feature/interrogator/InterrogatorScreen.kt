@@ -80,9 +80,7 @@ fun InterrogatorScreen(vm: InterrogatorViewModel, onBack: (() -> Unit)? = null) 
 
     PulseScaffold(
         title = "Interrogator",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             LazyColumn(

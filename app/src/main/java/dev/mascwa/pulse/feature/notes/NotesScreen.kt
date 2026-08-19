@@ -13,9 +13,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 fun NotesScreen(vm: NotesViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "NOTES",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         NotesBody(vm, Modifier.padding(innerPadding))
     }

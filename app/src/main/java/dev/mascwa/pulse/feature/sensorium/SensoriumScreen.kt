@@ -73,9 +73,7 @@ fun SensoriumScreen(vm: SensoriumViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Sensorium",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             LazyColumn(

@@ -53,9 +53,7 @@ fun SearchScreen(
 ) {
     PulseScaffold(
         title = "Search",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         SearchBody(vm, Modifier.padding(innerPadding), onOpen, onOpenGuide)
     }

@@ -49,9 +49,7 @@ fun PacksScreen(vm: PacksViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Packs",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             if (state.loading && state.offers.isEmpty()) {

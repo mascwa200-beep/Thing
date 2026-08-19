@@ -145,11 +145,7 @@ fun JarvisSetupScreen(
 
     PulseScaffold(
         title = "COMPUTER SETUP",
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Column(
             Modifier

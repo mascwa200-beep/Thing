@@ -46,11 +46,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun FuelScreen(vm: FuelViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Fuel & Energy",
-        navigationIcon = {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         FuelBody(vm, Modifier.padding(innerPadding))
     }

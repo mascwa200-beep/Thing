@@ -42,9 +42,7 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun SurviveHubScreen(onOpenRoute: (String) -> Unit, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Survive",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         SurviveBody(onOpenRoute, Modifier.padding(innerPadding))
     }

@@ -80,6 +80,11 @@ fun GuidesScreen(
 ) {
     val entries by vm.index.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+
+    // ⚠️ The system back gesture now agrees with the corner: inside a guide it closes the READER,
+    // not the whole screen. `enabled` is gated on the sub-state — an always-enabled BackHandler
+    // would swallow system back app-wide (it beats the NavHost's own handler).
+    androidx.activity.compose.BackHandler(enabled = selected != null) { vm.closeReader() }
     val mastery by vm.mastery.collectAsStateWithLifecycle()
     val taught by vm.taught.collectAsStateWithLifecycle()
     val bodyMatches by vm.bodyMatches.collectAsStateWithLifecycle()
@@ -118,11 +123,9 @@ fun GuidesScreen(
 
     PulseScaffold(
         title = selected?.title ?: "Knowledge Base",
-        navigationIcon = {
-            IconButton(onClick = { if (selected != null) vm.closeReader() else onBack?.invoke() }) {
-                Icon(LcarsIcons.ArrowBack, "Back")
-            }
-        },
+        // Context-aware: inside a guide the corner closes the READER; on the list it leaves the
+        // screen — and the system back gesture now agrees (see the BackHandler below).
+        onBack = { if (selected != null) vm.closeReader() else onBack?.invoke() },
     ) { innerPadding ->
         val sel = selected
         if (sel == null) {

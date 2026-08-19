@@ -67,9 +67,7 @@ fun ReaderScreen(
 
     PulseScaffold(
         title = "Reader",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             LazyColumn(

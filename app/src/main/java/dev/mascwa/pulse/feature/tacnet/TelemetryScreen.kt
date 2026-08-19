@@ -65,9 +65,7 @@ import kotlinx.coroutines.delay
 fun TelemetryScreen(vm: TelemetryViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Diagnostics",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         TelemetryBody(vm, Modifier.padding(innerPadding))
     }

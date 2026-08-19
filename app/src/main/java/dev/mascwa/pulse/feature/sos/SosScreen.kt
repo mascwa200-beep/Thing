@@ -56,9 +56,7 @@ fun SosScreen(vm: SosViewModel, onBack: (() -> Unit)? = null, onOpenGuide: ((Str
 
     PulseScaffold(
         title = "SOS",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.padding(innerPadding),

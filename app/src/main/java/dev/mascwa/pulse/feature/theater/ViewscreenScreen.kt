@@ -103,9 +103,7 @@ fun ViewscreenScreen(
 
     PulseScaffold(
         title = "Theater",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         LazyColumn(
             Modifier

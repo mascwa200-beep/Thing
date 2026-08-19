@@ -54,9 +54,7 @@ fun OracleScreen(vm: OracleViewModel, onOpenRoute: (String) -> Unit, onBack: (()
 
     PulseScaffold(
         title = "Oracle",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             when {

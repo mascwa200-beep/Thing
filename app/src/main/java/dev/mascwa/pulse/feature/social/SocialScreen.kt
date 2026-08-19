@@ -51,9 +51,7 @@ fun SocialScreen(
 ) {
     PulseScaffold(
         title = "Social",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         SocialBody(vm, Modifier.padding(innerPadding), onWatch = onWatch)
     }

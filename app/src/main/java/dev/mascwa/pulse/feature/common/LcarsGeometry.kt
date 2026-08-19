@@ -428,11 +428,13 @@ fun LcarsScreenFrame(
     modifier: Modifier = Modifier,
     seed: String = title,
     navigationIcon: (@Composable () -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     rail: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
+    val cue = rememberLcarsCue()
     // The status bar is this frame's to consume. `PulseApp`'s outer Scaffold sets
     // contentWindowInsets to zero, so the NavHost gets no top padding and each screen's own top bar
     // has always owned it — Home's custom bar applies exactly this by hand. Miss it and all 35
@@ -447,17 +449,39 @@ fun LcarsScreenFrame(
             Modifier.fillMaxWidth().height(HeaderHeight),
             horizontalArrangement = Arrangement.spacedBy(RailGutter),
         ) {
+            // ⚠️ THE CORNER SAYS WHAT IT IS. Three honest states, one back idiom app-wide:
+            //  - [onBack] set  -> the WHOLE 56×54 block is the back control (accent, tappable,
+            //    kit cue/haptics, black glyph — LCARS puts dark glyphs on coloured blocks). A far
+            //    bigger target than the 24dp IconButton every screen used to hand-roll.
+            //  - legacy [navigationIcon] -> the old contract, unchanged, until the sweep retires it.
+            //  - neither -> the block renders in the HEADER BAND's own colour, visually one piece
+            //    of chrome with the title block. The old behaviour painted it accent regardless,
+            //    which made a dead corner look tappable on every tab screen — the single most
+            //    reported "inconsistent back button" symptom.
+            val cornerActive = onBack != null || navigationIcon != null
             Box(
                 Modifier
                     .width(LcarsRailWidth)
                     .fillMaxHeight()
                     .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
-                    .background(c.accent),
+                    .background(if (cornerActive) c.accent else c.raise)
+                    .then(
+                        if (onBack != null) {
+                            Modifier.clickable { cue(SoundCue.TAP, HapticCue.TAP_CRISP); onBack() }
+                        } else {
+                            // No clickable otherwise: a legacy icon brings its own handler, and a
+                            // second no-op one would give the corner a ripple that does nothing.
+                            Modifier
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
-                // No clickable on the block itself: the icon passed in brings its own handler, and
-                // wrapping it in a second no-op one would give the whole corner a ripple that does
-                // nothing. The size win is real regardless — the icon centres in a 56x54 block.
-            ) { navigationIcon?.invoke() }
+            ) {
+                if (onBack != null) {
+                    Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.void)
+                } else {
+                    navigationIcon?.invoke()
+                }
+            }
 
             Row(
                 Modifier

@@ -53,6 +53,14 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
     var searchActive by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
 
+    // ⚠️ System back leaves SEARCH MODE, not the News tab — gated on the sub-state so it swallows
+    // nothing when search is closed.
+    androidx.activity.compose.BackHandler(enabled = searchActive) {
+        searchActive = false
+        searchText = ""
+        vm.clearSearch()
+    }
+
     PulseScaffold(
         title = "News",
         topBarOverride = {
@@ -64,11 +72,13 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
                         placeholder = { Text("Search news…") },
                         singleLine = true,
                         leadingIcon = {
+                            // ✕, not the back arrow: this CANCELS search — using the navigation
+                            // glyph for a different verb was one of the app's six back idioms.
                             IconButton(onClick = {
                                 searchActive = false
                                 searchText = ""
                                 vm.clearSearch()
-                            }) { Icon(LcarsIcons.ArrowBack, "Back") }
+                            }) { Icon(LcarsIcons.Close, "Cancel search") }
                         },
                         trailingIcon = {
                             if (searchText.isNotEmpty()) {

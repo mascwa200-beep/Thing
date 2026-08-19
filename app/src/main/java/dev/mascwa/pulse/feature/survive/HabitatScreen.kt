@@ -77,9 +77,7 @@ fun HabitatScreen(vm: HabitatViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Wildlife",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             when {

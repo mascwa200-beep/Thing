@@ -86,11 +86,7 @@ fun RadarScreen(vm: RadarViewModel, onBack: (() -> Unit)? = null) {
         title = "RADSCOPE",
         // Full-bleed scope: same reason as NAV.
         rail = false,
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, "Back")
-            }
-        },
+        onBack = onBack,
         actions = {
             IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh", tint = Pip.bright) }
         },

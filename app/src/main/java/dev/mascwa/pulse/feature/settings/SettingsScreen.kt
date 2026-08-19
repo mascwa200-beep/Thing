@@ -98,6 +98,7 @@ fun SettingsScreen(
     onOpenCrashLog: () -> Unit = {},
     onOpenSecurityAudit: () -> Unit = {},
     initialCategory: SettingsCategory? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
@@ -142,6 +143,10 @@ fun SettingsScreen(
     // searching) when its title/keywords match — so a search result is the real, live control.
     var selectedCat by remember { mutableStateOf(initialCategory) }
     var query by remember { mutableStateOf("") }
+
+    // ⚠️ System back leaves the CATEGORY, then the screen — Settings previously exited wholesale
+    // from three levels deep. Gated on the sub-state, per the app-wide BackHandler rule.
+    androidx.activity.compose.BackHandler(enabled = selectedCat != null) { selectedCat = null }
     val activeCat = selectedCat ?: SettingsCategory.FIRST
     fun vis(cat: SettingsCategory, keywords: String): Boolean {
         val q = query.trim()
@@ -1317,7 +1322,14 @@ fun SettingsScreen(
         }
     }
 
-    PulseScaffold(title = "Settings") { innerPadding ->
+    // The screen's FIRST frame-level back: the densest screen in the app had no back affordance
+    // at all — its only back was an 18dp text row 1300 lines into the body that exited a category,
+    // never the screen. The corner leaves the category first, then the screen, mirroring the
+    // system-back gesture above.
+    PulseScaffold(
+        title = "Settings",
+        onBack = { if (selectedCat != null) selectedCat = null else onBack?.invoke() },
+    ) { innerPadding ->
         SettingsShell(
             modifier = Modifier.padding(innerPadding),
             selectedCat = selectedCat,

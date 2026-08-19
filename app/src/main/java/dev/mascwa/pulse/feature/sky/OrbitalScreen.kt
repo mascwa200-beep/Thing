@@ -75,9 +75,7 @@ private enum class SkyTab(val label: String) {
 fun OrbitalScreen(vm: OrbitalViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "Observatory",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
         actions = {
             IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh") }
         },

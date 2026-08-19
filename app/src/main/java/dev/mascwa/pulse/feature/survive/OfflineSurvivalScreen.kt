@@ -39,6 +39,11 @@ import dev.mascwa.pulse.ui.theme.Pulse
  */
 @Composable
 fun OfflineSurvivalScreen(onOpenRoute: (String) -> Unit, onDismiss: () -> Unit) {
+    // ⚠️ System back DISMISSES the overlay. Without this it drove the invisible NavHost underneath
+    // while the takeover stayed on screen — navigation the user could not see. Always enabled is
+    // correct HERE (unlike every other BackHandler): this composable only exists while the overlay
+    // is showing, so its lifetime IS the gate.
+    androidx.activity.compose.BackHandler { onDismiss() }
     val c = Pulse.colors
     Box(Modifier.fillMaxSize().background(c.void)) {
         Column(

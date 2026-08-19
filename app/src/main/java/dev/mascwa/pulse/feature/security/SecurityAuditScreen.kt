@@ -58,9 +58,7 @@ fun SecurityAuditScreen(vm: SecurityAuditViewModel, onBack: () -> Unit) {
 
     PulseScaffold(
         title = "SECURITY AUDIT",
-        navigationIcon = {
-            IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),

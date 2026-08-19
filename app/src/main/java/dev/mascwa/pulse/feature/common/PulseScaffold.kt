@@ -39,7 +39,19 @@ fun PulseScaffold(
      * there is nothing here to reproduce. Delete the parameter once the call sites are swept.
      */
     @Suppress("UNUSED_PARAMETER") scrollBehavior: TopAppBarScrollBehavior? = null,
-    navigationIcon: @Composable () -> Unit = {},
+    /**
+     * The legacy slot, now NULLABLE with a null default — the shim that keeps every un-swept call
+     * site compiling while [onBack] becomes the one idiom. ⚠️ The nullability is load-bearing: the
+     * old non-null `{}` default meant a screen that passed nothing still painted the corner accent,
+     * a dead block that looked tappable on every tab screen. Null now means "no control here" and
+     * the frame paints the corner as plain header chrome.
+     */
+    navigationIcon: (@Composable () -> Unit)? = null,
+    /**
+     * THE back control. Set it and the whole 56×54 corner block becomes the back affordance —
+     * accent, tappable, cue and haptics from the kit — one idiom instead of the six this app grew.
+     */
+    onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     topBarOverride: (@Composable () -> Unit)? = null,
     /** False for a full-bleed screen — a map — where the horizontal room genuinely cannot be spared. */
@@ -59,6 +71,7 @@ fun PulseScaffold(
         // rail is fixed for as long as its name is, which is the stability those codes need.
         seed = title,
         navigationIcon = navigationIcon,
+        onBack = onBack,
         actions = actions,
         rail = rail,
     ) {

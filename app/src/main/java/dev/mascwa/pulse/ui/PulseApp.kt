@@ -170,6 +170,7 @@ fun PulseApp(
                     vm,
                     onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } },
                     onOpenSecurityAudit = { navController.navigate(Routes.SECURITY_AUDIT) { launchSingleTop = true } },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(Routes.ECONOMY) {
