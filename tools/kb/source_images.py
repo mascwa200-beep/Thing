@@ -1189,6 +1189,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--apply", action="store_true")
+    # ⚠️ Category OR guide id, comma-separated. It used to be a single category, which cannot
+    # express the one question worth asking of a change to article resolution: "do THESE named
+    # guides, the ones a previous run recorded as skipped, reach a picture now?" A category is the
+    # wrong unit for that — the skips are scattered across all 49 of them — and measuring a change
+    # by re-running a whole category mixes guides that already succeeded into the count.
+    # Category names carry no commas, so a single-category argument still means what it did.
     ap.add_argument("--only", default="")
     ap.add_argument("--report", default="")
     ap.add_argument("--selftest", action="store_true")
@@ -1199,10 +1205,19 @@ def main() -> int:
 
     check_gate_parity()
     guides, freq = load_corpus()
+    only = {t.strip() for t in args.only.split(",") if t.strip()}
+    if only:
+        known = {g.get("category") for g in guides.values()} | set(guides)
+        unknown = sorted(only - known)
+        if unknown:
+            # A typo in an id silently selects nothing, and "0 guides" reads exactly like "they all
+            # have pictures already" — which is the answer this flag exists to distinguish.
+            print("FAIL --only names nothing in the corpus: " + ", ".join(unknown))
+            return 1
     todo = [g for g in guides.values()
             if not any(s.get("image") for s in g.get("sections", []))
             and g.get("category") not in LORE_CATEGORIES
-            and (not args.only or g.get("category") == args.only)]
+            and (not only or g.get("category") in only or g["id"] in only)]
     todo.sort(key=lambda g: (g.get("category", ""), g["id"]))
     print(f"{len(todo)} guides without a diagram (lore categories excluded)\n")
 
