@@ -103,6 +103,12 @@ jobs:
           # build number carries is a fact about that tag rather than something to recall. Printing
           # it means one round answers both "does this tag exist" and "does the bridge use the right
           # names", instead of two.
+          #
+          # ⚠️ THE FOUR KV NAMES ARE HERE BECAUSE THIS LIST WAS ONCE INCOMPLETE AND COST A ROUND. The
+          # original probe covered the rename family I was WORRIED about (model/vocab accessors) and
+          # not the one that actually broke the build, because I had not recognised the KV-cache reset
+          # as a rename family at all. A probe only ever answers what it was asked. When a symbol here
+          # turns out to have moved, add its whole family rather than just the name that failed.
           hdr="$dir/include/llama.h"
           echo "llama.h API probe:"
           for sym in llama_backend_init llama_model_default_params llama_model_load_from_file \
@@ -110,7 +116,8 @@ jobs:
                      llama_new_context_with_model llama_model_get_vocab llama_tokenize \
                      llama_batch_get_one llama_decode llama_sampler_chain_init \
                      llama_sampler_init_greedy llama_sampler_sample llama_vocab_is_eog \
-                     llama_token_to_piece llama_model_free llama_free_model; do
+                     llama_token_to_piece llama_model_free llama_free_model \
+                     llama_memory_clear llama_get_memory llama_kv_self_clear llama_kv_cache_clear; do
             if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
           done
 

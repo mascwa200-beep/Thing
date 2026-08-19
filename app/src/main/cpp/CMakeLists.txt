@@ -65,6 +65,46 @@ if(EXISTS ${LLAMA_DIR}/CMakeLists.txt)
     add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama EXCLUDE_FROM_ALL)
     target_link_libraries(lcarsnative llama)
     target_compile_definitions(lcarsnative PRIVATE HAVE_LLAMA=1)
+
+    # ⚠️ THE KV-CACHE RESET IS A MOVING NAME, SO IT IS READ OUT OF THE HEADER RATHER THAN RECALLED.
+    # llama.cpp has spelled "forget everything from the last prompt" three ways across build
+    # generations — llama_kv_cache_clear(ctx), then llama_kv_self_clear(ctx), then
+    # llama_memory_clear(llama_get_memory(ctx), true) — and which one a pinned build number carries
+    # is a fact about that tag. Betting on it cost a 25-minute CI round once already: the pin has the
+    # NEW model/vocab accessors and the OLD cache API, a combination no amount of reasoning about
+    # "how recent is this tag" would have predicted, because the two renames landed months apart.
+    #
+    # Detecting it here rather than in the workflow means a tag bump in either direction keeps
+    # building with no edit, and the choice is printed at configure time so the log always says which
+    # generation was linked.
+    set(LCARS_LLAMA_KV_API "")
+    if(EXISTS ${LLAMA_DIR}/include/llama.h)
+        file(READ ${LLAMA_DIR}/include/llama.h LCARS_LLAMA_HEADER)
+        # Both names are required for the newest form: the clear takes a memory handle that only
+        # exists once the accessor does, and matching on the clear alone would pick a generation
+        # whose other half is missing.
+        if(LCARS_LLAMA_HEADER MATCHES "llama_memory_clear" AND LCARS_LLAMA_HEADER MATCHES "llama_get_memory")
+            set(LCARS_LLAMA_KV_API LCARS_LLAMA_KV_MEMORY)
+        elseif(LCARS_LLAMA_HEADER MATCHES "llama_kv_self_clear")
+            set(LCARS_LLAMA_KV_API LCARS_LLAMA_KV_SELF)
+        elseif(LCARS_LLAMA_HEADER MATCHES "llama_kv_cache_clear")
+            set(LCARS_LLAMA_KV_API LCARS_LLAMA_KV_CACHE)
+        endif()
+    endif()
+
+    # ⚠️ FATAL, NOT A WARNING WITH THE RESET SKIPPED. Every judgement is single-turn and supplies its
+    # whole prompt, so without a reset the second one decodes on top of the first one's context: a
+    # fluent answer about an argument nobody made. That is precisely the failure the adjudicator
+    # exists to prevent, and it would ship green. Failing here turns an unknown fourth spelling into
+    # a configure error that names all three known ones instead of a mystery on the device.
+    if(LCARS_LLAMA_KV_API STREQUAL "")
+        message(FATAL_ERROR
+                "lcarsnative: this llama.cpp carries none of llama_memory_clear, llama_kv_self_clear "
+                "or llama_kv_cache_clear. The KV reset has been renamed again - read include/llama.h, "
+                "add the spelling here and to reset_context() in llama_jni.cpp.")
+    endif()
+    target_compile_definitions(lcarsnative PRIVATE ${LCARS_LLAMA_KV_API}=1)
+    message(STATUS "lcarsnative: llama.cpp KV reset API is ${LCARS_LLAMA_KV_API}")
     if(TARGET ggml)
         set(LCARS_GGML_PROVIDED ON)
         message(STATUS "lcarsnative: llama.cpp found and defines the ggml targets")

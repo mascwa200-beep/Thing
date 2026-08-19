@@ -31,6 +31,26 @@ struct Session {
 
 inline Session *session_of(jlong handle) { return reinterpret_cast<Session *>(handle); }
 
+// Forget everything decoded so far.
+//
+// ⚠️ THREE SPELLINGS, ONE MEANING, AND THE CHOICE IS NOT MADE HERE. llama.cpp renamed this twice:
+// llama_kv_cache_clear(ctx) -> llama_kv_self_clear(ctx) -> llama_memory_clear(llama_get_memory(ctx)).
+// CMake reads include/llama.h and defines exactly one of the macros below, so the bridge follows
+// whatever the pinned tag actually carries instead of whatever seemed current when this was written.
+// The #error is belt and braces — CMake already fails at configure time — and exists so that a
+// hand-run compile without the detection cannot silently produce a bridge that never resets.
+inline void reset_context(llama_context *ctx) {
+#if defined(LCARS_LLAMA_KV_MEMORY)
+    llama_memory_clear(llama_get_memory(ctx), true);
+#elif defined(LCARS_LLAMA_KV_SELF)
+    llama_kv_self_clear(ctx);
+#elif defined(LCARS_LLAMA_KV_CACHE)
+    llama_kv_cache_clear(ctx);
+#else
+#error "No llama.cpp KV reset was detected - see the KV API block in CMakeLists.txt"
+#endif
+}
+
 std::string piece_of(const llama_vocab *vocab, llama_token token) {
     char buf[256];
     const int n = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, /*special=*/false);
@@ -123,7 +143,7 @@ Java_dev_mascwa_pulse_data_interrogator_LlamaNative_nativeComplete(
         return nullptr;
     }
 
-    llama_memory_clear(llama_get_memory(s->ctx), true);
+    reset_context(s->ctx);
 
     llama_batch batch = llama_batch_get_one(tokens.data(), static_cast<int32_t>(tokens.size()));
     if (llama_decode(s->ctx, batch) != 0) return nullptr;
