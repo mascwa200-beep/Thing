@@ -557,6 +557,14 @@ class AppContainer(private val appContext: Context) {
     val webSearchRepository: dev.mascwa.pulse.data.search.WebSearchRepository by lazy {
         dev.mascwa.pulse.data.search.WebSearchRepository(http, settingsRepository, libraryLookup)
     }
+    /** Page address → playable item, via the bundled yt-dlp. Lazy so Python never starts unasked. */
+    val mediaExtractor: dev.mascwa.pulse.data.media.MediaExtractor by lazy {
+        dev.mascwa.pulse.data.media.MediaExtractor(pythonRuntime)
+    }
+    /** The community skip database, behind the hash-prefix privacy endpoint. */
+    val sponsorBlockRepository: dev.mascwa.pulse.data.media.SponsorBlockRepository by lazy {
+        dev.mascwa.pulse.data.media.SponsorBlockRepository(http)
+    }
 
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
