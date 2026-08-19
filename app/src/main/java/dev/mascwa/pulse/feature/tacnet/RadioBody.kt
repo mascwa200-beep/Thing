@@ -57,6 +57,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.data.radio.RadioStation
 import dev.mascwa.pulse.feature.common.LcarsCorner
+import dev.mascwa.pulse.feature.common.LcarsField
+import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
@@ -168,33 +170,16 @@ fun RadioBody(vm: RadioViewModel, modifier: Modifier = Modifier) {
 
         // ---- SEARCH any station ----
         LcarsHeaderBar("Search")
-        LcarsFrame(Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("⌕", fontFamily = JetBrainsMono, fontSize = 16.sp, color = c.accent)
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    singleLine = true,
-                    textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 14.sp),
-                    cursorBrush = SolidColor(c.accent),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),
-                    modifier = Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 10.dp),
-                    decorationBox = { inner ->
-                        if (query.isEmpty()) {
-                            Text("Station name…", fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.muted)
-                        }
-                        inner()
-                    },
-                )
-                if (query.isNotEmpty() || searchStatus != RadioViewModel.SearchStatus.IDLE) {
-                    Text(
-                        "✕", fontFamily = JetBrainsMono, fontSize = 15.sp, color = c.muted,
-                        modifier = Modifier.clickable { query = ""; vm.clearSearch() }.padding(6.dp),
-                    )
-                }
-            }
-        }
+        LcarsField(
+            value = query,
+            // Emptying the box clears the results too — the old separate ✕ did both at once, and a
+            // field the user blanked by hand should not keep stale results standing under it.
+            onValueChange = { query = it; if (it.isEmpty()) vm.clearSearch() },
+            placeholder = "Station name…",
+            leadingIcon = LcarsIcons.Search,
+            imeAction = ImeAction.Search,
+            onImeAction = { vm.search(query) },
+        )
         when (searchStatus) {
             RadioViewModel.SearchStatus.SEARCHING ->
                 Text("··· SEARCHING", fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted, modifier = Modifier.padding(top = 4.dp))

@@ -45,6 +45,7 @@ import dev.mascwa.pulse.core.telemetry.MediaResolution
 import dev.mascwa.pulse.core.telemetry.SponsorSegments
 import dev.mascwa.pulse.core.telemetry.TheaterModel
 import dev.mascwa.pulse.feature.common.LcarsButton
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFillRow
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
@@ -249,29 +250,20 @@ fun ViewscreenScreen(
                         modifier = Modifier.clickable { addressOpen = !addressOpen }.padding(vertical = 4.dp),
                     )
                     if (addressOpen) {
-                        LcarsFrame(Modifier.fillMaxWidth()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                BasicTextField(
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                LcarsField(
                                     value = input,
                                     onValueChange = vm::setInput,
-                                    singleLine = true,
-                                    textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-                                    cursorBrush = SolidColor(c.accent),
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                                    keyboardActions = KeyboardActions(onGo = { vm.playFromInput(context) }),
-                                    modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-                                    decorationBox = { inner ->
-                                        if (input.isEmpty()) {
-                                            Text(
-                                                "Paste a video or track address…",
-                                                fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted,
-                                            )
-                                        }
-                                        inner()
-                                    },
+                                    placeholder = "Paste a video or track address…",
+                                    imeAction = ImeAction.Go,
+                                    onImeAction = { vm.playFromInput(context) },
                                 )
-                                LcarsButton("PLAY", onClick = { vm.playFromInput(context) })
                             }
+                            LcarsButton("PLAY", onClick = { vm.playFromInput(context) })
                         }
                         Spacer(Modifier.height(6.dp))
                         // The literal "audio only background playback" mode: keeps playing when you
@@ -299,36 +291,14 @@ private fun TheaterModel.Viewing.toMediaItem() = MediaItem(
 
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val c = Pulse.colors
-    LcarsFrame(modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(LcarsIcons.Search, contentDescription = null, tint = c.muted, modifier = Modifier.padding(end = 8.dp))
-            BasicTextField(
-                value = query,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-                cursorBrush = SolidColor(c.accent),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-                decorationBox = { inner ->
-                    if (query.isEmpty()) {
-                        Text(
-                            "Search for anything to watch…",
-                            fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted,
-                        )
-                    }
-                    inner()
-                },
-            )
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onChange("") }) {
-                    Icon(LcarsIcons.Close, contentDescription = "Clear", tint = c.muted)
-                }
-            }
-        }
-    }
+    LcarsField(
+        value = query,
+        onValueChange = onChange,
+        modifier = modifier,
+        placeholder = "Search for anything to watch…",
+        leadingIcon = LcarsIcons.Search,
+        imeAction = ImeAction.Search,
+    )
 }
 
 /** One saved file: play it (works with no network at all) or delete it. */

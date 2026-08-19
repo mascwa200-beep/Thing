@@ -61,6 +61,7 @@ import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHistogram
 import dev.mascwa.pulse.feature.common.LcarsIcons
@@ -212,25 +213,12 @@ private fun LazyListScope.weatherHeader(c: WeatherChrome) {
 @Composable
 private fun CitySearchField(query: String, onQuery: (String) -> Unit) {
     val p = Pulse.colors
-    LcarsFrame(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        BasicTextField(
-            value = query,
-            onValueChange = onQuery,
-            singleLine = true,
-            textStyle = TextStyle(color = p.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-            cursorBrush = SolidColor(p.accent),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text(
-                        "▸ SEARCH FOR A CITY", fontFamily = JetBrainsMono,
-                        fontSize = 12.sp, color = p.muted,
-                    )
-                }
-                inner()
-            },
-        )
-    }
+    LcarsField(
+        value = query,
+        onValueChange = onQuery,
+        modifier = Modifier.padding(vertical = 4.dp),
+        placeholder = "▸ SEARCH FOR A CITY",
+    )
 }
 
 /** One search hit. The whole row adds the city, so there is no separate button to aim at. */

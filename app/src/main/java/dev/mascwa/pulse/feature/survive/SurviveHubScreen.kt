@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.data.survival.GuideIndexEntry
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -117,23 +118,12 @@ fun SurviveBody(onOpenRoute: (String) -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun SurviveSearchField(query: String, onQuery: (String) -> Unit) {
     val c = Pulse.colors
-    LcarsFrame(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
-        BasicTextField(
-            value = query,
-            onValueChange = onQuery,
-            singleLine = true,
-            textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-            cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text("▸ SEARCH SURVIVAL — guides, tools, help…", fontFamily = JetBrainsMono,
-                        fontSize = 12.sp, color = c.muted)
-                }
-                inner()
-            },
-        )
-    }
+    LcarsField(
+        value = query,
+        onValueChange = onQuery,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        placeholder = "▸ SEARCH SURVIVAL — guides, tools, help…",
+    )
 }
 
 /** A search result row: an LCARS framed entry that deep-links to its exact page on tap. */

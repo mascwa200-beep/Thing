@@ -58,6 +58,7 @@ import dev.mascwa.pulse.core.connectivity.LocalIsMetered
 import dev.mascwa.pulse.core.telemetry.ChannelLineup
 import dev.mascwa.pulse.core.telemetry.LiveChannels
 import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.lcarsBlockShape
@@ -606,29 +607,10 @@ private fun Guide(
 
             val community = bands.firstOrNull { it.first == ChannelLineup.Band.COMMUNITY }?.second.orEmpty()
             if (community.isNotEmpty()) {
-                BasicTextField(
+                LcarsField(
                     value = filter,
                     onValueChange = { filter = it },
-                    singleLine = true,
-                    textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink),
-                    cursorBrush = SolidColor(c.accent),
-                    decorationBox = { inner ->
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(c.raise)
-                                .border(1.dp, c.lineSoft)
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                        ) {
-                            if (filter.isEmpty()) {
-                                Text(
-                                    "Filter the ${community.size} community channels",
-                                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted,
-                                )
-                            }
-                            inner()
-                        }
-                    },
+                    placeholder = "Filter the ${community.size} community channels",
                 )
             }
 

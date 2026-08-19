@@ -52,6 +52,7 @@ import dev.mascwa.pulse.data.survival.supergroupOf
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFillRow
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -131,20 +132,12 @@ fun GuidesScreen(
         if (sel == null) {
             Column(Modifier.padding(innerPadding).fillMaxWidth()) {
                 // Search — instant over the index fields; section bodies stream in per shard behind it.
-                LcarsFrame(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)) {
-                    BasicTextField(
-                        value = query, onValueChange = { query = it; vm.search(it) }, singleLine = true,
-                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-                        cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth(),
-                        decorationBox = { inner ->
-                            if (query.isEmpty()) {
-                                Text("▸ SEARCH EVERYTHING — chemistry, first aid, math, wiring…",
-                                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
-                            }
-                            inner()
-                        },
-                    )
-                }
+                LcarsField(
+                    value = query,
+                    onValueChange = { query = it; vm.search(it) },
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
+                    placeholder = "▸ SEARCH EVERYTHING — chemistry, first aid, math, wiring…",
+                )
                 // Supergroup rail — the top level of the taxonomy.
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())

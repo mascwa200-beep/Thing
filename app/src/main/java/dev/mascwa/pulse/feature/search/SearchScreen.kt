@@ -38,6 +38,7 @@ import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -94,28 +95,14 @@ fun SearchBody(
         modifier.padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
     ) {
             LcarsHeaderBar("Query")
-            LcarsFrame(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⌕", fontFamily = JetBrainsMono, fontSize = 18.sp, color = c.accent)
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it; vm.onQueryChanged(it) },
-                        singleLine = true,
-                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 15.sp),
-                        cursorBrush = SolidColor(c.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { go() }),
-                        modifier = Modifier.weight(1f).padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
-                        decorationBox = { inner ->
-                            if (query.isEmpty()) {
-                                Text("Search this device, or the web…", fontFamily = JetBrainsMono,
-                                    fontSize = 15.sp, color = c.muted)
-                            }
-                            inner()
-                        },
-                    )
-                }
-            }
+            LcarsField(
+                value = query,
+                onValueChange = { query = it; vm.onQueryChanged(it) },
+                placeholder = "Search this device, or the web…",
+                leadingIcon = LcarsIcons.Search,
+                imeAction = ImeAction.Search,
+                onImeAction = { go() },
+            )
 
             // --- an emergency outranks everything, including the ranker ------------------------
             emergency?.let { e -> EmergencyCard(e, onOpenGuide) }
