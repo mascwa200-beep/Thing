@@ -289,13 +289,16 @@ fun PulseApp(
                     // one screen that owns it, which is what RecordKind.route names.
                     onOpenGuide = { id -> navController.navigate("${Routes.SURVIVAL}?guide=$id") },
                     onOpen = { r ->
-                        navController.navigate(
-                            if (r.kind == dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE) {
-                                "${Routes.SURVIVAL}?guide=${r.id}"
-                            } else {
-                                r.kind.route
-                            },
-                        )
+                        when (r.kind) {
+                            // A guide opens at the guide, via the argumented deep-link.
+                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE ->
+                                navController.navigate("${Routes.SURVIVAL}?guide=${r.id}")
+                            // A feature's id IS its route (the FEATURE convention) — typing "radar"
+                            // and tapping the hit opens the radar, through the one navigate idiom.
+                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.FEATURE ->
+                                openApp(r.id)
+                            else -> navController.navigate(r.kind.route)
+                        }
                     },
                 )
             }

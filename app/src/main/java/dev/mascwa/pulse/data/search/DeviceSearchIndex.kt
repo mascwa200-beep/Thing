@@ -35,6 +35,13 @@ object DeviceSearchIndex {
     suspend fun records(c: AppContainer): List<DeviceSearch.Record> {
         val out = ArrayList<DeviceSearch.Record>(700)
 
+        // The app's own features, so typing "radar" OPENS the radar instead of only finding prose
+        // about radar. Ids are the nav routes (the FEATURE convention); the body carries the menu
+        // pitch plus each entry's declared synonyms, so "planes" matches the radar here exactly as
+        // it does in the MENU's own search. The search screen itself is excluded — being offered
+        // the screen you are standing on is noise.
+        out += featureRecords()
+
         // Guides: the resident index only. Title, category, summary and headings are exactly the
         // fields GuideSearch was tuned against, so these are passed through rather than flattened.
         runCatching { c.survivalContentRepository.index() }.getOrNull()?.forEach { g ->
@@ -69,5 +76,21 @@ object DeviceSearchIndex {
         }
 
         return out
+    }
+
+    private fun featureRecords(): List<DeviceSearch.Record> {
+        val terms = dev.mascwa.pulse.navigation.GROUPS
+            .flatMap { it.entries }
+            .associateBy({ it.route }, { it.searchTerms })
+        return dev.mascwa.pulse.data.usage.FeatureCatalog.entries
+            .filter { it.key != dev.mascwa.pulse.navigation.Routes.SEARCH }
+            .map { f ->
+                DeviceSearch.of(
+                    id = f.key,
+                    kind = RecordKind.FEATURE,
+                    title = f.label,
+                    body = (listOf(f.pitch) + terms[f.key].orEmpty()).joinToString(" "),
+                )
+            }
     }
 }

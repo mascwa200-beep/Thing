@@ -32,6 +32,13 @@ object DeviceSearch {
         PROFILE("Profile", "jarvis_memory"),
         FINDING("Finding", "jarvis_memory"),
         KNOWLEDGE("Document", "jarvis_memory"),
+
+        /**
+         * An app feature itself, so typing "radar" here opens the radar instead of only finding
+         * prose about radar. ⚠️ Convention: a FEATURE record's entry **id IS the route to open** —
+         * the `route` below is only the fallback for a tap handler that predates the convention.
+         */
+        FEATURE("Feature", "menu"),
     }
 
     /**
