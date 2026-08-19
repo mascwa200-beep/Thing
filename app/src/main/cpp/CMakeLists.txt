@@ -30,6 +30,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fvisibility=hidden")
 add_library(lcarsnative SHARED
         lcars_native.cpp
         whisper_jni.cpp
+        llama_jni.cpp
 )
 
 # ---- whisper.cpp -----------------------------------------------------------------------------
@@ -43,6 +44,37 @@ add_library(lcarsnative SHARED
 # the workflow asserts the tree is present after cloning, and asserts the whisper JNI symbols are in
 # the shipped .so afterwards. A build that quietly lost speech recognition and still went green would
 # be far worse than one that failed.
+# ---- llama.cpp -------------------------------------------------------------------------------
+#
+# ⚠️ ADDED BEFORE whisper.cpp, DELIBERATELY. Both projects bundle ggml, and two add_subdirectory
+# calls that each define targets named `ggml`, `ggml-base` and `ggml-cpu` collide outright. llama.cpp
+# is the upstream home of ggml and carries the fuller build, so it defines the targets and whisper is
+# told to reuse them. If that reuse does not take, the failure is a CMake duplicate-target error
+# naming the exact target, which is unambiguous - and the workflow prints how each tree guards its
+# own ggml before the build even starts, so one round explains it.
+set(LLAMA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp)
+set(LCARS_GGML_PROVIDED OFF)
+if(EXISTS ${LLAMA_DIR}/CMakeLists.txt)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+    set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(LLAMA_CURL OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama EXCLUDE_FROM_ALL)
+    target_link_libraries(lcarsnative llama)
+    target_compile_definitions(lcarsnative PRIVATE HAVE_LLAMA=1)
+    if(TARGET ggml)
+        set(LCARS_GGML_PROVIDED ON)
+        message(STATUS "lcarsnative: llama.cpp found and defines the ggml targets")
+    else()
+        message(STATUS "lcarsnative: llama.cpp found but no ggml target - whisper will build its own")
+    endif()
+else()
+    message(STATUS "lcarsnative: no llama.cpp tree - the adjudicator will be absent")
+endif()
+
 set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp)
 if(EXISTS ${WHISPER_DIR}/CMakeLists.txt)
     # Static, so everything lands in liblcarsnative.so and there are no extra .so files to package
@@ -50,6 +82,12 @@ if(EXISTS ${WHISPER_DIR}/CMakeLists.txt)
     # runs. OpenMP off because the NDK does not ship libomp on the default sysroot path and ggml
     # falls back to its own threading, which is what the phone wants anyway.
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    # Reuse llama's ggml rather than building a second copy under a colliding name. Belt and braces:
+    # the option is only meaningful if this whisper tag has it, and the `if(NOT TARGET ggml)` guard
+    # that recent whisper releases carry covers the case where it does not.
+    if(LCARS_GGML_PROVIDED)
+        set(WHISPER_USE_SYSTEM_GGML ON CACHE BOOL "" FORCE)
+    endif()
     set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)

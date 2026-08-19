@@ -74,6 +74,45 @@ jobs:
           # quietly lost speech recognition would still go green.
           test -f "$dir/CMakeLists.txt" || { echo "FAIL: whisper.cpp tree is not present after cloning"; exit 1; }
           echo "whisper.cpp tree: $(du -sh "$dir" | cut -f1)"
+          # Diagnostic, not a gate: whisper and llama each bundle ggml, so the two add_subdirectory
+          # calls can collide on target names. Report how this tag guards it, so a collision is
+          # explained in the same round it happens rather than the round after.
+          echo "whisper ggml guard:"; grep -nE "NOT TARGET ggml|USE_SYSTEM_GGML" "$dir/CMakeLists.txt" || echo "  (none found)"
+
+      - name: Fetch llama.cpp at a pinned build
+        run: |
+          set -e
+          dir=app/src/main/cpp/llama.cpp
+          repo=https://github.com/ggml-org/llama.cpp
+          # ⚠️ llama.cpp tags are build numbers (b4600), NOT semver, so the pattern differs from
+          # whisper's. Same fallback-and-warn shape and the same reason: this pin could not be
+          # verified from a machine that cannot reach GitHub.
+          TAG="b4600"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "llama.cpp @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'b*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned llama.cpp tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: llama.cpp tree is not present after cloning"; exit 1; }
+          echo "llama.cpp tree: $(du -sh "$dir" | cut -f1)"
+          # ⚠️ THE API PROBE, and it is the point of this step beyond the clone. llama.cpp renamed a
+          # good deal of its C API during 2024-25 (llama_load_model_from_file became
+          # llama_model_load_from_file, vocab accessors moved off the model), so which names a given
+          # build number carries is a fact about that tag rather than something to recall. Printing
+          # it means one round answers both "does this tag exist" and "does the bridge use the right
+          # names", instead of two.
+          hdr="$dir/include/llama.h"
+          echo "llama.h API probe:"
+          for sym in llama_backend_init llama_model_default_params llama_model_load_from_file \
+                     llama_load_model_from_file llama_context_default_params llama_init_from_model \
+                     llama_new_context_with_model llama_model_get_vocab llama_tokenize \
+                     llama_batch_get_one llama_decode llama_sampler_chain_init \
+                     llama_sampler_init_greedy llama_sampler_sample llama_vocab_is_eog \
+                     llama_token_to_piece llama_model_free llama_free_model; do
+            if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
+          done
 
       - name: Run unit tests
         run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
@@ -103,6 +142,13 @@ jobs:
             if nm -D --defined-only /tmp/lcarsnative.so | grep -q "WhisperNative_nativeInit"; then
               echo "whisper.cpp linked:"
               nm -D --defined-only /tmp/lcarsnative.so | grep WhisperNative || true
+              if nm -D --defined-only /tmp/lcarsnative.so | grep -q "LlamaNative_nativeInit"; then
+                echo "llama.cpp linked:"
+                nm -D --defined-only /tmp/lcarsnative.so | grep LlamaNative || true
+              else
+                echo "FAIL: liblcarsnative.so shipped WITHOUT llama.cpp - the adjudicator would be absent."
+                exit 1
+              fi
             else
               echo "FAIL: liblcarsnative.so shipped WITHOUT whisper.cpp - the if(EXISTS) guard took the"
               echo "      host-only branch, so speech recognition would be silently absent."
