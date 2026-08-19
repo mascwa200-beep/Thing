@@ -2293,3 +2293,19 @@ kb/the-endoplasmic-reticulum.svg
     File:Nucleus ER golgi.svg
     CC BY 3.0 — Nucleus ER golgi.jpg: Magnus Manske / derivative work: Pbroks13
     https://commons.wikimedia.org/wiki/File%3ANucleus_ER_golgi.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-golgi-apparatus-and-protein-trafficking.svg
+    File:Golgi apparatus (borderless version)-en.svg
+    CC BY 3.0 — Kelvinsong
+    https://commons.wikimedia.org/wiki/File%3AGolgi_apparatus_%28borderless_version%29-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-nucleolus-and-ribosome-assembly.svg
+    File:Diagram human cell nucleus multilang.svg
+    Public domain — Mariana Ruiz LadyofHats
+    https://commons.wikimedia.org/wiki/File%3ADiagram_human_cell_nucleus_multilang.svg
