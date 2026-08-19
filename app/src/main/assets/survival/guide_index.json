@@ -6462,6 +6462,121 @@
    "file": "guides_federation_timeline.json"
   },
   {
+   "id": "first-contact-day",
+   "title": "First Contact Day",
+   "category": "Federation Timeline",
+   "summary": "First Contact Day is the Federation holiday observed each April 5, commemorating humanity's first warp flight and the Vulcan landing at Bozeman, Montana in 2063 — the first contact between Earth and another world, marked by ceremonies, school observances, and celebrations across the member worlds.",
+   "headings": [
+    "What the Day Marks",
+    "The Flight and the Landing",
+    "How the Federation Observes It",
+    "Traditions Aboard Starships and Far From Home",
+    "What the Day Means"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-babel-conference",
+   "title": "The Babel Conference",
+   "category": "Federation Timeline",
+   "summary": "The Babel Conference of 2268 was the Federation summit convened to vote on the admission of Coridan; the murder of a Tellarite ambassador, an Orion sabotage plot, and the voyage of the delegates aboard the USS Enterprise made it a landmark of Federation diplomacy.",
+   "headings": [
+    "Purpose of the Conference",
+    "The Voyage of the Enterprise",
+    "The Murder of Ambassador Gav",
+    "The Orion Plot",
+    "Outcome and Significance"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-battle-of-wolf-359",
+   "title": "The Battle of Wolf 359",
+   "category": "Federation Timeline",
+   "summary": "The Battle of Wolf 359, fought at the start of 2367, was Starfleet's catastrophic stand against a single Borg cube: thirty-nine of forty starships destroyed and some eleven thousand people killed, a defeat that reshaped Federation defence and memory.",
+   "headings": [
+    "Prelude: The Borg Come",
+    "The Battle",
+    "The Cube Reaches Earth",
+    "Aftermath and Reform",
+    "Remembrance"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-eugenics-wars-and-the-augments",
+   "title": "The Eugenics Wars and the Augments",
+   "category": "Federation Timeline",
+   "summary": "The Eugenics Wars were the conflicts of Earth's late twentieth century in which genetically engineered Augments seized power in dozens of nations; the war, the Augment tyrants such as Khan Noonien Singh, and the genetic engineering bans that followed shaped Earth and later Federation law for centuries.",
+   "headings": [
+    "Origins of Human Genetic Augmentation",
+    "The Wars of the 1990s",
+    "Khan Noonien Singh",
+    "The Botany Bay and the Return of Khan",
+    "The Klingon Augment Crisis and Soong's Augments",
+    "The Ban and Its Long Shadow"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-organian-peace-treaty",
+   "title": "The Organian Peace Treaty",
+   "category": "Federation Timeline",
+   "summary": "The Organian Peace Treaty of 2267 was the peace imposed on the Federation and the Klingon Empire by the incorporeal Organians, halting a declared war within a day and redirecting the rivalry of the two powers into competition over the development of disputed worlds.",
+   "headings": [
+    "The Road to War",
+    "The Organians",
+    "The Imposed Peace",
+    "Terms and the Development Competition",
+    "Aftermath and the Long Cold Peace"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-treaty-of-algeron",
+   "title": "The Treaty of Algeron",
+   "category": "Federation Timeline",
+   "summary": "The treaty that ended open hostility between the United Federation of Planets and the Romulan Star Empire after the Tomed Incident of 2311, reaffirming the Romulan Neutral Zone and barring the Federation from developing cloaking technology or fielding cloaking devices.",
+   "headings": [
+    "Origins: The Tomed Incident",
+    "The Neutral Zone Reaffirmed",
+    "The Cloaking Prohibition",
+    "The Pegasus Affair",
+    "The Dominion War Exception",
+    "Assessment"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "world-war-iii-and-the-post-atomic-horror",
+   "title": "World War III and the Post-Atomic Horror",
+   "category": "Federation Timeline",
+   "summary": "World War III was Earth's last global war, a mid-twenty-first-century nuclear conflict that killed some six hundred million people; the lawless decades that followed are known as the post-atomic horror, and both shaped the world that made first contact.",
+   "headings": [
+    "The Shape of the War",
+    "Colonel Green and the Purges",
+    "The Post-Atomic Horror",
+    "Survival and Recovery",
+    "Memory and Meaning"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "zefram-cochrane-and-the-first-warp-flight",
+   "title": "Zefram Cochrane and the First Warp Flight",
+   "category": "Federation Timeline",
+   "summary": "Zefram Cochrane was the human inventor of warp drive; his ship the Phoenix made humanity's first faster-than-light flight from Bozeman, Montana on April 5, 2063, drawing the Vulcan first contact that ended Earth's isolation.",
+   "headings": [
+    "The Man Who Broke the Light Barrier",
+    "The Phoenix",
+    "The Flight of April 5, 2063",
+    "First Contact with the Vulcans",
+    "Later Life and Disappearance",
+    "Legacy"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -11337,6 +11452,118 @@
    "file": "guides_navigation.json"
   },
   {
+   "id": "the-communications-officer",
+   "title": "The Communications Officer",
+   "category": "Notable Figures",
+   "summary": "The communications officer — the bridge specialist (communications officers) in subspace signals, languages and cryptography who serves as the voice and ears of a Federation starship.",
+   "headings": [
+    "The Voice of the Ship",
+    "Subspace and the Reach of a Signal",
+    "Language and the Universal Translator",
+    "The Station's Later History",
+    "Officers of Note"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-federation-ambassador",
+   "title": "The Federation Ambassador",
+   "category": "Notable Figures",
+   "summary": "The Federation ambassador — the diplomats (ambassadors, envoys) who carry the United Federation of Planets' word beyond its borders, from Sarek of Vulcan to the special emissaries of the great treaties.",
+   "headings": [
+    "Diplomacy as the Federation's First Instrument",
+    "Powers, Immunities and Limits",
+    "The Great Negotiations",
+    "Sarek of Vulcan",
+    "Envoys of Note"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-helmsman-and-the-navigator",
+   "title": "The Helmsman and the Navigator",
+   "category": "Notable Figures",
+   "summary": "The paired helm and navigation stations of a Federation starship: the helmsman and helm officers who fly the ship, the navigator and navigators who plot her course, and the later merger of both posts into the flight controller, or conn.",
+   "headings": [
+    "Two Stations at the Heart of the Bridge",
+    "What the Helmsman Does",
+    "What the Navigator Does",
+    "The Merger into Flight Control",
+    "Officers of Note"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-klingon-warrior-ethos",
+   "title": "The Klingon Warrior Ethos",
+   "category": "Notable Figures",
+   "summary": "The Klingon warrior ethos — honor, Kahless, the Great Houses and the rituals (warriors, honor codes) that order the Klingon Empire's understanding of a life well spent.",
+   "headings": [
+    "Honor Above Life",
+    "Kahless the Unforgettable",
+    "The Great Houses and the High Council",
+    "Blade, Ritual and Song",
+    "Sto-vo-kor and the Honored Dead"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-operations-officer",
+   "title": "The Operations Officer",
+   "category": "Notable Figures",
+   "summary": "The operations officer — ops — is the Starfleet post responsible for a starship's resources as a whole system; this entry covers the duties and the bridge station, operations aboard stations, and notable officers such as Data and Harry Kim.",
+   "headings": [
+    "What the Operations Officer Does",
+    "A Day at the Console",
+    "Operations Aboard Stations",
+    "Notable Holders of the Post",
+    "Path and Temperament"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-ships-counselor",
+   "title": "The Ship's Counselor",
+   "category": "Notable Figures",
+   "summary": "The ship's counselor — the Starfleet officer (counselors) responsible for the mental health of a starship's crew and for advising the captain, a senior bridge post through the twenty-fourth century.",
+   "headings": [
+    "A Chair Beside the Captain",
+    "Clinical Duties",
+    "Empathy and Telepathy in Service",
+    "Advising Command",
+    "Counselors of Note"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-starfleet-admiralty",
+   "title": "The Starfleet Admiralty",
+   "category": "Notable Figures",
+   "summary": "The Starfleet admiralty — the flag officers (admirals, the admiralty) who command Starfleet's fleets, starbases and departments, and the uneasy weight the Federation places on them.",
+   "headings": [
+    "Flag Rank in Starfleet",
+    "What the Admiralty Commands",
+    "Between the Fleet and Civilian Rule",
+    "Admirals Who Crossed the Line",
+    "Admirals of Note"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-transporter-chief",
+   "title": "The Transporter Chief",
+   "category": "Notable Figures",
+   "summary": "The transporter chief — the specialist (transporter chiefs, transporter operators) who runs a starship's transporter room, keeps its pattern buffers true, and stands watch over the most routine miracle in Starfleet.",
+   "headings": [
+    "Custodian of a Routine Miracle",
+    "The Work of the Console",
+    "When Transport Goes Wrong",
+    "Chiefs of Note",
+    "Doctrine, Limits and Trust"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "fed-the-starship-captain",
    "title": "The Starship Captain",
    "category": "Notable Figures",
@@ -13395,6 +13622,118 @@
    "file": "guides_society_and_culture.json"
   },
   {
+   "id": "species-8472",
+   "title": "Species 8472",
+   "category": "Species & Civilisations",
+   "summary": "Species 8472 is a tripedal species from fluidic space, known for its organic bioships, its total immunity to Borg assimilation, and the devastating war it fought against the Borg Collective in the Delta Quadrant.",
+   "headings": [
+    "Fluidic Space: The Realm Beyond the Galaxy",
+    "Physiology of a Formidable Species",
+    "Bioships and Organic Technology",
+    "The War Against the Borg",
+    "Voyager, the Nanoprobe Weapon, and an Uneasy Truce"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-breen",
+   "title": "The Breen",
+   "category": "Species & Civilisations",
+   "summary": "The Breen are a secretive civilisation of the Breen Confederacy, known only through their refrigeration suits, snouted helmets and unintelligible vocoder speech; long a race of raiders and slavers, the Breen joined the Dominion in 2375 and struck Earth itself.",
+   "headings": [
+    "The Hidden People",
+    "The Homeworld Question",
+    "Raiders and Slavers",
+    "The Dominion Alliance and the Raid on Earth",
+    "The Energy-Dampening Weapon and the War's End"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-el-aurians",
+   "title": "The El-Aurians",
+   "category": "Species & Civilisations",
+   "summary": "The El-Aurians are a long-lived species of listeners scattered across the galaxy after the Borg destroyed their homeworld; notable El-Aurians include Guinan of the Enterprise-D and the scientist Tolian Soran.",
+   "headings": [
+    "A Species of Listeners",
+    "The Destruction of the Homeworld",
+    "The Lakul Disaster and the Nexus",
+    "Guinan, Soran, and Other Notable El-Aurians",
+    "Perception Beyond the Ordinary"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-gorn",
+   "title": "The Gorn",
+   "category": "Species & Civilisations",
+   "summary": "The Gorn are a powerful reptilian species governed by the Gorn Hegemony, fiercely territorial and long hostile to outsiders; early Gorn encounters were violent, and formal contact began with the Cestus III incident of 2267.",
+   "headings": [
+    "Physiology",
+    "Early Encounters and Restricted Records",
+    "Breeding and the Hatchling Threat",
+    "The Cestus III Incident",
+    "The Hegemony and Later Relations"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-jem-hadar",
+   "title": "The Jem'Hadar",
+   "category": "Species & Civilisations",
+   "summary": "The Jem'Hadar are the genetically engineered shock troops of the Dominion: soldiers grown rather than born, mature within days, bound to their Vorta overseers by the drug ketracel-white, and raised on a single creed — victory is life.",
+   "headings": [
+    "Engineered for War",
+    "Ketracel-White",
+    "Doctrine and Belief",
+    "Capabilities and Command",
+    "Service History"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-orion-syndicate-and-the-orions",
+   "title": "The Orion Syndicate and the Orions",
+   "category": "Species & Civilisations",
+   "summary": "The Orions are a green-skinned humanoid civilisation professing neutrality, while the Orion Syndicate — a criminal network of smugglers, pirates, slavers and extortionists — operates across the quadrant; Orion women and Orion men both figure in its trade, not always in the roles outsiders assume.",
+   "headings": [
+    "The Orions",
+    "The Slave Markets and the Pheromone Deception",
+    "The Syndicate",
+    "Reach and Method",
+    "The Long Arc"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-tholians",
+   "title": "The Tholians",
+   "category": "Species & Civilisations",
+   "summary": "The Tholians are a non-humanoid crystalline species of the Tholian Assembly, thriving in superheated environments lethal to humanoids and famed for punctuality, absolute territoriality, and the energy-web weapon known as the Tholian web.",
+   "headings": [
+    "Crystalline Physiology",
+    "The Assembly: Precision and Territory",
+    "The Tholian Web",
+    "Recorded Encounters",
+    "The Temporal Question"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-vorta",
+   "title": "The Vorta",
+   "category": "Species & Civilisations",
+   "summary": "The Vorta are the cloned administrators, diplomats and overseers of the Dominion: they speak for the Founders, whom they worship as gods, command the Jem'Hadar through control of ketracel-white, and return from death as numbered clones of themselves.",
+   "headings": [
+    "Origins: The Founders' Reward",
+    "Physiology by Design",
+    "Cloning and Succession",
+    "Role in the Dominion",
+    "Conduct in the War"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "fed-vulcans",
    "title": "Vulcans",
    "category": "Species & Civilisations",
@@ -13649,6 +13988,118 @@
    "file": "guides_sports_and_fitness.json"
   },
   {
+   "id": "federation-membership-how-a-world-joins",
+   "title": "Federation Membership: How a World Joins",
+   "category": "Starfleet & Federation",
+   "summary": "How a world joins the United Federation of Planets: the petition, the requirements for membership, the candidacy and evaluation period, and notable admissions and deferrals such as Coridan and Bajor.",
+   "headings": [
+    "The Petition",
+    "Requirements for Admission",
+    "Candidacy and Evaluation",
+    "Admissions Debated and Deferred",
+    "What Membership Brings — and Costs"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "starfleet-intelligence",
+   "title": "Starfleet Intelligence",
+   "category": "Starfleet & Federation",
+   "summary": "Starfleet Intelligence is Starfleet's intelligence service, responsible for gathering and analysing information on foreign powers and threats to Federation security — and formally distinct from the rogue organisation known as Section 31.",
+   "headings": [
+    "Role Within Starfleet",
+    "Organisation and Methods",
+    "Notable Operations and Failures",
+    "Starfleet Intelligence and Section 31",
+    "Oversight and Limits"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "starfleet-medical",
+   "title": "Starfleet Medical",
+   "category": "Starfleet & Federation",
+   "summary": "Starfleet Medical is the medical command of Starfleet, responsible for the health of crews across the fleet, the training of doctors and medical officers, xenobiology research, and quarantine authority throughout Federation space.",
+   "headings": [
+    "Mandate and Command Structure",
+    "Headquarters and Fleet Hospitals",
+    "Training Medical Officers",
+    "Research and the Frontier of Medicine",
+    "Medical Authority Aboard Ship"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-department-of-temporal-investigations",
+   "title": "The Department of Temporal Investigations",
+   "category": "Starfleet & Federation",
+   "summary": "The Department of Temporal Investigations is the Federation agency that investigates time travel incidents and temporal violations involving Starfleet officers and Federation citizens, and enforces the rules governing conduct in the past.",
+   "headings": [
+    "Mandate and Jurisdiction",
+    "How an Investigation Proceeds",
+    "Notable Cases on Record",
+    "Doctrine, the Temporal Prime Directive, and the Accords",
+    "Working With the Department"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-federation-charter",
+   "title": "The Federation Charter",
+   "category": "Starfleet & Federation",
+   "summary": "The Federation Charter is the founding document of the United Federation of Planets, signed in 2161 by Earth, Vulcan, Andoria and Tellar, establishing the Council, the Presidency, Starfleet and the guarantees of individual rights.",
+   "headings": [
+    "Founding at the End of a War",
+    "What the Charter Establishes",
+    "Guarantees and the Rights of the Individual",
+    "Contested Readings",
+    "Legacy"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-judge-advocate-general",
+   "title": "Starfleet's Judge Advocate General",
+   "category": "Starfleet & Federation",
+   "summary": "The Judge Advocate General (JAG) is Starfleet's legal service, conducting courts-martial, boards of inquiry and legal hearings under Federation law, and the office behind landmark rulings such as the Data personhood hearing.",
+   "headings": [
+    "The Legal Arm of Starfleet",
+    "Courts-Martial and Boards of Inquiry",
+    "Landmark Hearings",
+    "Rights of the Accused",
+    "The Office in Practice"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-post-scarcity-economy-of-the-federation",
+   "title": "The Post-Scarcity Economy of the Federation",
+   "category": "Starfleet & Federation",
+   "summary": "The Federation operates a post-scarcity economy: replicators and abundant energy have ended material want on its core worlds, money in the old sense has largely disappeared, and citizens work for purpose and reputation rather than wages.",
+   "headings": [
+    "What Post-Scarcity Means",
+    "The Replicator and the End of Material Want",
+    "Work Without Wages",
+    "Money at the Edges",
+    "Allocation, Land, and the Things That Stay Scarce"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-vulcan-science-academy",
+   "title": "The Vulcan Science Academy",
+   "category": "Starfleet & Federation",
+   "summary": "The Vulcan Science Academy is Vulcan's foremost institution of research and higher learning, an academy renowned across the Federation for the rigor of its admissions, the depth of its science, and the logic that governs its scholars.",
+   "headings": [
+    "Standing on Vulcan and Beyond",
+    "Admission and the Standard of Excellence",
+    "Disciplines and Research Programs",
+    "Governance and the Discipline of Logic",
+    "The Academy and Starfleet"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
    "id": "fed-united-federation-of-planets",
    "title": "The United Federation of Planets",
    "category": "Starfleet & Federation",
@@ -13751,6 +14202,118 @@
     "The Structural Problem"
    ],
    "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-akira-class",
+   "title": "The Akira Class",
+   "category": "Starships & Classes",
+   "summary": "The Akira-class heavy cruiser, Starfleet's torpedo-heavy twin-hulled warship of the 2370s. Covers the class's catamaran design, its weapons pod, and the service of these starships against the Borg at Sector 001 and through the Dominion War.",
+   "headings": [
+    "A Twin-Hulled Heavy Cruiser",
+    "Built for a Darker Decade",
+    "Armament and Defenses",
+    "Service Record",
+    "Place in the Fleet"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-borg-cube",
+   "title": "The Borg Cube",
+   "category": "Starships & Classes",
+   "summary": "The Borg cube, the Collective's vast cubic vessel and the most feared class of starship on record. Covers the cubes' decentralized design, drone complements, adaptive defenses, the battles of Wolf 359 and Sector 001, and known variants and weaknesses.",
+   "headings": [
+    "Geometry as Doctrine",
+    "A Ship Without a Bridge",
+    "Assimilation and Adaptation",
+    "Engagements in Federation Space",
+    "Variants and Vulnerabilities"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-cardassian-galor-class",
+   "title": "The Cardassian Galor Class",
+   "category": "Starships & Classes",
+   "summary": "The Galor class, mainline warship of the Cardassian Union: the ochre-hulled cruisers that enforced the occupation of Bajor and fought the Dominion War. Covers the starships' spiral-wave disruptors, wing tactics, the Keldon-class derivative, and the fleet's fate.",
+   "headings": [
+    "Profile and Construction",
+    "Armament and Tactical Character",
+    "Doctrine and Deployments",
+    "The Dominion Years",
+    "Derivatives and Aftermath"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-excelsior-class",
+   "title": "The Excelsior Class",
+   "category": "Starships & Classes",
+   "summary": "The Excelsior class began as the failed transwarp Great Experiment of the 2280s and became the longest-serving workhorse in Starfleet history — the class of Sulu's Excelsior and the Enterprise-B, still fighting on the front lines a century after its launch.",
+   "headings": [
+    "The Great Experiment",
+    "From Failure to Workhorse",
+    "Design and Layout",
+    "Excelsior Under Sulu and the Enterprise-B",
+    "A Century of Service"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-intrepid-class",
+   "title": "The Intrepid Class",
+   "category": "Starships & Classes",
+   "summary": "The Intrepid class is Starfleet's fast light explorer of the 2370s — the starship class of USS Voyager — known for its variable-geometry warp nacelles, bio-neural gel pack circuitry, planetary landing capability, and a sustainable cruise speed unmatched by ships many times its size.",
+   "headings": [
+    "Role and Design Intent",
+    "Variable-Geometry Nacelles and Warp Performance",
+    "Bio-Neural Circuitry",
+    "Planetary Landing Capability",
+    "USS Voyager and the Class in Service"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-miranda-class",
+   "title": "The Miranda Class",
+   "category": "Starships & Classes",
+   "summary": "Starfleet's long-serving general-purpose light cruiser of the late twenty-third and twenty-fourth centuries. Covers the Miranda-class starship and its variant starships: the design, the rollbar weapons pod, notable ships such as the USS Reliant, and a service record spanning a century.",
+   "headings": [
+    "Design and Configuration",
+    "Entering Service in the Late Twenty-Third Century",
+    "Mission Profiles and Variants",
+    "Notable Ships and Engagements",
+    "Why the Class Endured"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-romulan-warbird",
+   "title": "The Romulan Warbird",
+   "category": "Starships & Classes",
+   "summary": "The Romulan warbird, chiefly the immense D'deridex class: the Star Empire's cloaked mainline warship of the twenty-fourth century. Covers these warbirds and starships from the artificial singularity core to the Dominion War and the later Valdore-pattern vessels.",
+   "headings": [
+    "The D'deridex at a Glance",
+    "Power from a Captive Singularity",
+    "The Cloak and the Doctrine Behind It",
+    "Silence, Return, and Standoff",
+    "The Dominion War and the Later Warbirds"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-sovereign-class",
+   "title": "The Sovereign Class",
+   "category": "Starships & Classes",
+   "summary": "The Sovereign class is the Federation flagship starship class of the late 24th century — the class of the USS Enterprise-E — a heavily armed deep-space explorer shaped by the Borg threat, carrying quantum torpedoes on a frame that still gives half its volume to science and diplomacy.",
+   "headings": [
+    "Origins of the Design",
+    "Layout and Major Systems",
+    "Armament and Defence",
+    "The Enterprise-E",
+    "The Class in Service"
+   ],
+   "file": "guides_starships_and_classes.json"
   },
   {
    "id": "fed-starship-design",
@@ -14091,6 +14654,118 @@
     "A Short History of Seeing, and Why Styles Change"
    ],
    "file": "guides_visual_arts_and_design.json"
+  },
+  {
+   "id": "bussard-collectors",
+   "title": "Bussard Collectors",
+   "category": "Warp & Starship Technology",
+   "summary": "The ramscoop assemblies at the forward caps of a starship's warp nacelles, Bussard collectors sweep up interstellar hydrogen to replenish fuel reserves; the collector is a standard fitting on Federation starships and a distinctive feature of their silhouettes.",
+   "headings": [
+    "What a Bussard Collector Is",
+    "How the Ramscoop Gathers Fuel",
+    "Why Starships Carry Them",
+    "Unconventional Uses",
+    "Limits and Hazards"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "dilithium",
+   "title": "Dilithium",
+   "category": "Warp & Starship Technology",
+   "summary": "Dilithium is the rare crystalline mineral at the heart of every warp drive: dilithium crystals regulate the matter-antimatter reaction in a starship's warp core, making the crystal one of the most strategically important substances in the galaxy.",
+   "headings": [
+    "What Dilithium Is",
+    "The Crystal in the Warp Core",
+    "Scarcity, Mining, and Strategy",
+    "Recrystallization and the Engineer's Art",
+    "The Burn and Dilithium's Later History"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "impulse-engines",
+   "title": "Impulse Engines",
+   "category": "Warp & Starship Technology",
+   "summary": "Impulse engines are the fusion-powered sublight drives of a starship, the engine system used for maneuvering, orbit, and travel below the speed of light when the warp drive is not engaged.",
+   "headings": [
+    "What Impulse Drive Is For",
+    "Fusion Reactors and Drive Principle",
+    "Full Impulse and the Relativistic Limit",
+    "Maneuvering, Thrusters, and Helm Control",
+    "Engineering, Failure Modes, and Survivability"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "quantum-slipstream-and-transwarp",
+   "title": "Quantum Slipstream and Transwarp",
+   "category": "Warp & Starship Technology",
+   "summary": "Quantum slipstream drive and transwarp are the faster-than-warp propulsion regimes beyond the standard warp scale — from the Borg's transwarp conduit network to the slipstream flights logged by USS Voyager — and the reasons none has yet replaced warp drive.",
+   "headings": [
+    "Faster Than Warp",
+    "Quantum Slipstream Drive",
+    "Borg Transwarp Conduits",
+    "Starfleet's Own Attempts",
+    "Why Warp Still Rules"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "structural-integrity-and-inertial-dampening-fields",
+   "title": "Structural Integrity and Inertial Dampening Fields",
+   "category": "Warp & Starship Technology",
+   "summary": "Structural integrity fields reinforce a starship's spaceframe against stresses no material could bear, while inertial dampening fields (inertial dampeners) protect the crew from the accelerations of flight; together these two field systems make starship maneuvering survivable.",
+   "headings": [
+    "Two Fields, Two Jobs",
+    "The Structural Integrity Field",
+    "The Inertial Dampening Field",
+    "Why Crews Still Feel the Hits",
+    "Power, Failure, and Emergency Procedure"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "the-emergency-medical-hologram",
+   "title": "The Emergency Medical Hologram",
+   "category": "Warp & Starship Technology",
+   "summary": "The Emergency Medical Hologram, or EMH, is Starfleet's holographic physician — a sickbay program designed as a short-term replacement for lost medical staff, made famous by the Doctor of USS Voyager, whose seven-year career reshaped Federation thinking on holograms and personhood.",
+   "headings": [
+    "What the EMH Is",
+    "How the Program Works",
+    "The Mark I and Its Shortcomings",
+    "The Doctor of USS Voyager",
+    "Successors, Rights, and Legacy"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "the-navigational-deflector",
+   "title": "The Navigational Deflector",
+   "category": "Warp & Starship Technology",
+   "summary": "The navigational deflector is the forward dish of a starship that sweeps space debris and particles from the vessel's path, making warp and high-speed impulse flight survivable; deflectors are also famously adaptable emitters for engineering improvisation.",
+   "headings": [
+    "Why Starships Need a Deflector",
+    "The Main Deflector Dish",
+    "Operation at Warp and at Impulse",
+    "The Engineer's Favorite Emitter",
+    "Failure, Redundancy, and Safe Practice"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "tractor-beams",
+   "title": "Tractor Beams",
+   "category": "Warp & Starship Technology",
+   "summary": "A tractor beam is a focused graviton field a starship uses to grip, tow, and steer objects at a distance; tractor beams handle everything from guiding a shuttle into its bay to towing a disabled starship home.",
+   "headings": [
+    "What a Tractor Beam Is",
+    "How the Beam Grips",
+    "Towing, Docking, and Everyday Work",
+    "Rescue and Combat Applications",
+    "Countermeasures and Limits"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
   },
   {
    "id": "fed-warp-drive",
@@ -14463,6 +15138,121 @@
     "Step-by-Step: Map Your Own Yard or Neighbourhood's Microclimates in One Week"
    ],
    "file": "guides_weather.json"
+  },
+  {
+   "id": "andoria",
+   "title": "Andoria",
+   "category": "Worlds & Stations",
+   "summary": "Andoria is the icebound homeworld of the Andorians and a founding world of the United Federation of Planets — an ice moon of underground cities, home to the Andorian and Aenar peoples, the Imperial Guard, and customs such as the ushaan duel.",
+   "headings": [
+    "An Ice Moon of a Gas Giant",
+    "The Andorians",
+    "The Aenar",
+    "Government and the Imperial Guard",
+    "The Road to the Federation",
+    "Culture and the Ushaan"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "bajor-the-planet",
+   "title": "Bajor, the Planet",
+   "category": "Worlds & Stations",
+   "summary": "Bajor, homeworld of the Bajoran people: an ancient world of deep faith, scarred by the Cardassian occupation and transformed by the wormhole at its doorstep. Covers the planet and worlds of its system, the Prophets, the provisional government, and the road to Federation membership.",
+   "headings": [
+    "An Ancient World",
+    "The Prophets and the Faith",
+    "The Occupation",
+    "Rebuilding and the Provisional Government",
+    "The Wormhole and the Emissary",
+    "Toward the Federation"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "cardassia-prime",
+   "title": "Cardassia Prime",
+   "category": "Worlds & Stations",
+   "summary": "Cardassia Prime is the homeworld of the Cardassians and capital of the Cardassian Union — an arid, resource-poor planet whose military state, occupation of Bajor, Dominion alliance and postwar reconstruction reshaped the politics of the Alpha Quadrant.",
+   "headings": [
+    "Planetary Profile and Capital",
+    "The Union and Its Institutions",
+    "The Occupation of Bajor",
+    "The Dominion Alliance and the War",
+    "Society, Family and Culture",
+    "Reconstruction"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "deep-space-nine-the-station",
+   "title": "Deep Space Nine, the Station",
+   "category": "Worlds & Stations",
+   "summary": "Deep Space 9, the space station at the mouth of the Bajoran wormhole: a Cardassian-built ore-processing station, Terok Nor, turned Federation-administered trade hub, fortress, and the Dominion War's most contested outpost among stations of its era.",
+   "headings": [
+    "From Terok Nor to Deep Space 9",
+    "Structure and Layout",
+    "The Wormhole Changes Everything",
+    "Life on the Promenade",
+    "Fortress at the Threshold"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "ferenginar",
+   "title": "Ferenginar",
+   "category": "Worlds & Stations",
+   "summary": "Ferenginar is the rain-soaked homeworld of the Ferengi and seat of the Ferengi Alliance — the planet of the Grand Nagus and the Tower of Commerce, the Rules of Acquisition, commerce as culture, and the reforms that remade Ferengi society.",
+   "headings": [
+    "A World of Rain",
+    "The Grand Nagus and the Alliance",
+    "The Rules of Acquisition",
+    "Commerce as Culture",
+    "Reform and the New Ferenginar"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "risa",
+   "title": "Risa",
+   "category": "Worlds & Stations",
+   "summary": "Risa is the Federation's celebrated pleasure planet — a resort world of engineered perfect weather, Risian hospitality, the horga'hn and jamaharon customs, and a tourist economy that draws travellers from across the quadrant.",
+   "headings": [
+    "The Paradise That Was Built",
+    "The Risian People and Their Hospitality",
+    "The Horga'hn and the Jamaharon",
+    "Tourism: What Risa Offers",
+    "Incidents and Interruptions"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "the-badlands",
+   "title": "The Badlands",
+   "category": "Worlds & Stations",
+   "summary": "The Badlands are a region of violent plasma storms near the Cardassian border — a hazard to starships and navigation, a haven for the Maquis, smugglers and spies, and the place where the USS Voyager vanished.",
+   "headings": [
+    "A Region of Storms",
+    "Flying the Badlands",
+    "Refuge of the Maquis",
+    "The Voyager Disappearance",
+    "Smugglers, Spies and Strategy"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "the-utopia-planitia-fleet-yards",
+   "title": "The Utopia Planitia Fleet Yards",
+   "category": "Worlds & Stations",
+   "summary": "The Utopia Planitia Fleet Yards were Starfleet's principal shipyards, in orbit of Mars and on its surface — birthplace of the Galaxy, Defiant and Intrepid classes and the USS Voyager, and the target of the synth attack of 2385.",
+   "headings": [
+    "Starfleet's Shipyard",
+    "The Ships",
+    "Life and Work at the Yards",
+    "First Contact Day, 2385",
+    "Aftermath and Legacy"
+   ],
+   "file": "guides_worlds_and_stations.json"
   },
   {
    "id": "fed-earth-and-sol",
