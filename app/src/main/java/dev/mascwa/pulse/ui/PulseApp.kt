@@ -81,6 +81,18 @@ fun PulseApp(
         }
     }
 
+    /**
+     * THE one way to open anything: a bottom-nav tab gets the tab treatment (stack cleared, state
+     * saved/restored), everything else pushes so back returns whence you came. The top-vs-push
+     * branch used to be duplicated at two call sites and half-applied at six more — Settings was
+     * top-leveled from Home but pushed from MENU (two back-stack semantics for one screen), and
+     * JARVIS, a tab, was plain-pushed from Home, silently skipping its saved state.
+     */
+    fun openApp(route: String) {
+        if (TOP_DESTINATIONS.any { it.route == route.substringBefore('?') }) navigateTopLevel(route)
+        else navController.navigate(route) { launchSingleTop = true }
+    }
+
     // The ambient palette, which NightwireTheme provides and which now swings to the alert range when
     // the ship goes to red. This used to read `lcarsPalette` directly, to escape a stale pre-LCARS
     // default — but the redundant re-provider that made that necessary is gone, and a hardcoded read
@@ -132,16 +144,17 @@ fun PulseApp(
                         openNews = { navigateTopLevel(Routes.NEWS) },
                         openMarkets = { navigateTopLevel(Routes.MARKETS) },
                         openWeather = { navigateTopLevel(Routes.WEATHER) },
-                        openEconomy = { navController.navigate(Routes.ECONOMY) { launchSingleTop = true } },
-                        openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
-                        openSettings = { navigateTopLevel(Routes.SETTINGS) },
-                        openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
-                        openRadar = { navController.navigate(Routes.RADAR) { launchSingleTop = true } },
-                        openSpaceWeather = { navController.navigate(Routes.SPACE_WX) { launchSingleTop = true } },
-                        openRoute = { route ->
-                            if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
-                            else navController.navigate(route) { launchSingleTop = true }
-                        },
+                        openEconomy = { openApp(Routes.ECONOMY) },
+                        openFuel = { openApp(Routes.FUEL) },
+                        // Settings is PUSHED (it is not a tab; back returns to where you were) —
+                        // it used to be top-leveled here but pushed from MENU, two different
+                        // back-stack semantics for one screen depending on the door you came in.
+                        openSettings = { openApp(Routes.SETTINGS) },
+                        // JARVIS IS a tab; the plain push here skipped its saved state on the way in.
+                        openAssistant = { openApp(Routes.JARVIS) },
+                        openRadar = { openApp(Routes.RADAR) },
+                        openSpaceWeather = { openApp(Routes.SPACE_WX) },
+                        openRoute = { route -> openApp(route) },
                     ),
                 )
             }
@@ -188,12 +201,7 @@ fun PulseApp(
 
             // ---- THE MENU — the flat directory: every feature, one tap, plain English ----
             composable(Routes.MENU) {
-                dev.mascwa.pulse.feature.menu.MenuScreen(
-                    onOpen = { route ->
-                        if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
-                        else navController.navigate(route) { launchSingleTop = true }
-                    },
-                )
+                dev.mascwa.pulse.feature.menu.MenuScreen(onOpen = { route -> openApp(route) })
             }
 
             // ---- Sky ----
