@@ -87,7 +87,12 @@ MAX_WIDTH = 1280           # what optimize_images.py measured as the right cap f
 WEBP_QUALITY = 85
 MAX_SVG_BYTES = 400_000    # a pathological SVG can stall a phone renderer; a diagram never needs this
 MIN_SOURCE_WIDTH = 600
-FLUSH_EVERY = 10           # how many diagrams may be on disk unreferenced at once — see flush()
+FLUSH_EVERY = 1            # diagrams that may sit on disk unreferenced at once — see flush()
+# ⚠️ 1, not a batch. The batching was justified as "that would rewrite a half-megabyte shard for
+# every diagram" — which is true and costs nothing: a shard rewrite is milliseconds against the
+# ~2.6 s of paced API calls each diagram already takes, so 363 of them add well under a minute to
+# a run measured in hours. Measured instead of assumed: a hard kill mid-run at FLUSH_EVERY=10 left
+# 2 orphan images behind. At 1, with the atomic replace in flush(), it leaves none.
 
 # ⚠️ 1.6 s was not enough. A real 10-guide run hitting BOTH en.wikipedia and Commons still earned
 # 429s, because the limit is per-client across the whole Wikimedia estate rather than per-host.
@@ -415,7 +420,10 @@ def pixels_ok(raw: bytes, mime: str) -> tuple[bool, str]:
     if not 0.15 <= (w / max(h, 1)) <= 8.0:
         return False, f"extreme aspect {w}x{h}"
     small = img.convert("RGB").resize((64, 64))
-    colours = len(set(small.getdata()))
+    # getcolors rather than set(getdata()): the same count, without the deprecation warning Pillow
+    # now prints for every single image — 300-odd lines of noise through a log that has to be read
+    # by hand afterwards. maxcolors is the pixel count, so it can never return None by overflowing.
+    colours = len(small.getcolors(64 * 64) or ())
     if colours < 12:
         return False, f"near-blank: {colours} distinct colours"
     return True, f"{w}x{h}, {colours} colours"
@@ -983,7 +991,21 @@ def main() -> int:
             for m in re.finditer(r"commons\.wikimedia\.org/wiki/File:(\S+)", fh.read()):
                 claimed.add(file_key(urllib.parse.unquote(m.group(1))))
 
+    if args.apply:
+        os.makedirs(KB_IMAGES, exist_ok=True)
     matched, skipped = [], []
+    touched, notice_lines = {}, []
+
+    # ⚠️ **One loop, because two lost two waves.** This used to choose for every guide first and
+    # download afterwards — and choosing 363 guides is roughly two hours of paced API calls, so an
+    # interruption anywhere in that window threw the entire run away with nothing on disk to show
+    # for it. It happened twice: once to a container restart and once to a process killed while a
+    # Gradle build ran alongside it, at 81 of 363 selected and zero written.
+    #
+    # Interleaved, the run is resumable with **no new state at all**, because `todo` above is
+    # derived as "guides with no image" — a guide that got its diagram is skipped by construction
+    # on the next run. Together with the periodic flush() below, a death costs at most the last
+    # FLUSH_EVERY guides, and re-running the identical command picks up where it stopped.
     for guide in todo[: args.limit]:
         print(f"  {guide['id']}  [{guide.get('category')}]")
         best = choose(guide, freq, claimed)
@@ -996,41 +1018,30 @@ def main() -> int:
         author = strip_html(info.get("extmetadata", {}).get("Artist", {}).get("value"))[:100]
         print(f"      ✓ [{source} {sc}] {title[:56]}\n        {licence} · {author[:40]}"
               f"\n        because: {', '.join(why)}")
-        matched.append((guide, title, info, cats, licence, author, source, sc, why))
+        matched.append((guide, title, licence, author, source, sc, why))
+        if args.report:
+            write_report(args.report, matched)
+        if not args.apply:
+            continue
 
-    print(f"\n{len(matched)} matched, {len(skipped)} skipped")
-    if args.report:
-        # `why` rides the report because the report is what gets re-read by hand afterwards, and
-        # "what was said for this file" is the question that reading is trying to answer.
-        json.dump([{"guide": g["id"], "title": g["title"], "file": t, "licence": l,
-                    "author": a, "source": s, "score": sc, "why": w}
-                   for g, t, i, c, l, a, s, sc, w in matched], open(args.report, "w"), indent=1)
-        print(f"report -> {args.report}")
-    if not args.apply:
-        print("dry run — pass --apply to fetch and patch")
-        return 0
-
-    os.makedirs(KB_IMAGES, exist_ok=True)
-    touched, notice_lines = {}, []
-    for guide, title, info, cats, licence, author, source, sc, why in matched:
         mime = str(info.get("mime", ""))
         svg = mime == "image/svg+xml"
         raw = get(info["url"] if svg else (info.get("thumburl") or info["url"]), binary=True)
         if not raw:
-            print(f"  ! download failed: {guide['id']}")
+            print(f"      ! download failed")
             continue
         ok, note = pixels_ok(raw, mime)
         if not ok:
-            print(f"  ! {guide['id']}: {note}")
+            print(f"      ! {note}")
             continue
         data = raw if svg else encode(raw)
         if not data:
-            print(f"  ! not encodable: {guide['id']}")
+            print(f"      ! not encodable")
             continue
         name = f"{guide['id']}.{'svg' if svg else 'webp'}"
         idx = pick_section(guide)
         if idx < 0:
-            print(f"  ! no section to attach to: {guide['id']}")
+            print(f"      ! no section to attach to")
             continue
         with open(os.path.join(KB_IMAGES, name), "wb") as fh:
             fh.write(data)
@@ -1038,7 +1049,7 @@ def main() -> int:
         touched.setdefault(guide["_file"], []).append(guide)
         page = "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_"))
         notice_lines.append(f"kb/{name}\n    {title}\n    {licence} — {author or 'see source'}\n    {page}")
-        print(f"  wrote kb/{name}  ({len(data)/1024:.0f} kB, {note})")
+        print(f"      wrote kb/{name}  ({len(data)/1024:.0f} kB, {note})")
         # Bounded, rather than once at the end: the window in which the tree is inconsistent is now
         # at most this many files wide instead of the whole run. Not per-file, because that would
         # rewrite a half-megabyte shard for every diagram.
@@ -1046,7 +1057,24 @@ def main() -> int:
             flush(touched, notice_lines)
 
     flush(touched, notice_lines)
+    print(f"\n{len(matched)} matched, {len(skipped)} skipped")
+    if not args.apply:
+        print("dry run — pass --apply to fetch and patch")
     return 0
+
+
+def write_report(path: str, matched: list) -> None:
+    """
+    Rewrite the report after every pick, not once at the end.
+
+    `why` rides it because the report is what gets re-read by hand afterwards, and "what was said
+    for this file" is the question that reading is trying to answer. Written incrementally for the
+    same reason the shards are: a report that only exists if the process reaches its last line is
+    a report you do not have when you most want it — after a run that died.
+    """
+    json.dump([{"guide": g["id"], "title": g["title"], "file": t, "licence": l,
+                "author": a, "source": s, "score": sc, "why": w}
+               for g, t, l, a, s, sc, w in matched], open(path, "w"), indent=1)
 
 
 def flush(touched: dict, notice_lines: list) -> None:
@@ -1063,6 +1091,16 @@ def flush(touched: dict, notice_lines: list) -> None:
 
     NOTICE.txt is written in the same breath, because a diagram whose licence and author were not
     recorded is worse than one that was never fetched.
+
+    ⚠️ **The shard is replaced atomically, and that is what makes flushing this often safe.** Writing
+    in place means a kill during `json.dump` truncates a half-megabyte of shipped content — far worse
+    than the orphan it is trying to prevent. `os.replace` is atomic on POSIX, so the shard is either
+    the old one or the new one and never a torn one. With that, [FLUSH_EVERY] can be 1.
+
+    ⚠️ Order matters and is deliberate: the image file is written **before** the shard points at it.
+    An interruption between them leaves an unreferenced file, which is harmless and which
+    `BundledImagesTest` catches; the reverse would leave a guide pointing at an image that does not
+    exist, which breaks the reader on the page somebody opened.
     """
     for path, changed in touched.items():
         doc = json.load(open(path, encoding="utf-8"))
@@ -1072,10 +1110,14 @@ def flush(touched: dict, notice_lines: list) -> None:
             by_id[guide["id"]]["sections"] = guide["sections"]
         for g in items:
             g.pop("_file", None)
-        with open(path, "w", encoding="utf-8") as fh:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(doc, fh, ensure_ascii=False, indent=1)
             fh.write("\n")
-        print(f"  patched {os.path.basename(path)}")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+        print(f"      patched {os.path.basename(path)}")
     touched.clear()
 
     if notice_lines:
