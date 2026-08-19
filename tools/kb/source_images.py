@@ -87,6 +87,7 @@ MAX_WIDTH = 1280           # what optimize_images.py measured as the right cap f
 WEBP_QUALITY = 85
 MAX_SVG_BYTES = 400_000    # a pathological SVG can stall a phone renderer; a diagram never needs this
 MIN_SOURCE_WIDTH = 600
+FLUSH_EVERY = 10           # how many diagrams may be on disk unreferenced at once — see flush()
 
 # ⚠️ 1.6 s was not enough. A real 10-guide run hitting BOTH en.wikipedia and Commons still earned
 # 429s, because the limit is per-client across the whole Wikimedia estate rather than per-host.
@@ -1012,7 +1013,31 @@ def main() -> int:
         page = "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_"))
         notice_lines.append(f"kb/{name}\n    {title}\n    {licence} — {author or 'see source'}\n    {page}")
         print(f"  wrote kb/{name}  ({len(data)/1024:.0f} kB, {note})")
+        # Bounded, rather than once at the end: the window in which the tree is inconsistent is now
+        # at most this many files wide instead of the whole run. Not per-file, because that would
+        # rewrite a half-megabyte shard for every diagram.
+        if len(notice_lines) >= FLUSH_EVERY:
+            flush(touched, notice_lines)
 
+    flush(touched, notice_lines)
+    return 0
+
+
+def flush(touched: dict, notice_lines: list) -> None:
+    """
+    Write the shard edits and the provenance for everything downloaded so far, then forget it.
+
+    ⚠️ **Called during the run, not only at the end of it, and that is the whole point.** The images
+    land on disk as they are fetched while the shard that points at them was patched once, after the
+    last download — so any interruption at all left every file written so far referenced by nothing.
+    That is not hypothetical: a wave was stopped part-way and stranded **59 images**, which shipped
+    into the APK and the desktop jar with every check green, because nothing looked for a file no
+    guide points at. `BundledImagesTest.nothingShipsThatNoGuidePointsAt` is now the gate that
+    notices; flushing periodically is what stops it happening.
+
+    NOTICE.txt is written in the same breath, because a diagram whose licence and author were not
+    recorded is worse than one that was never fetched.
+    """
     for path, changed in touched.items():
         doc = json.load(open(path, encoding="utf-8"))
         items = doc if isinstance(doc, list) else doc.get("guides", [])
@@ -1025,13 +1050,14 @@ def main() -> int:
             json.dump(doc, fh, ensure_ascii=False, indent=1)
             fh.write("\n")
         print(f"  patched {os.path.basename(path)}")
+    touched.clear()
 
     if notice_lines:
         with open(NOTICE, "a", encoding="utf-8") as fh:
             fh.write("\n\nSourced from Wikimedia Commons (see the re-encoding notice above)\n")
             fh.write("-" * 62 + "\n" + "\n".join(notice_lines) + "\n")
         print(f"  appended {len(notice_lines)} entries to NOTICE.txt")
-    return 0
+        notice_lines.clear()
 
 
 if __name__ == "__main__":
