@@ -135,9 +135,18 @@ DIAGRAM_WORDS = re.compile(
     r"figure|fig\b|graph|plot|structure|cycle|flow|map of|profile|timeline|comparison|process)\b",
     re.I,
 )
+# ⚠️ **Word boundaries, and a real run proved every one of them necessary.** Written without them
+# this pattern fires inside the strongest words in the language for NOT a diagram: a bare `graph`
+# matches "photographs", "photography", "photographic" and "stratigraphy", and a bare `chart`
+# matches "Charters" and "Uncharted". Measured against the categories those files really carry,
+# the unbounded form accepted `2012 photographs of Malta`, `Earth photography during STS-39`,
+# `Non-photographic images by Hans Hillewaert` and `Archaeological stratigraphy` — 10 of 23 probe
+# cases wrong, against 0 bounded — and it put an hourglass photograph on relative dating and an
+# aurora photographed from the shuttle on aerial archaeology, each with this as its only evidence.
 DIAGRAM_CATEGORIES = re.compile(
-    r"(diagram|schematic|chart|illustration|cross.?section|annotations|graph|infographic|"
-    r"svg (drawing|diagram)|line art|technical drawing)",
+    r"(\bdiagrams?\b|\bschematics?\b|\bcharts?\b|\billustrations?\b|cross.?section|"
+    r"\bannotations?\b|\bgraphs?\b|\binfographics?\b|svg (drawing|diagram)|"
+    r"\bline art\b|technical drawing)",
     re.I,
 )
 # ⚠️ **Word boundaries defeat this list in BOTH directions, and a real run proved both.**
@@ -327,6 +336,46 @@ def is_english(file_title: str) -> bool:
 def subject_hits(file_title: str, vocab: set[str], freq: collections.Counter) -> list[str]:
     stem = file_stem(file_title)
     return sorted({w for w in vocab if len(w) >= 4 and w in stem})
+
+
+# Licence tags and housekeeping ride on nearly every file and say nothing about its subject, so a
+# vocabulary word landing in one of these is a coincidence rather than a filing decision.
+CATEGORY_NOISE = re.compile(
+    r"^(cc|pd|gfdl|public domain|licen[cs]|copyright|self-published|files? |media |"
+    r"images? (from|with|without|which|by|uploaded)|photographs? (by|taken)|"
+    r"uploaded |taken with|artworks? without|information field|.*wikidata item)",
+    re.I,
+)
+
+
+def category_hits(categories, vocab: set[str], freq: collections.Counter) -> list[str]:
+    """
+    The guide's own subject words appearing in a Commons category the file is filed under.
+
+    ⚠️ **The bar is STRICTER than [on_subject]'s, and it has to be — "two ordinary words" was
+    written first and measured wrong on the real corpus.** A filename is a phrase somebody wrote
+    for one file; a category is a phrase about a group, so its ordinary words collide by accident,
+    and substring matching makes that far worse than it looks. Measured against the real
+    vocabularies:
+
+        Earth photography during STS-39      vs remote sensing  ->  earth(243)  photograph(74)
+        Collections of the Malta Maritime …  vs relative dating ->  time(596)   ← inside "Mari-TIME"
+        Osmosis                              vs osmosis         ->  osmosis(16)
+        Harris matrix                        vs the Harris matrix -> harris(12) matrix(74)
+
+    Two hits would readmit the aurora photograph on "earth" and "photography", which is the exact
+    picture this floor exists to refuse. So the rule is one word rarer than [RARE_DF]: a category
+    naming something DISTINCTIVE about this guide, not merely a word the guide happens to use.
+    """
+    hits: set[str] = set()
+    for c in categories:
+        if CATEGORY_NOISE.match(c.replace("Category:", "").strip()):
+            continue
+        low = c.lower()
+        hits |= {w for w in vocab if len(w) >= 4 and w in low}
+    if not any(freq.get(w, 10 ** 6) < RARE_DF for w in hits):
+        return []
+    return sorted(hits)
 
 
 def on_subject(file_title: str, vocab: set[str], freq: collections.Counter,
@@ -611,15 +660,25 @@ def evidence(file_title: str, categories, vocab, freq) -> list[str]:
     on *the integrated circuit* all arrived by exactly the same route, each with a bare score of
     100 and not one thing said for it.
 
-    Three kinds of evidence count, in descending strength: an editor filing it under a diagram
-    category, the guide's own vocabulary in the filename, and the filename calling itself a
-    diagram. Any one is enough — requiring two was tried against the first run's real output and
-    threw away genuine figures whose names are Latin or German roots the guide never uses
-    (`Osmose en.svg` IS the osmosis diagram).
+    Three kinds of evidence count: an editor filing it under a category that names the guide's own
+    SUBJECT, the guide's vocabulary in the filename, and the filename calling itself a diagram. Any
+    one is enough — requiring two was tried against the first run's real output and threw away
+    genuine figures whose names are Latin or German roots the guide never uses.
+
+    ⚠️ **Being in a DIAGRAM category is deliberately not one of them, and that is a correction to an
+    earlier version of this function which said it was the strongest of the three.** It answers
+    "is this a diagram", never "is it a diagram about THIS" — so on the Wikipedia path, where
+    [on_subject] is skipped by design, it was the only thing standing between an article's gallery
+    tangents and a guide. The case that was cited here to justify it, `Osmose en.svg`, does not
+    actually rest on it: the file's real categories are `Osmosis`, `Non-photographic images by
+    Hans Hillewaert` and two licence tags, so what genuinely rescues it is the subject category
+    below. The claim was checked against Commons rather than assumed only after two photographs had
+    already been chosen on it.
     """
     out = []
-    if any(DIAGRAM_CATEGORIES.search(c) for c in categories):
-        out.append("diagram-category")
+    cat_hits = category_hits(categories, vocab, freq)
+    if cat_hits:
+        out.append("filed-under:" + "/".join(cat_hits[:3]))
     hits = subject_hits(file_title, vocab, freq)
     if hits:
         out.append("names:" + "/".join(sorted(hits)[:3]))
@@ -758,9 +817,17 @@ def selftest() -> int:
     ⚠️ These are real files that a real run really accepted, not invented fixtures — which is the
     only kind of regression test worth having here.
     """
+    # ⚠️ Every count here is MEASURED against the real 651-guide corpus, not chosen to make a case
+    # pass. `osmosis: 16` in particular is load-bearing: the category floor accepts a lone hit only
+    # when the word is rarer than RARE_DF, and an earlier version of this table simply omitted the
+    # word — so the default of "assume common" refused the control and the failure looked like a
+    # defect in the gate rather than a hole in the fixture.
     freq = collections.Counter({"opportunity": 66, "research": 223, "legacy": 51, "secondary": 156,
                                 "memory": 254, "building": 329, "relative": 361, "computer": 96,
-                                "thermoluminescence": 7})
+                                "thermoluminescence": 7, "osmosis": 16, "harris": 12,
+                                "stratigraphy": 22, "archaeology": 29, "aerial": 29,
+                                "time": 596, "earth": 243, "photograph": 74, "matrix": 74,
+                                "cation": 20, "graphs": 5})
     cases = [
         # (file, guide vocabulary, mime, categories, source, must_pass, why)
         # ── every one of these was really accepted by the first run and is really wrong ──
@@ -868,6 +935,17 @@ def selftest() -> int:
          {"canal", "lock", "gate"}, "image/svg+xml", [], "commons-search", True,
          "control: the chrome list keeps `lock-` hyphenated; widening it to `lock[- ]` would "
          "start refusing canal locks"),
+        # ⚠️ THE WORD-BOUNDARY CASE, and it isolates [teaches] rather than the evidence floor.
+        # A real file with its real categories: two subject words in the name so the subject gate
+        # passes, a JPEG with no diagram word so the ONLY thing that could call it a drawing is a
+        # category — and the category that matches without word boundaries is `2012 PHOTOGRAPHS of
+        # Malta`. The strongest available statement that a file is not a diagram, read as proof
+        # that it is one.
+        ("File:Marine sandglass MMM.jpg",
+         {"marine", "sandglass", "timekeeping"}, "image/jpeg",
+         ["Category:2012 photographs of Malta", "Category:Hourglasses",
+          "Category:Collections of the Malta Maritime Museum"], "commons-search", False,
+         "a museum photograph — only an unbounded `graph` inside 'photographs' calls it a drawing"),
     ]
     # ⚠️ The not-subject list is checked separately and in BOTH directions, because a real wave
     # showed it failing each way: compounds slipped through (Foodlogo2 onto a food-spoilage guide)
@@ -923,14 +1001,70 @@ def selftest() -> int:
         ("File:Climate change feedbacks.svg",
          {"climate", "feedback", "loops"}, [], True,
          "control: names the subject twice, and was a correct pick on the same run"),
+        # ⚠️ THE CATEGORIES BELOW ARE THE ONES COMMONS REALLY RETURNS, fetched rather than written
+        # from memory. The earlier version of this case invented `Category:Osmosis diagrams` and so
+        # passed for a reason that does not exist — the file is not in any diagram category at all.
         ("File:Osmose en.svg",
-         {"osmosis", "osmotic", "pressure"}, ["Category:Osmosis diagrams"], True,
+         {"osmosis", "osmotic", "pressure"},
+         ["Category:CC-BY-SA-3.0", "Category:Information field template with formatting",
+          "Category:Non-photographic images by Hans Hillewaert", "Category:Osmosis",
+          "Category:Self-published work"], True,
          "control: names NOTHING the guide says — 'osmose' is the French root — and is kept "
-         "purely because an editor filed it under a diagram category. ⚠️ This is why the floor "
-         "takes any ONE of three signals rather than requiring a name"),
+         "because an editor filed it under `Osmosis`. ⚠️ Its only diagram-ish category is "
+         "`Non-photographic images…`, which the unbounded pattern matched on 'photographic'"),
         ("File:Harris matrix example.svg",
-         {"stratigraphy", "harris", "matrix"}, [], True,
-         "control: names the subject"),
+         {"stratigraphy", "harris", "matrix"},
+         ["Category:Archaeological stratigraphy", "Category:CC-BY-SA-4.0",
+          "Category:Harris matrix", "Category:Self-published work"], True,
+         "control: names the subject, and is filed under it twice over"),
+        # ⚠️ Both of these were really chosen, by the run this fix interrupted, with a bare
+        # diagram-category as their ONLY evidence — and the category that matched was a
+        # PHOTOGRAPH category. Two defects in one: the pattern had no word boundaries, and being
+        # filed under 'diagrams' was being treated as evidence about the subject.
+        # ⚠️ The vocabularies below are the guides' REAL ones, and that is what makes these cases
+        # bite. `time` is in the dating guide's vocabulary and sits inside "Mari-TIME Museum";
+        # `earth` and `photograph` are both in the remote-sensing guide's and both sit inside
+        # "EARTH PHOTOGRAPHy during STS-39". Written with a tidy invented vocabulary neither file
+        # would have had a category hit at all and the rarity rule would have decided nothing.
+        ("File:Marine sandglass MMM.jpg",
+         {"relative", "dating", "archaeology", "stratigraphy", "time", "sequence", "layers"},
+         ["Category:2012 photographs of Malta", "Category:Hourglasses",
+          "Category:Collections of the Malta Maritime Museum",
+          "Category:Taken with Nikon D300s"], False,
+         "an hourglass in a Maltese museum, on 'Relative Dating Methods in Archaeology'"),
+        ("File:Aurora-SpaceShuttle-EO.jpg",
+         {"remote", "sensing", "aerial", "archaeology", "earth", "photograph", "imaging"},
+         ["Category:Aurora australis viewed from space",
+          "Category:Earth photography during STS-39", "Category:PD NASA"], False,
+         "an aurora from the shuttle, on 'Remote Sensing and Aerial Archaeology' — TWO real "
+         "vocabulary words land in its category, so only the rarity rule can refuse it"),
+        # ⚠️ THE CASE THAT ISOLATES "a diagram category is not evidence about the subject", because
+        # its category matches the pattern WITH the word boundaries in place. `Images with
+        # annotations` is Commons housekeeping for the ImageAnnotator gadget — it says a file page
+        # carries clickable regions, not that anybody drew anything — and it was the whole of the
+        # reason a photograph of a corroded bronze fragment was chosen for 'A History of Astronomy'.
+        # Restoring the old floor accepts this one even with the boundaries fixed.
+        ("File:Antikythera Fragment A (Front).webp",
+         {"history", "astronomy"},
+         ["Category:Antikythera Mechanism", "Category:Images with annotations",
+          "Category:Collections of the National Archaeological Museum of Athens"], False,
+         "a museum photograph on 'A History of Astronomy' — filed under a gadget category"),
+        # ⚠️ THE HOUSEKEEPING-CATEGORY CASES. Unlike everything above these are not pictures a run
+        # chose — they are collisions FOUND by scanning all 651 real vocabularies against the
+        # licence and maintenance categories Commons really attaches, which turned up 17. Every
+        # word below is rare enough to carry a match on its own, and every one of them is hiding
+        # inside a longer word: `cation` in lo-CATION, `graphs` in photo-GRAPHS, `ration` in
+        # mig-RATION, `tract` in ex-TRACTed, `wizard` in Upload-WIZARD. Without the noise filter a
+        # copyright tag becomes evidence about soil chemistry.
+        ("File:Marine sandglass MMM.jpg",
+         {"soil", "testing", "cation", "exchange", "fertility"},
+         ["Category:Files with coordinates missing SDC location of creation",
+          "Category:CC-BY-2.5"], False,
+         "real collision from 'Soil Testing and Interpreting the Results': cation ⊂ loCATION"),
+        ("File:Marine sandglass MMM.jpg",
+         {"stratigraphy", "harris", "matrix", "graphs", "sequence"},
+         ["Category:Photographs by Hans Hillewaert", "Category:Self-published work"], False,
+         "real collision from 'Stratigraphy and the Harris Matrix': graphs ⊂ photoGRAPHS"),
     ]
     ev_bad = 0
     for title, vocab, cats, must_pass, why in ev_cases:
