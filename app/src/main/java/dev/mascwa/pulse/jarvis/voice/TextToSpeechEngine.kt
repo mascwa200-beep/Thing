@@ -194,15 +194,48 @@ class TextToSpeechEngine(
     val isAvailable: Boolean get() = ready.get()
 
     /**
-     * Speak [text], replacing anything already being spoken. [onDone] runs (on the main thread) when
-     * the utterance finishes — or immediately if there's nothing to speak / no engine, so callers can
-     * safely sequence after speech (e.g. reopen the mic only once the computer has stopped talking).
+     * Speak [text], replacing anything already being spoken. [onDone] runs (on the main thread) once
+     * the computer has stopped talking — or immediately if there's nothing to speak / no engine, so
+     * callers can safely sequence after speech (e.g. reopen the mic only once it has stopped).
+     *
+     * ⚠️ **"Once it has stopped talking", not "once this utterance finishes"**, and the difference is
+     * the whole point: if a later [speak] replaces this one, [onDone] waits for *that* one instead of
+     * being dropped. A caller waiting on speech is never left waiting forever, and the microphone is
+     * never re-opened over an utterance that is still playing.
      */
     fun speak(text: String, onDone: () -> Unit = {}) {
         val trimmed = forSpeech(text)
         if (trimmed.isEmpty() || !ready.get()) { onDone(); return }
         val spoken = trimmed.take(MAX_LEN)
-        pendingDone.set(onDone)
+        // ⚠️ **Chain the callback being replaced; never drop it.** This `set` used to overwrite
+        // whatever was pending, and that was the callback's last moment of existence: `QUEUE_FLUSH`
+        // ends the previous utterance, the platform reports *that* through `onStop`, and
+        // `UtteranceProgressListener.onStop` compiles to a bare `return` — read out of the platform
+        // bytecode, not recalled. This listener does not override it, so no `onDone`/`onError` ever
+        // arrives for the flushed utterance and nothing downstream would have run it.
+        //
+        // It matters because the one caller that passes a real callback is the voice service's
+        // `speakThen`, which moves the arbiter into SPEAKING *before* speaking and relies on the
+        // callback to bring it back out. Losing it strands the arbiter: the wake word never re-arms
+        // and the phone silently stops answering to its name until the service is restarted — the
+        // exact failure [armWatchdog] exists to prevent, by a route the watchdog cannot see, because
+        // a callback *did* run, just not that one. [stop] and [shutdown] were already safe; they go
+        // through [fireDone]. Replacement was the one path that leaked, which is why the fix for the
+        // battery warning had to be a `!capturing` guard at that call site — this is the same defect
+        // at its root, where the console reply, a proactive remark and the Setup voice sample are
+        // all equally exposed.
+        //
+        // Chained rather than run here: the caller is waiting for the computer to *stop talking*,
+        // and it has not — a replacement is about to start, and re-arming the microphone over it is
+        // precisely what the watchdog is deliberately oversized to avoid. Last-in-first-out, so the
+        // newer caller's sequencing completes before the older one resumes. Re-arming twice is
+        // harmless: `VoiceMachine` is idempotent by construction. The chain can only grow while
+        // utterances are replaced back-to-back with no completion in between, and it collapses on
+        // the first one that finishes.
+        pendingDone.getAndUpdate { displaced ->
+            val chained: () -> Unit = { onDone(); displaced?.invoke() }
+            chained
+        }
         armWatchdog(spoken.length)
         // Before the sound starts, so the duck is already in place rather than arriving a beat late.
         focus.acquire()
