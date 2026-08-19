@@ -87,7 +87,16 @@ jobs:
           # ⚠️ llama.cpp tags are build numbers (b4600), NOT semver, so the pattern differs from
           # whisper's. Same fallback-and-warn shape and the same reason: this pin could not be
           # verified from a machine that cannot reach GitHub.
-          TAG="b4600"
+          # ⚠️ THE PIN IS CONSTRAINED BY WHISPER'S, NOT CHOSEN FREELY — see the ggml compatibility
+          # step below. Both projects vendor ggml and only one copy may exist in the shipped .so, so
+          # the two tags have to carry the same ggml generation. b4600 did not: whisper v1.7.6 calls
+          # ggml_backend_sched_new with six arguments and b4600's ggml declares five. b5000 is a
+          # later sync and is certain to exist (llama tags are sequential build numbers, long past
+          # this one), which removes the does-the-tag-resolve risk from this round.
+          #
+          # Bumping is cheap now in a way it was not before: the KV-reset API is detected from the
+          # header at configure time rather than assumed, so a newer tag needs no source edit.
+          TAG="b5000"
           if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
             echo "llama.cpp @ $TAG (pinned)"
           else
@@ -120,6 +129,48 @@ jobs:
                      llama_memory_clear llama_get_memory llama_kv_self_clear llama_kv_cache_clear; do
             if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
           done
+
+      - name: Check the two ggml copies agree
+        run: |
+          set -e
+          # ⚠️ THIS STEP EXISTS BECAUSE THE PREDICTED FAILURE MODE WAS THE WRONG ONE. whisper.cpp and
+          # llama.cpp each vendor ggml, and only one copy may end up in liblcarsnative.so — two would
+          # be an ODR violation rather than a link error. So whisper is told to reuse llama's. The
+          # CMake comment anticipated that a failed reuse would be a loud duplicate-target error. The
+          # real failure was the opposite and much quieter: the reuse SUCCEEDED, and whisper then
+          # compiled against a ggml four months older than the one it was written for —
+          #
+          #   whisper.cpp:591: error: no matching function for call to 'ggml_backend_sched_new'
+          #   note: candidate function not viable: requires 5 arguments, but 6 were provided
+          #
+          # — four minutes into a build, in the middle of the C++ output. The signature is a fact
+          # sitting in two headers that can be compared in two seconds, so it is compared here, and
+          # BOTH are printed whether or not they match: when a future bump breaks this again, the log
+          # already says what each side wants instead of requiring another round to find out.
+          for tree in llama.cpp whisper.cpp; do
+            hdr="app/src/main/cpp/$tree/ggml/include/ggml-backend.h"
+            test -f "$hdr" || { echo "FAIL: $tree has no bundled ggml-backend.h at $hdr"; exit 1; }
+            # The declaration spans lines in some versions, so newlines are folded before matching.
+            sig=$(tr '\n' ' ' < "$hdr" | grep -o 'ggml_backend_sched_new *([^;]*)' | tr -s ' ' | head -1)
+            # ⚠️ Without this, a rename of the function makes BOTH sides empty, the two empties
+            # compare equal, and the gate passes while proving nothing. A check that cannot fail is
+            # worse than no check.
+            test -n "$sig" || { echo "FAIL: no ggml_backend_sched_new declaration found in $tree"; exit 1; }
+            echo "  $tree: $sig"
+            # ⚠️ Compared with every space removed, printed with them. Upstream wraps this
+            # declaration across lines in some versions and not others, which leaves a space after
+            # the open bracket in one and not the other — testing the readable forms reports two
+            # IDENTICAL signatures as a mismatch and fails a build that would have worked. Found by
+            # running this gate against a deliberately wrapped header rather than by reading it.
+            eval "sig_$(echo "$tree" | tr -d '.')=\$(echo \"\$sig\" | tr -d ' ')"
+          done
+          if [ "$sig_llamacpp" != "$sig_whispercpp" ]; then
+            echo "FAIL: the pinned whisper.cpp and llama.cpp carry different ggml generations."
+            echo "      Only one ggml can be linked, so the two tags must be from the same sync."
+            echo "      Move one pin until these two signatures match."
+            exit 1
+          fi
+          echo "ggml generations agree"
 
       - name: Run unit tests
         run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
