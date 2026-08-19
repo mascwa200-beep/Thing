@@ -3796,10 +3796,6 @@ kb/biofilms-on-food-contact-surfaces.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/ph-and-acidity-in-food-safety.webp
-    File:Berthold Weiss Canned Foods.jpg
-    Public domain — Glatisant. Artwork by Unknown
-    https://commons.wikimedia.org/wiki/File%3ABerthold_Weiss_Canned_Foods.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3820,10 +3816,6 @@ kb/how-heat-moves-in-the-kitchen.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/market-equilibrium-and-how-prices-clear.webp
-    File:NY stock exchange traders floor LC-U9-10548-6.jpg
-    Public domain — Thomas J. O'Halloran
-    https://commons.wikimedia.org/wiki/File%3ANY_stock_exchange_traders_floor_LC-U9-10548-6.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3832,18 +3824,10 @@ Sourced from Wikimedia Commons (see the re-encoding notice above)
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/retrieval-cues-and-context-dependent-memory.webp
-    File:Studying.jpg
-    Public domain — Gnarlycraig
-    https://commons.wikimedia.org/wiki/File%3AStudying.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/sizing-a-shelter-to-your-body.webp
-    File:1 of the rock shelter caves at Bhimbetka, Madhya Pradesh.jpg
-    CC BY-SA 2.0 — solarisgirl from Pune, India
-    https://commons.wikimedia.org/wiki/File%3A1_of_the_rock_shelter_caves_at_Bhimbetka%2C_Madhya_Pradesh.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3904,10 +3888,6 @@ kb/the-roman-world.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/grammatical-categories-case-gender-number-agreement.webp
-    File:E7127-Balakhna-500-Years.jpg
-    CC BY-SA 3.0 — Vmenkov
-    https://commons.wikimedia.org/wiki/File%3AE7127-Balakhna-500-Years.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3920,10 +3900,6 @@ kb/phonology-sound-systems-patterns.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/conservatism.svg
-    File:NationalismIcon.svg
-    CC BY-SA 4.0 — Geysirhead
-    https://commons.wikimedia.org/wiki/File%3ANationalismIcon.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3944,7 +3920,67 @@ kb/narratology-how-stories-are-told.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/choosing-hardwoods-for-furniture-projects.webp
-    File:120 grid (scale).jpg
-    CC BY-SA 4.0 — Woodsurfsc
-    https://commons.wikimedia.org/wiki/File%3A120_grid_%28scale%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/negative-numbers-and-the-integers.svg
+    File:Integers-line -1+3.svg
+    CC0 — Averater
+    https://commons.wikimedia.org/wiki/File%3AIntegers-line_-1%2B3.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/music-notation-software-and-engraving.svg
+    File:Music notation.svg
+    Public domain — Benjamin D. Esham (bdesham)
+    https://commons.wikimedia.org/wiki/File%3AMusic_notation.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/social-anxiety-disorder.svg
+    File:20220801 Introversion - Shyness - Social anxiety disorder - comparative chart.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A20220801_Introversion_-_Shyness_-_Social_anxiety_disorder_-_comparative_chart.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/unified-command-in-multi-agency-rescue.webp
+    File:ICS Structure.PNG
+    Public domain — Federal Emergency Management Agency
+    https://commons.wikimedia.org/wiki/File%3AICS_Structure.PNG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
