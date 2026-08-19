@@ -5,6 +5,8 @@
 // The judgement they share lives in Readability, which IS a strict mirror.
 package dev.mascwa.pulse.desktop.reader
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.mascwa.pulse.desktop.network.HttpClient
 import dev.mascwa.pulse.desktop.network.HttpException
 import dev.mascwa.pulse.desktop.telemetry.Readability
@@ -42,8 +44,15 @@ class ReaderRepository(private val http: HttpClient) {
             return refusal("That link is a ${friendlyType(type)}, not a page to read.")
         }
 
+        // ⚠️ OFF THE CALLER'S THREAD. `getTextCapped` dispatches its own I/O, but parsing does not —
+        // and this runs from `viewModelScope`, which is the main thread. Building a DOM out of a
+        // megabyte of markup there is the same blocking-work-on-the-main-thread defect that froze the
+        // Security Audit screen and that `CalendarRepository.upcoming` is dispatched away from.
+        //
         // The URL that ANSWERED, not the one that was asked for — relative images resolve against it.
-        return Readability.extract(fetched.body, fetched.finalUrl)
+        return withContext(Dispatchers.Default) {
+            Readability.extract(fetched.body, fetched.finalUrl)
+        }
     }
 
     private fun refusal(note: String) = Readability.Extraction(
@@ -77,11 +86,14 @@ class ReaderRepository(private val http: HttpClient) {
         /**
          * The ceiling on a page, in characters.
          *
-         * Generous — a heavy news page with inlined scripts and JSON-LD really does run to a couple
-         * of million characters, and the strip pass throws most of it away. It exists so that a
-         * pathological page fails instead of taking the process with it.
+         * Measured rather than picked: across a spread of real pages the largest ARTICLE was an
+         * Associated Press story at about 892 kB of markup, and this leaves more than twice that in
+         * hand. It is not a size to aim for — the string is only half the cost, since the DOM built
+         * from it is several times larger again — so a generous ceiling is a real memory risk on a
+         * phone rather than free headroom. It exists so a pathological page fails instead of taking
+         * the process with it.
          */
-        const val MAX_CHARS = 4_000_000
+        const val MAX_CHARS = 2_000_000
 
         /**
          * ⚠️ A browser-shaped Accept, because a chunk of the web content-negotiates.
