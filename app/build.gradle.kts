@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.chaquopy)
 }
 
 // Read optional release-signing credentials from gradle.properties (or -P flags).
@@ -153,6 +154,31 @@ android {
                 "kotlin-tooling-metadata.json"
             )
         }
+    }
+}
+
+// ---- Python (Chaquopy) ---------------------------------------------------------------------
+//
+// ⚠️ TOOLCHAIN PROOF ONLY. Nothing in the app depends on Python yet, and that is deliberate: this
+// lands alone so that when the extractor is added on top, a build failure is unambiguously in the
+// extractor rather than in the toolchain. It is the same reason the CMake/NDK proof shipped by
+// itself before whisper.cpp and llama.cpp went in — and that is the round that made those land
+// cleanly.
+//
+// ⚠️ `ndk.abiFilters` above is load-bearing here, not incidental: the plugin refuses to configure
+// without it ("Chaquopy requires ndk.abiFilters"), and arm64-v8a alone keeps the interpreter to one
+// native ABI, which is the single biggest control on what this costs in the APK.
+chaquopy {
+    defaultConfig {
+        // The interpreter that runs on the BUILD machine, not the phone. CI's ubuntu runner has
+        // python3 preinstalled.
+        buildPython("python3")
+
+        // Ship .py rather than compiling to .pyc at build time. Compilation wants a build interpreter
+        // whose version matches the target's, and this proof has no reason to take that coupling on.
+        pyc { src = false }
+
+        // No pip requirements at this stage — see the note above. Adding yt-dlp is the NEXT slice.
     }
 }
 

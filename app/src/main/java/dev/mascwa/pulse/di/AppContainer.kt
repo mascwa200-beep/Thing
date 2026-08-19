@@ -525,6 +525,17 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
+    /**
+     * The embedded CPython interpreter.
+     *
+     * ⚠️ Lazy for a reason that matters: starting Python extracts the standard library out of the
+     * APK's assets on first run, so a user who never reaches anything Python-backed never pays that
+     * cost and never has the unpacked copy on disk. Constructing this object does not start it —
+     * `ensureStarted()` does, and only when something asks.
+     */
+    val pythonRuntime: dev.mascwa.pulse.data.python.PythonRuntime by lazy {
+        dev.mascwa.pulse.data.python.PythonRuntime(appContext)
+    }
     /** Stateless hardware key-attestation probe (StrongBox-backed). Read-only; used to record the device's
      *  security posture into the audit ledger when it changes. */
     val deviceAttestation: dev.mascwa.pulse.core.device.DeviceAttestation by lazy {

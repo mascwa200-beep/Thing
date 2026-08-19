@@ -61,6 +61,18 @@
 -dontwarn autovalue.shaded.**
 -dontwarn javax.lang.model.**
 
+# ---- Chaquopy (embedded CPython; the whole bridge is JNI + reflection) ----
+# ⚠️ Not optional, and the failure mode is the dangerous one: without these R8 renames or removes
+# classes the native interpreter resolves BY NAME at runtime, so the build goes green, the APK ships,
+# and Python fails on the device. Nothing in CI could catch that — which is exactly why the keep is
+# broad. The runtime is a handful of classes; there is nothing worth shrinking here.
+-keep class com.chaquo.python.** { *; }
+# StaticProxy/PyProxy subclasses are instantiated from Python, so their members are unreachable to R8.
+-keep class * extends com.chaquo.python.PyObject { *; }
+-keep class * implements com.chaquo.python.PyProxy { *; }
+-keepclassmembers class * implements com.chaquo.python.PyProxy { *; }
+-dontwarn com.chaquo.python.**
+
 # ---- Vosk + JNA (native STT; JNA binds native via reflection/proxies) ----
 -keep class org.vosk.** { *; }
 -keep class com.sun.jna.** { *; }

@@ -262,6 +262,58 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the Python runtime packaged
+        # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
+        # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64
+        # interpreter, so an assertion there would fail on a good build. What proves Chaquopy worked
+        # is the interpreter, its standard library and OUR module all being inside the shipped APK.
+        #
+        # ⚠️ Three separate assertions, not one, because they are three different failures:
+        #   - no libpython           → the plugin did not build the native interpreter at all
+        #   - no stdlib asset        → an interpreter that starts and cannot import anything
+        #   - no lcars_probe.py      → the plugin ran but never saw src/main/python
+        # A single "is Python in there" check would pass on the second and third and the build would
+        # ship something that only fails on the device.
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "inspecting $apk"
+          listing=$(unzip -l "$apk")
+
+          if ! echo "$listing" | grep -qE "lib/arm64-v8a/libpython3.*\.so"; then
+            echo "FAIL: no libpython in the APK — Chaquopy did not package an interpreter."
+            echo "$listing" | grep "lib/arm64-v8a/" || echo "(no arm64 libraries at all)"
+            exit 1
+          fi
+          echo "interpreter:"
+          echo "$listing" | grep -E "lib/arm64-v8a/lib(python|chaquopy)" || true
+
+          # Chaquopy ships the standard library and the app's own Python as assets extracted on first
+          # run. The exact asset layout is a plugin implementation detail, so this matches on the
+          # directory it has always used rather than on an exact filename.
+          if ! echo "$listing" | grep -q "assets/chaquopy/"; then
+            echo "FAIL: no assets/chaquopy/ — the interpreter would start with nothing to import."
+            exit 1
+          fi
+          echo "python assets:"
+          echo "$listing" | grep "assets/chaquopy/" | head -20
+
+          # And that OUR module is in there. It is inside one of the asset zips rather than a loose
+          # file, so the check greps the zip bytes — the name is stored uncompressed in the entry
+          # header even when the content is deflated, which is what makes this work at all.
+          found=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${PROBE}" /tmp/pyasset.bin; then found="$entry"; break; fi
+          done
+          if [ -z "$found" ]; then
+            echo "FAIL: ${PROBE} is not in any Python asset — src/main/python was not picked up."
+            exit 1
+          fi
+          echo "our module is in $found"
+          echo "Python runtime packaged."
+        env:
+          PROBE: lcars_probe.py
+
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:

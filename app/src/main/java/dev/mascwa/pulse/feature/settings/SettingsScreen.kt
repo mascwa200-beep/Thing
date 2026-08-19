@@ -1118,6 +1118,8 @@ fun SettingsScreen(
                 val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
                 val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
                 val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
+                val pythonTest by vm.pythonTestResult.collectAsStateWithLifecycle()
+                val pythonTestRunning by vm.pythonTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
@@ -1207,6 +1209,14 @@ fun SettingsScreen(
                             "your real log.",
                         onClick = { vm.runLedgerSelfTest() },
                     )
+                    PrefClickable(
+                        "Test the Python runtime",
+                        value = if (pythonTestRunning) "Starting…" else null,
+                        subtitle = "Start the embedded interpreter on this device and report what " +
+                            "actually works. The build only proves it was packaged; whether it runs " +
+                            "here is a separate question. Nothing leaves the device.",
+                        onClick = { vm.runPythonTest() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
@@ -1241,6 +1251,36 @@ fun SettingsScreen(
                                     DialogBody(ch.detail)
                                 }
                             }
+                        }
+                    }
+                }
+                pythonTest?.let { report ->
+                    LcarsDialog(
+                        title = if (report.allOk) "Python — running" else "Python — incomplete",
+                        onDismiss = { vm.dismissPythonTest() },
+                        dismissText = "DONE",
+                    ) {
+                        val pyColors = Pulse.colors
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Each finding is reported on its own line, because "the interpreter did
+                            // not start" and "it started with no standard library" are different
+                            // builds to fix and a single pass/fail could not tell them apart.
+                            listOf(
+                                "Interpreter started" to (if (report.running) "yes" else null),
+                                "Version" to report.interpreter,
+                                "Argument round-trip" to report.roundTrip,
+                                "Standard library" to report.stdlib,
+                            ).forEach { (name, detail) ->
+                                Column {
+                                    Text(
+                                        "${if (detail != null) "✓" else "✗"}  $name",
+                                        fontFamily = ChakraPetch, fontSize = 13.sp,
+                                        color = if (detail != null) pyColors.positive else pyColors.negative,
+                                    )
+                                    DialogBody(detail ?: "did not run")
+                                }
+                            }
+                            report.error?.let { DialogBody(it) }
                         }
                     }
                 }

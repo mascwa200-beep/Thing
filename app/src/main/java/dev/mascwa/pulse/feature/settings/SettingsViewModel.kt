@@ -42,6 +42,7 @@ class SettingsViewModel(
     private val ledgerSelfTest: dev.mascwa.pulse.data.blackbox.LedgerSelfTest,
     private val oracleLearning: dev.mascwa.pulse.data.oracle.OracleLearningStore,
     private val study: dev.mascwa.pulse.data.study.StudyStore,
+    private val python: dev.mascwa.pulse.data.python.PythonRuntime,
 ) : ViewModel() {
 
     private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
@@ -64,6 +65,40 @@ class SettingsViewModel(
     /** Dismiss the self-test result dialog. */
     fun dismissLedgerSelfTest() {
         _selfTest.value = null
+    }
+
+    private val _pythonTest = MutableStateFlow<dev.mascwa.pulse.data.python.PythonRuntime.Report?>(null)
+    /** Result of the Python self-test (null = not run / dialog dismissed). */
+    val pythonTestResult: StateFlow<dev.mascwa.pulse.data.python.PythonRuntime.Report?> = _pythonTest
+
+    private val _pythonTestRunning = MutableStateFlow(false)
+    val pythonTestRunning: StateFlow<Boolean> = _pythonTestRunning
+
+    /**
+     * Start the embedded interpreter and report what it can actually do.
+     *
+     * ⚠️ This is the owner-verify half of the toolchain proof. CI asserts that the interpreter and
+     * its standard-library asset are inside the shipped APK — a fact about a zip file — and cannot
+     * say whether it starts on a real phone. Neither check substitutes for the other, exactly as
+     * with the native library's symbol check and the ledger self-test above.
+     */
+    fun runPythonTest() {
+        if (_pythonTestRunning.value) return
+        viewModelScope.launch {
+            _pythonTestRunning.value = true
+            _pythonTest.value = runCatching { python.selfTest() }.getOrElse {
+                dev.mascwa.pulse.data.python.PythonRuntime.Report(
+                    running = false, interpreter = null, roundTrip = null, stdlib = null,
+                    error = it.message ?: it::class.java.simpleName,
+                )
+            }
+            _pythonTestRunning.value = false
+        }
+    }
+
+    /** Dismiss the Python self-test dialog. */
+    fun dismissPythonTest() {
+        _pythonTest.value = null
     }
 
     private val _selfCode = MutableStateFlow("")
