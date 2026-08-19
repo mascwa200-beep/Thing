@@ -5947,3 +5947,87 @@ one, and whether the reading measure is comfortable at full-screen width.
 **Open / steerable:** the reader is reachable only from a news card — the assistant could hand it a URL
 too; images on the desktop are named rather than drawn (no image pipeline in that module); and the
 owner's features 3 (Media3 + SponsorBlock) and 4 (bundled-Python yt-dlp) remain deferred.
+
+### FEATURES 3 & 4 — the media engine, SponsorBlock, and the hardware harvester (this session, PR #449)
+
+Owner: *"keep going autonomously and overpower every single feature. Use Fable 5 ultra code."* The
+noon-Eastern subagent gate had lifted, so this run used **Fable ultracode workflows** for the two KB
+content waves (below) while the main loop shipped the last two of the owner's four-feature directive.
+Features 1 (interrogator) and 2 (DOM decimator/reader) were already CI-green on this branch; this
+completes 3 and 4. The plan is `robust-baking-dewdrop.md`; P0 (Chaquopy) and Part A (real search) had
+landed earlier, so this session did **P2b → P3 → P4/P5 → H1 → the `play` tool**.
+
+- **P2b — extraction's Kotlin side (`c890f21`).** `data/media/MediaExtractor.kt` calls the bundled
+  `lcars_extract.resolve` through `PythonRuntime` and maps its NAMED reason onto `MediaResolution`
+  — the classification stays Python-side, the only side with yt-dlp's exception types (they do not
+  survive JNI). Items cache on `MediaItem.isFresh`; an address that never stated an expiry is never
+  cached (isFresh treats unknown expiry as already stale). `data/media/SponsorBlockRepository.kt`:
+  ⚠️ **the server is never told which video you watch** — the hash-prefix endpoint gets 4 hex chars
+  of SHA-256 (~156 videos back, measured) — and **every category is requested, the user's policy
+  applied locally**, because category filtering is server-side and a filtered request omits a video
+  with nothing in that set entirely (65 vs 156 rows for the same prefix, measured live). Both fully
+  type-checked against the real platform + the extracted chaquopy runtime jar (`/tmp/cqx`).
+- **P3 — the fourth audio claimant (`a8ff961`).** `MediaFloor` gained `Owner.ONDEMAND` +
+  `Action.STOP_ONDEMAND` (the per-owner `when` makes a new claimant a compile error, not a silent
+  fall-through); `displacedNote` now keys on **both** sides since with three players "who took the
+  speaker" is no longer implied by who stopped. +1 MediaFloorTest, 8/8 local. `feature/theater/
+  OnDemandController.kt` is the live controller's disciplines **plus a timeline**: a retry captures
+  the position before re-preparing and seeks back (a blip must not restart a 2-hour video), pause
+  keeps the player and the floor, and a 4 Hz poll performs the skips the CI-tested `SponsorSegments`
+  decides. ⚠️ `BEHIND_LIVE_WINDOW` is deliberately NOT in its transient set — this player never
+  plays live streams. Claims `AudioFloor` before building, so starting playback visibly stops the
+  radio and says so.
+- **P4/P5 — the Viewscreen (`333ffe9`).** MENU ▸ SOUND ▸ Viewscreen: address field, honest refusal
+  sentences, 16:9 surface + transport (pause/resume/±seek, blocky LCARS progress bar), and an honest
+  skip readout ("3 skips queued · 74s" / "no flagged segments" / "skipping off" — silence never
+  ambiguous). `AppSettings.sponsorSkip` (default OFF) ⚠️ **gates the network request, not just the
+  seeks** — a privacy toggle that still phones out and ignores the answer is not one. Routes.VIEWSCREEN
+  + MENU entry + deep-linkable + factory case; Settings row.
+- **H1 — the harvester + audio-only (`3a42900`).** Feature 4, literal: hold a physical volume key
+  ~1.2 s (`HARVEST_HOLD_REPEATS=15`) while media is on the viewscreen → `data/media/MediaHarvester.kt`
+  downloads it into `filesDir/harvest` in a background coroutine via `lcars_extract.download` (yt-dlp,
+  not a GET — an HLS "stream" is thousands of fragments). ⚠️ `dispatchKeyEvent` intercepts ONLY when
+  the player holds an item and only past the repeat threshold, so with nothing on the viewscreen both
+  volume keys are completely normal and slow volume presses never trip it; a one-shot latch fires one
+  harvest per hold. A HARVEST button mirrors the gesture. Feature 3's missing half: `LISTEN · AUDIO
+  ONLY` plays the audio rendition behind `OnDemandService` (a `mediaPlayback` FGS mirroring
+  RadioService) so it survives leaving the screen; video deliberately gets no service. ⚠️ The
+  `audioOnly` flag survives every state rebuild via `copy()` — a fresh construction would drop it and
+  the keep-alive service would read a background audio session as a video one. `NotifId.FGS_ONDEMAND`
+  added to the source constant, **both** derived sets, AND the test's independent list (the exact miss
+  that cost a CI round last arc) — `run_notifid_test.sh` 4/4 local.
+- **The `play` tool (`5210f69`).** `TOOL play <url|pause|resume|stop>` — the Computer resolves and
+  plays by voice/console, **audio-only** (a tool call has no screen), same sponsor-skip privacy rule
+  as the button. `OnDemandService.start` is best-effort: from the tool path it can be a background FGS
+  start, which 12+ may refuse → degraded keep-alive, not a crash.
+
+**⚠️ Chaquopy/yt-dlp toolchain lessons banked (all cost CI rounds earlier this session):** the block
+is top-level `chaquopy {}`, sibling of `android {}`, NOT nested; `version = "3.12"` is a **property
+assignment**, not `version(...)` — javap confirmed only `getVersion`/`setVersion` (I wrote the call
+form with the javap output on screen, the exact "derive calls from the real declaration" mistake);
+Chaquopy default Python is 3.8, yt-dlp needs ≥3.10 (diagnosed by reflecting on
+`com.chaquo.python.internal.Common`); the config cache is incompatible with its task graph (off,
+commented); `quiet:True` does NOT silence yt-dlp errors and a failure line carries the resolved URL →
+`_Silent` logger so viewing history never reaches logcat/DebugUploader; `yt_dlp.__version__` doesn't
+exist (it's `yt_dlp.version.__version__`). The pinned wheel (2026.7.4) is pure-Python, `requires_dist:
+[]`, vetted on PyPI. The download `outtmpl` uses `%(title).80B` (byte cap) — validated against the
+real wheel that a 300-char multibyte title truncates to 58 filename bytes.
+
+**⚠️ Owner-verify on the Pixel — CI compiles, it cannot play a video, open a mic, or hold a key.**
+Viewscreen: paste a real video URL → PLAY (picture + transport), turn the Settings skip switch on and
+watch a sponsor skip with its note; LISTEN · AUDIO ONLY then leave the app (keeps playing, Stop in the
+tray); hold volume-down ~1.2 s while playing (harvest line → "Saved to this device"); start playback
+over the radio (radio stops and says so); ask the Computer `play <url>` by voice. Extraction is
+against some sites' ToS — private, sideloaded, single-user, owner-authorised. APK size (~144 MB, now
+carrying CPython + yt-dlp on top of whisper/llama) is paid on **every** update via the rolling
+`latest` release — a documented cost, not a regression.
+
+**KB content, via Fable ultracode workflows (running as this was written):** a **55-topic KB breadth
+wave** (`wave_c1`, 14 writers, all 49 categories, 13–15 sections at ≥460 words each) and a **56-entry
+Federation Database lore wave** (`wave_l2`, 8 writers, the in-universe register, IP boundary =
+original prose only, no Memory Alpha, no franchise art — the seven lore shelves 46→~102). Both merge
+through the standard pipeline (`kb_pipeline.py` / `merge_new_guides.py` → `ci_parity_lint.py` →
+`check_emergency_routes.py` → ratchet `FULL_PAGE_BASELINE` → commit). ⚠️ The dynamic-workflow
+`args-is-a-string` trap bit once (`typeof args === 'string' ? JSON.parse(args) : args` guard is in the
+scripts, but the FIRST launch passed a filename instead of the topics array and threw at the guard —
+zero agents spent, relaunched with the array inline).
