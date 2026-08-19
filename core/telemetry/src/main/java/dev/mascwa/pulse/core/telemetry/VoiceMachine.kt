@@ -41,6 +41,18 @@ object VoiceMachine {
          * the reply and answers itself.
          */
         SPEAKING,
+
+        /**
+         * The acoustic interrogator is capturing ambient audio.
+         *
+         * ⚠️ **A THIRD CONTINUOUS CLAIMANT, and the one that forced this enum to grow.** The wake
+         * loop and the interrogator both want the microphone open indefinitely, and whether two
+         * `AudioRecord` clients inside one app both receive real audio is a question about a
+         * specific device's audio policy that cannot be answered from a build machine. Rather than
+         * guess and ship a feature that silently records silence, they are mutually exclusive here
+         * and the tradeoff is stated in [State.interrogating].
+         */
+        INTERROGATOR,
     }
 
     /** What the caller must do to make the world match the state. */
@@ -53,6 +65,19 @@ object VoiceMachine {
 
         /** Start a one-shot command capture. */
         START_COMMAND,
+
+        /**
+         * Open the ambient capture stream.
+         *
+         * ⚠️ **Starting an owner implicitly stops the previous one, and nothing here enforces that.**
+         * It was already the contract between [START_WAKE] and [START_COMMAND], which is invisible
+         * because those two share a single `VoskSpeech` and stopping is what starting does. The
+         * interrogator uses a different recorder entirely, so switching between it and the voice
+         * stack means genuinely closing one stream before opening the other — a service that started
+         * ambient capture without stopping the wake recogniser would be the two-claimant problem
+         * this enum exists to avoid, arrived at by a different route.
+         */
+        START_INTERROGATOR,
 
         /** Stop whatever this service has open. Someone else holds the mic, or nobody should. */
         RELEASE_MIC,
@@ -67,6 +92,7 @@ object VoiceMachine {
         val owner: Owner = Owner.NONE,
         val wanted: Boolean = false,
         val console: Boolean = false,
+        val interrogating: Boolean = false,
     )
 
     /** The next state, and the one thing to do about it. */
@@ -79,6 +105,20 @@ object VoiceMachine {
 
     /** The console claims or releases the mic. */
     fun State.console(active: Boolean): Step = copy(console = active).settle()
+
+    /**
+     * The acoustic interrogator is switched on or off.
+     *
+     * ⚠️ Turning it ON SUSPENDS THE WAKE WORD, and that is a deliberate, user-visible tradeoff
+     * rather than an oversight — see [Owner.INTERROGATOR]. Turning it off returns the microphone to
+     * whoever should have it, which is what makes the suspension reversible rather than a mode the
+     * user has to restart the service to leave.
+     *
+     * The proper fix is one `AudioRecord` fanned out to both consumers. That is a real refactor of
+     * the voice stack and is recorded rather than attempted blind, because getting it wrong means
+     * the wake word stops working and nothing in CI would notice.
+     */
+    fun State.interrogator(on: Boolean): Step = copy(interrogating = on).settle()
 
     /**
      * The wake phrase was recognised.
@@ -113,9 +153,16 @@ object VoiceMachine {
      */
     fun State.settle(holdFloor: Boolean = false): Step = to(
         when {
-            !wanted -> Owner.NONE
+            // ⚠️ The interrogator can run with the voice assistant entirely off, so "nobody wants the
+            // mic" is no longer the same question as "voice is off".
+            !wanted && !interrogating -> Owner.NONE
+            // The console still wins: somebody who taps to talk is asking for the microphone
+            // explicitly, and an ambient feature must never outrank a deliberate request.
             console -> Owner.CONSOLE
-            holdFloor -> Owner.COMMAND
+            // A conversation already in flight finishes before anything else takes the mic.
+            holdFloor && wanted -> Owner.COMMAND
+            // Then the interrogator, ahead of the wake word — see [Owner.INTERROGATOR].
+            interrogating -> Owner.INTERROGATOR
             else -> Owner.WAKE
         },
     )
@@ -128,7 +175,8 @@ object VoiceMachine {
      * [Owner.CONSOLE] and [Owner.SPEAKING] mean the mic is not ours, and [Owner.NONE] means nobody
      * has it — in none of those three is there anything of ours to stop.
      */
-    private val Owner.holdsMic: Boolean get() = this == Owner.WAKE || this == Owner.COMMAND
+    private val Owner.holdsMic: Boolean get() =
+        this == Owner.WAKE || this == Owner.COMMAND || this == Owner.INTERROGATOR
 
     /**
      * Move to [next], or do nothing if we are already there.
@@ -148,6 +196,7 @@ object VoiceMachine {
             when (next) {
                 Owner.WAKE -> Action.START_WAKE
                 Owner.COMMAND -> Action.START_COMMAND
+                Owner.INTERROGATOR -> Action.START_INTERROGATOR
                 Owner.NONE, Owner.CONSOLE, Owner.SPEAKING ->
                     if (owner.holdsMic) Action.RELEASE_MIC else Action.NOTHING
             },
