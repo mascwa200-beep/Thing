@@ -4,6 +4,7 @@ import android.util.Base64
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
 import dev.mascwa.pulse.core.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.SearchPlan
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
@@ -30,30 +31,73 @@ private fun stripHtml(html: String): String =
         .replace(HTML_WHITESPACE, " ")
         .trim()
 
-/** Keyless web search via DuckDuckGo's Instant-Answer API (limited but no key/account). */
-class WebSearchTool(private val http: HttpClient) : JarvisTool {
+/**
+ * Search — the offline library, an encyclopaedia, and the open web, in whichever order the question
+ * calls for.
+ *
+ * ⚠️ **What this replaced was not a search engine, and that was measured rather than suspected.**
+ * The old implementation called DuckDuckGo's Instant Answer API, which is an *entity lookup*: over
+ * fourteen real queries, all eight natural-language questions returned nothing and all six bare-noun
+ * lookups returned an abstract. Since the tool described itself as "search the web", the model used
+ * it as one — and got "No instant answer found", which it could only read as the web not knowing.
+ * A tool that returns silence for the commonest way of asking is worse than no tool, because the
+ * silence is indistinguishable from an answer.
+ *
+ * ⚠️ **Every result names its tier, and that is not decoration.** An offline guide, a keyless
+ * encyclopaedia summary and a live web result carry very different warranties; handed to a model as
+ * undifferentiated text, a 2019 encyclopaedia sentence gets presented as the state of the world
+ * today. The same discipline as `Readability.Outcome` and `Rebuttal.Provenance`.
+ */
+class WebSearchTool(
+    private val search: dev.mascwa.pulse.data.search.WebSearchRepository,
+) : JarvisTool {
     override val name = "web"
-    override val usage = "web <query> — search the web (DuckDuckGo, brief answer)"
+    override val usage =
+        "web <query> — search the offline library, Wikipedia and the web; says which answered"
 
-    @Serializable
-    private data class Ddg(
-        val AbstractText: String = "",
-        val Heading: String = "",
-        val RelatedTopics: List<Topic> = emptyList(),
-    )
+    override suspend fun run(arg: String): String {
+        val q = arg.trim()
+        if (q.isBlank()) return "Give me something to search for."
+        val outcome = runCatching { search.search(q) }
+            .getOrElse { return "Search failed: ${it.message ?: it::class.java.simpleName}" }
 
-    @Serializable
-    private data class Topic(val Text: String = "")
+        if (outcome.answers.isEmpty()) {
+            return outcome.verdict ?: "Nothing found for \"$q\"."
+        }
 
-    override suspend fun run(arg: String): String = runCatching {
-        val q = URLEncoder.encode(arg.trim(), "UTF-8")
-        val url = "https://api.duckduckgo.com/?q=$q&format=json&no_html=1&skip_disambig=1"
-        val r = http.getJson(url, Ddg.serializer())
-        val abstract = r.AbstractText.trim()
-        if (abstract.isNotBlank()) return@runCatching abstract.clip()
-        val topics = r.RelatedTopics.map { it.Text.trim() }.filter { it.isNotBlank() }.take(4)
-        if (topics.isEmpty()) "No instant answer found for \"$arg\"." else topics.joinToString("\n").clip()
-    }.getOrElse { "Web search failed: ${it.message}" }
+        val lines = StringBuilder()
+        // ⚠️ The provenance line comes FIRST, before any content. A model that reads the answer and
+        // then the source has already formed the answer; one that reads the source first knows how
+        // much to trust what follows.
+        lines.append(SearchPlan.provenance(outcome.answers.first().tier)).append(":\n")
+        outcome.answers.forEach { a ->
+            lines.append("• ").append(a.title)
+            a.url?.let { lines.append(" — ").append(it) }
+            if (a.snippet.isNotBlank()) lines.append("\n  ").append(a.snippet)
+            lines.append('\n')
+        }
+        // A tier the question genuinely wanted and could not reach is worth saying even when
+        // something else answered — otherwise a stale encyclopaedia entry stands in for today's news
+        // with nothing marking the substitution.
+        outcome.plan.missing?.let {
+            lines.append("(Note: this needed a live web search, which is not configured.)\n")
+        }
+        return lines.toString().trim().clip(SEARCH_OBS)
+    }
+
+    companion object {
+        /**
+         * ⚠️ Bigger than the file's default 1500, for the same reason the fetch tool's is: a search
+         * result is a LIST, and the default cap was sized for a single fact. Three tiers of titles,
+         * URLs and snippets clear 1500 easily, and truncating mid-list drops the very results the
+         * ranking put lowest — which is the wrong end to lose, because the tier order already put
+         * the best answer first and the tail is where the alternatives live.
+         *
+         * Still under `AgentOrchestrator`'s 6000-per-observation ceiling, so this cannot be the
+         * thing that overflows a turn.
+         */
+        const val SEARCH_OBS = 3000
+    }
 }
 
 /**

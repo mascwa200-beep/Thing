@@ -546,10 +546,22 @@ class AppContainer(private val appContext: Context) {
             appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository, auditLedgerStore,
         )
     }
+    /**
+     * The layered search behind the `web` tool: the offline library, then Wikipedia, then the open
+     * web when a key is set.
+     *
+     * A single instance rather than one per call site, so the three places that reach for `web`
+     * (the tool registry, an authored Lua tool's `web` capability, and the approval gate's research
+     * step) cannot end up searching differently from each other.
+     */
+    val webSearchRepository: dev.mascwa.pulse.data.search.WebSearchRepository by lazy {
+        dev.mascwa.pulse.data.search.WebSearchRepository(http, settingsRepository, libraryLookup)
+    }
+
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
         listOf(
-            dev.mascwa.pulse.jarvis.agent.WebSearchTool(http),
+            dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository),
             dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
             dev.mascwa.pulse.jarvis.agent.DownloadTool(appContext, http),
             dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
@@ -621,7 +633,7 @@ class AppContainer(private val appContext: Context) {
      *  Each delegates to an existing built-in tool — authored scripts get no raw fs/network. */
     private val toolCapabilities: Map<String, suspend (String) -> String> by lazy {
         mapOf<String, suspend (String) -> String>(
-            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(q) },
+            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository).run(q) },
             "fetch" to { q -> dev.mascwa.pulse.jarvis.agent.WebFetchTool(http).run(q) },
             "docs" to { q -> dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore).run(q) },
             "recall" to { q -> dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory).run(q) },
@@ -634,7 +646,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(
             selfEditStore,
             knowledgeStore,
-            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
+            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository).run(topic) },
             commitCode = { action ->
                 val result = selfCoder.commit(action)
                 // Record shipped self-changes to durable memory so J.A.R.V.I.S. can recall what it has

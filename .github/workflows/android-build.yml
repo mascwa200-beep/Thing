@@ -311,6 +311,15 @@ jobs:
           fi
           echo "our module is in $found"
           echo "Python runtime packaged."
+
+          # ⚠️ Reported on every build because it is paid on every UPDATE, not once: the APK goes to
+          # the rolling `latest` release and the in-app updater pulls the whole thing. Chasing the
+          # figure after the fact is not possible — the release asset is overwritten — so the only
+          # way to know what a change cost is to have measured the build before it.
+          bytes=$(stat -c%s "$apk")
+          echo "APK: $((bytes / 1024 / 1024)) MB ($bytes bytes)"
+          echo "largest components:"
+          unzip -l "$apk" | sort -k1 -n -r | head -12
         env:
           PROBE: lcars_probe.py
 

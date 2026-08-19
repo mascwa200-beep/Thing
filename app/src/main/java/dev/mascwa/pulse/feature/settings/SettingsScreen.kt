@@ -995,7 +995,7 @@ fun SettingsScreen(
             }
 
             // ----- Optional API keys -----
-            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google")) item {
+            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google brave search web")) item {
                 PrefSection("Optional API keys") {
                     Text(
                         "All sections work without keys. Add free keys to unlock richer sources.",
@@ -1021,6 +1021,17 @@ fun SettingsScreen(
                     EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa), "https://api.nasa.gov/") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(nasa = v.trim())) }
                     }
+                    EditableValueRow("Brave Search (the open web)", masked(s.apiKeys.brave), "https://api-dashboard.search.brave.com/register") { v ->
+                        vm.update { it.copy(apiKeys = it.apiKeys.copy(brave = v.trim())) }
+                    }
+                    Text(
+                        "Without a Brave key the Computer still searches the offline library and " +
+                            "Wikipedia — but it cannot answer anything about today, and it will say " +
+                            "so rather than guessing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
 
