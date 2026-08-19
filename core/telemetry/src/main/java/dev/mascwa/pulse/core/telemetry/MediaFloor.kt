@@ -37,6 +37,9 @@ object MediaFloor {
 
         /** A live video feed, which plays only while its surface is on screen. */
         VIDEO,
+
+        /** On-demand playback — a resolved video or track with a timeline. */
+        ONDEMAND,
     }
 
     /** What the caller must do to make the world match the state. */
@@ -49,6 +52,9 @@ object MediaFloor {
 
         /** Stop the live video — something else is taking the speaker. */
         STOP_VIDEO,
+
+        /** Stop on-demand playback — something else is taking the speaker. */
+        STOP_ONDEMAND,
     }
 
     data class State(val owner: Owner = Owner.NONE)
@@ -101,6 +107,7 @@ object MediaFloor {
     private fun stopOf(previous: Owner): Action = when (previous) {
         Owner.RADIO -> Action.STOP_RADIO
         Owner.VIDEO -> Action.STOP_VIDEO
+        Owner.ONDEMAND -> Action.STOP_ONDEMAND
         Owner.NONE -> Action.NOTHING
     }
 
@@ -114,10 +121,19 @@ object MediaFloor {
      */
     fun displacedNote(previous: Owner, next: Owner): String? {
         if (previous == next || previous == Owner.NONE || next == Owner.NONE) return null
-        return when (previous) {
-            Owner.RADIO -> "Radio stopped — the live feed has the speaker."
-            Owner.VIDEO -> "Live feed stopped — the radio has the speaker."
-            Owner.NONE -> null
+        // What stopped is the alarming half; who took the speaker is said from the taker's side.
+        val stopped = when (previous) {
+            Owner.RADIO -> "Radio stopped"
+            Owner.VIDEO -> "Live feed stopped"
+            Owner.ONDEMAND -> "Playback stopped"
+            Owner.NONE -> return null
         }
+        val taker = when (next) {
+            Owner.RADIO -> "the radio"
+            Owner.VIDEO -> "the live feed"
+            Owner.ONDEMAND -> "the player"
+            Owner.NONE -> return null
+        }
+        return "$stopped — $taker has the speaker."
     }
 }
