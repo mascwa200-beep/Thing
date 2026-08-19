@@ -295,6 +295,13 @@ class OpenScreenTool(
         val allowed = hit.key in dev.mascwa.pulse.navigation.SHORTCUT_ROUTES ||
             dev.mascwa.pulse.navigation.TOP_DESTINATIONS.any { it.route == hit.key }
         if (!allowed) return "That screen cannot be opened directly."
+        // ⚠️ A SharedFlow with replay=0 never re-delivers to a LATE collector: with nobody
+        // listening, tryEmit "succeeds" into the void. The subscription check is what makes the
+        // reply honest — a voice command with the app backgrounded gets told the truth instead
+        // of "Opening…" over nothing happening.
+        if (bus.subscriptionCount.value == 0) {
+            return "The console isn't on screen right now — open the app and ask again."
+        }
         return if (bus.tryEmit(hit.key)) "Opening ${hit.label}." else "Could not open ${hit.label} right now."
     }
 

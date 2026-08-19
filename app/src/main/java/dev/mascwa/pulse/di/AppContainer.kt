@@ -40,8 +40,12 @@ class AppContainer(private val appContext: Context) {
     /**
      * Screen-open requests from the Computer's tools. PulseApp collects it and navigates through
      * its one openApp idiom; the tool side emits a route and knows nothing about navigation.
-     * Buffered so a tool firing before the UI collects (or during a configuration change) is not
-     * silently dropped.
+     *
+     * ⚠️ replay = 0 ON PURPOSE: a navigation request is an imperative, not state — replaying the
+     * last route to every future collector would re-navigate on each Activity recreation. The
+     * buffer only absorbs a slow collector; with NO collector an emit is dropped, which is why
+     * the tool checks subscriptionCount and answers honestly instead of claiming "Opening…"
+     * into the void.
      */
     val navigationBus = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
 
