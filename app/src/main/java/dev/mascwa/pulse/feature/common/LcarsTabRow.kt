@@ -34,7 +34,18 @@ fun LcarsTabRow(
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(selected, tabs.size) {
-        if (selected in tabs.indices) listState.animateScrollToItem(selected)
+        if (selected !in tabs.indices) return@LaunchedEffect
+        // Scroll ONLY when the selected chip isn't already fully on screen — Material's
+        // ScrollableTabRow moved the minimum distance, and animateScrollToItem always
+        // start-aligns, so calling it unconditionally yanked the whole rail left even when the
+        // tapped chip was in plain view. When it does fire (returning with tab 15 selected),
+        // start-aligning is fine.
+        val info = listState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == selected }
+        val fullyVisible = item != null &&
+            item.offset >= info.viewportStartOffset &&
+            item.offset + item.size <= info.viewportEndOffset
+        if (!fullyVisible) listState.animateScrollToItem(selected)
     }
     LazyRow(
         state = listState,

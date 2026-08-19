@@ -48,13 +48,21 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
     val analyses by vm.analyses.collectAsStateWithLifecycle()
     val coverageByUrl by vm.coverageByUrl.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var searchActive by remember { mutableStateOf(false) }
-    var searchText by remember { mutableStateOf("") }
+    // ⚠️ THE DURABLE HALF OF SEARCH LIVES IN THE VM. These two are keyed on state.searchMode so a
+    // TRANSITION re-derives them: navigate to the reader mid-search (or rotate) and this
+    // composition dies while the VM — scoped to the NavBackStackEntry — keeps searchMode=true and
+    // the results as content. Plain remember{false} here made the rail reappear highlighting
+    // BREAKING over a list still showing the search hits, with the RESULTS line unreachable.
+    // The key only changes on mode transitions, so typing never re-initialises these.
+    var searchOpen by remember(state.searchMode) { mutableStateOf(state.searchMode) }
+    var searchText by remember(state.searchMode) {
+        mutableStateOf(if (state.searchMode) state.query else "")
+    }
 
     // ⚠️ System back leaves SEARCH MODE, not the News tab — gated on the sub-state so it swallows
     // nothing when search is closed.
-    androidx.activity.compose.BackHandler(enabled = searchActive) {
-        searchActive = false
+    androidx.activity.compose.BackHandler(enabled = searchOpen) {
+        searchOpen = false
         searchText = ""
         vm.clearSearch()
     }
@@ -67,13 +75,17 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
     PulseScaffold(
         title = "News",
         actions = {
-            IconButton(onClick = { searchActive = true }) {
-                Icon(LcarsIcons.Search, "Search")
+            // Gated: with the field already open the magnifier would be a live-looking control
+            // that fires the tap cue and changes nothing.
+            if (!searchOpen) {
+                IconButton(onClick = { searchOpen = true }) {
+                    Icon(LcarsIcons.Search, "Search")
+                }
             }
         },
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
-        if (searchActive) {
+        if (searchOpen) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -90,7 +102,7 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
                     )
                 }
                 LcarsButton("CANCEL", onClick = {
-                    searchActive = false
+                    searchOpen = false
                     searchText = ""
                     vm.clearSearch()
                 })
