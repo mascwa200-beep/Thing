@@ -1,10 +1,14 @@
 package dev.mascwa.pulse.feature.breaking
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import dev.mascwa.pulse.PulseApplication
 import dev.mascwa.pulse.core.util.openUrl
@@ -17,6 +21,18 @@ import dev.mascwa.pulse.core.util.openUrl
  */
 class BreakingNewsActivity : ComponentActivity() {
 
+    /**
+     * The story currently on screen.
+     *
+     * ⚠️ **State, not `intent`, because this Activity is `singleTask`.** A second story breaking
+     * while this is up does not create a new instance — it arrives at this one through
+     * [onNewIntent], `onCreate` does not run again, and `getIntent()` keeps returning the ORIGINAL.
+     * Read straight off `intent` at composition time, the newer story was silently swallowed: the
+     * takeover stayed on the first headline and nothing said another had come in. `MainActivity`
+     * had this same defect fixed in an earlier pass; the two takeovers were left behind.
+     */
+    private var current by mutableStateOf<Intent?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -27,11 +43,14 @@ class BreakingNewsActivity : ComponentActivity() {
             override fun handleOnBackPressed() { clearAndFinish() }
         })
 
-        val headline = intent.getStringExtra(EXTRA_HEADLINE)?.takeIf { it.isNotBlank() } ?: "Breaking News"
-        val query = intent.getStringExtra(EXTRA_QUERY)?.takeIf { it.isNotBlank() } ?: headline
+        current = intent
         val repo = (application as PulseApplication).container.breakingCoverageRepository
 
         setContent {
+            val shown = current ?: intent
+            val headline = shown.getStringExtra(EXTRA_HEADLINE)?.takeIf { it.isNotBlank() }
+                ?: "Breaking News"
+            val query = shown.getStringExtra(EXTRA_QUERY)?.takeIf { it.isNotBlank() } ?: headline
             BreakingNewsScreen(
                 headline = headline,
                 coverage = { force -> repo.coverage(query, force) },
@@ -39,6 +58,12 @@ class BreakingNewsActivity : ComponentActivity() {
                 onClose = { clearAndFinish() },
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        current = intent
     }
 
     private fun clearAndFinish() {
