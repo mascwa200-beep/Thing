@@ -167,6 +167,10 @@ class PythonRuntime(private val appContext: Context) {
         val probe = "lcars-probe"
         val echoed = callString(PROBE_MODULE, "echo", probe)
         val stdlib = callString(PROBE_MODULE, "stdlib_check")
+        // ⚠️ Reported even when it says "unavailable", rather than folded into a pass/fail. The build
+        // already asserts the wheel is IN the APK; whether it imports on this device is a different
+        // question with a different fix (`extractPackages`), and the exception name is the clue.
+        val extractor = callString(PROBE_MODULE, "extractor_check")
         return Report(
             running = true,
             interpreter = interpreter,
@@ -176,6 +180,7 @@ class PythonRuntime(private val appContext: Context) {
                 else -> null
             },
             stdlib = stdlib,
+            extractor = extractor,
             error = lastError,
         )
     }
@@ -192,6 +197,13 @@ class PythonRuntime(private val appContext: Context) {
         val interpreter: String?,
         val roundTrip: String?,
         val stdlib: String?,
+        /**
+         * What the bundled extractor said about itself, or null if it could not be asked.
+         *
+         * ⚠️ A non-null value is NOT a success — it may read "yt-dlp unavailable: ImportError: …",
+         * which is the interesting case and the reason this is a sentence rather than a boolean.
+         */
+        val extractor: String? = null,
         val error: String?,
     ) {
         val allOk: Boolean

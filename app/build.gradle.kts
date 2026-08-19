@@ -178,7 +178,18 @@ chaquopy {
         // whose version matches the target's, and this proof has no reason to take that coupling on.
         pyc { src = false }
 
-        // No pip requirements at this stage — see the note above. Adding yt-dlp is the NEXT slice.
+        pip {
+            // ⚠️ PINNED, and that is not fussiness: yt-dlp ships a release most weeks, so a floating
+            // version means the extractor silently differs between two builds of the same commit —
+            // and when extraction breaks, "which version was in that APK" is the first question.
+            //
+            // Checked on PyPI rather than assumed, because a pip dependency is exactly the kind of
+            // thing that fails in an unfamiliar way inside a build system: 2026.7.4 publishes as
+            // `py3-none-any`, a PURE-PYTHON wheel with **no native code to cross-compile**, and its
+            // `requires_dist` is EMPTY — every extra is optional. So this adds one 3.2 MB wheel and
+            // nothing else, on a build that has no Android SDK story for native Python packages.
+            install("yt-dlp==2026.7.4")
+        }
     }
 }
 

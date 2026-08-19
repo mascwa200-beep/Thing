@@ -310,6 +310,25 @@ jobs:
             exit 1
           fi
           echo "our module is in $found"
+
+          # ⚠️ And that the pip requirement really made it in. `pip { install(...) }` resolving at
+          # build time proves the wheel DOWNLOADED; it does not prove it was packaged into the APK,
+          # and a build that quietly shipped without the extractor would look completely fine until
+          # the first attempt to play something. Separate assertion, separate failure.
+          #
+          # It is not in the same asset as our source — Chaquopy keeps requirements apart from the
+          # app's own Python — so every asset archive is searched rather than assuming a filename.
+          ext=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${EXTRACTOR}" /tmp/pyasset.bin; then ext="$entry"; break; fi
+          done
+          if [ -z "$ext" ]; then
+            echo "FAIL: ${EXTRACTOR} is not in any Python asset — the pip requirement did not ship."
+            echo "$listing" | grep "assets/chaquopy/" || true
+            exit 1
+          fi
+          echo "the extractor is in $ext"
           echo "Python runtime packaged."
 
           # ⚠️ Reported on every build because it is paid on every UPDATE, not once: the APK goes to
@@ -322,6 +341,7 @@ jobs:
           unzip -l "$apk" | sort -k1 -n -r | head -12
         env:
           PROBE: lcars_probe.py
+          EXTRACTOR: yt_dlp/
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4

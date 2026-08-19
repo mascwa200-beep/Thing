@@ -61,3 +61,22 @@ def stdlib_check() -> str:
         except Exception as exc:  # noqa: BLE001 - the reason is the payload
             results.append("{n}!({e})".format(n=name, e=type(exc).__name__))
     return " ".join(results) + " | " + sys.platform
+
+
+def extractor_check() -> str:
+    """Whether the pip-installed extractor actually imports here, and which version.
+
+    ⚠️ A DISTINCT question from "did the wheel get packaged", which the build already asserts by
+    looking inside the APK. A pure-Python wheel can be present and still fail to import on Android —
+    Chaquopy serves packages out of a zip, so anything reading `__file__` or a data file next to
+    itself needs `extractPackages` to be told about it, and the failure is an ImportError at runtime
+    that no build check can see.
+
+    The version is reported because yt-dlp ships most weeks and extraction breakage is
+    version-specific: "which one was in that APK" is the first question when a site stops working.
+    """
+    try:
+        import yt_dlp
+        return "yt-dlp " + getattr(yt_dlp, "__version__", "?")
+    except Exception as exc:  # noqa: BLE001 - the reason IS the answer
+        return "yt-dlp unavailable: {e}: {m}".format(e=type(exc).__name__, m=exc)

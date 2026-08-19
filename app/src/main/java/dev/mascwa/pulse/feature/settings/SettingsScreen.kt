@@ -1281,6 +1281,9 @@ fun SettingsScreen(
                                 "Version" to report.interpreter,
                                 "Argument round-trip" to report.roundTrip,
                                 "Standard library" to report.stdlib,
+                                // Shown as its own line because "the interpreter runs but the
+                                // extractor did not import" is a specific, fixable state.
+                                "Extractor" to report.extractor,
                             ).forEach { (name, detail) ->
                                 Column {
                                     Text(
