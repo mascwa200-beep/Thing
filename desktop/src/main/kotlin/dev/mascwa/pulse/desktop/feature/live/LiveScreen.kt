@@ -1,45 +1,73 @@
 package dev.mascwa.pulse.desktop.feature.live
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.live.LivePlayer
+import dev.mascwa.pulse.desktop.telemetry.ChannelLineup
 import dev.mascwa.pulse.desktop.telemetry.LiveChannels
-import dev.mascwa.pulse.desktop.telemetry.LiveChannels.LiveChannel
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsButton
-import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsGhostButton
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsTextField
 import dev.mascwa.pulse.desktop.theme.Pulse
+import kotlinx.coroutines.delay
 
 /**
- * LIVE — television news, in the page or in a window you can leave running.
+ * LIVE — television as a cable box, on the same lineup the phone uses.
  *
- * The channel list and every judgement about it come from the same shared core the phone uses, so
- * the two cannot disagree about what is on offer or how far a channel is to be trusted.
+ * Channel numbers, channel up/down, a keypad and a guide, all decided by the shared
+ * [ChannelLineup] core — so **channel 7 is the same broadcaster on both machines**, which is the
+ * whole reason that core is mirrored rather than written twice.
+ *
+ * ⚠️ The desktop has a real keyboard, so it gets the thing a remote is an imitation of: **type the
+ * digits, or press the arrow keys.** The on-screen keypad stays anyway, and deliberately — key
+ * events need focus, focus is the least predictable part of any desktop UI, and a box you cannot
+ * operate because a click landed somewhere unexpected is worse than one with a redundant keypad.
  *
  * ⚠️ Nothing plays until it is asked to, here as on the phone. And the honesty about verification is
  * not decoration: a playlist that answers HTTP 200 is not a playlist that plays, which is why a
@@ -50,8 +78,6 @@ fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsState()
     val community by vm.community.collectAsState()
     val c = Pulse.colors
-    val channels = LiveChannels.offer()
-    var filter by remember { mutableStateOf("") }
 
     // Arriving asks for the catalogue. A no-op unless the switch is on, and a no-op once it is held.
     LaunchedEffect(Unit) { vm.loadCommunity() }
@@ -59,109 +85,153 @@ fun LiveScreen(vm: LiveViewModel, modifier: Modifier = Modifier) {
     // Leaving the page stops the stream, unless it has been popped out — see LiveViewModel.onLeave.
     DisposableEffect(Unit) { onDispose { vm.onLeave() } }
 
-    Column(modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-        LcarsHeaderBar(
-            "Live",
-            trailing = state.channel?.name?.uppercase()?.takeIf { state.status != LivePlayer.Status.IDLE },
-        )
+    val lineup = remember(community) { ChannelLineup.lineup(community = community) }
+    val current = remember(lineup, state.channel?.id) {
+        lineup.firstOrNull { it.channel.id == state.channel?.id }
+    }
+    var lastNumber by remember { mutableIntStateOf(0) }
+    var entry by remember { mutableStateOf(ChannelLineup.Entry()) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var filter by remember { mutableStateOf("") }
 
-        // ⚠️ The picture sits OUTSIDE the scrolling list, deliberately. A SwingPanel is a heavyweight
-        // AWT component drawn over the Compose surface, and one placed inside a LazyColumn clips
-        // against the scroll rather than with it. Fixed above the list, it has nothing to fight.
-        if (state.status != LivePlayer.Status.IDLE) {
-            LiveStage(vm, Modifier.fillMaxWidth().padding(top = 8.dp))
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                LcarsButton("Open in a window", vm::popOut)
-                LcarsGhostButton("Stop", vm::stop)
-            }
-        }
+    fun tune(slot: ChannelLineup.Slot) {
+        current?.let { lastNumber = it.number }
+        entry = ChannelLineup.Entry()
+        notice = null
+        vm.watch(slot.channel)
+    }
 
-        LazyColumn(
-            Modifier.fillMaxWidth().weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 24.dp),
-        ) {
-            item {
-                Text(
-                    "Television news. It plays here, and opens in a window of its own if you want it " +
-                        "on a second screen. These are broadcasters' own public streams, and nothing " +
-                        "plays until you ask it to.",
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2, lineHeight = 17.sp,
-                )
-            }
-
-            if (state.status == LivePlayer.Status.ERROR) item {
-                LcarsFrame(Modifier.fillMaxWidth(), accent = c.negative) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "NO SIGNAL",
-                            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp, letterSpacing = 1.5.sp, color = c.negative,
-                        )
-                        Text(
-                            state.detail ?: "That channel did not open.",
-                            fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.ink2,
-                        )
-                    }
-                }
-            }
-
-            if (state.status == LivePlayer.Status.CONNECTING) item {
-                Text(
-                    "OPENING ${state.channel?.name.orEmpty().uppercase()}…",
-                    fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 1.5.sp,
-                    color = c.accent,
-                )
-            }
-
-            items(channels.size) { i ->
-                ChannelCard(
-                    channel = channels[i],
-                    playing = channels[i].id == state.channel?.id &&
-                        state.status != LivePlayer.Status.IDLE,
-                    onWatch = { vm.watch(channels[i]) },
-                    onStop = { vm.stop() },
-                )
-            }
-
-            // The community catalogue, if it has been asked for. Hundreds of entries, so it gets a
-            // filter rather than being poured into the same list as the curated broadcasters.
-            if (community.isNotEmpty()) {
-                item {
-                    Column(
-                        Modifier.fillMaxWidth().padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        LcarsHeaderBar("Community", trailing = "${community.size} · UNVERIFIED")
-                        LcarsTextField(
-                            label = "Filter",
-                            value = filter,
-                            onValueChange = { filter = it },
-                            placeholder = "Filter by name or country",
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-                val shown = community.filter { ch ->
-                    val q = filter.trim().lowercase()
-                    q.isBlank() || ch.name.lowercase().contains(q) || ch.region.lowercase().contains(q)
-                }
-                items(shown.size) { i ->
-                    ChannelCard(
-                        channel = shown[i],
-                        playing = shown[i].id == state.channel?.id &&
-                            state.status != LivePlayer.Status.IDLE,
-                        onWatch = { vm.watch(shown[i]) },
-                        onStop = { vm.stop() },
-                    )
-                }
+    fun settle(result: ChannelLineup.Tune) {
+        when (result) {
+            is ChannelLineup.Tune.Typing -> entry = result.entry
+            is ChannelLineup.Tune.Tuned -> tune(result.slot)
+            is ChannelLineup.Tune.NoChannel -> {
+                entry = ChannelLineup.Entry()
+                notice = "Nothing on channel ${result.number}."
             }
         }
     }
+
+    // A half-keyed number has to tune itself — nothing else will.
+    LaunchedEffect(entry) {
+        if (entry.empty) return@LaunchedEffect
+        delay(ChannelLineup.ENTRY_TIMEOUT_MS)
+        settle(ChannelLineup.commit(entry, lineup))
+    }
+    LaunchedEffect(notice) {
+        if (notice == null) return@LaunchedEffect
+        delay(3_500)
+        notice = null
+    }
+
+    fun up() = ChannelLineup.next(lineup, current?.number ?: 1)?.let { tune(it) }
+    fun down() = ChannelLineup.previous(lineup, current?.number ?: 1)?.let { tune(it) }
+
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+
+    Column(
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .focusRequester(focus)
+            .focusable()
+            // ⚠️ Consumed only for keys the box actually uses, and only on KeyDown. Swallowing
+            // everything would take the text field's own typing away from it, and reacting to both
+            // down and up would key every digit twice.
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val digit = DIGIT_KEYS[event.key]
+                when {
+                    digit != null -> {
+                        settle(ChannelLineup.key(entry, digit, System.currentTimeMillis(), lineup))
+                        true
+                    }
+                    event.key == Key.DirectionUp -> { up(); true }
+                    event.key == Key.DirectionDown -> { down(); true }
+                    else -> false
+                }
+            },
+    ) {
+        LcarsHeaderBar(
+            "Live",
+            trailing = current
+                ?.takeIf { state.status != LivePlayer.Status.IDLE }
+                ?.let { "CH ${ChannelLineup.display(it.number)} · ${it.channel.name.uppercase()}" },
+        )
+
+        // ⚠️ The picture sits OUTSIDE the scrolling guide, deliberately. A SwingPanel is a
+        // heavyweight AWT component drawn over the Compose surface, and one placed inside a lazy
+        // list clips against the scroll rather than with it. Fixed above it, it has nothing to fight.
+        if (state.status != LivePlayer.Status.IDLE) {
+            LiveStage(vm, Modifier.fillMaxWidth().padding(top = 8.dp))
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LcarsButton("CH ▲", ::up)
+            LcarsButton("CH ▼", ::down)
+            LcarsGhostButton("Last", { ChannelLineup.at(lineup, lastNumber)?.let { tune(it) } })
+            if (state.status != LivePlayer.Status.IDLE) {
+                LcarsGhostButton("Open in a window", vm::popOut)
+                LcarsGhostButton("Stop", vm::stop)
+            }
+            Keypad { digit ->
+                settle(ChannelLineup.key(entry, digit, System.currentTimeMillis(), lineup))
+            }
+            if (!entry.empty) {
+                Text(
+                    entry.digits,
+                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp, letterSpacing = 2.sp, color = c.accent,
+                )
+            }
+        }
+
+        val line = notice
+            ?: (state.detail?.takeIf { state.status == LivePlayer.Status.ERROR }?.let { "No signal — $it" })
+            ?: (state.channel?.name?.let { "Opening $it…" }?.takeIf { state.status == LivePlayer.Status.CONNECTING })
+            ?: "Type a channel number, use the arrow keys, or pick one below. Nothing plays until you ask."
+        Text(
+            line,
+            fontFamily = JetBrainsMono, fontSize = 11.sp, lineHeight = 17.sp,
+            color = when {
+                notice != null || state.status == LivePlayer.Status.ERROR -> c.negative
+                state.status == LivePlayer.Status.CONNECTING -> c.accent
+                else -> c.ink2
+            },
+        )
+
+        if (community.isNotEmpty()) {
+            LcarsTextField(
+                label = "Filter the community directory",
+                value = filter,
+                onValueChange = { filter = it },
+                placeholder = "Name or country · ${community.size} channels, unverified",
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            )
+        }
+
+        Guide(
+            lineup = lineup,
+            playing = current?.number.takeIf { state.status != LivePlayer.Status.IDLE },
+            filter = filter,
+            onPick = ::tune,
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp),
+        )
+    }
 }
+
+/** Which physical keys are digits. Written out because [Key] has no numeric mapping of its own. */
+private val DIGIT_KEYS: Map<Key, Int> = mapOf(
+    Key.Zero to 0, Key.One to 1, Key.Two to 2, Key.Three to 3, Key.Four to 4,
+    Key.Five to 5, Key.Six to 6, Key.Seven to 7, Key.Eight to 8, Key.Nine to 9,
+    Key.NumPad0 to 0, Key.NumPad1 to 1, Key.NumPad2 to 2, Key.NumPad3 to 3, Key.NumPad4 to 4,
+    Key.NumPad5 to 5, Key.NumPad6 to 6, Key.NumPad7 to 7, Key.NumPad8 to 8, Key.NumPad9 to 9,
+)
 
 /**
  * The picture, in the page.
@@ -182,39 +252,102 @@ private fun LiveStage(vm: LiveViewModel, modifier: Modifier = Modifier) {
     )
 }
 
+/** Ten keys in a row — the desktop has the width for it, so it needs no telephone block. */
 @Composable
-private fun ChannelCard(
-    channel: LiveChannel,
-    playing: Boolean,
-    onWatch: () -> Unit,
-    onStop: () -> Unit,
+private fun Keypad(onDigit: (Int) -> Unit) {
+    val c = Pulse.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        (0..9).forEach { digit ->
+            Text(
+                digit.toString(),
+                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                color = c.ink, textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .size(width = 28.dp, height = 28.dp)
+                    .background(c.raise)
+                    .border(1.dp, c.lineSoft)
+                    .clickable { onDigit(digit) }
+                    .padding(top = 5.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Every channel at once, as numbers, grouped by band.
+ *
+ * ⚠️ This is the piece the phone cannot do as well, and it is why the desktop was worth doing in the
+ * same slice: a window this wide fits the whole curated lineup without scrolling at all, which is
+ * exactly what the owner asked for and what a phone-sized grid can only approximate.
+ */
+@Composable
+private fun Guide(
+    lineup: List<ChannelLineup.Slot>,
+    playing: Int?,
+    filter: String,
+    onPick: (ChannelLineup.Slot) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = Pulse.colors
-    LcarsFrame(
-        Modifier.fillMaxWidth(),
-        accent = if (playing) c.accent else c.lineSoft,
+    val bands = remember(lineup) { ChannelLineup.bands(lineup) }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 150.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        bands.forEach { (band, slots) ->
+            val shown =
+                if (band != ChannelLineup.Band.COMMUNITY || filter.isBlank()) slots
+                else slots.filter {
+                    it.channel.name.contains(filter, ignoreCase = true) ||
+                        it.channel.region.contains(filter, ignoreCase = true)
+                }
+            if (shown.isEmpty()) return@forEach
+            item(span = { GridItemSpan(maxLineSpan) }, key = "band-${band.name}") {
                 Text(
-                    channel.name,
-                    fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 15.sp,
-                    color = if (playing) c.accent else c.ink,
-                )
-                Text(
-                    LiveChannels.describe(channel),
-                    fontFamily = JetBrainsMono, fontSize = 10.sp,
-                    color = if (channel.verification == LiveChannels.Verification.UNVERIFIED) {
-                        c.amber
-                    } else {
-                        c.muted
-                    },
+                    "${band.label.uppercase()} · FROM ${band.first}",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 1.5.sp,
+                    color = c.muted, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                 )
             }
-            if (playing) LcarsGhostButton("Stop", onStop) else LcarsButton("Watch", onWatch)
+            items(shown, key = { it.number }) { slot ->
+                GuideTile(slot, slot.number == playing) { onPick(slot) }
+            }
         }
+    }
+}
+
+@Composable
+private fun GuideTile(slot: ChannelLineup.Slot, on: Boolean, onPick: () -> Unit) {
+    val c = Pulse.colors
+    val tint = when {
+        on -> c.accent
+        slot.channel.verification == LiveChannels.Verification.SEGMENT -> c.ink2
+        else -> c.amber
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 34.dp)
+            .background(if (on) c.accent else Color.Transparent)
+            .border(1.dp, tint.copy(alpha = 0.6f))
+            .clickable { onPick() }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            ChannelLineup.display(slot.number),
+            fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+            color = if (on) c.void else c.accent,
+        )
+        Text(
+            slot.channel.name,
+            fontFamily = JetBrainsMono, fontSize = 10.sp,
+            color = if (on) c.void else tint,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
