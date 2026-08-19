@@ -87,6 +87,39 @@ MAX_WIDTH = 1280           # what optimize_images.py measured as the right cap f
 WEBP_QUALITY = 85
 MAX_SVG_BYTES = 400_000    # a pathological SVG can stall a phone renderer; a diagram never needs this
 MIN_SOURCE_WIDTH = 600
+
+# ⚠️ **The same two numbers live in three places, in two languages, and only one of them decides
+# what actually gets written.** This module bundles the file; `BundledImagesTest` (app) and
+# `BundledSvgDiagramsParseTest` (desktop) refuse it. They agree today — 1280 and 400_000 on all
+# three — but nothing made them agree, so a wave could bundle 300 diagrams over two hours and only
+# find out from CI, long after the run that produced them is gone. A duplicated definition is a
+# mistake this repository has now corrected in six places.
+#
+# There is no shared home for a constant spanning Python and two Gradle modules, so the sourcer
+# reads the gate's own source instead and refuses to start on a mismatch — the same trick
+# `ci_parity_lint.py` uses to keep its category allowlist honest. Best-effort by design: a moved
+# or renamed test must not stop a wave, it just stops being cross-checked, and says so.
+GATE_TEST = "app/src/test/java/dev/mascwa/pulse/data/survival/BundledImagesTest.kt"
+
+
+def check_gate_parity() -> None:
+    path = os.path.join(ROOT, GATE_TEST)
+    if not os.path.exists(path):
+        print(f"  ⚠️ cannot cross-check size limits — {GATE_TEST} not found")
+        return
+    src = open(path, encoding="utf-8").read()
+    for name, ours in (("MAX_DISPLAY_PX", MAX_WIDTH), ("MAX_SVG_BYTES", MAX_SVG_BYTES)):
+        m = re.search(rf"\b{name}\s*=\s*([\d_]+)", src)
+        if not m:
+            print(f"  ⚠️ cannot cross-check {name} — not found in the gate")
+            continue
+        theirs = int(m.group(1).replace("_", ""))
+        if theirs != ours:
+            raise SystemExit(
+                f"size limits disagree: this sourcer would bundle up to {ours}, "
+                f"but {name} in the build gate is {theirs}. Every diagram this wave "
+                f"writes would fail CI. Reconcile them before running."
+            )
 FLUSH_EVERY = 1            # diagrams that may sit on disk unreferenced at once — see flush()
 # ⚠️ 1, not a batch. The batching was justified as "that would rewrite a half-megabyte shard for
 # every diagram" — which is true and costs nothing: a shard rewrite is milliseconds against the
@@ -1100,6 +1133,7 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
+    check_gate_parity()
     guides, freq = load_corpus()
     todo = [g for g in guides.values()
             if not any(s.get("image") for s in g.get("sections", []))

@@ -2309,3 +2309,83 @@ kb/the-nucleolus-and-ribosome-assembly.svg
     File:Diagram human cell nucleus multilang.svg
     Public domain — Mariana Ruiz LadyofHats
     https://commons.wikimedia.org/wiki/File%3ADiagram_human_cell_nucleus_multilang.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-sodium-potassium-pump.svg
+    File:Scheme sodium-potassium pump-bs.svg
+    Public domain — LadyofHats Mariana Ruiz Villarreal
+    https://commons.wikimedia.org/wiki/File%3AScheme_sodium-potassium_pump-bs.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/vesicle-transport-and-the-secretory-pathway.svg
+    File:Liposome scheme-en.svg
+    CC BY-SA 3.0 — SuperManu
+    https://commons.wikimedia.org/wiki/File%3ALiposome_scheme-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/building-a-minimum-viable-product.webp
+    File:From minimum viable product to more complex product.png
+    CC BY-SA 4.0 — Teemu
+    https://commons.wikimedia.org/wiki/File%3AFrom_minimum_viable_product_to_more_complex_product.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/competitor-analysis-for-new-ventures.webp
+    File:Venture Capital Fund Diagram.png
+    Public domain — Urbanrenewal
+    https://commons.wikimedia.org/wiki/File%3AVenture_Capital_Fund_Diagram.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/sizing-a-market-opportunity.webp
+    File:LPO Market Size and Growth.png
+    CC BY-SA 3.0 — Cekbrooks
+    https://commons.wikimedia.org/wiki/File%3ALPO_Market_Size_and_Growth.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/colligative-properties-of-solutions.webp
+    File:Freezing point depression and boiling point elevation.png
+    CC BY-SA 3.0 — Tomas er
+    https://commons.wikimedia.org/wiki/File%3AFreezing_point_depression_and_boiling_point_elevation.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/kinetic-molecular-theory-of-gases.svg
+    File:Increasing disorder.svg
+    CC BY 2.5 — Maxwell's_demon.svg: User:Htkym derivative work: Dhollm (talk)
+    https://commons.wikimedia.org/wiki/File%3AIncreasing_disorder.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/osmosis-and-osmotic-pressure.webp
+    File:Simplistic pressure retarded osmosis power generation diagram.jpg
+    CC BY-SA 3.0 — Starsend
+    https://commons.wikimedia.org/wiki/File%3ASimplistic_pressure_retarded_osmosis_power_generation_diagram.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/partial-pressures-and-dalton-s-law.svg
+    File:Dalton's law of partial pressures.svg
+    CC BY-SA 4.0 — Andrew Jarvis
+    https://commons.wikimedia.org/wiki/File%3ADalton%27s_law_of_partial_pressures.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/real-gases-and-the-van-der-waals-equation.webp
+    File:Tr vs Pitzer factor.png
+    CC BY-SA 4.0 — John H. Lienhard IV
+    https://commons.wikimedia.org/wiki/File%3ATr_vs_Pitzer_factor.png
