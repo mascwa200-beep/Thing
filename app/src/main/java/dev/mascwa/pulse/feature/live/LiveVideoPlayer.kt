@@ -210,10 +210,6 @@ fun LiveVideoPlayer(
             entry = entry,
             notice = notice,
             bannerShown = bannerShown,
-            guideOpen = guideOpen,
-            lineup = lineup,
-            onTune = { tune(it) },
-            onCloseGuide = { guideOpen = false },
             onToggleFullscreen = { fullscreen = !fullscreen },
             onRetry = { state.channel?.let { LiveVideoController.play(context, it) } },
         )
@@ -236,6 +232,17 @@ fun LiveVideoPlayer(
         FullscreenTv(
             onLeave = { fullscreen = false },
             remote = { remoteBar(true) },
+            guide = {
+                if (guideOpen) {
+                    Guide(
+                        lineup = lineup,
+                        playing = current?.number,
+                        onPick = { tune(it) },
+                        onClose = { guideOpen = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            },
             content = { screen(Modifier.fillMaxSize()) },
         )
     }
@@ -296,6 +303,21 @@ fun LiveVideoPlayer(
                 )
             }
         }
+
+        // ⚠️ **Over the WHOLE panel, not over the picture.** Drawn inside [TvScreen] it was confined
+        // to the 16:9 box, and on a Pixel 10 Pro XL that is 388x218dp against a grid the real
+        // 41-channel lineup needs 948dp for — **two of fourteen rows visible**, which is the exact
+        // hunting this screen exists to abolish. Measured rather than eyeballed. Here it gets the
+        // panel's 388x699 and shows twelve of the fourteen.
+        if (guideOpen) {
+            Guide(
+                lineup = lineup,
+                playing = current?.number,
+                onPick = { tune(it) },
+                onClose = { guideOpen = false },
+                modifier = Modifier.matchParentSize(),
+            )
+        }
     }
 }
 
@@ -303,7 +325,7 @@ fun LiveVideoPlayer(
 private const val BANNER_MS = 3_500L
 
 /**
- * The picture, everything drawn over it, and the guide.
+ * The picture and everything drawn over it.
  *
  * The SurfaceView is created once and handed to the controller, which holds it — the player can be
  * rebuilt underneath this composable (a retry does exactly that) and has to find its way back to
@@ -317,10 +339,6 @@ private fun TvScreen(
     entry: ChannelLineup.Entry,
     notice: String?,
     bannerShown: Boolean,
-    guideOpen: Boolean,
-    lineup: List<ChannelLineup.Slot>,
-    onTune: (ChannelLineup.Slot) -> Unit,
-    onCloseGuide: () -> Unit,
     onToggleFullscreen: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -414,15 +432,6 @@ private fun TvScreen(
             )
         }
 
-        if (guideOpen) {
-            Guide(
-                lineup = lineup,
-                playing = slot?.number,
-                onPick = onTune,
-                onClose = onCloseGuide,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
     }
 }
 
@@ -448,6 +457,7 @@ private fun TvScreen(
 private fun FullscreenTv(
     onLeave: () -> Unit,
     remote: @Composable () -> Unit,
+    guide: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -482,6 +492,7 @@ private fun FullscreenTv(
         }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             content()
+            guide()
             Box(Modifier.align(Alignment.BottomCenter).padding(16.dp)) { remote() }
         }
     }
