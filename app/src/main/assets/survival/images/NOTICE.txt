@@ -2577,10 +2577,6 @@ kb/bacterial-spores-and-why-they-survive-cooking.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/biofilms-on-food-contact-surfaces.svg
-    File:Contact angle.svg
-    Public domain — No machine-readable author provided. Joris Gillis~commonswiki assumed (based on copyright claims).
-    https://commons.wikimedia.org/wiki/File%3AContact_angle.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -2777,10 +2773,6 @@ kb/the-production-possibilities-frontier.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/how-human-memory-works-encoding-to-retrieval.svg
-    File:Rainbow-diagram-ROYGBIV.svg
-    CC BY-SA 3.0 — Oren neu dag
-    https://commons.wikimedia.org/wiki/File%3ARainbow-diagram-ROYGBIV.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -2793,10 +2785,6 @@ kb/procedural-memory-and-skill-automaticity.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/retrieval-cues-and-context-dependent-memory.webp
-    File:Studying.jpg
-    Public domain — Gnarlycraig
-    https://commons.wikimedia.org/wiki/File%3AStudying.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -2905,10 +2893,6 @@ kb/energy-pyramids-and-ecological-efficiency.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/landscape-ecology.webp
-    File:Land ocean ice cloud hires.jpg
-    Public domain — see source
-    https://commons.wikimedia.org/wiki/File%3ALand_ocean_ice_cloud_hires.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3025,10 +3009,6 @@ kb/using-terrain-for-wind-protection.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/the-survival-rule-of-threes.svg
-    File:Feynman rules - QWS three vertex - W lepton neutrino - 200px.svg
-    CC0 — Romainbehar
-    https://commons.wikimedia.org/wiki/File%3AFeynman_rules_-_QWS_three_vertex_-_W_lepton_neutrino_-_200px.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3049,10 +3029,6 @@ kb/chaturanga-the-indian-origin-of-chess.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/janggi-korean-chess-and-its-strategy.webp
-    File:Book of chess, dice and boards, 0022R, Berbers playing chess.jpg
-    Public domain — Alfonso X, King of Castile (1221-1284)
-    https://commons.wikimedia.org/wiki/File%3ABook_of_chess%2C_dice_and_boards%2C_0022R%2C_Berbers_playing_chess.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3177,10 +3153,6 @@ kb/coastal-storm-surge-mechanics.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/debris-flow-hazards-after-wildfire.webp
-    File:I just got off the phone with @GovJoshGreenMD – following a call with @FEMA Deanne – to discuss Hawai'i's recovery after the deadliest wildfire in a century that has claimed 99 lives.jpg
-    Public domain — POTUS
-    https://commons.wikimedia.org/wiki/File%3AI_just_got_off_the_phone_with_%40GovJoshGreenMD_%E2%80%93_following_a_call_with_%40FEMA_Deanne_%E2%80%93_to_discuss_Hawai%27i%27s_recovery_after_the_deadliest_wildfire_in_a_century_that_has_claimed_99_lives.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3345,10 +3317,6 @@ kb/semantics-the-study-of-meaning.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/conservatism.svg
-    File:Australian Conservatism Flags Symbol.svg
-    CC0 — Hstoops
-    https://commons.wikimedia.org/wiki/File%3AAustralian_Conservatism_Flags_Symbol.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3361,10 +3329,6 @@ kb/fascism.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/marxism-communism.webp
-    File:The Soviet Union 1988 CPA 5971 stamp (70th birth anniversary of Nelson Mandela, South African anti-apartheid revolutionary, political leader and philanthropist).jpg
-    Public domain — USSR Post
-    https://commons.wikimedia.org/wiki/File%3AThe_Soviet_Union_1988_CPA_5971_stamp_%2870th_birth_anniversary_of_Nelson_Mandela%2C_South_African_anti-apartheid_revolutionary%2C_political_leader_and_philanthropist%29.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3385,10 +3349,6 @@ kb/genre-theory-the-classification-of-literature.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/choosing-hardwoods-for-furniture-projects.webp
-    File:120 grid (scale).jpg
-    CC BY-SA 4.0 — Woodsurfsc
-    https://commons.wikimedia.org/wiki/File%3A120_grid_%28scale%29.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3409,10 +3369,6 @@ kb/infinity-and-the-continuum.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/percentages-and-percent-problems.webp
-    File:The problem of age, growth, and death; a study of cytomorphosis, based on lectures at the Lowell Institute, March 1907 (1908) (14591976420).jpg
-    No restrictions — Internet Archive Book Images
-    https://commons.wikimedia.org/wiki/File%3AThe_problem_of_age%2C_growth%2C_and_death%3B_a_study_of_cytomorphosis%2C_based_on_lectures_at_the_Lowell_Institute%2C_March_1907_%281908%29_%2814591976420%29.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3465,10 +3421,6 @@ kb/blood-plasma-cells-and-what-it-carries.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/getting-medical-care.webp
-    File:Life expectancy vs healthcare spending.jpg
-    CC BY 4.0 — Max Roser
-    https://commons.wikimedia.org/wiki/File%3ALife_expectancy_vs_healthcare_spending.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3481,10 +3433,6 @@ kb/hematopoiesis-how-blood-cells-are-made.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/how-blood-circulates-through-the-body.webp
-    File:Roosevelt's African trip; the story of his life, the voyage from New York to Mombasa, and the route through the heart of Africa, including the big game and other ferocious animals found in the course (14565216759).jpg
-    No restrictions — Internet Archive Book Images
-    https://commons.wikimedia.org/wiki/File%3ARoosevelt%27s_African_trip%3B_the_story_of_his_life%2C_the_voyage_from_New_York_to_Mombasa%2C_and_the_route_through_the_heart_of_Africa%2C_including_the_big_game_and_other_ferocious_animals_found_in_the_course_%2814565216759%29.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3505,10 +3453,6 @@ kb/side-hilling-and-traversing-slopes.webp
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/intervals-and-how-to-hear-them.webp
-    File:Aaron Marshall of Intervals (cropped).jpg
-    CC BY-SA 2.0 — Kyle Gaddo
-    https://commons.wikimedia.org/wiki/File%3AAaron_Marshall_of_Intervals_%28cropped%29.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3521,10 +3465,6 @@ kb/pitch-frequency-and-the-harmonic-series.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/the-modes-from-church-modes-to-modern-music.svg
-    File:Arabic music notation half sharp.svg
-    Public domain — HeavyD14
-    https://commons.wikimedia.org/wiki/File%3AArabic_music_notation_half_sharp.svg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3585,10 +3525,6 @@ kb/aesthetics-the-philosophy-of-art-and-beauty.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/women-in-the-history-of-philosophy.webp
-    File:Head of Laozi marble Tang Dynasty (618-906 CE) Shaanxi Province China.jpg
-    CC BY-SA 4.0 — Mary Harrsch
-    https://commons.wikimedia.org/wiki/File%3AHead_of_Laozi_marble_Tang_Dynasty_%28618-906_CE%29_Shaanxi_Province_China.jpg
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
@@ -3625,10 +3561,6 @@ kb/torque-and-rotational-equilibrium.svg
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
 --------------------------------------------------------------
-kb/building-a-household-hazard-risk-assessment.webp
-    File:Risk Based Sampling Nomogram (3yr).png
-    CC BY-SA 3.0 — see source
-    https://commons.wikimedia.org/wiki/File%3ARisk_Based_Sampling_Nomogram_%283yr%29.png
 
 
 Sourced from Wikimedia Commons (see the re-encoding notice above)
