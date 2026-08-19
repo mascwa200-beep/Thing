@@ -55,7 +55,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -1475,7 +1474,7 @@ private fun HomeSectionEditor(enabledOrdered: List<HomeSection>, onChange: (List
                 IconButton(enabled = i < enabledOrdered.lastIndex, onClick = {
                     val l = enabledOrdered.toMutableList(); l.add(i + 1, l.removeAt(i)); onChange(l)
                 }) { Icon(Icons.Filled.ArrowDownward, "Down") }
-                Switch(checked = true, onCheckedChange = { onChange(enabledOrdered - section) })
+                dev.mascwa.pulse.feature.common.LcarsSwitch(checked = true, onCheckedChange = { onChange(enabledOrdered - section) })
             }
         }
         disabled.forEach { section ->
@@ -1485,7 +1484,7 @@ private fun HomeSectionEditor(enabledOrdered: List<HomeSection>, onChange: (List
             ) {
                 Text(section.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Switch(checked = false, onCheckedChange = { onChange(enabledOrdered + section) })
+                dev.mascwa.pulse.feature.common.LcarsSwitch(checked = false, onCheckedChange = { onChange(enabledOrdered + section) })
             }
         }
     }

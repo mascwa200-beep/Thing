@@ -37,15 +37,6 @@ import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
 
-/**
- * The app's one panel silhouette — a swept LCARS block (one corner rounded large, the rest sharp), same
- * shape family [LcarsFrame] uses. Was the chamfered CP2077 parallelogram-notch (`CutCornerShape`); every
- * caller of [NeonPanel]/[HubTile] picks up the new geometry for free from this single definition, no
- * per-screen edits needed. The names ("Cyber…") are legacy — kept so this doesn't ripple into a mass
- * rename across every remaining caller.
- */
-val CyberCut: Shape = lcarsBlockShape(sweep = 28.dp, corner = LcarsCorner.TopStart)
-
 /** The chip/small-control shape — a stepped notch, matching [LcarsChip]'s exact silhouette so the two chip
  *  composables render identically shaped. */
 val CyberChipCut: Shape = CutCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 0.dp, bottomStart = 10.dp)
@@ -67,30 +58,25 @@ fun DrawScope.hudCorners(color: Color, lenPx: Float, strokePx: Float, marginPx: 
     drawLine(color, Offset(w - m, h - m), Offset(w - m, h - m - lenPx), strokePx)
 }
 
-/** Bordered carbon/panel container — the core NIGHTWIRE surface. */
+/**
+ * SHIM — the legacy panel name, now delegating to [LcarsFrame] so the app has ONE panel and not two
+ * that render subtly differently on the same page (Weather carried both at once). ~96 call sites
+ * stay untouched, which is what makes a change this wide verifiable.
+ *
+ * [corners] is accepted and ignored: the L-shaped HUD brackets were the CP2077 leftover, and keeping
+ * a second decoration path alive would keep the second look alive. Delete the parameter with the
+ * shim once the call sites are swept.
+ */
 @Composable
 fun NeonPanel(
     modifier: Modifier = Modifier,
     padding: PaddingValues = PaddingValues(13.dp),
     borderColor: Color = Pulse.colors.lineSoft,
     background: Color = Pulse.colors.panel,
-    corners: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") corners: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val accent = Pulse.colors.accent
-    Box(
-        modifier
-            .clip(CyberCut)
-            .background(background)
-            .border(BorderStroke(1.dp, borderColor), CyberCut)
-            .then(
-                if (corners) Modifier.drawWithContent {
-                    drawContent()
-                    hudCorners(accent, 12.dp.toPx(), 1.5.dp.toPx(), 3.dp.toPx())
-                } else Modifier,
-            )
-            .padding(padding),
-    ) { content() }
+    LcarsFrame(modifier, accent = borderColor, padding = padding, background = background) { content() }
 }
 
 /** Section header: accent bar + uppercase display title, optional mono action. */
@@ -129,123 +115,17 @@ fun SectionBar(
     }
 }
 
-/** Pill chip for category filters / ranges. */
+/**
+ * SHIM — the legacy chip name, now delegating to [LcarsChip] so the app has ONE chip. The visual
+ * change is deliberate and app-wide: a selected chip is a solid accent block with dark text (the
+ * LCARS read) rather than a faint tint, so "which tab am I on" stops depending on which screen
+ * happened to use which chip.
+ */
 @Composable
 fun NeonChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Pulse.colors
-    // Same reasoning as LcarsChip: the cue belongs to the kit, not to each of the many call sites.
-    val cue = rememberLcarsCue()
-    Box(
-        modifier
-            .clip(CyberChipCut)
-            .background(if (selected) c.accent.copy(alpha = 0.13f) else c.panel)
-            .border(
-                BorderStroke(1.dp, if (selected) c.accent else c.line),
-                CyberChipCut,
-            )
-            .clickable { cue(SoundCue.TAP, HapticCue.TAP_LIGHT); onClick() }
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-    ) {
-        Text(
-            text.uppercase(),
-            fontFamily = JetBrainsMono, fontSize = 11.sp, letterSpacing = 0.6.sp,
-            color = if (selected) c.accent else c.ink2,
-        )
-    }
+    LcarsChip(text, selected, onClick, modifier)
 }
 
-/** Label/number/sub stat tile (inflation, fuel, econ, weather stats). */
-@Composable
-fun StatTile(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    sub: String? = null,
-    valueColor: Color = Pulse.colors.ink,
-    subColor: Color = Pulse.colors.muted,
-) {
-    val c = Pulse.colors
-    NeonPanel(modifier, padding = PaddingValues(start = 12.dp, end = 12.dp, top = 11.dp, bottom = 11.dp)) {
-        Column {
-            Text(
-                label.uppercase(),
-                fontFamily = JetBrainsMono, fontSize = 9.sp, letterSpacing = 0.7.sp, color = c.muted,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                value,
-                fontFamily = ChakraPetch, fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                color = valueColor, modifier = Modifier.padding(top = 7.dp),
-            )
-            if (sub != null) {
-                Text(
-                    sub, fontFamily = JetBrainsMono, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                    color = subColor, modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-        }
-    }
-}
-
-/** Thin divider in the line-soft colour. */
-@Composable
-fun NeonDivider(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(1.dp).background(Pulse.colors.lineSoft))
-}
-
-/** Launcher tile for hub screens (GRID / SKY / SURVIVE). */
-@Composable
-fun HubTile(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    accent: Color = Pulse.colors.accent,
-    badge: String? = null,
-) {
-    val c = Pulse.colors
-    Box(
-        modifier
-            .clip(CyberCut)
-            .background(c.panel)
-            .border(BorderStroke(1.dp, c.lineSoft), CyberCut)
-            .drawWithContent {
-                drawContent()
-                hudCorners(accent.copy(alpha = 0.7f), 11.dp.toPx(), 1.5.dp.toPx(), 3.dp.toPx())
-            }
-            .clickable { onClick() }
-            .padding(14.dp),
-    ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(
-                    icon, null, tint = accent,
-                    modifier = Modifier.size(22.dp),
-                )
-                if (badge != null) {
-                    Box(
-                        Modifier.padding(start = 8.dp).clip(RoundedCornerShape(5.dp))
-                            .background(c.magenta).padding(horizontal = 5.dp, vertical = 1.dp),
-                    ) {
-                        Text(badge, fontFamily = JetBrainsMono, fontSize = 8.sp, color = c.void)
-                    }
-                }
-            }
-            Text(
-                title, fontFamily = ChakraPetch, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                color = c.ink, modifier = Modifier.padding(top = 10.dp),
-            )
-            Text(
-                subtitle, fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp),
-            )
-        }
-    }
-}
-
-/** Small status dot with glow. */
-@Composable
-fun StatusDot(color: Color, size: Int = 8) {
-    Box(Modifier.size(size.dp).clip(RoundedCornerShape(50)).background(color))
-}
+// StatTile, NeonDivider, HubTile, StatusDot and the CyberCut shape used to live here. All were
+// re-grepped at deletion time and had ZERO call sites — dead since their consumers migrated onto
+// the LCARS kit (LcarsStatBlock, LcarsDataRow's own rules, SurviveTileCard).

@@ -183,14 +183,15 @@ fun LcarsFrame(
     padding: PaddingValues = PaddingValues(13.dp),
     corner: LcarsCorner = LcarsCorner.TopStart,
     sweep: Dp = 28.dp,
+    /** Additive, for the NeonPanel shim's few tinted callers; everything else keeps the panel colour. */
+    background: Color = Pulse.colors.panel,
     content: @Composable () -> Unit,
 ) {
-    val c = Pulse.colors
     val shape = lcarsBlockShape(sweep, corner)
     Box(
         modifier
             .clip(shape)
-            .background(c.panel)
+            .background(background)
             .border(1.5.dp, accent, shape)
             .padding(padding),
     ) { content() }
