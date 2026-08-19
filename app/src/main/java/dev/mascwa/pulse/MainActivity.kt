@@ -276,11 +276,16 @@ class MainActivity : ComponentActivity() {
      * The hardware data harvester's trigger: a CONTINUOUS physical volume key press while inside the
      * app, while something is on the viewscreen, downloads that media into sandboxed storage.
      *
-     * ⚠️ Deliberately conditional on the player actually holding an item — with nothing on the
-     * viewscreen there is nothing to harvest and both volume keys behave completely normally
-     * everywhere in the app. During the hold the first few repeats still pass through (the volume
-     * steps a notch or two before the trigger fires); intercepting from the first event would break
-     * ordinary volume adjustment for anyone who presses slowly, which is worse.
+     * ⚠️ Conditional on the player actually holding an item — with nothing on the viewscreen both
+     * volume keys behave completely normally everywhere in the app, and a plain single press always
+     * steps the volume one notch as usual (`repeatCount == 0` passes through).
+     *
+     * ⚠️ **Once a hold begins (`repeatCount >= 1`) the events are consumed, so the volume freezes
+     * after that first notch rather than ramping to the rails on the way to the trigger.** Holding a
+     * volume key to ramp the volume continuously is the one ordinary gesture this sacrifices while
+     * media is on the viewscreen — the documented cost of the owner's chosen "continuous press"
+     * trigger. A 15-notch blast before the harvest fired would be far worse. The harvest itself
+     * fires once at [HARVEST_HOLD_REPEATS], latched until the key is released.
      */
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         if (event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
@@ -290,12 +295,12 @@ class MainActivity : ComponentActivity() {
             if (item != null) {
                 when (event.action) {
                     android.view.KeyEvent.ACTION_DOWN ->
-                        if (event.repeatCount >= HARVEST_HOLD_REPEATS) {
-                            if (!harvestFired) {
+                        if (event.repeatCount >= 1) {
+                            if (event.repeatCount >= HARVEST_HOLD_REPEATS && !harvestFired) {
                                 harvestFired = true
                                 app.container.mediaHarvester.harvest(item)
                             }
-                            return true // consume the continuous portion of the hold
+                            return true // consume the hold — freeze the volume, arm the gesture
                         }
                     android.view.KeyEvent.ACTION_UP -> {
                         val wasFired = harvestFired
