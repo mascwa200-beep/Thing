@@ -180,7 +180,12 @@ chaquopy {
         // 3.12 rather than 3.13 deliberately: the plugin offers 3.8 through 3.13, and 3.13.0 is a
         // .0 release with the least-exercised support of the set, where 3.12.7 is a mature point
         // release. Nothing here needs 3.13.
-        version("3.12")
+        // ⚠️ ASSIGNMENT, not a call. `PythonExtension` exposes `getVersion`/`setVersion` and no
+        // `version(String)` method — unlike `buildPython(String...)` on the very next line, which IS
+        // a method. Writing `version("3.12")` by analogy with its neighbour is a build-script compile
+        // error, and it cost a round: the javap output naming both spellings was already open at the
+        // time. Derive the call from the real declaration, never from the shape of the one beside it.
+        version = "3.12"
 
         // The interpreter that runs on the BUILD machine, not the phone. CI's ubuntu runner has
         // python3 preinstalled.

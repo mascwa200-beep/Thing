@@ -206,13 +206,38 @@ jobs:
           fi
 
       - name: Run unit tests
-        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
+        # ⚠️ Piped through tee so a failure can be RE-REPORTED readably below. `--stacktrace` puts
+        # several hundred frames after the message, and the log API's tail cannot reach back past
+        # them — two failures in a row this session were diagnosed by inference because the one line
+        # that mattered was unreachable. pipefail keeps gradle's exit code across the pipe.
+        run: |
+          set -o pipefail
+          ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
         # for PGO-style AOT) but kept on the same package id + debug keystore as before, so it updates in
         # place. The run number is the versionCode so each build out-versions the last (no downgrades).
-        run: ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-build.log
+
+      - name: Say what actually went wrong
+        # ⚠️ Runs ONLY on failure, and exists because the stack trace buries the message. Gradle
+        # prints "What went wrong" BEFORE several hundred frames of
+        # org.gradle.internal.execution.steps, so on a long failure the log API returns nothing but
+        # frames however far back it is asked to look. Re-printing the useful section at the END puts
+        # it where a tail can always find it. The stack is kept — it diagnosed the Chaquopy
+        # configuration-cache failure earlier today — it is simply no longer the last word.
+        if: failure()
+        run: |
+          for f in /tmp/gradle-tests.log /tmp/gradle-build.log; do
+            [ -f "$f" ] || continue
+            echo "===== $f ====="
+            awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
+            echo "----- failing tests, if any -----"
+            grep -E "FAILED$|^[A-Za-z].*> .* FAILED" "$f" | head -20 || true
+          done
 
       - name: Verify the native layer packaged
         # ⚠️ This is the ONLY gate on the native build, and it has to live here.
