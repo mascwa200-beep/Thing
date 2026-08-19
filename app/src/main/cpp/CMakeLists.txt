@@ -29,7 +29,40 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fvisibility=hidden")
 
 add_library(lcarsnative SHARED
         lcars_native.cpp
+        whisper_jni.cpp
 )
+
+# ---- whisper.cpp -----------------------------------------------------------------------------
+#
+# The tree is cloned by CI at a pinned tag (see .github/workflows/android-build.yml) and is NOT in
+# the repository — see the header of this file for why a submodule is not an option here.
+#
+# ⚠️ The `if(EXISTS)` is for the LOCAL host gate, not for CI. Without it, `cmake --build` in a
+# checkout that has never run the clone step fails outright, and the cheap local syntax check that
+# caught a missing jni.h earlier stops working. On CI the guard must never be the thing that decides:
+# the workflow asserts the tree is present after cloning, and asserts the whisper JNI symbols are in
+# the shipped .so afterwards. A build that quietly lost speech recognition and still went green would
+# be far worse than one that failed.
+set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp)
+if(EXISTS ${WHISPER_DIR}/CMakeLists.txt)
+    # Static, so everything lands in liblcarsnative.so and there are no extra .so files to package
+    # or to keep in step. Tests/examples/server off because they are megabytes of tools nobody here
+    # runs. OpenMP off because the NDK does not ship libomp on the default sysroot path and ggml
+    # falls back to its own threading, which is what the phone wants anyway.
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${WHISPER_DIR} ${CMAKE_CURRENT_BINARY_DIR}/whisper EXCLUDE_FROM_ALL)
+    target_link_libraries(lcarsnative whisper)
+    # Gates the JNI entry points themselves, so their ABSENCE from the shipped library is what CI
+    # checks. A flag the runtime reports would be a claim; a missing symbol is a fact.
+    target_compile_definitions(lcarsnative PRIVATE HAVE_WHISPER=1)
+    message(STATUS "lcarsnative: whisper.cpp found, speech recognition enabled")
+else()
+    message(STATUS "lcarsnative: no whisper.cpp tree - building the host gate only")
+endif()
 
 # ⚠️ Off Android, jni.h has to be found explicitly, and without this the local gate below only ever
 # CONFIGURES — the compile fails immediately on `#include <jni.h>`. The NDK puts the header on its

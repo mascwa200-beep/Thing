@@ -48,6 +48,33 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Fetch whisper.cpp at a pinned tag
+        run: |
+          set -e
+          dir=app/src/main/cpp/whisper.cpp
+          repo=https://github.com/ggml-org/whisper.cpp
+          # Pinned, not "latest": a native layer that follows upstream without anyone deciding to is
+          # a build whose speech recognition can change under it.
+          #
+          # The tag below could NOT be verified when it was written - the development container
+          # cannot reach GitHub - so rather than fail blind, the step falls back to the newest v*
+          # tag and says loudly which one it used. That turns a wrong guess into the answer inside a
+          # single ~25 minute round instead of two, and the fallback cannot drift silently because
+          # it warns every time it fires. Pin whatever it reports.
+          TAG="v1.7.6"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "whisper.cpp @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'v*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned whisper.cpp tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          # The CMake integration is guarded by if(EXISTS) so the tree's absence degrades to a
+          # host-only build locally. On CI that guard must never be what decides, or a build that
+          # quietly lost speech recognition would still go green.
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: whisper.cpp tree is not present after cloning"; exit 1; }
+          echo "whisper.cpp tree: $(du -sh "$dir" | cut -f1)"
+
       - name: Run unit tests
         run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
 
@@ -68,6 +95,20 @@ jobs:
           echo "inspecting $apk"
           if unzip -l "$apk" | grep -q "lib/arm64-v8a/liblcarsnative.so"; then
             unzip -l "$apk" | grep "lib/arm64-v8a/" || true
+            # ⚠️ And that whisper.cpp really linked. Its JNI entry points are compiled only under
+            # HAVE_WHISPER, so their ABSENCE from the shipped library is the check - a missing symbol
+            # is a fact, where a runtime flag would only be a claim. `nm -D` reads the dynamic symbol
+            # table, which survives stripping because JNI could not resolve anything otherwise.
+            unzip -p "$apk" lib/arm64-v8a/liblcarsnative.so > /tmp/lcarsnative.so
+            if nm -D --defined-only /tmp/lcarsnative.so | grep -q "WhisperNative_nativeInit"; then
+              echo "whisper.cpp linked:"
+              nm -D --defined-only /tmp/lcarsnative.so | grep WhisperNative || true
+            else
+              echo "FAIL: liblcarsnative.so shipped WITHOUT whisper.cpp - the if(EXISTS) guard took the"
+              echo "      host-only branch, so speech recognition would be silently absent."
+              nm -D --defined-only /tmp/lcarsnative.so | grep Java_ || echo "(no JNI exports at all)"
+              exit 1
+            fi
           else
             echo "FAIL: liblcarsnative.so is not in the APK — the CMake build produced nothing."
             unzip -l "$apk" | grep "lib/" || echo "(no native libraries at all)"
