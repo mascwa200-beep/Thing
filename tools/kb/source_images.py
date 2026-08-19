@@ -134,10 +134,26 @@ DIAGRAM_CATEGORIES = re.compile(
     r"svg (drawing|diagram)|line art|technical drawing)",
     re.I,
 )
+# ⚠️ **Word boundaries defeat this list in BOTH directions, and a real run proved both.**
+# Under-matching: `\blogo\b` misses `Foodlogo2` and `EFTA logo2` (glued to a word, suffixed with a
+# digit) and `\bclip.?art\b` misses `openclipart` — all three were accepted onto real guides, a food
+# logo onto food spoilage, a trade-bloc logo onto passports, a desktop sound icon onto film noir.
+# Over-matching is the subtler half: a bare `seal` rejects a harbour seal's anatomy, a bare `flag`
+# rejects a semaphore chart, a bare `crest` rejects a wave crest, and `signature` rejects a
+# dolphin's signature whistle — all genuine subjects in this library. So the compound-prone terms
+# lose their leading boundary and gain a negative lookahead, while the ambiguous nouns are required
+# to appear in their heraldic phrasing. `seal of` is deliberately absent: it cannot tell a state
+# seal from a mechanical one. 27 cases, both directions, are pinned in --selftest.
 NOT_SUBJECT = re.compile(
-    r"\b(logo|logotype|wordmark|coat of arms|crest|emblem|seal|flag|banner|icon|favicon|stamp|"
-    r"postage|poster|cover|portrait|selfie|album|jersey|badge|trademark|signature|cartoon|"
-    r"clip.?art|wordart|fan.?art|mascot|meme|screenshot|barnstar|userbox)\b",
+    # compound-prone: no leading boundary, a lookahead instead of a trailing one
+    r"logo(?![a-z])|logotype|wordmark|clip.?art|wordart|fan.?art|cartoon|"
+    # ordinary nouns that only ever mean decoration
+    r"\bposter(?![a-z])|\bicon(?![a-z])|\bfavicon|\bemblem|\bmascot|\bmeme(?![a-z])|"
+    r"\bbarnstar|\buserbox|\bscreenshot|\bselfie|\bportrait(?![a-z])|"
+    r"\bjersey|\bbadge(?![a-z])|\btrademark|"
+    # ambiguous nouns, required in their heraldic phrasing so the real subjects survive
+    r"signature of|coat of arms|crest of|great seal|\bflag of|flags of|"
+    r"(book|album|magazine|dvd|game|comic) cover|postage stamp",
     re.I,
 )
 # Wikipedia article chrome: maintenance banners, portal icons, licence marks. Never the subject.
@@ -632,7 +648,35 @@ def selftest() -> int:
          {"thermoluminescence"}, "image/svg+xml", [], "commons-search", True,
          "a single hit, but the word is rare enough in the corpus to carry the match alone"),
     ]
-    bad = 0
+    # ⚠️ The not-subject list is checked separately and in BOTH directions, because a real wave
+    # showed it failing each way: compounds slipped through (Foodlogo2 onto a food-spoilage guide)
+    # while bare nouns rejected genuine subjects (a harbour seal, a semaphore flag chart, a wave
+    # crest, a dolphin's signature whistle). Testing only the reject half would have caught one.
+    ns_reject = ["Foodlogo2", "EFTA logo2", "Gnome-mime-sound-openclipart", "Solar Power logo",
+                 "New Zealand Breakers logo", "Triumphant Cartoon Woman Using A Computer",
+                 "Flag of France", "Great Seal of the United States", "Coat of arms of Spain",
+                 "Book cover of Dune", "Postage stamp of Kenya", "Nintendo wordmark",
+                 "Signature of Napoleon"]
+    ns_accept = ["Silicon wafer diagram", "Posterior view of the heart",
+                 "Flag semaphore alphabet chart", "Harbor seal anatomy",
+                 "Wave crest and trough diagram", "Ground cover vegetation map",
+                 "Stamp mill diagram", "Logogram examples", "Iconic memory model",
+                 "Signature whistle of dolphins", "Badger sett cross-section",
+                 "Portraiture lighting setup", "Seal of a bearing assembly",
+                 "Cover crop rotation diagram"]
+    ns_bad = 0
+    for t in ns_reject:
+        if not NOT_SUBJECT.search(t):
+            ns_bad += 1
+            print(f"  FAIL not-subject let through   {t}")
+    for t in ns_accept:
+        if NOT_SUBJECT.search(t):
+            ns_bad += 1
+            print(f"  FAIL not-subject wrongly kills {t}")
+    print(f"  {'ok  ' if not ns_bad else 'FAIL'} not-subject list: "
+          f"{len(ns_reject)} reject + {len(ns_accept)} accept cases")
+
+    bad = ns_bad
     for title, vocab, mime, cats, source, must_pass, why in cases:
         passed = (is_english(title)
                   and on_subject(title, vocab, freq, source)
