@@ -199,7 +199,7 @@ class EmergencyWatchService : Service() {
 
     companion object {
         private const val CHANNEL = "emergency_watch"
-        private const val NOTIF_ID = 7402
+        private const val NOTIF_ID = NotifId.FGS_EMERGENCY_WATCH
         private const val STATE_KEY = "notify_state"
 
         /** A minute. Fast enough to matter, slow enough that the battery cost is a rounding error. */

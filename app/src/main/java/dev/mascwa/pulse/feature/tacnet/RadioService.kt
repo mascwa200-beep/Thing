@@ -109,7 +109,7 @@ class RadioService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "radio_playback"
-        private const val NOTIF_ID = 4201
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_RADIO
         const val ACTION_STOP = "dev.mascwa.pulse.radio.STOP"
     }
 }

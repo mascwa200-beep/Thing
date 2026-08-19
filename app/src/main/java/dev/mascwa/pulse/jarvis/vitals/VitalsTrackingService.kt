@@ -299,7 +299,7 @@ class VitalsTrackingService : Service() {
 
     companion object {
         private const val CHANNEL_ONGOING = "jarvis_vitals_ongoing"
-        private const val NOTIF_ID = 7311
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_VITALS
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.vitals.STOP"
 
         /** Same smoothing as SensorFusionController, so "moving" means one thing across the app. */

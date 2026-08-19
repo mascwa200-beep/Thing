@@ -74,6 +74,6 @@ class BreakingNewsActivity : ComponentActivity() {
     companion object {
         const val EXTRA_HEADLINE = "breaking_headline"
         const val EXTRA_QUERY = "breaking_query"
-        const val NOTIF_ID = 1003 // distinct from breaking (1001) / emergency (1002)
+        const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.TAKEOVER
     }
 }

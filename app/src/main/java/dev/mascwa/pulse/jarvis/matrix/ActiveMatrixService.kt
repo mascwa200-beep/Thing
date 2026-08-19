@@ -699,7 +699,7 @@ class ActiveMatrixService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "jarvis_active_matrix"
-        private const val NOTIF_ID = 7301
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_ACTIVE_MATRIX
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.matrix.STOP"
         private const val EXTRA_WAKE_WORD = "dev.mascwa.pulse.jarvis.matrix.WAKE_WORD"
 

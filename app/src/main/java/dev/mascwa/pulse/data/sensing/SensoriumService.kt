@@ -255,7 +255,7 @@ class SensoriumService : Service() {
 
     companion object {
         private const val CHANNEL_ONGOING = "sensorium_ongoing"
-        private const val NOTIF_ID = 7401
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_SENSORIUM
         private const val ACTION_STOP = "dev.mascwa.pulse.data.sensing.STOP"
         private const val EXTRA_FOREGROUND = "foreground_launch"
         private const val NOTIF_REFRESH_MS = 3 * 60_000L
