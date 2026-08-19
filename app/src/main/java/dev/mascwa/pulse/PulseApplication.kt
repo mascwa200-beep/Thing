@@ -26,7 +26,13 @@ class PulseApplication : Application(), Configuration.Provider, ComponentCallbac
     lateinit var container: AppContainer
         private set
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * The process-lifetime scope. Readable because a service sometimes has to finish a write that
+     * outlives itself — a notification action that both persists a setting and calls `stopSelf()`
+     * cannot use its own scope, since `onDestroy` cancels that as soon as its teardown completes.
+     * It is already handed out to [AppContainer.observeVoicePreference] for a related reason.
+     */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()

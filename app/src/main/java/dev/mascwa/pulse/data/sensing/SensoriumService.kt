@@ -64,6 +64,22 @@ class SensoriumService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            // ⚠️ **Turn the feature off, not just this instance.** `stopSelf()` alone was a Stop
+            // button that undid itself: `RefreshWorker` restarts the service on every run while
+            // `sensing.enabled` is true, and `BootReceiver` does the same after a reboot, so the
+            // scanner would quietly reappear within a worker period with nothing to explain why.
+            // Flipping the setting is what the Settings switch does, so afterwards the switch shows
+            // the truth, and it is the same shape as the game overlay's dismiss. The loop also
+            // reads this and stands itself down, so the two agree even if the write lands first.
+            // On the application's scope, not this service's: `onDestroy` cancels `scope` as soon
+            // as its own teardown finishes, which would race this write away.
+            val app = application as? PulseApplication
+            val repo = app?.container?.settingsRepository
+            if (app != null && repo != null) {
+                app.appScope.launch {
+                    runCatching { repo.update { it.copy(sensing = it.sensing.copy(enabled = false)) } }
+                }
+            }
             stopSelf()
             return START_NOT_STICKY
         }
