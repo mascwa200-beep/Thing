@@ -37,6 +37,14 @@ class AppContainer(private val appContext: Context) {
     /** The application context, for the few ViewModels that need it (e.g. AppOps / settings intents). */
     val applicationContext: Context get() = appContext
 
+    /**
+     * Screen-open requests from the Computer's tools. PulseApp collects it and navigates through
+     * its one openApp idiom; the tool side emits a route and knows nothing about navigation.
+     * Buffered so a tool firing before the UI collects (or during a configuration change) is not
+     * silently dropped.
+     */
+    val navigationBus = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
@@ -581,6 +589,7 @@ class AppContainer(private val appContext: Context) {
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
         listOf(
+            dev.mascwa.pulse.jarvis.agent.OpenScreenTool(navigationBus),
             dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository),
             dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
             dev.mascwa.pulse.jarvis.agent.DownloadTool(appContext, http),

@@ -64,6 +64,8 @@ fun PulseApp(
     isOnline: Boolean = true,
     onRouteVisit: (String) -> Unit = {},
     onStartRouteConsumed: () -> Unit = {},
+    /** The Computer's screen-open requests (the `open` tool) — see the collector below. */
+    navigationRequests: kotlinx.coroutines.flow.Flow<String>? = null,
 ) {
     val navController = rememberNavController()
     var offlineDismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -92,6 +94,19 @@ fun PulseApp(
     fun openApp(route: String) {
         if (TOP_DESTINATIONS.any { it.route == route.substringBefore('?') }) navigateTopLevel(route)
         else navController.navigate(route) { launchSingleTop = true }
+    }
+
+    // "Computer, open the radar." The tool side only ever emits a route; navigation happens HERE,
+    // through the same openApp idiom every tap uses. The whitelist is re-checked at this trust
+    // boundary — the bus is writable by any future producer, and what a tool validated is not
+    // what the collector may assume.
+    if (navigationRequests != null) {
+        LaunchedEffect(navigationRequests) {
+            navigationRequests.collect { route ->
+                val base = route.substringBefore('?')
+                if (base in SHORTCUT_ROUTES || TOP_DESTINATIONS.any { it.route == base }) openApp(route)
+            }
+        }
     }
 
     // The ambient palette, which NightwireTheme provides and which now swings to the alert range when

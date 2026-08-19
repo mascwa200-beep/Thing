@@ -240,6 +240,7 @@ class MainActivity : ComponentActivity() {
                             factory = factory,
                             startRoute = pendingRouteState.value,
                             isOnline = online,
+                            navigationRequests = app.container.navigationBus,
                             onRouteVisit = { route ->
                                 // ⚠️ The BASE route, not the pattern. currentRoute hands over the
                                 // route PATTERN — "survival?guide={guide}" — and recording that

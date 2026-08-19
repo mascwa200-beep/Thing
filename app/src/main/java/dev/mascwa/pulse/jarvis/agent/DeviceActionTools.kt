@@ -263,3 +263,57 @@ class PlayMediaTool(
     private fun looksLikeAddress(a: String): Boolean =
         a.contains("://") || Regex("^[\\w-]+(\\.[\\w-]+)+/\\S").containsMatchIn(a)
 }
+
+/**
+ * The Computer opens the app's own screens — "open the radar", "show me the weather".
+ *
+ * Forty-nine tools and it could not open a single page of its own console, while SHORTCUT_ROUTES
+ * whitelists thirty-one routes for EXTERNAL deep-links (launcher shortcuts, notifications). This
+ * closes that inversion by trusting exactly the same whitelist: a matched feature's route is
+ * emitted onto the navigation bus, which `PulseApp` collects and routes through its one openApp
+ * idiom. Nothing here navigates; nothing here can name a route the directory does not list.
+ *
+ * Matching is against the feature catalog (which the menu directory generates) plus each entry's
+ * declared synonyms, so "planes" opens the radar here exactly as it finds it in the MENU's search.
+ */
+class OpenScreenTool(
+    private val bus: kotlinx.coroutines.flow.MutableSharedFlow<String>,
+) : JarvisTool {
+    override val name = "open"
+    override val usage = "open <screen> — open one of the app's own screens by name (\"open the radar\", \"open settings\")"
+
+    override suspend fun run(arg: String): String {
+        val query = arg.trim().lowercase()
+            .removePrefix("the ").removePrefix("my ").trim().trimEnd('.', '!', '?')
+        if (query.isEmpty()) {
+            return "Say which screen — for example: " + labels().take(8).joinToString(", ") + "."
+        }
+        val hit = match(query)
+            ?: return "No screen called \"$arg\". The screens are: ${labels().joinToString(", ")}."
+        // The same whitelist external deep-links trust. Every catalog route passes today; the check
+        // stands so a future catalog entry outside the deep-linkable set cannot ride this tool in.
+        val allowed = hit.key in dev.mascwa.pulse.navigation.SHORTCUT_ROUTES ||
+            dev.mascwa.pulse.navigation.TOP_DESTINATIONS.any { it.route == hit.key }
+        if (!allowed) return "That screen cannot be opened directly."
+        return if (bus.tryEmit(hit.key)) "Opening ${hit.label}." else "Could not open ${hit.label} right now."
+    }
+
+    private fun labels(): List<String> =
+        dev.mascwa.pulse.data.usage.FeatureCatalog.entries.map { it.label }
+
+    private fun match(query: String): dev.mascwa.pulse.core.telemetry.FeatureMeta? {
+        val entries = dev.mascwa.pulse.data.usage.FeatureCatalog.entries
+        val terms = dev.mascwa.pulse.navigation.GROUPS
+            .flatMap { g -> g.entries }.associateBy({ it.route }, { it.searchTerms })
+        // Exact label first, then containment either way, then the declared synonyms — the same
+        // vocabulary the MENU search matches, so voice and menu agree on what a word means.
+        entries.firstOrNull { it.label.lowercase() == query }?.let { return it }
+        entries.firstOrNull {
+            val l = it.label.lowercase()
+            l.contains(query) || query.contains(l)
+        }?.let { return it }
+        return entries.firstOrNull { e ->
+            terms[e.key].orEmpty().any { t -> t == query || t.contains(query) || query.contains(t) }
+        }
+    }
+}
