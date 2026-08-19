@@ -59,8 +59,9 @@ fun PulseScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     if (topBarOverride != null) {
-        // Two screens draw their own masthead (Home and News). They short-circuit the frame exactly
-        // as they short-circuited the TopAppBar, including owning their own status-bar inset.
+        // ONE screen draws its own masthead (Home — News rejoined the standard frame in the
+        // consistency arc). It short-circuits the frame exactly as it short-circuited the
+        // TopAppBar, including owning its own status-bar inset.
         LcarsBareFrame(modifier, topBarOverride, content)
         return
     }

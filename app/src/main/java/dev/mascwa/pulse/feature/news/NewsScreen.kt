@@ -1,47 +1,45 @@
 package dev.mascwa.pulse.feature.news
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.Readability
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
+import dev.mascwa.pulse.feature.common.LcarsButton
+import dev.mascwa.pulse.feature.common.LcarsField
+import dev.mascwa.pulse.feature.common.LcarsIcons
+import dev.mascwa.pulse.feature.common.LcarsTabRow
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.live.LiveVideoPlayer
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
+import dev.mascwa.pulse.feature.live.LiveVideoPlayer
+import dev.mascwa.pulse.ui.theme.JetBrainsMono
+import dev.mascwa.pulse.ui.theme.Pulse
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,85 +59,67 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
         vm.clearSearch()
     }
 
+    // News was the LAST screen on stock Material chrome — its own TopAppBar + ScrollableTabRow
+    // behind a topBarOverride. It now takes the same LCARS frame as every other screen (only Home
+    // still draws its own masthead), the tab rail is the shared LcarsTabRow, and the search box is
+    // the one LcarsField. CANCEL is its own labelled button rather than a ✕ that meant a different
+    // verb from the ✕ beside it.
     PulseScaffold(
         title = "News",
-        topBarOverride = {
-            Column {
-                if (searchActive) {
-                    TextField(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        placeholder = { Text("Search news…") },
-                        singleLine = true,
-                        leadingIcon = {
-                            // ✕, not the back arrow: this CANCELS search — using the navigation
-                            // glyph for a different verb was one of the app's six back idioms.
-                            IconButton(onClick = {
-                                searchActive = false
-                                searchText = ""
-                                vm.clearSearch()
-                            }) { Icon(LcarsIcons.Close, "Cancel search") }
-                        },
-                        trailingIcon = {
-                            if (searchText.isNotEmpty()) {
-                                IconButton(onClick = { searchText = "" }) {
-                                    Icon(LcarsIcons.Close, "Clear")
-                                }
-                            }
-                        },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onSearch = { vm.search(searchText) },
-                        ),
-                        colors = TextFieldDefaults.colors(
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.statusBars),
-                    )
-                } else {
-                    TopAppBar(
-                        title = { Text(if (state.searchMode) "Results: ${state.query}" else "News") },
-                        actions = {
-                            IconButton(onClick = { searchActive = true }) {
-                                Icon(LcarsIcons.Search, "Search")
-                            }
-                        },
-                    )
-                }
-                if (!state.searchMode && state.tabs.isNotEmpty()) {
-                    ScrollableTabRow(
-                        selectedTabIndex = state.selectedIndex.coerceIn(0, state.tabs.lastIndex),
-                        edgePadding = 8.dp,
-                    ) {
-                        state.tabs.forEachIndexed { i, tab ->
-                            Tab(
-                                selected = i == state.selectedIndex,
-                                onClick = { vm.selectTab(i) },
-                                text = { Text(tab.title) },
-                            )
-                        }
-                    }
-                }
+        actions = {
+            IconButton(onClick = { searchActive = true }) {
+                Icon(LcarsIcons.Search, "Search")
             }
         },
     ) { innerPadding ->
+        Column(Modifier.padding(innerPadding)) {
+        if (searchActive) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    LcarsField(
+                        value = searchText,
+                        onValueChange = { searchText = it },
+                        placeholder = "Search news…",
+                        leadingIcon = LcarsIcons.Search,
+                        imeAction = ImeAction.Search,
+                        onImeAction = { vm.search(searchText) },
+                    )
+                }
+                LcarsButton("CANCEL", onClick = {
+                    searchActive = false
+                    searchText = ""
+                    vm.clearSearch()
+                })
+            }
+            if (state.searchMode) {
+                Text(
+                    "RESULTS · ${state.query.uppercase()}",
+                    fontFamily = JetBrainsMono, fontSize = 10.sp, color = Pulse.colors.muted,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                )
+            }
+        } else if (state.tabs.isNotEmpty()) {
+            LcarsTabRow(
+                tabs = state.tabs.map { it.title },
+                selected = state.selectedIndex.coerceIn(0, state.tabs.lastIndex),
+                onSelect = vm::selectTab,
+            )
+        }
         val content = state.content
         // Live television is not a list of articles and has nothing to pull down for, so it sits
         // outside the refresh box entirely rather than inside it doing nothing.
         val liveTab = !state.searchMode && state.tabs.getOrNull(state.selectedIndex)?.live == true
         if (liveTab) {
             LiveVideoPlayer(
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .padding(12.dp),
+                modifier = Modifier.padding(12.dp),
             )
         } else PullToRefreshBox(
             isRefreshing = content.loading && content.data != null,
             onRefresh = { vm.refresh() },
-            modifier = Modifier.padding(innerPadding),
         ) {
             when {
                 content.isInitialLoading -> LoadingState()
@@ -180,6 +160,7 @@ fun NewsScreen(vm: NewsViewModel, onRead: ((title: String, url: String) -> Unit)
                     }
                 }
             }
+        }
         }
     }
 }
