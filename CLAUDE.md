@@ -4853,6 +4853,132 @@ condition-red screen appears over the lock screen with the alarm at full volume 
 acknowledging **restores your previous alarm volume**. Then the map's REPLAY chip, the radio
 "near you" list, and the launch window line.
 
+### THEATER + THE CONSISTENCY ARC — the owner's two-part rebuke, answered (this session, PR #449)
+
+Owner (verbatim fragments): the Viewscreen's paste-a-URL design "completely defeats the purpose of
+not having to leave the app"; "who the f*** is going to download a goddamn video and just save it";
+"a human being wants to literally laziest option"; the MENU "is crappily designed for someone who
+wants to go through the arduous task of scrolling"; the back button is "inconveniently and
+inconsistently place[d] throughout the entire f***ing app"; "look at everything you've made…
+literally every single goddamn feature and… rework that feature" — plus two standing directives:
+**Fable 5 ultracode ON**, and **"ensure that every single time you go to make something you have
+your babysitter with you"** (= adversarial review on every big change). Plan approved
+(`robust-baking-dewdrop.md`): Part A (THEATER) + Part B (consistency, B1–B13).
+
+**Part A — THEATER (browse, search, watch — no links needed), commits `892c175..843433e`:**
+flat `ytsearchN:` browse in Python (probe-proven live; `/feed/trending` is DEAD; the opts trap —
+a copied `noplaylist` collapses a search to 1 result — negative-tested), the CI-tested
+`TheaterModel` core, `MediaBrowser` (10-min shelf memo, refusals never memoised), the resume
+ledger (`theater_resume.json`, store-owned scope because **onCleared runs after viewModelScope is
+cancelled** — a launch there silently never runs), and the screen as a discovery surface:
+CONTINUE WATCHING · ON TODAY'S STORIES (the app's own headlines → searches — the trending
+replacement) · FROM YOUR FEEDS · five curated shelves · ON THIS DEVICE (the harvester's
+first-ever listing surface). Social gains ▶ WATCH IN THEATER; the `play` tool searches
+("play some jazz"). Address box demoted to a collapsed DIRECT ADDRESS affordance.
+
+**THE BABYSITTER EARNED ITSELF: a 13-agent adversarial review of Part A confirmed 8 defects
+(1 BLOCKER), all fixed in `0959786`:**
+1. The resume waiter matched on PLAYING alone, was never cancelled, and seeked RELATIVE — a resume
+   armed for video A fired into video B tapped moments later, and a sponsor skip at 0:00 offset
+   the position. Now identity-checked (`it.item?.id == itemId`), cancelled by every newer play
+   (`supersedePlays()`), and ABSOLUTE (`OnDemandController.seekTo`, new beside `seekBy`).
+2. Two taps raced and the SLOWER resolve won. A monotonic `playGeneration` at every play entry;
+   a resolve returning to a newer generation neither publishes nor plays; STOP supersedes too.
+3. `LaunchedEffect(playAddress)` re-fired on composition re-entry — back from MENU RESTARTED the
+   video and lost the position. The nav argument is blanked once handled (`onPlayAddressConsumed`
+   → `arguments?.putString("play", "")`).
+4. Leaving mid-video left audio playing headless with NO transport anywhere (video earns no
+   keep-alive service; the fresh VM started Idle). A video session now ends with the screen
+   (`onCleared` stops non-audioOnly playback); audio-only deliberately keeps playing; a re-entered
+   screen ADOPTS a live session so the transport renders.
+5. BLOCKER: a card tap gave zero feedback and playback could start with the player scrolled
+   off-screen — disembodied audio. `LazyListState` + scroll-to-item-0 on every resolve-state
+   change; the "Resolving…" narration IS the tap feedback.
+6. Fresh-install cold start front-loaded the emptiest shelves (two social fetches + a news fetch
+   feeding rows the videoId filter then emptied) before the first curated search. Curated shelves
+   load FIRST (one fixed query each); stories/feeds append at index 0 as they land.
+7. Audio-only was reachable ONLY through the demoted paste path. The player panel gains ♪ LISTEN
+   (restart the current item audioOnly from its current position).
+8. `loadShelves(force=true)` had ZERO callers — a refused surface was a dead end. RETRY on the
+   refused-and-empty state (`retryShelves()`), which is why the browser never memoises refusals.
+
+**Part B — the consistency arc, B1–B13 (B11 deliberately reduced):**
+- **B1** usage keys record the base route; `foldLegacyKeys` merges the pattern-key junk once.
+- **B2** ONE back idiom: `PulseScaffold.onBack` makes the 56×54 corner block the control
+  (`navigationIcon` now NULLABLE — null means no control, killing the dead-but-tappable accent
+  corner); 36 screens swept; the repo's FIRST BackHandlers (Guides/News/Settings/OfflineSurvival),
+  each gated on sub-state — an always-enabled handler eats system back app-wide.
+- **B3** ONE navigate idiom: `openApp(route)` (tab → navigateTopLevel, else push). Settings PUSHED
+  everywhere; Computer always top-leveled.
+- **B4** ONE route inventory: `SHORTCUT_ROUTES` DERIVED from Directory GROUPS + {economy, fuel} —
+  switch-over set-diff EMPTY both directions (31 == 31), proven before the edit; FeatureCatalog
+  derives from GROUPS (20 → 37 features, labels stop drifting from menu names); SurviveTile titles
+  read `menuLabel(route)`; `MenuEntry.searchTerms` added ("planes" finds the radar).
+- **B5** MENU search-first + a RECENT strip (recency-ordered, menu-listed routes only) +
+  **`LcarsField` debuts as THE text field** (focus-accent border, kit-cued clear, every IME action
+  key routed to one callback).
+- **B6** `DeviceSearch.RecordKind.FEATURE` — a FEATURE record's **id IS the route**; typing "radar"
+  in device search OPENS the radar. Mirrored core; desktop build + 462 tests ran green locally.
+- **B7** Home: labelled MOST USED chip row (count-ordered; MENU's strip is recency-ordered — one
+  answers "what do I always use", the other "what was I just doing"); ForYou INTERLEAVES
+  recommendations (cap 2, dropped when an insight already points there) instead of suppressing;
+  feed capped 12→6 + the hero's URL dropped from every chip feed (it rendered twice).
+- **B8** NeonPanel → LcarsFrame shim (corners brackets accepted-and-ignored — the CP2077 leftover),
+  NeonChip → LcarsChip shim; StatTile/NeonDivider/HubTile/StatusDot/CyberCut deleted after a
+  call-site re-grep (all zero refs); the last 3 Material Switches → LcarsSwitch. LcarsFrame gains
+  a defaulted `background` param. ⚠️ Owner screenshot pass: ~40 screens' panel/chip render at once.
+- **B9a** 8 hand-rolled fields → LcarsField (search/guides/survive-hub/weather/radio/spotify/
+  live-filter/theater×2). Deliberately NOT converted: the console chat box (its identity),
+  Notes/Diary/memory composers (multi-line), NAV's map-overlay search (translucent-over-map is
+  the point). Radio's clear semantics preserved by clearing results whenever the box empties.
+- **B10a** `LcarsTabRow` kit; Markets + Weather rails converted (they were byte-identical copies);
+  tab state hoisted into VMs as clamped MutableStateFlow ordinals — remember{} dies with the
+  composition and rememberSaveable doesn't survive the popUpTo dance, so tabbing away reset the
+  sub-tab every time. **News stays Material deliberately** — its conversion is a masthead rebuild
+  that gets its own slice + adversarial review (B10b, open).
+- **B12** measured-first: the "Image search sites" Settings section was a ZOMBIE (edited
+  `customImageSites`, read by NOTHING since the Images screen died in #71) — deleted, field kept
+  (data contract); `settings?cat={cat}` wired to the zero-caller `initialCategory`; stale search
+  keywords removed ("world pulse", "accent amoled boot", "image search"). ⚠️ **The plan's
+  48-MaterialTheme-read sweep was SKIPPED on measurement**: NightwireTypography themes every
+  body/label style and the colour scheme derives from the palette, so the reads already render
+  correctly — the sweep would be zero-visual-change churn carrying the exact scope-error risk
+  ("Unresolved reference 'c'") that cost a CI round once. PrefSection-expanded was already fixed.
+- **B13** the Computer can navigate: `open` JarvisTool → `AppContainer.navigationBus`
+  (MutableSharedFlow) → PulseApp collects → openApp, re-checking SHORTCUT_ROUTES at the collector
+  (the bus is writable by any future producer). Matching = FeatureCatalog labels + directory
+  searchTerms, so voice and menu agree on vocabulary. ⚠️ **The SharedFlow honesty defect, caught
+  and fixed same-session (`390f0f3`)**: replay=0 never re-delivers to a late collector — with
+  nobody listening, tryEmit "succeeds" into the void, so the tool would have said "Opening the
+  radar." over nothing happening. replay stays 0 ON PURPOSE (a navigation request is an
+  imperative, not state; replaying would re-navigate on every Activity recreation) — the tool
+  checks `subscriptionCount` first and says the console isn't on screen.
+- **B11 reduced on inspection:** the plan's "JarvisMemory's 7 bare-Text empties → EmptyState" turned
+  out to be inline per-section explainers in one LazyColumn — converting them to the fillMaxSize
+  centered EmptyState would stack seven viewport-height blocks on one screen. Skipped; the real
+  screen-level cases were already covered by the earlier S4 retry arc.
+
+**⚠️ THE ONE CI FAILURE, AND THE GAP IT NAMED:** new file `LcarsField.kt` used
+`rememberLcarsCue`/`SoundCue`/`HapticCue` without importing them from `ui.effects`. The parse-only
+gate cannot see missing imports, and **`android_resolve_check.sh` cannot difference a NEW file
+against HEAD** (nothing to difference — a new false-positive/false-negative mechanism for that
+tool). The countermeasure that already paid: a mechanical **use-vs-import audit** greps every
+adopter for symbol-use vs import pairs — it caught the identical class in RadioBody
+(LcarsIcons.Search, no import) before it could ship.
+
+**Verification this arc:** the Theater review (13 agents, 8/9 findings confirmed) + a second
+adversarial review workflow over the whole B-arc (running at handoff — triage its findings on
+arrival); parse gates per slice; resolve-check with typed-probe discipline; desktop build + tests
+executed locally for the mirrored core; CI green through `4119a59` (run 1859 compile step passed;
+later runs superseded by design). ⚠️ **Everything visual is owner-verify on the Pixel**: the
+Theater shelves/tap-to-play/LISTEN/RETRY, back-gesture feel everywhere, MENU search + recents,
+Home's MOST USED row, the B8 panel/chip change across ~40 screens, LcarsField at 9 sites,
+Markets/Weather tab persistence, and "Computer, open the radar" by voice with the app OPEN
+(backgrounded now answers honestly that it can't).
+
+**Open:** B10b (News onto LcarsTabRow + masthead rebuild — its own slice + review); the B-arc
+review's findings (triage on arrival); the PR #449 batch merge to main once CI is green on the tip.
+
 ## How to continue (new session)
 Open this repo (default branch `main` has everything). Read this file. Continue development on the
 session's assigned dev branch (this session: `claude/loving-edison-bd65oa`), push small CI-green commits,
