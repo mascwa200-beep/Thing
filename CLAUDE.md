@@ -5792,3 +5792,55 @@ rather than broken.
 **Open / next:** whether a matching whisper/llama pin pair can be found so the adjudicator links (the
 workflow now prints exactly which headers differ); a retrieval bar fitted to speech for subject
 grounding; and the owner's deferred features 2, 3 and 4.
+
+#### The adjudicator links — the ggml pin, measured (run 1833 green)
+
+⚠️ **CORRECTION to the section above, which said the shipped build has no adjudicator.** That was
+true when written and is not any more. Run 1833 is green with **both** native trees: the ggml gate
+found identical headers so the llama tree survived, which means the APK verification took its llama
+branch and *required* `LlamaNative_nativeInit` in the shipped library. It passed. Stage 5 is in the
+APK, and the whole six-stage cascade exists on-device.
+
+**The pins are a MATCHED PAIR and must move together: whisper `v1.9.2` + llama `b10276`.**
+
+Three rounds of inferring which llama build carried whisper's ggml were wrong in three different
+ways, so it was measured instead — a temporary `ggml-probe` job (since retired) sparse-cloned
+candidate tags over `ggml/include` alone and diffed them. Against whisper v1.9.2:
+
+    b10499=3  b10455=2  b10443=2  b10417=2  b10358=1  b10322=1
+    b10276 == b10241 == b10197  IDENTICAL     b10141=1  b10021=3  b9945=5  b9867=6
+
+A contiguous window of byte-identical builds, exactly what "one ggml sync spans a range of build
+numbers" predicts. b10276 is the newest of that window.
+
+**Four lessons, each of which cost a round:**
+1. ⚠️ **Spot-checking a fast-moving C API is a treadmill.** The first gate compared one function,
+   passed, and the build died 212 objects deep on a macro. The question is never "do these agree
+   about X" but "are these the same sync", and since whisper vendors ggml by copying it, that is
+   answerable exactly by diffing the header directories.
+2. ⚠️ **Counting differences is useless without knowing their KIND.** The breakthrough was noticing
+   the residual differences were file *contents* with no `Only in ...` lines: identical file sets
+   meant version skew (a pin can fix it) rather than divergent vendorings (no pin ever could). Had
+   they been `Only in` lines I would have been hunting something that does not exist.
+3. ⚠️ **Search both axes.** The first sweep held whisper fixed and every candidate differed, by
+   monotonically fewer headers the older the tag — the signature of the FIXED side being stale.
+   v1.7.6 was four releases old and its own best partner was near b5845, the opposite end of the
+   space from every build guessed at.
+4. ⚠️ **A diagnostic belongs in its own job.** As a step inside `build` its answer lands several
+   hundred lines deep behind the ninja output, which is expensive to read back and defeats the point
+   of asking. Its own job has a short log, runs in parallel, and `continue-on-error` keeps it from
+   ever holding up a release.
+
+**Also fixed by re-reading the A1 code against this repo's recurring defect classes** — the screen
+showed *intent* (`sensing.interrogator`) rather than *fact*, so a revoked permission, a refused
+recorder, the notification's Stop, or an OS kill would each have left it reading LISTENING at a
+closed microphone; it now reads `MicFloor.interrogating`, true only while the service holds the
+device. `standDown()` clears the setting so Settings cannot advertise it either. And a segment cut
+mid-sentence was reported as `NO_CLAIM` — a statement about content nothing had examined — so
+`Trace.verdict` is nullable now and the screen says "still speaking".
+
+⚠️ **Whisper bumped four releases (v1.7.6 → v1.9.2) as part of the pair.** All eight symbols
+`whisper_jni.cpp` calls were confirmed present in v1.9.2 *before* the pin moved, because the build
+was green at the time and a blind bump trades a working state for an unknown one. The params fields
+it sets are long-stable. Transcription quality on the newer release is owner-verify like everything
+else here.
