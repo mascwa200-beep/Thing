@@ -634,7 +634,7 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.TorchTool(appContext),
             dev.mascwa.pulse.jarvis.agent.ClipboardTool(appContext),
             dev.mascwa.pulse.jarvis.agent.PlayMediaTool(
-                appContext, mediaExtractor, sponsorBlockRepository, settingsRepository,
+                appContext, mediaExtractor, sponsorBlockRepository, settingsRepository, mediaBrowser,
             ),
         )
     }

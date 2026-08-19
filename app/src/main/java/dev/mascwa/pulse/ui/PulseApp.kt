@@ -256,7 +256,17 @@ fun PulseApp(
             // ---- Social & search (Phase 3) — LCARS palette ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.social.SocialScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    // A social row whose link is a video plays HERE, in the Theater, instead of
+                    // bouncing out to a browser — the whole point of the discovery rework.
+                    onWatch = { url ->
+                        navController.navigate(
+                            "${Routes.VIEWSCREEN}?play=${android.net.Uri.encode(url)}",
+                        ) { launchSingleTop = true }
+                    },
+                )
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)

@@ -194,14 +194,15 @@ class PlayMediaTool(
     private val extractor: dev.mascwa.pulse.data.media.MediaExtractor,
     private val sponsor: dev.mascwa.pulse.data.media.SponsorBlockRepository,
     private val settings: dev.mascwa.pulse.data.settings.SettingsRepository,
+    private val browser: dev.mascwa.pulse.data.media.MediaBrowser,
 ) : JarvisTool {
     override val name = "play"
-    override val usage = "play <url|pause|resume|stop> — play a video/track address (audio, background), or control playback"
+    override val usage = "play <what|url|pause|resume|stop> — play something by name (\"play some jazz\") or by address (audio, background), or control playback"
 
     override suspend fun run(arg: String): String {
         val a = arg.trim()
         when (a.lowercase()) {
-            "" -> return "Give me an address to play, or pause/resume/stop."
+            "" -> return "Tell me what to play — a name or an address — or pause/resume/stop."
             "stop" -> {
                 dev.mascwa.pulse.feature.theater.OnDemandController.stop(context)
                 return "Playback stopped."
@@ -215,13 +216,27 @@ class PlayMediaTool(
                 return "Resuming."
             }
         }
-        return when (val r = extractor.resolve(a)) {
+        // Not an address? Then it is a REQUEST — "play some jazz" — and discovery is our job, not
+        // the user's. Search, take the top hit, and play its page through the same resolve path an
+        // address takes; the honest-refusal sentences flow through unchanged.
+        val target = if (looksLikeAddress(a)) {
+            a
+        } else {
+            when (val b = browser.search(a, limit = 3)) {
+                is dev.mascwa.pulse.data.media.MediaBrowser.Browse.Refused ->
+                    return dev.mascwa.pulse.core.telemetry.MediaResolution.say(b.reason) +
+                        if (b.detail.isNotBlank()) " (${b.detail})" else ""
+                is dev.mascwa.pulse.data.media.MediaBrowser.Browse.Page ->
+                    b.items.first().pageUrl
+            }
+        }
+        return when (val r = extractor.resolve(target)) {
             is dev.mascwa.pulse.core.telemetry.MediaResolution.Refused ->
                 dev.mascwa.pulse.core.telemetry.MediaResolution.say(r.reason) +
                     if (r.detail.isNotBlank()) " (${r.detail})" else ""
             is dev.mascwa.pulse.core.telemetry.MediaResolution.Ready -> {
                 val segments = if (settings.current().sponsorSkip) {
-                    val id = r.item.id.ifBlank { extractor.videoId(a) }
+                    val id = r.item.id.ifBlank { extractor.videoId(target) }
                     if (id.isBlank()) emptyList()
                     else dev.mascwa.pulse.core.telemetry.SponsorSegments.usable(
                         runCatching { sponsor.segments(id) }.getOrDefault(emptyList()),
@@ -236,4 +251,15 @@ class PlayMediaTool(
             }
         }
     }
+
+    /**
+     * Whether the argument is something to RESOLVE rather than something to SEARCH FOR.
+     *
+     * A scheme is decisive; a bare "youtu.be/xyz" or "example.com/watch" (a dot-word followed by a
+     * path) is close enough. Everything else — "some jazz", "the new trailer" — is a request, and
+     * a false negative here just costs one search that returns the pasted address's title anyway,
+     * while a false positive would hand English prose to the URL resolver and refuse.
+     */
+    private fun looksLikeAddress(a: String): Boolean =
+        a.contains("://") || Regex("^[\\w-]+(\\.[\\w-]+)+/\\S").containsMatchIn(a)
 }
