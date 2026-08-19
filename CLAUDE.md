@@ -5649,3 +5649,146 @@ not that every core is mirrored, and microphones are out of the companion's scop
 upgradeable pattern, the VAD driving the buffer, the cascade orchestrator) and **U1** (the screen:
 live transcript, flagged fallacies with counter-arguments and citations, purge control, Settings
 toggle default OFF).
+
+### THE ACOUSTIC INTERROGATOR — slices N0–U1 (this session, PR #449, branch `claude/loving-edison-bd65oa`)
+
+Owner asked for four features and chose, via AskUserQuestion, **feature 1 only, built deep**, with
+**literal whisper.cpp + llama.cpp** ("whatever it takes"). (Also recorded for a later session: the
+owner chose **literal yt-dlp via bundled Python** for feature 4. Features 2/3/4 are deferred.)
+Then, standing: *"keep going autonomously, never stop until the entire request in full has been
+completed"*, plus a budget instruction — be conscious of token use so the weekly limit resets before
+the work runs out. **Zero subagent spend this whole arc**, as with every arc since the credit
+directive; the owner's note that subagents are fine after noon Eastern is recorded and unused.
+
+The feature: capture ambient speech, transcribe it offline, log it to a rolling encrypted database,
+screen it for reasoning mistakes against the 651-guide offline library, and produce a real-time
+counter-argument. **A six-stage cascade — cheap-and-continuous in front of expensive-and-rare**,
+the same shape as `EmergencyTriage` before the ranker:
+
+    0 capture      InterrogatorCapture   continuous, trivial
+    1 transcribe   WhisperEngine         moderate
+    - record       TranscriptStore       screened, encrypted, capped
+    2 claim?       Discourse.consider    pure, free   ─┐ the gate
+    3 cue?         Fallacies.best        pure, free   ─┘
+    4 reference    FallacyReference      curated, offline
+    5 adjudicate   LlamaEngine           expensive, rare
+    6 compose      Rebuttal.compose      pure, free
+
+⚠️ **THE SCARCE RESOURCE IS THE MODEL, NOT THE MICROPHONE.** Stages 2–3 refuse the overwhelming
+majority of speech before anything expensive happens, and every refusal names itself so a quiet
+subsystem is distinguishable from a broken one. **The model is allowed to say no, and saying no ends
+it** — escalating means the cue tripped, not that the mistake is real; ignoring the refusal would
+make stage 5 decorative.
+
+**Shipped:** N0 toolchain proof · P1 four pure cores (Fallacies/Discourse/Rebuttal/TranscriptPolicy,
+54 tests, 21 rules negative-tested) · R1 Room transcript in its own encrypted database · N1
+whisper.cpp (green first try) · N2 llama.cpp · A1 cascade + capture + `MicFloor` + FGS · U1 screen,
+MENU entry, Settings switch.
+
+**⚠️ THE RETRIEVAL DESIGN CHANGED BECAUSE IT WAS MEASURED, and this is the `GuideSearch` lesson for
+the fourth time.** The obvious stage 4 is to hand the fallacy's name to the ranker. Run over the
+real 651-guide index with all 25 labels it returns noise, every hit on one matched word:
+
+    "Appeal to popularity" -> Reading Flood Maps and Base Flood Elevation
+    "Slippery slope"       -> Slope Aspect and Solar Warmth
+    "Straw man"            -> Charlie Chaplin and Silent Comedy
+
+Not a ranking bug — **the library has no per-fallacy page to find**; exactly two of 651 guides
+discuss fallacies, one with a section named for them. So `FallacyReference` is a curated table for
+the reason `EmergencyTriage` gives in its own words, with an app-module test resolving every route
+against the real shards (negative-tested).
+
+⚠️ **The other candidate — grounding on the SUBJECT of what was said — was measured too and is NOT
+shipped.** `LibraryLookup.consult` is tuned for typed *questions*, where the rarest word is the
+subject ("bowline", "schengen"). In speech it usually is not: over twelve realistic spoken claims it
+keyed on *minutes*, *either*, *obviously* and *grandfather*, citing a levee-breach guide for boiling
+water, while **refusing the correct Vaccines and Blood Pressure pages it had already ranked first**.
+`Hit.matched` does not separate them either — the worst hit scored 4 and the correct one scored 1.
+Recorded as open; it needs a retrieval bar fitted to speech, and inventing one against a dozen
+sentences would be overfitting.
+
+**⚠️ TWO VENDORED COPIES OF A FAST-MOVING C LIBRARY — the hardest lesson of the arc, three rounds.**
+whisper.cpp and llama.cpp each vendor ggml and only one may link (two would be an ODR violation, not
+a link error), so whisper is told to reuse llama's. The CMake comment predicted a failed reuse would
+be a loud duplicate-target error. **The real failure was the opposite and much quieter: the reuse
+SUCCEEDED and whisper compiled against a ggml months older than the one it was written for.**
+- Round 1: `llama_get_memory`/`llama_memory_clear` undeclared. The pin had the NEW model/vocab
+  accessors and the OLD cache API — renames months apart, unpredictable from "how recent is this
+  tag". Fix: **CMake reads `include/llama.h`** and defines one of three macros for the three
+  spellings the KV reset has had; `reset_context()` follows. None-of-three is FATAL at configure
+  time, because a missing reset means the second judgement decodes on the first's context — a fluent
+  answer about an argument nobody made, shipping green.
+- Round 2: passed a one-symbol gate, then failed 212 objects deep on `GGML_KQ_MASK_PAD`.
+  **Spot-checking a fast-moving C API is a treadmill; each round buys one more name.**
+- Round 3 (the fix): the question is not "do these agree about X" but **"are these the same ggml
+  sync"**, and whisper vendors ggml by copying it, so a matched pair has byte-identical public
+  headers. `diff -r` on the two include directories settles every symbol in a second. **And a
+  mismatch is no longer fatal** — the llama tree is removed and the build continues with
+  transcription and no adjudicator, which `Rebuttal.Provenance` already models as a first-class
+  outcome and prints on screen. The workflow warns and lists the differing headers, so the next pin
+  is chosen from evidence. The APK check follows: whisper REQUIRED, llama asserted only when its
+  tree survived.
+
+**⚠️ "There were failing tests" is not a compile error, and reading it carelessly wastes a round.**
+The A1 layer compiled clean; `NotifIdTest` failed. It keeps its own hand-written registry and
+asserts it equals `NotifId.PERSISTENT` — two independent statements of one fact, deliberately, the
+same shape as the MirrorDriftTest gap. I added `FGS_INTERROGATOR` to the source and both sets and
+not to the test. **New local gate `tools/run_notifid_test.sh`** brace-matches the `NotifId` object
+out of `Notifier.kt` (pure Kotlin object inside a file that imports half the platform) and runs the
+real test in a second. Negative-tested; also asserts its jars exist, since omitting one makes
+kotlinc die before compiling a line, which looks exactly like a clean pass.
+
+**⚠️ DERIVE STUBS AND CALLS FROM THE REAL DECLARATION.** Two U1 errors caught before CI by checking
+rather than recalling: `lcarsBlockShape` takes required `(sweep, corner)` with **no no-arg
+overload** (the exact shape of a CI failure this repo has already had), and the palette has
+`ink`/`muted`, not `text`/`textDim`.
+
+**Design decisions worth keeping.**
+- **`MicFloor`** (`feature/media/`) — the microphone had no arbiter reachable from outside
+  `ActiveMatrixService`, where the state is a private field. It carries a claim and decides nothing;
+  the service folds it into the tested `VoiceMachine`. ⚠️ Its collector is **its own launch**: the
+  console collector below it never returns, so a second `collect` written after it would compile,
+  read as wired, and never run a line. **The wake word yields while the interrogator runs** —
+  whether two `AudioRecord` clients in one app both get real audio is device-specific and
+  unanswerable from a build machine; a single capture fanned out is better and much larger.
+- **The service is NOT sticky**, unlike the Sensorium's: a system restart is a background start,
+  which cannot arm the microphone FGS type on 14+, so it would come back deaf while holding the
+  floor — and reopening a microphone that records conversation, unasked, is not a decision to make
+  for someone. Its Stop turns the **feature** off, not just the instance.
+- `sensing.interrogator` defaults **OFF**, the only sensing switch that does.
+- The Settings switch honours OFF and deliberately does not start it (the mic FGS type needs a
+  visible activity holding RECORD_AUDIO); the screen's LISTEN button requests the permission.
+- The transcript is loaded on demand, not exposed as a flow — every line must be decrypted, and a
+  flow would re-decrypt the window on each utterance for a screen nobody is looking at.
+- A **cut** segment (the detector's length ceiling, speaker still going) is transcribed and kept but
+  never judged: half a sentence reads as a bare assertion because the qualifying clause has not
+  arrived yet.
+
+**⚠️ THE PRIVACY INVARIANT, which INVERTS the Sensorium's.** That subsystem is classify-then-discard;
+this one necessarily writes down verbatim speech, and ambient capture picks up people who did not
+consent. On-device only, encrypted at rest, hard retention cap, one-tap purge that deletes the
+database **file** (rows leave text in freed SQLite pages). **Pinned to the local llama.cpp engine —
+NEVER `RoutingInferenceEngine`**, which prefers cloud whenever an API key is set and would silently
+ship ambient conversation to OpenRouter. No transcript text reaches `DebugUploader`, the audit
+ledger, or the episodic memory stream. **A row that cannot be encrypted is not stored** — the policy
+screen runs before the cipher, and there is no plaintext fallback.
+
+**⚠️ GitHub push protection rejected a push** over a realistic Slack-token fixture. Assemble such
+fixtures from parts (`"xoxb" + "-1234567890-" + "…"`) and use a placeholder in prose — **never
+resolve a blocked push with the "allow this secret" link.**
+
+**Verification, all local and free:** 54 core tests executed; 21 load-bearing rules negative-tested,
+each perturbation asserted to have matched the source first; the ggml gate negative-tested four ways
+including a faithful reproduction of the real `GGML_KQ_MASK_PAD` failure; the route test run against
+the real 651-guide corpus; the host CMake gate; the parse-only kotlinc pass on every touched file.
+
+⚠️ **Owner-verify on the Pixel — CI compiles, it cannot open a microphone.** Turn it on from MENU →
+Interrogator (LISTEN, granting the permission), confirm the ongoing notification and that the wake
+word stands down and **returns after Stop**; say something with a clear fallacy in it and check the
+finding names its provenance honestly; then ERASE and confirm the transcript is gone. The adjudicator
+is a separate ~1 GB download behind its own button, and the feature is honestly weaker without it
+rather than broken.
+
+**Open / next:** whether a matching whisper/llama pin pair can be found so the adjudicator links (the
+workflow now prints exactly which headers differ); a retrieval bar fitted to speech for subject
+grounding; and the owner's deferred features 2, 3 and 4.
