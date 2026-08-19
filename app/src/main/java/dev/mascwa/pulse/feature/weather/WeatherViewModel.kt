@@ -37,6 +37,10 @@ class WeatherViewModel(
     private val _state = MutableStateFlow(WeatherUiState())
     val state: StateFlow<WeatherUiState> = _state.asStateFlow()
 
+    /** The selected sub-tab, VM-scoped for the same reason as MarketsViewModel's: survival across
+     *  the bottom-nav's save/restore, which neither remember nor rememberSaveable guarantees. */
+    val tabIndex = MutableStateFlow(0)
+
     init {
         viewModelScope.launch { data.collect { d -> _state.update { it.copy(data = d) } } }
         viewModelScope.launch {

@@ -31,6 +31,13 @@ class MarketsViewModel(
     private val _state = MutableStateFlow(MarketsUiState())
     val state: StateFlow<MarketsUiState> = _state.asStateFlow()
 
+    /**
+     * The selected sub-tab, VM-scoped so tabbing away and back does not reset it — a `remember{}`
+     * in the screen dies with the composition, and `rememberSaveable` does not reliably survive
+     * the bottom-nav's popUpTo save/restore dance. An ordinal, so the screen keeps owning its enum.
+     */
+    val tabIndex = MutableStateFlow(0)
+
     init {
         viewModelScope.launch { watch.collect { w -> _state.value = _state.value.copy(watchlist = w) } }
         viewModelScope.launch { crypto.collect { c -> _state.value = _state.value.copy(crypto = c) } }
