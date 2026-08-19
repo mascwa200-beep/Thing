@@ -249,7 +249,23 @@ object NotifId {
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
     )
 
-    /** The foreground-service ids alone — what `NotifIdTest` checks [PERSISTENT] covers. */
+    /**
+     * ⚠️ **These double as PendingIntent request codes, and that is not decoration.**
+     *
+     * A PendingIntent's identity is its request code plus `Intent.filterEquals`, which compares
+     * action, categories, component, data, identifier, package and type — and **not the extras**
+     * (read out of the platform bytecode). So every `PendingIntent.getActivity(ctx, 0, Intent(ctx,
+     * MainActivity::class.java), …)` in the app is one and the same PendingIntent, and
+     * `FLAG_UPDATE_CURRENT` makes the last one built win the extras outright.
+     *
+     * That is harmless while they all mean "just open the app", which is why most of them still use
+     * 0. The moment one carries something — a route, an id, anything the tap depends on — sharing a
+     * request code silently deletes it: `RadioService` shipped exactly that, and its "open the radio"
+     * tap landed on Home because the Sensorium rebuilds its extras-free copy every three minutes.
+     *
+     * **So: any PendingIntent whose extras matter must use its owner's id from here as the request
+     * code.** They are unique by test, which is the property being borrowed.
+     */
     val FOREGROUND: Set<Int> = setOf(
         FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
         FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
