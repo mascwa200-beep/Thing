@@ -106,8 +106,30 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
     private var typingJob: Job? = null
     private var shelvesStarted = false
 
+    /** The armed resume seek, if any — cancelled by every newer play and by stop. */
+    private var resumeJob: Job? = null
+
+    /**
+     * Monotonic tap counter. Every play entry point bumps it; a resolve coroutine that comes back
+     * to find a newer generation was superseded by a later tap and must not publish or play —
+     * without this, the SLOWER of two resolves wins over the user's last choice.
+     */
+    private var playGeneration = 0
+
     init {
+        // Adopt a session already on the player (audio kept playing while the screen was away, per
+        // its keep-alive design) so the transport renders instead of an Idle screen over live
+        // sound. Segments/skip readout are not reconstructable here; the controller keeps applying
+        // its own skip set regardless, so only the readout line is conservative.
+        playback.value.item?.let { _resolve.value = Resolve.Ready(it, emptyList(), skippingOn = false) }
         loadShelves()
+    }
+
+    /** Invalidate every in-flight play: the armed resume seek and any unresolved tap. */
+    private fun supersedePlays(): Int {
+        resumeJob?.cancel()
+        resumeJob = null
+        return ++playGeneration
     }
 
     // ------------------------------------------------------------------ shelves
@@ -131,10 +153,21 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
                 _shelves.value = _shelves.value.copy(rows = rows.toList(), loading = loading, note = note)
             }
 
-            // FROM YOUR FEEDS — links the social feeds already carry, no new fetch class. Cached
-            // reads; a cold cache may fetch, so this is best-effort like everything below.
-            val feedItems = fromFeeds()
-            if (feedItems.isNotEmpty()) rows += ShelfRow("feeds", "FROM YOUR FEEDS", feedItems)
+            // ⚠️ ORDER IS TIME-TO-FIRST-CARD. The curated shelves go FIRST: they need no other
+            // subsystem — a fixed query each — so on a fresh install (empty ledger, empty caches)
+            // the first browsable card lands after ONE search round trip instead of after two
+            // social fetches + a news fetch that mostly feed shelves the videoId filter then
+            // empties. Stories and feeds follow; each still publishes as it lands.
+            for (shelf in TheaterModel.CATEGORY_SHELVES) {
+                when (val b = c.mediaBrowser.search(shelf.query, limit = SHELF_LIMIT)) {
+                    is MediaBrowser.Browse.Page -> {
+                        rows += ShelfRow(shelf.id, shelf.label, b.items)
+                        publish(loading = true)
+                    }
+                    is MediaBrowser.Browse.Refused ->
+                        if (note == null) note = MediaResolution.say(b.reason)
+                }
+            }
             publish(loading = true)
 
             // ON TODAY'S STORIES — the trending replacement: search for the app's own top headlines.
@@ -151,24 +184,26 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
                 }
             }
             if (storyItems.isNotEmpty()) {
-                rows += ShelfRow("stories", "ON TODAY'S STORIES", storyItems.distinctBy { it.pageUrl })
+                // Above the curated rows: today's stories are the fresher read once they exist.
+                rows.add(0, ShelfRow("stories", "ON TODAY'S STORIES", storyItems.distinctBy { it.pageUrl }))
             }
             publish(loading = true)
 
-            // The curated subjects, one at a time.
-            for (shelf in TheaterModel.CATEGORY_SHELVES) {
-                when (val b = c.mediaBrowser.search(shelf.query, limit = SHELF_LIMIT)) {
-                    is MediaBrowser.Browse.Page -> {
-                        rows += ShelfRow(shelf.id, shelf.label, b.items)
-                        publish(loading = true)
-                    }
-                    is MediaBrowser.Browse.Refused ->
-                        if (note == null) note = MediaResolution.say(b.reason)
-                }
-            }
+            // FROM YOUR FEEDS — links the social feeds already carry, no new fetch class. Cached
+            // reads; a cold cache may fetch, which is why this loads LAST: on a fresh install the
+            // videoId filter usually leaves it empty, so it must not gate anything visible.
+            val feedItems = fromFeeds()
+            if (feedItems.isNotEmpty()) rows.add(0, ShelfRow("feeds", "FROM YOUR FEEDS", feedItems))
             publish(loading = false)
         }
     }
+
+    /**
+     * Retry after a refused surface. [MediaBrowser] never memoises refusals precisely so that a
+     * retry gets fresh answers — this is the affordance that invokes one (before it, the force
+     * parameter had zero callers and the only retry was leaving and re-entering the screen).
+     */
+    fun retryShelves() = loadShelves(force = true)
 
     /** Video links sitting in the social feeds right now, as unresolved items. */
     private suspend fun fromFeeds(): List<MediaItem> {
@@ -227,6 +262,7 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
      */
     fun playItem(context: Context, item: MediaItem, audioOnly: Boolean = false) {
         if (item.isResolved && item.isFresh(System.currentTimeMillis())) {
+            supersedePlays() // an in-flight resolve from an earlier tap must not stomp this
             _resolve.value = Resolve.Ready(item, emptyList(), skippingOn = false)
             OnDemandController.play(context, item, emptyList(), audioOnly = audioOnly)
             return
@@ -234,8 +270,19 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         playUrl(context, item.pageUrl, audioOnly)
     }
 
+    /** Restart what is on the viewscreen as audio-only, which earns the background keep-alive. */
+    fun listenCurrent(context: Context) {
+        val ready = resolve.value as? Resolve.Ready ?: return
+        val at = progress.value.positionMs // capture BEFORE the restart resets the player
+        saveProgress()
+        supersedePlays()
+        OnDemandController.play(context, ready.item, ready.segments, audioOnly = true)
+        if (at > RESUME_MIN_MS) resumeWhenPlaying(ready.item.id, at)
+    }
+
     /** Play a harvested file from this device — works with no network at all. */
     fun playHarvested(context: Context, file: File) {
+        supersedePlays()
         val item = MediaItem(
             id = "",
             title = file.nameWithoutExtension,
@@ -275,38 +322,51 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun playUrl(context: Context, url: String, audioOnly: Boolean) {
         if (url.isBlank()) return
+        val gen = supersedePlays()
         _resolve.value = Resolve.Working
         viewModelScope.launch {
-            when (val r = c.mediaExtractor.resolve(url)) {
+            val r = c.mediaExtractor.resolve(url)
+            // The user tapped something newer (or STOP) while this resolved: the slower resolve
+            // must not win — it neither publishes state nor starts playback.
+            if (gen != playGeneration) return@launch
+            when (r) {
                 is MediaResolution.Refused -> _resolve.value = Resolve.Refused(r.reason, r.detail)
                 is MediaResolution.Ready -> {
                     val skippingOn = c.settingsRepository.current().sponsorSkip
                     val segments = if (skippingOn) fetchSegments(url, r.item) else emptyList()
+                    if (gen != playGeneration) return@launch // the segments fetch is a second await
                     _resolve.value = Resolve.Ready(r.item, segments, skippingOn)
                     val resumeAt = r.item.id.takeIf { it.isNotBlank() }
                         ?.let { c.viewingLedger.positionOf(it) } ?: 0L
                     OnDemandController.play(context, r.item, segments, audioOnly = audioOnly)
                     rememberViewing(r.item, positionMs = resumeAt)
-                    if (resumeAt > RESUME_MIN_MS) resumeWhenPlaying(resumeAt)
+                    if (resumeAt > RESUME_MIN_MS) resumeWhenPlaying(r.item.id, resumeAt)
                 }
             }
         }
     }
 
     /**
-     * Seek to the saved position once the player is actually playing.
+     * Seek to the saved position once THE SAME ITEM is actually playing.
      *
      * [OnDemandController.play] has no start-position parameter and its signature is not widened
      * for this — playback begins, the first frames may show 0:00 for a beat, then the seek lands.
      * Accepted and stated rather than hidden behind a race: seeking before READY is discarded by
      * the player, which is the bug this ordering avoids.
+     *
+     * ⚠️ The waiter matches on [itemId], not merely on PLAYING, and is cancelled by every newer
+     * play ([supersedePlays]) — without both, a resume armed for video A fires into video B tapped
+     * moments later, jumping it ten minutes in (or straight past its end). And the seek is
+     * ABSOLUTE: a saved position is a place, and anything that moved playback first (a sponsor
+     * skip at 0:00) would offset a relative one.
      */
-    private fun resumeWhenPlaying(positionMs: Long) {
-        viewModelScope.launch {
+    private fun resumeWhenPlaying(itemId: String, positionMs: Long) {
+        resumeJob?.cancel()
+        resumeJob = viewModelScope.launch {
             val playing = withTimeoutOrNull(RESUME_WAIT_MS) {
-                playback.first { it.status == OnDemandController.Status.PLAYING }
+                playback.first { it.status == OnDemandController.Status.PLAYING && it.item?.id == itemId }
             }
-            if (playing != null) OnDemandController.seekBy(positionMs)
+            if (playing != null) OnDemandController.seekTo(positionMs)
         }
     }
 
@@ -375,6 +435,7 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
 
     fun stop(context: Context) {
         saveProgress()
+        supersedePlays() // a resolve still in flight must not restart playback after STOP
         OnDemandController.stop(context)
         _resolve.value = Resolve.Idle
     }
@@ -384,6 +445,13 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
         // rides the ledger store's OWN scope (see rememberViewing), because viewModelScope is
         // already cancelled by the time onCleared runs.
         saveProgress()
+        // A VIDEO session ends with the screen: the player is process-wide, so without this the
+        // soundtrack kept playing headless — no notification (only audio-only earns the keep-alive
+        // service), no visible transport, and the fresh VM a re-entry builds started Idle so even
+        // the STOP button was gone. Audio-only sessions deliberately keep playing; that is their
+        // point, and the service's notification carries their Stop.
+        val pb = playback.value
+        if (pb.item != null && !pb.audioOnly) OnDemandController.stop(c.applicationContext)
         super.onCleared()
     }
 

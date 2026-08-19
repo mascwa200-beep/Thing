@@ -155,6 +155,17 @@ object OnDemandController {
         runCatching { exo.seekTo((exo.currentPosition + deltaMs).coerceAtLeast(0)) }
     }
 
+    /**
+     * Seek to an absolute position — the resume path's primitive. A saved position is a place in
+     * the video, not a distance from wherever playback happens to stand when the seek lands, and a
+     * relative seek there is off by exactly whatever moved first (a sponsor skip at 0:00, a user
+     * scrub while the resume waiter was still arming).
+     */
+    fun seekTo(positionMs: Long) = runOnMain {
+        val exo = player ?: return@runOnMain
+        runCatching { exo.seekTo(positionMs.coerceAtLeast(0)) }
+    }
+
     fun stop(context: Context) {
         pollJob?.cancel()
         segments = emptyList()

@@ -359,6 +359,9 @@ fun PulseApp(
                     vm,
                     onBack = { navController.popBackStack() },
                     playAddress = backStackEntry.arguments?.getString("play")?.takeIf { it.isNotBlank() },
+                    // Blank the argument once handled, so re-entering the composition (back from
+                    // MENU, a restored stack) does not replay the deep-link and restart playback.
+                    onPlayAddressConsumed = { backStackEntry.arguments?.putString("play", "") },
                 )
             }
 

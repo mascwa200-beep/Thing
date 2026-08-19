@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -76,6 +77,8 @@ fun ViewscreenScreen(
     vm: ViewscreenViewModel,
     onBack: (() -> Unit)? = null,
     playAddress: String? = null,
+    /** Called once the deep-link address has been handed to the player — see the effect below. */
+    onPlayAddressConsumed: () -> Unit = {},
 ) {
     val c = Pulse.colors
     val context = LocalContext.current
@@ -93,20 +96,37 @@ fun ViewscreenScreen(
     val searchNote by vm.searchNote.collectAsStateWithLifecycle()
 
     // A `viewscreen?play=` deep-link (a feed's play affordance, a shared address) starts playback
-    // once per address, surviving recomposition but re-firing on a genuinely new one.
+    // ONCE. ⚠️ A LaunchedEffect key survives recomposition but NOT leaving and re-entering the
+    // composition — without consumption, coming back from MENU (or a process-death restore of the
+    // nav stack) re-ran the effect with the same address and RESTARTED playback, losing the
+    // position. The caller blanks the nav argument, so re-entry sees no address; a genuinely new
+    // link (a fresh navigate) writes a new one.
     LaunchedEffect(playAddress) {
-        if (!playAddress.isNullOrBlank()) vm.playAddress(context, playAddress)
+        if (!playAddress.isNullOrBlank()) {
+            vm.playAddress(context, playAddress)
+            onPlayAddressConsumed()
+        }
     }
 
     var addressOpen by remember { mutableStateOf(false) }
     val searchActive = query.isNotBlank()
+    val listState = rememberLazyListState()
+
+    // The tap-feedback contract: the player item (and the "Resolving…" narration inside it) lives
+    // at index 0, and with several shelves the user has usually scrolled it off screen before
+    // tapping a card. Without this, a tap did NOTHING visible for the seconds the resolve takes,
+    // then audio started with the picture off-screen. Every resolve-state change brings it back.
+    LaunchedEffect(resolve) {
+        if (resolve !is ViewscreenViewModel.Resolve.Idle) listState.animateScrollToItem(0)
+    }
 
     PulseScaffold(
         title = "Theater",
         onBack = onBack,
     ) { innerPadding ->
         LazyColumn(
-            Modifier
+            state = listState,
+            modifier = Modifier
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth(),
@@ -197,7 +217,14 @@ fun ViewscreenScreen(
                 if (shelves.loading) {
                     item(key = "loading") { StatusLine("Scanning the archives…", c.amber) }
                 } else if (shelves.note != null && shelves.rows.isEmpty()) {
-                    item(key = "note") { StatusLine(shelves.note!!, c.negative) }
+                    // A refused surface is not a dead end: the browser never memoises refusals
+                    // precisely so a retry gets fresh answers — this is the affordance that asks.
+                    item(key = "note") {
+                        Column {
+                            StatusLine(shelves.note!!, c.negative)
+                            LcarsButton("RETRY", onClick = { vm.retryShelves() })
+                        }
+                    }
                 } else if (shelves.note != null) {
                     item(key = "note_soft") { StatusLine(shelves.note!!, c.muted) }
                 }
@@ -452,6 +479,11 @@ private fun PlayerPanel(
     // The harvester's button form. The gesture form is the same trigger: hold a volume key while
     // this item is on the viewscreen.
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!playback.audioOnly) {
+            // Background listening for what is ALREADY on the viewscreen — before this, the only
+            // path to audio-only was pasting an address, for content a shelf just showed you.
+            LcarsButton("♪ LISTEN", onClick = { vm.listenCurrent(context) }, color = c.amber)
+        }
         LcarsButton("HARVEST", onClick = { vm.harvestCurrent() }, color = c.violet)
         Text(
             "or hold a volume key",
