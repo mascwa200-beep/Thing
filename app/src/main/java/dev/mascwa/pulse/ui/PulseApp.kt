@@ -52,6 +52,7 @@ import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.feature.weather.WeatherScreen
 import dev.mascwa.pulse.feature.weather.WeatherViewModel
 import dev.mascwa.pulse.navigation.LocalConsoleSection
+import dev.mascwa.pulse.navigation.SHORTCUT_ROUTES
 import dev.mascwa.pulse.navigation.sectionOf
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.navigation.TOP_DESTINATIONS
@@ -495,19 +496,5 @@ fun PulseApp(
     }
 }
 
-/** Non-top routes reachable directly from a launcher shortcut or a notification deep-link — each opens
- *  straight to the page it's about (see AppShortcuts + Notifier). Everything the MENU lists is here, so
- *  any surface can deep-link any feature. */
-private val SHORTCUT_ROUTES = setOf(
-    Routes.NAV, Routes.SOS, Routes.SURVIVAL,
-    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
-    Routes.INTERROGATOR,
-    Routes.VIEWSCREEN,
-    Routes.PACKS,
-    Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
-    Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
-    Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,
-    Routes.OBJECTIVES, Routes.SOCIAL, Routes.SEARCH,
-    Routes.ECONOMY, Routes.FUEL, Routes.CRASH_LOG, Routes.SECURITY_AUDIT,
-    Routes.SETTINGS,
-)
+// SHORTCUT_ROUTES — the deep-linkable set — now lives in navigation/Directory.kt, DERIVED from the
+// menu's GROUPS instead of hand-copied here. See its doc for the verified empty diff at switch-over.

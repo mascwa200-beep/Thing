@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.navigation.Routes
+import dev.mascwa.pulse.navigation.menuLabel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.NightwirePalette
@@ -81,42 +82,42 @@ data class SurviveGroup(val label: String, val tiles: List<SurviveTile>)
 // The strobe, alarm and morse are hardware; a call or a text rides the cellular voice network, which is
 // there when the data connection is not. Nothing here waits on a request.
 private val SOS_TILE = SurviveTile(
-    "SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, { it.magenta }, Routes.SOS,
+    menuLabel(Routes.SOS) ?: "SOS", "Strobe, alarm, call & text for help", Icons.Filled.Sos, { it.magenta }, Routes.SOS,
     needs = Need.NOTHING,
 )
 // Overpass. Without a connection this shows the last places it fetched, which is worth having.
 private val NEAREST_HELP_TILE = SurviveTile(
-    "Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, { it.accent }, Routes.PLACES,
+    menuLabel(Routes.PLACES) ?: "Nearest Help", "Hospitals, shelters, food banks, towers", Icons.Filled.LocalHospital, { it.accent }, Routes.PLACES,
     needs = Need.CACHE,
 )
 // Live incident feeds, same story: the last quakes and alerts it saw still mean something, and its
 // repository already caches and serves them.
 private val NEARBY_SAFETY_TILE = SurviveTile(
-    "Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, { it.amber }, Routes.SAFETY,
+    menuLabel(Routes.SAFETY) ?: "Nearby Safety", "Quakes, disasters & weather alerts near you", Icons.Filled.Warning, { it.amber }, Routes.SAFETY,
     needs = Need.CACHE,
 )
 // Map tiles and routing are both live, and an area with nothing cached renders an empty grid.
 private val MAP_TILE = SurviveTile(
-    "Map", "Incidents & help on the live nav map", Icons.Filled.Map, { it.accent }, Routes.NAV,
+    menuLabel(Routes.NAV) ?: "Map", "Incidents & help on the live nav map", Icons.Filled.Map, { it.accent }, Routes.NAV,
     needs = Need.NETWORK,
 )
 private val KNOWLEDGE_BASE_TILE = SurviveTile(
-    "Knowledge Base", "Science · medicine · math · survival — offline wiki",
+    menuLabel(Routes.SURVIVAL) ?: "Knowledge Library", "Science · medicine · math · survival — offline wiki",
     Icons.AutoMirrored.Filled.MenuBook, { it.positive }, Routes.SURVIVAL,
     needs = Need.NOTHING,
 )
 // A position fix and a pure lookup table — no request of any kind. This is the tile the old hand-written
 // offline list dropped, on the stated grounds that it needed an Overpass fetch. It never did.
 private val WILDLIFE_TILE = SurviveTile(
-    "Wildlife", "Animals in your region + what to do · offline", Icons.Filled.Pets, { it.amber }, Routes.HABITAT,
+    menuLabel(Routes.HABITAT) ?: "Wildlife Guide", "Animals in your region + what to do · offline", Icons.Filled.Pets, { it.amber }, Routes.HABITAT,
     needs = Need.GPS,
 )
 private val TOOLS_TILE = SurviveTile(
-    "Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, { it.positive }, Routes.TOOLS,
+    menuLabel(Routes.TOOLS) ?: "Field Tools", "SOS strobe, alarm, morse · offline", Icons.Filled.Bolt, { it.positive }, Routes.TOOLS,
     needs = Need.NOTHING,
 )
 private val COMPASS_TILE = SurviveTile(
-    "Compass", "Heading & true north", Icons.Filled.Explore, { it.positive }, Routes.COMPASS,
+    menuLabel(Routes.COMPASS) ?: "Compass", "Heading & true north", Icons.Filled.Explore, { it.positive }, Routes.COMPASS,
     needs = Need.NOTHING,
 )
 
@@ -124,19 +125,19 @@ private val COMPASS_TILE = SurviveTile(
 // signal at all, and so belong on the offline screen. The app grew every one of these after that screen
 // was written, and it never learned about them.
 private val KB_STUDY_TILE = SurviveTile(
-    "Study", "Be taught the library a piece at a time", Icons.Filled.School, { it.sky }, Routes.STUDY,
+    menuLabel(Routes.STUDY) ?: "Study", "Be taught the library a piece at a time", Icons.Filled.School, { it.sky }, Routes.STUDY,
     needs = Need.NOTHING,
 )
 private val DEVICE_SEARCH_TILE = SurviveTile(
-    "Search", "Every guide and note held on this device", Icons.Filled.Search, { it.sky }, Routes.SEARCH,
+    menuLabel(Routes.SEARCH) ?: "Search", "Every guide and note held on this device", Icons.Filled.Search, { it.sky }, Routes.SEARCH,
     needs = Need.NOTHING,
 )
 private val NOTES_TILE = SurviveTile(
-    "Notes", "Write it down", Icons.Filled.Description, { it.sky }, Routes.NOTES,
+    menuLabel(Routes.NOTES) ?: "Notes", "Write it down", Icons.Filled.Description, { it.sky }, Routes.NOTES,
     needs = Need.NOTHING,
 )
 private val DIARY_TILE = SurviveTile(
-    "Diary", "Your daily log", Icons.Filled.Book, { it.sky }, Routes.DIARY,
+    menuLabel(Routes.DIARY) ?: "Diary", "Your daily log", Icons.Filled.Book, { it.sky }, Routes.DIARY,
     needs = Need.NOTHING,
 )
 
