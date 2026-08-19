@@ -12,17 +12,24 @@ or otherwise altered: the change is one of resolution and file format only, made
 corpus fits a phone (68 MB to 31 MB) without changing what the reader sees — the app draws
 these at 260dp on Android and 620dp on the desktop, so the discarded pixels were never
 displayed. Where a licence requires that modifications be indicated, this paragraph is that
-indication. SVG files are bundled unchanged, as vector, with two exceptions.
+indication. Most SVG files are bundled unchanged, as vector; the rest are covered below.
 
-Two diagrams that were originally vector are bundled as WebP instead:
-circadian-clock.webp and female-reproductive.webp. They were rendered from the original
-SVG at 1280 pixels wide and composited onto a white background, which is the same
-background the rest of the line art in this folder already carries. The change was made
-because the desktop reader's renderer could not parse circadian-clock.svg at all — it drew
-nothing and fell back to a caption — and because at 981 kB and 456 kB the two were far
-heavier than the drawings warranted; as raster they are 93 kB and 76 kB. As above, no
+SOME DIAGRAMS THAT WERE ORIGINALLY VECTOR ARE BUNDLED AS WEBP INSTEAD. Any such file was
+rendered from the original SVG at 1280 pixels wide and composited onto a white background,
+which is the same background the rest of the line art here already carries. As above, no
 cropping, recolouring or overlay: only resolution and file format. The Commons "File:"
-links recorded below still point at the original vector works.
+links recorded below still point at the original vector works. This is stated as a rule
+rather than a list so that it stays true as the corpus grows; a file's own entry below
+names the vector it came from.
+
+There are two reasons a diagram takes that route. Two of them — circadian-clock.webp and
+female-reproductive.webp — were converted because the desktop reader's renderer could not
+parse circadian-clock.svg at all (it drew nothing and fell back to a caption) and because
+at 981 kB and 456 kB the pair were far heavier than the drawings warranted; as raster they
+are 93 kB and 76 kB. The others are vectors that arrived over the 390 kB ceiling this
+corpus places on bundled SVG — a limit that exists because a heavy vector can stall a phone
+renderer — and which would otherwise have been discarded even though the drawing was the
+right one for the page.
 
 
   reef-knot.webp, clove-hitch.webp, two-half-hitches.webp, taut-line-hitch.webp
@@ -3721,3 +3728,55 @@ kb/the-stratosphere-and-the-ozone-layer.svg
     File:Ozone cycle.svg
     Public domain — Ozone_cycle.jpg: created by NASA derivative work: Smartse (talk)
     https://commons.wikimedia.org/wiki/File%3AOzone_cycle.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ice-cores-and-the-climate-record.webp
+    File:Global temperature relative to peak Holocene temperature, based on ocean cores (NASA).svg
+    Public domain — James E. Hansen and Makiko Sato
+    https://commons.wikimedia.org/wiki/File%3AGlobal_temperature_relative_to_peak_Holocene_temperature%2C_based_on_ocean_cores_%28NASA%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/power-distribution-and-substations.webp
+    File:Electricity Grid Schematic English.svg
+    CC BY 3.0 — MBizon
+    https://commons.wikimedia.org/wiki/File%3AElectricity_Grid_Schematic_English.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ecosystem-ecology-and-energy-flow.webp
+    File:Diagram of Trophic Layers & Energy Transfer in an Ecosystem.svg
+    CC BY-SA 4.0 — WDiment
+    https://commons.wikimedia.org/wiki/File%3ADiagram_of_Trophic_Layers_%26_Energy_Transfer_in_an_Ecosystem.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-government-works.webp
+    File:Administrative divisions of Germany.svg
+    CC BY-SA 2.0 de — Fred the Oyster (EN), Plaga med (BE), glglgl (original SVG), David Liuzzo (original PNG), C.Löser (c
+    https://commons.wikimedia.org/wiki/File%3AAdministrative_divisions_of_Germany.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/scales-keys-and-the-circle-of-fifths.webp
+    File:Circle of fifths deluxe 4.svg
+    CC BY-SA 3.0 — Just plain Bill
+    https://commons.wikimedia.org/wiki/File%3ACircle_of_fifths_deluxe_4.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-mesosphere-and-thermosphere.webp
+    File:Earth's atmosphere.svg
+    CC BY-SA 3.0 — Kelvinsong
+    https://commons.wikimedia.org/wiki/File%3AEarth%27s_atmosphere.svg

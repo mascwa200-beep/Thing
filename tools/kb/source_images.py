@@ -86,6 +86,20 @@ UA = (
 MAX_WIDTH = 1280           # what optimize_images.py measured as the right cap for both readers
 WEBP_QUALITY = 85
 MAX_SVG_BYTES = 400_000    # a pathological SVG can stall a phone renderer; a diagram never needs this
+# ⚠️ Above this, do not even try to render it — and the number comes from timing cairosvg on the
+# shape that actually causes trouble (one enormous path, as in a country outline), NOT from a guess:
+#
+#     500 kB -> 3.0 s     1 MB -> 14.0 s     2 MB -> 68.8 s
+#
+# Super-linear, so a first instinct of 2 MB was far too GENEROUS: one such file would cost more than
+# a minute, and across a 169-guide pass that is hours. 1.2 MB caps the worst case near 18 s, against
+# the ~2.6 s every request already pays. It admits the largest genuinely useful discard (the 1.1 MB
+# metric/imperial chart) and refuses the 2.8 MB LocationBurkinaFaso.svg — which is a real correction
+# to what this comment first claimed: that file was NOT going to fail the relevance gates, it passed
+# them and was chosen. It is refused on cost, and because the same timing run showed the rendered
+# PNG shrinking as the vector grows (1144 kB -> 282 kB -> 30 kB), a path that dense averages out to
+# near-flat colour at 1280 px and would be caught by the near-blank check anyway.
+MAX_SVG_RENDER_BYTES = 1_200_000
 MIN_SOURCE_WIDTH = 600
 
 # ⚠️ **The same two numbers live in three places, in two languages, and only one of them decides
@@ -482,12 +496,43 @@ def watermarked(categories: list[str]) -> bool:
     return False
 
 
+def render_svg(raw: bytes) -> bytes | None:
+    """
+    A too-heavy vector, rendered to PNG at the corpus width so it can be kept instead of lost.
+
+    ⚠️ **This exists because the size gate was throwing away the right picture.** A run discarded
+    nine chosen diagrams on [MAX_SVG_BYTES] alone, several of them plainly correct — the electricity
+    grid schematic for an electricity guide, Earth's atmosphere for the stratosphere, trophic layers
+    for an ecology one. They had passed every relevance gate; the only objection was byte count.
+
+    ⚠️ And the reason given for discarding them was stale. The comment here used to say rasterising
+    "would need a renderer this container has no reason to carry" — it carries one: `cairosvg` and
+    Pillow are installed, and `optimize_images.py` already uses exactly this route on the shipped
+    corpus (circadian-clock.svg 981 kB → 93 kB, female-reproductive.svg 456 kB → 76 kB). Checked
+    before writing this rather than assumed.
+
+    Returns PNG, not WebP, deliberately: the caller then runs it through the ordinary raster path,
+    so a render that came out blank or malformed meets [pixels_ok]'s decode, minimum-width, aspect
+    and near-blank checks — which is a *stronger* test than the SVG branch ever applied. A silent
+    blank render is the failure mode worth catching, and it is invisible in a byte count.
+
+    None on anything that goes wrong, which is treated exactly like a file that failed a gate.
+    """
+    if len(raw) > MAX_SVG_RENDER_BYTES:
+        return None                       # a multi-megabyte vector is a map, not a diagram
+    try:
+        import cairosvg
+        return cairosvg.svg2png(bytestring=raw, output_width=MAX_WIDTH)
+    except Exception:  # noqa: BLE001 — an unrenderable vector is a rejected candidate, not a crash
+        return None
+
+
 def pixels_ok(raw: bytes, mime: str) -> tuple[bool, str]:
     """
     Gate 6. Does the file actually contain a legible picture?
 
-    An SVG is vector and is checked by size and well-formedness instead — rasterising it here would
-    need a renderer this container has no reason to carry.
+    An SVG is vector, so it is checked by size and well-formedness instead of by decoding. One over
+    [MAX_SVG_BYTES] is not discarded outright — see [render_svg], which the caller tries first.
     """
     if mime == "image/svg+xml":
         if len(raw) > MAX_SVG_BYTES:
@@ -879,7 +924,21 @@ def choose(guide, freq, taken=None, verbose=True):
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 
 def encode(raw: bytes) -> bytes | None:
-    """To the corpus format: WebP q85, never wider than 1280. Nothing else is changed."""
+    """
+    To the corpus format: WebP q85, never wider than 1280, **flattened onto white**.
+
+    ⚠️ **The flattening is the corpus's rule, and this function was the one place breaking it.**
+    `optimize_images.py:convert()` states it: both readers draw the diagram on a light card, so a
+    transparent image already renders against white and keeping the alpha channel costs bytes for
+    an effect nothing can see. 451 of the 460 bundled images are RGB because they went through that
+    path; the nine that were not came through here.
+
+    It rarely bit while this only handled photographs off Commons, which are opaque. Rasterising
+    vectors makes it bite every time — a diagram's natural background IS transparent, and the grid
+    schematic written moments before this fix came out **91% transparent**. Worse than a cosmetic
+    difference: a white label or fill inside such a diagram is invisible against a light card, so
+    the picture can lose exactly the part that explains it.
+    """
     from PIL import Image
     try:
         img = Image.open(io.BytesIO(raw))
@@ -888,8 +947,13 @@ def encode(raw: bytes) -> bytes | None:
         return None
     if img.width > MAX_WIDTH:
         img = img.resize((MAX_WIDTH, round(img.height * MAX_WIDTH / img.width)), Image.LANCZOS)
-    if img.mode not in ("RGB", "RGBA"):
-        img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+    if img.mode in ("RGBA", "LA", "P") or "transparency" in img.info:
+        img = img.convert("RGBA")
+        flat = Image.new("RGB", img.size, (255, 255, 255))
+        flat.paste(img, mask=img.split()[-1])
+        img = flat
+    else:
+        img = img.convert("RGB")
     out = io.BytesIO()
     img.save(out, "WEBP", quality=WEBP_QUALITY, method=6)
     return out.getvalue()
@@ -1265,18 +1329,38 @@ def main() -> int:
         author = strip_html(info.get("extmetadata", {}).get("Artist", {}).get("value"))[:100]
         print(f"      ✓ [{source} {sc}] {title[:56]}\n        {licence} · {author[:40]}"
               f"\n        because: {', '.join(why)}")
-        matched.append((guide, title, licence, author, source, sc, why))
-        if args.report:
-            write_report(args.report, matched)
+        # ⚠️ **Recorded only once it is real.** This used to append and write the report here, before
+        # the download and the pixel checks that can still reject the pick — so pass 1's report
+        # claimed 170 matches against 154 files actually written. Sixteen rows described choices
+        # that never became images, and the report is the thing that gets hand-reviewed and turned
+        # into a contact sheet. A dry run has nothing but the choice to report, so it still records
+        # here; an applying run records after the file lands.
+        row = (guide, title, licence, author, source, sc, why)
         if not args.apply:
+            matched.append(row)
+            if args.report:
+                write_report(args.report, matched)
             continue
 
         mime = str(info.get("mime", ""))
         svg = mime == "image/svg+xml"
+        # `get` already retries three times and backs off 45 s on a 429, so an empty result here is
+        # a wall rather than a blip. The guide keeps no image, which means the next pass picks it up
+        # by construction — that IS the retry, and it needs no code of its own.
         raw = get(info["url"] if svg else (info.get("thumburl") or info["url"]), binary=True)
         if not raw:
-            print(f"      ! download failed")
+            print("      ! download failed")
             continue
+
+        # A vector over the ceiling is rendered rather than lost, and then goes through the ordinary
+        # raster path — so the render faces stricter checks than the vector ever did.
+        if svg and len(raw) > MAX_SVG_BYTES:
+            png = render_svg(raw)
+            if png:
+                print(f"      · vector {len(raw)//1024} kB over the "
+                      f"{MAX_SVG_BYTES//1024} kB ceiling — rendered to {MAX_WIDTH}px raster")
+                raw, mime, svg = png, "image/png", False
+
         ok, note = pixels_ok(raw, mime)
         if not ok:
             print(f"      ! {note}")
@@ -1297,6 +1381,10 @@ def main() -> int:
         page = "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_"))
         notice_lines.append(f"kb/{name}\n    {title}\n    {licence} — {author or 'see source'}\n    {page}")
         print(f"      wrote kb/{name}  ({len(data)/1024:.0f} kB, {note})")
+        # NOW it is real, so now it goes in the report — see the note at the choice above.
+        matched.append(row)
+        if args.report:
+            write_report(args.report, matched)
         # Bounded, rather than once at the end: the window in which the tree is inconsistent is now
         # at most this many files wide instead of the whole run. Not per-file, because that would
         # rewrite a half-megabyte shard for every diagram.
