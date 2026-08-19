@@ -404,10 +404,29 @@ class AppContainer(private val appContext: Context) {
 
     // ---- Sensorium: ambient environment sensing (classify-then-discard; labels only) ----
 
-    /** The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic. */
+    /**
+     * The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic or
+     * the computer is talking.
+     *
+     * ⚠️ The second condition is not about contention, it is about **truthfulness**: the microphone
+     * and the speaker are on the same phone, so a sip taken while a reply is being spoken hears the
+     * computer and labels it `speech`, which distils to "there are voices around you". That would
+     * feed the scene read, the ORACLE rules built on it, and — worst of all — the *learned* nightly
+     * baseline, teaching the Sensorium that 3 a.m. is normally noisy because that is when it answered
+     * a question. Yielding costs almost nothing; speech is a tiny fraction of the day.
+     *
+     * [ttsLazy] is checked rather than [textToSpeech] read, for the reason given on
+     * [observeVoicePreference]: binding a TTS engine costs about a second, and an engine that has
+     * never been built cannot be speaking.
+     */
     val ambientAudioSampler: dev.mascwa.pulse.data.sensing.AmbientAudioSampler by lazy {
         dev.mascwa.pulse.data.sensing.AmbientAudioSampler(
-            appContext, http, micBusy = { voskSpeech.consoleActive.value },
+            appContext,
+            http,
+            micBusy = {
+                voskSpeech.consoleActive.value ||
+                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking)
+            },
         )
     }
 

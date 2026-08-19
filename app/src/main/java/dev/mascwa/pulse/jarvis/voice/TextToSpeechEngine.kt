@@ -194,6 +194,16 @@ class TextToSpeechEngine(
     val isAvailable: Boolean get() = ready.get()
 
     /**
+     * True while an utterance is outstanding — i.e. the computer is talking.
+     *
+     * Read from [pendingDone], which is set the instant before the engine is asked to speak and
+     * cleared by [fireDone] on every path that ends an utterance, so it brackets the speaking window
+     * exactly. Deliberately not the platform's `TextToSpeech.isSpeaking`: that needs the engine bound
+     * to answer, and the point of asking is usually to avoid touching it.
+     */
+    val isSpeaking: Boolean get() = pendingDone.get() != null
+
+    /**
      * Speak [text], replacing anything already being spoken. [onDone] runs (on the main thread) once
      * the computer has stopped talking — or immediately if there's nothing to speak / no engine, so
      * callers can safely sequence after speech (e.g. reopen the mic only once it has stopped).
