@@ -4980,3 +4980,82 @@ stop and let CI compile.
 line** when that line contains the pattern. A `while pgrep -f "…"; do sleep; done` poll loop never
 terminates, and `kill $(pgrep -f "…")` kills the shell issuing it — which happened here. Use
 `ps -eo pid,cmd | awk '/pattern/ && !/awk/'`.
+
+### THE CABLE BOX — live TV gets channel numbers, on both platforms (this session, PR #449)
+
+Owner: *"turn the live TV tab in the news into a cable TV channel system type thing as close as
+possible to that that way I can easily swap between channels without having to scroll some stupid
+little long scrolling tab bar thing to find the channel that I want."*
+
+The complaint was exact. The picker was a horizontally scrolling `LazyRow` of names — the right
+shape for five channels, the wrong one for forty-one, hopeless for the ~660 the community catalogue
+adds. **The fix is not a better list.** A cable box does not ask you to read one: the channel has a
+number, the number does not move, and you reach it without looking. Owner chose (AskUserQuestion):
+**both platforms**, **tap for fullscreen**, **community numbered from 100 and in channel up/down**.
+
+`core:telemetry/ChannelLineup.kt` (+21 tests, locally executed, mirrored). Numbers come from
+`LiveChannels.CURATED`'s own declaration order, which is already authored in eight genre/region
+sections — one `Band` each on round decade boundaries, sized from the **measured** counts (10 global
+networks, 4 state services, 2 Europe, 6 Africa, 3 Middle East, 7 Asia-Pacific, 6 business, 3
+Americas). Real lineup: 2–82, no band overflow.
+
+**Two decisions carry the design:**
+- ⚠️ **A number must not move** — that is the entire premise. So numbering is NOT taken from
+  `offer()`, whose order is verification-first then alphabetical: one channel failing to play would
+  renumber every channel after it and the viewer's memory would be silently wrong. A dead channel
+  leaves a **gap**, which is what a real lineup does.
+- ⚠️ **The band anchors are a coupling to a list in another file, enforced rather than trusted.**
+  Eight ids beat a `band` field on all 41, and a defaulted field would let a new channel land in
+  whatever band preceded it unnoticed. A test asserts the anchors appear in CURATED's own
+  declaration order, so adding a section without recording it fails the build.
+
+⚠️ **THE DEFECT, and it was found by running the shipped rule over the real 41-channel lineup rather
+than by reading it.** The keypad matched digit *strings* as prefixes, so keying `0` answered "no
+channel 0" and `0`→`2` could never reach BBC News — though a box writes that channel as **02** and
+keying the padded form is the ordinary way in. The same one-digit lookahead would commit a `9` that
+could still have become `900` once the community directory is on. Now works in **values across every
+remaining width**. Both cases pinned. **Print the real lineup and the real keypad behaviour after
+any rule change — that is the step that finds this class.**
+
+**Seven load-bearing rules negative-tested**, each perturbation confirmed to fail exactly its own
+guard and nothing else, with the script asserting it matched the source first: numbering source, gap
+preservation, keypad lookahead depth, entry timeout reset, channel-up wrap, community ordering, band
+boundaries. **None asleep.**
+
+**Android** (`feature/live/LiveVideoPlayer.kt`, rewritten): channel banner over the picture, CH▲/CH▼
+wrapping, a keypad, LAST, and a GUIDE of numbered tiles grouped by band drawn **over** the picture
+while it keeps playing. Tap the picture for fullscreen.
+- ⚠️ **Fullscreen needs a Dialog, not a layout swap.** The panel renders inside the News scaffold's
+  slot with the scaffold's padding applied, so nothing it does to its own modifiers can reach the
+  display edges. `usePlatformDefaultWidth = false` gets its own window.
+- ⚠️ **Exactly one `TvScreen` exists at a time** because it owns the `SurfaceView`. Two on one
+  player means the second `attach` wins and the first is a black rectangle. Swapping is safe because
+  `detach` is identity-guarded — precisely the race that guard was written for. `configChanges`
+  already covers `orientation|screenSize|screenLayout` (**checked, not assumed**), so rotating does
+  not recreate the Activity. Orientation and system bars restore in `onDispose`.
+- ⚠️ Hide the bars on the **dialog's** window via `DialogWindowProvider`, not the Activity's — the
+  wrong one is invisible in code and obvious on the device.
+
+**Desktop** (`feature/live/LiveScreen.kt`, rewritten): same lineup, so **channel 7 is the same
+broadcaster on both machines** — the reason the core is mirrored. It also takes **number keys and
+arrow keys directly**, since a remote is an imitation of a keyboard; the on-screen keypad stays
+because key events need focus and focus is the least predictable part of a desktop UI. Only
+`KeyDown` is consumed and only for keys the box uses, so the filter field keeps its typing. A window
+that wide fits the whole curated lineup with **no scrolling at all**.
+⚠️ `focusable` is in `androidx.compose.foundation`, not `androidx.compose.ui.focus` — caught by
+`:desktop:compileKotlin` in 70 seconds. `:desktop:build` green, **438 tests** (was 413).
+
+**Verification, all local and free:** 21 core tests executed; a **typed probe** of every core symbol
+the UIs touch compiled and ran (proving the resolve-check's `empty`/`label`/`number`/`second` were
+the documented untracked-file cascade, not real); and `DialogProperties.decorFitsSystemWindows`,
+`DialogWindowProvider`, `LazyGridScope.item(key, span, …)` and `LazyGridItemSpanScope.maxLineSpan`
+were each **confirmed by `javap` against the published 1.7.6 jars** rather than recalled.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it does not draw: CH▲▼ walking the lineup; keying
+`0`→`2` landing on BBC News and `9` tuning instantly; the guide showing everything without hunting;
+the banner; and fullscreen returning cleanly rather than leaving the app sideways. On Windows: the
+keyboard tuning and whether the guide really fits.
+
+**Open/steerable:** whether the phone's guide should be its own full-screen route rather than an
+overlay on a 16:9 panel; desktop fullscreen (the pop-out window already covers that host); and
+per-channel favourites, which the band model would take without a structural change.
