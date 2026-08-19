@@ -202,7 +202,8 @@ fun PulseApp(
 
             // ---- THE MENU — the flat directory: every feature, one tap, plain English ----
             composable(Routes.MENU) {
-                dev.mascwa.pulse.feature.menu.MenuScreen(onOpen = { route -> openApp(route) })
+                val vm: dev.mascwa.pulse.feature.menu.MenuViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.menu.MenuScreen(vm, onOpen = { route -> openApp(route) })
             }
 
             // ---- Sky ----
