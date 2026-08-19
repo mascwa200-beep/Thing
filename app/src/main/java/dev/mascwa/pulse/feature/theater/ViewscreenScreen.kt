@@ -69,6 +69,7 @@ fun ViewscreenScreen(vm: ViewscreenViewModel, onBack: (() -> Unit)? = null) {
     val progress by vm.progress.collectAsStateWithLifecycle()
     val skipNote by vm.skipNote.collectAsStateWithLifecycle()
     val floorNote by AudioFloor.note.collectAsStateWithLifecycle()
+    val harvestState by vm.harvest.collectAsStateWithLifecycle()
 
     PulseScaffold(
         title = "Viewscreen",
@@ -108,6 +109,10 @@ fun ViewscreenScreen(vm: ViewscreenViewModel, onBack: (() -> Unit)? = null) {
                     LcarsButton("PLAY", onClick = { vm.playFromInput(context) })
                 }
             }
+            Spacer(Modifier.height(6.dp))
+            // The literal "audio only background playback" mode: keeps playing when you leave, held
+            // alive by a mediaPlayback foreground service with a Stop action in the tray.
+            LcarsButton("LISTEN · AUDIO ONLY", onClick = { vm.playFromInput(context, audioOnly = true) })
 
             Spacer(Modifier.height(10.dp))
 
@@ -135,6 +140,19 @@ fun ViewscreenScreen(vm: ViewscreenViewModel, onBack: (() -> Unit)? = null) {
             playback.detail?.takeIf { playback.status == OnDemandController.Status.ERROR }?.let {
                 StatusLine("Playback failed: $it", c.negative)
             }
+            when (val h = harvestState) {
+                dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Idle -> {}
+                is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Working ->
+                    StatusLine("Harvesting ${h.title}…", c.violet)
+                is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Done ->
+                    StatusLine("Saved to this device: ${h.file} · ${h.bytes / (1024 * 1024)} MB", c.positive)
+                is dev.mascwa.pulse.data.media.MediaHarvester.Harvest.Failed ->
+                    StatusLine(
+                        "Harvest failed — " + MediaResolution.say(h.reason) +
+                            if (h.detail.isNotBlank()) " (${h.detail})" else "",
+                        c.negative,
+                    )
+            }
         }
     }
 }
@@ -149,24 +167,39 @@ private fun PlayerPanel(
     val c = Pulse.colors
     val context = LocalContext.current
 
-    // The picture. The SurfaceView is created once and handed to the controller, which holds it —
-    // the player can be rebuilt underneath this composable (a retry does exactly that).
-    val view = remember { SurfaceView(context) }
-    DisposableEffect(view) {
-        OnDemandController.attach(view)
-        onDispose { OnDemandController.detach(view) }
-    }
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .background(c.void)
-            .border(1.dp, c.accent.copy(alpha = 0.4f)),
-    ) {
-        AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
-        if (playback.status == OnDemandController.Status.CONNECTING) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("WORKING…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.amber)
+    if (playback.audioOnly) {
+        // No dark 16:9 rectangle for a session with no picture — a slim badge says what is running
+        // and that leaving the screen does not end it.
+        Box(
+            Modifier.fillMaxWidth().background(c.void).border(1.dp, c.accent.copy(alpha = 0.4f))
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "♪ AUDIO ONLY · keeps playing in the background",
+                fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber,
+            )
+        }
+    } else {
+        // The picture. The SurfaceView is created once and handed to the controller, which holds
+        // it — the player can be rebuilt underneath this composable (a retry does exactly that).
+        val view = remember { SurfaceView(context) }
+        DisposableEffect(view) {
+            OnDemandController.attach(view)
+            onDispose { OnDemandController.detach(view) }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .background(c.void)
+                .border(1.dp, c.accent.copy(alpha = 0.4f)),
+        ) {
+            AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
+            if (playback.status == OnDemandController.Status.CONNECTING) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("WORKING…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.amber)
+                }
             }
         }
     }
@@ -224,6 +257,18 @@ private fun PlayerPanel(
         }
         LcarsButton("+30s", onClick = { vm.seekBy(30_000) })
         LcarsButton("STOP", onClick = { vm.stop(context) }, color = c.negative)
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // The harvester's button form. The gesture form is the same trigger: hold a volume key while
+    // this item is on the viewscreen.
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        LcarsButton("HARVEST", onClick = { vm.harvestCurrent() }, color = c.violet)
+        Text(
+            "or hold a volume key",
+            fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
+        )
     }
 
     Spacer(Modifier.height(10.dp))

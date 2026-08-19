@@ -51,6 +51,9 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
     val progress = OnDemandController.progress
     val skipNote = OnDemandController.skipNote
 
+    /** The harvester's readout — a download the held volume key (or the button) started. */
+    val harvest = c.mediaHarvester.state
+
     fun setInput(text: String) {
         _input.value = text
     }
@@ -62,7 +65,7 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
      * resolved item either plays or the refusal is the thing on screen. The intermediate states are
      * still published so the screen can narrate the seconds extraction takes.
      */
-    fun playFromInput(context: Context) {
+    fun playFromInput(context: Context, audioOnly: Boolean = false) {
         val url = _input.value.trim()
         if (url.isEmpty()) return
         _resolve.value = Resolve.Working
@@ -73,10 +76,16 @@ class ViewscreenViewModel(private val c: AppContainer) : ViewModel() {
                     val skippingOn = c.settingsRepository.current().sponsorSkip
                     val segments = if (skippingOn) fetchSegments(url, r.item) else emptyList()
                     _resolve.value = Resolve.Ready(r.item, segments, skippingOn)
-                    OnDemandController.play(context, r.item, segments)
+                    OnDemandController.play(context, r.item, segments, audioOnly = audioOnly)
                 }
             }
         }
+    }
+
+    /** Harvest what is on the viewscreen — the button form of the held-volume-key gesture. */
+    fun harvestCurrent(): Boolean {
+        val item = (resolve.value as? Resolve.Ready)?.item ?: return false
+        return c.mediaHarvester.harvest(item)
     }
 
     /**

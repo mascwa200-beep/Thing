@@ -565,6 +565,10 @@ class AppContainer(private val appContext: Context) {
     val sponsorBlockRepository: dev.mascwa.pulse.data.media.SponsorBlockRepository by lazy {
         dev.mascwa.pulse.data.media.SponsorBlockRepository(http)
     }
+    /** The hardware data harvester: held volume key → yt-dlp download into sandboxed storage. */
+    val mediaHarvester: dev.mascwa.pulse.data.media.MediaHarvester by lazy {
+        dev.mascwa.pulse.data.media.MediaHarvester(pythonRuntime, appContext)
+    }
 
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {

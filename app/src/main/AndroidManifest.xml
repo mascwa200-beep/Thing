@@ -385,6 +385,12 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- Viewscreen audio-only playback — keeps an on-demand audio session alive backgrounded. -->
+        <service
+            android:name=".feature.theater.OnDemandService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <!-- We schedule our own WorkManager instance from PulseApplication via
              the Configuration.Provider, so disable the default initializer. -->
         <provider

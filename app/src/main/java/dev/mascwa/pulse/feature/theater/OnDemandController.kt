@@ -59,6 +59,8 @@ object OnDemandController {
         val item: MediaItem? = null,
         val status: Status = Status.IDLE,
         val detail: String? = null,
+        /** True when playing the audio-only rendition — the mode that survives leaving the screen. */
+        val audioOnly: Boolean = false,
     )
 
     /** Where playback is, for the transport bar. Milliseconds; duration 0 while unknown. */
@@ -106,7 +108,12 @@ object OnDemandController {
      * builds via [SponsorSegments.usable]. Passing raw segments here would re-litigate the policy in
      * a second place, which is how two surfaces drift.
      */
-    fun play(context: Context, item: MediaItem, skip: List<SponsorSegments.Segment>) {
+    fun play(
+        context: Context,
+        item: MediaItem,
+        skip: List<SponsorSegments.Segment>,
+        audioOnly: Boolean = false,
+    ) {
         if (!item.isResolved) {
             _state.value = OnDemandState(item, Status.ERROR, "nothing playable in that item")
             return
@@ -116,8 +123,11 @@ object OnDemandController {
         AudioFloor.claim(app, MediaFloor.Owner.ONDEMAND)
         segments = skip
         _skipNote.value = null
-        _state.value = OnDemandState(item, Status.CONNECTING)
+        _state.value = OnDemandState(item, Status.CONNECTING, audioOnly = audioOnly)
         _progress.value = Progress()
+        // ⚠️ Only audio-only playback earns the keep-alive service. Video with no visible surface is
+        // data spent on pixels nobody sees — the live controller's reasoning, kept.
+        if (audioOnly) OnDemandService.start(app)
         runOnMain { startPlayer(app, item, resumeMs = 0) }
     }
 
@@ -196,7 +206,7 @@ object OnDemandController {
                     /* handleAudioFocus = */ true,
                 )
                 .build()
-            exo.setMediaItem(ExoMediaItem.fromUri(item.streamUrl.ifBlank { item.audioUrl }))
+            exo.setMediaItem(ExoMediaItem.fromUri(urlOf(item)))
             exo.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (_state.value.item?.id != item.id) return
@@ -204,9 +214,12 @@ object OnDemandController {
                         Player.STATE_READY -> {
                             // Per OUTAGE, not per tune — the live controller's hard-won lesson.
                             retries = 0
-                            _state.value = OnDemandState(
-                                item,
-                                if (exo.playWhenReady) Status.PLAYING else Status.PAUSED,
+                            // ⚠️ copy(), not a fresh construction — a rebuilt state must not drop
+                            // the audioOnly flag, or the keep-alive service would read a background
+                            // audio session as a video one and let the OS kill it.
+                            _state.value = _state.value.copy(
+                                status = if (exo.playWhenReady) Status.PLAYING else Status.PAUSED,
+                                detail = null,
                             )
                             watchPosition(item)
                         }
@@ -253,7 +266,7 @@ object OnDemandController {
         // player object may be the same across the re-prepare, but prepare() resets the position, and
         // "your movie restarted because the Wi-Fi blinked" is the failure this line prevents.
         val resumeMs = runCatching { player?.currentPosition }.getOrNull() ?: _progress.value.positionMs
-        _state.value = OnDemandState(item, Status.CONNECTING, "reconnecting…")
+        _state.value = _state.value.copy(status = Status.CONNECTING, detail = "reconnecting…")
         scope.launch {
             delay(1_500)
             runOnMain {
@@ -264,7 +277,7 @@ object OnDemandController {
                     return@runOnMain
                 }
                 runCatching {
-                    exo.setMediaItem(ExoMediaItem.fromUri(item.streamUrl.ifBlank { item.audioUrl }))
+                    exo.setMediaItem(ExoMediaItem.fromUri(urlOf(item)))
                     exo.prepare()
                     exo.seekTo(resumeMs)
                     exo.playWhenReady = true
@@ -314,6 +327,11 @@ object OnDemandController {
             }
         }
     }
+
+    /** The address for the current mode: the audio rendition when audio-only and one exists. */
+    private fun urlOf(item: MediaItem): String =
+        if (_state.value.audioOnly && item.audioUrl.isNotBlank()) item.audioUrl
+        else item.streamUrl.ifBlank { item.audioUrl }
 
     /** MUST run on the main thread — ExoPlayer is single-thread-affine. */
     private fun releasePlayerInternal() {

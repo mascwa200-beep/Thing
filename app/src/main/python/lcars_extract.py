@@ -185,6 +185,79 @@ def resolve(url: str) -> str:
     })
 
 
+def download(url: str, dest_dir: str) -> str:
+    """Download the media at `url` into `dest_dir`, returning JSON. Never raises.
+
+    The harvester behind the held volume key. The whole download runs inside yt-dlp rather than a
+    plain HTTP GET of the resolved address, because "the stream" is frequently not a file — an HLS
+    address is a playlist of thousands of fragments, and yt-dlp is the thing that knows how to turn
+    that into one playable file on disk.
+
+    ⚠️ `dest_dir` is the app's own sandboxed storage, passed in from Kotlin — this module never picks
+    a location itself, so where harvested media lives is decided (and cleaned up) in exactly one
+    place on the Kotlin side.
+    """
+    import os
+    try:
+        from yt_dlp import YoutubeDL
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": "{}: {}".format(type(exc).__name__, exc), "kind": "UNAVAILABLE"})
+
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": "cannot create {}: {}".format(dest_dir, exc), "kind": "FAILED"})
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "logger": _Silent(),  # same privacy reason as resolve(): a failure line carries the URL
+        "noprogress": True,
+        "noplaylist": True,
+        "format": FORMAT,
+        "cachedir": False,
+        # ASCII-safe names, title capped at 80 BYTES (the B conversion) — a 300-byte emoji title
+        # would otherwise exceed the filesystem's 255-byte limit and fail after downloading.
+        "restrictfilenames": True,
+        "outtmpl": os.path.join(dest_dir, "%(title).80B [%(id)s].%(ext)s"),
+        "retries": 2,
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if not info:
+                return json.dumps({"error": "the extractor returned nothing", "kind": "NO_STREAM"})
+            if info.get("_type") == "playlist":
+                entries = [e for e in (info.get("entries") or []) if e]
+                if not entries:
+                    return json.dumps({"error": "that address is an empty playlist", "kind": "NO_STREAM"})
+                info = entries[0]
+            # Where the file actually landed. `requested_downloads` is authoritative on modern
+            # yt-dlp (it reflects merges and remuxes); prepare_filename is the documented fallback.
+            path = ""
+            for rd in info.get("requested_downloads") or []:
+                path = rd.get("filepath") or path
+            if not path:
+                path = ydl.prepare_filename(info)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"error": str(exc)[:400], "kind": _classify(exc)})
+
+    size = 0
+    try:
+        if path and os.path.exists(path):
+            size = os.path.getsize(path)
+    except Exception:  # noqa: BLE001
+        pass
+    if not path or size <= 0:
+        return json.dumps({"error": "the download produced no file", "kind": "FAILED"})
+    return json.dumps({
+        "file": os.path.basename(path),
+        "path": path,
+        "bytes": size,
+        "title": info.get("title") or "",
+    })
+
+
 def video_id(url: str) -> str:
     """The source's own id for `url`, without resolving a stream.
 

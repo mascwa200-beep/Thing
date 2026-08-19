@@ -36,6 +36,7 @@ class NotifIdTest {
         "FGS_BREAKING_OVERLAY" to NotifId.FGS_BREAKING_OVERLAY,
         "FGS_INTERROGATOR" to NotifId.FGS_INTERROGATOR,
         "FGS_RADIO" to NotifId.FGS_RADIO,
+        "FGS_ONDEMAND" to NotifId.FGS_ONDEMAND,
     )
 
     @Test
