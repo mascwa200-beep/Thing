@@ -569,6 +569,14 @@ class AppContainer(private val appContext: Context) {
     val mediaHarvester: dev.mascwa.pulse.data.media.MediaHarvester by lazy {
         dev.mascwa.pulse.data.media.MediaHarvester(pythonRuntime, appContext)
     }
+    /** Flat video listings — the browse half of the Theater; resolves nothing until a tap. */
+    val mediaBrowser: dev.mascwa.pulse.data.media.MediaBrowser by lazy {
+        dev.mascwa.pulse.data.media.MediaBrowser(pythonRuntime)
+    }
+    /** The CONTINUE WATCHING shelf's memory. On-device only; viewing history never leaves. */
+    val viewingLedger: dev.mascwa.pulse.data.media.ViewingLedgerStore by lazy {
+        dev.mascwa.pulse.data.media.ViewingLedgerStore(appContext)
+    }
 
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
