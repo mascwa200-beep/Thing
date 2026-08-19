@@ -5344,3 +5344,148 @@ some check that the candidate's own subject overlaps the guide's, not merely a s
 `check_emergency_routes.py` → **hand-read every pick as `guide id <- Commons file title`** →
 `remove_images.py` for the wrong ones → commit. The hand read is the step that finds everything
 above; the gates only find shape.
+
+### THE ACOUSTIC INTERROGATOR — N0 + P1 (this session, PR on `claude/loving-edison-bd65oa`)
+
+Owner asked for four features and then chose, via AskUserQuestion, **feature 1 only, built deep**, with
+**literal whisper.cpp + llama.cpp** ("whatever it takes") rather than the Vosk + MediaPipe stacks already
+shipping. (For the record the owner also chose **literal yt-dlp via bundled Python** for feature 4 — a
+standing decision for a later session, not this one. Features 2/3/4 are deferred.) Owner is near a usage
+ceiling and asked for restraint, so: **zero subagent spend**, as with every arc since the credit directive.
+
+The feature: capture ambient speech, transcribe it offline, log it to a rolling Room database, run RAG
+against the 651 bundled offline guides with an embedded quantized LLM, detect logical fallacies and
+produce real-time counter-arguments.
+
+**The whole retrieval half of RAG already exists and is not being rebuilt.** `GuideSearch` is an
+IDF-weighted ranker already tuned against the real index; `LibraryLookup`/`LibraryConsult` already turn a
+query into a grounded excerpt with a citation. **No embeddings and no vector DB are needed.**
+
+**Architecture — a six-stage cascade**, cheap-and-continuous in front of expensive-and-rare, the same
+shape as `EmergencyTriage` before the ranker: AudioRecord→VAD → whisper → `Discourse` claim screen →
+`Fallacies` cue screen → `GuideSearch` retrieval → llama adjudication → `Rebuttal` composition.
+⚠️ **The scarce resource is the LLM, not the microphone**, and every policy rule exists to spend it well.
+
+**N0 — the toolchain proof (`93c28e6`, CI run 1813 GREEN).** Nothing in this repo had ever compiled a
+line of native code: every `.so` it ships (Vosk, JNA, MediaPipe, MapLibre, ExoPlayer) arrives prebuilt in
+an AAR. There is no NDK in this container and GitHub is unreachable through its proxy, so the first
+compile of anything happens on a runner. N0 ships **one trivial JNI translation unit alone** so that when
+the two C++ trees are added and something breaks, the failure is unambiguously in *them* rather than in
+the NDK version, the CMake version, the ABI filter, AGP wiring or packaging.
+- ⚠️ **`ndkVersion` in `app/build.gradle.kts` and the CI `sdkmanager` string must match exactly.** AGP
+  reports only that its chosen NDK is missing, never that a different one is present. Nothing gates the drift.
+- ⚠️ **The gate is an APK assertion, not a unit test.** `:app:testDebugUnitTest` runs on the host JVM and
+  cannot load an arm64 `.so`, so a test on `NativeBridge.available` would fail on a good build and pass on
+  one where CMake silently produced nothing. CI greps the shipped APK for `lib/arm64-v8a/liblcarsnative.so`.
+- ⚠️ **The CMake tree builds on a host toolchain too, and that took two fixes to be true.**
+  `find_library(log-lib log)` is guarded by an `if` (liblog is Android-only, and an unguarded
+  `target_link_libraries` fails generation everywhere else), and — found by actually RUNNING the host
+  build rather than assuming it worked — `jni.h` has to be located explicitly off Android, where it lives
+  in the JDK rather than on the NDK sysroot. Without that the tree configured and the compile died on the
+  first include, so the "gate" was inert. **A gate that cannot run is worth nothing**; this one is now
+  negative-tested (a deliberate syntax error fails the build) and exports the right JNI symbol under `nm`.
+  Worth two guarded blocks when CI rounds will run 20–35 minutes once whisper and llama are in the build.
+  Recipe: `cmake -S app/src/main/cpp -B /tmp/cmk && cmake --build /tmp/cmk`.
+- ⚠️ Upstreams are **not vendored and not submodules** — a submodule needs a pinned SHA and a SHA cannot be
+  fetched from a container that cannot reach GitHub. CI shallow-clones each at a pinned **tag**; `.gitignore`
+  keeps the trees out (added *before* the clone step exists, because `git add -A` has swept a stray file
+  into a commit once already this session and a multi-megabyte C++ tree is the same mistake, much worse).
+
+**P1 — four pure cores, all locally executed (54 tests), all 21 load-bearing rules negative-tested.**
+`Fallacies` (25-fallacy cue taxonomy), `Discourse` (claim screen + rate governor + segmentation),
+`Rebuttal` (composition, citation, provenance), `TranscriptPolicy` (what may be kept, and for how long).
+
+**⚠️ THE INTERROGATOR'S PRIVACY INVARIANT, which is new and inverts the Sensorium's.** That subsystem's
+rule is classify-then-discard — raw audio lives only in the recorder's buffer, only text labels leave.
+The interrogator cannot work that way: a fallacy is a property of what was actually said, so the words get
+written down, and ambient capture picks up people who did not consent. Owner's device, sole user, ambient
+sensing already authorised — a constraint to honour, not a reason to refuse. Putting the rules in a tested
+core rather than a DAO is the honouring. Transcripts stay on-device, encrypted at rest via `SecretCrypto`,
+capped, one-tap purge. **Pinned to the local llama.cpp engine — NEVER `RoutingInferenceEngine`**, which
+prefers cloud whenever an API key is set and would silently ship ambient conversation to OpenRouter the
+moment one exists. No transcript text reaches `DebugUploader`, the audit-ledger `detail`, or the episodic
+memory stream.
+
+**⚠️ THE SWEEP IS WHAT MADE THE TAXONOMY WORTH ANYTHING — this is the `GuideSearch` lesson again.** Unit
+tests passed while the cues were noise. Running the *shipped* `screen()` over the real bundled corpus
+(**158,949 sentences, 4.0M words** — a reference work almost never commits a fallacy, so nearly every hit
+is a false positive by construction) fired on **0.30%** of sentences with **four cues producing 79% of
+them**: `for centuries` (128 — a reference work states durations constantly), `at least one` (120 — "at
+least one full minute", which flagged a water-purification instruction as cherry picking), `by definition`
+(75) and a bare `ever since` (62). All four gone or tightened to the form that carries the move. **Final
+rate 0.039%**, and several survivors are the corpus's own guide *about* fallacies describing them.
+Recipe: `python3` extracts the shard bodies with a real JSON parser to a flat file (a regex extractor
+stack-overflowed on backtracking), then the shipped Kotlin runs over it from a throwaway `main`.
+
+**⚠️ AN OPTIONAL APOSTROPHE MUST NEVER COLLAPSE A CONTRACTION INTO ANOTHER REAL WORD.** `it'?s (all )?natural`
+also matches *its* natural — "crumbles along its natural planes of weakness". 24 false positives from one
+cue, against **zero** occurrences of the apostrophised form, so the leniency bought nothing. Found by
+**enumerating every `'?` in the file against the corpus**, which is the same technique that found the
+notification-id collision and the PendingIntent collision: exactly three cues are in that class
+(`it's`/`its` 12,159 uses, `answer's`/`answers` 407, `can't`/`cant` 3). All three now require an apostrophe.
+
+**⚠️ TWO DEAD CODE PATHS FOUND BY COMPUTING EXPECTED VALUES BEFORE WRITING ASSERTIONS**, and both looked
+handled in the source:
+1. **`RHETORICAL` only suppressed the question penalty and added nothing.** The straw man and the loaded
+   question are question-shaped and short — "So you're saying we should abolish the entire department
+   overnight?" is nine content words — so they scored 0.29 against a 0.45 floor and could never reach
+   stage 3. Rhetorical form now *adds* weight: these phrasings are not ambiguous the way a bare cue is.
+2. **The hedge penalty made `Verdict.HEDGED` unreachable.** Subtracting it pushed ordinary hedged sentences
+   under the floor, so they returned NO_CLAIM and the refusal could never fire. Hedging is a *verdict*
+   question, not a "is this a claim" question; strength now only measures whether a claim is present.
+   The dead `HEDGE_PENALTY` constant was deleted rather than left — that is this repo's recurring defect class.
+
+**⚠️ THE INTEGRATION GUARD EARNED ITSELF IMMEDIATELY.** `Fallacies` and `Discourse` were tuned separately,
+so a fallacy whose canonical phrasing never clears `CLAIM_FLOOR` is dead in the shipped cascade while both
+files' own tests pass. A test that runs a worked example of **every one of the 25** through the whole
+cascade found **6 unreachable**. Five were 12–13 content words scoring 0.386–0.418 against a 0.45 floor —
+i.e. an ordinary spoken sentence could not clear it, which is a calibration error rather than six content
+problems. Saturation moved to a typical spoken clause so a full clause alone clears the floor and the
+connective/assertive/rhetorical terms became bonuses that admit *shorter* utterances. The guard against
+fitting to fixtures is that the must-stay-rejected cases still get rejected, which is separately asserted.
+The sixth was whataboutism, which is nearly always question-shaped.
+
+**⚠️ FOUR GUARDS WERE ASLEEP AND ONE OF MY OWN CHECKS WAS WORTHLESS.**
+- Two `Fallacies` guards failed nothing when their rule was deleted, both by the **fixture never reaching
+  the branch**: the word-boundary fixtures had been chosen against the *original* cue list and stopped
+  being substring cases once the cues were tightened; and the ordering fixture tripped fallacies declared
+  15th and 23rd, so declaration order was *already* descending and deleting the sort changed nothing. The
+  replacement pairs a fallacy declared 2nd with one declared 15th, and asserts that premise so it cannot
+  silently stop testing anything.
+- A `git diff` "the file was restored" check printed nothing and passed — because the files are **untracked**,
+  so an empty diff proves nothing. Verify a restore by running the suite, not by diffing.
+- **`pgrep -f <pattern>` matches the calling shell's own command line**; a `while pgrep …; do sleep; done`
+  poll never terminates and `kill $(pgrep -f …)` kills the shell issuing it. Use `ps -eo pid,cmd | awk`.
+- ⚠️ **A FOURTH MECHANISM, found by the 21-rule perturbation run: the assertion checked the whole value
+  rather than any meaningful part of it.** `TranscriptPolicy`'s redaction ordering guard asserted only
+  `!masked.contains(secret)`. Swapping the two passes changed nothing it could see — because for most
+  credential shapes the digit mask is *inert*, `\b\d{4,}\b` needing the run bounded by non-word
+  characters while those keys sit digits-against-letters. The one exception is the Slack token, whose run
+  is hyphen-delimited: digits-first turns `xoxb-<10 digits>-<16-char tail>` into
+  `xoxb-[redacted]-<tail>`, so the whole original string is indeed absent **and the tail is sitting
+  in the clear**. ⚠️ The fixture is assembled from parts in the test rather than written as a literal:
+  GitHub push protection reads a well-formed Slack token as a real secret and rejected the whole push
+  on the first attempt. Assemble such fixtures; never resolve the block with the "allow this secret" link. Asserting the whole rendered line instead makes it fail.
+  The known ways a green test proves nothing are now: the perturbation never matched the source; the
+  perturbation only touched the code without removing the property; the fixture never reached the branch;
+  and the assertion was too weak to see the damage. **20 of 21 rules were awake on the first run; this was
+  the one, and it was in the privacy code.**
+
+⚠️ **My own expectation was wrong where the code was right, twice more** (a word count, and asserting two
+strengths equal when "I think" adds two content words and raises one of them). That is roughly the twelfth
+in this arc-series. **Compute the expected value from the shipped function before writing the assertion,
+and leave the arithmetic in the comment.**
+
+**Tandem: deliberately NOT mirrored.** `MirrorDriftTest` asserts that *listed* mirrors match their sources
+and that the test's map matches the script's — it does not require every core to be mirrored. The
+interrogator is a microphone feature, which the tandem rule puts explicitly out of desktop scope, and
+saying so beats a half-port.
+
+**Remaining slices, risk-ordered:** **R1** Room (apply KSP, three catalogued-but-unused deps, `Utterance`
+entity + DAO + rolling-cap delete, encryption at rest) → **N1** whisper.cpp (CI clone at a pinned tag, JNI
+wrapper, `WhisperEngine`, runtime model fetch) → **N2** llama.cpp, hard-pinned local-only → **A1** the
+`AcousticInterrogatorService` (AudioRecord FGS on the `SensoriumService` upgradeable pattern; ⚠️ a **third
+continuous mic claimant** beside the wake loop and the Sensorium's sips, so `VoiceMachine` gains an owner —
+a single-AudioRecord fan-out would be better and is a bigger refactor, recorded rather than silently
+degrading the wake word) → **U1** the screen (live transcript, flagged fallacies with counter-arguments and
+citations, purge control, Settings toggle default OFF).
