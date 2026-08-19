@@ -7,12 +7,10 @@ import dev.mascwa.pulse.core.telemetry.Rebuttal
 import dev.mascwa.pulse.data.interrogator.AcousticInterrogatorService
 import dev.mascwa.pulse.data.interrogator.TranscriptStore
 import dev.mascwa.pulse.di.AppContainer
+import dev.mascwa.pulse.feature.media.MicFloor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -28,15 +26,16 @@ class InterrogatorViewModel(private val c: AppContainer) : ViewModel() {
     val findings = c.interrogatorCascade.findings
 
     /**
-     * Whether it is listening.
+     * Whether it is listening — the FACT, not the intent.
      *
-     * ⚠️ Derived from the SETTING, not from a flag this class keeps. The notification's Stop action
-     * writes that setting from outside the app entirely, so a screen holding its own copy would sit
-     * showing LISTENING at a microphone that had already stopped.
+     * ⚠️ [MicFloor.interrogating] is true only while the service actually holds the microphone, so
+     * this cannot drift. `sensing.interrogator` is intent, and intent and fact come apart for real
+     * reasons: the notification's Stop writes the setting from outside the app, the permission can
+     * be revoked, the recorder can refuse to open, and the system can kill a non-sticky service.
+     * Reading the setting here would leave the screen showing LISTENING at a closed microphone in
+     * every one of those cases.
      */
-    val listening: StateFlow<Boolean> = c.settingsRepository.settings
-        .map { it.sensing.interrogator }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val listening: StateFlow<Boolean> = MicFloor.interrogating
     val lastTrace = c.interrogatorCascade.lastTrace
 
     private val _lines = MutableStateFlow<List<TranscriptStore.Line>>(emptyList())
@@ -121,8 +120,16 @@ class InterrogatorViewModel(private val c: AppContainer) : ViewModel() {
     companion object {
         /** What the screen shows when the model has run and found nothing worth raising. */
         fun quietLine(trace: dev.mascwa.pulse.data.interrogator.InterrogatorCascade.Trace?): String =
-            when (trace?.verdict) {
-                null -> "Nothing heard yet."
+            when {
+                trace == null -> "Nothing heard yet."
+                // Cut mid-sentence: nothing judged it, and saying otherwise would be a claim about
+                // words that have not finished arriving.
+                trace.verdict == null -> "Still speaking — waiting for the end of the sentence."
+                else -> quietLineFor(trace.verdict)
+            }
+
+        private fun quietLineFor(verdict: dev.mascwa.pulse.core.telemetry.Discourse.Verdict): String =
+            when (verdict) {
                 dev.mascwa.pulse.core.telemetry.Discourse.Verdict.NO_CLAIM ->
                     "Heard, no claim in it."
                 dev.mascwa.pulse.core.telemetry.Discourse.Verdict.NO_CANDIDATE ->

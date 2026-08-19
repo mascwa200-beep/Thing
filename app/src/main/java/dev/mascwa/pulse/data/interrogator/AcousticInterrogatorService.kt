@@ -118,7 +118,27 @@ class AcousticInterrogatorService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * Stop, and stop CLAIMING to be listening.
+     *
+     * ⚠️ **Clearing the setting is the load-bearing half.** Nothing auto-revives this service — it is
+     * not sticky, no boot receiver starts it, no worker heals it — so `sensing.interrogator` is pure
+     * intent, read by exactly two surfaces. Every path that ends capture for a reason other than the
+     * user asking (no permission, no model, the recorder refusing to open) previously left it true,
+     * and the Settings switch would then sit reading ON at a microphone that was closed. The same
+     * shape as the Sensorium's Stop button undoing itself, in the other direction.
+     *
+     * On the application scope, because `onDestroy` cancels this service's own scope as soon as its
+     * teardown begins and would race the write away.
+     */
     private fun standDown() {
+        val app = application as? PulseApplication
+        val repo = app?.container?.settingsRepository
+        if (app != null && repo != null) {
+            app.appScope.launch {
+                runCatching { repo.update { it.copy(sensing = it.sensing.copy(interrogator = false)) } }
+            }
+        }
         stopSelf()
     }
 

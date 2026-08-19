@@ -45,10 +45,17 @@ class InterrogatorCascade(
     private val now: () -> Long = System::currentTimeMillis,
 ) {
 
-    /** Why the last utterance did or did not produce a finding — for the screen and the log. */
+    /**
+     * Why the last utterance did or did not produce a finding — for the screen and the log.
+     *
+     * ⚠️ [verdict] is NULLABLE, and null is not a tidy default: it means the cascade never judged
+     * this at all, because the segment was cut mid-sentence. Reporting a cut as `NO_CLAIM` — which
+     * is what this did first — puts "heard, no claim in it" on screen about something nothing ever
+     * looked at, which is a statement about the content rather than about the cut.
+     */
     data class Trace(
         val heard: String,
-        val verdict: Discourse.Verdict,
+        val verdict: Discourse.Verdict?,
         val atMs: Long,
     )
 
@@ -88,7 +95,7 @@ class InterrogatorCascade(
         // manufacture findings out of the detector's own timing. Discourse.segment() is what stitches
         // these back together for a future caller; until something does, the honest thing is silence.
         if (cut) {
-            _lastTrace.value = Trace(text, Discourse.Verdict.NO_CLAIM, at)
+            _lastTrace.value = Trace(text, verdict = null, atMs = at)
             return null
         }
 
