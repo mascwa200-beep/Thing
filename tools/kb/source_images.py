@@ -513,7 +513,7 @@ def image_details(file_titles: list[str]) -> dict:
     return out
 
 
-BOILERPLATE_USES = 50      # above this a file is furniture, not a picture of anything
+BOILERPLATE_USES = 500     # above this a file is furniture, not a picture of anything
 _usage_cache: dict[str, bool] = {}
 
 
@@ -521,11 +521,34 @@ def is_boilerplate(file_title: str) -> bool:
     """
     Is this file used across so much of Wikimedia that it cannot be about any one subject?
 
-    A genuine diagram is used on a handful of pages; a template glyph is used on tens of thousands.
-    Measured: `Climate change feedbacks.svg` 10 uses, `Harris matrix example.svg` 4, against
-    `Symbol category class.svg` and `Text document with red question mark.svg` at well over a
-    hundred each. That is the one signal here that does not depend on my guessing filenames in
-    advance, which is what every other chrome rule does.
+    This is the one chrome rule that does not depend on guessing filenames in advance, which is
+    what every other one does. But the threshold took three attempts and only measurement found
+    the first two wrong, so the numbers are recorded here rather than left as a constant:
+
+        file                                   uses  wikis  article-space
+        Harris matrix example.svg                 4      3      2   <- diagram
+        Climate change feedbacks.svg             10      8      8   <- diagram
+        Animal cell structure en.svg             82     48      3   <- diagram
+        Supply-and-demand.svg                   151     65      6   <- diagram
+        Diagram human cell nucleus multilang.svg 189     72     10   <- diagram
+        A coloured voting box.svg              >500      3     23   <- chrome
+        Psi2.svg                               >500      9    233   <- chrome
+        Text document with red question mark   >500      7    479   <- chrome
+        Symbol category class.svg              >500      1      0   <- chrome
+
+    ⚠️ **A threshold of 50 rejects the best diagrams, and did.** A canonical illustration is used
+    a few times on each of *many* wikis, because it is the picture of that subject in every
+    language — 48, 65 and 72 wikis above. Counting raw uses punishes a diagram for being good, and
+    a live run refused `Animal cell structure en.svg` and the human cell nucleus diagram before
+    this was measured.
+
+    ⚠️ **"Used in article space" does not separate them either**, which was the obvious second
+    attempt. Maintenance icons ride templates that sit on articles: the unreferenced-article glyph
+    has **479** article-space uses. That rule would have kept it.
+
+    What does separate them cleanly is the raw count at a threshold two and a half times above the
+    busiest real diagram measured. Nothing that is genuinely *about* one subject appears on five
+    hundred pages; only furniture does.
 
     ⚠️ **ONE TITLE PER REQUEST, AND THE OBVIOUS OPTIMISATION INVERTS THE ANSWER.** `globalusage`
     can ride the batched [image_details] call for free — and `gulimit` is a budget shared across
@@ -547,7 +570,10 @@ def is_boilerplate(file_title: str) -> bool:
     key = file_key(file_title)
     if key in _usage_cache:
         return _usage_cache[key]
-    doc = api(COMMONS, prop="globalusage", gulimit=BOILERPLATE_USES + 1, titles=file_title)
+    # 500 is the API's own ceiling for this parameter, so asking for one more to see the overflow
+    # is not available — the continuation token IS the overflow. A file with exactly 500 uses comes
+    # back full and uncontinued and is kept; one with 501 comes back full and continued.
+    doc = api(COMMONS, prop="globalusage", gulimit=BOILERPLATE_USES, titles=file_title)
     verdict = False
     if doc:
         pages = list((doc.get("query") or {}).get("pages", {}).values())
