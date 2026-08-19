@@ -30,6 +30,18 @@ class MirrorDriftTest {
      * Mirror → source. Kept here rather than read out of the Python script on purpose: two independent
      * statements of the same mapping means adding a mirror to one and forgetting the other is caught,
      * which is exactly the failure this whole test exists for.
+     *
+     * ⚠️ **That reasoning is right and it was only half working.** Independence catches a mirror added
+     * *here* and missing from the script; it cannot catch the reverse, and the reverse is the direction
+     * that actually happens, because a mirror is added by running the script and this map is what gets
+     * forgotten. Measured: **22 of the script's 53 entries were absent from these two maps** — the whole
+     * expansion-pack format, the entire Khan learning layer (CourseMastery, PracticeSet, Hints),
+     * QuizBuilder, StudyProgress, Refresher, UpdatePolicy, Freshness, NewsSummary and ElapsedPhrase.
+     * Editing any of those in the core and forgetting to regenerate would have left the desktop running
+     * a stale copy with its own stale mirrored test passing against it.
+     *
+     * The independence is kept and [everyMirrorTheScriptWritesIsListedHere] closes the gap: the two
+     * lists must name the same set, so forgetting either side fails by name.
      */
     private val mirrors = mapOf(
         "telemetry/GuideSearch.kt" to "$CORE/GuideSearch.kt",
@@ -42,8 +54,23 @@ class MirrorDriftTest {
         "telemetry/EmergencyTriage.kt" to "$CORE/EmergencyTriage.kt",
         "telemetry/NewsInsights.kt" to "$CORE/NewsInsights.kt",
         "telemetry/NewsMarketLink.kt" to "$CORE/NewsMarketLink.kt",
+        "telemetry/NewsSummary.kt" to "$CORE/NewsSummary.kt",
         "telemetry/MediaBias.kt" to "$CORE/MediaBias.kt",
         "telemetry/SocialBuzz.kt" to "$CORE/SocialBuzz.kt",
+        // The Khan-model learning layer and the machinery that marks an answer. Both platforms teach
+        // from the same bundled library, so they have to judge and pace it identically or the same
+        // question is worth different things depending on which screen you answered it on.
+        "telemetry/ContentPack.kt" to "$CORE/ContentPack.kt",
+        "telemetry/CourseMastery.kt" to "$CORE/CourseMastery.kt",
+        "telemetry/PracticeSet.kt" to "$CORE/PracticeSet.kt",
+        "telemetry/Hints.kt" to "$CORE/Hints.kt",
+        "telemetry/QuizBuilder.kt" to "$CORE/QuizBuilder.kt",
+        "telemetry/StudyProgress.kt" to "$CORE/StudyProgress.kt",
+        "telemetry/Refresher.kt" to "$CORE/Refresher.kt",
+        // How old what is on screen is, and when a published build is safe to offer.
+        "telemetry/Freshness.kt" to "$CORE/Freshness.kt",
+        "telemetry/ElapsedPhrase.kt" to "$CORE/ElapsedPhrase.kt",
+        "telemetry/UpdatePolicy.kt" to "$CORE/UpdatePolicy.kt",
         // ⚠️ The live-TV four were mirrored by the script and absent from this map, which is the
         // exact hole this test exists to close — and it was a live one. Growing the curated channel
         // list from 5 to 41 without regenerating would have left the desktop showing the old five
@@ -71,6 +98,9 @@ class MirrorDriftTest {
         "GuideSearchTest.kt", "LibraryConsultTest.kt", "StudyQuestionsTest.kt", "RecallTest.kt",
         "CurriculumTest.kt", "DailyLessonTest.kt", "DeviceSearchTest.kt", "EmergencyTriageTest.kt",
         "LiveChannelsTest.kt", "M3uCatalogTest.kt", "DataRateTest.kt", "StardateTest.kt",
+        "ContentPackTest.kt", "CourseMasteryTest.kt", "PracticeSetTest.kt", "HintsTest.kt",
+        "QuizBuilderTest.kt", "ProcedureQuestionTest.kt", "StudyProgressTest.kt", "RefresherTest.kt",
+        "FreshnessTest.kt", "UpdatePolicyTest.kt", "NewsSummaryTest.kt",
     ).associate { "telemetry/$it" to "$CORE_TEST/$it" }
 
     private val all: Map<String, String> get() = mirrors + testMirrors
@@ -98,6 +128,45 @@ class MirrorDriftTest {
                 comparable(mirror.readText()),
             )
         }
+    }
+
+    /**
+     * The two lists name the same set, in both directions.
+     *
+     * ⚠️ **The independence above only ever caught one direction, and the wrong one.** A mirror is
+     * created by running `tools/mirror_desktop_cores.py`, so the script's map is the one that gets
+     * updated and this file's is the one that gets forgotten — and a forgotten entry here is
+     * invisible: the mirror exists, the desktop compiles against it, and nothing compares it to its
+     * source ever again. Measured before this test was written: **22 of the script's 53 entries were
+     * missing from this file**, among them the whole Khan learning layer and the expansion-pack
+     * format. That is not a hypothetical drift window; the live-TV four had already fallen through
+     * it once, and the comment above records what that would have cost.
+     *
+     * The map is still written out by hand — the independence is worth keeping, because a mirror
+     * added *here* and missing from the script is also a real mistake and this catches it too. What
+     * changes is that neither list can now be quietly shorter than the other.
+     *
+     * The script's map is a plain literal block, so reading it needs no Python: a line of the form
+     * `f"{X}/Name.kt": f"{Y}/rel/Name.kt",` yields the destination, and the destination minus the
+     * desktop root is exactly the key used here.
+     */
+    @Test
+    fun everyMirrorTheScriptWritesIsListedHere() {
+        val script = File(REPO, "tools/mirror_desktop_cores.py")
+        assertTrue("the mirror script is missing: ${script.path}", script.isFile)
+        val declared = Regex(""":\s*f"\{(DESKTOP|DESKTOP_TEST)}/([^"]+)"""")
+            .findAll(script.readText())
+            .map { it.groupValues[2] }
+            .toSortedSet()
+        assertTrue("parsed nothing out of the mirror script — has its MIRRORS block changed shape?",
+            declared.size > 20)
+        assertEquals(
+            "the mirror script and this test disagree about what is mirrored. Add the missing " +
+                "entries to whichever side is short; a mirror the script writes and this test does " +
+                "not check is a file that can drift for ever without anything noticing.",
+            declared.toList(),
+            all.keys.toSortedSet().toList(),
+        )
     }
 
     /** A mirror without its banner is a file nobody can tell is a mirror. */
