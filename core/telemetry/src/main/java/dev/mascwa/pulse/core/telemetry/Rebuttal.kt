@@ -47,10 +47,11 @@ object Rebuttal {
      * @param excerpt the text the model was given, and which the citation points at.
      */
     data class Grounding(
-        val guideId: String,
         val guideTitle: String,
         val section: String,
         val excerpt: String,
+        /** Optional: the retrieval path exposes a title and a section, not always an id. */
+        val guideId: String? = null,
     ) {
         /** How the source is named to the reader. The library is curated, so the title is worth showing. */
         fun cite(): String = if (section.isBlank()) guideTitle else "$guideTitle — $section"
@@ -215,6 +216,78 @@ object Rebuttal {
 
     /** Tokens this long or shorter before a full stop are abbreviations, not sentence ends. */
     private const val ABBREVIATION_MAX = 2
+
+    // ---- stage 5: asking the model ------------------------------------------------------------
+
+    /**
+     * What the adjudicator concluded.
+     *
+     * ⚠️ [present] false is the WHOLE POINT of stage 5 and the commonest correct answer. The cue
+     * screen is a keyword matcher and most of what it flags is innocent — "everyone knows" is how
+     * people introduce a fact everyone does in fact know. A model that could only agree would make
+     * the cascade a keyword matcher with a language model bolted on for confidence.
+     */
+    data class Judgement(val present: Boolean, val question: String?)
+
+    /**
+     * Build the prompt.
+     *
+     * ⚠️ **The instruction to refuse comes FIRST and is stated as the expected outcome**, because
+     * a small instruct model asked "is this an appeal to popularity?" will say yes. Leading with
+     * "most of what you see is not a fallacy, and saying so is the useful answer" is the difference
+     * between an adjudicator and a rubber stamp, and it is the single line here worth defending.
+     *
+     * The reply format is two fixed lines rather than JSON: a quantized 1.5B model produces
+     * malformed JSON often enough that the parser would be doing most of the work, and there is
+     * nothing here that two lines cannot carry.
+     */
+    fun judgePrompt(
+        utterance: String,
+        candidate: Fallacies.Candidate,
+        grounding: Grounding? = null,
+    ): String = buildString {
+        append("You are checking one thing somebody said for a reasoning mistake.\n")
+        append("Be strict. Most of what you are shown is NOT a fallacy, and saying so is the useful answer.\n")
+        append("Judge only what was actually said - not what it might have implied.\n\n")
+        append("WHAT WAS SAID: \"").append(utterance.trim()).append("\"\n\n")
+        append("SUSPECTED: ").append(candidate.fallacy.label).append(" - ")
+        append(candidate.fallacy.what).append("\n")
+        append("(matched on the words: \"").append(candidate.trigger).append("\")\n")
+        grounding?.let {
+            append("\nREFERENCE, from an offline library:\n")
+            append(it.excerpt.trim()).append("\n")
+        }
+        append("\nReply on exactly two lines:\n")
+        append("VERDICT: yes or no\n")
+        append("QUESTION: one short question that tests the claim, or - if the verdict is no\n")
+    }
+
+    /**
+     * Read the reply.
+     *
+     * ⚠️ **Anything unparseable is read as NO.** A model that wandered off the format has not made a
+     * judgement, and treating an ambiguous reply as a finding would surface exactly the false
+     * positives stage 5 exists to remove. Refusing on doubt costs a missed fallacy, which is the
+     * cheap direction — the same asymmetry the whole cascade is built on.
+     */
+    fun parseJudgement(raw: String?): Judgement {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return Judgement(false, null)
+        var yes = false
+        var question: String? = null
+        for (line in text.lineSequence()) {
+            val l = line.trim()
+            when {
+                l.startsWith("VERDICT", ignoreCase = true) ->
+                    yes = l.substringAfter(':', "").trim().startsWith("yes", ignoreCase = true)
+                l.startsWith("QUESTION", ignoreCase = true) ->
+                    question = l.substringAfter(':', "").trim().takeIf { it.isNotEmpty() && it != "-" }
+            }
+        }
+        // A yes with nothing to ask is not usable: the question IS the output, so a verdict without
+        // one leaves the surface with a label and no help.
+        return if (yes && question != null) Judgement(true, question) else Judgement(false, null)
+    }
 
     private val WHITESPACE = Regex("\\s+")
 

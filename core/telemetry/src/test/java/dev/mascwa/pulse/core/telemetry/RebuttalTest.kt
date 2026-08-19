@@ -10,10 +10,10 @@ class RebuttalTest {
 
     private val candidate = Fallacies.best("Everyone knows the whole funding scheme was never real.")!!
     private val grounding = Rebuttal.Grounding(
-        guideId = "logic-and-argument",
         guideTitle = "Logic and Argument",
         section = "Informal Fallacies",
         excerpt = "An appeal to popularity offers the number of believers as the reason to believe.",
+        guideId = "logic-and-argument",
     )
 
     // ---- provenance: the load-bearing rule --------------------------------------------------
@@ -172,5 +172,79 @@ class RebuttalTest {
     @Test
     fun whitespaceIsNormalisedSoAModelsLineBreaksDoNotReachTheScreen() {
         assertEquals("One thought only.", Rebuttal.trimToOneThought("  One\n\n  thought   only.  "))
+    }
+
+    // ---- stage 5: the prompt and the reply ---------------------------------------------------
+
+    /**
+     * ⚠️ THE LINE WORTH DEFENDING. A small instruct model asked "is this an appeal to popularity?"
+     * will say yes. Leading with the instruction to refuse — stated as the EXPECTED outcome rather
+     * than as a permission — is the difference between an adjudicator and a rubber stamp, and it is
+     * why the whole cascade is not just a keyword matcher with a language model bolted on.
+     */
+    @Test
+    fun thePromptLeadsWithTheInstructionToRefuse() {
+        val p = Rebuttal.judgePrompt("Everyone knows the scheme was doomed.", candidate)
+        val refuse = p.indexOf("NOT a fallacy")
+        val suspect = p.indexOf("SUSPECTED")
+        assertTrue("the prompt must say most of what it sees is not a fallacy", refuse >= 0)
+        assertTrue("and it must say so BEFORE naming the suspicion", refuse < suspect)
+    }
+
+    @Test
+    fun thePromptCarriesTheUtteranceTheTriggerAndTheExcerpt() {
+        val p = Rebuttal.judgePrompt("Everyone knows the scheme was doomed.", candidate, grounding)
+        assertTrue(p.contains("Everyone knows the scheme was doomed."))
+        assertTrue(p.contains(candidate.fallacy.label))
+        // ⚠️ THE WHOLE RENDERED LINE, NOT JUST THE TRIGGER — this guard was asleep when it asserted
+        // only `p.contains(candidate.trigger)`. The trigger is by construction a substring of the
+        // utterance, and the utterance is quoted in the prompt, so deleting the "matched on the
+        // words" line entirely changed nothing the assertion could see. Same failure mode as the
+        // redaction-ordering guard: an assertion too weak to see the damage.
+        assertTrue(
+            "the matched words let the model see a silly match",
+            p.contains("(matched on the words: \"${candidate.trigger}\")"),
+        )
+        assertTrue(p.contains(grounding.excerpt))
+        // Without retrieval there is simply no reference section, rather than an empty one.
+        assertFalse(Rebuttal.judgePrompt("x y z", candidate).contains("REFERENCE"))
+    }
+
+    @Test
+    fun aClearYesWithAQuestionIsAFinding() {
+        val j = Rebuttal.parseJudgement("VERDICT: yes\nQUESTION: Would it stop being true if fewer believed it?")
+        assertTrue(j.present)
+        assertEquals("Would it stop being true if fewer believed it?", j.question)
+    }
+
+    /**
+     * ⚠️ NO IS THE COMMONEST CORRECT ANSWER, and every shape of "not a finding" must reach it.
+     * Negative-tested: making the parser default to `present = true` fails this.
+     */
+    @Test
+    fun everyShapeOfDoubtIsReadAsNo() {
+        for (raw in listOf(
+            null,
+            "",
+            "   \n  ",
+            "VERDICT: no\nQUESTION: -",
+            "VERDICT: no\nQUESTION: Would it matter?",     // no wins over a stray question
+            "VERDICT: yes\nQUESTION: -",                   // yes with nothing to ask is unusable
+            "VERDICT: yes",                                // ditto, question line missing
+            "I think this is probably an appeal to popularity, yes.",  // wandered off the format
+            "{\"verdict\": \"yes\"}",                        // decided to emit JSON after all
+        )) {
+            val j = Rebuttal.parseJudgement(raw)
+            assertFalse("'$raw' must not be read as a finding", j.present)
+            assertNull(j.question)
+        }
+    }
+
+    /** The format is read leniently on case and spacing, because a small model is not precise. */
+    @Test
+    fun theReplyIsReadLeniently() {
+        val j = Rebuttal.parseJudgement("  verdict:  YES  \n  question:   Is that the only option?  ")
+        assertTrue(j.present)
+        assertEquals("Is that the only option?", j.question)
     }
 }
