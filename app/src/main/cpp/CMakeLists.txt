@@ -31,6 +31,23 @@ add_library(lcarsnative SHARED
         lcars_native.cpp
 )
 
+# ⚠️ Off Android, jni.h has to be found explicitly, and without this the local gate below only ever
+# CONFIGURES — the compile fails immediately on `#include <jni.h>`. The NDK puts the header on its
+# sysroot include path so nothing is needed there; a host toolchain has it in the JDK instead. This
+# was caught by actually running the host build rather than assuming it worked, which is the whole
+# reason to keep a local gate: a gate that cannot run is worth nothing.
+# Belt and braces: the NDK toolchain file sets ANDROID, but if that ever changed, adding the host
+# JDK's linux headers to an Android cross-compile would be a 25-minute CI round to discover.
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+    find_package(JNI QUIET)
+    if(JNI_INCLUDE_DIRS)
+        target_include_directories(lcarsnative PRIVATE ${JNI_INCLUDE_DIRS})
+    elseif(DEFINED ENV{JAVA_HOME})
+        target_include_directories(lcarsnative PRIVATE
+                $ENV{JAVA_HOME}/include $ENV{JAVA_HOME}/include/linux)
+    endif()
+endif()
+
 # log is the only system library needed so far; whisper/llama will add android and OpenMP.
 #
 # ⚠️ Guarded so this file also CONFIGURES AND BUILDS ON A HOST TOOLCHAIN, which is the point.
