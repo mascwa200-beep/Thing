@@ -3788,3 +3788,19 @@ kb/soil-texture-structure-and-tilth.webp
     File:Soil profile.svg
     CC BY-SA 4.0 — Tomáš Kebert &amp; umimeto.org
     https://commons.wikimedia.org/wiki/File%3ASoil_profile.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/glacial-interglacial-cycles.webp
+    File:Approximate chronology of Heinrich events vs Dansgaard-Oeschger events and Antarctic Isotope Maxima.png
+    CC BY-SA 4.0 — Goeland1234
+    https://commons.wikimedia.org/wiki/File%3AApproximate_chronology_of_Heinrich_events_vs_Dansgaard-Oeschger_events_and_Antarctic_Isotope_Maxima.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/biofilms-on-food-contact-surfaces.svg
+    File:Contact angle.svg
+    Public domain — No machine-readable author provided. Joris Gillis~commonswiki assumed (based on copyright claims).
+    https://commons.wikimedia.org/wiki/File%3AContact_angle.svg

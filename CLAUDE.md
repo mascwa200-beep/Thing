@@ -5059,3 +5059,124 @@ keyboard tuning and whether the guide really fits.
 **Open/steerable:** whether the phone's guide should be its own full-screen route rather than an
 overlay on a 16:9 panel; desktop fullscreen (the pop-out window already covers that host); and
 per-channel favourites, which the band model would take without a structural change.
+
+### THE IMAGE ARC FINISHED, AND FIVE BUGS UNDER IT (this session cont., PR #449)
+
+Owner: *"recomplete the image wave and then ensure that everything for Android build and desktop
+build is perfectly fine with no bugs whatsoever"*, then repeatedly *"keep going autonomously."*
+**Zero subagent spend**, as with every arc since the credit directive.
+
+**The library now illustrates 438 of 651 guides** (was 238 when the wave started), 544 images, every
+one referenced, correctly shaped and attributed. Pass 1 considered 306 guides and gave 170 a
+diagram; pass 2 is running over the remaining 163.
+
+**⚠️ THE TOOLING GAINED THREE THINGS, and the reason for each is a mistake that already happened.**
+- `tools/kb/check_images.py` — the local twin of the build gates *plus* the attribution check
+  nothing asserts. It exists because the three assertions had been retyped after every bank and one
+  was retyped WRONG: a scan reporting 300 unattributed images had skipped every file named
+  `NOTICE.txt` and never opened `images/kb/NOTICE.txt`, where 300 of the entries live. The real
+  answer was zero, and that false alarm came within a sentence of being reported. **All five checks
+  negative-tested** against a hardlinked corpus copy (`--root`), including the dangling-reference
+  one in isolation.
+- `tools/kb/remove_images.py` — takes a wrong diagram out of the shard, the disk and the NOTICE
+  together, resolving entries by **Commons file title** rather than guide id (a guide can carry more
+  than one picture, and resolving by id would delete the good one).
+- `--only` now accepts guide ids, not just a category, because the one question worth asking of a
+  change to article resolution is "do THESE named guides reach a picture now?"
+
+**⚠️ THE MEASUREMENT THAT DECIDED PASS 2, and it was modest.** Ten guides pass 1 recorded as never
+resolving an article, run through old code and new: articles resolved **1 → 3**, pictures
+**0 → 1**. A lower bound (a 429 cost one guide). One in ten on the hardest population justified the
+pass; ~14 more diagrams was the honest expectation, not a transformation.
+
+**⚠️ THE BETTER LEVER WAS RECOVERING WHAT THE GATE THREW AWAY.** Pass 1 discarded **nine chosen
+diagrams on SVG byte count alone** — the electricity grid schematic, trophic layers, the circle of
+fifths, an ice-core record, the atmosphere. They had passed every relevance gate. And the stated
+reason was stale: the comment said rasterising "would need a renderer this container has no reason
+to carry", and it carries one — `cairosvg` + Pillow, which `optimize_images.py` already uses on this
+same corpus. An over-ceiling vector is now rendered to PNG at 1280 px and pushed through the
+**ordinary raster path**, so it faces stricter checks than the vector branch ever applied; the
+near-blank check is what catches a render that came out empty. **6 of 9 recovered.**
+
+⚠️ **The render ceiling came from timing cairosvg, and the measurement inverted the instinct**:
+500 kB → 3.0 s, 1 MB → 14.0 s, 2 MB → **68.8 s**. Super-linear, so 2 MB was far too GENEROUS.
+`MAX_SVG_RENDER_BYTES = 1_200_000` caps the worst case near 18 s.
+
+**⚠️ AND LOOKING AT THE RESULTS FOUND A PRE-EXISTING DEFECT.** Five of seven renders carried an
+alpha channel; the grid schematic was **91% transparent**. The corpus rule is the opposite and
+`optimize_images.convert()` states why — both readers draw on a light card, so a white label inside
+a transparent diagram is invisible. 451 of 460 images were RGB; the 9 that were not all came through
+the sourcer's `encode()`, which never flattened. It rarely bit while this only fetched photographs.
+Fixed, all nine re-encoded through the same function, corpus now alpha-free and 180 kB smaller.
+Both NOTICE files' re-encoding paragraph rewritten as a **rule rather than a list** ("with two
+exceptions" had become false), which is a licensing statement, not tidying.
+
+**⚠️ A CORRECTION TO MY OWN WORK, and the lesson is the sharpest of the arc.** Hand-reading all 148
+picks found 18 wrong and 17 were removed. One of them — `how-government-works` ← "Administrative
+divisions of Germany.svg" — I called "one country's administrative map". **It is not a map.** It is
+a tiers-of-government pyramid (federal level, states, districts, municipalities), exactly what that
+guide is about. I judged it from a filename in a report instead of from the picture, which is the
+precise failure `contact_sheet.py` exists to prevent and which I had skipped. Restored. **Look at
+the image.**
+
+### FIVE BUGS, ALL IN CODE CI COULD ONLY COMPILE
+
+1. **The vitals alert asserted something nothing had checked.** `VitalsAnalyzer`'s documented design
+   raises a heart-rate check-in only when acceleration is anomalous **and** the wearer is not
+   moving. The one production caller omitted the motion argument; `stepsPerSec` defaulted to `0.0`
+   against a `0.5` threshold, so `exerting` was false on every device and **the gate could never
+   fire** — four green tests covered a guard that did not exist in the shipped app, because only the
+   tests ever passed the argument. Meanwhile the notification said *"…without movement"*. Root cause:
+   **a default that means two things** — "nobody told me" and "measured: standing still" were the
+   same value. Both motion inputs are nullable now, `CheckInEvent.motionChecked` carries the
+   difference out, and the service registers its own accelerometer (ACTIVITY_RECOGNITION is not in
+   the manifest, so the step counter it was designed around is unavailable to this app at all).
+   ⚠️ Its OWN listener, not the Sensorium's — that snapshot reads `0f` when nothing feeds it, which
+   would rebuild the same false certainty elsewhere. **Owner's call, flagged not made silently:**
+   with the gate real, a sharp rise while moving is now suppressed.
+2. **The desktop cable box could not be typed into.** A root `onPreviewKeyEvent` runs in the pass
+   that travels from the ROOT DOWN to the focused element — confirmed by disassembling
+   `FocusOwnerImpl.dispatchKeyEvent` in the shipped compose-ui 1.7.3, where both `onPreKeyEvent`
+   invocations precede both `onKeyEvent` ones. So every digit was taken before the filter field
+   could have it: typing `24` changed channel twice. **8 of 41 curated channel names carry a digit.**
+   Now `onKeyEvent`, which is what the comment always claimed.
+3. **Android composed two channel guides at once** in full screen.
+4. **The emergency alarm could leave your alarm volume at maximum, permanently.** The re-entry guard
+   is `tone != null`, but the volume is raised *before* the ToneGenerator is constructed — so when
+   that throws, the next `start()` records MAXIMUM as the "prior" level. Also re-armed the tone,
+   because whether `TONE_CDMA_EMERGENCY_RINGBACK` is finite lives in the platform's **native tone
+   table** and cannot be settled from `android.jar`. And the KDoc's "full volume regardless of Do Not
+   Disturb" was softened to what is true: STREAM_ALARM audibility holds with no permission; RAISING
+   the volume can be refused under DND without Notification Policy access.
+5. **Both full-screen takeovers silently swallowed the second alert.** Both are `singleTask`,
+   neither overrode `onNewIntent` — a tornado warning behind a flood warning was never shown. A
+   sweep of every singleTask/singleTop activity found four: `MainActivity` and `SpotifyAuthActivity`
+   handle it; the two takeovers — the only screens that appear uninvited — did not.
+6. **The emergency watch claimed to be watching when it could not be** — with no location `sweep`
+   returns at its first line forever while the notification says "Watching for official alerts in
+   your area." Now says what is actually true, re-posted only on change.
+
+**Deliberately NOT changed, so nobody re-chases them:** the sourcer's download-failure path (`get`
+already retries three times with a 45 s backoff; an empty result is a wall, and the next pass picks
+the guide up by construction — that IS the retry); the watch's `notify_state` write (already
+re-reads immediately before writing, the discipline the BreakingNewsPulse clobber established); its
+50-alert cap; and two inert things in `BreakingOverlayService` — `FLAG_WATCH_OUTSIDE_TOUCH` is set
+but `ACTION_OUTSIDE` is never handled, and the card's `MarginLayoutParams` margins are never read
+(only a parent ViewGroup honours them, and this view's parent is `ViewRootImpl`), so the card spans
+edge to edge instead of floating with a 12 dp inset. Both are cosmetic, and fixing them means
+restructuring the view that carries the drag listener and the pass-through flags on a surface that
+cannot be rendered here.
+
+**⚠️ TWO OPERATIONAL LESSONS THAT COST REAL WORK.**
+- **`nohup … &` inside a foreground Bash call gets reaped.** Pass 2 was launched that way and died
+  three minutes in, silently, after 8 of 169 guides — while I had already reported it as running.
+  Long runs go through the Bash tool's own `run_in_background: true`, which is what kept the
+  two-hour pass 1 alive.
+- **`git add -A` swept a 1300-line scratch copy of the sourcer into a commit.** It had to live beside
+  the real one (the sourcer resolves the repo root from its own `__file__`). `.gitignore` now carries
+  `tools/**/_*_TEMP.py`; a rule is cheaper than remembering.
+
+⚠️ **Owner-verify on the Pixel** — CI compiles, it does not draw, sound an alarm, or raise a second
+emergency: that a red alert keeps sounding and leaves your alarm volume where you left it; that a
+newer takeover replaces what is on screen; that the emergency watch says so when location is off;
+the new diagrams on the light card; and on Windows, typing a digit into the channel filter.
