@@ -16,6 +16,11 @@ on:
       # guards would only run when desktop/ itself happened to change.
       - "app/src/main/assets/survival/**"
       - "app/src/main/java/dev/mascwa/pulse/data/survival/**"
+      # ⚠️ And the live-TV catalogue repository, which is mirrored from the app too and was missing
+      # here — so editing it and forgetting to regenerate would not have run this workflow at all,
+      # and the drift guard that would have caught it never fires. Found by checking every mirror
+      # source against this list mechanically rather than reading it; MirrorDriftTest now asserts it.
+      - "app/src/main/java/dev/mascwa/pulse/data/live/**"
       # It bundles the typefaces out of the app's resource directory too, so removing or renaming
       # one there would break the desktop at render time with nothing in this workflow to catch it.
       - "app/src/main/res/font/**"

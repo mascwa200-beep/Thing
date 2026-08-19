@@ -23,6 +23,13 @@ import java.io.File
  * `// MIRROR OF` banner, the `package` line, and imports of this project's own packages. Everything
  * else must be byte-identical. `tools/mirror_desktop_cores.py` writes the mirrors by the same rule, so
  * a failure here is fixed by re-running it rather than by hand-editing.
+ *
+ * ⚠️ **Every check here reads files outside `:desktop`, which Gradle does not know about.** They are not
+ * declared inputs of `:desktop:test`, so editing a core — or the workflow file — and re-running locally
+ * can report the previous result from the task cache and look like a pass. It bit while negative-testing
+ * [theDesktopWorkflowRunsWhenAnyMirroredSourceChanges], where a deliberately broken workflow reported
+ * green. CI is unaffected, because a fresh runner has no prior output to be up to date with; locally, use
+ * `--rerun-tasks` when the thing you changed lives outside this module.
  */
 class MirrorDriftTest {
 
@@ -105,6 +112,28 @@ class MirrorDriftTest {
 
     private val all: Map<String, String> get() = mirrors + testMirrors
 
+    /**
+     * A GitHub `paths:` glob as a regex: `**` crosses separators, a single `*` does not.
+     *
+     * ⚠️ Built character by character rather than with `Regex.escape(glob).replace("*", ...)`, which
+     * is the obvious version and is silently inert: `Regex.escape` returns a `\Q…\E` literal block,
+     * so the replacements find nothing and every path comes back uncovered. That looks like a
+     * finding — the assertion fails loudly and names every mirrored file — which is exactly how a
+     * broken check gets believed.
+     */
+    private fun globToRegex(glob: String): String = buildString {
+        append('^')
+        var i = 0
+        while (i < glob.length) {
+            when {
+                glob.startsWith("**", i) -> { append(".*"); i += 2 }
+                glob[i] == '*' -> { append("[^/]*"); i++ }
+                else -> { append(Regex.escape(glob[i].toString())); i++ }
+            }
+        }
+        append('$')
+    }
+
     /** Mirrored tests live under src/test; everything else under src/main. */
     private fun rootFor(mirrorRel: String): File =
         if (mirrorRel.endsWith("Test.kt")) DESKTOP_TEST else DESKTOP_SRC
@@ -166,6 +195,40 @@ class MirrorDriftTest {
                 "not check is a file that can drift for ever without anything noticing.",
             declared.toList(),
             all.keys.toSortedSet().toList(),
+        )
+    }
+
+    /**
+     * This workflow runs whenever any mirrored source changes.
+     *
+     * ⚠️ **A drift guard is worth nothing if the build that runs it is not triggered.** Every check in
+     * this file lives in `:desktop:test`, which only runs when `desktop-build.yml`'s `paths:` filter
+     * matches the push — so a mirrored source outside that filter can be edited, left un-regenerated,
+     * and never compared to its mirror by anything. That was live for one file:
+     * `LiveCatalogRepository.kt` is mirrored out of the app's `data/live` package, and the filter
+     * listed `data/survival` and not `data/live`.
+     *
+     * Found by matching every mirror source against the filter mechanically. Asserting it here is
+     * what stops the next mirror from a new package reopening it, and the failure names the glob to
+     * add rather than leaving somebody to work out why the desktop shipped stale logic.
+     *
+     * `**` is expanded to match across separators, which is what GitHub means by it and what a naive
+     * glob does not.
+     */
+    @Test
+    fun theDesktopWorkflowRunsWhenAnyMirroredSourceChanges() {
+        val yaml = File(REPO, ".github/workflows/desktop-build.yml")
+        assertTrue("the desktop workflow is missing: ${yaml.path}", yaml.isFile)
+        val block = yaml.readText().substringAfter("paths:").substringBefore("workflow_dispatch")
+        val globs = Regex("""-\s+"([^"]+)"""").findAll(block).map { it.groupValues[1] }.toList()
+        assertTrue("parsed no path filters — has the workflow changed shape?", globs.size > 5)
+
+        val patterns = globs.map { Regex(globToRegex(it)) }
+        val uncovered = all.values.toSortedSet().filterNot { src -> patterns.any { it.matches(src) } }
+        assertTrue(
+            "mirrored sources that do not trigger this workflow, so nothing here would ever compare " +
+                "them to their mirrors — add a paths: entry for each: $uncovered",
+            uncovered.isEmpty(),
         )
     }
 
