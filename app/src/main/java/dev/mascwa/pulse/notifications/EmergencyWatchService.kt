@@ -56,6 +56,19 @@ class EmergencyWatchService : Service() {
     private var scope: CoroutineScope? = null
     private var job: Job? = null
 
+    /**
+     * What the ongoing notification currently says, so it is re-posted only when it changes.
+     *
+     * ⚠️ It used to say one fixed thing — "Watching for official alerts in your area." — whatever
+     * was actually happening. With location unavailable (permission revoked, services off, no fix
+     * yet) `sweep` returns at its first line and the loop spins every minute doing nothing, while
+     * the notification keeps asserting a watch that structurally cannot happen: this feature is
+     * geographic, and without a position there is no area to check. A life-safety feature that has
+     * silently stopped working is worse than one that says so, and the user can only act on what
+     * they are told. The sibling VitalsTrackingService already words its degraded states this way.
+     */
+    private var ongoingText: String? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,7 +116,12 @@ class EmergencyWatchService : Service() {
             stopSelf()
             return
         }
-        val loc = container.locationProvider.current() ?: return
+        val loc = container.locationProvider.current()
+        if (loc == null) {
+            updateOngoing(NEEDS_LOCATION)
+            return
+        }
+        updateOngoing(WATCHING)
         val alerts = container.emergencyAlertRepository.active(loc.latitude, loc.longitude)
         if (alerts.isEmpty()) return
 
@@ -160,11 +178,20 @@ class EmergencyWatchService : Service() {
         )
     }
 
-    private fun ongoing(): Notification =
+    /** Re-post only on a real change: this runs every minute and the tray is not a log. */
+    private fun updateOngoing(text: String) {
+        if (text == ongoingText) return
+        ongoingText = text
+        runCatching {
+            getSystemService(NotificationManager::class.java)?.notify(NOTIF_ID, ongoing(text))
+        }
+    }
+
+    private fun ongoing(detail: String = WATCHING): Notification =
         NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_pulse)
             .setContentTitle("Emergency watch active")
-            .setContentText("Watching for official alerts in your area.")
+            .setContentText(detail)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setSilent(true)
             .setOngoing(true)
@@ -177,6 +204,10 @@ class EmergencyWatchService : Service() {
 
         /** A minute. Fast enough to matter, slow enough that the battery cost is a rounding error. */
         private const val POLL_MS = 60_000L
+
+        private const val WATCHING = "Watching for official alerts in your area."
+        private const val NEEDS_LOCATION =
+            "Needs location access — without a position there is no area to check."
 
         /** Start it if the user has it on. Safe to call repeatedly — a running loop is not stacked. */
         fun start(context: Context) {
