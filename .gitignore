@@ -46,3 +46,8 @@ scratchpad/**/*.class
 scratchpad/**/*.kotlin_module
 scratchpad/**/*.jar
 scratchpad/kb/index.tsv
+
+# Scratch copies of tools, which have to live beside the real ones because several resolve the
+# repo root from their own __file__. `git add -A` swept a 1300-line temp copy of the image sourcer
+# into a commit once; a name pattern is cheaper than remembering.
+tools/**/_*_TEMP.py
