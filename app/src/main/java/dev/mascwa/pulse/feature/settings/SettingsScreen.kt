@@ -739,6 +739,21 @@ fun SettingsScreen(
                 }
             }
 
+            if (vis(SettingsCategory.SECURITY, "viewscreen sponsor skip sponsorblock segments on-demand video playback")) item {
+                PrefSection("Viewscreen") {
+                    PrefSwitch(
+                        "Skip flagged segments",
+                        "During on-demand playback, jump over segments the SponsorBlock community has " +
+                            "flagged — sponsors, self-promotion, intros and the like. Asks a public " +
+                            "database about each video privately: only the first four characters of a " +
+                            "hash are sent, so the server is never told which video you are watching. " +
+                            "Off = nothing is asked and nothing is skipped.",
+                        checked = s.sponsorSkip,
+                        onChange = { v -> vm.update { it.copy(sponsorSkip = v) } },
+                    )
+                }
+            }
+
             if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer")) item {
                 PrefSection("Ambient sensing (Sensorium)") {
                     PrefSwitch(

@@ -116,6 +116,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
 
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel::class.java) ->
                 dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel(c)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.theater.ViewscreenViewModel::class.java) ->
+                dev.mascwa.pulse.feature.theater.ViewscreenViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.study.StudyViewModel::class.java) ->
                 dev.mascwa.pulse.feature.study.StudyViewModel(c)
 

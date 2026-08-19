@@ -509,6 +509,11 @@ data class AppSettings(
      *  restreams of channels that are not free to watch, which is the owner's call to make and not
      *  ours. Costs a ~215 KB fetch, cached for a week. */
     val communityChannels: Boolean = false,
+    /** Skip community-flagged segments (sponsors, self-promo, intros…) during on-demand playback.
+     *  **Default OFF and a switch on purpose**: it asks a third-party database about each video
+     *  (privately — a 4-hex hash prefix, never the video id) and then jumps playback on its own,
+     *  both of which are behaviours to opt into rather than discover. */
+    val sponsorSkip: Boolean = false,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,

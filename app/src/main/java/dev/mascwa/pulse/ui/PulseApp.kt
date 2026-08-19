@@ -322,6 +322,11 @@ fun PulseApp(
                 )
             }
 
+            composable(Routes.VIEWSCREEN) {
+                val vm: dev.mascwa.pulse.feature.theater.ViewscreenViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.theater.ViewscreenScreen(vm, onBack = { navController.popBackStack() })
+            }
+
             // ⚠️ The URL is a QUERY argument and is encoded at every call site. A URL contains
             // slashes and question marks — the characters a route pattern is parsed with — so a
             // path argument would split the route apart. Navigation decodes it once on the way in.
@@ -467,6 +472,7 @@ private val SHORTCUT_ROUTES = setOf(
     Routes.NAV, Routes.SOS, Routes.SURVIVAL,
     Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
     Routes.INTERROGATOR,
+    Routes.VIEWSCREEN,
     Routes.PACKS,
     Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
     Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,

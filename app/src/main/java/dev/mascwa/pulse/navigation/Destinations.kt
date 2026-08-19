@@ -54,6 +54,9 @@ object Routes {
     // The acoustic interrogator — continuous speech capture, transcription and fallacy screening.
     const val INTERROGATOR = "interrogator"
 
+    // The viewscreen — paste an address, the bundled extractor resolves it, the player plays it.
+    const val VIEWSCREEN = "viewscreen"
+
     /**
      * READER — a web page with the page taken off it.
      *
