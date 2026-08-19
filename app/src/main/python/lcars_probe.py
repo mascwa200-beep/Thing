@@ -76,7 +76,13 @@ def extractor_check() -> str:
     version-specific: "which one was in that APK" is the first question when a site stops working.
     """
     try:
-        import yt_dlp
-        return "yt-dlp " + getattr(yt_dlp, "__version__", "?")
+        # ⚠️ `yt_dlp.__version__` DOES NOT EXIST — the version lives in a submodule. Found by
+        # installing the pinned wheel and asking it, after the obvious spelling raised
+        # AttributeError. The original line used a defensive `getattr(..., "?")`, which would not
+        # have crashed and would have reported "?" forever — silently defeating the one thing this
+        # function is for. A defensive default around a wrong attribute name hides the mistake
+        # instead of surfacing it.
+        import yt_dlp.version
+        return "yt-dlp " + yt_dlp.version.__version__
     except Exception as exc:  # noqa: BLE001 - the reason IS the answer
         return "yt-dlp unavailable: {e}: {m}".format(e=type(exc).__name__, m=exc)

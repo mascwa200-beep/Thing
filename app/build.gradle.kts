@@ -170,6 +170,18 @@ android {
 // native ABI, which is the single biggest control on what this costs in the APK.
 chaquopy {
     defaultConfig {
+        // ⚠️ THE TARGET INTERPRETER, AND IT MUST BE SET EXPLICITLY. Chaquopy 16.1.0's
+        // `DEFAULT_PYTHON_VERSION` is **3.8** — read straight off the plugin jar by reflection, not
+        // inferred — while yt-dlp declares `requires_python >= 3.10`. So the first build with the pip
+        // requirement failed in pip's resolver, and the Gradle stack trace was long enough that the
+        // "what went wrong" line could not be read back through the log API at all. Asking the
+        // plugin what its default was answered it in one step.
+        //
+        // 3.12 rather than 3.13 deliberately: the plugin offers 3.8 through 3.13, and 3.13.0 is a
+        // .0 release with the least-exercised support of the set, where 3.12.7 is a mature point
+        // release. Nothing here needs 3.13.
+        version("3.12")
+
         // The interpreter that runs on the BUILD machine, not the phone. CI's ubuntu runner has
         // python3 preinstalled.
         buildPython("python3")
