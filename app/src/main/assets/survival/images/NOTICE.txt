@@ -2869,3 +2869,67 @@ kb/transformers.svg
     File:Transformers Animated.svg
     Public domain — Hasbro Studios, Cartoon Network Studios
     https://commons.wikimedia.org/wiki/File%3ATransformers_Animated.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/biomass-and-ecological-production.svg
+    File:World capture fisheries and aquaculture production by production mode.svg
+    CC BY-SA 3.0 igo — Food and Agriculture Organization
+    https://commons.wikimedia.org/wiki/File%3AWorld_capture_fisheries_and_aquaculture_production_by_production_mode.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/carrying-capacity-and-limits-to-growth.svg
+    File:World population supported by synthetic nitrogen fertilizers, OWID.svg
+    CC BY 3.0 — Our World In Data
+    https://commons.wikimedia.org/wiki/File%3AWorld_population_supported_by_synthetic_nitrogen_fertilizers%2C_OWID.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/community-ecology.webp
+    File:TrophicWeb.jpg
+    CC BY 3.0 — Thompsma
+    https://commons.wikimedia.org/wiki/File%3ATrophicWeb.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/energy-pyramids-and-ecological-efficiency.webp
+    File:Ecological Pyramid.png
+    CC BY-SA 4.0 — Swiggity.Swag.YOLO.Bro
+    https://commons.wikimedia.org/wiki/File%3AEcological_Pyramid.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/landscape-ecology.webp
+    File:Land ocean ice cloud hires.jpg
+    Public domain — see source
+    https://commons.wikimedia.org/wiki/File%3ALand_ocean_ice_cloud_hires.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/life-tables-and-survivorship-curves.webp
+    File:Survivorship Curves.jpg
+    CC BY 3.0 — Ray Husthwaite
+    https://commons.wikimedia.org/wiki/File%3ASurvivorship_Curves.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/nuclear-power-and-reactors.webp
+    File:Spent nuclear fuel in the US.jpg
+    Public domain — U.S. Government Accountability Office
+    https://commons.wikimedia.org/wiki/File%3ASpent_nuclear_fuel_in_the_US.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/primary-productivity-in-ecosystems.svg
+    File:Carbon cycle-cute diagram.svg
+    Public domain — Original: Kevin Saff Vector: FischX
+    https://commons.wikimedia.org/wiki/File%3ACarbon_cycle-cute_diagram.svg
