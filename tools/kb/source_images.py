@@ -199,6 +199,12 @@ NOT_SUBJECT = re.compile(
     r"\bposter(?![a-z])|\bicon(?![a-z])|\bfavicon|\bemblem|\bmascot|\bmeme(?![a-z])|"
     r"\bbarnstar|\buserbox|\bscreenshot|\bselfie|\bportrait(?![a-z])|"
     r"\bjersey|\bbadge(?![a-z])|\btrademark|"
+    # A social-media handle in the filename means the file IS a post — a screenshot of a tweet,
+    # never an illustration of anything. Found by hand-reading a real run: a guide on debris-flow
+    # hazards after a wildfire was given a file called "I just got off the phone with
+    # @GovJoshGreenMD – following a call with…". Narrow on purpose: `@` is vanishingly rare in a
+    # Commons filename and when it appears it is a handle or an address, neither of which teaches.
+    r"@[a-z0-9_]{2,}|"
     # ambiguous nouns, required in their heraldic phrasing so the real subjects survive
     r"signature of|coat of arms|crest of|great seal|\bflag of|flags of|"
     r"(book|album|magazine|dvd|game|comic) cover|postage stamp",
@@ -1042,7 +1048,11 @@ def selftest() -> int:
                  "New Zealand Breakers logo", "Triumphant Cartoon Woman Using A Computer",
                  "Flag of France", "Great Seal of the United States", "Coat of arms of Spain",
                  "Book cover of Dune", "Postage stamp of Kenya", "Nintendo wordmark",
-                 "Signature of Napoleon"]
+                 "Signature of Napoleon",
+                 # A social handle means the file IS a post. Both of these are the shape a real run
+                 # produced: a tweet given to a guide on debris-flow hazards after a wildfire.
+                 "I just got off the phone with @GovJoshGreenMD - following a call",
+                 "Screenshot of @NWSHonolulu advisory"]
     ns_accept = ["Silicon wafer diagram", "Posterior view of the heart",
                  "Flag semaphore alphabet chart", "Harbor seal anatomy",
                  "Wave crest and trough diagram", "Ground cover vegetation map",
