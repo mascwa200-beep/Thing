@@ -62,7 +62,6 @@ class MirrorDriftTest {
         "telemetry/NewsInsights.kt" to "$CORE/NewsInsights.kt",
         "telemetry/NewsMarketLink.kt" to "$CORE/NewsMarketLink.kt",
         "telemetry/NewsSummary.kt" to "$CORE/NewsSummary.kt",
-        "telemetry/MediaBias.kt" to "$CORE/MediaBias.kt",
         "telemetry/SocialBuzz.kt" to "$CORE/SocialBuzz.kt",
         // The Khan-model learning layer and the machinery that marks an answer. Both platforms teach
         // from the same bundled library, so they have to judge and pace it identically or the same

@@ -414,9 +414,14 @@ data class AppSettings(
     val refreshIntervalMinutes: Int = 60,
     val refreshOnlyOnWifi: Boolean = false,
     val newsItemsPerCategory: Int = 30,
-    /** Per-article bias-distribution + social-buzz "COVERAGE" strip — does one extra (cached, lazy) network
-     *  search per viewed article to find who else is covering the story. Default on; off = the extra fetch
-     *  never fires. */
+    /** Whether a viewed article looks up who ELSE is carrying the same story — one extra (cached, lazy)
+     *  network search per article. Default on; off = the extra fetch never fires and the card simply says
+     *  no other outlet was found.
+     *
+     *  ⚠️ The NAME is stale and deliberately not changed: this once drove a coloured bias-distribution +
+     *  social-buzz strip, both of which were removed (a band of colour is not a fact, and a lean label
+     *  rates a newspaper rather than reporting the event). Renaming the field would silently discard every
+     *  existing device's saved value, which is a worse trade than an inaccurate identifier. */
     val showNewsCoverageStrip: Boolean = true,
 
     // Home dashboard

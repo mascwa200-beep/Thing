@@ -6,7 +6,7 @@ independently buildable without AGP or the Android SDK. The price is that shared
 copied rather than imported, and a copy with nothing watching it can drift.
 
 ⚠️ Diffing the pre-existing mirrors is what motivated this, and the result was NOT the scandal a first
-skim suggested: `NewsInsights`, `MediaBias` and `SocialBuzz` were identical, and `NewsMarketLink`
+skim suggested: `NewsInsights` and `SocialBuzz` were identical, and `NewsMarketLink`
 differed only in trailing whitespace. `NewsExplainers` differs in real copy — and *correctly*, because
 it names social tabs and a cloud analysis engine the desktop does not have. The actual problem was that
 none of that was knowable without diffing six files by hand.
@@ -87,7 +87,6 @@ MIRRORS: dict[str, str] = {
     # aggregator that repeats the headline in its description must not repeat it on either.
     f"{CORE}/NewsSummary.kt": f"{DESKTOP}/telemetry/NewsSummary.kt",
     f"{CORE}/NewsMarketLink.kt": f"{DESKTOP}/telemetry/NewsMarketLink.kt",
-    f"{CORE}/MediaBias.kt": f"{DESKTOP}/telemetry/MediaBias.kt",
     f"{CORE}/SocialBuzz.kt": f"{DESKTOP}/telemetry/SocialBuzz.kt",
     # The library's own models and taxonomy — app-side content, but pure data.
     f"{SURVIVAL}/GuideModels.kt": f"{DESKTOP}/library/GuideModels.kt",

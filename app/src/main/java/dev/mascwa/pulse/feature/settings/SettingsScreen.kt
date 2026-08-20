@@ -569,8 +569,8 @@ fun SettingsScreen(
                         listOf(15 to "15", 30 to "30", 50 to "50"),
                     ) { n -> vm.update { it.copy(newsItemsPerCategory = n) } }
                     PrefSwitch(
-                        "Source bias & buzz strip",
-                        subtitle = "On each article, show which way the covering outlets lean and how much social chatter there is. Does one extra cached search per article you view.",
+                        "Look up who else is carrying a story",
+                        subtitle = "On each article, name the other outlets reporting the same story. Does one extra cached search per article you view.",
                         checked = s.showNewsCoverageStrip,
                         onChange = { v -> vm.update { it.copy(showNewsCoverageStrip = v) } },
                     )
