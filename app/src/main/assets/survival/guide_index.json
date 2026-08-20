@@ -7111,6 +7111,90 @@
    "file": "guides_federation_timeline.json"
   },
   {
+   "id": "the-klingon-civil-war",
+   "title": "The Klingon Civil War",
+   "category": "Federation Timeline",
+   "summary": "The Klingon civil war of 2367 to 2368 between Chancellor Gowron and the House of Duras — a poisoned chancellor, a contested succession, covert Romulan backing, and the Federation tachyon blockade that decided the war without firing on a single Klingon.",
+   "headings": [
+    "The Succession Crisis",
+    "Outbreak of War",
+    "Romulan Involvement",
+    "The Federation Blockade",
+    "Resolution and Aftermath"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-federation-cardassian-border-wars-and-the-maquis",
+   "title": "The Federation-Cardassian Border Wars and the Maquis",
+   "category": "Federation Timeline",
+   "summary": "The long Federation-Cardassian border wars, the 2370 treaty that created the Demilitarized Zone, and the Maquis — the insurgency of abandoned Federation colonists and defecting Starfleet officers that was ultimately destroyed by the Dominion in 2373.",
+   "headings": [
+    "The Border Wars",
+    "The Treaty of 2370 and the Demilitarized Zone",
+    "The Rise of the Maquis",
+    "Starfleet's Dilemma",
+    "Annihilation and Legacy"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-whale-probe-crisis",
+   "title": "The Whale Probe Crisis",
+   "category": "Federation Timeline",
+   "summary": "The 2286 crisis in which an alien probe, calling to Earth's extinct humpback whales, nearly rendered the planet uninhabitable — and the time travel mission by Admiral Kirk's crew that brought two whales, and an answer, back from the year 1986.",
+   "headings": [
+    "The Probe's Approach",
+    "Effects on Earth",
+    "Identifying the Signal",
+    "The Temporal Mission",
+    "Resolution and Aftermath"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-battle-of-sector-001",
+   "title": "The Battle of Sector 001",
+   "category": "Federation Timeline",
+   "summary": "The 2373 Borg attack on Earth — the fleet battle in the Sol system against a single Borg cube, its destruction under Captain Picard's improvised command, and the temporal incursion to 2063 that nearly erased humanity's first contact with the Vulcans.",
+   "headings": [
+    "The Second Borg Incursion",
+    "The Fleet Engagement",
+    "The Cube's Destruction",
+    "The Temporal Incursion",
+    "Aftermath and Assessment"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-tomed-incident",
+   "title": "The Tomed Incident",
+   "category": "Federation Timeline",
+   "summary": "The Tomed Incident of 2311 — the catastrophic Federation-Romulan confrontation that cost thousands of Federation lives, produced the Treaty of Algeron and its ban on Federation cloaking technology, and opened half a century of Romulan isolation.",
+   "headings": [
+    "What the Record States",
+    "The Cost",
+    "The Treaty of Algeron",
+    "The Long Silence",
+    "Historical Assessment"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
+   "id": "the-xindi-crisis",
+   "title": "The Xindi Crisis",
+   "category": "Federation Timeline",
+   "summary": "The Xindi attack on Earth in 2153 and the crisis that followed: the probe strike, the Delphic Expanse and its Sphere Builders, the Xindi Council and its planet-killing weapon, and the Enterprise NX-01 mission that ended the threat.",
+   "headings": [
+    "The Probe Attack of 2153",
+    "The Delphic Expanse and the Sphere Builders",
+    "The Xindi Council and Its Five Species",
+    "The Enterprise Mission and the Weapon",
+    "Aftermath and Legacy"
+   ],
+   "file": "guides_federation_timeline.json"
+  },
+  {
    "id": "mindset",
    "title": "Survival Mindset",
    "category": "Foundations",
@@ -12377,6 +12461,90 @@
    "file": "guides_navigation.json"
   },
   {
+   "id": "the-klingon-chancellor-and-the-high-council",
+   "title": "The Klingon Chancellor and the High Council",
+   "category": "Notable Figures",
+   "summary": "The office of Chancellor of the Klingon Empire and the High Council it leads: the powers of the chancellorship, the Rite of Succession, and the chancellors — Gorkon, Azetbur, K'mpec, Gowron, Martok — whose reigns shaped the Empire.",
+   "headings": [
+    "The Great Hall and the Council",
+    "Powers of the Office and Their Limits",
+    "The Rite of Succession",
+    "Gorkon and Azetbur: The Khitomer Peace",
+    "K'mpec, Gowron, and Martok"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-ferengi-grand-nagus",
+   "title": "The Ferengi Grand Nagus",
+   "category": "Notable Figures",
+   "summary": "The Grand Nagus, supreme leader of the Ferengi Alliance: the office and its symbols, Gint and the Rules of Acquisition, Zek's long reign and sweeping reforms, and the succession of Rom in 2375.",
+   "headings": [
+    "The Office and Its Authority",
+    "The Tower of Commerce and the Symbols of Office",
+    "Gint and the Rules of Acquisition",
+    "Zek's Reign and Reforms",
+    "The Succession of Rom"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-vulcan-ambassador",
+   "title": "The Vulcan Ambassador",
+   "category": "Notable Figures",
+   "summary": "The Vulcan ambassadorship and the ambassadors who defined it — Soval on 22nd-century Earth, Sarek across a century of Federation diplomacy including the Coridan debate at Babel, and Spock's unsanctioned reunification mission to Romulus.",
+   "headings": [
+    "Vulcan Diplomacy and the Weight of the Office",
+    "Soval and 22nd-Century Earth",
+    "Sarek of Vulcan",
+    "The Coridan Debate and the Babel Conference",
+    "Spock and the Reunification Mission"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-bajoran-kai-and-the-vedek-assembly",
+   "title": "The Bajoran Kai and the Vedek Assembly",
+   "category": "Notable Figures",
+   "summary": "The kai, supreme spiritual leader of the Bajoran faith, and the Vedek Assembly of senior clergy that elects the office: the Prophets and the Orbs, the election of a kai, and the reigns of Kai Opaka and Kai Winn Adami.",
+   "headings": [
+    "The Kai and the Faith of the Prophets",
+    "Vedeks and the Assembly",
+    "Electing a Kai",
+    "Kai Opaka",
+    "Kai Winn Adami"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-cardassian-gul-and-the-central-command",
+   "title": "The Cardassian Gul and the Central Command",
+   "category": "Notable Figures",
+   "summary": "The rank of gul in the Cardassian military and the Central Command that ruled the Cardassian Union: the Obsidian Order rivalry, Gul Dukat and the Occupation of Bajor, and the fall of military rule to the Detapa Council and then the Dominion.",
+   "headings": [
+    "The Rank of Gul",
+    "Central Command and the Cardassian State",
+    "The Obsidian Order",
+    "Dukat and the Occupation of Bajor",
+    "The Fall of Central Command"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
+   "id": "the-romulan-praetor-and-the-tal-shiar",
+   "title": "The Romulan Praetor and the Tal Shiar",
+   "category": "Notable Figures",
+   "summary": "The praetor, head of the Romulan Star Empire, and the Tal Shiar, its feared intelligence service: the Senate and Continuing Committee, praetors Neral and Hiren, the Omarion Nebula disaster of 2371, and the Shinzon coup of 2379.",
+   "headings": [
+    "The Praetorship",
+    "The Senate and the Continuing Committee",
+    "The Tal Shiar: Mandate and Methods",
+    "The Omarion Nebula Disaster of 2371",
+    "The Shinzon Coup of 2379"
+   ],
+   "file": "guides_notable_figures.json"
+  },
+  {
    "id": "the-communications-officer",
    "title": "The Communications Officer",
    "category": "Notable Figures",
@@ -14780,6 +14948,91 @@
    "file": "guides_society_and_culture.json"
   },
   {
+   "id": "the-xindi",
+   "title": "The Xindi",
+   "category": "Species & Civilisations",
+   "summary": "The Xindi, a civilisation of six species from a single homeworld in the Delphic Expanse — Primate, Arboreal, Reptilian, Insectoid, Aquatic and the extinct Avians — known for the 2153 attack on Earth, the Xindi superweapon crisis, and the reconciliation that followed.",
+   "headings": [
+    "Six Species, One Homeworld",
+    "The Delphic Expanse and the Guardians",
+    "The 2153 Attack on Earth",
+    "The Xindi Council and Its Politics",
+    "Aftermath and Reconciliation"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-hirogen",
+   "title": "The Hirogen",
+   "category": "Species & Civilisations",
+   "summary": "The Hirogen, nomadic hunters of the Delta Quadrant whose society, rank and technology are organised entirely around the Hunt — Hirogen hunting packs, the ancient relay network, the taking of trophies, and the holographic prey experiment.",
+   "headings": [
+    "A Civilisation Organised Around the Hunt",
+    "The Ancient Relay Network",
+    "Rank, Ritual and the Taking of Trophies",
+    "Contact with Voyager",
+    "The Holographic Prey Rebellion"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-kazon",
+   "title": "The Kazon",
+   "category": "Species & Civilisations",
+   "summary": "The Kazon, a fractious warrior civilisation of the Delta Quadrant divided into rival sects under First Majes — former slaves of the Trabe, and early adversaries of the USS Voyager. Kazon sects include the Kazon-Ogla, Kazon-Relora and Kazon-Nistrim.",
+   "headings": [
+    "A People Forged Under Trabe Rule",
+    "The Uprising of 2346",
+    "The Sects and the Rule of the Maje",
+    "Scarcity as Politics",
+    "The Voyager Years"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-vidiians",
+   "title": "The Vidiians",
+   "category": "Species & Civilisations",
+   "summary": "The Vidiians, a Delta Quadrant civilisation devastated by the Phage — a disease that consumed their bodies and drove their society to harvest organs from other species. Covers the Vidiian Sodality, the honatta, Denara Pel, and the eventual cure.",
+   "headings": [
+    "The Phage",
+    "What the Sodality Was Before",
+    "Harvesting the Living",
+    "Denara Pel",
+    "The Cure"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-talaxians-and-the-ocampa",
+   "title": "The Talaxians and the Ocampa",
+   "category": "Species & Civilisations",
+   "summary": "Talaxians and Ocampa, two neighbouring peoples of the Delta Quadrant: the gregarious Talaxian traders of Talax, and the short-lived, telepathically gifted Ocampa of the Caretaker's hidden city. Covers the metreon cascade, the Caretaker, and the Talaxian diaspora.",
+   "headings": [
+    "Two Peoples of One Region",
+    "Talax: Trade, Kinship and Cuisine",
+    "The Haakonian War and the Metreon Cascade",
+    "The Ocampa and the Caretaker",
+    "A Nine-Year Life",
+    "Diaspora and Later History"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
+   "id": "the-nausicaans",
+   "title": "The Nausicaans",
+   "category": "Species & Civilisations",
+   "summary": "The Nausicaans, a tall and belligerent humanoid species known across two quadrants as raiders, pirates, mercenaries and hired muscle — Nausicaan raids on early Earth freighters, and the dom-jot incident that nearly killed a Starfleet ensign named Picard.",
+   "headings": [
+    "Physiology and Bearing",
+    "Raiders of the Early Trade Lanes",
+    "Mercenaries and Hired Muscle",
+    "The Starbase Earhart Incident",
+    "Homeworld and Society — Records Differ"
+   ],
+   "file": "guides_species_and_civilisations.json"
+  },
+  {
    "id": "species-8472",
    "title": "Species 8472",
    "category": "Species & Civilisations",
@@ -15045,7 +15298,7 @@
     "The Federation's Accent",
     "Why Humans Are the Viewpoint"
    ],
-   "file": "guides_species_and_civilisations.json"
+   "file": "guides_species_and_civilisations_2.json"
   },
   {
    "id": "fed-q-continuum",
@@ -15058,7 +15311,7 @@
     "Omnipotence With a Personality Problem",
     "Why an Unbeatable Antagonist Is Useful"
    ],
-   "file": "guides_species_and_civilisations.json"
+   "file": "guides_species_and_civilisations_2.json"
   },
   {
    "id": "fed-founders",
@@ -15071,7 +15324,7 @@
     "Detecting Them",
     "The One Who Was Raised Outside"
    ],
-   "file": "guides_species_and_civilisations.json"
+   "file": "guides_species_and_civilisations_2.json"
   },
   {
    "id": "football-formations-and-tactical-systems",
@@ -15166,6 +15419,90 @@
     "What Exercise Actually Does to You"
    ],
    "file": "guides_sports_and_fitness.json"
+  },
+  {
+   "id": "the-federation-president-and-the-executive",
+   "title": "The Federation President and the Executive",
+   "category": "Starfleet & Federation",
+   "summary": "The President of the United Federation of Planets and the executive branch: the office's powers and duties, its seat in Paris on Earth, its relationship with the Federation Council and Starfleet, and the presidents and presidencies the record preserves.",
+   "headings": [
+    "The Office and Its Seat",
+    "Powers and Responsibilities",
+    "The President and the Federation Council",
+    "The Executive at Work: Crisis and Cabinet",
+    "Presidents in the Historical Record"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-starfleet-corps-of-engineers",
+   "title": "The Starfleet Corps of Engineers",
+   "category": "Starfleet & Federation",
+   "summary": "The Starfleet Corps of Engineers is the engineering corps of Starfleet — the engineer teams, construction crews and salvage specialists called in when a job has been declared impossible. Covers the Corps' mandate, projects, organisation and field methods.",
+   "headings": [
+    "Mandate and Reputation",
+    "Notable Projects",
+    "Organisation and Deployment",
+    "Field Methods",
+    "Standing Within Starfleet"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "first-contact-protocols",
+   "title": "First Contact Protocols",
+   "category": "Starfleet & Federation",
+   "summary": "First contact protocols are the Federation rules governing first contact with a new species or civilisation — when contacts are permitted, how covert observation is conducted, the warp-capability threshold, and what happens when a pre-warp culture detects observers.",
+   "headings": [
+    "Purpose and Origin",
+    "The Warp Threshold",
+    "Covert Observation and Survey",
+    "Making Contact",
+    "When Contact Goes Wrong"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-federation-diplomatic-service",
+   "title": "The Federation Diplomatic Service",
+   "category": "Starfleet & Federation",
+   "summary": "The Federation Diplomatic Service is the civilian diplomatic corps of the United Federation of Planets — its ambassadors, envoys, embassies, negotiators and mediators, and their working relationship with Starfleet.",
+   "headings": [
+    "Role Within the Federation",
+    "Ambassadors and Envoys",
+    "Embassies and Missions",
+    "Working With Starfleet",
+    "Notable Achievements"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "starfleet-command-and-fleet-organisation",
+   "title": "Starfleet Command and Fleet Organisation",
+   "category": "Starfleet & Federation",
+   "summary": "Starfleet Command is the operating authority of Starfleet. Covers the admiralty and its headquarters, the chain of command, the numbered fleets and task forces, sector commands and starbases, and the civilian oversight the fleet answers to.",
+   "headings": [
+    "Headquarters and the Admiralty",
+    "The Chain of Command",
+    "Numbered Fleets and Task Forces",
+    "Sectors, Starbases and Support",
+    "Civilian Oversight"
+   ],
+   "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-daystrom-institute",
+   "title": "The Daystrom Institute",
+   "category": "Starfleet & Federation",
+   "summary": "The Daystrom Institute is the Federation's premier research institution for computing, cybernetics and artificial intelligence, named for Doctor Richard Daystrom, the inventor of duotronics. Covers its origins, the M-5 lesson, its research divisions and its standing.",
+   "headings": [
+    "Origins and Namesake",
+    "The M-5 Lesson",
+    "Research Divisions and Annexes",
+    "Cybernetics and Artificial Life",
+    "Standing in the Federation"
+   ],
+   "file": "guides_starfleet_and_federation.json"
   },
   {
    "id": "federation-membership-how-a-world-joins",
@@ -15382,6 +15719,90 @@
     "The Structural Problem"
    ],
    "file": "guides_starfleet_and_federation.json"
+  },
+  {
+   "id": "the-nebula-class",
+   "title": "The Nebula Class",
+   "category": "Starships & Classes",
+   "summary": "The Nebula class is a 24th-century Federation starship class — a multi-role cruiser sharing components with the Galaxy class and distinguished by its interchangeable mission pod. Ships of the class include the Sutherland, the Phoenix and the T'Kumbra.",
+   "headings": [
+    "Design and Lineage",
+    "The Mission Pod",
+    "Capabilities and Layout",
+    "Service History",
+    "Notable Ships of the Class"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-oberth-class",
+   "title": "The Oberth Class",
+   "category": "Starships & Classes",
+   "summary": "The Oberth class is a small Federation science vessel class — survey and research ships such as the USS Grissom, USS Tsiolkovsky and USS Pegasus — in continuous service from the 23rd century into the 24th.",
+   "headings": [
+    "Role and Design",
+    "An Unusual Configuration",
+    "A Long Service Life",
+    "Ships of the Record",
+    "Assessment and Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-ambassador-class",
+   "title": "The Ambassador Class",
+   "category": "Starships & Classes",
+   "summary": "The Ambassador class was a Starfleet heavy cruiser of the early twenty-fourth century, the bridge between the Excelsior and Galaxy generations of starship and starships; its most famous vessel, the USS Enterprise-C, was lost defending the Klingon outpost at Narendra III.",
+   "headings": [
+    "Role and Place in the Fleet",
+    "Design and Capabilities",
+    "The Enterprise-C and Narendra III",
+    "Notable Ships of the Class",
+    "Service Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-nova-class",
+   "title": "The Nova Class",
+   "category": "Starships & Classes",
+   "summary": "The Nova class was a small Starfleet science vessel of the late twenty-fourth century, a ship built for short-range planetary surveys and research; among ships and starships of its size it is remembered chiefly for the USS Equinox, stranded in the Delta Quadrant.",
+   "headings": [
+    "Purpose and Profile",
+    "Design Features",
+    "The USS Equinox",
+    "Variants and Later Service",
+    "Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-prometheus-class",
+   "title": "The Prometheus Class",
+   "category": "Starships & Classes",
+   "summary": "The Prometheus class was Starfleet's advanced tactical starship of 2374, a warship among ships and starships able to split into three warp-capable sections in multi-vector assault mode; its prototype was hijacked by Romulans and recovered by two holographic doctors.",
+   "headings": [
+    "A Ship Built for Combat",
+    "Multi-Vector Assault Mode",
+    "The Prototype Hijacking of 2374",
+    "Systems and Defences",
+    "Service and Legacy"
+   ],
+   "file": "guides_starships_and_classes.json"
+  },
+  {
+   "id": "the-jem-hadar-attack-ship",
+   "title": "The Jem'Hadar Attack Ship",
+   "category": "Starships & Classes",
+   "summary": "The Jem'Hadar attack ship was the Dominion's standard small warship — a fast, expendable fighter among the ships and warships of the Dominion War, whose phased polaron beams cut through Federation shields in the first years of contact.",
+   "headings": [
+    "The Dominion's Standard Warship",
+    "Weapons, Shields and the Odyssey Lesson",
+    "A Ship Without Comforts",
+    "Captured Hulls in Starfleet Service",
+    "Assessment"
+   ],
+   "file": "guides_starships_and_classes.json"
   },
   {
    "id": "the-akira-class",
@@ -15903,6 +16324,91 @@
    "file": "guides_visual_arts_and_design.json"
   },
   {
+   "id": "lcars-the-library-computer-access-and-retrieval-system",
+   "title": "LCARS: The Library Computer Access and Retrieval System",
+   "category": "Warp & Starship Technology",
+   "summary": "LCARS — the Library Computer Access and Retrieval System — is the standard computer operating and interface system aboard Starfleet starships and starbases of the twenty-fourth century, spanning the touch panels, voice interaction and main computer cores of ship and ships alike.",
+   "headings": [
+    "What LCARS Is",
+    "The Interface",
+    "Cores, Chips and Gel Packs",
+    "Voice, Authority and Security",
+    "From Duotronics to LCARS"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "stellar-cartography-and-astrometrics",
+   "title": "Stellar Cartography and Astrometrics",
+   "category": "Warp & Starship Technology",
+   "summary": "Stellar cartography and astrometrics are the sciences of mapping stars, star systems and space itself aboard Federation starships — the charts, maps, laboratories and instruments by which Starfleet knows where it is and where it is going.",
+   "headings": [
+    "The Science of Knowing Where You Are",
+    "The Stellar Cartography Laboratory",
+    "Voyager's Astrometrics Lab",
+    "Instruments and Methods",
+    "Why the Map Is Never Finished"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "escape-pods-and-ship-evacuation",
+   "title": "Escape Pods and Ship Evacuation",
+   "category": "Warp & Starship Technology",
+   "summary": "Escape pods — Starfleet's lifeboats — and the ship evacuation protocols that go with them: how a starship's crew abandons ship, what a pod carries, and how survivors in pods are found and recovered.",
+   "headings": [
+    "The Order No Captain Wants to Give",
+    "The Escape Pod",
+    "Evacuation Protocols",
+    "Evacuations on Record",
+    "Survival and Recovery"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "life-support-and-environmental-systems",
+   "title": "Life Support and Environmental Systems",
+   "category": "Warp & Starship Technology",
+   "summary": "The systems that keep a starship crew alive — atmosphere recycling, artificial gravity, thermal control, water reclamation and the emergency modes of a life support system — and how environmental systems survive the failures that darken everything else.",
+   "headings": [
+    "What Life Support Comprises",
+    "Atmosphere and Air Recycling",
+    "Gravity Plating and Inertial Systems",
+    "Thermal Control, Water and Waste",
+    "Emergency Modes and Redundancy"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "warp-nacelles-and-warp-plasma",
+   "title": "Warp Nacelles and Warp Plasma",
+   "category": "Warp & Starship Technology",
+   "summary": "How warp nacelles and warp plasma turn a warp core's energy into faster-than-light propulsion: warp coils, plasma conduits and injectors, Bussard collectors, and why nacelle designs differ between starship classes.",
+   "headings": [
+    "What a Nacelle Is For",
+    "Warp Plasma and the Transfer Conduits",
+    "Warp Coils and Field Geometry",
+    "Bussard Collectors",
+    "Why Nacelle Designs Differ",
+    "Failure Modes and Hazards"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
+   "id": "the-ship-s-sensor-arrays",
+   "title": "The Ship's Sensor Arrays",
+   "category": "Warp & Starship Technology",
+   "summary": "A starship's sensor arrays and scanners: long-range and lateral sensor pallets, navigational, astrometric and internal sensors, passive versus active scanning modes, and the honest limits of what a sensor sweep can and cannot detect.",
+   "headings": [
+    "Passive and Active Scanning",
+    "Long-Range Sensors",
+    "Lateral Arrays and Short-Range Sensing",
+    "Navigational, Astrometric and Internal Sensors",
+    "What Sensors Cannot See"
+   ],
+   "file": "guides_warp_and_starship_technology.json"
+  },
+  {
    "id": "bussard-collectors",
    "title": "Bussard Collectors",
    "category": "Warp & Starship Technology",
@@ -16168,7 +16674,7 @@
     "Sickbay as a Place",
     "The Emergency Hologram"
    ],
-   "file": "guides_warp_and_starship_technology.json"
+   "file": "guides_warp_and_starship_technology_2.json"
   },
   {
    "id": "atmospheric-circulation-and-global-wind-belts",
@@ -16407,6 +16913,91 @@
     "Step-by-Step: Map Your Own Yard or Neighbourhood's Microclimates in One Week"
    ],
    "file": "guides_weather.json"
+  },
+  {
+   "id": "betazed",
+   "title": "Betazed",
+   "category": "Worlds & Stations",
+   "summary": "Betazed, the Federation member world and homeworld of the telepathic Betazoid people — the planet's culture and customs, its noble houses, notable Betazoids, and the Dominion occupation of Betazed during the war.",
+   "headings": [
+    "The World",
+    "Telepathy and the Betazoid Mind",
+    "Culture and Customs",
+    "The Dominion Occupation",
+    "Notable Betazoids"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "trill-the-planet",
+   "title": "Trill, the Planet",
+   "category": "Worlds & Stations",
+   "summary": "Trill, homeworld of the Trill species and the symbionts: the Caves of Mak'ala, the Symbiosis Commission, the joining of hosts and symbionts, and how joined Trill shape the planet's society and its place in the Federation.",
+   "headings": [
+    "The World",
+    "Hosts and Symbionts",
+    "The Caves of Mak'ala",
+    "The Symbiosis Commission and the Truth About Joining",
+    "Law, Ritual and the Federation"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "memory-alpha-the-federation-archive",
+   "title": "Memory Alpha, the Federation Archive",
+   "category": "Worlds & Stations",
+   "summary": "Memory Alpha, the planetoid housing the Federation's central library and archive — its open-access charter, the memory core, the 2269 Zetarian attack that destroyed the archive's heart, and its place in Federation scholarship.",
+   "headings": [
+    "Charter and Purpose",
+    "The Memory Core",
+    "The Zetarian Attack of 2269",
+    "Reconstruction and Hardening",
+    "The Archive in Federation Life"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "jupiter-station",
+   "title": "Jupiter Station",
+   "category": "Worlds & Stations",
+   "summary": "Jupiter Station, the Starfleet research and operations complex orbiting Jupiter in the Sol system — home of the Holoprogramming Center where Doctor Lewis Zimmerman developed the Emergency Medical Hologram.",
+   "headings": [
+    "Overview and Location",
+    "Structure and Operations",
+    "The Holoprogramming Center",
+    "The EMH Legacy and the 2377 Incident",
+    "Notable Personnel"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "the-bajoran-wormhole",
+   "title": "The Bajoran Wormhole",
+   "category": "Worlds & Stations",
+   "summary": "The stable wormhole in the Bajoran system linking the Alpha and Gamma Quadrants, known to Bajor as the Celestial Temple of the Prophets. Covers the wormhole's discovery near station Deep Space 9, the wormhole aliens and the Orbs, and its role in the Dominion War.",
+   "headings": [
+    "Discovery and Location",
+    "Structure and Stability",
+    "The Prophets and the Celestial Temple",
+    "Strategic Value and the Dominion War",
+    "Aftermath and Continuing Significance"
+   ],
+   "file": "guides_worlds_and_stations.json"
+  },
+  {
+   "id": "the-delta-quadrant",
+   "title": "The Delta Quadrant",
+   "category": "Worlds & Stations",
+   "summary": "The galactic quadrant on the far side of the core from Federation space — heartland of the Borg Collective and the region crossed by the starship USS Voyager. Covers the quadrant's extent, its powers and species, and the seven-year Voyager crossing.",
+   "headings": [
+    "Definition and Extent",
+    "Early Federation Contact",
+    "Major Powers and Species",
+    "The Borg Heartland",
+    "The Voyager Crossing",
+    "Assessment and Open Questions"
+   ],
+   "file": "guides_worlds_and_stations.json"
   },
   {
    "id": "andoria",
