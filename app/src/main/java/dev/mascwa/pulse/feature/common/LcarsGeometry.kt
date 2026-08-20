@@ -432,6 +432,19 @@ fun LcarsScreenFrame(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     rail: Boolean = true,
+    /**
+     * How wide the rail column — and therefore the header's corner block — is.
+     *
+     * ⚠️ ONE number for both on purpose: the corner and the rail beneath it are the two arms of the
+     * same L, and if they differ the corner does not close. Additive, defaulting to the value every
+     * screen already gets, so this changes nothing anywhere it is not passed.
+     *
+     * The MENU passes a wider one, because there the column is not decoration — it holds the group
+     * names, and "YOUR THINGS" does not fit in 56dp at a legible size. Setting it here rather than
+     * letting that screen draw a mismatched column is the difference between a console and two
+     * things that happen to be next to each other.
+     */
+    railWidth: Dp = LcarsRailWidth,
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
@@ -462,7 +475,7 @@ fun LcarsScreenFrame(
             val cornerActive = onBack != null || navigationIcon != null
             Box(
                 Modifier
-                    .width(LcarsRailWidth)
+                    .width(railWidth)
                     .fillMaxHeight()
                     .clip(lcarsBlockShape(CornerSweep, LcarsCorner.TopStart))
                     .background(if (cornerActive) c.accent else c.raise)
@@ -558,7 +571,7 @@ fun LcarsScreenFrame(
             horizontalArrangement = Arrangement.spacedBy(RailGutter),
         ) {
             if (rail) {
-                LcarsRail(seed, Modifier.width(LcarsRailWidth).fillMaxHeight())
+                LcarsRail(seed, Modifier.width(railWidth).fillMaxHeight())
             }
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }

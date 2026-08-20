@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.mascwa.pulse.ui.theme.Pulse
 
@@ -56,6 +57,15 @@ fun PulseScaffold(
     topBarOverride: (@Composable () -> Unit)? = null,
     /** False for a full-bleed screen — a map — where the horizontal room genuinely cannot be spared. */
     rail: Boolean = true,
+    /**
+     * How wide the rail column and the header's corner block are — ONE number, because they are the
+     * two arms of the same L and the corner does not close if they differ.
+     *
+     * Additive and defaulted, so nothing that does not pass it changes. The MENU passes a wider one
+     * and draws its own column in the rail's place: there the blocks are the group names rather than
+     * decoration, and the labels do not fit in the default width at a legible size.
+     */
+    railWidth: Dp = LcarsRailWidth,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     if (topBarOverride != null) {
@@ -75,6 +85,7 @@ fun PulseScaffold(
         onBack = onBack,
         actions = actions,
         rail = rail,
+        railWidth = railWidth,
     ) {
         // The frame owns its own insets and the host Scaffold already pads above the bottom nav, so
         // there is no inner padding left to hand down.
