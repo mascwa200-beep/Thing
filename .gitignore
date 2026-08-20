@@ -28,6 +28,9 @@ build/
 # much worse blast radius.
 app/src/main/cpp/whisper.cpp/
 app/src/main/cpp/llama.cpp/
+# quickjs-ng, on the same terms and for the same reason — it is the JavaScript engine yt-dlp needs
+# for YouTube, cloned at a pinned tag by the same workflow.
+app/src/main/cpp/quickjs/
 *.apk
 *.aab
 *.keystore

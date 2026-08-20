@@ -150,6 +150,16 @@ class _Notes:
         if line not in self.notes and len(self.notes) < self.MAX:
             self.notes.append(line)
 
+    def note(self, text):
+        """Record something this app worked out, rather than something yt-dlp said.
+
+        Same cap and dedupe as everything else here, and no level prefix: a line about our own
+        configuration is not a warning from the extractor and should not read as one.
+        """
+        text = str(text).strip()
+        if text and text not in self.notes and len(self.notes) < self.MAX:
+            self.notes.append(text[: self.MAX_CHARS])
+
     def debug(self, msg):  # noqa: D102 - the interface is yt-dlp's
         pass
 
@@ -161,6 +171,41 @@ class _Notes:
 
     def error(self, msg):  # noqa: D102
         self._add("error", msg)
+
+
+_js_status = None
+
+
+def _enable_js_runtime() -> str:
+    """Register the in-process JavaScript engine with yt-dlp, and report what happened.
+
+    ⚠️ **Importing the module IS the registration.** `lcars_jsi` decorates its provider class with
+    `@register_provider`, which runs at class-definition time and puts it in a global registry — so
+    nothing here has to be called, only imported. Python caches modules, so repeat calls are free
+    and, more to the point, cannot double-register: yt-dlp *asserts* on a duplicate key, which would
+    turn a second resolve into an exception.
+
+    ⚠️ **The status line is the diagnostic that was missing.** Whether YouTube extraction has a
+    JavaScript engine is the single most useful fact about a failed resolve, and until now the app
+    could not have said either way. It rides in the notes, so it appears exactly where a refusal is
+    already being explained — and it is worth having on a success too, because "the engine is live,
+    so the fault is elsewhere" is as useful an answer as the negative.
+
+    Never raises: an engine that will not load has to cost some formats, not the whole resolve.
+    """
+    global _js_status
+    if _js_status is None:
+        try:
+            import lcars_jsi
+            if lcars_jsi.available():
+                _js_status = "javascript: quickjs {}".format(lcars_jsi.engine_version() or "?")
+            else:
+                _js_status = "javascript: NONE ({})".format(
+                    lcars_jsi.setup_error or "engine not in this build")
+        except Exception as exc:  # noqa: BLE001
+            _js_status = "javascript: NONE (provider failed: {}: {})".format(
+                type(exc).__name__, exc)
+    return _js_status
 
 
 def _expiry_ms(url: str) -> int:
@@ -302,6 +347,11 @@ def resolve(url: str) -> str:
         return json.dumps({"error": "{}: {}".format(type(exc).__name__, exc), "kind": "UNAVAILABLE"})
 
     notes = _Notes()
+    # Registers the in-process JavaScript engine before anything asks YouTube for a format, and
+    # records which way that went. Both halves matter: without a runtime, yt-dlp warns that "some
+    # formats may be missing" — which is the fault this exists to remove — and until now the app
+    # could not have told you either way.
+    notes.note(_enable_js_runtime())
     opts = {
         "quiet": True,
         # False because we now want the warnings and the flag should agree with the intent.
@@ -408,6 +458,11 @@ def download(url: str, dest_dir: str) -> str:
         return json.dumps({"error": "cannot create {}: {}".format(dest_dir, exc), "kind": "FAILED"})
 
     notes = _Notes()
+    # Registers the in-process JavaScript engine before anything asks YouTube for a format, and
+    # records which way that went. Both halves matter: without a runtime, yt-dlp warns that "some
+    # formats may be missing" — which is the fault this exists to remove — and until now the app
+    # could not have told you either way.
+    notes.note(_enable_js_runtime())
     opts = {
         "quiet": True,
         # As in resolve(): the logger is what captures, not this flag. A harvest that fails silently

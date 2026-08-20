@@ -206,6 +206,25 @@ chaquopy {
             // `requires_dist` is EMPTY — every extra is optional. So this adds one 3.2 MB wheel and
             // nothing else, on a build that has no Android SDK story for native Python packages.
             install("yt-dlp==2026.7.4")
+
+            // The JavaScript the YouTube challenge solver actually runs. Without it the engine
+            // shipped in liblcarsnative.so has nothing to execute.
+            //
+            // ⚠️ **NOT OPTIONAL, AND THAT WAS MEASURED RATHER THAN ASSUMED.** yt-dlp vendors its own
+            // copy of the solver's *core* script but NOT the *lib* script — its `_builtin/vendor`
+            // directory holds `yt.solver.core.js` alongside two 240-byte NPM import shims, and
+            // nothing else. So the builtin source can never supply the lib half; the remaining
+            // routes are this package, a warm cache, or a GitHub download gated behind an opt-in
+            // `remote_components` flag. On a phone with neither, this is the only one.
+            //
+            // ⚠️ **THE VERSION MUST TRACK yt-dlp's OWN `vendor.VERSION`.** The scripts are checked
+            // against a hash table baked into yt-dlp, and a mismatch is not an error — the script is
+            // rejected with a warning and the provider quietly becomes unavailable. Verified for
+            // this pair: yt-dlp 2026.7.4 declares 0.8.0, and 0.8.0's lib and core hash exactly to
+            // its `yt.solver.lib.min.js` and `yt.solver.core.min.js` entries.
+            //
+            // Pure-Python `py3-none-any`, like yt-dlp itself, so there is nothing to cross-compile.
+            install("yt-dlp-ejs==0.8.0")
         }
     }
 }

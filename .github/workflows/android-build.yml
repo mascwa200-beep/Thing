@@ -137,6 +137,54 @@ jobs:
             if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
           done
 
+      - name: Fetch quickjs-ng at a pinned tag
+        run: |
+          set -e
+          dir=app/src/main/cpp/quickjs
+          repo=https://github.com/quickjs-ng/quickjs
+          # The JavaScript engine yt-dlp has required for full YouTube support since 2025.11.12.
+          # quickjs-ng rather than Bellard's original because it ships a real CMakeLists (the
+          # original is a Makefile) and because yt-dlp names it among the supported runtimes.
+          #
+          # ⚠️ UNLIKE THE TWO ABOVE, THIS TAG WAS MEASURED, NOT CHOSEN. raw.githubusercontent.com is
+          # reachable from the development container even though the API and codeload are not, so
+          # two candidate versions were fetched, built, and RUN end to end against the real 2.88 MB
+          # YouTube player with real n and sig challenges:
+          #
+          #   quickjs-ng v0.11.0 (-O2)   FAILED - still running at 183 seconds
+          #   quickjs-ng v0.16.0 (-O2)   ok in 7.8 seconds, answers byte-identical to node
+          #   node (reference)           2.1 seconds
+          #
+          # More than a twentyfold difference, and v0.11.0 does not finish at all inside any sane
+          # budget. yt-dlp says as much in its own source — `_QJS_MIN_RECOMMENDED` in
+          # jsc/_builtin/quickjs.py names **(0, 12, 0)** as the floor for quickjs-ng, warning that
+          # older builds are "missing important optimizations and will solve the JS challenges very
+          # slowly". A first draft of this step pinned v0.11.0, which is below that floor; the
+          # measurement is what caught it. **Do not lower this pin.**
+          #
+          # v0.16.0 is the newest tag that exists (v0.17.0 answers 404), and its CMakeLists was
+          # checked to still define the `qjs` library target and both options set in cpp/CMakeLists.
+          TAG="v0.16.0"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "quickjs-ng @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'v*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned quickjs-ng tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: quickjs tree is not present after cloning"; exit 1; }
+          # ⚠️ The STATIC LIBRARY target name, asserted rather than assumed. CMakeLists.txt links
+          # against `qjs`; `qjs_exe` and `qjsc` are the command-line tools and are deliberately not
+          # built. If a future tag renames the library target, the failure would otherwise be a
+          # link error four minutes into the build instead of one line here.
+          grep -qE '^ *add_library\( *qjs\b' "$dir/CMakeLists.txt" || {
+            echo "FAIL: this quickjs-ng defines no static library target named 'qjs'."
+            echo "      Targets it does define:"
+            grep -nE '^ *add_(library|executable)\(' "$dir/CMakeLists.txt" | sed 's/^/        /'
+            exit 1
+          }
+          echo "quickjs tree: $(du -sh "$dir" | cut -f1), library target 'qjs' present"
+
       - name: Check the two ggml copies agree
         run: |
           set -e
@@ -286,6 +334,25 @@ jobs:
                 fi
               else
                 echo "::warning::built without the adjudicator - see the ggml compatibility step above"
+              fi
+              # ⚠️ `nativeVersion`, NOT `nativeAvailable`, AND THE DIFFERENCE IS THE WHOLE GATE.
+              # `nativeAvailable` is compiled in BOTH CMake branches — it has to be, or the Kotlin
+              # call that asks whether JavaScript exists would raise UnsatisfiedLinkError instead of
+              # answering "no" — so `nm` finding it proves nothing at all, and a check written
+              # against it would pass on a build with no engine in it. `nativeVersion` cannot be
+              # linked without QuickJS, so its presence is a fact about the build.
+              #
+              # Fatal rather than a warning: without JavaScript, yt-dlp says outright that "YouTube
+              # extraction without a JS runtime has been deprecated, and some formats may be
+              # missing" — which is the defect this whole change exists to remove, and it would
+              # ship green.
+              if nm -D --defined-only /tmp/lcarsnative.so | grep -q "JsRuntime_nativeVersion"; then
+                echo "quickjs linked:"
+                nm -D --defined-only /tmp/lcarsnative.so | grep JsRuntime || true
+              else
+                echo "FAIL: liblcarsnative.so shipped WITHOUT QuickJS - the if(EXISTS) guard took"
+                echo "      the engine-less branch, so YouTube extraction would silently lose formats."
+                exit 1
               fi
             else
               echo "FAIL: liblcarsnative.so shipped WITHOUT whisper.cpp - the if(EXISTS) guard took the"
