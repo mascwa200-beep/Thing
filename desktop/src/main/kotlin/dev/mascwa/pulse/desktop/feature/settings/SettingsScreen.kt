@@ -158,20 +158,10 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // ----- Appearance -----------------------------------------------------------------------
-        LcarsFrame(Modifier.fillMaxWidth()) {
-            Column {
-                SectionTitle("APPEARANCE")
-                LcarsSwitch(
-                    "Boot sequence", s.bootSequence, vm::setBootSequence,
-                    subtitle = "The console's opening, on launch",
-                )
-                LcarsSwitch(
-                    "Console sounds", s.consoleSounds, vm::setConsoleSounds,
-                    subtitle = "The chirps and acknowledgements",
-                )
-            }
-        }
+        // ⚠️ No APPEARANCE section. It offered "Boot sequence" and "Console sounds", and this machine
+        // has neither a boot sequence nor an audio kit — the two switches were written to disk and
+        // read by nothing, which is worse than not offering them. They come back with the subsystems,
+        // not before.
 
         // ----- Library & updates ----------------------------------------------------------------
         LcarsFrame(Modifier.fillMaxWidth()) {

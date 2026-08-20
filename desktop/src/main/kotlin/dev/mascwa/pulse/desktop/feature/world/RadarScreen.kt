@@ -23,6 +23,8 @@ import dev.mascwa.pulse.data.radar.ContactKind
 import dev.mascwa.pulse.data.radar.RadarData
 import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.settings.DesktopUnits
+import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsChip
@@ -201,8 +203,13 @@ private fun ContactRow(contact: Contact) {
     }
 }
 
-private fun km(meters: Double): String =
-    if (meters < 1000) "${meters.toInt()} m" else String.format(java.util.Locale.US, "%.1f km", meters / 1000.0)
+/**
+ * ⚠️ `@Composable` so it can read the reader's own unit switch, and no longer a fourth private copy
+ * of the same formatter — Places, Radar and Safety each carried one, identically, and three copies
+ * of one rule is how they drift.
+ */
+@Composable
+private fun km(meters: Double): String = DesktopUnits.distance(meters, LocalUnits.current.miles)
 
 /** Eight points is as precise as a bearing needs to be when you are reading it off a list. */
 private fun compass(deg: Double): String {

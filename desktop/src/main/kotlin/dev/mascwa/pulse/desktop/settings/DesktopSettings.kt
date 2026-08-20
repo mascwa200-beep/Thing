@@ -128,14 +128,6 @@ data class DesktopSettings(
      *  means it shows what it has until the timer comes round, which is quieter on a metered link. */
     val refreshOnOpen: Boolean = true,
 
-    // ----- Appearance -------------------------------------------------------------------------
-
-    /** Play the console's boot sequence on launch. On by default because it is the app's own opening;
-     *  off for anyone who opens it forty times a day. */
-    val bootSequence: Boolean = true,
-
-    /** Sound the console's own cues on interaction. */
-    val consoleSounds: Boolean = true,
 )
 
 private val defaultJson = Json {

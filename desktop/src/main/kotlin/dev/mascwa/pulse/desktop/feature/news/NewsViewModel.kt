@@ -144,7 +144,18 @@ class NewsViewModel(
             live.collectLatest { tab ->
                 if (tab == null) return@collectLatest
                 while (true) {
-                    delay(nextTickDelayMs(_state.value.lastUpdatedEpochMs, System.currentTimeMillis()))
+                    // ⚠️ Re-read every pass rather than captured once: changing the interval in
+                    // Settings should take effect on the next tick, not on the next app launch.
+                    val every = intervalMs(runCatching { settings.current().refreshMinutes }.getOrDefault(5))
+                    // `refreshOnOpen` off means "show what you have until the timer comes round" —
+                    // so a cached copy older than the interval waits a full one instead of firing
+                    // the moment the tab is opened.
+                    val onOpen = runCatching { settings.current().refreshOnOpen }.getOrDefault(true)
+                    val since = _state.value.lastUpdatedEpochMs
+                    delay(
+                        if (onOpen) nextTickDelayMs(since, System.currentTimeMillis(), every)
+                        else every,
+                    )
                     tick(tab)
                 }
             }
@@ -265,7 +276,13 @@ class NewsViewModel(
 
     companion object {
         /** How often the shown feed is brought up to date while it is being looked at. */
+        /** The default, when nothing has said otherwise. The reader's own setting overrides it. */
         const val LIVE_INTERVAL_MS = 5 * 60 * 1000L
+
+        /** Whatever the reader asked for, kept inside bounds a live feed can honour. One minute is
+         *  as often as this is worth doing; an hour is where "live" stops meaning anything. */
+        fun intervalMs(refreshMinutes: Int): Long =
+            (refreshMinutes.coerceIn(1, 60)) * 60_000L
 
         /**
          * How long to wait before the next live refresh, given how old what is on screen already is.
@@ -277,10 +294,14 @@ class NewsViewModel(
          * zero, so arriving at a tab whose cached copy is nine minutes old refreshes on arrival
          * instead of showing old news for another five.
          */
-        fun nextTickDelayMs(lastUpdatedEpochMs: Long, nowMs: Long): Long {
-            if (lastUpdatedEpochMs <= 0L) return LIVE_INTERVAL_MS
+        fun nextTickDelayMs(
+            lastUpdatedEpochMs: Long,
+            nowMs: Long,
+            intervalMs: Long = LIVE_INTERVAL_MS,
+        ): Long {
+            if (lastUpdatedEpochMs <= 0L) return intervalMs
             val age = nowMs - lastUpdatedEpochMs
-            return (LIVE_INTERVAL_MS - age).coerceIn(0L, LIVE_INTERVAL_MS)
+            return (intervalMs - age).coerceIn(0L, intervalMs)
         }
     }
 }

@@ -18,11 +18,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.core.telemetry.WeatherComfort
+import dev.mascwa.pulse.core.telemetry.WeatherUnits
 import dev.mascwa.pulse.core.util.Async
 import dev.mascwa.pulse.data.weather.WeatherData
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
@@ -120,7 +122,13 @@ fun WeatherScreen(vm: WeatherViewModel, modifier: Modifier = Modifier) {
                         now.windGust?.let { LcarsDataRow("Gusts", "${it.toInt()} ${wd.windUnitSymbol}") }
                         now.pressure?.let { LcarsDataRow("Pressure", "${it.toInt()} hPa") }
                         now.cloudCover?.let { LcarsDataRow("Cloud", "${it.toInt()}%") }
-                        now.visibility?.let { LcarsDataRow("Visibility", "${(it / 1000).toInt()} km") }
+                        // ⚠️ `visibilityMetres`, the CANONICAL companion — never the display `visibility` field.
+                        // Open-Meteo returns that one in FEET under an imperial request (measured:
+                        // 25240 metric against 82808 imperial for one place and moment), which its own
+                        // documentation denies. Dividing it by 1000 and calling it kilometres was right
+                        // only for as long as this machine never asked for imperial, which it now can.
+                        WeatherUnits.describeVisibility(now.visibilityMetres, LocalUnits.current.miles)
+                            ?.let { LcarsDataRow("Visibility", it) }
                     }
                 }
             }

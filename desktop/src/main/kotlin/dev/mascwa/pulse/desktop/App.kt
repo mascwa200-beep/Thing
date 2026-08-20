@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,10 +95,12 @@ import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.social.SocialRepository
 import dev.mascwa.pulse.data.settings.MarketPreferences
-import dev.mascwa.pulse.data.settings.WeatherPreferences
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.settings.DesktopUnits
+import dev.mascwa.pulse.desktop.settings.LocalUnits
+import dev.mascwa.pulse.desktop.settings.UnitPrefs
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
@@ -162,7 +165,12 @@ fun PulseDesktopApp(
             // from `AppSettings`, which deliberately did not move.
             MarketsRepository(http, cache) { MarketPreferences() }
         }
-        val weatherRepository = remember { WeatherRepository(http, cache) { WeatherPreferences() } }
+        val weatherRepository = remember {
+            // ⚠️ The reader's actual unit switches, not a bare `WeatherPreferences()`. Passing the
+            // defaults asked Open-Meteo for Celsius and km/h however the Settings page was set, so
+            // three switches were written to disk and changed nothing on screen.
+            WeatherRepository(http, cache) { DesktopUnits.weatherPreferences(settings.current()) }
+        }
 
         val newsVm = remember {
             NewsViewModel(
@@ -268,7 +276,13 @@ fun PulseDesktopApp(
 
         // Where you are, for the frame's header readout — one provider around everything, so no
         // screen has to know its own name. Same arrangement as the phone's.
-        CompositionLocalProvider(LocalConsoleSection provides (DESK_SECTION[screen] ?: "")) {
+        // The unit switches, read once for the whole app. Collected rather than fetched so flipping
+        // one redraws every screen holding a distance or a clock time — see [LocalUnits].
+        val prefs by settings.settingsFlow.collectAsState()
+        CompositionLocalProvider(
+            LocalConsoleSection provides (DESK_SECTION[screen] ?: ""),
+            LocalUnits provides UnitPrefs(miles = prefs.miles, twelveHourClock = prefs.twelveHourClock),
+        ) {
             ProvideStardate {
                 Surface(color = c.void) {
                     val entry = DESK_ENTRIES[screen]

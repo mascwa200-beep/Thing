@@ -25,6 +25,8 @@ import dev.mascwa.pulse.data.orbital.OrbitalData
 import dev.mascwa.pulse.data.orbital.OrbitalRepository
 import dev.mascwa.pulse.data.orbital.UpcomingLaunch
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.settings.DesktopUnits
+import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsDataRow
@@ -85,7 +87,7 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                 LcarsFrame(Modifier.fillMaxWidth()) {
                     Column {
                         LcarsDataRow("Sub-point", "${deg(iss.latitude)}, ${deg(iss.longitude)}")
-                        LcarsDataRow("Altitude", "${iss.altitudeKm.toInt()} km")
+                        LcarsDataRow("Altitude", DesktopUnits.longDistance(iss.altitudeKm, LocalUnits.current.miles))
                         // ⚠️ Propagated here from a stored element set rather than fetched. The ground
                         // point moves 416 km a minute, so a position from a five-minute cache is not a
                         // position at all — which is why the phone's version stopped fetching it.
@@ -153,6 +155,10 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                     Modifier.padding(top = 12.dp),
                     trailing = if (data.neoHazardousCount > 0) "${data.neoHazardousCount} FLAGGED" else null,
                 )
+                // One read for the card. `listOfNotNull` below is not an inline composable scope, so
+                // reading the local inside it would not compile — hoist, exactly as this repo's
+                // cross-module smart-cast fix does.
+                val miles = LocalUnits.current.miles
                 data.neos.take(8).forEach { neo ->
                     LcarsFrame(
                         Modifier.fillMaxWidth().padding(top = 3.dp),
@@ -166,9 +172,14 @@ fun ObservatoryScreen(vm: ObservatoryViewModel, modifier: Modifier = Modifier) {
                             )
                             Text(
                                 listOfNotNull(
-                                    neo.diameterMetersMax?.let { "up to ${it.toInt()} m across" },
-                                    neo.missDistanceKm?.let { "misses by ${thousands(it)} km" },
-                                    neo.velocityKmh?.let { "${thousands(it)} km/h" },
+                                    neo.diameterMetersMax?.let { "up to ${DesktopUnits.distance(it, miles)} across" },
+                                    neo.missDistanceKm?.let { "misses by ${DesktopUnits.longDistance(it, miles)}" },
+                                    // Converted with the rest rather than left in km/h: a card that
+                                    // quotes the miss in miles and the speed in kilometres is harder
+                                    // to read than one that picks a system and keeps it.
+                                    neo.velocityKmh?.let {
+                                        if (miles) "${thousands(it / 1.609344)} mph" else "${thousands(it)} km/h"
+                                    },
                                     neo.closeApproachEpochMs?.let { stamp(it) } ?: neo.closeApproach,
                                 ).joinToString(" · "),
                                 fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.muted,
@@ -257,14 +268,20 @@ private fun LaunchRow(launch: UpcomingLaunch) {
 
 // ⚠️ Local zone throughout. Rendering a UTC clock time next to local ones is a mistake this repository
 // has already made twice — once in the observatory's own "tonight" geometry and once in the day plan.
-private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm")
+//
+// ⚠️ `@Composable`, and the pattern comes from the reader's own switch. The two formatters were fixed
+// 24-hour constants, so the Settings page's "12-hour clock" was written to disk and read by nothing —
+// the only screen on this machine that prints a clock time ignored it.
+@Composable
+private fun clock(epochMs: Long?): String {
+    val fmt = DesktopUnits.clock(LocalUnits.current.twelveHourClock)
+    return epochMs?.let { fmt.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) } ?: "—"
+}
 
-private fun clock(epochMs: Long?): String =
-    epochMs?.let { CLOCK.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) } ?: "—"
-
+@Composable
 private fun stamp(epochMs: Long): String =
-    STAMP.format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()))
+    DesktopUnits.stamp(LocalUnits.current.twelveHourClock)
+        .format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()))
 
 private fun deg(v: Double) = String.format(java.util.Locale.US, "%.2f°", v)
 private fun thousands(v: Double) = String.format(java.util.Locale.US, "%,.0f", v)

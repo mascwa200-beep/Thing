@@ -25,6 +25,8 @@ import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.safety.SafetyResult
 import dev.mascwa.pulse.data.safety.Severity
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.desktop.settings.DesktopUnits
+import dev.mascwa.pulse.desktop.settings.LocalUnits
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
@@ -188,8 +190,13 @@ private fun coverageLine(result: SafetyResult): String {
         .ifBlank { "Checked earthquakes, major disasters, weather alerts and street crime." }
 }
 
-private fun km(meters: Double): String =
-    if (meters < 1000) "${meters.toInt()} m" else String.format(java.util.Locale.US, "%.1f km", meters / 1000.0)
+/**
+ * ⚠️ `@Composable` so it can read the reader's own unit switch, and no longer a fourth private copy
+ * of the same formatter — Places, Radar and Safety each carried one, identically, and three copies
+ * of one rule is how they drift.
+ */
+@Composable
+private fun km(meters: Double): String = DesktopUnits.distance(meters, LocalUnits.current.miles)
 
 private fun compass(deg: Double): String {
     val points = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")

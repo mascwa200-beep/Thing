@@ -76,8 +76,6 @@ class SettingsViewModel(
     fun setTwelveHourClock(v: Boolean) = write { it.copy(twelveHourClock = v) }
     fun setRefreshMinutes(v: Int) = write { it.copy(refreshMinutes = v.coerceIn(1, 240)) }
     fun setRefreshOnOpen(v: Boolean) = write { it.copy(refreshOnOpen = v) }
-    fun setBootSequence(v: Boolean) = write { it.copy(bootSequence = v) }
-    fun setConsoleSounds(v: Boolean) = write { it.copy(consoleSounds = v) }
     fun setCommunityChannels(v: Boolean) = write { it.copy(communityChannels = v) }
     fun setAutoCheckUpdates(v: Boolean) = write { it.copy(autoCheckUpdates = v) }
     fun setGithubToken(v: String) = write { it.copy(githubToken = v.trim()) }
