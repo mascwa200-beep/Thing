@@ -75,6 +75,57 @@ data class DesktopSettings(
 
     /** Look for a newer build on launch. The check is one request and never installs anything by itself. */
     val autoCheckUpdates: Boolean = true,
+
+    // ----- Location & units -------------------------------------------------------------------
+    //
+    // ⚠️ A desktop has no GPS. Where it is has to be either guessed from the internet connection or
+    // typed, and the guess is genuinely unreliable — see `IpLocationService`, which measured three
+    // services disagreeing by two thousand miles from one machine because the traffic left through a
+    // proxy. So: guess once to fill the field in, then let it be corrected, and never silently
+    // re-guess over an answer someone typed.
+
+    /** Latitude in degrees. `null` means nothing has established it yet — distinct from 0.0, which is
+     *  a real place in the Gulf of Guinea and the classic wrong answer for "unset". */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+
+    /** "San Francisco, United States" — what to show, so the setting reads as a place not a number pair. */
+    val placeLabel: String = "",
+
+    /** True once a person has edited the place by hand. While this is false the app may fill the fields
+     *  in from the connection; once it is true it must not, ever — overwriting a correction is the one
+     *  behaviour that would make the setting useless. */
+    val placeSetByHand: Boolean = false,
+
+    /** Celsius when false. Named for the departure from the norm rather than as an enum, because there
+     *  are exactly two and a boolean here reads better at the call site than `Units.IMPERIAL`. */
+    val fahrenheit: Boolean = false,
+
+    /** Miles and feet when true, kilometres and metres when false. Separate from [fahrenheit] on
+     *  purpose: plenty of people want °C with miles, and one combined "imperial" switch would deny it. */
+    val miles: Boolean = false,
+
+    /** 12-hour clock when true. */
+    val twelveHourClock: Boolean = false,
+
+    // ----- Data & refresh ---------------------------------------------------------------------
+
+    /** How often a live feed re-fetches while its screen is open, in minutes. ⚠️ Only while OPEN —
+     *  off-screen there is no timer at all, which is what makes this cheap. */
+    val refreshMinutes: Int = 5,
+
+    /** Re-fetch the moment a screen is opened if what it holds is older than [refreshMinutes]. Off
+     *  means it shows what it has until the timer comes round, which is quieter on a metered link. */
+    val refreshOnOpen: Boolean = true,
+
+    // ----- Appearance -------------------------------------------------------------------------
+
+    /** Play the console's boot sequence on launch. On by default because it is the app's own opening;
+     *  off for anyone who opens it forty times a day. */
+    val bootSequence: Boolean = true,
+
+    /** Sound the console's own cues on interaction. */
+    val consoleSounds: Boolean = true,
 )
 
 private val defaultJson = Json {
