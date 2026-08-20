@@ -12,7 +12,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
@@ -291,45 +290,18 @@ object OnDemandController {
             PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
     /**
-     * The server answered, and said no.
+     * The server answered, and said no — and what to print for it.
      *
-     * ⚠️ Deliberately outside [isTransient]'s range rather than folded into it — checked against the
-     * shipped jar, `BAD_HTTP_STATUS` is 2004 and that range ends at 2002, which is why this used to
-     * fall straight through to a permanent failure. The range is correct; what was missing is that
-     * this class of error has its own recovery.
+     * ⚠️ Both live in [MediaHttp] now rather than here, because the radio needs exactly the same two
+     * judgements and had neither: a refused reconnect there went straight to a dead "No signal".
+     * A shared definition also closed a real gap in this copy — `INVALID_HTTP_CONTENT_TYPE` (2003)
+     * sat between the transient band and the refusal test and fell through to permanent failure,
+     * which is what a 403 returning an HTML error page produces.
      */
-    private fun isRefusal(error: PlaybackException): Boolean =
-        error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-            error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
+    private fun isRefusal(error: PlaybackException) = MediaHttp.isRefusal(error)
 
-    /**
-     * What to put on screen.
-     *
-     * ⚠️ The status code, not the enum name. `ERROR_CODE_IO_BAD_HTTP_STATUS` is what the owner saw,
-     * and it hides the one fact that distinguishes three completely different situations: 403 means
-     * the address was refused (expired, or fetched without the headers it was minted for), 404 means
-     * it is gone, 429 means we are being rate-limited. The real code is on the cause chain the whole
-     * time — it just was not being read.
-     */
-    private fun describe(error: PlaybackException): String {
-        var cause: Throwable? = error.cause
-        var guard = 0
-        while (cause != null && guard++ < 8) {
-            val code = (cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
-            if (code != null) {
-                return when (code) {
-                    403 -> "403 — the source refused that address"
-                    404 -> "404 — that address is gone"
-                    429 -> "429 — the source is rate-limiting us"
-                    else -> "HTTP $code"
-                }
-            }
-            cause = cause.cause
-        }
-        return error.errorCodeName
-    }
+    private fun describe(error: PlaybackException) = MediaHttp.describe(error)
 
-    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     private fun retryOrFail(app: Context, item: MediaItem, reason: String) {
         if (retries >= MAX_RETRIES) {
             failPermanently(item, reason)

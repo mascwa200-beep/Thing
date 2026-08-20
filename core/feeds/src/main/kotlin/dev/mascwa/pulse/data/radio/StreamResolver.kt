@@ -24,10 +24,31 @@ object StreamResolver {
 
     private enum class Kind { PLS, M3U, ASX }
 
-    /** Resolve [url] to a playable stream URL (unchanged for direct streams / HLS). */
-    suspend fun resolve(url: String): String = withContext(Dispatchers.IO) {
-        val kind = playlistKind(url) ?: return@withContext url
-        runCatching { fetchAndParse(url, kind) }.getOrNull()?.takeIf { it.isNotBlank() } ?: url
+    /**
+     * Resolve [url] to a playable stream URL (unchanged for direct streams / HLS).
+     *
+     * ⚠️ [sniff] is a RECOVERY mode, not a better default. Detection is by file extension, which
+     * misses a playlist served from an extensionless path — `/listen`, `Tune.ashx`, `?type=pls` —
+     * with `Content-Type: audio/x-scpls`. ExoPlayer is then handed a text file, reaches the end of it
+     * immediately, and reports a dropped stream, which looks exactly like a station that will not
+     * stay tuned.
+     *
+     * The tempting fix is to probe every address before playing. That is wrong here: a probe opens a
+     * connection to the mount, and a duplicate listener from one address is precisely what makes
+     * connection-limited stations drop the audio — the defect this whole change exists to remove. So
+     * the sniff runs only AFTER playback has already failed, where it costs nothing on the happy
+     * path and there is no live connection left to disturb.
+     */
+    suspend fun resolve(url: String, sniff: Boolean = false): String = withContext(Dispatchers.IO) {
+        val kind = playlistKind(url)
+        if (kind != null) {
+            return@withContext runCatching { fetchAndParse(url, kind) }
+                .getOrNull()?.takeIf { it.isNotBlank() } ?: url
+        }
+        if (!sniff) return@withContext url
+        // No usable extension and playback already failed: fetch once and try each parser in turn.
+        // Whichever yields an http address wins; none of them doing so means it really was audio.
+        runCatching { fetchAndSniff(url) }.getOrNull()?.takeIf { it.isNotBlank() } ?: url
     }
 
     /** Detect a resolvable playlist by extension (query/fragment stripped). HLS `.m3u8` is deliberately
@@ -42,6 +63,43 @@ object StreamResolver {
             else -> null
         }
     }
+
+    /**
+     * Fetch [url] once and see whether it is a playlist after all, whatever it is called.
+     *
+     * ⚠️ Reads a bounded prefix and refuses anything that does not look like text, so a real audio
+     * stream — which this is called on by definition, since playback just failed — is dropped after
+     * a few kilobytes rather than being read as a string. The `Content-Type` is consulted first
+     * because it is the authoritative answer when the server bothers to give one.
+     */
+    private fun fetchAndSniff(url: String): String? {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                setRequestProperty("User-Agent", UA)
+                connectTimeout = 12_000
+                readTimeout = 12_000
+                instanceFollowRedirects = true
+            }
+            conn.connect()
+            val type = conn.contentType.orEmpty().lowercase()
+            // audio/mpeg, audio/aac and friends are the stream itself: nothing to parse, leave now
+            // rather than reading any of it.
+            val looksLikeAudio = type.startsWith("audio/") &&
+                PLAYLIST_TYPES.none { type.contains(it) }
+            if (looksLikeAudio) return null
+            val body = conn.inputStream.bufferedReader().use { it.readText().take(64_000) }
+            // Order matters only in that each parser is cheap and returns null on a non-match.
+            parsePls(body) ?: parseM3u(body) ?: parseAsx(body)
+        } catch (_: Exception) {
+            null
+        } finally {
+            runCatching { conn?.disconnect() }
+        }
+    }
+
+    /** Content types that ARE playlists despite living under `audio/`. */
+    private val PLAYLIST_TYPES = listOf("scpls", "mpegurl", "x-mpegurl", "xspf", "ms-asf")
 
     private fun fetchAndParse(url: String, kind: Kind): String? {
         var conn: HttpURLConnection? = null

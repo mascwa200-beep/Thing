@@ -246,6 +246,7 @@ dependencies {
     // redirects that bare MediaPlayer fails on (StreamTheWorld/Triton commercial streams).
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.extractor)
 
     // Local feature modules
     implementation(project(":core:database"))

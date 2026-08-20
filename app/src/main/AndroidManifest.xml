@@ -25,6 +25,14 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
+    <!-- Keeps a stream alive with the screen off.
+         ⚠️ Load-bearing rather than defensive: ExoPlayer's `setWakeMode(C.WAKE_MODE_NETWORK)` acquires
+         a partial wake lock AND a Wi-Fi lock, and without this permission that call does nothing at
+         all — silently. The radio's foreground service keeps the PROCESS alive but holds no lock, so
+         doze could stall the socket and the drop then landed in a retry window measured in seconds.
+         This is the second, independent cause of "it will not stay tuned". -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Full-screen takeovers that show over the lock screen (e.g. the BREAKING NEWS interrupt). -->

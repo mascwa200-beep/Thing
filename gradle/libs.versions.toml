@@ -123,6 +123,10 @@ coil-svg = { group = "io.coil-kt", name = "coil-svg", version.ref = "coil" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
+# Declared explicitly because RadioController imports IcyInfo from it directly. It already arrives
+# transitively at compile scope via media3-exoplayer; naming it means a change in that POM cannot
+# quietly break an import we own.
+androidx-media3-extractor = { group = "androidx.media3", name = "media3-extractor", version.ref = "media3" }
 
 # On-device LLM
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
