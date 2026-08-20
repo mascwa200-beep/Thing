@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -33,10 +34,11 @@ import kotlinx.coroutines.delay
  *
  * ### What is given up, stated rather than discovered
  *
- * - **HARVEST cannot work here.** There is no file and no address — only a player — so the caller
- *   must say so rather than offering a button that fails.
  * - **The transport is YouTube's**, not the app's: no ±10s buttons of ours, no LISTEN, no timeline.
  * - **Ads may appear**, because this is YouTube's player behaving normally.
+ * - **Nothing here can be saved** — there is no file and no address, only a player. That is a
+ *   statement about THIS view and not about HARVEST, which downloads by re-resolving the page
+ *   address and is unaffected by whatever refused us; the caller decides which is true and says so.
  *
  * ### Sponsor skipping survives, and reuses the tested core
  *
@@ -61,6 +63,29 @@ fun EmbeddedPlayer(
     skippingOn: Boolean,
     onSkip: (SponsorSegments.Segment) -> Unit,
     modifier: Modifier = Modifier,
+) {
+    // ⚠️ **KEYED ON THE ID, and this is a correctness fix rather than a tidy-up.** `AndroidView`'s
+    // `factory` runs ONCE and there is no `update` below, so a changed [videoId] would leave the old
+    // page loaded and playing — the wrong video, with the right title above it and no error anywhere.
+    // Today the view model happens to null `_embedded` before setting a new one, which would usually
+    // dispose this composable in between; "usually" rests on two state writes landing in different
+    // frames, which is not a property to depend on. `key` discards the node subtree AND the
+    // remembered `WebView` handle whenever the id changes, so the old page is released through
+    // `onRelease` and a new one is built from the factory.
+    key(videoId) {
+        Player(videoId, startAtS, segments, skippingOn, onSkip, modifier)
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun Player(
+    videoId: String,
+    startAtS: Double,
+    segments: List<SponsorSegments.Segment>,
+    skippingOn: Boolean,
+    onSkip: (SponsorSegments.Segment) -> Unit,
+    modifier: Modifier,
 ) {
     var web by remember { mutableStateOf<WebView?>(null) }
     // Read inside the polling effect, which must not restart when the callback identity changes.

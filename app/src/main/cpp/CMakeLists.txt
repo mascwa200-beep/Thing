@@ -129,17 +129,22 @@ endif()
 set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/quickjs)
 if(EXISTS ${QUICKJS_DIR}/CMakeLists.txt)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    # ⚠️ BOTH NAMES READ OUT OF THE PINNED TAG'S OWN CMakeLists, NOT RECALLED. A first draft also set
-    # `QJS_ENABLE_INSTALL`, which does not exist in this project at all — the install rules are
-    # guarded by `if(NOT IOS)` — so that line would have sat here implying it disabled something
-    # while doing nothing whatsoever. Setting a name that is not an option is silent in CMake, which
-    # is exactly why it has to be checked rather than assumed.
+    # ⚠️ **THESE NAMES MUST BE RE-READ WHENEVER THE PIN MOVES, and skipping that already produced a
+    # wrong comment here.** An earlier draft checked v0.11.0's CMakeLists, correctly found no
+    # `QJS_ENABLE_INSTALL`, wrote a note saying it "does not exist in this project at all" — and then
+    # the pin moved to v0.16.0, where it DOES exist (CMakeLists:32, defaulting ON). The note survived
+    # the bump and was false for the version actually shipping. Checking the option list is exactly
+    # what that note was warning about, so: read them again at every tag change.
+    #
+    # `QJS_ENABLE_INSTALL` is switched off because its install/EXPORT rules describe a `qjs` nobody
+    # installs. AGP never runs `install`, so this is tidiness rather than a fix.
     #
     # `QJS_BUILD_LIBC` already defaults OFF upstream; it is stated anyway so a future flip of that
     # default cannot quietly pull the file/OS bindings into a JavaScript engine that runs untrusted
     # player code. That is a security property, not tidiness.
     set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(QJS_BUILD_LIBC OFF CACHE BOOL "" FORCE)
+    set(QJS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
     # ⚠️ Cheap insurance against a link error 20 minutes into a CI round. A static library is being
     # linked INTO a shared one, which needs position-independent code, and quickjs-ng's CMakeLists
     # says nothing about PIC either way. The NDK's clang defaults to -fPIC for Android targets, so

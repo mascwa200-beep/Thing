@@ -126,10 +126,26 @@ fun ViewscreenScreen(
         title = "Theater",
         onBack = onBack,
     ) { innerPadding ->
+      Column(modifier = Modifier.padding(innerPadding)) {
+        // ---- The embedded fallback, PINNED ABOVE THE LIST -----------------------------------
+        //
+        // ⚠️ **Deliberately outside the LazyColumn.** A lazy list disposes an item as soon as it
+        // leaves the viewport, and disposing this one destroys the WebView — playback would stop
+        // the moment you scrolled down to the shelves, then restart from the original offset when
+        // you scrolled back. Nothing about that is obvious from the code; it looks like an ordinary
+        // item. A pinned player is also what every video app does, so the layout is not a
+        // compromise. The OFFER (the button) stays in the list, where disposal costs nothing.
+        embedded?.let { onScreen ->
+            EmbeddedFallback(
+                vm = vm,
+                embedded = onScreen,
+                harvestable = resolve is ViewscreenViewModel.Resolve.Ready,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .padding(innerPadding)
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth(),
         ) {
@@ -166,10 +182,11 @@ fun ViewscreenScreen(
                     // and the extractor's own words above are the diagnostic this whole change
                     // exists to surface. One tap gets the video; nothing is hidden to do it.
                     val failed = resolve is ViewscreenViewModel.Resolve.Refused || playbackFailed
-                    val onScreen = embedded
-                    if (onScreen != null) {
-                        EmbeddedFallback(vm = vm, embedded = onScreen)
-                    } else if (failed && vm.fallbackVideoId().isNotBlank()) {
+                    // ⚠️ The player itself is NOT drawn here — see the pinned Box above the list.
+                    // A `LazyColumn` disposes an item once it scrolls out of the viewport, and
+                    // disposing this one destroys the WebView: playback stops dead and, on scrolling
+                    // back, restarts from the original offset. Only the OFFER lives in the list.
+                    if (embedded == null && failed && vm.fallbackVideoId().isNotBlank()) {
                         StatusLine("Our player cannot get this one. YouTube's own still can.", c.muted)
                         LcarsButton(
                             "PLAY IT ANOTHER WAY",
@@ -301,6 +318,7 @@ fun ViewscreenScreen(
                 }
             }
         }
+      }
     }
 }
 
@@ -492,19 +510,36 @@ private fun PlayerPanel(
 /**
  * The embedded player, with everything it cannot do said out loud.
  *
- * ⚠️ **HARVEST is stated as impossible rather than left to fail.** There is no file and no media
- * address here — only YouTube's player — so the button would have nothing to hand the downloader.
- * Saying so is the honest form; offering a control that always fails is not. Same for the transport:
- * the ±10s buttons, LISTEN and the timeline all belong to our own player and are simply not here,
- * which is better admitted in one line than discovered by hunting for them.
+ * ⚠️ **What HARVEST can do here depends on WHY we are here, and the line says which.** The two ways
+ * in are not equivalent. If extraction was REFUSED there is nothing to save, because
+ * [dev.mascwa.pulse.data.media.MediaHarvester] downloads through the same yt-dlp that just refused.
+ * But if extraction SUCCEEDED and only playback failed, harvesting still works perfectly — it is
+ * keyed on the item's PAGE address and re-resolves from scratch, so it never depended on the stream
+ * address this player could not fetch. Saying "HARVEST cannot save this one" in that case is simply
+ * false, and it talks the owner out of the one control that would still have worked.
+ *
+ * The transport is a different matter and genuinely absent: the ±10s buttons, LISTEN and the
+ * timeline all belong to our own player, which is stopped. Better admitted in a line than discovered
+ * by hunting for them.
+ *
+ * @param harvestable whether extraction produced an item — i.e. whether HARVEST has anything to
+ *   work from. Read live from `resolve` at the call site rather than carried: opening this player
+ *   goes through `beginPlayback()`, which closes it again before any new resolve can start, so the
+ *   verdict cannot change underneath while it is on screen.
  */
 @Composable
 private fun EmbeddedFallback(
     vm: ViewscreenViewModel,
     embedded: ViewscreenViewModel.Embedded,
+    harvestable: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val c = Pulse.colors
-    Column {
+    Column(modifier) {
+        // ⚠️ The reason we are here, kept in view. Our own player's failure line is driven by
+        // `playback.detail`, which `stop()` clears the instant this player is asked for — so
+        // without this the fault would disappear at exactly the moment somebody wants to report it.
+        embedded.failureDetail?.let { StatusLine("Playback failed: $it", c.negative) }
         StatusLine("Playing through YouTube's own player — ads may appear.", c.amber)
         EmbeddedPlayer(
             videoId = embedded.videoId,
@@ -524,7 +559,17 @@ private fun EmbeddedFallback(
             },
             c.muted,
         )
-        StatusLine("HARVEST cannot save this one — there is a player here, not a file.", c.muted)
+        StatusLine(
+            if (harvestable) {
+                // True, and worth saying: the downloader never used the address this player could
+                // not fetch. It re-resolves the page from scratch, so it is unaffected by whatever
+                // refused us here.
+                "HARVEST still works — it downloads separately, not from this player."
+            } else {
+                "Nothing to HARVEST — the downloader uses the same extractor that refused this."
+            },
+            c.muted,
+        )
         LcarsButton(
             "CLOSE",
             onClick = { vm.closeEmbedded() },

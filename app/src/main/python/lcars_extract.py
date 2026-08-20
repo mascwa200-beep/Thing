@@ -315,6 +315,17 @@ def _pick(info: dict) -> dict:
                     stream, stream_headers = f["url"], _headers(f)
                     # A fully-muxed entry can appear inside `requested_formats`; taken as the video
                     # half, it must not then be merged with a second audio track.
+                    #
+                    # ⚠️ **An ABSENT `acodec` is read the OPPOSITE way here to the top-level case
+                    # above, deliberately.** There, a bare `url` IS the muxed selection, so silence
+                    # about the audio codec means it has one. Here the entry is one half of a pair
+                    # yt-dlp split precisely BECAUSE the halves are separate, so silence means it
+                    # does not. Each default follows from what its own container implies, and
+                    # levelling them would be wrong in one place or the other — the failure being
+                    # traded is silent video against doubled audio. (In practice yt-dlp populates
+                    # both codecs on every `requested_formats` entry, so this default decides
+                    # nothing today; it is written down so a later reader does not "fix" the
+                    # asymmetry into a real bug.)
                     stream_has_audio = f.get("acodec") not in (None, "none")
             elif f.get("acodec") not in (None, "none"):
                 if f.get("url"):
@@ -402,12 +413,31 @@ def resolve(url: str) -> str:
             })
         info = entries[0]
 
-    picked = _pick(info)
-    if not picked["stream"] and not picked["audio"]:
+    # ⚠️ **THE ASSEMBLY IS GUARDED TOO, and it was not.** Everything below reads fields out of a
+    # dictionary this code did not build, and the docstring above promises never to raise. `_pick`
+    # walks `requested_formats` assuming a list of dicts; `float(...)` on a duration yt-dlp reported
+    # as a string raises `ValueError`; `_earliest_expiry` parses a query string. None of that is
+    # likely and all of it is possible, and the failure mode is the misleading kind: the exception
+    # crosses back through Chaquopy, `callString` returns null, and the screen says the PYTHON
+    # RUNTIME is unavailable — pointing at the bridge when the bridge worked perfectly.
+    try:
+        picked = _pick(info)
+        if not picked["stream"] and not picked["audio"]:
+            return json.dumps({
+                "error": "no playable stream in the result", "kind": "NO_STREAM",
+                "notes": notes.notes,
+            })
+        return _resolved(url, info, picked, notes)
+    except Exception as exc:  # noqa: BLE001
         return json.dumps({
-            "error": "no playable stream in the result", "kind": "NO_STREAM", "notes": notes.notes,
+            "error": "could not read the extractor's result: {}: {}".format(
+                type(exc).__name__, _redact(str(exc))[:200]),
+            "kind": "FAILED", "notes": notes.notes,
         })
 
+
+def _resolved(url: str, info: dict, picked: dict, notes: "_Notes") -> str:
+    """The success payload, assembled from what the extractor returned."""
     return json.dumps({
         "id": info.get("id") or "",
         "title": info.get("title") or "",

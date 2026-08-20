@@ -155,6 +155,20 @@ def check_solves(jsi) -> list[str]:
         bad.append(f"a thrown script raised {type(e).__name__}, not JsChallengeProviderError")
     else:
         bad.append("a thrown script was not reported as a failure at all")
+
+    # ⚠️ **A script that runs cleanly and PRINTS NOTHING is a failure, and the caller cannot see
+    # that.** The base class does `json.loads()` on whatever comes back, so an empty string raises
+    # `JSONDecodeError` — inside yt-dlp, from a provider that reported success, and NOT of the type
+    # the director catches per provider, so it escapes extraction entirely. This is a real engine
+    # behaviour rather than a hypothetical: `var x = 1;` exits 0 with no output, measured.
+    try:
+        provider._run_js_runtime("var x = 1;")
+    except JsChallengeProviderError:
+        pass
+    except Exception as e:  # noqa: BLE001
+        bad.append(f"a silent script raised {type(e).__name__}, not JsChallengeProviderError")
+    else:
+        bad.append("a silent script was reported as a SUCCESS, so json.loads will blow up later")
     return bad
 
 

@@ -56,6 +56,21 @@ android {
         // behaviour change on the target device.
         ndk { abiFilters += "arm64-v8a" }
 
+        // ⚠️ **NAME THE ONE TARGET, because the AGP default is "build every executable and shared
+        // library the CMake project defines" — and `EXCLUDE_FROM_ALL` on `add_subdirectory` does not
+        // save you, since AGP enumerates targets from CMake's file API rather than building `all`.**
+        //
+        // This did not matter while the tree held whisper.cpp and llama.cpp: both have
+        // BUILD_TESTS/EXAMPLES/SERVER options that are set OFF here, so their tools are never
+        // *defined*. quickjs-ng is the first upstream to define command-line targets
+        // unconditionally — at the pinned v0.16.0 that is `qjsc`, `qjs_exe`, `run-test262`,
+        // `api-test`, `lre-test` and `function_source`, none of which upstream ever compiles for
+        // Android and none of which this app has any use for.
+        //
+        // The lower bound on getting this wrong is a slower build; the upper bound is a CLI tool
+        // failing to cross-compile and taking the whole APK with it. One line removes the question.
+        externalNativeBuild { cmake { targets += "lcarsnative" } }
+
         // Device the app is built exclusively for. The runtime gate matches
         // Build.MODEL against this (case-insensitive, substring). Documented
         // override in DeviceGate keeps the sole user from ever being locked out.

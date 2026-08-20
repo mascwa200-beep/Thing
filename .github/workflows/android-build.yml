@@ -177,7 +177,7 @@ jobs:
           # against `qjs`; `qjs_exe` and `qjsc` are the command-line tools and are deliberately not
           # built. If a future tag renames the library target, the failure would otherwise be a
           # link error four minutes into the build instead of one line here.
-          grep -qE '^ *add_library\( *qjs\b' "$dir/CMakeLists.txt" || {
+          grep -qE '^[[:space:]]*add_library\([[:space:]]*qjs\b' "$dir/CMakeLists.txt" || {
             echo "FAIL: this quickjs-ng defines no static library target named 'qjs'."
             echo "      Targets it does define:"
             grep -nE '^ *add_(library|executable)\(' "$dir/CMakeLists.txt" | sed 's/^/        /'

@@ -96,6 +96,42 @@ if setup_error is None:
 
     _RUNTIME_NAME = 'lcars-quickjs'
 
+    _INFO_CACHE: list = []  # 0 or 1 entries: the computed runtime_info, or nothing yet.
+
+    def _runtime_info():
+        """The engine described to yt-dlp, computed once.
+
+        Absence is cached as well as presence — every input is fixed for the life of the process
+        (`NativeBridge.available` is a `val` assigned at class-init, `JsRuntime.available()` is a
+        `by lazy`), so a second look could not return a different answer and would only pay the
+        JNI hop again.
+        """
+        if _INFO_CACHE:
+            return _INFO_CACHE[0]
+        # ⚠️ Do NOT cache before registration completes. `registered` is set on the module's last
+        # line, and `available()` is False until it is — so a call that somehow arrived during
+        # class definition (a future decorator that probes the provider, say) would otherwise
+        # freeze "no engine" for the life of the process. Nothing does that today; this costs one
+        # comparison and removes a way for that to become permanent silently.
+        if not registered:
+            return None
+        info = None
+        if available():
+            version = engine_version() or '0.0.0'
+            parts = []
+            for piece in version.split('.')[:3]:
+                digits = ''.join(c for c in piece if c.isdigit())
+                parts.append(int(digits) if digits else 0)
+            info = JsRuntimeInfo(
+                name=_RUNTIME_NAME,
+                path='(linked into liblcarsnative.so)',
+                version=version,
+                version_tuple=tuple(parts),
+                supported=True,
+            )
+        _INFO_CACHE.append(info)
+        return info
+
     @register_provider
     class LcarsJsJCP(EJSBaseJCP):
         """Solves YouTube's JS challenges in the QuickJS compiled into this app.
@@ -120,21 +156,14 @@ if setup_error is None:
             not a program on a path, so its presence is reported directly.
 
             The `path` is descriptive rather than real, for the same reason: nothing execs it.
+
+            ⚠️ Answered from a module-level cache. Every input is a process constant — the library
+            either loaded at class-init or did not, and `JsRuntime.available()` is a Kotlin `by
+            lazy` — but this is a PROPERTY the director reads through `is_available()`, so an
+            uncached version pays two JNI round trips and re-parses the version string on each
+            read. Caching costs nothing and cannot go stale.
             """
-            if not available():
-                return None
-            version = engine_version() or '0.0.0'
-            parts = []
-            for piece in version.split('.')[:3]:
-                digits = ''.join(c for c in piece if c.isdigit())
-                parts.append(int(digits) if digits else 0)
-            return JsRuntimeInfo(
-                name=_RUNTIME_NAME,
-                path='(linked into liblcarsnative.so)',
-                version=version,
-                version_tuple=tuple(parts),
-                supported=True,
-            )
+            return _runtime_info()
 
         def _run_js_runtime(self, stdin: str, /) -> str:
             """Hand the script to QuickJS and return everything it printed.
@@ -144,13 +173,24 @@ if setup_error is None:
             propagate out of extraction entirely. The message from the Kotlin side is preserved
             because it is the only description of what went wrong — a syntax error, a thrown value
             with its stack, or the interrupt that fires when a script runs past its budget.
+
+            ⚠️ **Printing NOTHING is a failure, and has to be reported as one here.** The base class
+            does `json.loads()` on whatever comes back, so an empty string raises `JSONDecodeError`
+            — inside yt-dlp, from a provider that reported success, and NOT of the type the director
+            catches per provider. It would surface as a broken extraction rather than as one
+            provider declining, which is the whole reason this method is expected to raise a typed
+            error. A script that ran cleanly but printed nothing means the solver never reached its
+            `console.log`, and saying so is far more use than a decode error two frames away.
             """
             try:
-                return _runtime().evalOrThrow(stdin, _TIMEOUT_MS)
+                out = _runtime().evalOrThrow(stdin, _TIMEOUT_MS)
             except JsChallengeProviderError:
                 raise
             except Exception as e:  # noqa: BLE001 - includes the JVM exception Chaquopy re-raises
                 raise JsChallengeProviderError(f'QuickJS failed: {e}') from e
+            if not out or not out.strip():
+                raise JsChallengeProviderError('QuickJS ran the script but it printed nothing')
+            return out
 
     @register_preference(LcarsJsJCP)
     def _preference(provider: JsChallengeProvider, requests: list[JsChallengeRequest]) -> int:
