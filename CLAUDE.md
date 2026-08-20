@@ -6446,3 +6446,103 @@ Compass, Environment Scanner, Device Health, Security Check, Theater.
 menu page (does the column read, does tapping a sibling land right, does back still behave). On
 Windows: the new charts, the map (pan, scroll-zoom, the three basemaps, the four layers, the scale
 bar and the MGRS readout), and the crash console.
+
+### THEATER's 403, and PART G — the desktop stops being one window (this session, PR #449 cont.)
+
+Owner sent a screenshot with no text: the THEATER screen, title and duration and thumbnail and
+"2 skips queued · 71s" all populated, video panel black at 0:00, and in red
+`Playback failed: ERROR_CODE_IO_BAD_HTTP_STATUS`. So extraction worked and the media fetch was
+refused. Owner then chose (AskUserQuestion) to **also raise the quality ceiling**, and **Part G**
+next. **Zero subagent spend**, as with every arc since the credit directive.
+
+**Three defects, and the third made the first two undiagnosable.**
+1. **The cause.** yt-dlp reports, per format, the exact headers it used to mint that URL —
+   User-Agent, Accept, Accept-Language, Sec-Fetch-*. `_pick` returned `f["url"]` and dropped
+   `f["http_headers"]`; `MediaItem` had nowhere to put them; the player set one hardcoded browser
+   agent and nothing else. **A signed media URL fetched by a client that does not look like the one
+   it was issued to gets a 403.**
+2. **Nothing ever re-resolved.** Checked against the shipped jar: `BAD_HTTP_STATUS` is **2004** and
+   `isTransient` covers **2000..2002**, so a refusal fell through to a permanent failure — and even
+   inside the range the retry re-prepared the SAME address, right for a stutter and useless for a URL
+   the source has stopped accepting. Now a refusal evicts the extractor's cache entry and resolves
+   **once**, resuming from the captured position, then fails for good.
+3. **The message named an enum.** 403/404/429 rendered identically. The status was on the cause chain
+   (`HttpDataSource.InvalidResponseCodeException.responseCode`) the whole time.
+
+**Quality ceiling:** `FORMAT` asked only for a muxed stream. Sites have been retiring those, so the
+app was quietly playing well below what was available. Now `bestvideo+bestaudio` merged via
+`MergingMediaSource`, with the old muxed chain intact as fallback.
+
+⚠️ **THE TRAP, guarded structurally in both halves.** "Are both addresses set" is NOT "does this need
+merging": a muxed stream can sit beside a separate audio-only rendition — which is what LISTEN plays
+— and merging those plays the audio twice. So the extractor STATES it, tracking whether **both**
+halves came from the same adaptive pair (a video half with no URL leaves `stream` as the muxed
+fallback, which must not then be merged). And an address and its headers are passed as **one value**,
+never two arguments, because taking one track's URL with the other's headers is not a compile error
+and produces a 403 that reads as a dead video.
+
+**Ruled out, so nobody re-chases:** the resolve cache is sound (`isFresh` treats unknown expiry as
+stale, so such items are never cached); HARVEST is unaffected (yt-dlp does its own HTTP).
+
+**PART G — desktop power, four items, all shipped.**
+
+⚠️ **The enabling fact, verified by compiling a nested one rather than recalled: Compose Desktop's
+`Window` takes NO `ApplicationScope`.** It is a plain composable, so a window can be declared
+anywhere in the composition — which means torn-off windows read the SAME view models the main pane
+does. No second dependency graph, no second fetch, no container refactor.
+
+- **Tear-off.** Any screen but LIVE opens in its own window; the directory marks it and selecting it
+  RAISES that window rather than drawing a second copy. It navigates itself (a window whose links did
+  nothing would ship a dead button; one that rearranged the main window would defeat the point).
+  ⚠️ **LIVE is excluded for a stated reason**: it already opens a detached JFrame+JFXPanel, and a
+  second `SwingPanel` over the one player raises exactly the question `LiveWindow`'s own note avoids.
+- **Ops wall.** F11 fills a monitor with up to six instruments. ⚠️ It is the EXISTING screens in a
+  grid, **not** new miniature tiles — tiles would be a second rendering of every feed and a second
+  chance for the wall and the page to disagree. A cell IS the screen, reading a view model the main
+  window already built, so raising it costs a redraw and no fetch. What is ON it persists; whether it
+  is OPEN does not. Stored as SCREEN NAMES, never ordinals.
+- **Keyboard.** Ctrl+K/Ctrl+P command bar (the same `deskMatches` rule as the phone's MENU), Ctrl+O
+  tears off, F11 the wall, Escape closes what is over the page and is left alone when nothing is.
+- **Deep analysis.** `DeepAnalysis` + 9 tests: off means it never runs; once per subject; a FAILED
+  subject is not retried on its own; switching off drops what was held. **There is no clock in the
+  file**, which is what makes "never on a timer" true rather than intended. SEARCH gains a body-text
+  scan (the index cannot see body text — a documented real gap); WEATHER gains 16 days over 7.
+
+**⚠️ FOUR THINGS WORTH KEEPING.**
+1. **`onKeyEvent`, NOT `onPreviewKeyEvent`, at the window.** Preview runs root-DOWN to whatever has
+   focus, so a handler there sees every keystroke before a text field can — the exact bug this repo
+   already shipped once (typing a digit into a filter box changed the TV channel). The command bar's
+   OWN arrow handling *is* a preview handler, **on the field**, which is the opposite case and
+   correct: the list must see Up/Down before the caret does.
+2. **Compose Desktop lets NOTHING outside compose-ui construct a `KeyEvent`.** `toComposeEvent` is
+   `internal`; the `KeyEvent(...)` factory is marked unstable-between-modules. Discovered by writing
+   the test, after `javap` on `KeyEvent` showed only `getNativeKeyEvent(): Object` and I wrongly read
+   "native" as AWT — it wraps an internal `InternalKeyEvent`. **Lesson refined: javap on the class is
+   not enough when the wrapped type erases to `Object`; find the constructor path the runtime uses.**
+   The fix was to change shape, not force it: `consoleCommandFor` takes the three facts and
+   `ConsoleKeys.handle` shrinks to three property reads.
+3. **A shared-module parameter must be defaulted, and the call sites read.** `forecast_days` is now a
+   parameter of `WeatherRepository.fetch` defaulted to 7 — all **14** weather call sites were read
+   and none passes more than four arguments. ⚠️ **The day count had to join the cache key**, or the
+   deep and ordinary answers share a slot and the switch appears to do nothing.
+4. **`LcarsTextField` gained an additive `fieldModifier`** — focus and key handling belong to the
+   editable field, not its label, and `modifier` lands on the outer column. Eight call sites untouched.
+
+**Verified locally:** 8 real yt-dlp shapes through the shipped `_pick`; a typed probe of the
+Wire→MediaItem mapping and the header split against the real core type; `OnDemandController`
+compiled against the real media3 1.5.1 jars **with that gate negative-tested by a planted wrong
+overload**; 10 MediaItemModel, 11 shortcut and 9 deep-analysis tests; **10 load-bearing rules
+negative-tested** across the arc, each perturbation asserted to have matched the source first. CI
+run 1892 fully green including the publish to `latest`.
+
+⚠️ **Owner-verify.** On the Pixel: play the same item from CONTINUE WATCHING; the picture should be
+better than before; leave it hours and resume something to exercise the re-resolve; a genuinely dead
+video should fail with a real status code rather than looping. On Windows: tear a screen onto a
+second monitor, F11 for the wall, Ctrl+K to jump — and confirm **typing into any ordinary field
+still behaves**, which is the regression the key design is shaped to avoid.
+
+**Open:** MARKETS is the one panel with an obvious deep reading (an intraday series `intradayBars`
+already fetches) and has no instrument selection to hang it on — a redesign rather than a switch, so
+left as the honest remainder. A shortcut that works when the app is NOT focused needs `RegisterHotKey`
+via a native hook and a new dependency; that is an owner call, and the shipped half is every screen
+reachable without the mouse while focused.
