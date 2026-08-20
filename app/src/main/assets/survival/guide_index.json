@@ -297,6 +297,29 @@
    "file": "guides_agriculture_and_gardening.json"
   },
   {
+   "id": "mycorrhizal-fungi-in-crop-production",
+   "title": "Mycorrhizal Fungi in Crop Production",
+   "category": "Agriculture & Gardening",
+   "summary": "How mycorrhizal fungi partner with crop roots to supply phosphorus, water, and micronutrients, which crops benefit and which never will, and how tillage, fallow, and fertilizer affect the fungi. Covers commercial inoculants, how to apply them, and how to judge whether they are working.",
+   "headings": [
+    "What Mycorrhizal Fungi Are and Why Farmers and Gardeners Care",
+    "Arbuscular Mycorrhizal Fungi: The Specialists That Live in Crop Roots",
+    "Ectomycorrhizas, Ericoid, and Orchid Types: The Other Partnerships",
+    "How the Trade Works: Sugar and Fat for Phosphorus",
+    "Phosphorus: The Headline Nutrient and Why Roots Alone Struggle",
+    "Beyond Phosphorus: Water, Zinc, Nitrogen, and Stress Protection",
+    "Hyphae, Glomalin, and Soil Structure: The Underground Engineering",
+    "Which Crops Partner and Which Never Will: Hosts and Non-Hosts",
+    "Practices That Break the Network: Tillage, Fallow, Fertilizer, and Chemicals",
+    "Managing a Farm or Garden for Mycorrhizas Without Buying Anything",
+    "Commercial Inoculants: What Is in the Bag and What the Evidence Says",
+    "Applying Inoculant: A Practical Procedure",
+    "Checking Results: Colonization, Yield, and Simple Economics",
+    "Milestones, Myths, and Open Questions in Mycorrhizal Science"
+   ],
+   "file": "guides_agriculture_and_gardening.json"
+  },
+  {
    "id": "archaeological-excavation-methods-and-techniques",
    "title": "Archaeological Excavation: Methods and Techniques",
    "category": "Archaeology & Anthropology",
@@ -673,6 +696,30 @@
     "Use-Wear and Residue Analysis: Experiments Under the Microscope",
     "Living History, Open-Air Museums, and the Experiential Borderland",
     "Limits, Criticisms, and Good Practice: What an Experiment Can Never Tell You"
+   ],
+   "file": "guides_archaeology_and_anthropology.json"
+  },
+  {
+   "id": "ethnoarchaeology",
+   "title": "Ethnoarchaeology",
+   "category": "Archaeology & Anthropology",
+   "summary": "How archaeologists study living communities to learn how human behavior turns into material remains: the history of the field, famous studies like Binford among the Nunamiut and the Kalinga pottery project, the logic of analogy and middle-range theory, methods, ethics, and the debates over its limits.",
+   "headings": [
+    "What Ethnoarchaeology Is and the Question It Answers",
+    "Origins and History of the Field",
+    "Analogy and Middle-Range Theory: The Logic Behind It",
+    "Lewis Binford Among the Nunamiut",
+    "John Yellen, the !Kung San, and Camp Layout",
+    "Richard Gould in the Australian Western Desert",
+    "Fieldwork Methods: How Ethnoarchaeologists Work",
+    "Ceramic Ethnoarchaeology: The Kalinga Project and Beyond",
+    "Site Formation Processes, Discard, and Refuse",
+    "Bones, Butchery, and Taphonomy",
+    "Households, Villages, and the Use of Space",
+    "Pastoralists, Farmers, Smiths, and Other Specialists",
+    "Cautionary Tales and the Limits of Analogy",
+    "Ethics, Critique, and Working with Living Communities",
+    "Why Ethnoarchaeology Still Matters Today"
    ],
    "file": "guides_archaeology_and_anthropology.json"
   },
@@ -1130,6 +1177,29 @@
     "Death in Prague: The Banquet, the Bladder, and Four Centuries of Rumor",
     "The Star Catalog and the Rudolphine Tables: What the Data Became",
     "Legacy: From the Fluid Heavens to a Crater on the Moon"
+   ],
+   "file": "guides_astronomy.json"
+  },
+  {
+   "id": "johannes-kepler-life-and-work",
+   "title": "Johannes Kepler: Life and Work",
+   "category": "Astronomy",
+   "summary": "Who Johannes Kepler was, how he discovered the three laws of planetary motion, and what he contributed to optics, mathematics, and astronomy. Covers his life from Weil der Stadt to Regensburg, his years with Tycho Brahe, his mother's witchcraft trial, and his lasting legacy.",
+   "headings": [
+    "Why Kepler Matters: The Man Who Found the Shape of the Solar System",
+    "Childhood in Weil der Stadt and Early Schooling, 1571 to 1589",
+    "Tuebingen, Michael Maestlin, and the Copernican Conversion, 1589 to 1594",
+    "Graz and the Mysterium Cosmographicum: Five Solids and Six Planets, 1594 to 1600",
+    "Prague and the Uneasy Partnership with Tycho Brahe, 1600 to 1601",
+    "The War with Mars and the Famous Eight Minutes of Arc",
+    "Astronomia Nova, 1609: The Ellipse and the Area Law in Print",
+    "Kepler the Optician: The Eye, the Camera Obscura, and the Telescope",
+    "The Disaster Years and the Move to Linz, 1611 to 1613",
+    "Harmonice Mundi and the Third Law, 1619",
+    "Katharina Kepler's Witchcraft Trial, 1615 to 1621",
+    "The Rudolphine Tables, Wallenstein, and the Final Years, 1622 to 1630",
+    "The Somnium and Kepler as a Writer of Science and Fiction",
+    "Kepler's Legacy: From Newton's Gravity to the Kepler Space Telescope"
    ],
    "file": "guides_astronomy.json"
   },
@@ -1720,6 +1790,30 @@
    "file": "guides_biology_2.json"
   },
   {
+   "id": "the-cytoskeleton-actin-microtubules-and-intermediate-filamen",
+   "title": "The Cytoskeleton: Actin, Microtubules and Intermediate Filaments",
+   "category": "Biology",
+   "summary": "How the three filament systems inside cells — actin filaments, microtubules and intermediate filaments — are built and taken apart, how motor proteins walk along them to move cargo and drive muscle, cilia and cell division, and what happens when drugs or disease break them.",
+   "headings": [
+    "What the Cytoskeleton Is and Why Cells Need One",
+    "Actin Filaments: Structure, Polarity and the Monomer Pool",
+    "Actin Assembly: Nucleation, Critical Concentration and Treadmilling",
+    "Actin-Binding Proteins: Arp2/3, Formins, Cofilin and Capping",
+    "Cell Crawling: Lamellipodia, Filopodia and Stress Fibers",
+    "Myosin Motors and How Muscle Contracts",
+    "Microtubules: Tubulin Dimers, Protofilaments and Polarity",
+    "Dynamic Instability: The GTP Cap, Catastrophe and Rescue",
+    "Organizing Centers: Centrosomes, Gamma-Tubulin and Nucleation",
+    "Kinesins and Dyneins: The Motors that Walk on Microtubules",
+    "The Mitotic Spindle: Microtubules Divide the Genome",
+    "Cilia and Flagella: The 9+2 Axoneme and Intraflagellar Transport",
+    "Intermediate Filaments: Keratins, Vimentin, Neurofilaments and Lamins",
+    "Linking the Networks: Cross-Talk, Junctions and Mechanics",
+    "Drugs, Toxins and Diseases: Breaking the Cytoskeleton on Purpose and by Accident"
+   ],
+   "file": "guides_biology_2.json"
+  },
+  {
    "id": "how-to-validate-a-business-idea",
    "title": "How to Validate a Business Idea",
    "category": "Business & Finance",
@@ -2029,6 +2123,30 @@
     "When and How to Convert a Sole Proprietorship to an LLC or Corporation",
     "Continuity, Succession and the Key-Person Problem",
     "Closing a Sole Proprietorship: Winding Down Cleanly"
+   ],
+   "file": "guides_business_and_finance.json"
+  },
+  {
+   "id": "how-business-partnerships-work",
+   "title": "How Business Partnerships Work",
+   "category": "Business & Finance",
+   "summary": "How business partnerships are formed, taxed, and managed: general and limited partnerships, LLPs, partnership agreements, capital accounts, profit splits, liability, fiduciary duties, buy-sell agreements, disputes and dissolution, and how partnerships compare with LLCs and corporations.",
+   "headings": [
+    "What a Business Partnership Is",
+    "General Partnerships: The Default Arrangement",
+    "Limited Partnerships: Two Classes of Partner",
+    "Limited Liability Partnerships and Professional Firms",
+    "The Partnership Agreement",
+    "Capital Contributions, Ownership, and Capital Accounts",
+    "Pass-Through Taxation and the Schedule K-1",
+    "Splitting Profits, Losses, and Draws",
+    "Management, Voting, and the Power to Bind the Firm",
+    "Liability: What Partners Risk",
+    "Fiduciary Duties Between Partners",
+    "Adding Partners, Exits, and Buy-Sell Agreements",
+    "Disputes, Deadlock, Dissociation, and Dissolution",
+    "Partnership vs. LLC vs. Corporation",
+    "Setting Up a Partnership: Registration, Banking, Insurance, and Records"
    ],
    "file": "guides_business_and_finance.json"
   },
@@ -2623,6 +2741,30 @@
    "file": "guides_chemistry_2.json"
   },
   {
+   "id": "lewis-structures-and-formal-charge",
+   "title": "Lewis Structures and Formal Charge",
+   "category": "Chemistry",
+   "summary": "How to draw Lewis structures for molecules and ions, count valence electrons, apply the octet rule, and use formal charges to pick the best structure. Covers resonance, exceptions to the octet rule, the difference between formal charge and oxidation state, and common mistakes.",
+   "headings": [
+    "What a Lewis Structure Shows and Why Chemists Draw Them",
+    "Gilbert N. Lewis and the Shared Electron Pair",
+    "Counting Valence Electrons: The Number You Must Get Right",
+    "The Octet Rule and Hydrogen's Duet",
+    "How to Draw a Lewis Structure, Step by Step",
+    "Single, Double, and Triple Bonds: Bond Order in Practice",
+    "Lone Pairs: The Electrons That Do Not Bond",
+    "Formal Charge: The Formula and What It Means",
+    "Using Formal Charges to Choose the Best Structure",
+    "Formal Charge Versus Oxidation State: Two Different Fictions",
+    "Resonance: When One Drawing Is Not Enough",
+    "Exceptions to the Octet Rule: Radicals, Incomplete and Expanded Octets",
+    "Polyatomic Ions: Bracket the Whole, Charge the Parts",
+    "From Dots to Shapes: What Lewis Structures Feed Into",
+    "Common Mistakes, Worked Checks, and How to Self-Audit"
+   ],
+   "file": "guides_chemistry_2.json"
+  },
+  {
    "id": "cold",
    "title": "Cold & Hypothermia",
    "category": "Climate",
@@ -3149,6 +3291,29 @@
     "Forecasts and Early Warning Systems: The Quiet Revolution That Saves Lives",
     "Preparing Your Household for a More Extreme Climate",
     "What the Future Holds: Scenarios, Thresholds and the Case Against Fatalism"
+   ],
+   "file": "guides_climate.json"
+  },
+  {
+   "id": "the-keeling-curve-and-measuring-co2",
+   "title": "The Keeling Curve and Measuring CO2",
+   "category": "Climate",
+   "summary": "The story and science of the Keeling Curve: how carbon dioxide in the air is measured precisely, why the record from Mauna Loa shows a seasonal sawtooth on a relentless rise, how isotopes and ice cores prove where the carbon comes from, and what the numbers mean for climate.",
+   "headings": [
+    "What the Keeling Curve Shows",
+    "Charles David Keeling and the Origin of Precise CO2 Measurement",
+    "Why Mauna Loa: Choosing a Site for Background Air",
+    "The Instrument: How Infrared Analyzers Measure CO2",
+    "The Sawtooth: The Seasonal Cycle and the Breathing Biosphere",
+    "The Long Rise: From 315 ppm to Beyond 420",
+    "Fingerprinting the Carbon: Isotopes and the Oxygen Decline",
+    "Ice Cores: Extending the Record 800,000 Years Back",
+    "The Global Network: Flasks, Towers, Aircraft and Satellites",
+    "Keeping the Record Alive: Funding Crises and Continuity",
+    "What the Numbers Mean: ppm, Gigatonnes and the Airborne Fraction",
+    "The Ocean's Share: Uptake, Chemistry and Acidification",
+    "The Curve in Science and Policy",
+    "Reading Today's Curve: Milestones, Rates and What Comes Next"
    ],
    "file": "guides_climate.json"
   },
@@ -3777,6 +3942,30 @@
    "file": "guides_computing_2.json"
   },
   {
+   "id": "history-of-ibm",
+   "title": "History of IBM",
+   "category": "Computing",
+   "summary": "The story of IBM from Herman Hollerith's census tabulators and the 1911 CTR merger through the punched-card era, the System/360 gamble, the PC and the clone wars, the 1990s crisis and services turnaround, to Deep Blue, Watson, Red Hat, and quantum computing.",
+   "headings": [
+    "Herman Hollerith and the 1890 Census",
+    "The 1911 Merger: Computing-Tabulating-Recording",
+    "Thomas J. Watson Sr. and the Making of IBM",
+    "The Punched-Card Business Between the Wars",
+    "The Depression Gamble and Social Security",
+    "IBM in World War II",
+    "Into Electronics: the 701, the 650, and the 1401",
+    "The System/360 Gamble",
+    "Inventions That Built Modern Computing",
+    "Antitrust: Consent Decrees, the 1969 Case, and Unbundling",
+    "The IBM PC and the Clone Wars",
+    "The Early-1990s Crisis",
+    "Lou Gerstner and the Services Turnaround",
+    "Deep Blue, Watson, and the 2000s Reinvention",
+    "Red Hat, Kyndryl, and IBM Research's Long Legacy"
+   ],
+   "file": "guides_computing_2.json"
+  },
+  {
    "id": "cook-food-safety-fundamentals",
    "title": "Food Safety & Kitchen Safety Fundamentals",
    "category": "Cooking — Food Safety",
@@ -4263,6 +4452,29 @@
    "file": "guides_cooking_food_safety.json"
   },
   {
+   "id": "oxygen-requirements-of-foodborne-bacteria",
+   "title": "Oxygen Requirements of Foodborne Bacteria",
+   "category": "Cooking — Food Safety",
+   "summary": "How oxygen shapes which bacteria grow in food: aerobes, anaerobes, facultative organisms and microaerophiles, why vacuum packing and canning create botulism risk, and the practical rules for oil infusions, cooling, fermentation, and packaged foods.",
+   "headings": [
+    "Why Oxygen Matters in Food Safety",
+    "The Five Oxygen Classes of Bacteria",
+    "How Bacteria Handle Oxygen: Respiration, Fermentation, and Toxic Byproducts",
+    "Aerobic Spoilage: Pseudomonas, Molds, and the Warning System You Smell",
+    "Facultative Pathogens: Salmonella, E. coli, Listeria, Staph, and Bacillus",
+    "Clostridium botulinum: The Anaerobe That Defines Canning",
+    "Clostridium perfringens: The Buffet Bug in the Cooling Pot",
+    "Campylobacter: The Microaerophile on Raw Poultry",
+    "Redox Potential: How Anaerobic a Food Really Is",
+    "Vacuum Packaging and Sous Vide: When Removing Air Adds Risk",
+    "Modified Atmosphere Packaging: Engineering the Air in the Bag",
+    "Home Anaerobic Hazards: Garlic in Oil, Foil Potatoes, and Confits",
+    "Fermentation: Making Anaerobiosis Work for You",
+    "Practical Rules for the Home Kitchen"
+   ],
+   "file": "guides_cooking_food_safety.json"
+  },
+  {
    "id": "conduction-convection-and-radiant-heat",
    "title": "Conduction, Convection and Radiant Heat",
    "category": "Cooking — Techniques",
@@ -4602,6 +4814,28 @@
     "Maillard in the Kitchen: Searing Meat, Baking Bread Crust, Browning Butter and Roasting Coffee",
     "Controlling Browning: Troubleshooting Pale, Bitter and Burnt Results",
     "Browning and Health: Acrylamide, Burnt Food and the Golden Rule"
+   ],
+   "file": "guides_cooking_techniques.json"
+  },
+  {
+   "id": "surface-drying-and-why-browning-stalls",
+   "title": "Surface Drying and Why Browning Stalls",
+   "category": "Cooking — Techniques",
+   "summary": "Why wet food refuses to brown and why big cuts stall mid-cook: the physics of evaporative cooling, the barbecue stall, and the drying moves — patting, air-drying, dry brining, wrapping, double frying — that bring back color and crust.",
+   "headings": [
+    "Why Water Is the Enemy of Browning",
+    "The Maillard Reaction and the Temperatures It Needs",
+    "Evaporative Cooling: The Physics Behind Every Stall",
+    "The Barbecue Stall: Why Brisket Sits at 155°F for Hours",
+    "Patting Dry: The Thirty Seconds That Decide a Sear",
+    "Air-Drying in the Refrigerator: Crisp Skin Starts a Day Early",
+    "Dry Brining: Salt as a Moisture Manager",
+    "Baking Soda and pH: Chemistry That Speeds Browning",
+    "Crowding the Pan: How Good Food Steams Itself Grey",
+    "The Texas Crutch: Wrapping Through the Stall",
+    "Bread Crust: When Steam Helps First and Must Leave Later",
+    "Deep Frying and the Double Fry: Browning as Dehydration",
+    "Troubleshooting: Reading a Stall and Choosing the Fix"
    ],
    "file": "guides_cooking_techniques.json"
   },
@@ -5160,6 +5394,29 @@
     "Telling Them Apart: Hardness, Streak, Density and Simple Tests",
     "Treatments, Imitations and Synthetics: Stabilized Turquoise, Dyed Howlite and Gilson Stones",
     "Working and Caring for These Stones: Porosity, Heat and the Hazard of Malachite Dust"
+   ],
+   "file": "guides_earth_science.json"
+  },
+  {
+   "id": "pearl-and-amber-organic-gems",
+   "title": "Pearl and Amber — Organic Gems",
+   "category": "Earth Science",
+   "summary": "How pearls grow inside mollusks and how tree resin becomes amber: nacre structure, cultured pearl farming, Baltic and Dominican amber deposits, famous inclusions, how to judge quality, spot imitations, and care for these soft organic gems.",
+   "headings": [
+    "What Makes a Gem Organic",
+    "How Pearls Form Inside a Mollusk",
+    "Nacre: The Brick Wall Built of Aragonite",
+    "The Culturing Revolution: From Mikimoto to Modern Farms",
+    "Saltwater Pearls: Akoya, South Sea, and Tahitian",
+    "Freshwater Pearls: China Rewrites the Market",
+    "Judging Pearl Quality: The Seven Value Factors",
+    "Caring for Pearls: A Soft Gem in a Hard World",
+    "What Amber Is: Fossil Resin, Not Sap",
+    "From Resin to Amber: Copal, Maturation, and Deep Time",
+    "The Great Deposits: Baltic, Dominican, and Burmese Amber",
+    "Inclusions: A Window Into Ancient Ecosystems",
+    "Testing Amber and Spotting Imitations",
+    "The Wider Family: Coral, Jet, Ivory, and Other Organic Gems"
    ],
    "file": "guides_earth_science.json"
   },
@@ -12796,6 +13053,29 @@
    "file": "guides_movement.json"
   },
   {
+   "id": "diatonic-harmony-and-chord-progressions",
+   "title": "Diatonic Harmony and Chord Progressions",
+   "category": "Music",
+   "summary": "How chords are built from the major and minor scales, why some progressions feel inevitable, and how to analyze and write chord progressions using Roman numerals, harmonic function, cadences, seventh chords, inversions and basic voice leading.",
+   "headings": [
+    "What Diatonic Means: One Scale as the Source of All the Chords",
+    "Building Triads on Every Scale Degree: the Seven Diatonic Chords",
+    "Roman Numeral Analysis: Naming Chords by Their Job, Not Their Letter",
+    "Harmonic Function: Tonic, Subdominant and Dominant as the Three Jobs",
+    "The Dominant Seventh: the Engine of Resolution",
+    "The Progressions Everyone Uses: I-IV-V, the 50s Changes, the Axis and ii-V-I",
+    "Cadences: How Phrases End, and Why Endings Carry the Meaning",
+    "Minor Keys: Three Scales, One Tonality, and the Raised Leading Tone",
+    "Seventh Chords Across the Scale: Adding the Fourth Note",
+    "Inversions and Bass Lines: the Same Chord, Different Floors",
+    "Voice Leading: Moving Between Chords Smoothly",
+    "Root Motion and the Circle of Fifths: Why Progressions Have Direction",
+    "Just Past the Border: Secondary Dominants and Borrowed Chords",
+    "Analyzing Real Songs: a Practical Method From First Listen to Full Map"
+   ],
+   "file": "guides_music.json"
+  },
+  {
    "id": "triads-seventh-chords-and-chord-building",
    "title": "Triads, Seventh Chords and Chord Building",
    "category": "Music",
@@ -13008,6 +13288,28 @@
     "The Digital Era and the Limits of Notation"
    ],
    "file": "guides_music.json"
+  },
+  {
+   "id": "recognising-landforms-from-contour-patterns",
+   "title": "Recognising Landforms From Contour Patterns",
+   "category": "Navigation",
+   "summary": "How to read hills, ridges, valleys, spurs, saddles, depressions and cliffs directly from contour line patterns on a topographic map, judge slope from contour spacing, and use recognised landforms to navigate.",
+   "headings": [
+    "What a Contour Line Really Shows",
+    "Contour Intervals, Index Contours and What Map Scale Changes",
+    "Judging Slope From Spacing: Steepness at a Glance and by Arithmetic",
+    "Hills, Summits and Knolls: Reading Closed Rings",
+    "Ridges and Spurs: The U's and V's That Point Downhill",
+    "Valleys, Draws and Reentrants: The V's That Point Upstream",
+    "Saddles and Cols: The Passes Between High Ground",
+    "Depressions, Sinkholes and Craters: When Closed Contours Mean Down",
+    "Cliffs and Very Steep Ground: When Contours Crowd, Touch or Vanish",
+    "Plateaus, Terraces and Benches: Reading Flat Ground at Height",
+    "Drainage Patterns: What Streams and Their Contours Reveal Together",
+    "Navigating by Landform: Handrails, Catching Features and Attack Points",
+    "Common Contour-Reading Mistakes and How to Train the Eye"
+   ],
+   "file": "guides_navigation.json"
   },
   {
    "id": "interpreting-contour-lines-on-the-ground",
@@ -13499,6 +13801,30 @@
    "file": "guides_notable_figures.json"
   },
   {
+   "id": "dietary-fiber-and-digestive-health",
+   "title": "Dietary Fiber and Digestive Health",
+   "category": "Nutrition",
+   "summary": "What dietary fiber is, how soluble, insoluble, and fermentable fibers work in the gut, how much you need each day, the best food sources, and how fiber affects constipation, blood sugar, cholesterol, weight, and conditions like IBS and diverticular disease.",
+   "headings": [
+    "What Dietary Fiber Is and Why It Matters",
+    "Soluble and Insoluble Fiber: What the Split Means",
+    "Fermentable Fibers, Prebiotics, and Resistant Starch",
+    "Your Gut Microbiome and Short-Chain Fatty Acids",
+    "How Much Fiber You Need Each Day",
+    "Whole Grains: Bran, Germ, and Fiber",
+    "Beans, Lentils, and Other Legumes",
+    "Fruits, Vegetables, Nuts, and Seeds",
+    "Fiber and Constipation: Keeping Stool Soft and Regular",
+    "Fiber, Blood Sugar, and Diabetes",
+    "Fiber, Cholesterol, and Your Heart",
+    "Fiber, Fullness, and Weight Management",
+    "How to Increase Fiber Without Gas and Bloating",
+    "Fiber Supplements: Psyllium, Methylcellulose, Wheat Dextrin, and Inulin",
+    "IBS, FODMAPs, and Diverticular Disease: When Fiber Needs Adjusting"
+   ],
+   "file": "guides_nutrition.json"
+  },
+  {
    "id": "protein-how-much-you-need-and-where-to-get-it",
    "title": "Protein: How Much You Need and Where to Get It",
    "category": "Nutrition",
@@ -13857,6 +14183,29 @@
    "file": "guides_nutrition.json"
   },
   {
+   "id": "thought-experiments-philosophy-s-laboratory",
+   "title": "Thought Experiments — Philosophy's Laboratory",
+   "category": "Philosophy",
+   "summary": "A tour of philosophy's most famous thought experiments — the trolley problem, the Ship of Theseus, Mary's room, the Chinese room, the veil of ignorance, Gettier cases, the experience machine, philosophical zombies and more — what each was built to test, what it actually shows, and when imagined cases can mislead.",
+   "headings": [
+    "What a Thought Experiment Is and Why Philosophers Use Them",
+    "Ancient Instruments: The Ring of Gyges and the Ship of Theseus",
+    "Galileo's Falling Bodies: When Pure Thought Refutes a Physics",
+    "The Trolley Problem: Foot, Thomson and the Ethics of Killing versus Letting Die",
+    "The Experience Machine: Nozick on Whether Pleasure Is All That Matters",
+    "The Veil of Ignorance: Rawls and Justice as Fairness",
+    "Mary the Color Scientist: The Knowledge Argument Against Physicalism",
+    "The Chinese Room: Searle Against Strong AI",
+    "Philosophical Zombies and the Hard Problem of Consciousness",
+    "Twin Earth: Putnam and Meaning Outside the Head",
+    "Gettier Cases: When Justified True Belief Is Not Knowledge",
+    "Teletransporters and Fission: Parfit on Personal Identity",
+    "The Violinist: Thomson on Abortion and the Limits of the Right to Life",
+    "How Thought Experiments Work — and When They Mislead"
+   ],
+   "file": "guides_philosophy.json"
+  },
+  {
    "id": "metaethics-the-nature-of-moral-truth",
    "title": "Metaethics — The Nature of Moral Truth",
    "category": "Philosophy",
@@ -14041,6 +14390,29 @@
     "Why Philosophy Matters"
    ],
    "file": "guides_philosophy.json"
+  },
+  {
+   "id": "angular-momentum-and-its-conservation",
+   "title": "Angular Momentum and Its Conservation",
+   "category": "Physics",
+   "summary": "What angular momentum is, how to calculate it for particles and rotating bodies, why it is conserved when no external torque acts, and how the same law explains spinning skaters, gyroscopes, planetary orbits, neutron stars and the quantized spin of electrons.",
+   "headings": [
+    "What Angular Momentum Is: the Rotational Analogue of Momentum",
+    "Angular Momentum of a Single Particle: L Equals r Cross p",
+    "Moment of Inertia: Why Mass Distribution Matters as Much as Mass",
+    "Torque: What Changes Angular Momentum, and the Rotational Second Law",
+    "The Conservation Law Stated Carefully: When It Holds and When It Does Not",
+    "The Spinning Skater: Trading Moment of Inertia for Angular Velocity",
+    "Everyday and Engineering Examples: Helicopters, Flywheels, Wheels and Cats",
+    "Gyroscopes and Precession: Why a Spinning Top Refuses to Fall Over",
+    "Angular Momentum in Orbits: Kepler's Second Law and Central Forces",
+    "Cosmic Spin-Ups: Neutron Stars, Accretion Disks and Why the Solar System Is Flat",
+    "Angular Momentum in Quantum Mechanics: Quantization and Spin",
+    "Noether's Theorem: Rotational Symmetry Is the Reason for the Law",
+    "The Vector Character of Angular Momentum: Right-Hand Rules and Rotating Frames",
+    "Solving Problems and Avoiding the Classic Misconceptions"
+   ],
+   "file": "guides_physics.json"
   },
   {
    "id": "circular-motion-and-centripetal-force",
@@ -14336,6 +14708,29 @@
    "file": "guides_physics.json"
   },
   {
+   "id": "choosing-scenarios-worth-planning-against",
+   "title": "Choosing Scenarios Worth Planning Against",
+   "category": "Preparedness",
+   "summary": "How to decide which emergencies actually deserve your planning time and money: assessing local hazards, weighing likelihood against consequence, avoiding fantasy scenarios, and building capabilities that cover many disasters at once.",
+   "headings": [
+    "Why Scenario Selection Matters More Than Gear",
+    "The Basic Math: Risk Is Likelihood Times Consequence",
+    "Start Local: Researching the Hazards of Your Actual Address",
+    "Audit the Household: Your Vulnerabilities Change the Rankings",
+    "The Near-Certainties: Outages, Storms, Fires, Falls and Lost Paychecks",
+    "The Regional Middle Tier: Your Area's Signature Disaster",
+    "The Rare but Real: Pandemics, Long Outages and Other Tail Events Worth a Hedge",
+    "Where to Stop: Diminishing Returns and the Fantasy-Scenario Trap",
+    "Capabilities Beat Scenarios: The All-Hazards Insight",
+    "Time Horizons: Seventy-Two Hours, Two Weeks, and Longer",
+    "Budgeting Money and Effort Across the Ranked List",
+    "Practicing the Plan: Drills, Tests and Tabletop Exercises",
+    "Reviewing and Updating: Risk Changes Under Your Feet",
+    "Common Mistakes: A Field Guide to Getting This Wrong"
+   ],
+   "file": "guides_preparedness.json"
+  },
+  {
    "id": "reading-a-county-hazard-mitigation-plan",
    "title": "Reading a County Hazard Mitigation Plan",
    "category": "Preparedness",
@@ -14521,6 +14916,29 @@
     "Sustaining a Neighborhood Group Over Time"
    ],
    "file": "guides_preparedness.json"
+  },
+  {
+   "id": "obsessive-compulsive-disorder-ocd",
+   "title": "Obsessive-Compulsive Disorder (OCD)",
+   "category": "Psychology",
+   "summary": "What OCD really is: obsessions, compulsions, the anxiety cycle that drives them, how the disorder is diagnosed, and the treatments with the strongest evidence, including exposure and response prevention and SSRI medication.",
+   "headings": [
+    "What Obsessive-Compulsive Disorder Is — and What It Is Not",
+    "Obsessions: Intrusive Thoughts, Images, and Urges",
+    "Compulsions and Rituals: Why They Feel Necessary",
+    "The OCD Cycle: How Relief Teaches the Brain to Repeat",
+    "Common Themes: Contamination, Checking, Symmetry, and Taboo Thoughts",
+    "How Common OCD Is and When It Starts",
+    "What Causes OCD: Brain Circuits, Genes, and Learning",
+    "Related Conditions: Hoarding, Body Dysmorphia, Hair Pulling, and Skin Picking",
+    "How OCD Is Diagnosed",
+    "Exposure and Response Prevention: The Treatment With the Strongest Evidence",
+    "Medication for OCD",
+    "Family Accommodation and Reassurance: Helping Without Feeding the Disorder",
+    "Myths, Stigma, and Everyday Language",
+    "When to Seek Help and What Recovery Looks Like"
+   ],
+   "file": "guides_psychology.json"
   },
   {
    "id": "phobias-and-how-to-overcome-them",
@@ -14835,6 +15253,29 @@
    "file": "guides_psychology.json"
   },
   {
+   "id": "the-kilogram-and-the-kibble-balance",
+   "title": "The Kilogram and the Kibble Balance",
+   "category": "Reference",
+   "summary": "Why the kilogram was defined for 130 years by a metal cylinder in a Paris vault, how that artifact drifted, and how the Kibble balance and the silicon-sphere Avogadro project let the world redefine mass in 2019 by fixing the Planck constant, so any equipped laboratory can now realize the kilogram from the laws of physics.",
+   "headings": [
+    "Why the Kilogram Matters: The Base Unit of Mass",
+    "The International Prototype: A Cylinder in a Vault",
+    "The Drift Problem: When the Standard Itself Changes",
+    "From Artifacts to Constants: The Idea of Fixing Nature's Numbers",
+    "The Quantum Electrical Bridge: Josephson and von Klitzing",
+    "The Kibble Balance: Weighing Against the Quantum",
+    "Inside a Real Kibble Balance: Magnets, Interferometers and Gravimeters",
+    "Bryan Kibble and the History of the Watt Balance",
+    "The Rival Route: Counting Atoms with Silicon Spheres",
+    "The 2018 Vote and the New Definition",
+    "What Changed in Practice — and What Deliberately Did Not",
+    "Gravity in the Loop: Why g Matters and How It Is Measured",
+    "Disseminating the Kilogram: From Primary Balance to Working Standards",
+    "Small Masses and the Future: Tabletop Balances and Quantum Metrology"
+   ],
+   "file": "guides_reference.json"
+  },
+  {
    "id": "si-prefixes-from-quecto-to-quetta",
    "title": "SI Prefixes From Quecto to Quetta",
    "category": "Reference",
@@ -15017,6 +15458,29 @@
    "file": "guides_reference.json"
   },
   {
+   "id": "myth-theories-of-sacred-story",
+   "title": "Myth — Theories of Sacred Story",
+   "category": "Religion & Mythology",
+   "summary": "What scholars mean by myth and the major theories of why cultures tell sacred stories, from ancient allegory and euhemerism through Mueller, Tylor, Frazer, Durkheim, Malinowski, Freud, Jung, Eliade, Propp, Levi-Strauss, and Campbell to modern cognitive approaches. Explains each theory, its evidence, and its criticisms.",
+   "headings": [
+    "What Myth Means: Sacred Story, Not Simple Falsehood",
+    "Myth, Legend, and Folktale: How Scholars Sort Traditional Stories",
+    "The Oldest Theories: Allegory and Euhemerism in the Ancient World",
+    "Max Mueller and the Nature-Myth School: A Disease of Language",
+    "Tylor and Lang: Myth as Primitive Science",
+    "Frazer, Robertson Smith, and the Myth-and-Ritual School",
+    "Durkheim: Myth, the Sacred, and the Life of the Group",
+    "Malinowski: Myth as Social Charter",
+    "Freud and Rank: Myth and the Unconscious",
+    "Jung and the Archetypes: Myth from the Collective Unconscious",
+    "Eliade: Sacred Time, Sacred Space, and the Eternal Return",
+    "Propp and Levi-Strauss: The Structure Beneath the Stories",
+    "Campbell and the Hero's Journey: Fame, Uses, and Criticism",
+    "Where the Field Stands: Dumezil, Girard, Burkert, and the Cognitive Turn"
+   ],
+   "file": "guides_religion_and_mythology.json"
+  },
+  {
    "id": "prehistoric-religion-burials-figurines-and-the-first-temples",
    "title": "Prehistoric Religion — Burials, Figurines and the First Temples",
    "category": "Religion & Mythology",
@@ -15179,6 +15643,28 @@
     "Why the Question Matters and Where It Leads"
    ],
    "file": "guides_religion_and_mythology.json"
+  },
+  {
+   "id": "search-urgency-determination",
+   "title": "Search Urgency Determination",
+   "category": "Rescue",
+   "summary": "How search and rescue planners decide how urgently to respond when someone is reported missing: the relative urgency rating factors, subject age, medical condition, weather, terrain and equipment, lost person behavior, survivability windows, and how the rating drives mobilisation.",
+   "headings": [
+    "Why Urgency Is Decided Before Anything Else",
+    "The Relative Urgency Worksheet and How the Scoring Works",
+    "Age of the Missing Person: The Very Young and the Very Old",
+    "Medical Conditions, Medications and State of Mind",
+    "How Many Are Missing: Why the Lone Subject Raises the Alarm",
+    "Experience, Fitness and Knowledge of the Area",
+    "Clothing and Equipment Measured Against the Conditions",
+    "Weather: The Fastest-Moving Factor",
+    "Terrain and Environmental Hazards Around the Search Area",
+    "Lost Person Behavior: What Category Statistics Tell Planners",
+    "Survivability: How Time Erodes the Odds",
+    "The First Interview: Gathering the Facts That Set the Rating",
+    "From Rating to Response: Mobilisation Levels"
+   ],
+   "file": "guides_rescue.json"
   },
   {
    "id": "search-and-rescue-planning-cycle",
@@ -15374,6 +15860,29 @@
    "file": "guides_rescue.json"
   },
   {
+   "id": "the-ashley-stopper-knot-explained",
+   "title": "The Ashley Stopper Knot Explained",
+   "category": "Skills",
+   "summary": "How to tie, dress, check, and use the Ashley stopper knot — the bulky, secure end knot from The Ashley Book of Knots — and how it compares to the overhand and figure-eight stoppers.",
+   "headings": [
+    "What a Stopper Knot Is For",
+    "Clifford W. Ashley and a Knot Born from a Mistake",
+    "Why Not Just an Overhand or a Figure-Eight?",
+    "Anatomy: A Noose That Swallows Its Own Tail",
+    "Tying It Step by Step: The Slipknot Method",
+    "Dressing and Setting: The Difference Between Tied and Finished",
+    "The Trefoil Check: Reading the Knot's Face",
+    "Common Mistakes and How the Knot Fails",
+    "Choosing Rope: Material, Stiffness, and Slipperiness",
+    "On the Water: Where Sailors Put Stopper Knots",
+    "Around the House, Camp, and Workshop",
+    "Climbing and Life-Safety: Where This Knot Is Not the Standard",
+    "Security Under Load, and Untying It Afterward",
+    "Practice Drills: Making the Knot Automatic"
+   ],
+   "file": "guides_skills.json"
+  },
+  {
    "id": "the-figure-eight-stopper-knot",
    "title": "The Figure Eight Stopper Knot",
    "category": "Skills",
@@ -15557,6 +16066,29 @@
     "Storage, Care and Making an Edge Last"
    ],
    "file": "guides_skills.json"
+  },
+  {
+   "id": "rational-choice-social-exchange-theory",
+   "title": "Rational Choice & Social Exchange Theory",
+   "category": "Society & Culture",
+   "summary": "What rational choice theory and social exchange theory claim about human behaviour, where they came from, the key thinkers from Adam Smith to Homans, Blau and Emerson, and the behavioural criticisms that limit them.",
+   "headings": [
+    "What Rational Choice Theory Claims",
+    "Preferences, Constraints and Utility: The Building Blocks",
+    "From Adam Smith to Gary Becker: A Short History of the Idea",
+    "Choosing Under Risk: Expected Utility and Its Paradoxes",
+    "Game Theory and Strategic Interaction",
+    "Social Exchange Theory: Homans and the Elementary Forms",
+    "Peter Blau: From Interpersonal Exchange to Social Structure",
+    "Thibaut and Kelley: Comparison Levels and Why People Stay or Leave",
+    "Richard Emerson: Power, Dependence and Exchange Networks",
+    "Reciprocity, Gifts and Trust: The Moral Infrastructure of Exchange",
+    "Collective Action and the Free-Rider Problem",
+    "Bounded Rationality and the Behavioural Critique",
+    "Culture, Emotion and Embeddedness: What Exchange Models Leave Out",
+    "Where the Theories Are Used Today: Crime, Voting, Work and Love"
+   ],
+   "file": "guides_society_and_culture.json"
   },
   {
    "id": "postmodern-poststructuralist-social-thought",
@@ -16089,6 +16621,29 @@
     "The One Who Was Raised Outside"
    ],
    "file": "guides_species_and_civilisations_2.json"
+  },
+  {
+   "id": "passing-and-receiving-in-football",
+   "title": "Passing and Receiving in Football",
+   "category": "Sports & Fitness",
+   "summary": "How to pass and receive a football (soccer ball) well: the push pass, driven and lofted passes, first touch, receiving on the back foot, scanning before the ball arrives, one-touch combinations, and drills like rondos and wall work to build the skills.",
+   "headings": [
+    "Why Passing and Receiving Decide Matches",
+    "The Push Pass: The Technique You Will Use Most",
+    "Striking Surfaces: Inside, Instep, Outside, Sole, and Heel",
+    "Weight of Pass: Playing a Ball Your Teammate Can Use",
+    "The Driven Ground Pass and Breaking Lines",
+    "Lofted Passes, Chips, and Switching Play",
+    "First Touch: Cushioning and Setting the Ball",
+    "Receiving on the Back Foot and Opening Your Body",
+    "Scanning: Look Before the Ball Arrives",
+    "Receiving Aerial Balls: Chest, Thigh, and Foot",
+    "One-Touch Play, Wall Passes, and Combinations",
+    "Training: Rondos, Passing Squares, and Wall Work",
+    "Common Faults and How to Fix Them",
+    "Building the Habit: A Weekly Self-Training Plan"
+   ],
+   "file": "guides_sports_and_fitness.json"
   },
   {
    "id": "football-formations-and-tactical-systems",
@@ -16759,6 +17314,29 @@
    "file": "guides_starships_and_classes.json"
   },
   {
+   "id": "plant-family-patterns-for-foragers",
+   "title": "Plant Family Patterns for Foragers",
+   "category": "Sustenance",
+   "summary": "How to recognise the major plant families by their flower, stem and leaf patterns, which families are broadly safe for foragers, and which carry deadly look-alikes such as poison hemlock and death camas.",
+   "headings": [
+    "Why Plant Families Matter More Than Memorising Species",
+    "Reading a Flower: The Parts That Identify a Family",
+    "The Mint Family (Lamiaceae): Square Stems and Opposite Leaves",
+    "The Mustard Family (Brassicaceae): Four Petals and Telltale Seed Pods",
+    "The Carrot Family (Apiaceae): Umbels, Edibles and the Deadliest Look-Alikes",
+    "The Rose Family (Rosaceae): Five Petals, Many Stamens and a Cyanide Caveat",
+    "The Aster Family (Asteraceae): Composite Heads From Dandelion to Ragwort",
+    "The Pea Family (Fabaceae): Banner, Wings and Keel, and Why Pods Do Not Mean Food",
+    "Onions and the Lily-Like Plants: The Smell Test and Death Camas",
+    "The Nightshade Family (Solanaceae): Familiar Foods, Dangerous Wild Relatives",
+    "Goosefoots and Amaranths (Amaranthaceae): Wild Spinach and Wild Grain",
+    "Grasses, Docks and Buckwheats: Grains, Sour Leaves and Their Limits",
+    "A Field Workflow: From Unknown Plant to Confident Family Call",
+    "Building a Local Family Catalogue: Season, Law and Sustainable Harvest"
+   ],
+   "file": "guides_sustenance.json"
+  },
+  {
    "id": "using-a-botanical-key-to-identify-plants",
    "title": "Using a Botanical Key to Identify Plants",
    "category": "Sustenance",
@@ -16900,6 +17478,28 @@
    "file": "guides_sustenance.json"
   },
   {
+   "id": "the-atkinson-and-miller-engine-cycles",
+   "title": "The Atkinson and Miller Engine Cycles",
+   "category": "Vehicles & Transport",
+   "summary": "How Atkinson- and Miller-cycle engines squeeze more miles from fuel by expanding further than they compress — from James Atkinson's 1880s linkage engine and Ralph Miller's supercharged patent to the valve-timing versions inside modern hybrids and turbo cars.",
+   "headings": [
+    "The Waste Every Gasoline Engine Suffers: Blowdown",
+    "The Otto Baseline: How a Conventional Four-Stroke Works",
+    "James Atkinson and the Engines of 1882–1887",
+    "How the Original Linkage Worked — and Why It Died",
+    "The Core Idea: Expansion Ratio Greater Than Compression Ratio",
+    "Ralph Miller and the Supercharged Answer of the 1950s",
+    "Late or Early Intake Closing: LIVC and EIVC",
+    "Why Modern \"Atkinson\" Engines Are Really Valve-Timed",
+    "The Torque Penalty: What Over-Expansion Gives Up",
+    "Toyota's Hybrids: The Case Study That Proved the Cycle",
+    "Miller in the Showroom: From the Mazda Millenia to Modern Turbos",
+    "Switching Cycles on the Fly: Variable Valve Timing at Work",
+    "The Supporting Cast: EGR, Knock Margin, and Friction"
+   ],
+   "file": "guides_vehicles_and_transport.json"
+  },
+  {
    "id": "the-diesel-cycle-explained",
    "title": "The Diesel Cycle Explained",
    "category": "Vehicles & Transport",
@@ -16993,6 +17593,30 @@
     "Buying, Insuring and the Paperwork That Protects You"
    ],
    "file": "guides_vehicles_and_transport.json"
+  },
+  {
+   "id": "ancient-egyptian-architecture-pyramids-temples-and-tombs",
+   "title": "Ancient Egyptian Architecture: Pyramids, Temples and Tombs",
+   "category": "Visual Arts & Design",
+   "summary": "How the Egyptians built the pyramids, temples and tombs: the materials, the engineering, the evolution from mastaba to Great Pyramid, the great temple complexes at Karnak and Abu Simbel, and what the forms meant.",
+   "headings": [
+    "Why Egyptian Building Looks the Way It Does: the Nile, the Desert and Eternity",
+    "Materials and Methods: Mudbrick, Limestone, Granite and the Post-and-Lintel System",
+    "Mastabas: Where Monumental Tombs Began",
+    "Djoser's Step Pyramid at Saqqara and Imhotep, the First Named Architect",
+    "From Steps to Smooth Sides: Sneferu, Meidum, the Bent Pyramid and the Red Pyramid",
+    "The Great Pyramid of Khufu: Dimensions, Precision and Interior Design",
+    "The Giza Plateau as a Planned Complex: Khafre, Menkaure and the Great Sphinx",
+    "How Were the Pyramids Actually Built? Ramps, Sledges, Levers and the Evidence",
+    "After Giza: Sun Cults, Pyramid Texts and the Middle Kingdom's Hidden Pyramids",
+    "The Valley of the Kings: Rock-Cut Royal Tombs of the New Kingdom",
+    "Anatomy of an Egyptian Temple: Pylon, Court, Hypostyle Hall and Sanctuary",
+    "Karnak and Luxor: The Great Temples of Thebes",
+    "Mortuary Temples: Hatshepsut at Deir el-Bahri, the Ramesseum and Medinet Habu",
+    "Rock-Cut Temples and Colossi: Abu Simbel and Building in Living Stone",
+    "Late and Ptolemaic Temples: Edfu, Dendera and Philae, and What Egypt Handed On"
+   ],
+   "file": "guides_visual_arts_and_design.json"
   },
   {
    "id": "ancient-egyptian-art",
@@ -17439,6 +18063,29 @@
     "The Emergency Hologram"
    ],
    "file": "guides_warp_and_starship_technology_2.json"
+  },
+  {
+   "id": "the-coriolis-effect",
+   "title": "The Coriolis Effect",
+   "category": "Weather",
+   "summary": "Why winds curve, hurricanes spin, and ocean currents drift sideways on a rotating Earth: the Coriolis effect explained from the merry-go-round picture to geostrophic winds, Buys Ballot's law, the Ekman spiral, and the truth about draining sinks.",
+   "headings": [
+    "A Deflection, Not a Push: What the Coriolis Effect Is",
+    "Gaspard-Gustave de Coriolis and the 1835 Paper",
+    "The Merry-Go-Round: Building Intuition for Rotating Frames",
+    "A Planet of Different Speeds: Earth as the Rotating Platform",
+    "The Numbers: 2Ωv sin φ and the Coriolis Parameter",
+    "Zero at the Equator: Latitude and the Five-Degree Rule",
+    "Why Hurricanes Spin: Counterclockwise North, Clockwise South",
+    "Geostrophic Balance: Why Wind Blows Along the Isobars",
+    "Buys Ballot's Law: Finding the Low with Your Back to the Wind",
+    "Nansen's Drifting Ice and the Ekman Spiral",
+    "The Global Wind Machine: Hadley, Ferrel, and the Belts",
+    "The Toilet-Bowl Myth and the Rossby Number",
+    "Bullets, Shells, and Airplanes: Coriolis Beyond the Weather",
+    "Foucault's Pendulum: Watching the Earth Turn"
+   ],
+   "file": "guides_weather.json"
   },
   {
    "id": "atmospheric-circulation-and-global-wind-belts",
