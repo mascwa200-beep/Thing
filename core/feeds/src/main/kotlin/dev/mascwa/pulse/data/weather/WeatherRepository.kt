@@ -26,15 +26,44 @@ class WeatherRepository(
 ) {
     private val ttl = 30 * 60 * 1000L
 
+    companion object {
+        /** What a page needs: a week. Every caller but the desktop's deep switch takes this. */
+        const val DEFAULT_FORECAST_DAYS = 7
+
+        /**
+         * The provider's ceiling.
+         *
+         * ⚠️ Sixteen is what Open-Meteo serves; asking for more fails the whole request rather than
+         * being trimmed, which is why the argument is clamped rather than trusted.
+         */
+        const val MAX_FORECAST_DAYS = 16
+    }
+
     suspend fun fetch(
         latitude: Double,
         longitude: Double,
         locationName: String,
         force: Boolean,
+        /**
+         * How many days of forecast to ask for.
+         *
+         * ⚠️ **Defaulted to what every caller asked for before this existed**, so the phone is
+         * untouched by its presence. The desktop's opt-in deep switch is the only thing that passes
+         * anything else, and it asks for the provider's maximum — sixteen days, which the same
+         * endpoint has always been willing to give and nothing was asking for.
+         *
+         * Clamped rather than trusted: a number outside what the provider serves comes back as an
+         * error for the whole request, which would turn a wrong argument into a blank screen.
+         */
+        forecastDays: Int = DEFAULT_FORECAST_DAYS,
     ): Fetched<WeatherData> {
         val s = preferences()
+        val days = forecastDays.coerceIn(1, MAX_FORECAST_DAYS)
+        // ⚠️ The day count is part of the cache key. Without it a deep sixteen-day answer and an
+        // ordinary seven-day one share a slot, so whichever ran first is served to both — and the
+        // deep switch would appear to do nothing at all.
         val key = "weather_${"%.3f".format(latitude)}_${"%.3f".format(longitude)}" +
-            "_${s.temperatureUnit.apiValue}_${s.windUnit.apiValue}_${s.precipUnit.apiValue}"
+            "_${s.temperatureUnit.apiValue}_${s.windUnit.apiValue}_${s.precipUnit.apiValue}_d$days"
         if (!force) {
             cache.read(key, ttl, WeatherData.serializer())?.let {
                 return Fetched(it.value, true, it.savedAtMs)
@@ -42,7 +71,7 @@ class WeatherRepository(
         }
         return try {
             val data = coroutineScope {
-                val forecastD = async { loadForecast(latitude, longitude, locationName, s) }
+                val forecastD = async { loadForecast(latitude, longitude, locationName, s, days) }
                 val airD = async { runCatching { loadAir(latitude, longitude) }.getOrNull() }
                 forecastD.await().copy(airQuality = airD.await())
             }
@@ -73,7 +102,7 @@ class WeatherRepository(
     }
 
     private suspend fun loadForecast(
-        lat: Double, lon: Double, name: String, s: WeatherPreferences,
+        lat: Double, lon: Double, name: String, s: WeatherPreferences, days: Int,
     ): WeatherData {
         val url = buildString {
             append("https://api.open-meteo.com/v1/forecast")
@@ -88,7 +117,7 @@ class WeatherRepository(
             append("precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,")
             append("wind_gusts_10m_max,wind_direction_10m_dominant,apparent_temperature_max,")
             append("apparent_temperature_min,precipitation_hours,sunshine_duration,daylight_duration,snowfall_sum")
-            append("&timezone=auto&forecast_days=7")
+            append("&timezone=auto&forecast_days=$days")
             append("&temperature_unit=${s.temperatureUnit.apiValue}")
             append("&wind_speed_unit=${s.windUnit.apiValue}")
             append("&precipitation_unit=${s.precipUnit.apiValue}")

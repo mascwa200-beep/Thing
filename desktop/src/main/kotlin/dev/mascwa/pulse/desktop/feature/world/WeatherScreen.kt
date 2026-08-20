@@ -27,6 +27,7 @@ import dev.mascwa.pulse.data.weather.WeatherRepository
 import dev.mascwa.pulse.data.weather.WeatherCode
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.settings.LocalUnits
+import dev.mascwa.pulse.desktop.DeepAnalysis
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.ChartSeries
@@ -35,19 +36,52 @@ import dev.mascwa.pulse.desktop.theme.LcarsTimeChart
 import dev.mascwa.pulse.desktop.theme.LcarsFrame
 import dev.mascwa.pulse.desktop.theme.LcarsHeaderBar
 import dev.mascwa.pulse.desktop.theme.LcarsStatBlock
+import dev.mascwa.pulse.desktop.theme.LcarsSwitch
 import dev.mascwa.pulse.desktop.theme.Pulse
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class WeatherViewModel(
     scope: CoroutineScope,
     repository: WeatherRepository,
     private val settings: DesktopSettingsStore,
 ) {
+    private val _deep = MutableStateFlow(false)
+
+    /** Whether the reader has asked for the long forecast. Default off, like every deep switch. */
+    val deep: StateFlow<Boolean> = _deep.asStateFlow()
+
     val feed = WorldFeed<WeatherData>(scope, settings) { lat, lon, force ->
         // The place's own name where one was entered, and the bare coordinate where it was not —
         // rather than inventing a label for somewhere the machine only knows numerically.
         val label = settings.current().placeLabel.ifBlank { "Here" }
-        repository.fetch(lat, lon, label, force)
+        repository.fetch(
+            lat, lon, label, force,
+            // ⚠️ Read at fetch time rather than captured, so a refresh for any other reason — a new
+            // location, a manual reload — keeps honouring the switch instead of quietly reverting to
+            // a week while the switch still reads on.
+            forecastDays = if (_deep.value) {
+                WeatherRepository.MAX_FORECAST_DAYS
+            } else {
+                WeatherRepository.DEFAULT_FORECAST_DAYS
+            },
+        )
+    }
+
+    /**
+     * Ask the provider for everything it has, rather than the week a page needs.
+     *
+     * ⚠️ `force = false`, deliberately. The day count is part of the repository's cache key, so the
+     * long answer and the ordinary one occupy different slots — which means turning the switch back
+     * OFF serves the week already on hand with no request at all, and turning it on again inside the
+     * cache window is likewise free. Forcing would throw both away every time the switch moved.
+     */
+    fun setDeep(on: Boolean) {
+        if (on == _deep.value) return
+        _deep.value = on
+        feed.refresh(force = false)
     }
 }
 
@@ -63,6 +97,7 @@ class WeatherViewModel(
 fun WeatherScreen(vm: WeatherViewModel, modifier: Modifier = Modifier) {
     val state: Async<WeatherData> by vm.feed.state.collectAsState()
     val located by vm.feed.located.collectAsState()
+    val deep by vm.deep.collectAsState()
     val c = Pulse.colors
 
     LaunchedEffect(Unit) { vm.feed.ensureLoaded() }
@@ -75,6 +110,28 @@ fun WeatherScreen(vm: WeatherViewModel, modifier: Modifier = Modifier) {
             located = located,
             trailing = state.data?.locationName?.uppercase(),
         ) { wd ->
+            // ⚠️ The deep switch, in the panel it applies to. Off by default; nothing on this screen
+            // asks for more than a week until it is turned on, and there is no timer that turns it on
+            // for you.
+            LcarsSwitch(
+                label = "Look ${WeatherRepository.MAX_FORECAST_DAYS} days out, not ${WeatherRepository.DEFAULT_FORECAST_DAYS}",
+                checked = deep,
+                onCheckedChange = { vm.setDeep(it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                if (deep) {
+                    // Said plainly rather than implied by a longer chart. A sixteen-day forecast is
+                    // not sixteen days of the same quality as the first two, and a reader who thinks
+                    // it is has been misled by the app rather than by the weather.
+                    "Showing ${wd.daily.size} days. The far end of a long forecast is a tendency, not a forecast."
+                } else {
+                    DeepAnalysis.OFF_HINT
+                },
+                fontFamily = JetBrainsMono, fontSize = 10.sp, color = c.faint,
+                modifier = Modifier.padding(top = 3.dp, bottom = 6.dp),
+            )
+
             val now = wd.current
             if (now != null) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
