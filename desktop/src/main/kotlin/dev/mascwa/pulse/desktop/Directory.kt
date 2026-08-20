@@ -46,7 +46,7 @@ enum class Screen {
     ADVISORIES,
     NEWS, LIVE,
     SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
-    MARKETS, WEATHER, ECONOMY,
+    MARKETS, WEATHER, ECONOMY, FUEL,
     NOTES, DIARY,
 }
 
@@ -84,6 +84,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("forecast", "rain", "temperature", "wind", "air quality", "uv")),
         DeskEntry(Screen.ECONOMY, "Economy", "A country's figures, each with how old it is",
             listOf("inflation", "gdp", "unemployment", "world bank", "indicators")),
+        DeskEntry(Screen.FUEL, "Fuel & energy", "What crude, gas and petrol cost",
+            listOf("oil", "petrol", "gasoline", "diesel", "crude", "brent", "wti", "natural gas", "pump")),
     )),
     DeskGroup("MAPS & SKY", { it.positive }, listOf(
         DeskEntry(Screen.SPACE_WEATHER, "Space weather", "What the Sun is doing, and what it is doing to us",

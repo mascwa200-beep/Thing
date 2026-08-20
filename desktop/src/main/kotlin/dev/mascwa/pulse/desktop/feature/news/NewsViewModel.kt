@@ -279,10 +279,17 @@ class NewsViewModel(
         /** The default, when nothing has said otherwise. The reader's own setting overrides it. */
         const val LIVE_INTERVAL_MS = 5 * 60 * 1000L
 
-        /** Whatever the reader asked for, kept inside bounds a live feed can honour. One minute is
-         *  as often as this is worth doing; an hour is where "live" stops meaning anything. */
+        /**
+         * Whatever the reader asked for, in milliseconds.
+         *
+         * ⚠️ The bounds MATCH `SettingsViewModel.setRefreshMinutes`, deliberately. Clamping tighter
+         * here than the setter allows would silently honour a stored 120 as 60 — the switch would
+         * appear to accept a value and then not use it, which is the defect this whole change
+         * exists to remove. One minute is the floor because a stored 0 means a request every
+         * millisecond; the ceiling is the setter's.
+         */
         fun intervalMs(refreshMinutes: Int): Long =
-            (refreshMinutes.coerceIn(1, 60)) * 60_000L
+            (refreshMinutes.coerceIn(1, 240)) * 60_000L
 
         /**
          * How long to wait before the next live refresh, given how old what is on screen already is.

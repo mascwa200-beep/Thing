@@ -135,6 +135,26 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
         // ----- Data & refresh -------------------------------------------------------------------
         LcarsFrame(Modifier.fillMaxWidth()) {
             Column {
+                SectionTitle("YOUR COUNTRY")
+                // ⚠️ Not derived from the coordinate above. Somebody may want the weather where they
+                // are and the economy of somewhere else, and inferring one from the other would take
+                // that away while looking like a convenience.
+                LcarsTextField(
+                    label = "Country code",
+                    value = s.countryCode,
+                    onValueChange = vm::setCountryCode,
+                    placeholder = "US",
+                )
+                Text(
+                    "Two letters, ISO-3166 — which country's economic figures and fuel prices to show.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.faint,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+
+        LcarsFrame(Modifier.fillMaxWidth()) {
+            Column {
                 SectionTitle("DATA & REFRESH")
                 Text(
                     "A live screen re-fetches on this interval WHILE IT IS OPEN. Off it there is no " +
@@ -190,6 +210,21 @@ fun SettingsScreen(vm: SettingsViewModel, modifier: Modifier = Modifier) {
                     value = s.githubToken,
                     onValueChange = vm::setGithubToken,
                     placeholder = "Not set — updates cannot be checked",
+                )
+                // The same warning covers this one, which is why it sits under it rather than in a
+                // section of its own with the caution repeated.
+                LcarsTextField(
+                    label = "EIA key (optional)",
+                    value = s.eiaKey,
+                    onValueChange = vm::setEiaKey,
+                    placeholder = "Not set — US pump prices unavailable",
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    "A free key from eia.gov unlocks weekly US retail petrol and diesel prices on the " +
+                        "fuel screen. Everything else there works without one.",
+                    fontFamily = JetBrainsMono, fontSize = 9.sp, lineHeight = 14.sp, color = c.faint,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }

@@ -118,6 +118,26 @@ data class DesktopSettings(
     /** 12-hour clock when true. */
     val twelveHourClock: Boolean = false,
 
+    /**
+     * ISO-3166 alpha-2, for the figures that belong to a country rather than a coordinate — the
+     * economic indicators and the fuel prices.
+     *
+     * ⚠️ Separate from [latitude]/[longitude] on purpose, and not derived from them. Somebody may
+     * well want the weather where they are sitting and the economy of somewhere else, and deriving
+     * one from the other would take that away while looking like a convenience. The economy screen
+     * was hardcoded to "US" until this existed.
+     */
+    val countryCode: String = "US",
+
+    /**
+     * An optional EIA key, which unlocks weekly US retail pump prices on the fuel screen.
+     *
+     * ⚠️ Stored in plain text, exactly like [githubToken] and for the same reason: this machine has
+     * no secure element to put it behind, and the settings page says so rather than implying a
+     * protection that is not there. It is a free, read-only, rate-limited key.
+     */
+    val eiaKey: String = "",
+
     // ----- Data & refresh ---------------------------------------------------------------------
 
     /** How often a live feed re-fetches while its screen is open, in minutes. ⚠️ Only while OPEN —

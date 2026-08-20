@@ -80,6 +80,12 @@ class SettingsViewModel(
     fun setAutoCheckUpdates(v: Boolean) = write { it.copy(autoCheckUpdates = v) }
     fun setGithubToken(v: String) = write { it.copy(githubToken = v.trim()) }
 
+    /** Upper-cased and clipped to two letters, because that is the whole of an ISO-3166 alpha-2 code
+     *  and a lower-case or longer one simply returns nothing from the World Bank. */
+    fun setCountryCode(v: String) = write { it.copy(countryCode = v.trim().uppercase().take(2)) }
+
+    fun setEiaKey(v: String) = write { it.copy(eiaKey = v.trim()) }
+
     private fun write(transform: (DesktopSettings) -> DesktopSettings) {
         scope.launch { store.update(transform) }
     }

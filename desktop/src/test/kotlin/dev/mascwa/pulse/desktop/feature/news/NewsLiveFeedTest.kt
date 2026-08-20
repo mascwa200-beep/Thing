@@ -84,7 +84,10 @@ class NewsLiveFeedTest {
         // otherwise mean a request every millisecond.
         assertEquals(60_000L, NewsViewModel.intervalMs(0))
         assertEquals(60_000L, NewsViewModel.intervalMs(-5))
-        assertEquals(60 * 60_000L, NewsViewModel.intervalMs(999))
+        // ⚠️ The ceiling matches `SettingsViewModel.setRefreshMinutes`, which allows up to 240. A
+        // tighter one here would silently honour a stored 120 as something else.
+        assertEquals(240 * 60_000L, NewsViewModel.intervalMs(999))
+        assertEquals(120 * 60_000L, NewsViewModel.intervalMs(120))
 
         val now = 1_700_000_000_000L
         val two = NewsViewModel.intervalMs(2)

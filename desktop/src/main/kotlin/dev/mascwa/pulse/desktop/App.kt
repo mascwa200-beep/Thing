@@ -56,6 +56,8 @@ import dev.mascwa.pulse.desktop.feature.world.AdvisoriesScreen
 import dev.mascwa.pulse.desktop.feature.world.AdvisoriesViewModel
 import dev.mascwa.pulse.desktop.feature.world.EconomyScreen
 import dev.mascwa.pulse.desktop.feature.world.EconomyViewModel
+import dev.mascwa.pulse.desktop.feature.world.FuelScreen
+import dev.mascwa.pulse.desktop.feature.world.FuelViewModel
 import dev.mascwa.pulse.desktop.feature.world.MarketsScreen
 import dev.mascwa.pulse.desktop.feature.world.MarketsViewModel
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryScreen
@@ -85,6 +87,7 @@ import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.data.economy.EconomyRepository
+import dev.mascwa.pulse.data.fuel.FuelRepository
 import dev.mascwa.pulse.data.economy.WorldBankClient
 import dev.mascwa.pulse.data.markets.MarketsRepository
 import dev.mascwa.pulse.data.orbital.LaunchRepository
@@ -94,6 +97,7 @@ import dev.mascwa.pulse.data.places.OverpassRepository
 import dev.mascwa.pulse.data.radar.RadarRepository
 import dev.mascwa.pulse.data.safety.SafetyRepository
 import dev.mascwa.pulse.data.social.SocialRepository
+import dev.mascwa.pulse.data.settings.FuelPreferences
 import dev.mascwa.pulse.data.settings.MarketPreferences
 import dev.mascwa.pulse.data.space.SpaceWeatherRepository
 import dev.mascwa.pulse.data.weather.WeatherRepository
@@ -235,8 +239,20 @@ fun PulseDesktopApp(
         val wildlifeVm = remember { WildlifeViewModel(scope, settings) }
         val marketsVm = remember { MarketsViewModel(scope, marketsRepository) }
         val weatherVm = remember { WeatherViewModel(scope, weatherRepository, settings) }
+        val worldBank = remember { WorldBankClient(http) }
         val economyVm = remember {
-            EconomyViewModel(scope, EconomyRepository(WorldBankClient(http), cache) { "US" })
+            // ⚠️ The reader's own country, not a hardcoded "US". It was hardcoded because there was
+            // nowhere to put the setting; there is now.
+            EconomyViewModel(scope, EconomyRepository(worldBank, cache) { settings.current().countryCode })
+        }
+        val fuelVm = remember {
+            FuelViewModel(
+                scope,
+                FuelRepository(http, marketsRepository, worldBank, cache) {
+                    val s = settings.current()
+                    FuelPreferences(countryCode = s.countryCode, eiaKey = s.eiaKey)
+                },
+            )
         }
         val homeVm = remember {
             HomeViewModel(
@@ -318,6 +334,7 @@ fun PulseDesktopApp(
                                     Screen.MARKETS -> MarketsScreen(marketsVm, Modifier.fillMaxWidth())
                                     Screen.WEATHER -> WeatherScreen(weatherVm, Modifier.fillMaxWidth())
                                     Screen.ECONOMY -> EconomyScreen(economyVm, Modifier.fillMaxWidth())
+                                    Screen.FUEL -> FuelScreen(fuelVm, Modifier.fillMaxWidth())
                                     Screen.HOME -> HomeScreen(
                                         vm = homeVm,
                                         // The SAME advisories view model the ADVISORIES screen reads,
