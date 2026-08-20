@@ -445,6 +445,13 @@ fun LcarsScreenFrame(
      * things that happen to be next to each other.
      */
     railWidth: Dp = LcarsRailWidth,
+    /**
+     * What goes in the rail column, when the decorative stack is not what belongs there.
+     *
+     * Null — the default, and what every screen gets unless something above it says otherwise — draws
+     * [LcarsRail]. Additive, so no call site changes.
+     */
+    railContent: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val c = Pulse.colors
@@ -571,7 +578,13 @@ fun LcarsScreenFrame(
             horizontalArrangement = Arrangement.spacedBy(RailGutter),
         ) {
             if (rail) {
-                LcarsRail(seed, Modifier.width(railWidth).fillMaxHeight())
+                // ⚠️ A SLOT, not a flag. The kit knows what a rail looks like and nothing about what
+                // the app might want to put in one — teaching it about the directory would invert the
+                // layering, and the whole reason twenty-nine screens could change shape at once is
+                // that this decision is made one level up, in `PulseScaffold`, where it belongs.
+                val column = railContent
+                if (column != null) column(Modifier.width(railWidth).fillMaxHeight())
+                else LcarsRail(seed, Modifier.width(railWidth).fillMaxHeight())
             }
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
