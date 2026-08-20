@@ -10,6 +10,14 @@ data class SocialItem(
     val meta: String,         // e.g. "▲ 412 · 88 comments"
     val publishedEpochMs: Long = 0L,
     val thumbnail: String? = null,
+    /**
+     * The post's own text, where the post IS text rather than a link.
+     *
+     * ⚠️ Hacker News publishes `text` on every self-post and the app discarded it, so an Ask HN
+     * thread — which is nothing but its text — rendered as a title and a vote count and nothing
+     * else. Null for link posts, which genuinely have no body.
+     */
+    val body: String? = null,
 )
 
 @Serializable

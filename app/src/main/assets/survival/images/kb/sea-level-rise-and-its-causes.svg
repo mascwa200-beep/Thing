@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg  width="1200" height="800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" x="0" y="0" fill="#f8f8f8"/><rect width="996" height="528" x="156" y="152" stroke="#888" stroke-width="1" fill="white"/><defs>
+<radialGradient id="gradient1.5">
+ <stop offset="0%" stop-color="#d22" />
+ <stop offset="40%" stop-color="#d22" />
+ <stop offset="95%" stop-color="#f4f4f4" />
+ <stop offset="100%" stop-color="#f4f4f4" />
+</radialGradient>
+<radialGradient id="gradient4">
+ <stop offset="0%" stop-color="#d22" />
+ <stop offset="20%" stop-color="#d22" />
+ <stop offset="75%" stop-color="#f4f4f4" />
+ <stop offset="100%" stop-color="#f4f4f4" />
+</radialGradient>
+</defs>   <g font-family="Liberation Sans,sans-serif" text-anchor="middle" fill="black" font-size="40px"><path stroke-dasharray="20,20" stroke="black" stroke-width="0.2" d="M146,152 h1006M146,218 h1006M146,284 h1006M146,350 h1006M146,416 h1006M146,482 h1006M146,548 h1006M146,614 h1006M146,680 h1006M156,152 v538M322,152 v538M488,152 v538M654,152 v538M820,152 v538M986,152 v538M1152,152 v538	"/><g transform="translate(110,0)" font-size="35px"><text y="164.25">200</text><text y="296.25">150</text><text y="428.25">100</text><text y="560.25">50</text></g><g transform="translate(0,725)" font-size="35px"><text x="322">10%</text><text x="488">20%</text><text x="654">30%</text><text x="820">40%</text><text x="986">50%</text><text x="1152">60%</text></g><!-- Confidence Areas COMMENTED OUT<rect transform="translate(488,373.76) scale(16.6,2.64)" width="12" height="52" fill="url(#gradient1.5)" />
+<rect transform="translate(654,161.28) scale(16.6,2.64)"width="22" height="88" fill="url(#gradient4)" />
+-->
+
+<path d="M156,680 L1070,152" stroke-width="3" stroke="#55d" stroke-dasharray="10,30"/><g fill="#d55">
+<circle cx="156" cy="685" fill="#55d" stroke="#55d" stroke-width="1" r="50"/><circle cx="587.6" cy="442.34" r="50"/><circle cx="587.6" cy="442.34" fill="#55d" stroke="white" stroke-width="1" r="35.7"/><circle cx="836.6" cy="277.44" r="50"/><circle cx="836.6" cy="277.44" fill="#55d" stroke="white" stroke-width="1" r="20.6"/></g>
+<text x="654" y="55" font-size="60px">Impacts of different degrees</text><text x="654" y="120" font-size="60px">of global warming by year 2100</text><text  transform="translate(50,416) rotate(-90)">Sea level rise (mm)</text><text x="654" y="780">Global glacier <tspan font-style="italic">mass</tspan> loss (2015 to 2100)</text>
+
+<g text-anchor="start">
+<g transform="translate(175,0)" letter-spacing="-.2">
+<text y="214"><tspan fill="#d22">Red rings</tspan> show number</text><text y="266">of <tspan fill="#55d">glaciers from 2015</tspan></text><text y="314">to be <tspan fill="#d22">lost</tspan> by 2100</text>
+</g>
+
+<g fill="#d55" font-size="30">
+<text x="650" y="500">49±9% loss</text>
+<text x="900" y="335">83±7% loss</text>
+</g>
+
+<g fill="#d55"><text x="750" y="385">4 °C global warming</text><text x="525" y="545">1.5 °C global warming</text></g></g><text x="156" y="695" fill="white">2015</text><!-- Confidence bars -->
+<path opacity="0.1" fill="none" stroke="#f11" stroke-width="3"
+d="
+M488,442.34 v-5 v10 v-5 h199.2 v-5 v10
+M587.6,373.7 h-5 h10 h-5 v137.28 h-5 h10
+
+M654,277.44 v-5 v10 v-5 h365.2 v-5 v10
+M836.6,161.28 h-5 h10 h-5 v232.32 h-5 h10
+"/>
+   </g></svg>

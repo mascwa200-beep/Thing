@@ -103,7 +103,7 @@ class OverpassRepository(
             radius = next
         }
         // Ran out of probes. Whatever the last one gave is the answer, flagged for what it is.
-        return (best ?: PlacesResult(id, lat, lon, emptyList()))
+        return (best ?: PlacesResult(id, emptyList()))
             .copy(truncated = truncated, searchRadiusMeters = bestRadius)
     }
 
@@ -139,7 +139,7 @@ class OverpassRepository(
             throw OverpassRemarkException(it)
         }
         val elements = root["elements"]?.jsonArray
-            ?: return PlacesResult(id, lat, lon, emptyList()) to 0
+            ?: return PlacesResult(id, emptyList()) to 0
 
         val places = elements.mapNotNull { el ->
             val o = el.jsonObject
@@ -180,7 +180,7 @@ class OverpassRepository(
             .sortedBy { it.distanceMeters }
             .take(PoiSearch.WANT)
 
-        return PlacesResult(id, lat, lon, places) to elements.size
+        return PlacesResult(id, places) to elements.size
     }
 
     /**
@@ -199,7 +199,7 @@ class OverpassRepository(
                 bearing = Geo.bearingDegrees(lat, lon, it.latitude, it.longitude),
             )
         }.sortedBy { it.distanceMeters }
-        return result.copy(originLat = lat, originLon = lon, places = updated)
+        return result.copy(places = updated)
     }
 
     /**

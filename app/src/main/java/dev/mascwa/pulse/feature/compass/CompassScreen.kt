@@ -81,11 +81,7 @@ fun CompassScreen(vm: CompassViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Compass",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, "Back")
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Column(
             Modifier.padding(innerPadding).padding(16.dp).fillMaxWidth(),

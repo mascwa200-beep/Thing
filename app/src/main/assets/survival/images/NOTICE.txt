@@ -12,7 +12,24 @@ or otherwise altered: the change is one of resolution and file format only, made
 corpus fits a phone (68 MB to 31 MB) without changing what the reader sees — the app draws
 these at 260dp on Android and 620dp on the desktop, so the discarded pixels were never
 displayed. Where a licence requires that modifications be indicated, this paragraph is that
-indication. SVG files are bundled unchanged, as vector.
+indication. Most SVG files are bundled unchanged, as vector; the rest are covered below.
+
+SOME DIAGRAMS THAT WERE ORIGINALLY VECTOR ARE BUNDLED AS WEBP INSTEAD. Any such file was
+rendered from the original SVG at 1280 pixels wide and composited onto a white background,
+which is the same background the rest of the line art here already carries. As above, no
+cropping, recolouring or overlay: only resolution and file format. The Commons "File:"
+links recorded below still point at the original vector works. This is stated as a rule
+rather than a list so that it stays true as the corpus grows; a file's own entry below
+names the vector it came from.
+
+There are two reasons a diagram takes that route. Two of them — circadian-clock.webp and
+female-reproductive.webp — were converted because the desktop reader's renderer could not
+parse circadian-clock.svg at all (it drew nothing and fell back to a caption) and because
+at 981 kB and 456 kB the pair were far heavier than the drawings warranted; as raster they
+are 93 kB and 76 kB. The others are vectors that arrived over the 390 kB ceiling this
+corpus places on bundled SVG — a limit that exists because a heavy vector can stall a phone
+renderer — and which would otherwise have been discarded even though the drawing was the
+right one for the page.
 
 
   reef-knot.webp, clove-hitch.webp, two-half-hitches.webp, taut-line-hitch.webp
@@ -41,7 +58,7 @@ here and inline in the guide text; the artwork is unaltered (see the re-encoding
 Clinical reproductive-anatomy diagrams for the Sexual Health guide
 (labelled medical schematics, artwork unaltered):
 
-  female-reproductive.svg — "Scheme female reproductive system"
+  female-reproductive.webp — "Scheme female reproductive system"
       by CDC / Mysid — public domain, Wikimedia Commons
   male-reproductive.svg — "Human male reproductive system"
       by Wumingbai — CC BY-SA 4.0, Wikimedia Commons
@@ -54,7 +71,7 @@ original upload where noted, to keep the bundle size reasonable; artwork itself 
   sleep-hypnogram.svg — "Hypnogram of sleep between midnight and 6.30 am"
       by RazerM — CC BY-SA 3.0, Wikimedia Commons
       https://commons.wikimedia.org/wiki/File:Sleep_Hypnogram.svg
-  circadian-clock.svg — "Overview of biological circadian clock in humans"
+  circadian-clock.webp — "Overview of biological circadian clock in humans"
       by YassineMrabet (fixed by Addicted04) — CC BY-SA 3.0, Wikimedia Commons
       https://commons.wikimedia.org/wiki/File:Biological_clock_human.svg
   vaccine-antibody-structure.svg — "Schematic diagram of an antibody (immunoglobulin)"
@@ -2079,3 +2096,1891 @@ below is a labelled diagram or an inscribed historical plate rather than a photo
       which is Mead's "me" regarded by the "I" — by Rcragun — CC BY 3.0, Wikimedia Commons
       (Commons cannot render a scaled thumbnail of this upload, so the original file is bundled)
       https://commons.wikimedia.org/wiki/File:The_looking_glass_self.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/cover-crops-and-green-manures.webp
+    File:Northwestern South Dakota cover crops, 2015 (20097473376).jpg
+    CC BY-SA 2.0 — USDA NRCS South Dakota
+    https://commons.wikimedia.org/wiki/File%3ANorthwestern_South_Dakota_cover_crops%2C_2015_%2820097473376%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/no-till-and-reduced-tillage-farming.webp
+    File:No-till farming, USA (9391).jpg
+    Public domain — Brandon O'Connor/Indiana NCRS
+    https://commons.wikimedia.org/wiki/File%3ANo-till_farming%2C_USA_%289391%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/soil-erosion-control-and-conservation.webp
+    File:Erosion control construction entrance.jpg
+    CC0 — Mds08011
+    https://commons.wikimedia.org/wiki/File%3AErosion_control_construction_entrance.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/tillage-systems-and-field-preparation.webp
+    File:No-till farming, USA (9391).jpg
+    Public domain — Brandon O'Connor/Indiana NCRS
+    https://commons.wikimedia.org/wiki/File%3ANo-till_farming%2C_USA_%289391%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/dendrochronology-tree-ring-dating.webp
+    File:1937. Ponderosa pine stump section showing tree growth rings and fire scars from 1255-1930. Deming Creek. Bly, Oregon. (34049124174).jpg
+    Public domain — R6, State &amp; Private Forestry, Forest Health Protection
+    https://commons.wikimedia.org/wiki/File%3A1937._Ponderosa_pine_stump_section_showing_tree_growth_rings_and_fire_scars_from_1255-1930._Deming_Creek._Bly%2C_Oregon._%2834049124174%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/lidar-in-archaeology.webp
+    File:Ouster OS1-64 lidar point cloud of intersection of Folsom and Dore St, San Francisco.png
+    CC BY 4.0 — Daniel L. Lu
+    https://commons.wikimedia.org/wiki/File%3AOuster_OS1-64_lidar_point_cloud_of_intersection_of_Folsom_and_Dore_St%2C_San_Francisco.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/potassium-argon-and-argon-argon-dating.svg
+    File:Potassium-40-decay-scheme.svg
+    CC BY-SA 3.0 — Tubas-en
+    https://commons.wikimedia.org/wiki/File%3APotassium-40-decay-scheme.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/radiocarbon-dating.svg
+    File:Radiocarbon Date Calibration Curve.svg
+    CC BY-SA 3.0 — HowardMorland
+    https://commons.wikimedia.org/wiki/File%3ARadiocarbon_Date_Calibration_Curve.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/seriation-and-typology.webp
+    File:Seriation Ideal 3Polynom.png
+    Public domain — The original uploader was Archy33 at English Wikipedia.
+    https://commons.wikimedia.org/wiki/File%3ASeriation_Ideal_3Polynom.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/stratigraphy-and-the-harris-matrix.svg
+    File:Harris matrix example.svg
+    CC BY-SA 4.0 — DnaX
+    https://commons.wikimedia.org/wiki/File%3AHarris_matrix_example.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/archaeoastronomy-ancient-skywatchers.webp
+    File:Newgrange Eingang Stein.jpg
+    CC BY 2.5 — Clemensfranz
+    https://commons.wikimedia.org/wiki/File%3ANewgrange_Eingang_Stein.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/islamic-and-medieval-astronomy.webp
+    File:Timbuktu-manuscripts-astronomy-mathematics.jpg
+    Public domain — Elias Altmimi
+    https://commons.wikimedia.org/wiki/File%3ATimbuktu-manuscripts-astronomy-mathematics.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ptolemy-and-geocentric-astronomy.webp
+    File:A modern reconstruction of Claudius Ptolemy's map of Europe and North Africa by Kotsanas Museum of Ancient Greek Technology.jpg
+    CC BY 4.0 — Aga39memnon
+    https://commons.wikimedia.org/wiki/File%3AA_modern_reconstruction_of_Claudius_Ptolemy%27s_map_of_Europe_and_North_Africa_by_Kotsanas_Museum_of_Ancient_Greek_Technology.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-copernican-revolution.webp
+    File:Copernican heliocentrism diagram-2.jpg
+    Public domain — Copernican_heliocentrism_diagram.jpg: Own work from Copernicus 1543 derivative work: Professor margi
+    https://commons.wikimedia.org/wiki/File%3ACopernican_heliocentrism_diagram-2.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-discovery-of-uranus-and-neptune.webp
+    File:Discovery of Neptune1846.png
+    CC BY-SA 4.0 — Zonk43
+    https://commons.wikimedia.org/wiki/File%3ADiscovery_of_Neptune1846.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-great-debate-and-the-discovery-of-galaxies.webp
+    File:PSM V60 D298 Great nebula in andromeda.png
+    Public domain — Ritchey (December 31, 1864 – November 4, 1945) in an article by George E. Hale (June 29, 1868 – Febr
+    https://commons.wikimedia.org/wiki/File%3APSM_V60_D298_Great_nebula_in_andromeda.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/chloroplasts-and-plastids.svg
+    File:Plastids types en.svg
+    Public domain — Mariana Ruiz Villarreal LadyofHats
+    https://commons.wikimedia.org/wiki/File%3APlastids_types_en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/mitochondria-the-cell-s-powerhouses.svg
+    File:Electron transport chain.svg
+    Public domain — T-Fork
+    https://commons.wikimedia.org/wiki/File%3AElectron_transport_chain.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-cell-nucleus-and-nuclear-envelope.svg
+    File:Diagram human cell nucleus multilang.svg
+    Public domain — Mariana Ruiz LadyofHats
+    https://commons.wikimedia.org/wiki/File%3ADiagram_human_cell_nucleus_multilang.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/relative-dating-methods-in-archaeology.webp
+    File:Lapa do Santo - Rock art - C-shaped head anthropomorph Schematic relative dating.png
+    CC BY-SA 4.0 — Walter A. Neves , Astolfo G. M. Araujo, Danilo V. Bernardo, Renato Kipnis, James K. Feathers
+    https://commons.wikimedia.org/wiki/File%3ALapa_do_Santo_-_Rock_art_-_C-shaped_head_anthropomorph_Schematic_relative_dating.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/thermoluminescence-and-optically-stimulated-luminescence-dat.svg
+    File:Quartz UV NET NTL Curve.svg
+    CC BY-SA 3.0 — GeoGammaMorphologe
+    https://commons.wikimedia.org/wiki/File%3AQuartz_UV_NET_NTL_Curve.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/a-history-of-astronomy.webp
+    File:Johannes-kepler-tabulae-rudolphinae-google-arts-culture.jpg
+    Public domain — Johannes Kepler
+    https://commons.wikimedia.org/wiki/File%3AJohannes-kepler-tabulae-rudolphinae-google-arts-culture.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ribosomes-and-the-machinery-of-protein-synthesis.svg
+    File:Ribosome mRNA translation en.svg
+    Public domain — LadyofHats
+    https://commons.wikimedia.org/wiki/File%3ARibosome_mRNA_translation_en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-endoplasmic-reticulum.svg
+    File:Nucleus ER golgi.svg
+    CC BY 3.0 — Nucleus ER golgi.jpg: Magnus Manske / derivative work: Pbroks13
+    https://commons.wikimedia.org/wiki/File%3ANucleus_ER_golgi.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-golgi-apparatus-and-protein-trafficking.svg
+    File:Golgi apparatus (borderless version)-en.svg
+    CC BY 3.0 — Kelvinsong
+    https://commons.wikimedia.org/wiki/File%3AGolgi_apparatus_%28borderless_version%29-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-nucleolus-and-ribosome-assembly.svg
+    File:Diagram human cell nucleus multilang.svg
+    Public domain — Mariana Ruiz LadyofHats
+    https://commons.wikimedia.org/wiki/File%3ADiagram_human_cell_nucleus_multilang.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-sodium-potassium-pump.svg
+    File:Scheme sodium-potassium pump-bs.svg
+    Public domain — LadyofHats Mariana Ruiz Villarreal
+    https://commons.wikimedia.org/wiki/File%3AScheme_sodium-potassium_pump-bs.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/vesicle-transport-and-the-secretory-pathway.svg
+    File:Liposome scheme-en.svg
+    CC BY-SA 3.0 — SuperManu
+    https://commons.wikimedia.org/wiki/File%3ALiposome_scheme-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/building-a-minimum-viable-product.webp
+    File:From minimum viable product to more complex product.png
+    CC BY-SA 4.0 — Teemu
+    https://commons.wikimedia.org/wiki/File%3AFrom_minimum_viable_product_to_more_complex_product.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/competitor-analysis-for-new-ventures.webp
+    File:Venture Capital Fund Diagram.png
+    Public domain — Urbanrenewal
+    https://commons.wikimedia.org/wiki/File%3AVenture_Capital_Fund_Diagram.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/sizing-a-market-opportunity.webp
+    File:LPO Market Size and Growth.png
+    CC BY-SA 3.0 — Cekbrooks
+    https://commons.wikimedia.org/wiki/File%3ALPO_Market_Size_and_Growth.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/colligative-properties-of-solutions.webp
+    File:Freezing point depression and boiling point elevation.png
+    CC BY-SA 3.0 — Tomas er
+    https://commons.wikimedia.org/wiki/File%3AFreezing_point_depression_and_boiling_point_elevation.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/kinetic-molecular-theory-of-gases.svg
+    File:Increasing disorder.svg
+    CC BY 2.5 — Maxwell's_demon.svg: User:Htkym derivative work: Dhollm (talk)
+    https://commons.wikimedia.org/wiki/File%3AIncreasing_disorder.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/osmosis-and-osmotic-pressure.webp
+    File:Simplistic pressure retarded osmosis power generation diagram.jpg
+    CC BY-SA 3.0 — Starsend
+    https://commons.wikimedia.org/wiki/File%3ASimplistic_pressure_retarded_osmosis_power_generation_diagram.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/partial-pressures-and-dalton-s-law.svg
+    File:Dalton's law of partial pressures.svg
+    CC BY-SA 4.0 — Andrew Jarvis
+    https://commons.wikimedia.org/wiki/File%3ADalton%27s_law_of_partial_pressures.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/real-gases-and-the-van-der-waals-equation.webp
+    File:Tr vs Pitzer factor.png
+    CC BY-SA 4.0 — John H. Lienhard IV
+    https://commons.wikimedia.org/wiki/File%3ATr_vs_Pitzer_factor.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-feedback-loops.webp
+    File:The methane climate feedback loop for natural ecosystems.jpg
+    CC BY-SA 4.0 — Joshua Dean
+    https://commons.wikimedia.org/wiki/File%3AThe_methane_climate_feedback_loop_for_natural_ecosystems.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-models-and-projections.webp
+    File:Global Climate Model.png
+    Public domain — NOAA
+    https://commons.wikimedia.org/wiki/File%3AGlobal_Climate_Model.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/climate-sensitivity-and-radiative-forcing.svg
+    File:Climate sensitivity diagram.svg
+    CC BY-SA 4.0 — Femkemilene
+    https://commons.wikimedia.org/wiki/File%3AClimate_sensitivity_diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/global-warming-causes-and-evidence.svg
+    File:1979- Radiative forcing - climate change - global warming - EPA NOAA.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A1979-_Radiative_forcing_-_climate_change_-_global_warming_-_EPA_NOAA.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/milankovitch-cycles-and-orbital-forcing.svg
+    File:Vostok Petit data.svg
+    CC BY-SA 3.0 — Original: Unknown Vector: Autopilot
+    https://commons.wikimedia.org/wiki/File%3AVostok_Petit_data.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ocean-acidification.svg
+    File:Carbonate system of seawater.svg
+    Public domain — Karbonatsystem Meerwasser de.svg: User:BeAr / derivative work: Meiyuchang
+    https://commons.wikimedia.org/wiki/File%3ACarbonate_system_of_seawater.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/paleoclimatology-reading-past-climates.svg
+    File:Holocene Temperature Variations (2026).svg
+    CC BY-SA 4.0 — Dawei20
+    https://commons.wikimedia.org/wiki/File%3AHolocene_Temperature_Variations_%282026%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/permafrost-thaw-and-the-carbon-feedback.svg
+    File:Carbon cycle-cute diagram.svg
+    Public domain — Original: Kevin Saff Vector: FischX
+    https://commons.wikimedia.org/wiki/File%3ACarbon_cycle-cute_diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/sea-level-rise-and-its-causes.svg
+    File:2015-2100 Impacts of global warming on glaciers and sea level rise.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A2015-2100_Impacts_of_global_warming_on_glaciers_and_sea_level_rise.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-antarctic-and-greenland-ice-sheets.svg
+    File:20201210 Antarctica ice mass variation - NASA GRACE-en.svg
+    CC BY-SA 4.0 — Employee(s) of NASA, U.S. government, in the ordinary course of their employment duties.
+    https://commons.wikimedia.org/wiki/File%3A20201210_Antarctica_ice_mass_variation_-_NASA_GRACE-en.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-programming-languages.webp
+    File:Fortran acs cover.jpeg
+    Public domain — original uploader was en:User:Muhandis
+    https://commons.wikimedia.org/wiki/File%3AFortran_acs_cover.jpeg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-the-internet-and-arpanet.webp
+    File:Arpanet map 1973.jpg
+    Public domain — ARPANET
+    https://commons.wikimedia.org/wiki/File%3AArpanet_map_1973.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-the-personal-computer.webp
+    File:77 68 home computer under development.jpg
+    CC BY-SA 3.0 — see source
+    https://commons.wikimedia.org/wiki/File%3A77_68_home_computer_under_development.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-video-game-consoles.webp
+    File:TeleGames-Atari-Pong.jpg
+    CC BY-SA 3.0 — Evan-Amos
+    https://commons.wikimedia.org/wiki/File%3ATeleGames-Atari-Pong.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-eniac-and-the-first-electronic-computers.webp
+    File:Two women operating ENIAC (full resolution).jpg
+    Public domain — Unidentified U.S. Army photographer
+    https://commons.wikimedia.org/wiki/File%3ATwo_women_operating_ENIAC_%28full_resolution%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-home-computer-era.webp
+    File:Altair 8800 Computer.jpg
+    Public domain — Swtpc6800 en:User:Swtpc6800 Michael Holley
+    https://commons.wikimedia.org/wiki/File%3AAltair_8800_Computer.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-integrated-circuit-and-moore-s-law.webp
+    File:3 watt power LED after removing phosphor.jpg
+    CC BY-SA 4.0 — Ashkananisi7
+    https://commons.wikimedia.org/wiki/File%3A3_watt_power_LED_after_removing_phosphor.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-microprocessor-revolution.svg
+    File:Z80 arch.svg
+    CC BY-SA 3.0 — Appaloosa
+    https://commons.wikimedia.org/wiki/File%3AZ80_arch.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-transistor-and-the-birth-of-modern-electronics.webp
+    File:IGBT Cross Section.jpg
+    Public domain — Wefoij at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3AIGBT_Cross_Section.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-unix-story-and-its-legacy.svg
+    File:Operating systems used on top 500 supercomputers.svg
+    Public domain — Benedikt.Seidl
+    https://commons.wikimedia.org/wiki/File%3AOperating_systems_used_on_top_500_supercomputers.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-world-wide-web-origins-and-evolution.webp
+    File:CERN web corridor.jpg
+    CC BY-SA 4.0 — Lupus sat
+    https://commons.wikimedia.org/wiki/File%3ACERN_web_corridor.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/alan-turing-and-the-foundations-of-computer-science.webp
+    File:Alan Turing Blue Plaque, University of Manchester.jpg
+    CC BY 2.0 — Dunk 🐝
+    https://commons.wikimedia.org/wiki/File%3AAlan_Turing_Blue_Plaque%2C_University_of_Manchester.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/bacterial-spores-and-why-they-survive-cooking.webp
+    File:Bacillus subtilis endospore stain.png
+    CC0 — WMrapids
+    https://commons.wikimedia.org/wiki/File%3ABacillus_subtilis_endospore_stain.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-bacteria-grow-in-food.svg
+    File:Food Safety 1.svg
+    CC BY-SA 4.0 — GNOME icon artists; Pbroks13 (talk)
+    https://commons.wikimedia.org/wiki/File%3AFood_Safety_1.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/water-activity-and-food-spoilage.webp
+    File:Fish drying in the sun poisson seche Madagascar.jpg
+    CC BY-SA 2.0 — Jean-Louis Vandevivère
+    https://commons.wikimedia.org/wiki/File%3AFish_drying_in_the_sun_poisson_seche_Madagascar.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/conduction-convection-and-radiant-heat.webp
+    File:Convection-snapshot.png
+    CC BY-SA 3.0 — The original uploader was Harroschmeling at German Wikipedia.
+    https://commons.wikimedia.org/wiki/File%3AConvection-snapshot.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/induction-cooking-how-the-field-heats-steel.webp
+    File:Induction heating of bar.jpg
+    CC BY-SA 3.0 — C Paice, Auckland New Zealand / Vector1 nz at en.wikipedia
+    https://commons.wikimedia.org/wiki/File%3AInduction_heating_of_bar.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/infrared-and-radiant-heat-in-cooking.webp
+    File:Far infrared heater by Bilux.jpg
+    CC BY-SA 4.0 — PalytsiaIvan
+    https://commons.wikimedia.org/wiki/File%3AFar_infrared_heater_by_Bilux.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/reading-and-calibrating-kitchen-thermometers.webp
+    File:Hand holding non-contact infrared thermometer checking a person temprature. COVID-19 Concept.jpg
+    CC BY 2.0 — Jernej Furman
+    https://commons.wikimedia.org/wiki/File%3AHand_holding_non-contact_infrared_thermometer_checking_a_person_temprature._COVID-19_Concept.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/carbonate-oxide-and-sulfide-minerals.svg
+    File:Mohs-Hardness-Graph.svg
+    CC BY-SA 4.0 — Kilawyn Punx
+    https://commons.wikimedia.org/wiki/File%3AMohs-Hardness-Graph.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/clay-minerals-and-their-uses.webp
+    File:China Clay Silos near Par - geograph.org.uk - 30198.jpg
+    CC BY-SA 2.0 — Chris J Dixon
+    https://commons.wikimedia.org/wiki/File%3AChina_Clay_Silos_near_Par_-_geograph.org.uk_-_30198.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/diamond-formation-properties-and-mining.webp
+    File:First synthetic diamonds by ASEA 1953.jpg
+    CC BY 4.0 — Erik Lundblad
+    https://commons.wikimedia.org/wiki/File%3AFirst_synthetic_diamonds_by_ASEA_1953.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/emerald-and-the-beryl-family.webp
+    File:Natural History Museum - Aquamarine, Minas Gerais.jpg
+    CC BY-SA 2.0 — thisisbossi from Washington, DC, USA
+    https://commons.wikimedia.org/wiki/File%3ANatural_History_Museum_-_Aquamarine%2C_Minas_Gerais.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/gemstones-and-gemology.svg
+    File:Gemstones.svg
+    CC0 — mystica
+    https://commons.wikimedia.org/wiki/File%3AGemstones.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/native-elements-gold-copper-and-sulfur.webp
+    File:Gold-cat12a.jpg
+    CC BY-SA 3.0 — Robert M. Lavinsky
+    https://commons.wikimedia.org/wiki/File%3AGold-cat12a.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/opal-structure-play-of-color-and-origin.webp
+    File:Opal molecular structure2.jpg
+    CC BY-SA 3.0 — Dpulitzer
+    https://commons.wikimedia.org/wiki/File%3AOpal_molecular_structure2.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/quartz-and-the-silica-minerals.svg
+    File:Quartz-alpha-pV.svg
+    CC BY-SA 4.0 — TomR
+    https://commons.wikimedia.org/wiki/File%3AQuartz-alpha-pV.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ruby-and-sapphire-the-corundum-gems.svg
+    File:Corundum-pV.svg
+    CC BY-SA 4.0 — TomR
+    https://commons.wikimedia.org/wiki/File%3ACorundum-pV.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-feldspar-group.svg
+    File:Feldspar group.svg
+    CC BY-SA 4.0 — Muskid
+    https://commons.wikimedia.org/wiki/File%3AFeldspar_group.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-mica-group.webp
+    File:Muscovite and Biotite2a.jpg
+    CC BY-SA 3.0 — Chmee2
+    https://commons.wikimedia.org/wiki/File%3AMuscovite_and_Biotite2a.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/comparative-statics-in-supply-and-demand.svg
+    File:Supply-and-demand.svg
+    CC BY-SA 3.0 — Paweł Zdziarski (faxe), Astarot
+    https://commons.wikimedia.org/wiki/File%3ASupply-and-demand.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/price-elasticity-of-demand.svg
+    File:Price elasticity of demand and revenue.svg
+    CC BY-SA 3.0 — Price_elasticity_of_demand_and_revenue.png: Original uploader was RedWordSmith at en.wikipedia deriv
+    https://commons.wikimedia.org/wiki/File%3APrice_elasticity_of_demand_and_revenue.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/price-elasticity-of-supply.svg
+    File:Price elasticity - perfectly inelastic.svg
+    CC BY-SA 4.0 — Stiegenaufgang, based on nickaat's work
+    https://commons.wikimedia.org/wiki/File%3APrice_elasticity_-_perfectly_inelastic.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/scarcity-choice-and-opportunity-cost.webp
+    File:Comparison of economic profit and accounting profit.png
+    CC BY-SA 4.0 — Dolbysurroundsound
+    https://commons.wikimedia.org/wiki/File%3AComparison_of_economic_profit_and_accounting_profit.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-law-of-demand-and-the-demand-curve.webp
+    File:Supply and demand-stacked4.png
+    CC BY-SA 4.0 — FlippyFlink
+    https://commons.wikimedia.org/wiki/File%3ASupply_and_demand-stacked4.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-law-of-supply-and-the-supply-curve.svg
+    File:Supply and demand curves.svg
+    Public domain — Wdflake at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3ASupply_and_demand_curves.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-production-possibilities-frontier.svg
+    File:Production Possibilities Frontier Curve.svg
+    CC BY-SA 3.0 — User:Everlong
+    https://commons.wikimedia.org/wiki/File%3AProduction_Possibilities_Frontier_Curve.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/procedural-memory-and-skill-automaticity.svg
+    File:Basal ganglia and related structures (2).svg
+    CC BY-SA 4.0 — File:BrainCaudatePutamen.svg: User:Leevanjackson Derivative work: User:SUM1
+    https://commons.wikimedia.org/wiki/File%3ABasal_ganglia_and_related_structures_%282%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-forgetting-curve-and-memory-decay.webp
+    File:Ebbinghaus curve.png
+    CC BY 4.0 — Jaap M. J. Murre
+    https://commons.wikimedia.org/wiki/File%3AEbbinghaus_curve.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ac-circuit-analysis-impedance-phasors-and-resonance.svg
+    File:Impedances in parallel.svg
+    CC BY-SA 3.0 — Omegatron
+    https://commons.wikimedia.org/wiki/File%3AImpedances_in_parallel.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/avionics-and-flight-instruments.webp
+    File:Airbus A380 cockpit.jpg
+    CC BY 2.0 — Naddsy
+    https://commons.wikimedia.org/wiki/File%3AAirbus_A380_cockpit.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/electric-power-transmission.webp
+    File:Sample cross-section of high tension power (pylon) line.jpg
+    CC BY-SA 3.0 — ClarkMills
+    https://commons.wikimedia.org/wiki/File%3ASample_cross-section_of_high_tension_power_%28pylon%29_line.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/generators-and-alternators.webp
+    File:Alternator voltage regulator.jpg
+    CC BY-SA 4.0 — Milicevic01
+    https://commons.wikimedia.org/wiki/File%3AAlternator_voltage_regulator.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/power-system-protection-relays-breakers-and-fuses.webp
+    File:Overlapping zones of electrical protection with labels.png
+    CC BY-SA 4.0 — Marshelec
+    https://commons.wikimedia.org/wiki/File%3AOverlapping_zones_of_electrical_protection_with_labels.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-electrical-grid-and-how-it-is-operated.webp
+    File:High voltage power grid of the United States.webp
+    CC0 — Wikideas1
+    https://commons.wikimedia.org/wiki/File%3AHigh_voltage_power_grid_of_the_United_States.webp
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/three-phase-power-systems.svg
+    File:Hawkins Electrical Guide - 3phase Elementary 6wire.svg
+    Public domain — Nehemiah Hawkins
+    https://commons.wikimedia.org/wiki/File%3AHawkins_Electrical_Guide_-_3phase_Elementary_6wire.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/transformers.svg
+    File:Transformers Animated.svg
+    Public domain — Hasbro Studios, Cartoon Network Studios
+    https://commons.wikimedia.org/wiki/File%3ATransformers_Animated.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/biomass-and-ecological-production.svg
+    File:World capture fisheries and aquaculture production by production mode.svg
+    CC BY-SA 3.0 igo — Food and Agriculture Organization
+    https://commons.wikimedia.org/wiki/File%3AWorld_capture_fisheries_and_aquaculture_production_by_production_mode.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/carrying-capacity-and-limits-to-growth.svg
+    File:World population supported by synthetic nitrogen fertilizers, OWID.svg
+    CC BY 3.0 — Our World In Data
+    https://commons.wikimedia.org/wiki/File%3AWorld_population_supported_by_synthetic_nitrogen_fertilizers%2C_OWID.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/community-ecology.webp
+    File:TrophicWeb.jpg
+    CC BY 3.0 — Thompsma
+    https://commons.wikimedia.org/wiki/File%3ATrophicWeb.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/energy-pyramids-and-ecological-efficiency.webp
+    File:Ecological Pyramid.png
+    CC BY-SA 4.0 — Swiggity.Swag.YOLO.Bro
+    https://commons.wikimedia.org/wiki/File%3AEcological_Pyramid.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/life-tables-and-survivorship-curves.webp
+    File:Survivorship Curves.jpg
+    CC BY 3.0 — Ray Husthwaite
+    https://commons.wikimedia.org/wiki/File%3ASurvivorship_Curves.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/nuclear-power-and-reactors.webp
+    File:Spent nuclear fuel in the US.jpg
+    Public domain — U.S. Government Accountability Office
+    https://commons.wikimedia.org/wiki/File%3ASpent_nuclear_fuel_in_the_US.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/primary-productivity-in-ecosystems.svg
+    File:Carbon cycle-cute diagram.svg
+    Public domain — Original: Kevin Saff Vector: FischX
+    https://commons.wikimedia.org/wiki/File%3ACarbon_cycle-cute_diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/trophic-levels-and-food-webs.svg
+    File:Ecological Pyramid.svg
+    CC BY-SA 4.0 — Swiggity.Swag.YOLO.Bro
+    https://commons.wikimedia.org/wiki/File%3AEcological_Pyramid.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/computer-aided-design-cad.webp
+    File:CAD computer-aided design.jpg
+    CC BY-SA 4.0 — Toolpathsubmanu
+    https://commons.wikimedia.org/wiki/File%3ACAD_computer-aided_design.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/engineering-drawing-and-technical-drafting.svg
+    File:Conventions of placing vues in technical drawings.svg
+    CC BY-SA 3.0 — GregorDS
+    https://commons.wikimedia.org/wiki/File%3AConventions_of_placing_vues_in_technical_drawings.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/engineering-project-management.webp
+    File:Project Management (phases).png
+    CC BY-SA 4.0 — Alphamu57
+    https://commons.wikimedia.org/wiki/File%3AProject_Management_%28phases%29.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/history-of-engineering.webp
+    File:MOSFET Structure.png
+    CC BY-SA 3.0 — Brews ohare
+    https://commons.wikimedia.org/wiki/File%3AMOSFET_Structure.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/statics-forces-and-equilibrium-in-structures.webp
+    File:Polygon of forces.png
+    Public domain — Karl fon Ott (1835-1904)
+    https://commons.wikimedia.org/wiki/File%3APolygon_of_forces.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/strength-of-materials-stress-strain-and-deformation.svg
+    File:Toughness area under curve.svg
+    CC BY-SA 4.0 — Bob Clemintime
+    https://commons.wikimedia.org/wiki/File%3AToughness_area_under_curve.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/systems-engineering.webp
+    File:Systems Engineering Process.jpg
+    Public domain — United States Defense Acquisition University
+    https://commons.wikimedia.org/wiki/File%3ASystems_Engineering_Process.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/slope-aspect-and-solar-warmth.svg
+    File:Solar altitude.svg
+    CC BY-SA 3.0 — Hartz
+    https://commons.wikimedia.org/wiki/File%3ASolar_altitude.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/using-terrain-for-wind-protection.webp
+    File:Diagram of terrain and vegetation creating sheltered microclimate.jpg
+    Public domain — San Francisco Department of City Planning
+    https://commons.wikimedia.org/wiki/File%3ADiagram_of_terrain_and_vegetation_creating_sheltered_microclimate.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/abstract-strategy-games-and-their-families.webp
+    File:Warochess zillions.jpg
+    CC BY-SA 4.0 — Warolus
+    https://commons.wikimedia.org/wiki/File%3AWarochess_zillions.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/chaturanga-the-indian-origin-of-chess.webp
+    File:Arrangement of Chess pieces in Indian Chess in an Indian Manual.png
+    CC BY-SA 4.0 — Probashibangali
+    https://commons.wikimedia.org/wiki/File%3AArrangement_of_Chess_pieces_in_Indian_Chess_in_an_Indian_Manual.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/shatranj-and-the-medieval-chess-ancestors.webp
+    File:Chaturanga Chess Set.jpg
+    CC BY-SA 4.0 — Chaturaji
+    https://commons.wikimedia.org/wiki/File%3AChaturanga_Chess_Set.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/shogi-japanese-chess-and-the-drop-rule.webp
+    File:Brooklyn Museum - Two Boys Playing Shogi with a Third Observer.jpg
+    No restrictions — see source
+    https://commons.wikimedia.org/wiki/File%3ABrooklyn_Museum_-_Two_Boys_Playing_Shogi_with_a_Third_Observer.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/xiangqi-chinese-chess-explained.webp
+    File:Chess pieces from Samarkand 700s.jpg
+    CC0 — LAS30a
+    https://commons.wikimedia.org/wiki/File%3AChess_pieces_from_Samarkand_700s.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/xiangqi-openings-and-cannon-tactics.svg
+    File:European Xiangqi Board.svg
+    CC BY-SA 4.0 — Yevrowl
+    https://commons.wikimedia.org/wiki/File%3AEuropean_Xiangqi_Board.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-botswana.webp
+    File:Botswana Map.jpg
+    Public domain — CIA
+    https://commons.wikimedia.org/wiki/File%3ABotswana_Map.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-burundi.svg
+    File:Burundi location map.svg
+    CC BY 3.0 — NordNordWest
+    https://commons.wikimedia.org/wiki/File%3ABurundi_location_map.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-cabo-verde.webp
+    File:Fogo, Cape Verde Islands.jpg
+    Public domain — Jesse AllenImage created using data from instrument EO-1 ALI, provided courtesy of the NASA EO-1 Tea
+    https://commons.wikimedia.org/wiki/File%3AFogo%2C_Cape_Verde_Islands.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-cameroon.webp
+    File:Mount Cameroon craters.jpg
+    CC BY-SA 3.0 — User:Amcaja
+    https://commons.wikimedia.org/wiki/File%3AMount_Cameroon_craters.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-chad.webp
+    File:Chad Topography.png
+    Public domain — Sadalmelik
+    https://commons.wikimedia.org/wiki/File%3AChad_Topography.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-the-central-african-republic.webp
+    File:Satellite map of the Central African Republic.png
+    Public domain — see source
+    https://commons.wikimedia.org/wiki/File%3ASatellite_map_of_the_Central_African_Republic.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-the-comoros.webp
+    File:Comoros rel91.jpg
+    Public domain — see source
+    https://commons.wikimedia.org/wiki/File%3AComoros_rel91.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/geography-of-the-democratic-republic-of-the-congo.webp
+    File:River in rainforest - North Kivu (21062578875).jpg
+    CC BY-SA 2.0 — MONUSCO Photos
+    https://commons.wikimedia.org/wiki/File%3ARiver_in_rainforest_-_North_Kivu_%2821062578875%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/coastal-storm-surge-mechanics.webp
+    File:Storm surge Wilhelmshaven.JPG
+    CC BY-SA 3.0 — Jacek Rużyczka
+    https://commons.wikimedia.org/wiki/File%3AStorm_surge_Wilhelmshaven.JPG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ice-jam-flooding-on-northern-rivers.webp
+    File:Floods on the Red River (1).jpg
+    Public domain — MODIS Rapid Response Team at NASA GSFC
+    https://commons.wikimedia.org/wiki/File%3AFloods_on_the_Red_River_%281%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/riverine-flooding-and-floodplain-dynamics.webp
+    File:Ganges River Delta, Bangladesh, India.jpg
+    Public domain — NASA
+    https://commons.wikimedia.org/wiki/File%3AGanges_River_Delta%2C_Bangladesh%2C_India.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/feeding-babies-and-introducing-solids.webp
+    File:Eleanor banana (328573115).jpg
+    CC BY 2.0 — In Memoriam: Andy / Andrew Fogg from near Cambridge, UK
+    https://commons.wikimedia.org/wiki/File%3AEleanor_banana_%28328573115%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/low-testosterone.webp
+    File:Testosterone metabolism.png
+    CC BY-SA 4.0 — Medgirl131
+    https://commons.wikimedia.org/wiki/File%3ATestosterone_metabolism.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/male-infertility.webp
+    File:Male infertility -- intermed mag.jpg
+    CC BY-SA 3.0 — Nephron
+    https://commons.wikimedia.org/wiki/File%3AMale_infertility_--_intermed_mag.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/prostate-health-and-screening.webp
+    File:Prostate cancer global epidemiology.png
+    Public domain — US govt
+    https://commons.wikimedia.org/wiki/File%3AProstate_cancer_global_epidemiology.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/understanding-your-menstrual-cycle.webp
+    File:Estradiol and progesterone % changes across the menstrual cycle.tif
+    CC BY-SA 4.0 — Drawn by Dharani Kalidasan MSc and modified by Jerilynn C. Prior BA, MD, FRCPC
+    https://commons.wikimedia.org/wiki/File%3AEstradiol_and_progesterone_%25_changes_across_the_menstrual_cycle.tif
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/big-history-from-the-big-bang-to-the-present.webp
+    File:WMAP power spectrum.jpg
+    Public domain — Uploaded by Deglr6328. (Created by NASA).
+    https://commons.wikimedia.org/wiki/File%3AWMAP_power_spectrum.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/diplomacy-and-treaties.webp
+    File:President Donald J. Trump holds a bilateral meeting with French President Emmanuel Macron (54350966064).jpg
+    Public domain — The White House
+    https://commons.wikimedia.org/wiki/File%3APresident_Donald_J._Trump_holds_a_bilateral_meeting_with_French_President_Emmanuel_Macron_%2854350966064%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/historical-geography.webp
+    File:Theatrum Orbis Terrarum, by Abraham Ortelius, World, 1572.jpg
+    Public domain — Abraham Ortelius
+    https://commons.wikimedia.org/wiki/File%3ATheatrum_Orbis_Terrarum%2C_by_Abraham_Ortelius%2C_World%2C_1572.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/oral-history-as-a-method.webp
+    File:Oral history baltimore.jpg
+    CC BY 2.0 — Baltimore Heritage
+    https://commons.wikimedia.org/wiki/File%3AOral_history_baltimore.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/periodization-how-we-divide-the-past.webp
+    File:Timeline of Indian history.jpg
+    CC BY 4.0 — Footy2000 (talk)
+    https://commons.wikimedia.org/wiki/File%3ATimeline_of_Indian_history.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-columbian-exchange.webp
+    File:400Behandlung der Syphilis.jpg
+    Public domain — Bartholomäus Steber
+    https://commons.wikimedia.org/wiki/File%3A400Behandlung_der_Syphilis.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-history-of-timekeeping-and-calendars.webp
+    File:Atomic Clock-Louis Essen.jpg
+    Public domain — National Physical Laboratory
+    https://commons.wikimedia.org/wiki/File%3AAtomic_Clock-Louis_Essen.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-philosophy-of-history.webp
+    File:Talk Philosophy history tree.png
+    CC BY-SA 4.0 — RTG
+    https://commons.wikimedia.org/wiki/File%3ATalk_Philosophy_history_tree.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-second-world-war.webp
+    File:USS SHAW exploding Pearl Harbor Nara 80-G-16871 2.jpg
+    Public domain — Unknown navy photographer
+    https://commons.wikimedia.org/wiki/File%3AUSS_SHAW_exploding_Pearl_Harbor_Nara_80-G-16871_2.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/hand-saws-and-how-to-cut-straight.webp
+    File:Five-foot crosscut saw.jpg
+    Public domain — ATsawyer at en.wikipedia
+    https://commons.wikimedia.org/wiki/File%3AFive-foot_crosscut_saw.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/reciprocating-saws-for-demolition-work.webp
+    File:Reciprocating Saw.JPG
+    Public domain — Junglecat
+    https://commons.wikimedia.org/wiki/File%3AReciprocating_Saw.JPG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/prosody-stress-intonation.webp
+    File:SP 25 black text.png
+    CC0 — Aviad Albert
+    https://commons.wikimedia.org/wiki/File%3ASP_25_black_text.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/semantics-the-study-of-meaning.webp
+    File:Colortaxonomy.png
+    CC BY-SA 4.0 — Stephmau
+    https://commons.wikimedia.org/wiki/File%3AColortaxonomy.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fascism.svg
+    File:Fasces lictoriae.svg
+    Public domain — F l a n k e r
+    https://commons.wikimedia.org/wiki/File%3AFasces_lictoriae.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/socialism.webp
+    File:Karl Marx 001 (3x4 cropped).jpg
+    Public domain — John Jabez Edwin Mayall
+    https://commons.wikimedia.org/wiki/File%3AKarl_Marx_001_%283x4_cropped%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/genre-theory-the-classification-of-literature.webp
+    File:Allegories of literary genre.jpg
+    Public domain — Constant Montald
+    https://commons.wikimedia.org/wiki/File%3AAllegories_of_literary_genre.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/timber-defects-knots-shakes-and-checks.webp
+    File:Fraxinus excelsior crosssection.jpg
+    Public domain — No machine-readable author provided. Lumbar~commonswiki assumed (based on copyright claims).
+    https://commons.wikimedia.org/wiki/File%3AFraxinus_excelsior_crosssection.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/infinity-and-the-continuum.svg
+    File:Cantor's first uncountability proof Case 1 svg.svg
+    CC BY-SA 4.0 — Jochen Burghardt
+    https://commons.wikimedia.org/wiki/File%3ACantor%27s_first_uncountability_proof_Case_1_svg.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/charlie-chaplin-and-silent-comedy.webp
+    File:Charlie Chaplin (left) in Making a Living 1914.jpg
+    Public domain — Keystone Studios in Edendale, Los Angeles, California, 1914
+    https://commons.wikimedia.org/wiki/File%3ACharlie_Chaplin_%28left%29_in_Making_a_Living_1914.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/early-film-movements-german-expressionism-and-soviet-montage.webp
+    File:Filmstudio Babelsberg Eingang.jpg
+    Public domain — Unify
+    https://commons.wikimedia.org/wiki/File%3AFilmstudio_Babelsberg_Eingang.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/orson-welles-and-citizen-kane.webp
+    File:Citizen-Kane-Welles-Breakfast.jpg
+    Public domain — RKO Radio Pictures, still photographer Alexander Kahle
+    https://commons.wikimedia.org/wiki/File%3ACitizen-Kane-Welles-Breakfast.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-hollywood-studio-system-and-the-golden-age-of-film.webp
+    File:Gate 2, Universal Studios Lot.jpg
+    CC BY 4.0 — Coolcaesar
+    https://commons.wikimedia.org/wiki/File%3AGate_2%2C_Universal_Studios_Lot.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/arteries-veins-and-capillaries-vascular-anatomy.webp
+    File:Image of a wrist with blue veins visible.JPG
+    CC BY-SA 3.0 — ARBAY
+    https://commons.wikimedia.org/wiki/File%3AImage_of_a_wrist_with_blue_veins_visible.JPG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/blood-plasma-cells-and-what-it-carries.webp
+    File:Blausen 0087 Blood Transfusion.png
+    CC BY 3.0 — BruceBlaus. When using this image in external sources it can be cited as: Blausen.com staff (2014). 
+    https://commons.wikimedia.org/wiki/File%3ABlausen_0087_Blood_Transfusion.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/hematopoiesis-how-blood-cells-are-made.svg
+    File:Red blood cells.svg
+    CC BY-SA 4.0 — Jessica Polka
+    https://commons.wikimedia.org/wiki/File%3ARed_blood_cells.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-coronary-circulation.svg
+    File:Coronary arteries.svg
+    CC BY-SA 3.0 — Coronary.pdf: Patrick J. Lynch, medical illustrator derivative work: Fred the Oyster adaption and fu
+    https://commons.wikimedia.org/wiki/File%3ACoronary_arteries.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/side-hilling-and-traversing-slopes.webp
+    File:Tamaras traverse.JPG
+    CC BY-SA 4.0 — KSszilas
+    https://commons.wikimedia.org/wiki/File%3ATamaras_traverse.JPG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/pitch-frequency-and-the-harmonic-series.svg
+    File:Harmonic partials on strings.svg
+    Public domain — Qef / Houtlijm
+    https://commons.wikimedia.org/wiki/File%3AHarmonic_partials_on_strings.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/measuring-distance-on-a-map-accurately.webp
+    File:Map of Holland- According to Astronomical Observations, Measurements of Schnellius & c. and the Superiorly Redesigned Special Maps of F. L. Güssefeld WDL1132.png
+    Public domain — Güssefeld, Franz Ludwig (1744-1807)
+    https://commons.wikimedia.org/wiki/File%3AMap_of_Holland-_According_to_Astronomical_Observations%2C_Measurements_of_Schnellius_%26_c._and_the_Superiorly_Redesigned_Special_Maps_of_F._L._G%C3%BCssefeld_WDL1132.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/reading-the-margin-of-a-topographic-map.svg
+    File:Soviet topographic map codes.svg
+    CC BY-SA 3.0 — Hellerick
+    https://commons.wikimedia.org/wiki/File%3ASoviet_topographic_map_codes.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/standard-topographic-map-symbols-in-the-field.webp
+    File:Topographic-Relief-perspective-sample.jpg
+    CC BY-SA 3.0 — Kbh3rd at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3ATopographic-Relief-perspective-sample.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/carbohydrates-and-blood-sugar.webp
+    File:Suckale08 fig3 glucose insulin day.png
+    CC BY 3.0 — Jakob Suckale, Michele Solimena
+    https://commons.wikimedia.org/wiki/File%3ASuckale08_fig3_glucose_insulin_day.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/dietary-fats-saturated-unsaturated-and-trans-fats.webp
+    File:XBio illustration – Polyunsaturated Fatty Acid.png
+    CC BY 4.0 — explorebiology
+    https://commons.wikimedia.org/wiki/File%3AXBio_illustration_%E2%80%93_Polyunsaturated_Fatty_Acid.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-b-vitamins-and-their-functions.svg
+    File:(R)-Pantothenic acid Formula V.1.svg
+    CC0 — Jü
+    https://commons.wikimedia.org/wiki/File%3A%28R%29-Pantothenic_acid_Formula_V.1.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/aesthetics-the-philosophy-of-art-and-beauty.svg
+    File:Aesthetic concepts.svg
+    CC0 — Phlsph7
+    https://commons.wikimedia.org/wiki/File%3AAesthetic_concepts.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/kinematics-describing-motion.svg
+    File:Velocity Time physics graph.svg
+    CC BY-SA 4.0 — Luisvallejomohl
+    https://commons.wikimedia.org/wiki/File%3AVelocity_Time_physics_graph.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/projectile-motion-and-trajectories.svg
+    File:Free body diagram gravity air resistance.svg
+    CC0 — Original: SkorkmazLilbitmessy Vector: Vectorizer
+    https://commons.wikimedia.org/wiki/File%3AFree_body_diagram_gravity_air_resistance.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/rotational-dynamics-and-moment-of-inertia.svg
+    File:Moment of inertia rod center.svg
+    CC0 — Krishnavedala
+    https://commons.wikimedia.org/wiki/File%3AMoment_of_inertia_rod_center.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/torque-and-rotational-equilibrium.svg
+    File:Diagram of a ball placed in an unstable equilibrium.svg
+    CC BY-SA 4.0 — OrdinaryArtery
+    https://commons.wikimedia.org/wiki/File%3ADiagram_of_a_ball_placed_in_an_unstable_equilibrium.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/anxiety-disorders-an-overview.svg
+    File:20220801 Introversion - Shyness - Social anxiety disorder - comparative chart.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A20220801_Introversion_-_Shyness_-_Social_anxiety_disorder_-_comparative_chart.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/panic-disorder-and-panic-attacks.svg
+    File:Panic disorder svg hariadhi.svg
+    CC BY-SA 4.0 — Hariadhi
+    https://commons.wikimedia.org/wiki/File%3APanic_disorder_svg_hariadhi.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-metre-definition-history-and-realisation.webp
+    File:Prototype mass drifts.jpg
+    CC BY-SA 3.0 — Greg L at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3APrototype_mass_drifts.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/incident-command-system-for-rescue.webp
+    File:ICS Structure.PNG
+    Public domain — Federal Emergency Management Agency
+    https://commons.wikimedia.org/wiki/File%3AICS_Structure.PNG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/double-overhand-and-barrel-knots.svg
+    File:Double overhand knot.svg
+    Public domain — LadyofHats
+    https://commons.wikimedia.org/wiki/File%3ADouble_overhand_knot.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/sharpening-knives-and-tools.webp
+    File:Knife sharpening 02.jpg
+    CC BY-SA 4.0 — Vijayanrajapuram
+    https://commons.wikimedia.org/wiki/File%3AKnife_sharpening_02.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-overhand-knot-and-its-variations.svg
+    File:Figure-eight knot.svg
+    CC BY-SA 3.0 — Lucasbosch
+    https://commons.wikimedia.org/wiki/File%3AFigure-eight_knot.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/critical-theory-the-frankfurt-school.webp
+    File:AdornoHorkheimerHabermasbyJeremyJShapiro2.png
+    CC BY-SA 3.0 — Jeremy J. Shapiro
+    https://commons.wikimedia.org/wiki/File%3AAdornoHorkheimerHabermasbyJeremyJShapiro2.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/social-constructionism.webp
+    File:Sushi Rolls not Gender Roles (32945717780).jpg
+    CC BY 2.0 — Jeanne Menjoulet from Paris, France
+    https://commons.wikimedia.org/wiki/File%3ASushi_Rolls_not_Gender_Roles_%2832945717780%29.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/association-football-rules-and-positions.svg
+    File:Boisko.svg
+    CC BY-SA 3.0 — No machine-readable author provided. MesserWoland assumed (based on copyright claims).
+    https://commons.wikimedia.org/wiki/File%3ABoisko.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-offside-works-in-football.webp
+    File:Michigan Appalachian State line of scrimmage crop.jpg
+    CC BY-SA 2.0 — Derrick S. of flickr
+    https://commons.wikimedia.org/wiki/File%3AMichigan_Appalachian_State_line_of_scrimmage_crop.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/starting-to-exercise.webp
+    File:Ballistic training medicine ball throw.jpg
+    CC0 — Airman 1st Class Monica Roybal
+    https://commons.wikimedia.org/wiki/File%3ABallistic_training_medicine_ball_throw.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fed-constitution-class.webp
+    File:1987-S Proof Constitution Commemorative Silver Dollar $1.jpg
+    Public domain — U.S. Government
+    https://commons.wikimedia.org/wiki/File%3A1987-S_Proof_Constitution_Commemorative_Silver_Dollar_%241.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fed-defiant-class.svg
+    File:Defiant Flag (Black Sails).svg
+    CC BY-SA 4.0 — RootOfAllLight
+    https://commons.wikimedia.org/wiki/File%3ADefiant_Flag_%28Black_Sails%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fed-galaxy-class.webp
+    File:Geely Galaxy Starship 7 004.jpg
+    CC0 — JustAnotherCarDesigner
+    https://commons.wikimedia.org/wiki/File%3AGeely_Galaxy_Starship_7_004.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/fed-shuttlecraft.webp
+    File:Galileo Shuttle Space Centre Houston.jpg
+    CC BY-SA 2.0 — GorissenM
+    https://commons.wikimedia.org/wiki/File%3AGalileo_Shuttle_Space_Centre_Houston.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-a-two-stroke-engine-works.webp
+    File:Nordberg radial engine 648.JPG
+    Public domain — DanielHolth at English Wikipedia
+    https://commons.wikimedia.org/wiki/File%3ANordberg_radial_engine_648.JPG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/prehistoric-art-cave-paintings-and-the-origins-of-image-maki.webp
+    File:20,000 Year Old Cave Paintings Hyena.png
+    Public domain — Carla Hufstedler
+    https://commons.wikimedia.org/wiki/File%3A20%2C000_Year_Old_Cave_Paintings_Hyena.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/rock-art-and-petroglyphs-around-the-world.webp
+    File:Golpayegan.petroglyphs0101.jpg
+    CC BY-SA 4.0 — Asef-m-m
+    https://commons.wikimedia.org/wiki/File%3AGolpayegan.petroglyphs0101.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-stratosphere-and-the-ozone-layer.svg
+    File:Ozone cycle.svg
+    Public domain — Ozone_cycle.jpg: created by NASA derivative work: Smartse (talk)
+    https://commons.wikimedia.org/wiki/File%3AOzone_cycle.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ice-cores-and-the-climate-record.webp
+    File:Global temperature relative to peak Holocene temperature, based on ocean cores (NASA).svg
+    Public domain — James E. Hansen and Makiko Sato
+    https://commons.wikimedia.org/wiki/File%3AGlobal_temperature_relative_to_peak_Holocene_temperature%2C_based_on_ocean_cores_%28NASA%29.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/power-distribution-and-substations.webp
+    File:Electricity Grid Schematic English.svg
+    CC BY 3.0 — MBizon
+    https://commons.wikimedia.org/wiki/File%3AElectricity_Grid_Schematic_English.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/ecosystem-ecology-and-energy-flow.webp
+    File:Diagram of Trophic Layers & Energy Transfer in an Ecosystem.svg
+    CC BY-SA 4.0 — WDiment
+    https://commons.wikimedia.org/wiki/File%3ADiagram_of_Trophic_Layers_%26_Energy_Transfer_in_an_Ecosystem.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-government-works.webp
+    File:Administrative divisions of Germany.svg
+    CC BY-SA 2.0 de — Fred the Oyster (EN), Plaga med (BE), glglgl (original SVG), David Liuzzo (original PNG), C.Löser (c
+    https://commons.wikimedia.org/wiki/File%3AAdministrative_divisions_of_Germany.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/scales-keys-and-the-circle-of-fifths.webp
+    File:Circle of fifths deluxe 4.svg
+    CC BY-SA 3.0 — Just plain Bill
+    https://commons.wikimedia.org/wiki/File%3ACircle_of_fifths_deluxe_4.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-mesosphere-and-thermosphere.webp
+    File:Earth's atmosphere.svg
+    CC BY-SA 3.0 — Kelvinsong
+    https://commons.wikimedia.org/wiki/File%3AEarth%27s_atmosphere.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/soil-texture-structure-and-tilth.webp
+    File:Soil profile.svg
+    CC BY-SA 4.0 — Tomáš Kebert &amp; umimeto.org
+    https://commons.wikimedia.org/wiki/File%3ASoil_profile.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/glacial-interglacial-cycles.webp
+    File:Approximate chronology of Heinrich events vs Dansgaard-Oeschger events and Antarctic Isotope Maxima.png
+    CC BY-SA 4.0 — Goeland1234
+    https://commons.wikimedia.org/wiki/File%3AApproximate_chronology_of_Heinrich_events_vs_Dansgaard-Oeschger_events_and_Antarctic_Isotope_Maxima.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/biofilms-on-food-contact-surfaces.svg
+    File:Contact angle.svg
+    Public domain — No machine-readable author provided. Joris Gillis~commonswiki assumed (based on copyright claims).
+    https://commons.wikimedia.org/wiki/File%3AContact_angle.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/water-activity-thresholds-for-pathogens.svg
+    File:Food Safety 1.svg
+    CC BY-SA 4.0 — GNOME icon artists; Pbroks13 (talk)
+    https://commons.wikimedia.org/wiki/File%3AFood_Safety_1.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/how-heat-moves-in-the-kitchen.webp
+    File:Convection-snapshot.png
+    CC BY-SA 3.0 — The original uploader was Harroschmeling at German Wikipedia.
+    https://commons.wikimedia.org/wiki/File%3AConvection-snapshot.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/debris-flow-hazards-after-wildfire.webp
+    File:PIA22243 – Effects of Deadly California Debris Flows Seen in Before-After Images from NASA's UAVSAR.jpg
+    Public domain — NASA/JPL-Caltech
+    https://commons.wikimedia.org/wiki/File%3APIA22243_%E2%80%93_Effects_of_Deadly_California_Debris_Flows_Seen_in_Before-After_Images_from_NASA%27s_UAVSAR.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/levee-breach-behavior-and-warning-time.svg
+    File:River Levee Cross Section Figure.svg
+    CC BY-SA 3.0 — User:たまなるたみ
+    https://commons.wikimedia.org/wiki/File%3ARiver_Levee_Cross_Section_Figure.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/reading-flood-maps-and-base-flood-elevation.svg
+    File:Sketch of floodplain floodway and flood fringe.svg
+    CC0 — see source
+    https://commons.wikimedia.org/wiki/File%3ASketch_of_floodplain_floodway_and_flood_fringe.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/urban-flooding-and-storm-drain-failure.svg
+    File:Stormwater Pollution Diagram.svg
+    CC BY-SA 4.0 — TyDelargy
+    https://commons.wikimedia.org/wiki/File%3AStormwater_Pollution_Diagram.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/child-growth-and-developmental-milestones.webp
+    File:26444-two-month-developmental-milestone.jpg
+    Public domain — CDC/ Learn the Signs. Act Early.
+    https://commons.wikimedia.org/wiki/File%3A26444-two-month-developmental-milestone.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/testicular-self-examination-and-health.webp
+    File:Testicular cancer.jpg
+    CC BY-SA 4.0 — www.scientificanimations.com
+    https://commons.wikimedia.org/wiki/File%3ATesticular_cancer.jpg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/the-roman-world.svg
+    File:Map of Ancient Rome 271 AD.svg
+    CC BY-SA 3.0 — Blank map of South Europe and North Africa.svg: historicair 23:27, 8 August 2007 (UTC)
+    https://commons.wikimedia.org/wiki/File%3AMap_of_Ancient_Rome_271_AD.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/phonology-sound-systems-patterns.svg
+    File:French vowel chart.svg
+    CC BY-SA 4.0 — IPA_vowel_trapezium.svg: Moxfyre (talk) Ga_open_allophones.svg: Angr (talk) derivative work: Mr KEBA
+    https://commons.wikimedia.org/wiki/File%3AFrench_vowel_chart.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/marxism-communism.webp
+    File:Map of Marxist–Leninist states.png
+    Public domain — GOLDIEM J
+    https://commons.wikimedia.org/wiki/File%3AMap_of_Marxist%E2%80%93Leninist_states.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/narratology-how-stories-are-told.webp
+    File:Memento Timeline.png
+    CC BY-SA 3.0 — Dr Steve Aprahamian
+    https://commons.wikimedia.org/wiki/File%3AMemento_Timeline.png
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/negative-numbers-and-the-integers.svg
+    File:Integers-line -1+3.svg
+    CC0 — Averater
+    https://commons.wikimedia.org/wiki/File%3AIntegers-line_-1%2B3.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/music-notation-software-and-engraving.svg
+    File:Music notation.svg
+    Public domain — Benjamin D. Esham (bdesham)
+    https://commons.wikimedia.org/wiki/File%3AMusic_notation.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/social-anxiety-disorder.svg
+    File:20220801 Introversion - Shyness - Social anxiety disorder - comparative chart.svg
+    CC BY-SA 4.0 — RCraig09
+    https://commons.wikimedia.org/wiki/File%3A20220801_Introversion_-_Shyness_-_Social_anxiety_disorder_-_comparative_chart.svg
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------
+kb/unified-command-in-multi-agency-rescue.webp
+    File:ICS Structure.PNG
+    Public domain — Federal Emergency Management Agency
+    https://commons.wikimedia.org/wiki/File%3AICS_Structure.PNG
+
+
+Sourced from Wikimedia Commons (see the re-encoding notice above)
+--------------------------------------------------------------

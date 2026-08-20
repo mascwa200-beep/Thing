@@ -60,6 +60,8 @@ object AudioFloor {
             MediaFloor.Action.NOTHING -> {}
             MediaFloor.Action.STOP_RADIO -> RadioController.stop(app)
             MediaFloor.Action.STOP_VIDEO -> LiveVideoController.stop(app)
+            MediaFloor.Action.STOP_ONDEMAND ->
+                dev.mascwa.pulse.feature.theater.OnDemandController.stop(app)
         }
     }
 

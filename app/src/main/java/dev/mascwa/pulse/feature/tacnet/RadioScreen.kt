@@ -13,9 +13,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 fun RadioScreen(vm: RadioViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "RADIO",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         RadioBody(vm, Modifier.padding(innerPadding))
     }

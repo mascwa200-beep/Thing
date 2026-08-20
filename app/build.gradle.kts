@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.chaquopy)
 }
 
 // Read optional release-signing credentials from gradle.properties (or -P flags).
@@ -21,6 +22,23 @@ val pulseBuildNumber = (project.findProperty("PULSE_VERSION_CODE") as String?)?.
 android {
     namespace = "dev.mascwa.pulse"
     compileSdk = libs.versions.compileSdk.get().toInt()
+
+    // ⚠️ Pinned, and pinned to the SAME string the CI workflow feeds sdkmanager. AGP otherwise picks
+    // a default that varies with the AGP version, and a runner that has some other NDK installed
+    // fails with a message about the missing one rather than about anything real. The two must be
+    // edited together; there is no gate that notices if they drift.
+    ndkVersion = "27.0.12077973"
+
+    // The acoustic interrogator's native layer. See src/main/cpp/CMakeLists.txt for why this starts
+    // as a single trivial file: nothing in this repository has ever compiled native code, and the
+    // development container can neither cross compile nor reach the upstreams, so the first build
+    // of anything here happens on CI with no local gate.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 
     defaultConfig {
         applicationId = "dev.mascwa.pulse"
@@ -135,6 +153,59 @@ android {
                 "DebugProbesKt.bin",
                 "kotlin-tooling-metadata.json"
             )
+        }
+    }
+}
+
+// ---- Python (Chaquopy) ---------------------------------------------------------------------
+//
+// ⚠️ TOOLCHAIN PROOF ONLY. Nothing in the app depends on Python yet, and that is deliberate: this
+// lands alone so that when the extractor is added on top, a build failure is unambiguously in the
+// extractor rather than in the toolchain. It is the same reason the CMake/NDK proof shipped by
+// itself before whisper.cpp and llama.cpp went in — and that is the round that made those land
+// cleanly.
+//
+// ⚠️ `ndk.abiFilters` above is load-bearing here, not incidental: the plugin refuses to configure
+// without it ("Chaquopy requires ndk.abiFilters"), and arm64-v8a alone keeps the interpreter to one
+// native ABI, which is the single biggest control on what this costs in the APK.
+chaquopy {
+    defaultConfig {
+        // ⚠️ THE TARGET INTERPRETER, AND IT MUST BE SET EXPLICITLY. Chaquopy 16.1.0's
+        // `DEFAULT_PYTHON_VERSION` is **3.8** — read straight off the plugin jar by reflection, not
+        // inferred — while yt-dlp declares `requires_python >= 3.10`. So the first build with the pip
+        // requirement failed in pip's resolver, and the Gradle stack trace was long enough that the
+        // "what went wrong" line could not be read back through the log API at all. Asking the
+        // plugin what its default was answered it in one step.
+        //
+        // 3.12 rather than 3.13 deliberately: the plugin offers 3.8 through 3.13, and 3.13.0 is a
+        // .0 release with the least-exercised support of the set, where 3.12.7 is a mature point
+        // release. Nothing here needs 3.13.
+        // ⚠️ ASSIGNMENT, not a call. `PythonExtension` exposes `getVersion`/`setVersion` and no
+        // `version(String)` method — unlike `buildPython(String...)` on the very next line, which IS
+        // a method. Writing `version("3.12")` by analogy with its neighbour is a build-script compile
+        // error, and it cost a round: the javap output naming both spellings was already open at the
+        // time. Derive the call from the real declaration, never from the shape of the one beside it.
+        version = "3.12"
+
+        // The interpreter that runs on the BUILD machine, not the phone. CI's ubuntu runner has
+        // python3 preinstalled.
+        buildPython("python3")
+
+        // Ship .py rather than compiling to .pyc at build time. Compilation wants a build interpreter
+        // whose version matches the target's, and this proof has no reason to take that coupling on.
+        pyc { src = false }
+
+        pip {
+            // ⚠️ PINNED, and that is not fussiness: yt-dlp ships a release most weeks, so a floating
+            // version means the extractor silently differs between two builds of the same commit —
+            // and when extraction breaks, "which version was in that APK" is the first question.
+            //
+            // Checked on PyPI rather than assumed, because a pip dependency is exactly the kind of
+            // thing that fails in an unfamiliar way inside a build system: 2026.7.4 publishes as
+            // `py3-none-any`, a PURE-PYTHON wheel with **no native code to cross-compile**, and its
+            // `requires_dist` is EMPTY — every extra is optional. So this adds one 3.2 MB wheel and
+            // nothing else, on a build that has no Android SDK story for native Python packages.
+            install("yt-dlp==2026.7.4")
         }
     }
 }

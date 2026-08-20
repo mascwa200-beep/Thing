@@ -50,9 +50,9 @@ class RadioViewModel(
         viewModelScope.launch {
             runCatching {
                 repo.update { s ->
-                    val exists = s.favoriteRadio.any { it.streamUrl == station.streamUrl }
+                    val exists = s.favoriteRadio.any { it.sameStation(station) }
                     val next = if (exists) {
-                        s.favoriteRadio.filterNot { it.streamUrl == station.streamUrl }
+                        s.favoriteRadio.filterNot { it.sameStation(station) }
                     } else {
                         s.favoriteRadio + station
                     }

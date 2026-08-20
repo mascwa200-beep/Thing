@@ -57,6 +57,49 @@ class HttpClient(
         json.decodeFromString(deserializer, text)
     }
 
+    /** A text response, with where it actually came from. */
+    data class TextResponse(val body: String, val finalUrl: String, val contentType: String?)
+
+    /**
+     * Fetch text, giving up past [maxChars], and report the URL the response really came from.
+     *
+     * ⚠️ Two things [getString] does not do, both of which matter for an arbitrary web page rather
+     * than a known feed. **A page has no size a caller can assume** — a feed is a few hundred
+     * kilobytes by construction, a news article can be several megabytes of inlined script, and
+     * reading it whole into a string on a phone is how that becomes an out-of-memory. And **the
+     * final URL is not the requested one**: an http→https hop or a canonical redirect is routine,
+     * and resolving a page's relative images against the address that was asked for rather than the
+     * one that answered points them at the wrong host.
+     *
+     * The cap counts characters, not bytes, which is close enough for a ceiling and lets the charset
+     * be OkHttp's problem.
+     */
+    suspend fun getTextCapped(
+        url: String,
+        maxChars: Int,
+        headers: Map<String, String> = emptyMap(),
+    ): TextResponse = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .headers(defaultHeaders(headers).toHeaders())
+            .get()
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, "HTTP ${resp.code} for $url")
+            val body = resp.body ?: throw IOException("empty response")
+            val sb = StringBuilder()
+            body.charStream().use { reader ->
+                val buf = CharArray(1 shl 15)
+                var n = reader.read(buf)
+                while (n >= 0 && sb.length < maxChars) {
+                    sb.appendRange(buf, 0, minOf(n, maxChars - sb.length))
+                    n = reader.read(buf)
+                }
+            }
+            TextResponse(sb.toString(), resp.request.url.toString(), resp.header("Content-Type"))
+        }
+    }
+
     /**
      * Stream a URL to [dest], aborting if it exceeds [maxBytes]. Returns (bytesWritten, contentType?).
      *

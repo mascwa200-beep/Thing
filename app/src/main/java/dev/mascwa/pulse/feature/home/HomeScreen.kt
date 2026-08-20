@@ -195,6 +195,30 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                 // then the monitoring focus. Never chat content.
                 item { ForYouCard(state.insights, state.recommendations, nav.openRoute) }
 
+                // The launcher row: your most-opened features, one tap, no directory trip. Labelled,
+                // because the feed-filter chips further down are the same shape and an unlabelled
+                // chip row here would read as filters.
+                if (state.mostUsed.isNotEmpty()) {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                            Text(
+                                "MOST USED", fontFamily = JetBrainsMono, fontSize = 9.sp,
+                                letterSpacing = 1.5.sp, color = c.muted,
+                            )
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                state.mostUsed.forEach { (route, label) ->
+                                    dev.mascwa.pulse.feature.common.LcarsChip(
+                                        text = label, selected = false, onClick = { nav.openRoute(route) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Compact weather (temp + rain) above the sky digest.
                 if (state.weather.data?.current != null) {
                     item { WeatherMiniWidget(state.weather, nav.openWeather) }
@@ -229,13 +253,17 @@ fun HomeScreen(vm: HomeViewModel, nav: HomeNav) {
                     }
                 }
 
-                // Feed (filtered)
+                // Feed (filtered) — capped at six, because Home is a taste of the news and the
+                // NEWS tab is the news: twelve rows here duplicated most of that tab on the
+                // dashboard. The hero above shows headlines[0], so it is dropped from every feed
+                // (a TOP story can also appear in tech/politics) rather than shown twice.
+                val heroUrl = state.headlines.data?.firstOrNull()?.url
                 val feed = when (chip) {
                     "tech" -> state.tech.data
                     "pol" -> state.politics.data
                     "cult" -> state.popculture.data
                     else -> state.headlines.data
-                }.orEmpty().distinctBy { it.url }.take(12)
+                }.orEmpty().distinctBy { it.url }.filter { it.url != heroUrl }.take(6)
                 if (feed.isEmpty()) {
                     item {
                         Text(
@@ -453,23 +481,25 @@ private fun ForYouCard(
             if (topic.isNotBlank()) {
                 QuestFeedRow("◆", topic, "MONITORING · BRIEFING FOCUS", hud, hud, c) { openRoute("jarvis") }
             }
-            // The usage heuristic, as the floor rather than a peer.
+            // The usage heuristic rides BELOW the Oracle rather than being suppressed by it.
             //
-            // The Oracle already consumes your usage rhythm as one of its ~18 signals, so showing
-            // both at once would be showing a conclusion beside one of its own inputs. It earns a
-            // row only when the Oracle has nothing — a fresh install, or a genuinely quiet moment —
-            // so the card is never empty.
-            if (insights.isEmpty()) {
-                recommendations.forEach { rec ->
-                    val rk = rec.routeKey
-                    QuestFeedRow("◇", rec.headline, rec.detail, c.ink, hud, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
-                }
-                if (recommendations.isEmpty()) {
-                    QuestFeedRow(
-                        "▸", "All quiet — nothing needs you right now",
-                        "STANDING BY · ADVISORIES", c.ink2, hud, c,
-                    ) { openRoute(Routes.ORACLE) }
-                }
+            // The Oracle eats usage rhythm as one of its ~18 signals, so a recommendation pointing
+            // at the same place an insight already points would be a conclusion beside one of its
+            // own inputs — those are dropped. What survives is capped at two: the Oracle's ranked
+            // read stays the card's voice, and the habits line stops vanishing for days at a time
+            // whenever the Oracle has anything at all to say.
+            val extras = recommendations
+                .filter { rec -> rec.routeKey == null || insights.none { it.actionRoute == rec.routeKey } }
+                .take(2)
+            extras.forEach { rec ->
+                val rk = rec.routeKey
+                QuestFeedRow("◇", rec.headline, rec.detail, c.ink, hud, c, onClick = if (rk != null) ({ openRoute(rk) }) else null)
+            }
+            if (insights.isEmpty() && extras.isEmpty()) {
+                QuestFeedRow(
+                    "▸", "All quiet — nothing needs you right now",
+                    "STANDING BY · ADVISORIES", c.ink2, hud, c,
+                ) { openRoute(Routes.ORACLE) }
             }
         }
     }

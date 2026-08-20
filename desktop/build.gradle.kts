@@ -109,6 +109,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    // The DOM decimator, mirrored from core:telemetry. jsoup is plain JVM, so the desktop reads a
+    // web page with exactly the same rules the phone does.
+    implementation(libs.jsoup)
 
     testImplementation(libs.junit)
 }

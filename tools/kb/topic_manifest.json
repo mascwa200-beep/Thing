@@ -82,13 +82,13 @@
    "id": "t00014",
    "topic": "Lysosomes and Cellular Digestion",
    "category": "Biology",
-   "guideId": null
+   "guideId": "lysosomes-and-cellular-digestion"
   },
   {
    "id": "t00015",
    "topic": "Peroxisomes and Cellular Detoxification",
    "category": "Biology",
-   "guideId": null
+   "guideId": "peroxisomes-and-cellular-detoxification"
   },
   {
    "id": "t00016",
@@ -3064,7 +3064,7 @@
    "id": "t00511",
    "topic": "Decomposition and Detritivores",
    "category": "Energy & Environment",
-   "guideId": null
+   "guideId": "decomposition-and-detritivores"
   },
   {
    "id": "t00512",
@@ -4342,13 +4342,13 @@
    "id": "t00724",
    "topic": "The Quantum Mechanical Model of the Atom",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "the-quantum-mechanical-model-of-the-atom"
   },
   {
    "id": "t00725",
    "topic": "Electron Configuration and Atomic Orbitals",
    "category": "Chemistry",
-   "guideId": null
+   "guideId": "electron-configuration-and-atomic-orbitals"
   },
   {
    "id": "t00726",
@@ -7678,7 +7678,7 @@
    "id": "t01280",
    "topic": "History of Apple Inc.",
    "category": "Computing",
-   "guideId": null
+   "guideId": "history-of-apple-inc"
   },
   {
    "id": "t01281",
@@ -11782,7 +11782,7 @@
    "id": "t01964",
    "topic": "Jade — Nephrite, Jadeite and Ornamental Stone",
    "category": "Earth Science",
-   "guideId": null
+   "guideId": "jade-nephrite-jadeite-and-ornamental-stone"
   },
   {
    "id": "t01965",
@@ -12778,7 +12778,7 @@
    "id": "t02130",
    "topic": "Atmospheric Circulation and Global Wind Belts",
    "category": "Weather",
-   "guideId": null
+   "guideId": "atmospheric-circulation-and-global-wind-belts"
   },
   {
    "id": "t02131",
@@ -13216,7 +13216,7 @@
    "id": "t02203",
    "topic": "Climate Tipping Points",
    "category": "Climate",
-   "guideId": null
+   "guideId": "climate-tipping-points"
   },
   {
    "id": "t02204",
@@ -15046,7 +15046,7 @@
    "id": "t02508",
    "topic": "Structural analysis: trusses, beams and frames",
    "category": "Engineering",
-   "guideId": null
+   "guideId": "structural-analysis-trusses-beams-and-frames"
   },
   {
    "id": "t02509",
@@ -17038,7 +17038,7 @@
    "id": "t02840",
    "topic": "Grounding and earthing systems",
    "category": "Electronics",
-   "guideId": null
+   "guideId": "grounding-and-earthing-systems"
   },
   {
    "id": "t02841",
@@ -18286,7 +18286,7 @@
    "id": "t03048",
    "topic": "Geography of the Republic of the Congo",
    "category": "Geography",
-   "guideId": null
+   "guideId": "geography-of-the-republic-of-the-congo"
   },
   {
    "id": "t03049",
@@ -23350,13 +23350,13 @@
    "id": "t03892",
    "topic": "Ground-Penetrating Radar and Geophysical Survey",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "ground-penetrating-radar-and-geophysical-survey"
   },
   {
    "id": "t03893",
    "topic": "Underwater and Maritime Archaeology",
    "category": "Archaeology & Anthropology",
-   "guideId": null
+   "guideId": "underwater-and-maritime-archaeology"
   },
   {
    "id": "t03894",
@@ -24316,7 +24316,7 @@
    "id": "t04053",
    "topic": "Global Trade Networks in History",
    "category": "History",
-   "guideId": null
+   "guideId": "global-trade-networks-in-history"
   },
   {
    "id": "t04054",
@@ -30004,7 +30004,7 @@
    "id": "t05001",
    "topic": "Marxist & Political Literary Criticism",
    "category": "Literature & Writing",
-   "guideId": null
+   "guideId": "marxist-political-literary-criticism"
   },
   {
    "id": "t05002",
@@ -32194,7 +32194,7 @@
    "id": "t05366",
    "topic": "Discourse & Conversation Analysis",
    "category": "Language & Linguistics",
-   "guideId": null
+   "guideId": "discourse-conversation-analysis"
   },
   {
    "id": "t05367",
@@ -33364,7 +33364,7 @@
    "id": "t05561",
    "topic": "Roots, Radicals and Surds",
    "category": "Mathematics",
-   "guideId": null
+   "guideId": "roots-radicals-and-surds"
   },
   {
    "id": "t05562",
@@ -36448,7 +36448,7 @@
    "id": "t06075",
    "topic": "Hemostasis and the Blood Clotting Cascade",
    "category": "Medical",
-   "guideId": null
+   "guideId": "hemostasis-and-the-blood-clotting-cascade"
   },
   {
    "id": "t06076",
@@ -39586,7 +39586,7 @@
    "id": "t06598",
    "topic": "Tooth Decay and Cavities",
    "category": "Health",
-   "guideId": null
+   "guideId": "tooth-decay-and-cavities"
   },
   {
    "id": "t06599",
@@ -39688,7 +39688,7 @@
    "id": "t06615",
    "topic": "Phobias and How to Overcome Them",
    "category": "Psychology",
-   "guideId": null
+   "guideId": "phobias-and-how-to-overcome-them"
   },
   {
    "id": "t06616",
@@ -40426,7 +40426,7 @@
    "id": "t06738",
    "topic": "Protein: How Much You Need and Where to Get It",
    "category": "Nutrition",
-   "guideId": null
+   "guideId": "protein-how-much-you-need-and-where-to-get-it"
   },
   {
    "id": "t06739",
@@ -41692,7 +41692,7 @@
    "id": "t06949",
    "topic": "Triads, Seventh Chords and Chord Building",
    "category": "Music",
-   "guideId": null
+   "guideId": "triads-seventh-chords-and-chord-building"
   },
   {
    "id": "t06950",
@@ -44356,7 +44356,7 @@
    "id": "t07393",
    "topic": "Metaethics — The Nature of Moral Truth",
    "category": "Philosophy",
-   "guideId": null
+   "guideId": "metaethics-the-nature-of-moral-truth"
   },
   {
    "id": "t07394",
@@ -45736,7 +45736,7 @@
    "id": "t07623",
    "topic": "Prehistoric Religion — Burials, Figurines and the First Temples",
    "category": "Religion & Mythology",
-   "guideId": null
+   "guideId": "prehistoric-religion-burials-figurines-and-the-first-temples"
   },
   {
    "id": "t07624",
@@ -47368,7 +47368,7 @@
    "id": "t07895",
    "topic": "Postmodern & Poststructuralist Social Thought",
    "category": "Society & Culture",
-   "guideId": null
+   "guideId": "postmodern-poststructuralist-social-thought"
   },
   {
    "id": "t07896",
@@ -48910,7 +48910,7 @@
    "id": "t08152",
    "topic": "Sovereignty & the State",
    "category": "Law & Government",
-   "guideId": null
+   "guideId": "sovereignty-the-state"
   },
   {
    "id": "t08153",
@@ -50632,13 +50632,13 @@
    "id": "t08439",
    "topic": "Contour Farming, Terracing and Strip Cropping",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "contour-farming-terracing-and-strip-cropping"
   },
   {
    "id": "t08440",
    "topic": "Mulching: Materials, Methods and Timing",
    "category": "Agriculture & Gardening",
-   "guideId": null
+   "guideId": "mulching-materials-methods-and-timing"
   },
   {
    "id": "t08441",
@@ -53314,7 +53314,7 @@
    "id": "t08886",
    "topic": "Ancient Egyptian Art",
    "category": "Visual Arts & Design",
-   "guideId": null
+   "guideId": "ancient-egyptian-art"
   },
   {
    "id": "t08887",
@@ -55156,7 +55156,7 @@
    "id": "t09193",
    "topic": "Alfred Hitchcock and the Thriller",
    "category": "Media & Communication",
-   "guideId": null
+   "guideId": "alfred-hitchcock-and-the-thriller"
   },
   {
    "id": "t09194",
@@ -81304,7 +81304,7 @@
    "id": "t13551",
    "topic": "Circular Motion and Centripetal Force",
    "category": "Physics",
-   "guideId": null
+   "guideId": "circular-motion-and-centripetal-force"
   },
   {
    "id": "t13552",
@@ -82840,13 +82840,13 @@
    "id": "t13807",
    "topic": "The Telescope: A History",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "the-telescope-a-history"
   },
   {
    "id": "t13808",
    "topic": "Nicolaus Copernicus: Life and Work",
    "category": "Astronomy",
-   "guideId": null
+   "guideId": "nicolaus-copernicus-life-and-work"
   },
   {
    "id": "t13809",
@@ -87964,7 +87964,7 @@
    "id": "t14661",
    "topic": "SI Prefixes From Quecto to Quetta",
    "category": "Reference",
-   "guideId": null
+   "guideId": "si-prefixes-from-quecto-to-quetta"
   },
   {
    "id": "t14662",
@@ -90244,7 +90244,7 @@
    "id": "t15041",
    "topic": "Router Basics for Home Woodwork",
    "category": "Home & Repair",
-   "guideId": null
+   "guideId": "router-basics-for-home-woodwork"
   },
   {
    "id": "t15042",
@@ -94564,7 +94564,7 @@
    "id": "t15761",
    "topic": "Board Foot Measurement and Timber Grading",
    "category": "Making",
-   "guideId": null
+   "guideId": "board-foot-measurement-and-timber-grading"
   },
   {
    "id": "t15762",
@@ -98866,13 +98866,13 @@
    "id": "t16478",
    "topic": "Choosing a Profitable Niche",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "choosing-a-profitable-niche"
   },
   {
    "id": "t16479",
    "topic": "Choosing a Legal Business Structure",
    "category": "Business & Finance",
-   "guideId": null
+   "guideId": "choosing-a-legal-business-structure"
   },
   {
    "id": "t16480",
@@ -104662,7 +104662,7 @@
    "id": "t17444",
    "topic": "Income and Cross-Price Elasticities",
    "category": "Economics",
-   "guideId": null
+   "guideId": "income-and-cross-price-elasticities"
   },
   {
    "id": "t17445",
@@ -107530,7 +107530,7 @@
    "id": "t17922",
    "topic": "Cognitive Load Theory for Learners",
    "category": "Education & Learning",
-   "guideId": null
+   "guideId": "cognitive-load-theory-for-learners"
   },
   {
    "id": "t17923",
@@ -110410,7 +110410,7 @@
    "id": "t18402",
    "topic": "Infectious Dose and Individual Susceptibility",
    "category": "Cooking — Food Safety",
-   "guideId": null
+   "guideId": "infectious-dose-and-individual-susceptibility"
   },
   {
    "id": "t18403",
@@ -112930,7 +112930,7 @@
    "id": "t18822",
    "topic": "Using a Botanical Key to Identify Plants",
    "category": "Sustenance",
-   "guideId": null
+   "guideId": "using-a-botanical-key-to-identify-plants"
   },
   {
    "id": "t18823",
@@ -116842,7 +116842,7 @@
    "id": "t19474",
    "topic": "The Maillard Reaction Explained for Cooks",
    "category": "Cooking — Techniques",
-   "guideId": null
+   "guideId": "the-maillard-reaction-explained-for-cooks"
   },
   {
    "id": "t19475",
@@ -120364,7 +120364,7 @@
    "id": "t20061",
    "topic": "Makruk: Thai Chess and Its Origins",
    "category": "Games & Recreation",
-   "guideId": null
+   "guideId": "makruk-thai-chess-and-its-origins"
   },
   {
    "id": "t20062",
@@ -124714,7 +124714,7 @@
    "id": "t20786",
    "topic": "The Figure Eight Stopper Knot",
    "category": "Skills",
-   "guideId": null
+   "guideId": "the-figure-eight-stopper-knot"
   },
   {
    "id": "t20787",
@@ -128710,7 +128710,7 @@
    "id": "t21452",
    "topic": "Football Formations and Tactical Systems",
    "category": "Sports & Fitness",
-   "guideId": null
+   "guideId": "football-formations-and-tactical-systems"
   },
   {
    "id": "t21453",
@@ -133726,7 +133726,7 @@
    "id": "t22288",
    "topic": "Rockfall and Avalanche Terrain Awareness",
    "category": "Essentials",
-   "guideId": null
+   "guideId": "rockfall-and-avalanche-terrain-awareness"
   },
   {
    "id": "t22289",
@@ -134860,7 +134860,7 @@
    "id": "t22477",
    "topic": "Building a Personal Survival Doctrine",
    "category": "Foundations",
-   "guideId": null
+   "guideId": "building-a-personal-survival-doctrine"
   },
   {
    "id": "t22478",
@@ -136006,7 +136006,7 @@
    "id": "t22668",
    "topic": "Floodwater Contamination and Health Risks",
    "category": "Hazards",
-   "guideId": null
+   "guideId": "floodwater-contamination-and-health-risks"
   },
   {
    "id": "t22669",
@@ -137788,7 +137788,7 @@
    "id": "t22965",
    "topic": "Search and Rescue Planning Cycle",
    "category": "Rescue",
-   "guideId": null
+   "guideId": "search-and-rescue-planning-cycle"
   },
   {
    "id": "t22966",
@@ -139624,7 +139624,7 @@
    "id": "t23271",
    "topic": "Interpreting Contour Lines on the Ground",
    "category": "Navigation",
-   "guideId": null
+   "guideId": "interpreting-contour-lines-on-the-ground"
   },
   {
    "id": "t23272",
@@ -141028,7 +141028,7 @@
    "id": "t23505",
    "topic": "Using Trekking Poles Effectively",
    "category": "Movement",
-   "guideId": null
+   "guideId": "using-trekking-poles-effectively"
   },
   {
    "id": "t23506",
@@ -142402,7 +142402,7 @@
    "id": "t23734",
    "topic": "Reading a County Hazard Mitigation Plan",
    "category": "Preparedness",
-   "guideId": null
+   "guideId": "reading-a-county-hazard-mitigation-plan"
   },
   {
    "id": "t23735",
@@ -145324,7 +145324,7 @@
    "id": "t24221",
    "topic": "The Diesel Cycle Explained",
    "category": "Vehicles & Transport",
-   "guideId": null
+   "guideId": "the-diesel-cycle-explained"
   },
   {
    "id": "t24222",

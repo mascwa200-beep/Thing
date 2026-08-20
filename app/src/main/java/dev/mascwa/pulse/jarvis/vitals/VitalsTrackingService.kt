@@ -46,9 +46,56 @@ class VitalsTrackingService : Service() {
     private var gatt: BluetoothGatt? = null
     private var scanning = false
 
+    /**
+     * Am I moving? Smoothed |accelG − 1|, or null until the first reading arrives.
+     *
+     * ⚠️ **Registered here rather than read from the Sensorium's fusion controller, and the reason
+     * is the bug this fixes.** That controller only runs while ambient sensing is switched on, and
+     * its snapshot is a StateFlow whose `movement` sits at `0f` when nothing has fed it — which
+     * reads as "definitely still" and is precisely the false certainty being removed. A listener
+     * this service owns lives exactly as long as the service, so "no reading yet" stays null and
+     * the analyzer is told the truth. The accelerometer needs no permission, which matters:
+     * ACTIVITY_RECOGNITION is not in the manifest, so the step counter — the better signal, and the
+     * one the analyzer was designed around — is unavailable to this app at all.
+     */
+    @Volatile private var movement: Double? = null
+    private var movementEwma = 0.0
+
+    private val sensorManager by lazy {
+        getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+    }
+
+    private val motionListener = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            val (x, y, z) = e.values
+            val g = kotlin.math.sqrt(x * x + y * y + z * z) /
+                android.hardware.SensorManager.GRAVITY_EARTH
+            // The same EWMA and the same smoothing constant the Sensorium settled on, over the
+            // deviation from rest rather than the raw ~1 g magnitude — the recorded fix for
+            // "it thinks I'm moving while stationary".
+            movementEwma = MOTION_SMOOTH * movementEwma + (1 - MOTION_SMOOTH) * kotlin.math.abs(g - 1.0)
+            movement = movementEwma
+        }
+
+        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) = Unit
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannels()
+        // Cheap: NORMAL rate with a long batch latency, so the FIFO coalesces deliveries and the
+        // AP sleeps between them. A missing accelerometer simply leaves `movement` null forever,
+        // which the analyzer and the notification copy both handle honestly.
+        runCatching {
+            sensorManager?.let { sm ->
+                sm.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)?.let {
+                    sm.registerListener(
+                        motionListener, it,
+                        android.hardware.SensorManager.SENSOR_DELAY_NORMAL, MOTION_BATCH_US,
+                    )
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -144,8 +191,8 @@ class VitalsTrackingService : Service() {
         ) {
             if (characteristic.uuid != HR_MEASUREMENT) return
             val bpm = parseHeartRate(value) ?: return
-            analyzer.addSample(System.currentTimeMillis(), bpm)?.let { event ->
-                raiseCheckIn(event.bpm)
+            analyzer.addSample(System.currentTimeMillis(), bpm, movement = movement)?.let { event ->
+                raiseCheckIn(event)
             }
         }
     }
@@ -202,14 +249,17 @@ class VitalsTrackingService : Service() {
         notificationManager().notify(NOTIF_ID, ongoing(text))
     }
 
-    private fun raiseCheckIn(bpm: Int) {
-        // Rides the one LCARS board's alerting channel (RED — a vitals anomaly is worth interrupting for)
-        // instead of posting its own separate tray notification.
+    private fun raiseCheckIn(event: dev.mascwa.pulse.core.telemetry.CheckInEvent) {
+        // ⚠️ "without movement" is said ONLY when movement was actually measured and found absent.
+        // It used to be said unconditionally while nothing fed the analyzer's exertion gate, so the
+        // device asserted a fact it had never checked — on its highest-severity channel, about the
+        // wearer's heart.
+        val stillness = if (event.motionChecked) " without movement" else ""
         runCatching {
             (application as dev.mascwa.pulse.PulseApplication).container.notifier.notifyUrgentLine(
                 headline = "Everything OK?",
-                detail = "Heart rate jumped to $bpm bpm without movement. Tap if you need help.",
-                key = "vitals:$bpm",
+                detail = "Heart rate jumped to ${event.bpm} bpm$stillness. Tap if you need help.",
+                key = "vitals:${event.bpm}",
                 red = true,
             )
         }
@@ -241,6 +291,7 @@ class VitalsTrackingService : Service() {
         }
         gatt = null
         scanning = false
+        runCatching { sensorManager?.unregisterListener(motionListener) }
         super.onDestroy()
     }
 
@@ -248,8 +299,13 @@ class VitalsTrackingService : Service() {
 
     companion object {
         private const val CHANNEL_ONGOING = "jarvis_vitals_ongoing"
-        private const val NOTIF_ID = 7311
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_VITALS
         private const val ACTION_STOP = "dev.mascwa.pulse.jarvis.vitals.STOP"
+
+        /** Same smoothing as SensorFusionController, so "moving" means one thing across the app. */
+        private const val MOTION_SMOOTH = 0.8
+        /** 10 s of batching: the EWMA does not need 60 ms updates and the AP should sleep. */
+        private const val MOTION_BATCH_US = 10_000_000
 
         private val HR_SERVICE: UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb")
         private val HR_MEASUREMENT: UUID = UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb")

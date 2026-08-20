@@ -26,7 +26,16 @@ import kotlinx.coroutines.withContext
  * DUMB — [sip] captures and classifies exactly once; the SensoriumEngine owns all cadence, adaptive
  * ramping, and the throttle ladder. Unlike the deleted always-recording perception sampler, the
  * microphone is opened per sip and released before returning, so between sips the mic is genuinely
- * free (and the wake-word recognizer can hold it without conflict — [micBusy] makes a sip yield).
+ * free.
+ *
+ * ⚠️ **[micBusy] does not — and must not — yield to the wake word.** An earlier version of this note
+ * claimed it did; it never has, and making it would be worse than the problem. The resident wake loop
+ * listens essentially all the time the voice service is running, so a sampler that stood down for it
+ * would never sip at all and the Sensorium's ears would be permanently deaf. The two coexist, and
+ * whether the platform lets both capture at once is a device question this cannot settle. What
+ * [micBusy] does cover is the deliberate, short-lived cases where sipping is either rude or wrong:
+ * the console holding the mic for tap-to-talk, and the computer speaking — see the wiring in
+ * `AppContainer` for why the second one matters more than it looks.
  *
  * Privacy: classify-then-discard. Raw audio exists only in the recorder's buffer during the sip;
  * only text labels leave this class. Fully defensive: no permission, no model, hardware or classifier
@@ -35,7 +44,7 @@ import kotlinx.coroutines.withContext
 class AmbientAudioSampler(
     private val context: Context,
     private val http: HttpClient,
-    /** Returns true while something else (wake word, console capture) owns the microphone. */
+    /** True while a sip would be rude or misleading — see the class note and the `AppContainer` wiring. */
     private val micBusy: () -> Boolean = { false },
 ) {
     private val mutex = Mutex()

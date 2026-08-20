@@ -30,17 +30,21 @@ object Geo {
         return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 
-    /** "1.2 km" / "840 m" / "12.4 km". */
-    fun formatDistance(meters: Double, metric: Boolean = true): String {
-        return if (metric) {
-            if (meters < 1000) "${meters.roundToInt()} m"
-            else "${"%.1f".format(meters / 1000)} km"
-        } else {
-            val miles = meters / 1609.344
-            if (miles < 0.1) "${(meters / 0.3048).roundToInt()} ft"
-            else "${"%.1f".format(miles)} mi"
-        }
-    }
+    /**
+     * "1.2 km" / "840 m" / "12.4 km" — delegated, not reimplemented.
+     *
+     * ⚠️ This used to be a second copy of the same arithmetic, identical in every respect except
+     * that it formatted with the **default locale** while its twin used `Locale.US`. So the same
+     * distance rendered as "1.2 km" or "1,2 km" depending on nothing but which of two
+     * indistinguishable functions the screen happened to call — the NAV banner and a Nearest Help
+     * row could disagree on the same figure at the same moment.
+     *
+     * The fix is convergence rather than a locale patch: [Geodesy.formatDistance] is the CI-tested
+     * one and its behaviour is pinned by its own tests, so it wins and this becomes a forwarder.
+     * A duplicated definition is a mistake this repository has now corrected in five places.
+     */
+    fun formatDistance(meters: Double, metric: Boolean = true): String =
+        dev.mascwa.pulse.core.telemetry.Geodesy.formatDistance(meters, metric)
 
     /** 16-point compass label for a bearing in degrees. */
     fun cardinal(bearing: Double): String {

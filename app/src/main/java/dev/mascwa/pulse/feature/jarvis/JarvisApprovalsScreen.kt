@@ -43,9 +43,7 @@ fun JarvisApprovalsScreen(vm: JarvisApprovalsViewModel, onBack: () -> Unit) {
 
     PulseScaffold(
         title = "APPROVALS",
-        navigationIcon = {
-            IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),

@@ -52,6 +52,7 @@ import dev.mascwa.pulse.feature.settings.SettingsViewModel
 import dev.mascwa.pulse.feature.weather.WeatherScreen
 import dev.mascwa.pulse.feature.weather.WeatherViewModel
 import dev.mascwa.pulse.navigation.LocalConsoleSection
+import dev.mascwa.pulse.navigation.SHORTCUT_ROUTES
 import dev.mascwa.pulse.navigation.sectionOf
 import dev.mascwa.pulse.navigation.Routes
 import dev.mascwa.pulse.navigation.TOP_DESTINATIONS
@@ -63,6 +64,8 @@ fun PulseApp(
     isOnline: Boolean = true,
     onRouteVisit: (String) -> Unit = {},
     onStartRouteConsumed: () -> Unit = {},
+    /** The Computer's screen-open requests (the `open` tool) — see the collector below. */
+    navigationRequests: kotlinx.coroutines.flow.Flow<String>? = null,
 ) {
     val navController = rememberNavController()
     var offlineDismissed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -78,6 +81,31 @@ fun PulseApp(
             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    /**
+     * THE one way to open anything: a bottom-nav tab gets the tab treatment (stack cleared, state
+     * saved/restored), everything else pushes so back returns whence you came. The top-vs-push
+     * branch used to be duplicated at two call sites and half-applied at six more — Settings was
+     * top-leveled from Home but pushed from MENU (two back-stack semantics for one screen), and
+     * JARVIS, a tab, was plain-pushed from Home, silently skipping its saved state.
+     */
+    fun openApp(route: String) {
+        if (TOP_DESTINATIONS.any { it.route == route.substringBefore('?') }) navigateTopLevel(route)
+        else navController.navigate(route) { launchSingleTop = true }
+    }
+
+    // "Computer, open the radar." The tool side only ever emits a route; navigation happens HERE,
+    // through the same openApp idiom every tap uses. The whitelist is re-checked at this trust
+    // boundary — the bus is writable by any future producer, and what a tool validated is not
+    // what the collector may assume.
+    if (navigationRequests != null) {
+        LaunchedEffect(navigationRequests) {
+            navigationRequests.collect { route ->
+                val base = route.substringBefore('?')
+                if (base in SHORTCUT_ROUTES || TOP_DESTINATIONS.any { it.route == base }) openApp(route)
+            }
         }
     }
 
@@ -132,22 +160,28 @@ fun PulseApp(
                         openNews = { navigateTopLevel(Routes.NEWS) },
                         openMarkets = { navigateTopLevel(Routes.MARKETS) },
                         openWeather = { navigateTopLevel(Routes.WEATHER) },
-                        openEconomy = { navController.navigate(Routes.ECONOMY) { launchSingleTop = true } },
-                        openFuel = { navController.navigate(Routes.FUEL) { launchSingleTop = true } },
-                        openSettings = { navigateTopLevel(Routes.SETTINGS) },
-                        openAssistant = { navController.navigate(Routes.JARVIS) { launchSingleTop = true } },
-                        openRadar = { navController.navigate(Routes.RADAR) { launchSingleTop = true } },
-                        openSpaceWeather = { navController.navigate(Routes.SPACE_WX) { launchSingleTop = true } },
-                        openRoute = { route ->
-                            if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
-                            else navController.navigate(route) { launchSingleTop = true }
-                        },
+                        openEconomy = { openApp(Routes.ECONOMY) },
+                        openFuel = { openApp(Routes.FUEL) },
+                        // Settings is PUSHED (it is not a tab; back returns to where you were) —
+                        // it used to be top-leveled here but pushed from MENU, two different
+                        // back-stack semantics for one screen depending on the door you came in.
+                        openSettings = { openApp(Routes.SETTINGS) },
+                        // JARVIS IS a tab; the plain push here skipped its saved state on the way in.
+                        openAssistant = { openApp(Routes.JARVIS) },
+                        openRadar = { openApp(Routes.RADAR) },
+                        openSpaceWeather = { openApp(Routes.SPACE_WX) },
+                        openRoute = { route -> openApp(route) },
                     ),
                 )
             }
             composable(Routes.NEWS) {
                 val vm: NewsViewModel = viewModel(factory = factory)
-                NewsScreen(vm)
+                NewsScreen(vm) { title, url ->
+                    navController.navigate(
+                        "${Routes.READER}?url=${android.net.Uri.encode(url)}" +
+                            "&title=${android.net.Uri.encode(title)}",
+                    )
+                }
             }
             composable(Routes.MARKETS) {
                 val marketsVm: MarketsViewModel = viewModel(factory = factory)
@@ -159,12 +193,23 @@ fun PulseApp(
                 val vm: WeatherViewModel = viewModel(factory = factory)
                 WeatherScreen(vm)
             }
-            composable(Routes.SETTINGS) {
+            // The category is a query argument (the `survival?guide=` precedent: defaultValue keeps
+            // a bare "settings" matching), so a deep surface can land on the right category —
+            // "settings?cat=notifications" opens Settings AT Notifications. This is what finally
+            // feeds SettingsScreen's initialCategory parameter, which had zero callers.
+            composable(
+                "${Routes.SETTINGS}?cat={cat}",
+                arguments = listOf(navArgument("cat") { defaultValue = "" }),
+            ) { entry ->
                 val vm: SettingsViewModel = viewModel(factory = factory)
+                val catArg = entry.arguments?.getString("cat").orEmpty()
                 SettingsScreen(
                     vm,
                     onOpenCrashLog = { navController.navigate(Routes.CRASH_LOG) { launchSingleTop = true } },
                     onOpenSecurityAudit = { navController.navigate(Routes.SECURITY_AUDIT) { launchSingleTop = true } },
+                    initialCategory = dev.mascwa.pulse.feature.settings.SettingsCategory.entries
+                        .firstOrNull { it.name.equals(catArg, ignoreCase = true) },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(Routes.ECONOMY) {
@@ -176,18 +221,16 @@ fun PulseApp(
                 FuelScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            val openRoute: (String) -> Unit = { route ->
-                navController.navigate(route) { launchSingleTop = true }
-            }
+            // ⚠️ Delegates to openApp — B3's ONE navigate idiom. This used to be a plain
+            // navigate{launchSingleTop}, and the Oracle routes its insights through it with TAB
+            // routes ("weather", "markets", "news", "jarvis"): a plain push stacked a second copy
+            // of a tab on the back stack instead of switching tabs, skipping the tab's saved state.
+            val openRoute: (String) -> Unit = { route -> openApp(route) }
 
             // ---- THE MENU — the flat directory: every feature, one tap, plain English ----
             composable(Routes.MENU) {
-                dev.mascwa.pulse.feature.menu.MenuScreen(
-                    onOpen = { route ->
-                        if (TOP_DESTINATIONS.any { it.route == route }) navigateTopLevel(route)
-                        else navController.navigate(route) { launchSingleTop = true }
-                    },
-                )
+                val vm: dev.mascwa.pulse.feature.menu.MenuViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.menu.MenuScreen(vm, onOpen = { route -> openApp(route) })
             }
 
             // ---- Sky ----
@@ -251,7 +294,17 @@ fun PulseApp(
             // ---- Social & search (Phase 3) — LCARS palette ----
             composable(Routes.SOCIAL) {
                 val vm: dev.mascwa.pulse.feature.social.SocialViewModel = viewModel(factory = factory)
-                dev.mascwa.pulse.feature.social.SocialScreen(vm, onBack = { navController.popBackStack() })
+                dev.mascwa.pulse.feature.social.SocialScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    // A social row whose link is a video plays HERE, in the Theater, instead of
+                    // bouncing out to a browser — the whole point of the discovery rework.
+                    onWatch = { url ->
+                        navController.navigate(
+                            "${Routes.VIEWSCREEN}?play=${android.net.Uri.encode(url)}",
+                        ) { launchSingleTop = true }
+                    },
+                )
             }
             composable(Routes.SEARCH) {
                 val vm: dev.mascwa.pulse.feature.search.SearchViewModel = viewModel(factory = factory)
@@ -263,13 +316,16 @@ fun PulseApp(
                     // one screen that owns it, which is what RecordKind.route names.
                     onOpenGuide = { id -> navController.navigate("${Routes.SURVIVAL}?guide=$id") },
                     onOpen = { r ->
-                        navController.navigate(
-                            if (r.kind == dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE) {
-                                "${Routes.SURVIVAL}?guide=${r.id}"
-                            } else {
-                                r.kind.route
-                            },
-                        )
+                        when (r.kind) {
+                            // A guide opens at the guide, via the argumented deep-link.
+                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.GUIDE ->
+                                navController.navigate("${Routes.SURVIVAL}?guide=${r.id}")
+                            // A feature's id IS its route (the FEATURE convention) — typing "radar"
+                            // and tapping the hit opens the radar, through the one navigate idiom.
+                            dev.mascwa.pulse.core.telemetry.DeviceSearch.RecordKind.FEATURE ->
+                                openApp(r.id)
+                            else -> navController.navigate(r.kind.route)
+                        }
                     },
                 )
             }
@@ -307,6 +363,52 @@ fun PulseApp(
             composable(Routes.SENSORIUM) {
                 val vm: dev.mascwa.pulse.feature.sensorium.SensoriumViewModel = viewModel(factory = factory)
                 dev.mascwa.pulse.feature.sensorium.SensoriumScreen(vm, onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.INTERROGATOR) {
+                val vm: dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.interrogator.InterrogatorScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // ⚠️ `play` is a QUERY argument, encoded at call sites (the reader-route rule: a URL
+            // carries the characters route patterns are parsed with). Plain `viewscreen`
+            // navigations and every existing deep-link still match — the base-route handling
+            // below strips `?` before comparing.
+            composable(
+                "${Routes.VIEWSCREEN}?play={play}",
+                arguments = listOf(navArgument("play") { defaultValue = "" }),
+            ) { backStackEntry ->
+                val vm: dev.mascwa.pulse.feature.theater.ViewscreenViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.theater.ViewscreenScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    playAddress = backStackEntry.arguments?.getString("play")?.takeIf { it.isNotBlank() },
+                    // Blank the argument once handled, so re-entering the composition (back from
+                    // MENU, a restored stack) does not replay the deep-link and restart playback.
+                    onPlayAddressConsumed = { backStackEntry.arguments?.putString("play", "") },
+                )
+            }
+
+            // ⚠️ The URL is a QUERY argument and is encoded at every call site. A URL contains
+            // slashes and question marks — the characters a route pattern is parsed with — so a
+            // path argument would split the route apart. Navigation decodes it once on the way in.
+            composable(
+                "${Routes.READER}?url={url}&title={title}",
+                arguments = listOf(
+                    navArgument("url") { defaultValue = "" },
+                    navArgument("title") { defaultValue = "" },
+                ),
+            ) { backStackEntry ->
+                val vm: dev.mascwa.pulse.feature.reader.ReaderViewModel = viewModel(factory = factory)
+                dev.mascwa.pulse.feature.reader.ReaderScreen(
+                    vm,
+                    url = backStackEntry.arguments?.getString("url").orEmpty(),
+                    fallbackTitle = backStackEntry.arguments?.getString("title").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(Routes.STUDY) {
@@ -428,17 +530,5 @@ fun PulseApp(
     }
 }
 
-/** Non-top routes reachable directly from a launcher shortcut or a notification deep-link — each opens
- *  straight to the page it's about (see AppShortcuts + Notifier). Everything the MENU lists is here, so
- *  any surface can deep-link any feature. */
-private val SHORTCUT_ROUTES = setOf(
-    Routes.NAV, Routes.SOS, Routes.SURVIVAL,
-    Routes.SPACE_WX, Routes.SAFETY, Routes.RADAR, Routes.ORACLE, Routes.SENSORIUM, Routes.STUDY,
-    Routes.PACKS,
-    Routes.PLACES, Routes.TOOLS, Routes.HABITAT,
-    Routes.SURVIVE, Routes.COMPASS, Routes.ORBITAL, Routes.TELEMETRY,
-    Routes.RADIO, Routes.MUSIC, Routes.NOTES, Routes.DIARY,
-    Routes.OBJECTIVES, Routes.SOCIAL, Routes.SEARCH,
-    Routes.ECONOMY, Routes.FUEL, Routes.CRASH_LOG, Routes.SECURITY_AUDIT,
-    Routes.SETTINGS,
-)
+// SHORTCUT_ROUTES — the deep-linkable set — now lives in navigation/Directory.kt, DERIVED from the
+// menu's GROUPS instead of hand-copied here. See its doc for the verified empty diff at switch-over.

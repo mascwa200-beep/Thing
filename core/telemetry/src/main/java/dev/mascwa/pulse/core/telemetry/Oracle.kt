@@ -130,7 +130,11 @@ object Oracle {
     private const val WALK_MPS = 1.35        // average walking pace
     private const val DRIVE_MPS = 11.0       // ~40 km/h effective urban drive
     private const val ARRIVE_BUFFER_MIN = 5  // be there a few minutes early
-    private const val MOVEMENT_THRESHOLD = 0.09f // smoothed motion intensity above which you're "moving"
+    // ⚠️ Borrowed, not restated. This was a private `0.09f` sitting a few files from
+    // [Sensorium.MOVEMENT_THRESHOLD], which is the same number arrived at by the same reasoning and
+    // is where the movement EWMA is actually defined. Two statements of one threshold drift, and a
+    // third consumer (the vitals exertion gate) has just appeared — so they all read one value.
+    private const val MOVEMENT_THRESHOLD = Sensorium.MOVEMENT_THRESHOLD
 
     /** Fewer than this and the queue is not worth opening the app for. */
     private const val REVIEWS_WORTH_MENTIONING = 3

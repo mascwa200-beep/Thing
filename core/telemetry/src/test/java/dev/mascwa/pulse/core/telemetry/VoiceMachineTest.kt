@@ -4,6 +4,7 @@ import dev.mascwa.pulse.core.telemetry.VoiceMachine.Action
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.Owner
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.State
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.console
+import dev.mascwa.pulse.core.telemetry.VoiceMachine.interrogator
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.micFailed
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.settle
 import dev.mascwa.pulse.core.telemetry.VoiceMachine.speaking
@@ -275,5 +276,82 @@ class VoiceMachineTest {
         assertTrue(VoiceMachine.overBudget(8, 8, 0, 120_000))          // >= turns
         assertFalse(VoiceMachine.overBudget(0, 8, 120_000, 120_000))   // > ms, not >=
         assertTrue(VoiceMachine.overBudget(0, 8, 120_001, 120_000))
+    }
+
+    // ---- the interrogator, a third continuous claimant ---------------------------------------
+
+    /**
+     * ⚠️ THE TRADEOFF, ASSERTED SO IT CANNOT DRIFT SILENTLY. Switching the interrogator on suspends
+     * the wake word, because whether two AudioRecord clients in one app both receive real audio is a
+     * device-specific question that cannot be answered from a build machine — and shipping a feature
+     * that silently records silence is worse than shipping one that says what it costs.
+     */
+    @Test
+    fun theInterrogatorSuspendsTheWakeWord() {
+        val armed = VoiceMachine.State().wants(true)
+        assertEquals(VoiceMachine.Owner.WAKE, armed.state.owner)
+
+        val on = armed.state.interrogator(true)
+        assertEquals(VoiceMachine.Owner.INTERROGATOR, on.state.owner)
+        assertEquals(VoiceMachine.Action.START_INTERROGATOR, on.action)
+
+        // And it is reversible without restarting anything.
+        val off = on.state.interrogator(false)
+        assertEquals(VoiceMachine.Owner.WAKE, off.state.owner)
+        assertEquals(VoiceMachine.Action.START_WAKE, off.action)
+    }
+
+    /** It runs with the voice assistant entirely off — the two are independent features. */
+    @Test
+    fun theInterrogatorRunsWithVoiceOff() {
+        val step = VoiceMachine.State().interrogator(true)
+        assertEquals(VoiceMachine.Owner.INTERROGATOR, step.state.owner)
+        assertEquals(VoiceMachine.Action.START_INTERROGATOR, step.action)
+        assertFalse(step.state.wanted)
+    }
+
+    /**
+     * ⚠️ A deliberate request always outranks an ambient one. Somebody tapping to talk is asking for
+     * the microphone explicitly, and a background listener that could outrank that would make the
+     * console silently useless.
+     */
+    @Test
+    fun theConsoleOutranksTheInterrogator() {
+        val listening = VoiceMachine.State().interrogator(true)
+        val opened = listening.state.console(true)
+        assertEquals(VoiceMachine.Owner.CONSOLE, opened.state.owner)
+        assertEquals("the ambient stream must actually be closed", VoiceMachine.Action.RELEASE_MIC, opened.action)
+
+        val closed = opened.state.console(false)
+        assertEquals(VoiceMachine.Owner.INTERROGATOR, closed.state.owner)
+    }
+
+    /** Speaking silences it, or the computer transcribes its own replies as somebody's argument. */
+    @Test
+    fun speakingTakesTheMicFromTheInterrogator() {
+        val listening = VoiceMachine.State().interrogator(true)
+        val speaking = listening.state.speaking()
+        assertEquals(VoiceMachine.Owner.SPEAKING, speaking.state.owner)
+        assertEquals(VoiceMachine.Action.RELEASE_MIC, speaking.action)
+        assertEquals(VoiceMachine.Owner.INTERROGATOR, speaking.state.settle().state.owner)
+    }
+
+    /** The file's central property, extended to the new owner. */
+    @Test
+    fun settlingTwiceStartsTheInterrogatorOnce() {
+        val first = VoiceMachine.State().interrogator(true)
+        assertEquals(VoiceMachine.Action.START_INTERROGATOR, first.action)
+        assertEquals(VoiceMachine.Action.NOTHING, first.state.settle().action)
+        assertEquals(VoiceMachine.Action.NOTHING, first.state.settle().state.settle().action)
+    }
+
+    /** A conversation already in flight finishes before the interrogator takes over again. */
+    @Test
+    fun aConversationInFlightOutranksTheInterrogator() {
+        val s = VoiceMachine.State(wanted = true, interrogating = true)
+        assertEquals(VoiceMachine.Owner.COMMAND, s.settle(holdFloor = true).state.owner)
+        // But holding the floor means nothing when the voice assistant is off entirely.
+        val voiceOff = VoiceMachine.State(wanted = false, interrogating = true)
+        assertEquals(VoiceMachine.Owner.INTERROGATOR, voiceOff.settle(holdFloor = true).state.owner)
     }
 }

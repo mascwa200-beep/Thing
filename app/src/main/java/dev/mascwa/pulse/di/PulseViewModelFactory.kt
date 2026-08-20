@@ -70,6 +70,8 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.tacnet.RadioViewModel(c.locationProvider, c.radioBrowserRepository, c.settingsRepository, c.tuneInRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.notes.NotesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.notes.NotesViewModel(c.notesStore)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.menu.MenuViewModel::class.java) ->
+                dev.mascwa.pulse.feature.menu.MenuViewModel(c.usageRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diary.DiaryViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diary.DiaryViewModel(c.diaryStore)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.spotify.SpotifyViewModel::class.java) ->
@@ -97,7 +99,7 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
             modelClass.isAssignableFrom(WeatherViewModel::class.java) ->
                 WeatherViewModel(c.weatherRepository, c.locationProvider, c.settingsRepository)
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest, c.oracleLearningStore, c.studyStore)
+                SettingsViewModel(c.settingsRepository, c.notificationScheduler, c.diskCache, c.notifier, c.updateRepository, c.selfCoder, c.usageRepository, c.cerebellumStore, c.profileStore, c.taskStore, c.memoryStream, c.wifiPolicyController, c.auditLedgerStore, c.ledgerSelfTest, c.oracleLearningStore, c.studyStore, c.pythonRuntime)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel::class.java) ->
                 dev.mascwa.pulse.feature.diagnostics.CrashLogViewModel(c.crashReporter, c.debugUploader)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.security.SecurityAuditViewModel::class.java) ->
@@ -106,10 +108,18 @@ class PulseViewModelFactory(private val c: AppContainer) : ViewModelProvider.Fac
                 dev.mascwa.pulse.feature.nav.NavViewModel(c.locationProvider, c.newCompassController(), c.overpassRepository, c.settingsRepository, c.waypointStore, c.safetyRepository, c.routingRepository, c.rainViewerRepository, c.radarRepository, c.trackStore, c.elevationRepository)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.objectives.ObjectivesViewModel::class.java) ->
                 dev.mascwa.pulse.feature.objectives.ObjectivesViewModel(c.calendarObjectives, c.waypointStore, c.locationProvider)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.reader.ReaderViewModel::class.java) ->
+                dev.mascwa.pulse.feature.reader.ReaderViewModel(c)
+
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.oracle.OracleViewModel::class.java) ->
                 dev.mascwa.pulse.feature.oracle.OracleViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.sensorium.SensoriumViewModel::class.java) ->
                 dev.mascwa.pulse.feature.sensorium.SensoriumViewModel(c)
+
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel::class.java) ->
+                dev.mascwa.pulse.feature.interrogator.InterrogatorViewModel(c)
+            modelClass.isAssignableFrom(dev.mascwa.pulse.feature.theater.ViewscreenViewModel::class.java) ->
+                dev.mascwa.pulse.feature.theater.ViewscreenViewModel(c)
             modelClass.isAssignableFrom(dev.mascwa.pulse.feature.study.StudyViewModel::class.java) ->
                 dev.mascwa.pulse.feature.study.StudyViewModel(c)
 

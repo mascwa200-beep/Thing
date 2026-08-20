@@ -52,6 +52,7 @@ import dev.mascwa.pulse.data.survival.supergroupOf
 import dev.mascwa.pulse.feature.common.LcarsButton
 import dev.mascwa.pulse.feature.common.LcarsChip
 import dev.mascwa.pulse.feature.common.LcarsFillRow
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -80,6 +81,11 @@ fun GuidesScreen(
 ) {
     val entries by vm.index.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+
+    // ⚠️ The system back gesture now agrees with the corner: inside a guide it closes the READER,
+    // not the whole screen. `enabled` is gated on the sub-state — an always-enabled BackHandler
+    // would swallow system back app-wide (it beats the NavHost's own handler).
+    androidx.activity.compose.BackHandler(enabled = selected != null) { vm.closeReader() }
     val mastery by vm.mastery.collectAsStateWithLifecycle()
     val taught by vm.taught.collectAsStateWithLifecycle()
     val bodyMatches by vm.bodyMatches.collectAsStateWithLifecycle()
@@ -118,30 +124,20 @@ fun GuidesScreen(
 
     PulseScaffold(
         title = selected?.title ?: "Knowledge Base",
-        navigationIcon = {
-            IconButton(onClick = { if (selected != null) vm.closeReader() else onBack?.invoke() }) {
-                Icon(LcarsIcons.ArrowBack, "Back")
-            }
-        },
+        // Context-aware: inside a guide the corner closes the READER; on the list it leaves the
+        // screen — and the system back gesture now agrees (see the BackHandler below).
+        onBack = { if (selected != null) vm.closeReader() else onBack?.invoke() },
     ) { innerPadding ->
         val sel = selected
         if (sel == null) {
             Column(Modifier.padding(innerPadding).fillMaxWidth()) {
                 // Search — instant over the index fields; section bodies stream in per shard behind it.
-                LcarsFrame(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)) {
-                    BasicTextField(
-                        value = query, onValueChange = { query = it; vm.search(it) }, singleLine = true,
-                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-                        cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth(),
-                        decorationBox = { inner ->
-                            if (query.isEmpty()) {
-                                Text("▸ SEARCH EVERYTHING — chemistry, first aid, math, wiring…",
-                                    fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
-                            }
-                            inner()
-                        },
-                    )
-                }
+                LcarsField(
+                    value = query,
+                    onValueChange = { query = it; vm.search(it) },
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
+                    placeholder = "▸ SEARCH EVERYTHING — chemistry, first aid, math, wiring…",
+                )
                 // Supergroup rail — the top level of the taxonomy.
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())

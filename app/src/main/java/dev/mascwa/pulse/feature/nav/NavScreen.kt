@@ -194,11 +194,7 @@ fun NavScreen(vm: NavViewModel, onBack: () -> Unit) {
         title = "NAV",
         // Full-bleed map: the rail would eat width the chart genuinely needs.
         rail = false,
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         NavBody(vm, Modifier.padding(innerPadding))
     }
@@ -239,6 +235,7 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
     val rainFrame by vm.rainFrame.collectAsState()
     val rainFrames by vm.rainFrames.collectAsState()
     val rainPlaying by vm.rainPlaying.collectAsState()
+    val routeState by vm.routeState.collectAsState()
     val trafficOn by vm.traffic.collectAsState()
     val seismicOn by vm.seismic.collectAsState()
     val aircraft by vm.aircraft.collectAsState()
@@ -615,7 +612,10 @@ fun NavBody(vm: NavViewModel, modifier: Modifier = Modifier) {
                     profile?.let { ElevationProfile(profile = it, c = c) }
                     // Live navigation readout — distance + driving ETA + turn arrow to the active objective.
                     readout?.let { r ->
-                        NavReadoutBanner(readout = r, heading = heading, c = c, onTap = { vm.focusActive() })
+                        NavReadoutBanner(
+                            readout = r, heading = heading, routeState = routeState,
+                            c = c, onTap = { vm.focusActive() },
+                        )
                     }
                     selectedWaypoint?.let { wp ->
                         WaypointDetailCard(
@@ -1601,7 +1601,13 @@ private fun formatScale(meters: Double): String =
 
 /** Live navigation banner: relative turn arrow + objective + distance · driving ETA (or "direct"). */
 @Composable
-private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePalette, onTap: () -> Unit) {
+private fun NavReadoutBanner(
+    readout: NavReadout,
+    heading: Float,
+    routeState: NavViewModel.RouteState,
+    c: NightwirePalette,
+    onTap: () -> Unit,
+) {
     val arrow = NavGuidance.relativeArrow(readout.bearingDeg, heading.toDouble())
     NeonPanel(Modifier.fillMaxWidth().clickable(onClick = onTap), corners = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1654,8 +1660,22 @@ private fun NavReadoutBanner(readout: NavReadout, heading: Float, c: NightwirePa
                     )
                 }
             }
+            // ⚠️ "ROUTING…" used to show for every reason the road route was absent, forever. An
+            // unreachable destination, a rate-limited server and a genuine no-route are all
+            // finished states, and the distance beside this line is already a real straight-line
+            // reading — so say which of the two you are looking at.
             if (!readout.viaRoad) {
-                Text("◢ ROUTING…", fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted)
+                when (routeState) {
+                    NavViewModel.RouteState.UNAVAILABLE -> Text(
+                        "◢ NO ROAD ROUTE — DIRECT LINE",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.amber,
+                    )
+                    NavViewModel.RouteState.RESOLVING -> Text(
+                        "◢ ROUTING…",
+                        fontFamily = JetBrainsMono, fontSize = 9.sp, color = c.muted,
+                    )
+                    else -> Unit
+                }
             }
         }
     }

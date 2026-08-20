@@ -1,7 +1,12 @@
 *.iml
 .gradle/
 # Gradle's own Kotlin-compiler-daemon/session working directory at the repo root — same root cause as the
-# build/ rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
+# build/
+
+# Python bytecode from the tools/ scripts. Same class of gap as the leading-slash `build/` fixed
+# earlier: harmless while nothing here ever ran locally, real now that it does.
+__pycache__/
+*.pyc rule below (only ever appears once a real local Kotlin/JVM build runs, e.g. `gradle :desktop:build`).
 .kotlin/
 /local.properties
 /.idea/
@@ -14,6 +19,15 @@ build/
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# The acoustic interrogator's native upstreams. CI shallow-clones whisper.cpp and llama.cpp at a
+# pinned tag into app/src/main/cpp/ before Gradle runs — they are never vendored, because a git
+# submodule needs a pinned commit SHA and the development container cannot reach GitHub to obtain
+# one. Listed BEFORE those clone steps exist, deliberately: `git add -A` has already swept one
+# stray file into a commit this session, and a multi-megabyte C++ tree is the same mistake with a
+# much worse blast radius.
+app/src/main/cpp/whisper.cpp/
+app/src/main/cpp/llama.cpp/
 *.apk
 *.aab
 *.keystore
@@ -41,3 +55,17 @@ scratchpad/**/*.class
 scratchpad/**/*.kotlin_module
 scratchpad/**/*.jar
 scratchpad/kb/index.tsv
+
+# Scratch copies of tools, which have to live beside the real ones because several resolve the
+# repo root from their own __file__. `git add -A` swept a 1300-line temp copy of the image sourcer
+# into a commit once; a name pattern is cheaper than remembering.
+tools/**/_*_TEMP.py
+
+# Regenerable local verification input: the fallacy sweep extracts this from the bundled guide
+# shards with tools-side Python. The harness is tracked; what it derives is not.
+scratchpad/fallacy/prose.txt
+
+# Measurement corpora pulled from live APIs for local validation — large, regenerable, and not
+# content the app ships. The harnesses that read them ARE committed; the data they read is not.
+scratchpad/**/sb_*.json
+scratchpad/**/corpus.tsv

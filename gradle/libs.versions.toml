@@ -27,6 +27,11 @@ serializationJson = "1.7.3"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 retrofitKotlinxConverter = "1.0.0"
+jsoup = "1.18.3"
+# Python-in-Android. Pinned to a version whose plugin jar was inspected directly rather than
+# recalled: 16.1.0 declares MIN_AGP_VERSION 7.0.0 (we are on 8.7.3) and exposes the
+# chaquopy{defaultConfig{...}} DSL used below.
+chaquopy = "16.1.0"
 
 # Storage / background / images / location
 datastore = "1.1.1"
@@ -104,6 +109,7 @@ retrofit-scalars = { group = "com.squareup.retrofit2", name = "converter-scalars
 retrofit-kotlinx-serialization = { group = "com.jakewharton.retrofit", name = "retrofit2-kotlinx-serialization-converter", version.ref = "retrofitKotlinxConverter" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 # Storage / background / images / location
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -139,6 +145,7 @@ luaj-jse = { group = "org.luaj", name = "luaj-jse", version.ref = "luaj" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
+chaquopy = { id = "com.chaquo.python", version.ref = "chaquopy" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

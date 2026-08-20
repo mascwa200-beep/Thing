@@ -2,8 +2,10 @@ package dev.mascwa.pulse.feature.sensorium
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dev.mascwa.pulse.data.sensing.SensoriumService
 import dev.mascwa.pulse.di.AppContainer
+import kotlinx.coroutines.launch
 
 /**
  * Thin projection of the Sensorium's live state for the scanner screen — every flow here is owned by
@@ -23,9 +25,20 @@ class SensoriumViewModel(private val c: AppContainer) : ViewModel() {
     /** Ask the eyes to look now — honored on the engine's next heartbeat. */
     fun lookNow() = c.sensoriumEngine.requestLook()
 
-    /** Re-arm from a foreground context (after a permission grant, or when the scanner notices the
-     *  service is running on the standby path). */
+    /**
+     * Re-arm from a foreground context (after a permission grant, or when the scanner notices the
+     * service is running on the standby path).
+     *
+     * ⚠️ Turns the feature back on first. The notification's Stop action now switches
+     * `sensing.enabled` off — otherwise `RefreshWorker` would restart the service on its next run
+     * and Stop would undo itself — so without this, ARM would start the service and the loop's
+     * first iteration would read the setting and immediately stand it down again. A button that
+     * silently does nothing is worse than the bug it was added to fix.
+     */
     fun rearm(context: Context) {
-        runCatching { SensoriumService.start(context, foregroundLaunch = true) }
+        viewModelScope.launch {
+            runCatching { c.settingsRepository.update { it.copy(sensing = it.sensing.copy(enabled = true)) } }
+            runCatching { SensoriumService.start(context, foregroundLaunch = true) }
+        }
     }
 }

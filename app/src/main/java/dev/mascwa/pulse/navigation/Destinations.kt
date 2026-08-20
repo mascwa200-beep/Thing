@@ -51,6 +51,20 @@ object Routes {
     // SENSORIUM — the ambient environment scanner (the ship's senses)
     const val SENSORIUM = "sensorium"
 
+    // The acoustic interrogator — continuous speech capture, transcription and fallacy screening.
+    const val INTERROGATOR = "interrogator"
+
+    // The viewscreen — paste an address, the bundled extractor resolves it, the player plays it.
+    const val VIEWSCREEN = "viewscreen"
+
+    /**
+     * READER — a web page with the page taken off it.
+     *
+     * ⚠️ The URL rides as a query argument and must be encoded at the call site, because a URL
+     * contains the very characters a route is parsed with.
+     */
+    const val READER = "reader"
+
     // STUDY — the bundled library taught rather than browsed
     const val STUDY = "study"
 

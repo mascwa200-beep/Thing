@@ -27,8 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -145,11 +143,7 @@ fun JarvisSetupScreen(
 
     PulseScaffold(
         title = "COMPUTER SETUP",
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Column(
             Modifier
@@ -592,16 +586,7 @@ private fun SettingToggle(title: String, subtitle: String, enabled: Boolean, onT
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = c.accent,
-                    checkedTrackColor = c.accent.copy(alpha = 0.3f),
-                    uncheckedThumbColor = c.muted,
-                    uncheckedTrackColor = c.panel,
-                ),
-            )
+            dev.mascwa.pulse.feature.common.LcarsSwitch(checked = enabled, onCheckedChange = onToggle)
         }
     }
 }

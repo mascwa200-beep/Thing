@@ -176,3 +176,155 @@ class ClipboardTool(private val context: Context) : JarvisTool {
         return "Copied to the clipboard."
     }
 }
+
+/**
+ * Play a video or track address through the on-demand player, by request.
+ *
+ * ⚠️ **Audio-only, deliberately.** A tool call has no screen attached — the request usually arrives
+ * by voice or from the console mid-conversation — so the video rendition would decode pixels nobody
+ * is looking at. Audio-only also rides the keep-alive foreground service, so what the Computer
+ * starts keeps playing when the conversation ends. The Viewscreen (MENU ▸ SOUND) is where the
+ * picture lives.
+ *
+ * The skip database is consulted under exactly the same rule as the screen: only when the user's
+ * sponsor-skip switch is on. A tool must not have looser privacy than the button it mirrors.
+ */
+class PlayMediaTool(
+    private val context: Context,
+    private val extractor: dev.mascwa.pulse.data.media.MediaExtractor,
+    private val sponsor: dev.mascwa.pulse.data.media.SponsorBlockRepository,
+    private val settings: dev.mascwa.pulse.data.settings.SettingsRepository,
+    private val browser: dev.mascwa.pulse.data.media.MediaBrowser,
+) : JarvisTool {
+    override val name = "play"
+    override val usage = "play <what|url|pause|resume|stop> — play something by name (\"play some jazz\") or by address (audio, background), or control playback"
+
+    override suspend fun run(arg: String): String {
+        val a = arg.trim()
+        when (a.lowercase()) {
+            "" -> return "Tell me what to play — a name or an address — or pause/resume/stop."
+            "stop" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.stop(context)
+                return "Playback stopped."
+            }
+            "pause" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.pause()
+                return "Paused."
+            }
+            "resume" -> {
+                dev.mascwa.pulse.feature.theater.OnDemandController.resume()
+                return "Resuming."
+            }
+        }
+        // Not an address? Then it is a REQUEST — "play some jazz" — and discovery is our job, not
+        // the user's. Search, take the top hit, and play its page through the same resolve path an
+        // address takes; the honest-refusal sentences flow through unchanged.
+        val target = if (looksLikeAddress(a)) {
+            a
+        } else {
+            when (val b = browser.search(a, limit = 3)) {
+                is dev.mascwa.pulse.data.media.MediaBrowser.Browse.Refused ->
+                    return dev.mascwa.pulse.core.telemetry.MediaResolution.say(b.reason) +
+                        if (b.detail.isNotBlank()) " (${b.detail})" else ""
+                is dev.mascwa.pulse.data.media.MediaBrowser.Browse.Page ->
+                    b.items.first().pageUrl
+            }
+        }
+        return when (val r = extractor.resolve(target)) {
+            is dev.mascwa.pulse.core.telemetry.MediaResolution.Refused ->
+                dev.mascwa.pulse.core.telemetry.MediaResolution.say(r.reason) +
+                    if (r.detail.isNotBlank()) " (${r.detail})" else ""
+            is dev.mascwa.pulse.core.telemetry.MediaResolution.Ready -> {
+                val segments = if (settings.current().sponsorSkip) {
+                    val id = r.item.id.ifBlank { extractor.videoId(target) }
+                    if (id.isBlank()) emptyList()
+                    else dev.mascwa.pulse.core.telemetry.SponsorSegments.usable(
+                        runCatching { sponsor.segments(id) }.getOrDefault(emptyList()),
+                        dev.mascwa.pulse.core.telemetry.SponsorSegments.Policy(),
+                    )
+                } else emptyList()
+                dev.mascwa.pulse.feature.theater.OnDemandController.play(
+                    context, r.item, segments, audioOnly = true,
+                )
+                val skips = if (segments.isEmpty()) "" else " ${segments.size} flagged segments will be skipped."
+                "Playing ${r.item.title.ifBlank { "it" }} — audio, in the background.$skips"
+            }
+        }
+    }
+
+    /**
+     * Whether the argument is something to RESOLVE rather than something to SEARCH FOR.
+     *
+     * A scheme is decisive; a bare "youtu.be/xyz" or "example.com/watch" (a dot-word followed by a
+     * path) is close enough. Everything else — "some jazz", "the new trailer" — is a request, and
+     * a false negative here just costs one search that returns the pasted address's title anyway,
+     * while a false positive would hand English prose to the URL resolver and refuse.
+     */
+    private fun looksLikeAddress(a: String): Boolean =
+        a.contains("://") || Regex("^[\\w-]+(\\.[\\w-]+)+/\\S").containsMatchIn(a)
+}
+
+/**
+ * The Computer opens the app's own screens — "open the radar", "show me the weather".
+ *
+ * Forty-nine tools and it could not open a single page of its own console, while SHORTCUT_ROUTES
+ * whitelists thirty-one routes for EXTERNAL deep-links (launcher shortcuts, notifications). This
+ * closes that inversion by trusting exactly the same whitelist: a matched feature's route is
+ * emitted onto the navigation bus, which `PulseApp` collects and routes through its one openApp
+ * idiom. Nothing here navigates; nothing here can name a route the directory does not list.
+ *
+ * Matching is against the feature catalog (which the menu directory generates) plus each entry's
+ * declared synonyms, so "planes" opens the radar here exactly as it finds it in the MENU's search.
+ */
+class OpenScreenTool(
+    private val bus: kotlinx.coroutines.flow.MutableSharedFlow<String>,
+    private val foreground: kotlinx.coroutines.flow.StateFlow<Boolean>,
+) : JarvisTool {
+    override val name = "open"
+    override val usage = "open <screen> — open one of the app's own screens by name (\"open the radar\", \"open settings\")"
+
+    override suspend fun run(arg: String): String {
+        val query = arg.trim().lowercase()
+            .removePrefix("the ").removePrefix("my ").trim().trimEnd('.', '!', '?')
+        if (query.isEmpty()) {
+            return "Say which screen — for example: " + labels().take(8).joinToString(", ") + "."
+        }
+        val hit = match(query)
+            ?: return "No screen called \"$arg\". The screens are: ${labels().joinToString(", ")}."
+        // The same whitelist external deep-links trust. Every catalog route passes today; the check
+        // stands so a future catalog entry outside the deep-linkable set cannot ride this tool in.
+        val allowed = hit.key in dev.mascwa.pulse.navigation.SHORTCUT_ROUTES ||
+            dev.mascwa.pulse.navigation.TOP_DESTINATIONS.any { it.route == hit.key }
+        if (!allowed) return "That screen cannot be opened directly."
+        // ⚠️ Two halves make the reply honest. A SharedFlow with replay=0 never re-delivers to
+        // a LATE collector, so the subscription check covers destroyed/never-launched — but the
+        // collector is a composition-lifetime LaunchedEffect, which SURVIVES a merely-STOPPED
+        // Activity: with the screen off, subscriptionCount still reads 1, the navigation would
+        // land on an invisible NavController, and the spoken "Opening…" would be a false claim
+        // (the user finds the app on a screen they never left it on). The foreground flag
+        // (MainActivity onStart/onStop) covers that half.
+        if (bus.subscriptionCount.value == 0 || !foreground.value) {
+            return "The console isn't on screen right now — open the app and ask again."
+        }
+        return if (bus.tryEmit(hit.key)) "Opening ${hit.label}." else "Could not open ${hit.label} right now."
+    }
+
+    private fun labels(): List<String> =
+        dev.mascwa.pulse.data.usage.FeatureCatalog.entries.map { it.label }
+
+    private fun match(query: String): dev.mascwa.pulse.core.telemetry.FeatureMeta? {
+        val entries = dev.mascwa.pulse.data.usage.FeatureCatalog.entries
+        val terms = dev.mascwa.pulse.navigation.GROUPS
+            .flatMap { g -> g.entries }.associateBy({ it.route }, { it.searchTerms })
+        // Exact label first, then containment either way, then the declared synonyms — the same
+        // vocabulary the MENU search matches, so voice and menu agree on what a word means.
+        entries.firstOrNull { it.label.lowercase() == query }?.let { return it }
+        entries.firstOrNull {
+            val l = it.label.lowercase()
+            l.contains(query) || query.contains(l)
+        }?.let { return it }
+        return entries.firstOrNull { e ->
+            terms[e.key].orEmpty().any { t -> t == query || t.contains(query) || query.contains(t) }
+        }
+    }
+}

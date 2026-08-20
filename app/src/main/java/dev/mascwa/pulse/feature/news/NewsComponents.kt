@@ -62,6 +62,7 @@ import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.ui.theme.ChakraPetch
 import dev.mascwa.pulse.ui.theme.JetBrainsMono
 import dev.mascwa.pulse.ui.theme.Pulse
+import java.util.Locale
 
 /** Which strip's methodology the open [ExplainerDialog] is showing — [title] is the strip's own short name
  *  (matches its header glyph text), [items] the one or two [Explainer]s that explain it. */
@@ -632,7 +633,10 @@ private fun MarketChip(link: MarketLink, live: Double?) {
     }
     val text = if (live != null) {
         val sign = if (live >= 0.0) "+" else ""
-        "${if (live >= 0.0) "▲" else "▼"} ${link.market} $sign${"%.1f".format(live)}%"
+        // Locale.US: the sign, the arrow and the number are one compound token, and a
+        // comma-decimal device rendered "▲ Oil +2,3%" beside "+2.3%" elsewhere on the same card.
+        "${if (live >= 0.0) "▲" else "▼"} ${link.market} $sign" +
+            String.format(Locale.US, "%.1f%%", live)
     } else {
         val arrow = when (link.impact) {
             MarketImpact.UP -> "▲"

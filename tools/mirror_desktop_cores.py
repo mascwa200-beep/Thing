@@ -62,6 +62,9 @@ MIRRORS: dict[str, str] = {
     # How old what is on screen is, and why. ElapsedPhrase comes along because Freshness needs it and it
     # was split out of TemporalReasoner precisely so this could travel without the memory stream.
     f"{CORE}/Freshness.kt": f"{DESKTOP}/telemetry/Freshness.kt",
+    # The DOM decimator. jsoup is plain JVM, so the desktop reads a web page with exactly the same
+    # rules the phone does — a story that strips well on one strips identically on the other.
+    f"{CORE}/Readability.kt": f"{DESKTOP}/telemetry/Readability.kt",
     f"{CORE}/ElapsedPhrase.kt": f"{DESKTOP}/telemetry/ElapsedPhrase.kt",
     # When a published build is safe to offer. Shared so the phone and the desktop cannot come to
     # disagree about it — the tri-state green gate has an edge that cost real debugging once.
@@ -75,6 +78,9 @@ MIRRORS: dict[str, str] = {
     f"{CORE}/DataRate.kt": f"{DESKTOP}/telemetry/DataRate.kt",
     f"{CORE}/Stardate.kt": f"{DESKTOP}/telemetry/Stardate.kt",
     f"{CORE}/LiveChannels.kt": f"{DESKTOP}/telemetry/LiveChannels.kt",
+    # The lineup: which channel is on which number, and what a remote does to it. Shared because a
+    # channel number that differs between the phone and the desktop is worse than no number at all.
+    f"{CORE}/ChannelLineup.kt": f"{DESKTOP}/telemetry/ChannelLineup.kt",
     f"{CORE}/M3uCatalog.kt": f"{DESKTOP}/telemetry/M3uCatalog.kt",
     f"{CORE}/NewsInsights.kt": f"{DESKTOP}/telemetry/NewsInsights.kt",
     # What is worth printing under a headline. Both platforms render the same card, and an
@@ -97,6 +103,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/StardateTest.kt": f"{DESKTOP_TEST}/telemetry/StardateTest.kt",
     f"{CORE_TEST}/NewsSummaryTest.kt": f"{DESKTOP_TEST}/telemetry/NewsSummaryTest.kt",
     f"{CORE_TEST}/LiveChannelsTest.kt": f"{DESKTOP_TEST}/telemetry/LiveChannelsTest.kt",
+    f"{CORE_TEST}/ChannelLineupTest.kt": f"{DESKTOP_TEST}/telemetry/ChannelLineupTest.kt",
     f"{CORE_TEST}/M3uCatalogTest.kt": f"{DESKTOP_TEST}/telemetry/M3uCatalogTest.kt",
     f"{CORE_TEST}/GuideSearchTest.kt": f"{DESKTOP_TEST}/telemetry/GuideSearchTest.kt",
     f"{CORE_TEST}/LibraryConsultTest.kt": f"{DESKTOP_TEST}/telemetry/LibraryConsultTest.kt",
@@ -115,6 +122,7 @@ MIRRORS: dict[str, str] = {
     f"{CORE_TEST}/DeviceSearchTest.kt": f"{DESKTOP_TEST}/telemetry/DeviceSearchTest.kt",
     f"{CORE_TEST}/EmergencyTriageTest.kt": f"{DESKTOP_TEST}/telemetry/EmergencyTriageTest.kt",
     f"{CORE_TEST}/FreshnessTest.kt": f"{DESKTOP_TEST}/telemetry/FreshnessTest.kt",
+    f"{CORE_TEST}/ReadabilityTest.kt": f"{DESKTOP_TEST}/telemetry/ReadabilityTest.kt",
     f"{CORE_TEST}/UpdatePolicyTest.kt": f"{DESKTOP_TEST}/telemetry/UpdatePolicyTest.kt",
 }
 

@@ -54,9 +54,7 @@ fun ObjectivesScreen(vm: ObjectivesViewModel, onBack: () -> Unit) {
     val c = Pulse.colors
     PulseScaffold(
         title = "OBJECTIVES",
-        navigationIcon = {
-            IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back", tint = c.ink) }
-        },
+        onBack = onBack,
         actions = { IconButton(onClick = { vm.refresh() }) { Icon(LcarsIcons.Refresh, "Refresh", tint = c.ink) } },
     ) { innerPadding ->
         ObjectivesPanel(vm, c, Modifier.fillMaxSize().padding(innerPadding))

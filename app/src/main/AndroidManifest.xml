@@ -350,6 +350,25 @@
         </service>
 
         <!--
+            The acoustic interrogator (opt-in, DEFAULT OFF — the only sensing feature that is).
+            Continuous speech capture, transcribed offline and screened for reasoning mistakes; the
+            transcript is encrypted at rest, capped, and never leaves the device.
+
+            Started only from a visible activity: the microphone foreground-service type cannot be
+            armed from a background start on Android 14+, so a background caller would produce a
+            service that holds the microphone floor and records nothing. exported="false" — nothing
+            outside the app may start something that opens the microphone.
+        -->
+        <service
+            android:name=".data.interrogator.AcousticInterrogatorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|dataSync|microphone">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="acoustic_interrogation" />
+        </service>
+
+        <!--
             LAN remote link (opt-in, default off). exported="false" is deliberate and load-bearing: the
             service must never be startable by another app on the device. Its inbound surface is the TCP
             socket it opens, which is guarded by pairing + signatures + a private-address check, not by
@@ -363,6 +382,12 @@
         <!-- PIP-BOY radio playback — keeps the stream alive when the app is backgrounded. -->
         <service
             android:name=".feature.tacnet.RadioService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Viewscreen audio-only playback — keeps an on-demand audio session alive backgrounded. -->
+        <service
+            android:name=".feature.theater.OnDemandService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 

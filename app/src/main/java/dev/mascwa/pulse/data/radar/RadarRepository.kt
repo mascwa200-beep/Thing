@@ -62,7 +62,7 @@ class RadarRepository(
                 val quakeD = async { runCatching { quakes(lat, lon) }.getOrDefault(emptyList()) }
                 val (air, src) = aircraft(lat, lon)
                 val extras = listOfNotNull(issD.await()) + quakeD.await()
-                RadarData(lat, lon, air + extras, source = src)
+                RadarData(air + extras, source = src)
             }
             cache.write(key, data, RadarData.serializer())
             Fetched(recompute(data, lat, lon, issElements), false)
@@ -103,7 +103,7 @@ class RadarRepository(
                 bearingDeg = Geo.bearingDegrees(lat, lon, it.latitude, it.longitude),
             )
         }.sortedBy { it.distanceMeters }
-        return d.copy(originLat = lat, originLon = lon, contacts = updated)
+        return d.copy(contacts = updated)
     }
 
     // --- Live aircraft (keyless community ADS-B) ---

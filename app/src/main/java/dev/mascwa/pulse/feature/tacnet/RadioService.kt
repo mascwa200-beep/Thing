@@ -66,8 +66,19 @@ class RadioService : Service() {
             RadioController.Status.ERROR -> "No signal"
             RadioController.Status.IDLE -> "Stopped"
         }
+        // ⚠️ **The request code must be unique, because the route extra is what makes this tap useful
+        // and extras are not part of a PendingIntent's identity.** `Intent.filterEquals` compares
+        // action, categories, component, data, identifier, package and type — read out of the platform
+        // bytecode, not recalled — and pointedly NOT the extras. At request code 0 this was therefore
+        // the SAME PendingIntent as the plain `Intent(this, MainActivity)` that the Sensorium, vitals,
+        // remote-link and voice services and all three widgets build, and `FLAG_UPDATE_CURRENT` means
+        // last-writer-wins on the extras. Those all carry no extras, so they stripped `EXTRA_ROUTE`
+        // off this one and tapping the radio's notification opened Home instead of the radio. The
+        // Sensorium alone rebuilds its copy every three minutes, so on a default install this was
+        // less a race than a certainty. Keyed on the notification id, which `NotifId` now guarantees
+        // is unique — the same trick `Notifier.notifyBreakingInterrupt` already uses.
         val open = PendingIntent.getActivity(
-            this, 0,
+            this, NOTIF_ID,
             Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, Routes.RADIO),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
@@ -109,7 +120,7 @@ class RadioService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "radio_playback"
-        private const val NOTIF_ID = 4201
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_RADIO
         const val ACTION_STOP = "dev.mascwa.pulse.radio.STOP"
     }
 }

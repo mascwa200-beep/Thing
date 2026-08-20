@@ -9,7 +9,12 @@ or otherwise altered: the change is one of resolution and file format only, made
 corpus fits a phone (68 MB to 31 MB) without changing what the reader sees — the app draws
 these at 260dp on Android and 620dp on the desktop, so the discarded pixels were never
 displayed. Where a licence requires that modifications be indicated, this paragraph is that
-indication. SVG files are bundled unchanged, as vector.
+indication. Most SVG files are bundled unchanged, as vector. Some diagrams that were
+originally vector are bundled as WebP instead: any such file was rendered from the original
+SVG at 1280 pixels wide and composited onto a white background, which is the same background
+the rest of the line art here already carries. No cropping, recolouring or overlay — only
+resolution and file format — and the Commons "File:" link recorded for each still points at
+the original vector work. See the fuller note in ../NOTICE.txt, which governs both folders.
 
 
 chem-atoms-elements-periodic-table.webp  —  Periodic table large.svg  —  CC BY 3.0  —  2012rc

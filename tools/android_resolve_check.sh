@@ -46,8 +46,15 @@ COR=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-coroutines-core-jvm-*.jar'
 # a pure false positive and it fires on the commonest edit there is — adding a field to a cached
 # data class — so the jar belongs here rather than in a caveat.
 SER=$(find "$GC/org.jetbrains.kotlinx" -name 'kotlinx-serialization-core-jvm-*.jar' 2>/dev/null | head -1)
+# ⚠️ jsoup, because `core:telemetry` itself depends on it (Readability). Without it the WHOLE core
+# fails to compile and every member of every core type cascades into the report — a run that named
+# `Extraction.wordCount`, `Meta` and `truncated` as unresolved while the core compiled clean under
+# the real build. A baseline that broad reports nothing useful, and a gate you learn to ignore is
+# worse than no gate. Whenever the core takes a new dependency, add it here too.
+JSOUP=$(find "$GC/org.jsoup" -name 'jsoup-*.jar' 2>/dev/null | head -1)
+if [ -z "$JSOUP" ]; then JSOUP=$(find /tmp -name 'jsoup*.jar' 2>/dev/null | head -1); fi
 COMPILER="$G/kotlin-compiler-embeddable-2.0.21.jar:$G/kotlin-stdlib-2.0.21.jar:$G/trove4j-1.0.20200330.jar:$G/annotations-24.0.1.jar:$COR"
-TARGET_CP="$COR:$SER:$G/kotlin-stdlib-2.0.21.jar"
+TARGET_CP="$COR:$SER:$JSOUP:$G/kotlin-stdlib-2.0.21.jar"
 
 # The whole pure core, so its types DO resolve — exactly one file in it imports android.*.
 mapfile -t CORE < <(grep -rLE '^import android[.x]?' core/telemetry/src/main --include='*.kt')

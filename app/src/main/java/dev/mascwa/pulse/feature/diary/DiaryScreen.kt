@@ -13,9 +13,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 fun DiaryScreen(vm: DiaryViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "DIARY",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         DiaryBody(vm, Modifier.padding(innerPadding))
     }

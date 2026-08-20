@@ -177,15 +177,13 @@ class Notifier(private val context: Context) {
         swept = true
         runCatching {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val keep = setOf(
-                NotifId.BRIEF,
-                dev.mascwa.pulse.feature.breaking.BreakingNewsActivity.NOTIF_ID,
-                7301, // ActiveMatrixService ongoing
-                7311, // VitalsTrackingService ongoing
-                7321, // RemoteLinkService ongoing — also carries the live pairing code
-                4201, // RadioService playback
-            )
-            nm.activeNotifications.filter { it.id !in keep }.forEach { nm.cancel(it.tag, it.id) }
+            // ⚠️ Derived, never re-typed — see [NotifId]. The hand-written version of this set was
+            // missing the Sensorium (7401) and the emergency watch (7402), so this sweep cancelled the
+            // ongoing notification of two running foreground services on the first board post of every
+            // process, taking the scanner's Stop button with it.
+            nm.activeNotifications
+                .filter { it.id !in NotifId.PERSISTENT }
+                .forEach { nm.cancel(it.tag, it.id) }
         }
     }
 
@@ -203,9 +201,77 @@ class Notifier(private val context: Context) {
 }
 
 /**
- * The canonical notification ids. The whole board lives and refreshes under ONE fixed id; the takeover's
- * transient id lives with its Activity (BreakingNewsActivity.NOTIF_ID = 1003) and self-cancels on open.
+ * The canonical notification ids — **every one of them, in one place**.
+ *
+ * The whole board lives and refreshes under [BRIEF]; the takeover's transient id self-cancels on open;
+ * the rest are the mandatory ongoing notifications of the foreground services.
+ *
+ * ⚠️ **This exists because scattering them broke twice at once.** Each service used to declare its own
+ * `private const val NOTIF_ID`, so nothing could see them together, and two things followed:
+ *
+ * 1. **A collision.** `SensoriumService` and `BreakingOverlayService` were both 7401. They are
+ *    foreground services that run at the same time — ambient sensing is adaptive-24/7 and a breaking
+ *    story can arrive at any moment — and an id with no tag is the whole identity of a notification.
+ *    So the overlay's notification REPLACED the scanner's (taking its status line and its Stop button
+ *    with it), the scanner's three-minutely refresh overwrote the overlay's back again, and whichever
+ *    stopped first removed the other's notification, leaving a foreground service holding the camera
+ *    and microphone with nothing on screen to say so or to stop it.
+ * 2. **A keep-list that could not be kept.** [Notifier.sweepLegacyOnce] cancels every notification
+ *    outside a hand-typed set of magic numbers. It was written before the Sensorium and the emergency
+ *    watch existed and was never extended, so the first board post of every process cancelled both of
+ *    their ongoing notifications. Same shape as the mirror-map gap already recorded in this repo: two
+ *    independent statements of one fact, only one of which gets updated.
+ *
+ * The sweep's keep set is now [PERSISTENT], derived from these constants, and `NotifIdTest` fails the
+ * build if any two ids collide or if a foreground id is missing from it. Adding a service means adding
+ * one constant here; forgetting to is a red build, not a silent bug on someone's phone.
  */
 object NotifId {
+    /** THE one notification — the situation board, replaced in place forever. */
     const val BRIEF = 2300
+
+    /** The breaking-news takeover's full-screen-intent fallback; self-cancels when opened. */
+    const val TAKEOVER = 1003
+
+    // ---- foreground-service ongoing notifications (mandatory while their service runs) ----
+    const val FGS_ACTIVE_MATRIX = 7301
+    const val FGS_VITALS = 7311
+    const val FGS_REMOTE_LINK = 7321
+    const val FGS_SENSORIUM = 7401
+    const val FGS_EMERGENCY_WATCH = 7402
+    const val FGS_BREAKING_OVERLAY = 7403
+    const val FGS_INTERROGATOR = 7411
+    const val FGS_RADIO = 4201
+    const val FGS_ONDEMAND = 4211
+
+    /** Every id a sweep must never touch: the board, the takeover, and each service's ongoing. */
+    val PERSISTENT: Set<Int> = setOf(
+        BRIEF, TAKEOVER,
+        FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
+        FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
+        FGS_INTERROGATOR, FGS_ONDEMAND,
+    )
+
+    /**
+     * ⚠️ **These double as PendingIntent request codes, and that is not decoration.**
+     *
+     * A PendingIntent's identity is its request code plus `Intent.filterEquals`, which compares
+     * action, categories, component, data, identifier, package and type — and **not the extras**
+     * (read out of the platform bytecode). So every `PendingIntent.getActivity(ctx, 0, Intent(ctx,
+     * MainActivity::class.java), …)` in the app is one and the same PendingIntent, and
+     * `FLAG_UPDATE_CURRENT` makes the last one built win the extras outright.
+     *
+     * That is harmless while they all mean "just open the app", which is why most of them still use
+     * 0. The moment one carries something — a route, an id, anything the tap depends on — sharing a
+     * request code silently deletes it: `RadioService` shipped exactly that, and its "open the radio"
+     * tap landed on Home because the Sensorium rebuilds its extras-free copy every three minutes.
+     *
+     * **So: any PendingIntent whose extras matter must use its owner's id from here as the request
+     * code.** They are unique by test, which is the property being borrowed.
+     */
+    val FOREGROUND: Set<Int> = setOf(
+        FGS_ACTIVE_MATRIX, FGS_VITALS, FGS_REMOTE_LINK,
+        FGS_SENSORIUM, FGS_EMERGENCY_WATCH, FGS_BREAKING_OVERLAY, FGS_RADIO,
+        FGS_INTERROGATOR, FGS_ONDEMAND,
+    )
 }

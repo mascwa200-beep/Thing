@@ -41,7 +41,7 @@ import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.EmptyState
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonChip
+import dev.mascwa.pulse.feature.common.LcarsTabRow
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
@@ -67,7 +67,8 @@ fun MarketsScreen(
     economyVm: EconomyViewModel,
     fuelVm: FuelViewModel,
 ) {
-    var tab by remember { mutableStateOf(MarketsTab.MARKETS) }
+    val tabIdx by marketsVm.tabIndex.collectAsStateWithLifecycle()
+    val tab = MarketsTab.entries[tabIdx.coerceIn(0, MarketsTab.entries.lastIndex)]
     PulseScaffold(
         title = "Markets",
         actions = {
@@ -81,15 +82,11 @@ fun MarketsScreen(
         },
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MarketsTab.entries.forEach { t ->
-                    NeonChip(t.label, selected = t == tab, onClick = { tab = t })
-                }
-            }
+            LcarsTabRow(
+                tabs = MarketsTab.entries.map { it.label },
+                selected = tab.ordinal,
+                onSelect = { marketsVm.tabIndex.value = it },
+            )
             when (tab) {
                 MarketsTab.MARKETS -> MarketsBody(marketsVm)
                 MarketsTab.ECONOMY -> EconomyBody(economyVm)

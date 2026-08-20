@@ -8,6 +8,9 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
+    // Python-in-Android (Chaquopy). Resolves from mavenCentral(), which pluginManagement already
+    // lists — no repository change was needed, checked before adding it.
+    alias(libs.plugins.chaquopy) apply false
     // Declared apply-false here too (not just in desktop/build.gradle.kts) so it resolves through the same
     // classpath pass as kotlin-android — kotlin.jvm/kotlin.android are different plugin IDs from the SAME
     // kotlin-gradle-plugin jar, and requesting one from a subproject without the other already registered

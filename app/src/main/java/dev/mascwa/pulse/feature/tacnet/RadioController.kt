@@ -74,7 +74,10 @@ object RadioController {
     private var player: ExoPlayer? = null
 
     // Auto-recover from a brief live-stream drop (a momentary STATE_ENDED / IO blip) by re-preparing a
-    // couple of times before surfacing an error — many live mounts hiccup but recover. Reset per tune.
+    // couple of times before surfacing an error — many live mounts hiccup but recover.
+    // ⚠️ Reset on every STATE_READY, i.e. per OUTAGE. It used to reset only per tune, which quietly
+    // turned "two retries per hiccup" into "two hiccups per listening session": a station left on all
+    // evening recovered from the first two drops and then treated the third as permanent.
     private var retries = 0
     private const val MAX_RETRIES = 2
 
@@ -166,7 +169,12 @@ object RadioController {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (_state.value.tuned?.streamUrl != station.streamUrl) return
                     when (playbackState) {
-                        Player.STATE_READY -> _state.value = RadioState(station, Status.ON_AIR)
+                        Player.STATE_READY -> {
+                            // ⚠️ Spend the retry budget per OUTAGE, not per tune — see the field's
+                            // own note. On air again means the outage that spent it has ended.
+                            retries = 0
+                            _state.value = RadioState(station, Status.ON_AIR)
+                        }
                         // A live stream shouldn't end; a brief drop often recovers on a re-prepare, so
                         // retry a couple of times before surfacing it.
                         Player.STATE_ENDED -> retryOrFail(app, station, audioUrl, "stream ended")
@@ -188,9 +196,19 @@ object RadioController {
         }.onFailure { failPermanently(app, station, it.message) }
     }
 
-    /** Network/IO errors are worth a retry; container-parse / decoder / bad-HTTP errors are not. */
+    /**
+     * Network/IO errors are worth a retry; container-parse / decoder / bad-HTTP errors are not.
+     *
+     * ⚠️ **`BEHIND_LIVE_WINDOW` is named explicitly** for the same reason as the video controller's
+     * copy: it is the one recoverable live error outside the IO band (code 1002, below 2000), it is
+     * what a sliding HLS window produces after a stall, and it recovers completely on a re-prepare —
+     * which already resets the position, so no seek is needed. This reaches the radio because
+     * `StreamResolver` passes `.m3u8` straight through, so an HLS mount from the community catalogue
+     * plays on exactly this path.
+     */
     private fun isTransient(error: PlaybackException): Boolean =
-        error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+        error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+            error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
     /** Re-prepare the stream after a short delay, up to [MAX_RETRIES]; otherwise show [reason]. */
     private fun retryOrFail(app: Context, station: RadioStation, audioUrl: String, reason: String) {

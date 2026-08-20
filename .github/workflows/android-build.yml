@@ -37,6 +37,10 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          # The acoustic interrogator compiles native code (whisper.cpp / llama.cpp are coming).
+          # ⚠️ The NDK string must match `ndkVersion` in app/build.gradle.kts exactly — AGP looks for
+          # that one and reports only that it is missing, never that a different one is present.
+          sdkmanager "ndk;27.0.12077973" "cmake;3.22.1"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -44,14 +48,325 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Fetch whisper.cpp at a pinned tag
+        run: |
+          set -e
+          dir=app/src/main/cpp/whisper.cpp
+          repo=https://github.com/ggml-org/whisper.cpp
+          # Pinned, not "latest": a native layer that follows upstream without anyone deciding to is
+          # a build whose speech recognition can change under it.
+          #
+          # The tag below could NOT be verified when it was written - the development container
+          # cannot reach GitHub - so rather than fail blind, the step falls back to the newest v*
+          # tag and says loudly which one it used. That turns a wrong guess into the answer inside a
+          # single ~25 minute round instead of two, and the fallback cannot drift silently because
+          # it warns every time it fires. Pin whatever it reports.
+          # ⚠️ MEASURED, NOT CHOSEN. This tag and the llama build below are a MATCHED PAIR: their
+          # vendored ggml headers are byte-identical, which is the only condition under which both
+          # projects can link into one .so. A CI probe swept both tag axes to find it — see the
+          # commit that pinned them for the numbers. Moving either one alone will break the other.
+          TAG="v1.9.2"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "whisper.cpp @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'v*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned whisper.cpp tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          # The CMake integration is guarded by if(EXISTS) so the tree's absence degrades to a
+          # host-only build locally. On CI that guard must never be what decides, or a build that
+          # quietly lost speech recognition would still go green.
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: whisper.cpp tree is not present after cloning"; exit 1; }
+          echo "whisper.cpp tree: $(du -sh "$dir" | cut -f1)"
+          # Diagnostic, not a gate: whisper and llama each bundle ggml, so the two add_subdirectory
+          # calls can collide on target names. Report how this tag guards it, so a collision is
+          # explained in the same round it happens rather than the round after.
+          echo "whisper ggml guard:"; grep -nE "NOT TARGET ggml|USE_SYSTEM_GGML" "$dir/CMakeLists.txt" || echo "  (none found)"
+
+      - name: Fetch llama.cpp at a pinned build
+        run: |
+          set -e
+          dir=app/src/main/cpp/llama.cpp
+          repo=https://github.com/ggml-org/llama.cpp
+          # ⚠️ llama.cpp tags are build numbers (b4600), NOT semver, so the pattern differs from
+          # whisper's. Same fallback-and-warn shape and the same reason: this pin could not be
+          # verified from a machine that cannot reach GitHub.
+          # ⚠️ THE OTHER HALF OF A MATCHED PAIR — see the whisper TAG above, and do not move one
+          # without re-running the search for the other.
+          #
+          # Both projects vendor ggml and only one copy may exist in the shipped .so, so the two tags
+          # must carry the same ggml sync. Three rounds of inferring which build that was were wrong
+          # in three different ways, so it was measured instead. Against whisper v1.9.2:
+          #
+          #   b10499=3  b10455=2  b10443=2  b10417=2  b10358=1  b10322=1
+          #   b10276 == b10241 == b10197 IDENTICAL      b10141=1  b10021=3  b9945=5  b9867=6
+          #
+          # A contiguous window of identical builds, which is exactly what "one ggml sync spans a
+          # range of build numbers" predicts. b10276 is the newest of that window.
+          TAG="b10276"
+          if git clone --quiet --depth 1 --branch "$TAG" "$repo" "$dir" 2>/dev/null; then
+            echo "llama.cpp @ $TAG (pinned)"
+          else
+            newest=$(git ls-remote --tags --refs --sort=-v:refname "$repo" 'b*' | head -1 | sed 's#.*refs/tags/##')
+            echo "::warning::pinned llama.cpp tag $TAG did not resolve; using $newest - update TAG in this workflow"
+            git clone --quiet --depth 1 --branch "$newest" "$repo" "$dir"
+          fi
+          test -f "$dir/CMakeLists.txt" || { echo "FAIL: llama.cpp tree is not present after cloning"; exit 1; }
+          echo "llama.cpp tree: $(du -sh "$dir" | cut -f1)"
+          # ⚠️ THE API PROBE, and it is the point of this step beyond the clone. llama.cpp renamed a
+          # good deal of its C API during 2024-25 (llama_load_model_from_file became
+          # llama_model_load_from_file, vocab accessors moved off the model), so which names a given
+          # build number carries is a fact about that tag rather than something to recall. Printing
+          # it means one round answers both "does this tag exist" and "does the bridge use the right
+          # names", instead of two.
+          #
+          # ⚠️ THE FOUR KV NAMES ARE HERE BECAUSE THIS LIST WAS ONCE INCOMPLETE AND COST A ROUND. The
+          # original probe covered the rename family I was WORRIED about (model/vocab accessors) and
+          # not the one that actually broke the build, because I had not recognised the KV-cache reset
+          # as a rename family at all. A probe only ever answers what it was asked. When a symbol here
+          # turns out to have moved, add its whole family rather than just the name that failed.
+          hdr="$dir/include/llama.h"
+          echo "llama.h API probe:"
+          for sym in llama_backend_init llama_model_default_params llama_model_load_from_file \
+                     llama_load_model_from_file llama_context_default_params llama_init_from_model \
+                     llama_new_context_with_model llama_model_get_vocab llama_tokenize \
+                     llama_batch_get_one llama_decode llama_sampler_chain_init \
+                     llama_sampler_init_greedy llama_sampler_sample llama_vocab_is_eog \
+                     llama_token_to_piece llama_model_free llama_free_model \
+                     llama_memory_clear llama_get_memory llama_kv_self_clear llama_kv_cache_clear; do
+            if grep -q "\b$sym\b" "$hdr" 2>/dev/null; then echo "  present  $sym"; else echo "  ABSENT   $sym"; fi
+          done
+
+      - name: Check the two ggml copies agree
+        run: |
+          set -e
+          # ⚠️ THE WHOLE HEADER SET, NOT ONE SYMBOL — and that correction cost a round.
+          # The first version of this gate compared `ggml_backend_sched_new` only. b5000 passed it
+          # and then failed 212 objects deep on `GGML_KQ_MASK_PAD`, a macro one copy defines and the
+          # other does not. Spot-checking a fast-moving C API symbol by symbol is a treadmill: each
+          # round buys one more name.
+          #
+          # The real question is not "do these two agree about X" but "are these the same ggml
+          # sync", and that is answerable exactly. whisper.cpp vendors ggml by copying it from
+          # llama.cpp, so a matched pair has byte-identical public headers and a mismatched pair does
+          # not. Comparing the directories settles every symbol at once, in about a second.
+          #
+          # ⚠️ AND A MISMATCH IS NO LONGER FATAL. Only one ggml may be linked — two would be an ODR
+          # violation rather than a link error — so an unmatched pair cannot build both. Rather than
+          # failing the whole app build for that, the llama tree is REMOVED and the build continues
+          # with transcription and no adjudicator. That is not a fudge: `Rebuttal.Provenance` already
+          # models "nothing read the argument" as a first-class outcome and says so on screen, and
+          # `LlamaEngine.prepare` already returns false when the symbols are absent. The build says
+          # loudly which it produced, and the APK check below asserts accordingly.
+          # ⚠️ THIS STEP EXISTS BECAUSE THE PREDICTED FAILURE MODE WAS THE WRONG ONE. whisper.cpp and
+          # llama.cpp each vendor ggml, and only one copy may end up in liblcarsnative.so — two would
+          # be an ODR violation rather than a link error. So whisper is told to reuse llama's. The
+          # CMake comment anticipated that a failed reuse would be a loud duplicate-target error. The
+          # real failure was the opposite and much quieter: the reuse SUCCEEDED, and whisper then
+          # compiled against a ggml four months older than the one it was written for —
+          #
+          #   whisper.cpp:591: error: no matching function for call to 'ggml_backend_sched_new'
+          #   note: candidate function not viable: requires 5 arguments, but 6 were provided
+          #
+          # — four minutes into a build, in the middle of the C++ output. The signature is a fact
+          # sitting in two headers that can be compared in two seconds, so it is compared here, and
+          # BOTH are printed whether or not they match: when a future bump breaks this again, the log
+          # already says what each side wants instead of requiring another round to find out.
+          for tree in llama.cpp whisper.cpp; do
+            hdr="app/src/main/cpp/$tree/ggml/include/ggml-backend.h"
+            test -f "$hdr" || { echo "FAIL: $tree has no bundled ggml-backend.h at $hdr"; exit 1; }
+            # The declaration spans lines in some versions, so newlines are folded before matching.
+            sig=$(tr '\n' ' ' < "$hdr" | grep -o 'ggml_backend_sched_new *([^;]*)' | tr -s ' ' | head -1)
+            # ⚠️ Without this, a rename of the function makes BOTH sides empty, the two empties
+            # compare equal, and the gate passes while proving nothing. A check that cannot fail is
+            # worse than no check.
+            test -n "$sig" || { echo "FAIL: no ggml_backend_sched_new declaration found in $tree"; exit 1; }
+            echo "  $tree: $sig"
+            # ⚠️ Compared with every space removed, printed with them. Upstream wraps this
+            # declaration across lines in some versions and not others, which leaves a space after
+            # the open bracket in one and not the other — testing the readable forms reports two
+            # IDENTICAL signatures as a mismatch and fails a build that would have worked. Found by
+            # running this gate against a deliberately wrapped header rather than by reading it.
+            eval "sig_$(echo "$tree" | tr -d '.')=\$(echo \"\$sig\" | tr -d ' ')"
+          done
+          # The decisive comparison: every public ggml header, byte for byte.
+          if diff -r -q app/src/main/cpp/llama.cpp/ggml/include \
+                        app/src/main/cpp/whisper.cpp/ggml/include > /tmp/ggml-diff.txt 2>&1; then
+            echo "ggml headers are identical — the pins are the same sync, adjudicator enabled"
+          else
+            echo "::warning::whisper.cpp and llama.cpp carry DIFFERENT ggml syncs - building without the adjudicator"
+            echo "Header differences (only one ggml may be linked, so both cannot build):"
+            sed 's/^/  /' /tmp/ggml-diff.txt
+            echo ""
+            echo "To enable the adjudicator, move one pin until this comparison is clean."
+            # CMake's own `if(EXISTS .../llama.cpp/CMakeLists.txt)` guard is the switch — removing
+            # the tree turns the adjudicator off through machinery that already exists rather than
+            # adding a second way to express the same thing.
+            rm -rf app/src/main/cpp/llama.cpp
+          fi
+
       - name: Run unit tests
-        run: ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon
+        # ⚠️ Piped through tee so a failure can be RE-REPORTED readably below. `--stacktrace` puts
+        # several hundred frames after the message, and the log API's tail cannot reach back past
+        # them — two failures in a row this session were diagnosed by inference because the one line
+        # that mattered was unreachable. pipefail keeps gradle's exit code across the pipe.
+        run: |
+          set -o pipefail
+          ./gradlew :core:telemetry:testDebugUnitTest :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured
         # for PGO-style AOT) but kept on the same package id + debug keystore as before, so it updates in
         # place. The run number is the versionCode so each build out-versions the last (no downgrades).
-        run: ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease -PPULSE_VERSION_CODE=${{ github.run_number }} --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-build.log
+
+      - name: Say what actually went wrong
+        # ⚠️ Runs ONLY on failure, and exists because the stack trace buries the message. Gradle
+        # prints "What went wrong" BEFORE several hundred frames of
+        # org.gradle.internal.execution.steps, so on a long failure the log API returns nothing but
+        # frames however far back it is asked to look. Re-printing the useful section at the END puts
+        # it where a tail can always find it. The stack is kept — it diagnosed the Chaquopy
+        # configuration-cache failure earlier today — it is simply no longer the last word.
+        if: failure()
+        run: |
+          for f in /tmp/gradle-tests.log /tmp/gradle-build.log; do
+            [ -f "$f" ] || continue
+            echo "===== $f ====="
+            awk '/^\* What went wrong:/,/^\* Try:/' "$f" | head -40
+            echo "----- failing tests, if any -----"
+            grep -E "FAILED$|^[A-Za-z].*> .* FAILED" "$f" | head -20 || true
+          done
+
+      - name: Verify the native layer packaged
+        # ⚠️ This is the ONLY gate on the native build, and it has to live here.
+        # `:app:testDebugUnitTest` runs on the host JVM, so it cannot load an arm64-v8a .so — a unit
+        # test asserting NativeBridge.available would fail on a perfectly good build and pass on one
+        # where CMake silently produced nothing. What actually proves the toolchain worked is the
+        # library being inside the shipped APK, for the target ABI, so that is what is asserted.
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "inspecting $apk"
+          if unzip -l "$apk" | grep -q "lib/arm64-v8a/liblcarsnative.so"; then
+            unzip -l "$apk" | grep "lib/arm64-v8a/" || true
+            # ⚠️ And that whisper.cpp really linked. Its JNI entry points are compiled only under
+            # HAVE_WHISPER, so their ABSENCE from the shipped library is the check - a missing symbol
+            # is a fact, where a runtime flag would only be a claim. `nm -D` reads the dynamic symbol
+            # table, which survives stripping because JNI could not resolve anything otherwise.
+            unzip -p "$apk" lib/arm64-v8a/liblcarsnative.so > /tmp/lcarsnative.so
+            if nm -D --defined-only /tmp/lcarsnative.so | grep -q "WhisperNative_nativeInit"; then
+              echo "whisper.cpp linked:"
+              nm -D --defined-only /tmp/lcarsnative.so | grep WhisperNative || true
+              # ⚠️ whisper is REQUIRED and llama is CONDITIONAL, and the difference is deliberate.
+              # Without transcription the feature does not exist; without the adjudicator it is
+              # honestly weaker and says so on screen (Rebuttal.Provenance.PATTERN_ONLY). The ggml
+              # step above removes the llama tree when the two vendored copies are different syncs,
+              # so its absence here is that decision arriving — asserted against the tree rather
+              # than assumed, so a llama tree that IS present and still failed to link is a failure.
+              if [ -d app/src/main/cpp/llama.cpp ]; then
+                if nm -D --defined-only /tmp/lcarsnative.so | grep -q "LlamaNative_nativeInit"; then
+                  echo "llama.cpp linked:"
+                  nm -D --defined-only /tmp/lcarsnative.so | grep LlamaNative || true
+                else
+                  echo "FAIL: the llama.cpp tree is present but its JNI symbols are not in the library."
+                  exit 1
+                fi
+              else
+                echo "::warning::built without the adjudicator - see the ggml compatibility step above"
+              fi
+            else
+              echo "FAIL: liblcarsnative.so shipped WITHOUT whisper.cpp - the if(EXISTS) guard took the"
+              echo "      host-only branch, so speech recognition would be silently absent."
+              nm -D --defined-only /tmp/lcarsnative.so | grep Java_ || echo "(no JNI exports at all)"
+              exit 1
+            fi
+          else
+            echo "FAIL: liblcarsnative.so is not in the APK — the CMake build produced nothing."
+            unzip -l "$apk" | grep "lib/" || echo "(no native libraries at all)"
+            exit 1
+          fi
+
+      - name: Verify the Python runtime packaged
+        # ⚠️ Same reasoning as the native gate above, for the same reason it lives here rather than in
+        # a unit test: `:app:testDebugUnitTest` runs on the host JVM and cannot start an arm64
+        # interpreter, so an assertion there would fail on a good build. What proves Chaquopy worked
+        # is the interpreter, its standard library and OUR module all being inside the shipped APK.
+        #
+        # ⚠️ Three separate assertions, not one, because they are three different failures:
+        #   - no libpython           → the plugin did not build the native interpreter at all
+        #   - no stdlib asset        → an interpreter that starts and cannot import anything
+        #   - no lcars_probe.py      → the plugin ran but never saw src/main/python
+        # A single "is Python in there" check would pass on the second and third and the build would
+        # ship something that only fails on the device.
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          echo "inspecting $apk"
+          listing=$(unzip -l "$apk")
+
+          if ! echo "$listing" | grep -qE "lib/arm64-v8a/libpython3.*\.so"; then
+            echo "FAIL: no libpython in the APK — Chaquopy did not package an interpreter."
+            echo "$listing" | grep "lib/arm64-v8a/" || echo "(no arm64 libraries at all)"
+            exit 1
+          fi
+          echo "interpreter:"
+          echo "$listing" | grep -E "lib/arm64-v8a/lib(python|chaquopy)" || true
+
+          # Chaquopy ships the standard library and the app's own Python as assets extracted on first
+          # run. The exact asset layout is a plugin implementation detail, so this matches on the
+          # directory it has always used rather than on an exact filename.
+          if ! echo "$listing" | grep -q "assets/chaquopy/"; then
+            echo "FAIL: no assets/chaquopy/ — the interpreter would start with nothing to import."
+            exit 1
+          fi
+          echo "python assets:"
+          echo "$listing" | grep "assets/chaquopy/" | head -20
+
+          # And that OUR module is in there. It is inside one of the asset zips rather than a loose
+          # file, so the check greps the zip bytes — the name is stored uncompressed in the entry
+          # header even when the content is deflated, which is what makes this work at all.
+          found=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${PROBE}" /tmp/pyasset.bin; then found="$entry"; break; fi
+          done
+          if [ -z "$found" ]; then
+            echo "FAIL: ${PROBE} is not in any Python asset — src/main/python was not picked up."
+            exit 1
+          fi
+          echo "our module is in $found"
+
+          # ⚠️ And that the pip requirement really made it in. `pip { install(...) }` resolving at
+          # build time proves the wheel DOWNLOADED; it does not prove it was packaged into the APK,
+          # and a build that quietly shipped without the extractor would look completely fine until
+          # the first attempt to play something. Separate assertion, separate failure.
+          #
+          # It is not in the same asset as our source — Chaquopy keeps requirements apart from the
+          # app's own Python — so every asset archive is searched rather than assuming a filename.
+          ext=""
+          for entry in $(echo "$listing" | awk '/assets\/chaquopy\/.*\.(zip|imy)$/ {print $4}'); do
+            unzip -p "$apk" "$entry" > /tmp/pyasset.bin 2>/dev/null || continue
+            if grep -qa "${EXTRACTOR}" /tmp/pyasset.bin; then ext="$entry"; break; fi
+          done
+          if [ -z "$ext" ]; then
+            echo "FAIL: ${EXTRACTOR} is not in any Python asset — the pip requirement did not ship."
+            echo "$listing" | grep "assets/chaquopy/" || true
+            exit 1
+          fi
+          echo "the extractor is in $ext"
+          echo "Python runtime packaged."
+
+          # ⚠️ Reported on every build because it is paid on every UPDATE, not once: the APK goes to
+          # the rolling `latest` release and the in-app updater pulls the whole thing. Chasing the
+          # figure after the fact is not possible — the release asset is overwritten — so the only
+          # way to know what a change cost is to have measured the build before it.
+          bytes=$(stat -c%s "$apk")
+          echo "APK: $((bytes / 1024 / 1024)) MB ($bytes bytes)"
+          echo "largest components:"
+          unzip -l "$apk" | sort -k1 -n -r | head -12
+        env:
+          PROBE: lcars_probe.py
+          EXTRACTOR: yt_dlp/
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4

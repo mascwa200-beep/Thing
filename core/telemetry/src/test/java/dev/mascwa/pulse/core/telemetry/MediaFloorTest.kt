@@ -109,4 +109,35 @@ class MediaFloorTest {
         assertNull(MediaFloor.displacedNote(Owner.RADIO, Owner.NONE))
         assertNull(MediaFloor.displacedNote(Owner.RADIO, Owner.RADIO))
     }
+
+    // ---- the fourth claimant ----------------------------------------------------------------------
+
+    /**
+     * On-demand playback is a full citizen of the floor: it displaces, is displaced, and its late
+     * release report is ignored exactly as the radio's is. Written against the sequence the app will
+     * actually produce — the player starts while the radio is on, then the radio takes it back.
+     */
+    @Test
+    fun onDemandDisplacesAndIsDisplacedLikeAnyOther() {
+        var state = State(Owner.RADIO)
+
+        val play = state.claim(Owner.ONDEMAND)
+        assertEquals(Action.STOP_RADIO, play.action)
+        state = play.state
+        assertEquals(Owner.ONDEMAND, state.owner)
+
+        // The radio's teardown reports its release late — must not blank the floor.
+        state = state.released(Owner.RADIO).state
+        assertEquals(Owner.ONDEMAND, state.owner)
+
+        val back = state.claim(Owner.RADIO)
+        assertEquals(Action.STOP_ONDEMAND, back.action)
+        assertEquals(Owner.RADIO, back.state.owner)
+
+        // And every displacement involving it is explained.
+        assertNotNull(MediaFloor.displacedNote(Owner.RADIO, Owner.ONDEMAND))
+        assertNotNull(MediaFloor.displacedNote(Owner.ONDEMAND, Owner.RADIO))
+        assertNotNull(MediaFloor.displacedNote(Owner.VIDEO, Owner.ONDEMAND))
+        assertNull(MediaFloor.displacedNote(Owner.ONDEMAND, Owner.ONDEMAND))
+    }
 }

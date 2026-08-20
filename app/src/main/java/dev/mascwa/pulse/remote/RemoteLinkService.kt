@@ -263,7 +263,7 @@ class RemoteLinkService : Service() {
 
     companion object {
         private const val CHANNEL = "remote_link"
-        private const val NOTIF_ID = 7321
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_REMOTE_LINK
         private const val ACTION_STOP = "dev.mascwa.pulse.remote.STOP"
         private const val ACTION_PAIR = "dev.mascwa.pulse.remote.PAIR"
         private const val ACTION_UNPAIR = "dev.mascwa.pulse.remote.UNPAIR"

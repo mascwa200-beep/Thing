@@ -60,6 +60,25 @@ class LibraryLookup(private val content: SurvivalContentRepository) {
         )
     }
 
+    /**
+     * The guides most related to [query], best first — a list of candidates, not an answer.
+     *
+     * ⚠️ **Deliberately a much lower bar than [consult], and the difference is the point.** `consult`
+     * has to decide whether the library can *answer*, so it refuses anything that does not clear the
+     * distinctive-word test: a confident paragraph about the wrong subject is worse than admitting
+     * the library has nothing. A search result list is a different promise — three related guides
+     * under a heading that says "from the offline library" invites the reader to judge, and applying
+     * the answer bar there would show an empty list next to genuinely relevant pages.
+     *
+     * Only the resident index is read; no shard is opened, which is what the sharded loader exists
+     * for. The caller fetches prose for whichever hit it actually shows.
+     */
+    suspend fun rank(query: String, limit: Int): List<GuideSearch.Hit> {
+        val index = runCatching { content.index() }.getOrNull().orEmpty()
+        if (index.isEmpty()) return emptyList()
+        return GuideSearch.rank(index.map { it.toSearchEntry() }, query, limit)
+    }
+
     /** The library's best answer to [query], or null when it genuinely has none. */
     suspend fun consult(query: String): Found? {
         val index = runCatching { content.index() }.getOrNull().orEmpty()

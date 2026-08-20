@@ -53,6 +53,7 @@ import dev.mascwa.pulse.data.spotify.SpotifyDevice
 import dev.mascwa.pulse.data.spotify.SpotifyPlayback
 import dev.mascwa.pulse.data.spotify.SpotifyPlaylist
 import dev.mascwa.pulse.data.spotify.SpotifyTrack
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsCorner
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
@@ -455,18 +456,11 @@ private fun PipButton(label: String, c: NightwirePalette, modifier: Modifier, on
 }
 
 @Composable
-private fun SpotifyField(value: String, onChange: (String) -> Unit, placeholder: String, c: NightwirePalette) {
-    Box(
-        Modifier.fillMaxWidth().border(1.dp, c.line, lcarsBlockShape(sweep = 4.dp, corner = LcarsCorner.TopStart)).padding(horizontal = 10.dp, vertical = 9.dp),
-    ) {
-        if (value.isEmpty()) Text(placeholder, fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.muted)
-        BasicTextField(
-            value = value,
-            onValueChange = onChange,
-            singleLine = true,
-            textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 12.sp, color = c.ink),
-            cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+private fun SpotifyField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    @Suppress("UNUSED_PARAMETER") c: NightwirePalette, // kept so the call sites stay untouched
+) {
+    LcarsField(value = value, onValueChange = onChange, placeholder = placeholder)
 }

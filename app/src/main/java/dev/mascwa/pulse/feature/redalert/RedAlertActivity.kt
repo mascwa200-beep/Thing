@@ -8,6 +8,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.mascwa.pulse.core.telemetry.CapAlerts
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,6 +37,19 @@ class RedAlertActivity : ComponentActivity() {
 
     private var klaxon: EmergencyKlaxon? = null
 
+    /**
+     * The alert currently on screen.
+     *
+     * ⚠️ **State, not `intent`, because this Activity is `singleTask`.** A second alert arriving
+     * while one is up does not create a new instance — it is delivered to this one through
+     * [onNewIntent], `onCreate` does not run again, and `getIntent()` keeps returning the ORIGINAL.
+     * With the screen read straight off `intent` at composition time, that meant a tornado warning
+     * arriving behind a flood warning was silently swallowed: the alarm kept sounding, the screen
+     * kept showing the older, possibly milder hazard, and nothing anywhere said a second one had
+     * come in. Holding it as state and updating it is what makes the newer alert appear.
+     */
+    private var current by mutableStateOf<Intent?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -48,30 +65,40 @@ class RedAlertActivity : ComponentActivity() {
             },
         )
 
-        val hazard = intent.getStringExtra(EXTRA_HAZARD)?.takeIf { it.isNotBlank() } ?: "Emergency alert"
-        val condition = intent.getStringExtra(EXTRA_CONDITION)?.takeIf { it.isNotBlank() } ?: "RED ALERT"
-
+        current = intent
         klaxon = EmergencyKlaxon(this).also { it.start() }
 
         setContent {
+            val shown = current ?: intent
             RedAlertScreen(
-                condition = condition,
-                hazard = hazard,
-                area = intent.getStringExtra(EXTRA_AREA).orEmpty(),
+                condition = shown.getStringExtra(EXTRA_CONDITION)?.takeIf { it.isNotBlank() } ?: "RED ALERT",
+                hazard = shown.getStringExtra(EXTRA_HAZARD)?.takeIf { it.isNotBlank() } ?: "Emergency alert",
+                area = shown.getStringExtra(EXTRA_AREA).orEmpty(),
                 timing = CapAlerts.timing(
-                    intent.getStringExtra(EXTRA_URGENCY),
-                    intent.getStringExtra(EXTRA_CERTAINTY),
+                    shown.getStringExtra(EXTRA_URGENCY),
+                    shown.getStringExtra(EXTRA_CERTAINTY),
                 ),
-                remaining = intent.getStringExtra(EXTRA_REMAINING)?.takeIf { it.isNotBlank() },
-                instruction = intent.getStringExtra(EXTRA_INSTRUCTION)?.takeIf { it.isNotBlank() },
-                source = intent.getStringExtra(EXTRA_SOURCE)?.takeIf { it.isNotBlank() } ?: "the issuing agency",
-                receivedAt = CLOCK.format(Date(System.currentTimeMillis())),
+                remaining = shown.getStringExtra(EXTRA_REMAINING)?.takeIf { it.isNotBlank() },
+                instruction = shown.getStringExtra(EXTRA_INSTRUCTION)?.takeIf { it.isNotBlank() },
+                source = shown.getStringExtra(EXTRA_SOURCE)?.takeIf { it.isNotBlank() } ?: "the issuing agency",
+                // Keyed on the alert, so a newer one stamps its own arrival rather than inheriting
+                // the time the first one came in.
+                receivedAt = remember(shown) { CLOCK.format(Date(System.currentTimeMillis())) },
                 onAcknowledge = {
                     klaxon?.stop()
                     finish()
                 },
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        current = intent
+        // Already sounding in the ordinary case, and `start()` is a no-op then. It matters when the
+        // alarm had been stopped: a second emergency has to be audible again, not merely visible.
+        klaxon?.start()
     }
 
     override fun onDestroy() {

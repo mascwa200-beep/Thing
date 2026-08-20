@@ -105,12 +105,21 @@ data class ApiKeys(
     val finnhub: String = "",
     val openWeatherMap: String = "",
     val nasa: String = "",
+    /**
+     * Brave Search. The only tier of the assistant's `web` tool that reaches the open web.
+     *
+     * Everything else this app searches is keyless — the bundled library is on disk and Wikipedia
+     * asks for nothing — so without this a question about today has no way to be answered, and
+     * `SearchPlan` says so by name rather than quietly returning an encyclopaedia article instead.
+     */
+    val brave: String = "",
 ) {
     val hasNewsApi get() = newsApi.isNotBlank()
     val hasFred get() = fred.isNotBlank()
     val hasEia get() = eia.isNotBlank()
     val hasFinnhub get() = finnhub.isNotBlank()
     val hasOwm get() = openWeatherMap.isNotBlank()
+    val hasBrave get() = brave.isNotBlank()
     /** NASA NeoWs falls back to the shared DEMO_KEY when no personal key is set. */
     val nasaOrDemo get() = nasa.ifBlank { "DEMO_KEY" }
 }
@@ -335,6 +344,17 @@ data class SensingSettings(
     val rememberEvents: Boolean = true,
     /** Battery %, discharging, below which the whole stack stands down (heartbeat only). */
     val standDownBatteryPct: Int = 9,
+    /**
+     * The acoustic interrogator: continuous speech capture, offline transcription to a rolling
+     * encrypted log, and fallacy screening against the offline library.
+     *
+     * ⚠️ **DEFAULT OFF, and it is the only sensing switch that is.** The rest of this group produces
+     * text labels from sound and light and keeps nothing; this one writes down what was actually
+     * said, which can include people who did not choose to be recorded. It also takes the microphone
+     * outright, so the wake word stands down while it runs. Neither of those should begin because an
+     * app updated.
+     */
+    val interrogator: Boolean = false,
 )
 
 /**
@@ -489,6 +509,11 @@ data class AppSettings(
      *  restreams of channels that are not free to watch, which is the owner's call to make and not
      *  ours. Costs a ~215 KB fetch, cached for a week. */
     val communityChannels: Boolean = false,
+    /** Skip community-flagged segments (sponsors, self-promo, intros…) during on-demand playback.
+     *  **Default OFF and a switch on purpose**: it asks a third-party database about each video
+     *  (privately — a 4-hex hash prefix, never the video id) and then jumps playback on its own,
+     *  both of which are behaviours to opt into rather than discover. */
+    val sponsorSkip: Boolean = false,
     /** When J.A.R.V.I.S. last ran an autonomous curiosity/research pass (throttle), and a round-robin
      *  cursor over the standing interests + the device subject so it rotates what it investigates. */
     val lastCuriosityMs: Long = 0,
@@ -523,6 +548,7 @@ data class AppSettings(
  */
 fun AppSettings.allSecretValues(): List<String> = listOf(
     apiKeys.newsApi, apiKeys.fred, apiKeys.eia, apiKeys.finnhub, apiKeys.openWeatherMap, apiKeys.nasa,
+    apiKeys.brave,
     jarvis.githubToken, jarvis.modelToken, jarvis.cloudApiKey,
     spotify.accessToken, spotify.refreshToken, spotify.pendingVerifier,
 ).map { it.trim() }.filter { it.isNotBlank() }

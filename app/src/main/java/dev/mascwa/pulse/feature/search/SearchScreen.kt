@@ -38,6 +38,7 @@ import dev.mascwa.pulse.core.telemetry.EmergencyTriage
 import dev.mascwa.pulse.core.util.openUrl
 import dev.mascwa.pulse.data.settings.SearchEngine
 import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHeaderBar
 import dev.mascwa.pulse.feature.common.PulseScaffold
@@ -53,9 +54,7 @@ fun SearchScreen(
 ) {
     PulseScaffold(
         title = "Search",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         SearchBody(vm, Modifier.padding(innerPadding), onOpen, onOpenGuide)
     }
@@ -96,28 +95,14 @@ fun SearchBody(
         modifier.padding(horizontal = 16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
     ) {
             LcarsHeaderBar("Query")
-            LcarsFrame(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⌕", fontFamily = JetBrainsMono, fontSize = 18.sp, color = c.accent)
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it; vm.onQueryChanged(it) },
-                        singleLine = true,
-                        textStyle = TextStyle(color = c.ink, fontFamily = JetBrainsMono, fontSize = 15.sp),
-                        cursorBrush = SolidColor(c.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { go() }),
-                        modifier = Modifier.weight(1f).padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
-                        decorationBox = { inner ->
-                            if (query.isEmpty()) {
-                                Text("Search this device, or the web…", fontFamily = JetBrainsMono,
-                                    fontSize = 15.sp, color = c.muted)
-                            }
-                            inner()
-                        },
-                    )
-                }
-            }
+            LcarsField(
+                value = query,
+                onValueChange = { query = it; vm.onQueryChanged(it) },
+                placeholder = "Search this device, or the web…",
+                leadingIcon = LcarsIcons.Search,
+                imeAction = ImeAction.Search,
+                onImeAction = { go() },
+            )
 
             // --- an emergency outranks everything, including the ranker ------------------------
             emergency?.let { e -> EmergencyCard(e, onOpenGuide) }
@@ -190,6 +175,9 @@ private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.
         Modifier.fillMaxWidth().padding(top = 6.dp)
             .let { m -> if (open != null) m.clickable { open(result) } else m },
     ) {
+      // ⚠️ LcarsFrame seats its content in a Box — siblings emitted directly STACK at top-start
+      // (the recorded NeonPanel lesson). These three overlapped into unreadable text.
+      Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 result.kind.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 8.sp,
@@ -207,6 +195,7 @@ private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.
                 color = c.ink2, modifier = Modifier.padding(top = 2.dp),
             )
         }
+      }
     }
 }
 
@@ -230,6 +219,8 @@ private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: ((String) -
             .let { m -> if (open != null) m.clickable { open(gid!!) } else m },
         accent = c.magenta,
     ) {
+      // Same Box-stacking trap as DeviceResultRow above — the Column is load-bearing.
+      Column {
         Text(
             e.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp,
             letterSpacing = 1.sp, fontWeight = FontWeight.Bold, color = c.magenta,
@@ -244,5 +235,6 @@ private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: ((String) -
                 letterSpacing = 0.8.sp, color = c.muted, modifier = Modifier.padding(top = 6.dp),
             )
         }
+      }
     }
 }

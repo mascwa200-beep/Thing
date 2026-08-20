@@ -3,10 +3,14 @@ package dev.mascwa.pulse.jarvis.agent
 import android.util.Base64
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.DeviceContextProvider
+import dev.mascwa.pulse.core.telemetry.Readability
+import dev.mascwa.pulse.core.telemetry.SearchPlan
 import dev.mascwa.pulse.data.jarvis.JarvisMemory
 import dev.mascwa.pulse.data.jarvis.KnowledgeStore
 import dev.mascwa.pulse.data.jarvis.db.NoteSource
 import dev.mascwa.pulse.data.settings.SettingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.net.URLEncoder
 
@@ -27,42 +31,149 @@ private fun stripHtml(html: String): String =
         .replace(HTML_WHITESPACE, " ")
         .trim()
 
-/** Keyless web search via DuckDuckGo's Instant-Answer API (limited but no key/account). */
-class WebSearchTool(private val http: HttpClient) : JarvisTool {
+/**
+ * Search — the offline library, an encyclopaedia, and the open web, in whichever order the question
+ * calls for.
+ *
+ * ⚠️ **What this replaced was not a search engine, and that was measured rather than suspected.**
+ * The old implementation called DuckDuckGo's Instant Answer API, which is an *entity lookup*: over
+ * fourteen real queries, all eight natural-language questions returned nothing and all six bare-noun
+ * lookups returned an abstract. Since the tool described itself as "search the web", the model used
+ * it as one — and got "No instant answer found", which it could only read as the web not knowing.
+ * A tool that returns silence for the commonest way of asking is worse than no tool, because the
+ * silence is indistinguishable from an answer.
+ *
+ * ⚠️ **Every result names its tier, and that is not decoration.** An offline guide, a keyless
+ * encyclopaedia summary and a live web result carry very different warranties; handed to a model as
+ * undifferentiated text, a 2019 encyclopaedia sentence gets presented as the state of the world
+ * today. The same discipline as `Readability.Outcome` and `Rebuttal.Provenance`.
+ */
+class WebSearchTool(
+    private val search: dev.mascwa.pulse.data.search.WebSearchRepository,
+) : JarvisTool {
     override val name = "web"
-    override val usage = "web <query> — search the web (DuckDuckGo, brief answer)"
+    override val usage =
+        "web <query> — search the offline library, Wikipedia and the web; says which answered"
 
-    @Serializable
-    private data class Ddg(
-        val AbstractText: String = "",
-        val Heading: String = "",
-        val RelatedTopics: List<Topic> = emptyList(),
-    )
+    override suspend fun run(arg: String): String {
+        val q = arg.trim()
+        if (q.isBlank()) return "Give me something to search for."
+        val outcome = runCatching { search.search(q) }
+            .getOrElse { return "Search failed: ${it.message ?: it::class.java.simpleName}" }
 
-    @Serializable
-    private data class Topic(val Text: String = "")
+        if (outcome.answers.isEmpty()) {
+            return outcome.verdict ?: "Nothing found for \"$q\"."
+        }
 
-    override suspend fun run(arg: String): String = runCatching {
-        val q = URLEncoder.encode(arg.trim(), "UTF-8")
-        val url = "https://api.duckduckgo.com/?q=$q&format=json&no_html=1&skip_disambig=1"
-        val r = http.getJson(url, Ddg.serializer())
-        val abstract = r.AbstractText.trim()
-        if (abstract.isNotBlank()) return@runCatching abstract.clip()
-        val topics = r.RelatedTopics.map { it.Text.trim() }.filter { it.isNotBlank() }.take(4)
-        if (topics.isEmpty()) "No instant answer found for \"$arg\"." else topics.joinToString("\n").clip()
-    }.getOrElse { "Web search failed: ${it.message}" }
+        val lines = StringBuilder()
+        // ⚠️ The provenance line comes FIRST, before any content. A model that reads the answer and
+        // then the source has already formed the answer; one that reads the source first knows how
+        // much to trust what follows.
+        lines.append(SearchPlan.provenance(outcome.answers.first().tier)).append(":\n")
+        outcome.answers.forEach { a ->
+            lines.append("• ").append(a.title)
+            a.url?.let { lines.append(" — ").append(it) }
+            if (a.snippet.isNotBlank()) lines.append("\n  ").append(a.snippet)
+            lines.append('\n')
+        }
+        // A tier the question genuinely wanted and could not reach is worth saying even when
+        // something else answered — otherwise a stale encyclopaedia entry stands in for today's news
+        // with nothing marking the substitution.
+        outcome.plan.missing?.let {
+            lines.append("(Note: this needed a live web search, which is not configured.)\n")
+        }
+        return lines.toString().trim().clip(SEARCH_OBS)
+    }
+
+    companion object {
+        /**
+         * ⚠️ Bigger than the file's default 1500, for the same reason the fetch tool's is: a search
+         * result is a LIST, and the default cap was sized for a single fact. Three tiers of titles,
+         * URLs and snippets clear 1500 easily, and truncating mid-list drops the very results the
+         * ranking put lowest — which is the wrong end to lose, because the tier order already put
+         * the best answer first and the tail is where the alternatives live.
+         *
+         * Still under `AgentOrchestrator`'s 6000-per-observation ceiling, so this cannot be the
+         * thing that overflows a turn.
+         */
+        const val SEARCH_OBS = 3000
+    }
 }
 
-/** Fetch a URL and return its readable text. */
+/**
+ * Fetch a URL and return what was written on it.
+ *
+ * ⚠️ **THIS USED TO RETURN THE NAVIGATION AND CALL IT THE PAGE.** It stripped every tag and handed
+ * back the first 1500 characters, which on a real page is the skip-link, the masthead, the menu and
+ * the site's own promoted headlines. Measured over five real pages, the article did not begin within
+ * that budget on ANY of them: BBC at character 1,609, MDN at 2,112, and the Associated Press at
+ * **34,972** of a 47,010-character strip. On AP the tool did not merely return nothing useful — it
+ * returned OTHER STORIES' headlines out of the nav rail ("The Moscow region is hit by a drone
+ * blitz") inside what was supposed to be a musician's obituary, which the model would read as the
+ * content of the page it asked for. That is a correctness defect, not a quality one.
+ *
+ * ⚠️ It also fetched with no size cap at all, so a heavy page was read whole into a string.
+ *
+ * Deliberately NOT routed through `ReaderRepository`, even though the two do similar work. A reader
+ * wants an article and is right to refuse a PDF or a JSON feed; a `fetch` tool wants *whatever is
+ * there*, because the model may well be asking for an API response or a plain-text file. So the
+ * ladder here is its own: non-HTML comes back as-is, HTML is decimated, and anything the decimator
+ * will not call an article falls back to the old crude strip — which keeps every page that works
+ * today working, and is why this can only improve the tool's output.
+ */
 class WebFetchTool(private val http: HttpClient) : JarvisTool {
     override val name = "fetch"
-    override val usage = "fetch <https url> — fetch a page and return its text"
+    override val usage = "fetch <https url> — fetch a page and return its readable text (the article, not the site chrome)"
 
     override suspend fun run(arg: String): String {
         val url = arg.trim()
         if (!url.startsWith("http")) return "Provide a full http(s) URL."
-        return runCatching { stripHtml(http.getString(url)).clip() }
-            .getOrElse { "Fetch failed: ${it.message}" }
+        // Known redirect stubs: say so instead of fetching a shell page and reporting it as content.
+        Readability.unreadableReason(url)?.let { return it }
+
+        val res = runCatching { http.getTextCapped(url, MAX_FETCH_CHARS) }
+            .getOrElse { return "Fetch failed: ${it.message}" }
+
+        val type = res.contentType?.substringBefore(';')?.trim()?.lowercase()
+        val isHtml = type == null ||
+            type.startsWith("text/html") ||
+            type.startsWith("application/xhtml")
+        // A JSON feed, a CSV, a plain-text file: hand it over untouched. Running the tag stripper
+        // over JSON mangles it, and there is no article in it to find.
+        if (!isHtml) return res.body.trim().clip(PAGE_OBS)
+
+        val e = withContext(Dispatchers.Default) { Readability.extract(res.body, res.finalUrl) }
+        if (e.isArticle) {
+            return buildString {
+                e.meta.title?.let { appendLine(it) }
+                e.meta.byline?.let { appendLine("By $it") }
+                appendLine()
+                append(Readability.plainText(e))
+            }.trim().clip(PAGE_OBS)
+        }
+        // An index, a listing, a wall, a page built entirely by script. Say what was concluded, then
+        // fall back to exactly what this tool did before, so nothing that worked stops working.
+        return (e.note?.let { "($it)\n" } ?: "") + stripHtml(res.body).clip()
+    }
+
+    private companion object {
+        /**
+         * The ceiling on a page this tool will read into memory.
+         *
+         * Lower than the reader's, because a tool result is bounded to a few thousand characters
+         * anyway — reading four times that off the wire only to discard it is waste, not safety.
+         */
+        const val MAX_FETCH_CHARS = 1_000_000
+
+        /**
+         * How much of a decimated page to hand back.
+         *
+         * Larger than [MAX_OBS], and the reason is the measurement above: 1500 characters of an
+         * article is worth more than 1500 characters of menu, so the budget that was being spent on
+         * chrome can now buy content. Kept below `AgentOrchestrator.MAX_OBS` (6000), which truncates
+         * every observation anyway — so this is a real bound and not a way around that one.
+         */
+        const val PAGE_OBS = 4000
     }
 }
 

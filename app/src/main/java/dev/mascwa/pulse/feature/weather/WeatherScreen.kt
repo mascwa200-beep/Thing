@@ -61,13 +61,14 @@ import dev.mascwa.pulse.feature.common.CyberRowFrame
 import dev.mascwa.pulse.feature.common.ErrorState
 import dev.mascwa.pulse.feature.common.ExplainerDialog
 import dev.mascwa.pulse.feature.common.LcarsChip
+import dev.mascwa.pulse.feature.common.LcarsTabRow
+import dev.mascwa.pulse.feature.common.LcarsField
 import dev.mascwa.pulse.feature.common.LcarsFrame
 import dev.mascwa.pulse.feature.common.LcarsHistogram
 import dev.mascwa.pulse.feature.common.LcarsIcons
 import dev.mascwa.pulse.feature.common.LcarsMeter
 import dev.mascwa.pulse.feature.common.LcarsTimeChart
 import dev.mascwa.pulse.feature.common.LoadingState
-import dev.mascwa.pulse.feature.common.NeonChip
 import dev.mascwa.pulse.feature.common.NeonPanel
 import dev.mascwa.pulse.feature.common.PulseScaffold
 import dev.mascwa.pulse.feature.common.StaleBanner
@@ -88,7 +89,8 @@ fun WeatherScreen(vm: WeatherViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf(WeatherTab.NOW) }
+    val tabIdx by vm.tabIndex.collectAsStateWithLifecycle()
+    val tab = WeatherTab.entries[tabIdx.coerceIn(0, WeatherTab.entries.lastIndex)]
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -127,15 +129,11 @@ fun WeatherScreen(vm: WeatherViewModel) {
         Column(Modifier.padding(innerPadding)) {
             // Only the rail is fixed. Everything else scrolls, as it did when this screen was one
             // long page — a permanent header would cost real estate a phone does not have.
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                WeatherTab.entries.forEach { t ->
-                    NeonChip(t.label, selected = t == tab, onClick = { tab = t })
-                }
-            }
+            LcarsTabRow(
+                tabs = WeatherTab.entries.map { it.label },
+                selected = tab.ordinal,
+                onSelect = { vm.tabIndex.value = it },
+            )
             when (tab) {
                 WeatherTab.NOW -> NowBody(vm, chrome, onExplain)
                 WeatherTab.HOURS -> HoursBody(vm, chrome)
@@ -212,25 +210,12 @@ private fun LazyListScope.weatherHeader(c: WeatherChrome) {
 @Composable
 private fun CitySearchField(query: String, onQuery: (String) -> Unit) {
     val p = Pulse.colors
-    LcarsFrame(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        BasicTextField(
-            value = query,
-            onValueChange = onQuery,
-            singleLine = true,
-            textStyle = TextStyle(color = p.ink, fontFamily = JetBrainsMono, fontSize = 13.sp),
-            cursorBrush = SolidColor(p.accent),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text(
-                        "▸ SEARCH FOR A CITY", fontFamily = JetBrainsMono,
-                        fontSize = 12.sp, color = p.muted,
-                    )
-                }
-                inner()
-            },
-        )
-    }
+    LcarsField(
+        value = query,
+        onValueChange = onQuery,
+        modifier = Modifier.padding(vertical = 4.dp),
+        placeholder = "▸ SEARCH FOR A CITY",
+    )
 }
 
 /** One search hit. The whole row adds the city, so there is no separate button to aim at. */

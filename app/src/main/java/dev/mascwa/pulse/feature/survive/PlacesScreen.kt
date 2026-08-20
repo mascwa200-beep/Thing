@@ -61,9 +61,7 @@ fun PlacesScreen(vm: PlacesViewModel, onBack: (() -> Unit)? = null) {
 
     PulseScaffold(
         title = "Nearest Help",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         Column(Modifier.padding(innerPadding)) {
             Row(

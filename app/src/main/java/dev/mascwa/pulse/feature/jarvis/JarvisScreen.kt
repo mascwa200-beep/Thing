@@ -111,11 +111,7 @@ fun JarvisScreen(
 
     PulseScaffold(
         title = "COMPUTER",
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
+        onBack = onBack,
         actions = {
             IconButton(onClick = { vm.setVoiceReplies(!voiceReplies) }) {
                 Icon(

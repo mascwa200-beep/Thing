@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 data class IssPosition(
     val latitude: Double,
     val longitude: Double,
-    val altitudeKm: Double,
-    val velocityKmh: Double,
+    /** How high the station is right now — varies with each reboost, so worth saying. */
+    val altitudeKm: Double = 0.0,
     /**
      * When the service says this fix was taken — not when we asked for it.
      *

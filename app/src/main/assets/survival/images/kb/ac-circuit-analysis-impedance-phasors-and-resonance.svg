@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="230" height="110" 
+    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+  <title>Impedences in parallel</title>
+  <desc>Diagram of impedence in parallel</desc>
+  <defs>
+    <path id="Z1" d="M0,0 v20 h6 v30 h-6 m0,-30 h-6 v30 h6 v20" />
+    <text id="Z1T" x="12" y="55">Z</text>
+    <circle id="node" r="3.5" fill="#FFF" stroke-width="1.5"/>
+  </defs>
+  <g stroke="#000" stroke-width="2.5" font-family="Times" fill="none" font-size="22" >
+    <path d="M20,20 h90 m50,0 h20 v2 M20,90 h90 m50,0 h20 v-2"/>
+    <path stroke-dasharray="3,3" d="M110,20 h50 M110,90 h50"/>
+    <use xlink:href="#Z1" x="50" y="20" />
+    <use xlink:href="#Z1" x="100" y="20" />
+    <use xlink:href="#Z1" x="180" y="20" />
+    <g fill="#000" stroke="none" font-style="italic" >
+      <use xlink:href="#Z1T" x="50" y="20" />
+      <use xlink:href="#Z1T" x="100" y="20" />
+      <use xlink:href="#Z1T" x="180" y="20" />
+      <circle cy="20" cx="50" r="3" />
+      <circle cy="20" cx="100" r="3" />
+      <circle cy="90" cx="50" r="3" />
+      <circle cy="90" cx="100" r="3" />
+    </g>
+    <g fill="#000" stroke="none" font-size="16" >
+      <text y="79" x="76">1</text>
+      <text y="79" x="126">2</text>
+      <text y="78" x="206">n</text>
+    </g>
+    <use xlink:href="#node" x="20" y="20" />
+    <use xlink:href="#node" x="20" y="90" />
+  </g>
+  <!--  :vim:ai:et:sw=2:nowrap:so=2: -->
+</svg>

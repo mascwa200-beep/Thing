@@ -49,11 +49,7 @@ fun CrashLogScreen(vm: CrashLogViewModel, onBack: () -> Unit) {
 
     PulseScaffold(
         title = "CRASH LOG",
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(LcarsIcons.ArrowBack, contentDescription = "Back", tint = c.ink)
-            }
-        },
+        onBack = onBack,
         actions = {
             if (entries.isNotEmpty()) {
                 IconButton(onClick = { vm.clear() }) {

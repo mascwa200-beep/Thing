@@ -290,7 +290,9 @@ class BreakingOverlayService : Service() {
         const val ACTION_DISMISS = "dev.mascwa.pulse.BREAKING_OVERLAY_DISMISS"
 
         private const val CHANNEL = "breaking_overlay"
-        private const val NOTIF_ID = 7401
+        // ⚠️ Was 7401 — the SAME id as SensoriumService's ongoing notification, and the two run at the
+        // same time. See NotifId for what that did to both of them.
+        private const val NOTIF_ID = dev.mascwa.pulse.notifications.NotifId.FGS_BREAKING_OVERLAY
         private const val ID_OPEN = 0x7E51
         private const val AUTO_DISMISS_MS = 5 * 60_000L
         private val ACCENT = Color.parseColor("#FFB000")

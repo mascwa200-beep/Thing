@@ -296,7 +296,10 @@ class NewsViewModel(
     }
 
     private fun SocialItem.toArticle(cat: String): Article = Article(
-        title = title, url = url, summary = meta, source = source,
+        // ⚠️ The summary is the post's own text where there is one. It used to be the vote count
+        // unconditionally, so an Ask HN thread — which is nothing BUT its text — arrived here as a
+        // title and "▲ 412 · 88 comments", with the actual question discarded.
+        title = title, url = url, summary = body ?: meta, source = source,
         publishedEpochMs = publishedEpochMs, imageUrl = thumbnail, category = cat,
     )
 
@@ -313,11 +316,20 @@ class NewsViewModel(
         }
         _state.update { it.copy(searchMode = true, query = query, content = it.content.copy(loading = true, error = null)) }
         viewModelScope.launch {
+            // ⚠️ Commit only if this search is still the one on screen — the same ownership guard
+            // selectTab() has always had. CANCEL / system back call clearSearch(), whose
+            // selectTab() serves the tab synchronously from cache and launches nothing after it,
+            // so an abandoned search landing seconds later would stomp a correctly-showing tab
+            // (or paint an ErrorState over it) with no later write to heal the screen.
             try {
                 val results = repo.search(query)
-                _state.update { it.copy(content = Async(data = results, loading = false)) }
+                _state.update {
+                    if (it.searchMode && it.query == query) it.copy(content = Async(data = results, loading = false)) else it
+                }
             } catch (e: Throwable) {
-                _state.update { it.copy(content = Async(loading = false, error = e.toUserMessage())) }
+                _state.update {
+                    if (it.searchMode && it.query == query) it.copy(content = Async(loading = false, error = e.toUserMessage())) else it
+                }
             }
         }
     }

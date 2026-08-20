@@ -5,8 +5,8 @@ to an independent verifier told to **refute** it. Only what survived is below, c
 verifier's own corrected severity — which moved in both directions.
 
 This file exists because the workflow transcript lives in an ephemeral container. It is a
-**work list**, and the HIGH items on it are now done — see the status table below. Everything at
-medium and cosmetic is still outstanding.
+**work list**. The HIGH items are done and so is the COSMETIC list — see the two status sections
+below. The 15 MEDIUM findings are what remains.
 
 ## Status
 
@@ -27,6 +27,27 @@ negative-tested; the wiring is compile-gated only. Aeroplane mode is the quickes
 of them.
 
 **49 confirmed of 53 raw** across all 7 sources — 7 high, 15 medium, 22 cosmetic. 4 refuted.
+
+### The COSMETIC list, resolved
+
+Worked through in `27d62a9`. The list is mostly self-refuting — the verifier's own conclusion on
+many entries is that no user would act differently — so it was not swept wholesale. One shape in it
+is this repository's recurring defect and was worth closing: **a field parsed, modelled, cached and
+read by nobody.** That is how `tempoNudge`, `windKmh`, `NavGuidance.turnHint`, `savedAtMs` and
+`mastery()` each reached this codebase.
+
+| Finding | Outcome |
+|---|---|
+| ISS `altitudeKm` unread | **Surfaced.** The digest's own KDoc claimed the fetched fallback could not know how high the station is — and it was in the response all along. A comment asserting a limitation the model does not have is how a discarded field stays discarded. |
+| ISS `velocityKmh` unread | **Deleted.** Within a per-cent of 27,600 km/h on every pass ever flown; printing it would be decoration pretending to be telemetry. |
+| `originLat` / `originLon` inert in three models | **Deleted.** Worse than dead: they name an origin the distances beside them were not computed from, because `recompute()` re-derives from the live fix. Safe on old cache blobs — `DiskCache` shares `HttpClient`'s `Json`, which sets `ignoreUnknownKeys`. |
+| RainViewer `nowcast` unread | **No longer parsed**, with the reasoning moved onto the declaration. Excluding the forecast is deliberate; leaving it in the model made a decision look like an oversight. |
+| `SunTimes.dayLengthSec` unread | **Stale finding** — now read by `SolarDay.classify`. |
+| HN `text` / `by` / `type`; radio `stationuuid` / `language` / `codec` / `bitrate`; `Geo.formatDistance` locale; orbital cache key | **Already fixed** in `604b1ad`, `6804bc0`, `885f1da`, `cd84e39` before this pass. |
+| ISS `visibility`; `is_sentry_object`; twilight and solar-noon fields; OSRM `weight_name`/`hint`; Overpass `operator:type` / `wheelchair` / `addr:postcode` | **Left alone deliberately**, on the verifier's own reasoning. Wiring `visibility` would be a *regression* — "daylight" means the station is sunlit, not visible, so it would imply a naked-eye sighting at noon. Sentry impact probabilities of 1e-06 on objects decades out would alarm more than inform. The twilight fields are already computed offline and printed. The Overpass three are information-richness at 5–8% coverage, not action-changing. |
+
+**Still outstanding:** the 15 MEDIUM findings, and the description-cluster re-fetch, which is
+**blocked** — Google answers this container with a block page.
 
 Sources: `radio-browser` · `overpass-poi` · `rainviewer` · `osrm-routing` · `orbital-iss-sun` ·
 `news-google-rss` · `social-hn`.

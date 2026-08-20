@@ -55,7 +55,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -98,6 +97,7 @@ fun SettingsScreen(
     onOpenCrashLog: () -> Unit = {},
     onOpenSecurityAudit: () -> Unit = {},
     initialCategory: SettingsCategory? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSize.collectAsStateWithLifecycle()
@@ -111,7 +111,6 @@ fun SettingsScreen(
     var watchlistCollapsed by rememberSaveable { mutableStateOf(false) }
     var feedsCollapsed by rememberSaveable { mutableStateOf(false) }
     var mutedCollapsed by rememberSaveable { mutableStateOf(false) }
-    var imageSitesCollapsed by rememberSaveable { mutableStateOf(false) }
 
     fun notificationsAllowed(): Boolean =
         android.os.Build.VERSION.SDK_INT < 33 ||
@@ -140,8 +139,14 @@ fun SettingsScreen(
     // Steam-style master-detail state: which category is open (null = the compact master list), and the
     // cross-category search query. A section is visible when it belongs to the active category, or (while
     // searching) when its title/keywords match — so a search result is the real, live control.
-    var selectedCat by remember { mutableStateOf(initialCategory) }
+    // VM-backed (see SettingsViewModel.selectedCategory) — a remember{} here died on tab-away.
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.seedCategory(initialCategory) }
+    val selectedCat by vm.selectedCategory.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
+
+    // ⚠️ System back leaves the CATEGORY, then the screen — Settings previously exited wholesale
+    // from three levels deep. Gated on the sub-state, per the app-wide BackHandler rule.
+    androidx.activity.compose.BackHandler(enabled = selectedCat != null) { vm.selectedCategory.value = null }
     val activeCat = selectedCat ?: SettingsCategory.FIRST
     fun vis(cat: SettingsCategory, keywords: String): Boolean {
         val q = query.trim()
@@ -739,6 +744,21 @@ fun SettingsScreen(
                 }
             }
 
+            if (vis(SettingsCategory.SECURITY, "viewscreen sponsor skip sponsorblock segments on-demand video playback")) item {
+                PrefSection("Viewscreen") {
+                    PrefSwitch(
+                        "Skip flagged segments",
+                        "During on-demand playback, jump over segments the SponsorBlock community has " +
+                            "flagged — sponsors, self-promotion, intros and the like. Asks a public " +
+                            "database about each video privately: only the first four characters of a " +
+                            "hash are sent, so the server is never told which video you are watching. " +
+                            "Off = nothing is asked and nothing is skipped.",
+                        checked = s.sponsorSkip,
+                        onChange = { v -> vm.update { it.copy(sponsorSkip = v) } },
+                    )
+                }
+            }
+
             if (vis(SettingsCategory.SECURITY, "ambient sensing sensorium camera mic microphone environment scanner light barometer")) item {
                 PrefSection("Ambient sensing (Sensorium)") {
                     PrefSwitch(
@@ -766,6 +786,22 @@ fun SettingsScreen(
                             "camera indicator lighting up during a sip is the OS working as designed.",
                         checked = s.sensing.cameraSensing,
                         onChange = { v -> vm.update { it.copy(sensing = it.sensing.copy(cameraSensing = v)) } },
+                    )
+                    PrefSwitch(
+                        "Acoustic interrogator",
+                        "Records speech continuously, transcribes it on-device, and questions weak " +
+                            "reasoning. The transcript is encrypted and kept for a day; the wake word " +
+                            "stands down while this runs. Off unless you turn it on.",
+                        checked = s.sensing.interrogator,
+                        onChange = { v ->
+                            vm.update { it.copy(sensing = it.sensing.copy(interrogator = v)) }
+                            // ⚠️ Stop is honoured from here, but START is not: the microphone
+                            // foreground-service type can only be armed from a visible activity that
+                            // holds RECORD_AUDIO, and Settings has no way to ask for it. Turning it on
+                            // here arms the setting; the Interrogator screen's LISTEN button is what
+                            // actually opens the microphone, and it requests the permission first.
+                            if (!v) dev.mascwa.pulse.data.interrogator.AcousticInterrogatorService.stop(context)
+                        },
                     )
                     PrefSwitch(
                         "Radio density (crowd sense)",
@@ -948,38 +984,13 @@ fun SettingsScreen(
                 }
             }
 
-            // ----- Image search sites -----
-            if (vis(SettingsCategory.CONTENT, "image search site url")) collapsibleHeader("Image search sites", imageSitesCollapsed) { imageSitesCollapsed = !imageSitesCollapsed }
-            if (vis(SettingsCategory.CONTENT, "image search site url") && !imageSitesCollapsed) {
-                item {
-                    Text(
-                        "Sites you've added on the Images screen (a %s is replaced with your keyword).",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
-                itemsIndexed(s.customImageSites) { i, site ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(site, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                        IconButton(onClick = {
-                            vm.update { it.copy(customImageSites = it.customImageSites.filterIndexed { idx, _ -> idx != i }) }
-                        }) { Icon(LcarsIcons.Delete, "Remove") }
-                    }
-                }
-                item {
-                    AddTextRow("Add image site URL") { url ->
-                        if (url.startsWith("http")) {
-                            vm.update { it.copy(customImageSites = (it.customImageSites + url.trim()).distinct()) }
-                        }
-                    }
-                }
-            }
+            // The "Image search sites" section lived here until it was found to be a ZOMBIE: it
+            // edited AppSettings.customImageSites, which fed the Images screen deleted long ago —
+            // a settings surface inviting configuration of a feature that no longer exists. The
+            // field itself stays (property names are a data contract; old blobs still carry it).
 
             // ----- Optional API keys -----
-            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google")) item {
+            if (vis(SettingsCategory.KEYS, "api key token openrouter github openai google brave search web")) item {
                 PrefSection("Optional API keys") {
                     Text(
                         "All sections work without keys. Add free keys to unlock richer sources.",
@@ -1005,6 +1016,17 @@ fun SettingsScreen(
                     EditableValueRow("NASA (asteroids)", masked(s.apiKeys.nasa), "https://api.nasa.gov/") { v ->
                         vm.update { it.copy(apiKeys = it.apiKeys.copy(nasa = v.trim())) }
                     }
+                    EditableValueRow("Brave Search (the open web)", masked(s.apiKeys.brave), "https://api-dashboard.search.brave.com/register") { v ->
+                        vm.update { it.copy(apiKeys = it.apiKeys.copy(brave = v.trim())) }
+                    }
+                    Text(
+                        "Without a Brave key the Computer still searches the offline library and " +
+                            "Wikipedia — but it cannot answer anything about today, and it will say " +
+                            "so rather than guessing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
 
@@ -1102,6 +1124,8 @@ fun SettingsScreen(
                 val ledgerStatus by vm.auditLedgerStatus.collectAsStateWithLifecycle()
                 val selfTest by vm.ledgerSelfTestResult.collectAsStateWithLifecycle()
                 val selfTestRunning by vm.ledgerSelfTestRunning.collectAsStateWithLifecycle()
+                val pythonTest by vm.pythonTestResult.collectAsStateWithLifecycle()
+                val pythonTestRunning by vm.pythonTestRunning.collectAsStateWithLifecycle()
                 PrefSection("Storage & about") {
                     PrefClickable("Cached data", value = Formatters.compact(cacheSize.toDouble()) + " B",
                         onClick = { vm.refreshCacheSize() })
@@ -1191,6 +1215,14 @@ fun SettingsScreen(
                             "your real log.",
                         onClick = { vm.runLedgerSelfTest() },
                     )
+                    PrefClickable(
+                        "Test the Python runtime",
+                        value = if (pythonTestRunning) "Starting…" else null,
+                        subtitle = "Start the embedded interpreter on this device and report what " +
+                            "actually works. The build only proves it was packaged; whether it runs " +
+                            "here is a separate question. Nothing leaves the device.",
+                        onClick = { vm.runPythonTest() },
+                    )
                     PrefClickable("Crash log", subtitle = "View & share recent faults (on-device)",
                         onClick = onOpenCrashLog)
                     PrefClickable("Reset all settings", subtitle = "Restore defaults",
@@ -1228,16 +1260,56 @@ fun SettingsScreen(
                         }
                     }
                 }
+                pythonTest?.let { report ->
+                    LcarsDialog(
+                        title = if (report.allOk) "Python — running" else "Python — incomplete",
+                        onDismiss = { vm.dismissPythonTest() },
+                        dismissText = "DONE",
+                    ) {
+                        val pyColors = Pulse.colors
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Each finding is reported on its own line, because "the interpreter did
+                            // not start" and "it started with no standard library" are different
+                            // builds to fix and a single pass/fail could not tell them apart.
+                            listOf(
+                                "Interpreter started" to (if (report.running) "yes" else null),
+                                "Version" to report.interpreter,
+                                "Argument round-trip" to report.roundTrip,
+                                "Standard library" to report.stdlib,
+                                // Shown as its own line because "the interpreter runs but the
+                                // extractor did not import" is a specific, fixable state.
+                                "Extractor" to report.extractor,
+                            ).forEach { (name, detail) ->
+                                Column {
+                                    Text(
+                                        "${if (detail != null) "✓" else "✗"}  $name",
+                                        fontFamily = ChakraPetch, fontSize = 13.sp,
+                                        color = if (detail != null) pyColors.positive else pyColors.negative,
+                                    )
+                                    DialogBody(detail ?: "did not run")
+                                }
+                            }
+                            report.error?.let { DialogBody(it) }
+                        }
+                    }
+                }
             }
         }
     }
 
-    PulseScaffold(title = "Settings") { innerPadding ->
+    // The screen's FIRST frame-level back: the densest screen in the app had no back affordance
+    // at all — its only back was an 18dp text row 1300 lines into the body that exited a category,
+    // never the screen. The corner leaves the category first, then the screen, mirroring the
+    // system-back gesture above.
+    PulseScaffold(
+        title = "Settings",
+        onBack = { if (selectedCat != null) vm.selectedCategory.value = null else onBack?.invoke() },
+    ) { innerPadding ->
         SettingsShell(
             modifier = Modifier.padding(innerPadding),
             selectedCat = selectedCat,
             query = query,
-            onSelect = { selectedCat = it },
+            onSelect = { vm.selectedCategory.value = it },
             onQuery = { query = it },
             detail = detail,
         )
@@ -1378,7 +1450,7 @@ private fun HomeSectionEditor(enabledOrdered: List<HomeSection>, onChange: (List
                 IconButton(enabled = i < enabledOrdered.lastIndex, onClick = {
                     val l = enabledOrdered.toMutableList(); l.add(i + 1, l.removeAt(i)); onChange(l)
                 }) { Icon(Icons.Filled.ArrowDownward, "Down") }
-                Switch(checked = true, onCheckedChange = { onChange(enabledOrdered - section) })
+                dev.mascwa.pulse.feature.common.LcarsSwitch(checked = true, onCheckedChange = { onChange(enabledOrdered - section) })
             }
         }
         disabled.forEach { section ->
@@ -1388,7 +1460,7 @@ private fun HomeSectionEditor(enabledOrdered: List<HomeSection>, onChange: (List
             ) {
                 Text(section.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Switch(checked = false, onCheckedChange = { onChange(enabledOrdered + section) })
+                dev.mascwa.pulse.feature.common.LcarsSwitch(checked = false, onCheckedChange = { onChange(enabledOrdered + section) })
             }
         }
     }

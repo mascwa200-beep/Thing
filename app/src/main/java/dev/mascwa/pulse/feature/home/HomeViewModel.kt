@@ -58,6 +58,12 @@ data class HomeUiState(
      */
     val recommendations: List<dev.mascwa.pulse.core.telemetry.Recommendation> = emptyList(),
     /**
+     * The user's most-opened menu destinations, count-ordered — Home's launcher row. Route to the
+     * directory's label. Menu-listed destinations only: the bottom-nav tabs are already one tap away,
+     * so a chip for one would spend the row on nothing.
+     */
+    val mostUsed: List<Pair<String, String>> = emptyList(),
+    /**
      * The Oracle's ranked read — the cross-signal foresight, already re-ranked by what you act on.
      *
      * Capped at [ORACLE_ON_HOME] because the count is not cosmetic: it is what
@@ -129,14 +135,32 @@ class HomeViewModel(
             // Oracle now takes both as signals in its own right, so they are gone rather than
             // revived: a second, weaker opinion about the same data helps nobody.
             launch {
-                val recs = runCatching {
-                    val snap = usage.snapshot()
-                    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-                    dev.mascwa.pulse.core.telemetry.UsageInsights.recommend(
-                        snap, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
-                    )
-                }.getOrDefault(emptyList())
-                _state.update { it.copy(recommendations = recs) }
+                val snap = runCatching { usage.snapshot() }.getOrNull()
+                val menuEntries = dev.mascwa.pulse.navigation.GROUPS
+                    .flatMap { g -> g.entries }.associateBy { it.route }
+                val recs = snap?.let { sn ->
+                    runCatching {
+                        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                        // ⚠️ Menu-listed routes only, the same eligibility rule as the launcher row
+                        // and the MENU strip. The unfiltered snapshot recommended "Your go-to is
+                        // Home" ON Home (a tab, recorded on every arrival, near-always the top
+                        // count), and uncataloged keys like "reader" leaked a raw route id as
+                        // user-facing copy whose tap landed on a Reader with an empty address.
+                        val eligible = sn.copy(features = sn.features.filter { it.key in menuEntries })
+                        dev.mascwa.pulse.core.telemetry.UsageInsights.recommend(
+                            eligible, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
+                        )
+                    }.getOrDefault(emptyList())
+                }.orEmpty()
+                // The launcher row: most-opened MENU destinations, by count (the MENU's own strip is
+                // recency-ordered — that one answers "what was I just doing", this one "what do I
+                // always use"). Same eligibility rule as there: menu-listed routes only.
+                val most = snap?.features.orEmpty()
+                    .filter { it.key in menuEntries }
+                    .sortedByDescending { it.count }
+                    .take(MOST_USED)
+                    .map { f -> f.key to (menuEntries.getValue(f.key).label) }
+                _state.update { it.copy(recommendations = recs, mostUsed = most) }
             }
 
             // The Oracle. Its own launch because it reasons over every store the others just filled
@@ -256,5 +280,8 @@ class HomeViewModel(
     private companion object {
         /** The station's catalogue number, and the only object this digest speaks about. */
         const val ISS_NORAD_ID = 25544
+
+        /** Launcher-row width: one comfortable scrolling row of chips at phone width. */
+        const val MOST_USED = 6
     }
 }

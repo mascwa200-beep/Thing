@@ -37,6 +37,26 @@ class AppContainer(private val appContext: Context) {
     /** The application context, for the few ViewModels that need it (e.g. AppOps / settings intents). */
     val applicationContext: Context get() = appContext
 
+    /**
+     * Screen-open requests from the Computer's tools. PulseApp collects it and navigates through
+     * its one openApp idiom; the tool side emits a route and knows nothing about navigation.
+     *
+     * ⚠️ replay = 0 ON PURPOSE: a navigation request is an imperative, not state — replaying the
+     * last route to every future collector would re-navigate on each Activity recreation. The
+     * buffer only absorbs a slow collector; with NO collector an emit is dropped, which is why
+     * the tool checks subscriptionCount and answers honestly instead of claiming "Opening…"
+     * into the void.
+     */
+    val navigationBus = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+
+    /**
+     * Whether the Activity is between onStart and onStop. The navigation bus's collector is a
+     * composition-lifetime LaunchedEffect, which survives a STOPPED Activity — so subscriptionCount
+     * alone reads "someone is listening" while the screen is off, and a spoken "open the radar"
+     * would navigate an invisible NavController and claim success. This flag is the visible half.
+     */
+    val appForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
@@ -150,6 +170,10 @@ class AppContainer(private val appContext: Context) {
     /** Cloud-gated, per-article "what's really going on" synthesis for the MARKET REACTION/MOOD copy. */
     val newsAnalysisEngine: dev.mascwa.pulse.data.news.NewsAnalysisEngine by lazy {
         dev.mascwa.pulse.data.news.NewsAnalysisEngine(inferenceEngine, settingsRepository)
+    }
+    /** Fetches a page and hands it to the DOM decimator. */
+    val readerRepository: dev.mascwa.pulse.data.reader.ReaderRepository by lazy {
+        dev.mascwa.pulse.data.reader.ReaderRepository(http)
     }
     val breakingCoverageRepository: dev.mascwa.pulse.data.breaking.BreakingCoverageRepository by lazy {
         dev.mascwa.pulse.data.breaking.BreakingCoverageRepository(newsRepository, diskCache)
@@ -404,10 +428,29 @@ class AppContainer(private val appContext: Context) {
 
     // ---- Sensorium: ambient environment sensing (classify-then-discard; labels only) ----
 
-    /** The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic. */
+    /**
+     * The Sensorium's ears — one YAMNet mic sip at a time; skips while the console holds the mic or
+     * the computer is talking.
+     *
+     * ⚠️ The second condition is not about contention, it is about **truthfulness**: the microphone
+     * and the speaker are on the same phone, so a sip taken while a reply is being spoken hears the
+     * computer and labels it `speech`, which distils to "there are voices around you". That would
+     * feed the scene read, the ORACLE rules built on it, and — worst of all — the *learned* nightly
+     * baseline, teaching the Sensorium that 3 a.m. is normally noisy because that is when it answered
+     * a question. Yielding costs almost nothing; speech is a tiny fraction of the day.
+     *
+     * [ttsLazy] is checked rather than [textToSpeech] read, for the reason given on
+     * [observeVoicePreference]: binding a TTS engine costs about a second, and an engine that has
+     * never been built cannot be speaking.
+     */
     val ambientAudioSampler: dev.mascwa.pulse.data.sensing.AmbientAudioSampler by lazy {
         dev.mascwa.pulse.data.sensing.AmbientAudioSampler(
-            appContext, http, micBusy = { voskSpeech.consoleActive.value },
+            appContext,
+            http,
+            micBusy = {
+                voskSpeech.consoleActive.value ||
+                    (ttsLazy.isInitialized() && textToSpeech.isSpeaking)
+            },
         )
     }
 
@@ -420,6 +463,45 @@ class AppContainer(private val appContext: Context) {
      *  proximity) + on-demand WiFi/BLE density bursts. */
     val sensorFusion: dev.mascwa.pulse.data.sensing.SensorFusionController by lazy {
         dev.mascwa.pulse.data.sensing.SensorFusionController(appContext)
+    }
+
+    /**
+     * The acoustic interrogator's rolling transcript.
+     *
+     * ⚠️ Its own Room database, not a table in the shared one — see [TranscriptDatabase] for the two
+     * reasons, both load-bearing: bumping the shared database's version destroys the user's ingested
+     * knowledge docs, and a one-tap purge of a separate file removes the bytes rather than leaving
+     * them in freed SQLite pages.
+     *
+     * `by lazy`, so nothing is created until the interrogator is actually switched on: a user who
+     * never enables it never has a transcript database on disk at all.
+     */
+    val transcriptStore: dev.mascwa.pulse.data.interrogator.TranscriptStore by lazy {
+        dev.mascwa.pulse.data.interrogator.TranscriptStore(appContext)
+    }
+
+    /** Offline transcription. `by lazy` for the same reason as above: no model is fetched until used. */
+    val whisperEngine: dev.mascwa.pulse.data.interrogator.WhisperEngine by lazy {
+        dev.mascwa.pulse.data.interrogator.WhisperEngine(appContext, http)
+    }
+
+    /**
+     * The interrogator's adjudicator.
+     *
+     * ⚠️ **A LOCAL ENGINE, PINNED, AND NEVER [inferenceEngine].** That router prefers the cloud
+     * whenever an API key is set, so wiring the interrogator through it would ship ambient
+     * conversation — other people's conversation — to a third party the moment a key exists. The
+     * whole feature's privacy rests on this one line staying as it is.
+     */
+    val llamaEngine: dev.mascwa.pulse.data.interrogator.LlamaEngine by lazy {
+        dev.mascwa.pulse.data.interrogator.LlamaEngine(appContext, http)
+    }
+
+    /** Stages 1–6: transcribe, record, screen, reference, adjudicate, compose. */
+    val interrogatorCascade: dev.mascwa.pulse.data.interrogator.InterrogatorCascade by lazy {
+        dev.mascwa.pulse.data.interrogator.InterrogatorCascade(
+            whisperEngine, transcriptStore, libraryLookup, llamaEngine,
+        )
     }
 
     /** Learned normality + the 48 h event log (baseline must survive restarts or anomaly detection
@@ -463,6 +545,17 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.data.blackbox.TsaClient(http),
         )
     }
+    /**
+     * The embedded CPython interpreter.
+     *
+     * ⚠️ Lazy for a reason that matters: starting Python extracts the standard library out of the
+     * APK's assets on first run, so a user who never reaches anything Python-backed never pays that
+     * cost and never has the unpacked copy on disk. Constructing this object does not start it —
+     * `ensureStarted()` does, and only when something asks.
+     */
+    val pythonRuntime: dev.mascwa.pulse.data.python.PythonRuntime by lazy {
+        dev.mascwa.pulse.data.python.PythonRuntime(appContext)
+    }
     /** Stateless hardware key-attestation probe (StrongBox-backed). Read-only; used to record the device's
      *  security posture into the audit ledger when it changes. */
     val deviceAttestation: dev.mascwa.pulse.core.device.DeviceAttestation by lazy {
@@ -473,10 +566,43 @@ class AppContainer(private val appContext: Context) {
             appContext, gitHubRepo, crashReporter, usageRepository, settingsRepository, auditLedgerStore,
         )
     }
+    /**
+     * The layered search behind the `web` tool: the offline library, then Wikipedia, then the open
+     * web when a key is set.
+     *
+     * A single instance rather than one per call site, so the three places that reach for `web`
+     * (the tool registry, an authored Lua tool's `web` capability, and the approval gate's research
+     * step) cannot end up searching differently from each other.
+     */
+    val webSearchRepository: dev.mascwa.pulse.data.search.WebSearchRepository by lazy {
+        dev.mascwa.pulse.data.search.WebSearchRepository(http, settingsRepository, libraryLookup)
+    }
+    /** Page address → playable item, via the bundled yt-dlp. Lazy so Python never starts unasked. */
+    val mediaExtractor: dev.mascwa.pulse.data.media.MediaExtractor by lazy {
+        dev.mascwa.pulse.data.media.MediaExtractor(pythonRuntime)
+    }
+    /** The community skip database, behind the hash-prefix privacy endpoint. */
+    val sponsorBlockRepository: dev.mascwa.pulse.data.media.SponsorBlockRepository by lazy {
+        dev.mascwa.pulse.data.media.SponsorBlockRepository(http)
+    }
+    /** The hardware data harvester: held volume key → yt-dlp download into sandboxed storage. */
+    val mediaHarvester: dev.mascwa.pulse.data.media.MediaHarvester by lazy {
+        dev.mascwa.pulse.data.media.MediaHarvester(pythonRuntime, appContext)
+    }
+    /** Flat video listings — the browse half of the Theater; resolves nothing until a tap. */
+    val mediaBrowser: dev.mascwa.pulse.data.media.MediaBrowser by lazy {
+        dev.mascwa.pulse.data.media.MediaBrowser(pythonRuntime)
+    }
+    /** The CONTINUE WATCHING shelf's memory. On-device only; viewing history never leaves. */
+    val viewingLedger: dev.mascwa.pulse.data.media.ViewingLedgerStore by lazy {
+        dev.mascwa.pulse.data.media.ViewingLedgerStore(appContext)
+    }
+
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
         listOf(
-            dev.mascwa.pulse.jarvis.agent.WebSearchTool(http),
+            dev.mascwa.pulse.jarvis.agent.OpenScreenTool(navigationBus, appForeground),
+            dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository),
             dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
             dev.mascwa.pulse.jarvis.agent.DownloadTool(appContext, http),
             dev.mascwa.pulse.jarvis.agent.RepoReadTool(http, settingsRepository),
@@ -528,6 +654,9 @@ class AppContainer(private val appContext: Context) {
             dev.mascwa.pulse.jarvis.agent.OpenLinkTool(appContext),
             dev.mascwa.pulse.jarvis.agent.TorchTool(appContext),
             dev.mascwa.pulse.jarvis.agent.ClipboardTool(appContext),
+            dev.mascwa.pulse.jarvis.agent.PlayMediaTool(
+                appContext, mediaExtractor, sponsorBlockRepository, settingsRepository, mediaBrowser,
+            ),
         )
     }
     /** Enqueue-only self-edit + read-only inspection tools, offered to the model only when the user
@@ -548,7 +677,7 @@ class AppContainer(private val appContext: Context) {
      *  Each delegates to an existing built-in tool — authored scripts get no raw fs/network. */
     private val toolCapabilities: Map<String, suspend (String) -> String> by lazy {
         mapOf<String, suspend (String) -> String>(
-            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(q) },
+            "web" to { q -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository).run(q) },
             "fetch" to { q -> dev.mascwa.pulse.jarvis.agent.WebFetchTool(http).run(q) },
             "docs" to { q -> dev.mascwa.pulse.jarvis.agent.KnowledgeTool(knowledgeStore).run(q) },
             "recall" to { q -> dev.mascwa.pulse.jarvis.agent.RecallTool(jarvisMemory).run(q) },
@@ -561,7 +690,7 @@ class AppContainer(private val appContext: Context) {
         dev.mascwa.pulse.jarvis.selfedit.ApprovalGate(
             selfEditStore,
             knowledgeStore,
-            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(http).run(topic) },
+            research = { topic -> dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository).run(topic) },
             commitCode = { action ->
                 val result = selfCoder.commit(action)
                 // Record shipped self-changes to durable memory so J.A.R.V.I.S. can recall what it has

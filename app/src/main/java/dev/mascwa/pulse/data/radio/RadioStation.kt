@@ -19,7 +19,37 @@ data class RadioStation(
      */
     val codec: String = "",
     val kbps: Int = 0,
-)
+    /**
+     * The directory's own stable id for this station, where it came from a directory.
+     *
+     * ⚠️ Favourites are persisted as whole stations and were matched **by stream URL**, which is
+     * the one field a directory entry is free to change. When a station moves its stream — a new
+     * CDN, a switch to https — the favourite silently stops matching itself: the star goes out, and
+     * starring it again just adds a second copy. This is the identity that does not move. Blank for
+     * the curated SomaFM list, which is a constant in this repository and cannot drift.
+     */
+    val uuid: String = "",
+    /**
+     * The language the station broadcasts in, as the directory states it.
+     *
+     * Present on the directory response and discarded, which left a "near you" list in which
+     * nothing distinguished a station you can understand from one you cannot.
+     */
+    val language: String = "",
+) {
+    /**
+     * Whether this is the same station as [other], for favouriting.
+     *
+     * ⚠️ Prefers the directory's stable [uuid] and falls back to the stream URL, which is what this
+     * used to compare and is the one field a directory entry is free to change. A station that
+     * moves its stream would otherwise stop matching its own favourite — the star goes out and
+     * starring it again adds a duplicate rather than restoring it. The fallback keeps every
+     * favourite saved before this field existed working exactly as it did.
+     */
+    fun sameStation(other: RadioStation): Boolean =
+        if (uuid.isNotBlank() && other.uuid.isNotBlank()) uuid == other.uuid
+        else streamUrl == other.streamUrl
+}
 
 /**
  * Curated free, listener-supported live streams (SomaFM) spanning the dial — a hacker channel, a

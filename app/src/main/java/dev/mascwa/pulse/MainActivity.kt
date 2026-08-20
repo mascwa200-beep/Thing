@@ -240,9 +240,15 @@ class MainActivity : ComponentActivity() {
                             factory = factory,
                             startRoute = pendingRouteState.value,
                             isOnline = online,
+                            navigationRequests = app.container.navigationBus,
                             onRouteVisit = { route ->
-                                app.container.usageRepository.record(route)
-                                app.container.usageRepository.log("nav", route)
+                                // ⚠️ The BASE route, not the pattern. currentRoute hands over the
+                                // route PATTERN — "survival?guide={guide}" — and recording that
+                                // verbatim mints junk usage keys that never match FeatureCatalog,
+                                // so those features could never be counted or recommended.
+                                val base = route.substringBefore('?')
+                                app.container.usageRepository.record(base)
+                                app.container.usageRepository.log("nav", base)
                             },
                             onStartRouteConsumed = { pendingRouteState.value = null },
                         )
@@ -269,8 +275,53 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRouteState.value = it }
     }
 
+    /** One-shot latch so a single held press fires one harvest, however long it is held. */
+    private var harvestFired = false
+
+    /**
+     * The hardware data harvester's trigger: a CONTINUOUS physical volume key press while inside the
+     * app, while something is on the viewscreen, downloads that media into sandboxed storage.
+     *
+     * ⚠️ Conditional on the player actually holding an item — with nothing on the viewscreen both
+     * volume keys behave completely normally everywhere in the app, and a plain single press always
+     * steps the volume one notch as usual (`repeatCount == 0` passes through).
+     *
+     * ⚠️ **Once a hold begins (`repeatCount >= 1`) the events are consumed, so the volume freezes
+     * after that first notch rather than ramping to the rails on the way to the trigger.** Holding a
+     * volume key to ramp the volume continuously is the one ordinary gesture this sacrifices while
+     * media is on the viewscreen — the documented cost of the owner's chosen "continuous press"
+     * trigger. A 15-notch blast before the harvest fired would be far worse. The harvest itself
+     * fires once at [HARVEST_HOLD_REPEATS], latched until the key is released.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+            event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN
+        ) {
+            val item = dev.mascwa.pulse.feature.theater.OnDemandController.state.value.item
+            if (item != null) {
+                when (event.action) {
+                    android.view.KeyEvent.ACTION_DOWN ->
+                        if (event.repeatCount >= 1) {
+                            if (event.repeatCount >= HARVEST_HOLD_REPEATS && !harvestFired) {
+                                harvestFired = true
+                                app.container.mediaHarvester.harvest(item)
+                            }
+                            return true // consume the hold — freeze the volume, arm the gesture
+                        }
+                    android.view.KeyEvent.ACTION_UP -> {
+                        val wasFired = harvestFired
+                        harvestFired = false
+                        if (wasFired) return true // swallow the release of a consumed hold
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onStart() {
         super.onStart()
+        app.container.appForeground.value = true
         // Self-gates on the glassesHud setting + a connected external display; defensive so it can't crash.
         hud = runCatching { dev.mascwa.pulse.feature.hud.HudController(this, app.container).also { it.start() } }.getOrNull()
         // Catch a build that turned green while the app was backgrounded — prompt the install on return.
@@ -287,6 +338,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        app.container.appForeground.value = false
         runCatching { hud?.stop() }
         hud = null
         // Best-effort: persist any buffered on-device learning before the process may be reclaimed.
@@ -316,6 +368,14 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ROUTE = "pulse.extra.route"
+
+        /**
+         * How many auto-repeats a volume key must deliver before a hold counts as the harvest
+         * gesture. The platform repeats roughly every 50 ms after an initial ~400 ms delay, so 15
+         * repeats is about 1.2 s of continuous hold — long enough that nobody adjusting volume
+         * trips it, short enough to feel like a gesture. One constant to tune from real use.
+         */
+        const val HARVEST_HOLD_REPEATS = 15
         /** Don't re-check GitHub more than once per ~15 min of foregrounding (covers fast app-switches). */
         private const val AUTO_UPDATE_MIN_INTERVAL_MS = 15 * 60 * 1000L
     }

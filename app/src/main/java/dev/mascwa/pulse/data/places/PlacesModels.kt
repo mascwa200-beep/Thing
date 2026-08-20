@@ -57,8 +57,6 @@ data class Place(
 @Serializable
 data class PlacesResult(
     val category: String,
-    val originLat: Double,
-    val originLon: Double,
     val places: List<Place>,
     /**
      * Whether the server's quota bound, so this list is an arbitrary slice rather than the nearest.

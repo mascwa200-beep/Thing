@@ -13,9 +13,7 @@ import dev.mascwa.pulse.feature.common.PulseScaffold
 fun MusicScreen(vm: SpotifyViewModel, onBack: (() -> Unit)? = null) {
     PulseScaffold(
         title = "MUSIC",
-        navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(LcarsIcons.ArrowBack, "Back") }
-        },
+        onBack = onBack,
     ) { innerPadding ->
         SpotifyBody(vm, Modifier.padding(innerPadding))
     }
