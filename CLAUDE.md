@@ -6546,3 +6546,103 @@ already fetches) and has no instrument selection to hang it on — a redesign ra
 left as the honest remainder. A shortcut that works when the app is NOT focused needs `RegisterHotKey`
 via a native hook and a new dependency; that is an owner call, and the shipped half is every screen
 reachable without the mouse while focused.
+
+### THE 403 ARC — a JavaScript engine in the APK, and a radio that stays tuned (this session, PR #450)
+
+Owner sent one screenshot and one sentence: the THEATER screen showing **"Playback failed: 403 — the
+source refused that address"** (so the previous session's diagnostic half worked and the header-carrying
+half did not fix the refusal), plus *"the radio has trouble keeping tuned to the real stations like 92.7
+The Van and any other stations. This is in tandem with the problem of the theater as well."*
+
+⚠️ **They were NOT the same fault**, and saying so early is what made the work tractable. They share
+only a defect *class* — an error band that stops at 2002, and a fabricated User-Agent. Both fixed;
+neither fix would have fixed the other. Owner chose (AskUserQuestion): **"Everything: runtime +
+fallback"** for Theater and **"Read it off the stream itself"** for radio metadata.
+
+**RADIO — the cause was a second connection to the same stream.** `startMetaPolling` opened a
+duplicate listener to the same mount every 30 seconds (not a HEAD — it read up to three metaint
+blocks), so connection-limited broadcast affiliates dropped the older socket. The retry budget was
+2 × 1.5 s ≈ 3 seconds, and the reconnect's 2004 was outside `isTransient`'s 2000–2002 band, so it went
+straight to `failPermanently`. ⚠️ **And the whole poll was redundant**: `ProgressiveMediaPeriod`
+requests ICY unconditionally (verified by disassembly — `setHttpRequestHeaders(ICY_METADATA_HEADERS)`
+has no conditional branch) and delivers `IcyInfo.title` to `Player.Listener.onMetadata`, a callback
+nothing implemented. `IcyMetadata.kt` deleted; retries widened with backoff; `setWakeMode(WAKE_MODE_NETWORK)`
+added (⚠️ silently inert without `WAKE_LOCK`, which the manifest lacked); `StreamResolver` gained a
+**recovery-only** content-type sniff (probing pre-flight would re-create the duplicate connection).
+
+**THEATER — the app had no JavaScript runtime and was throwing away yt-dlp's own warning about it.**
+Reproduced against the exact pin: *"No supported JavaScript runtime could be found... YouTube
+extraction without a JS runtime has been deprecated, and some formats may be missing."* Required since
+**2025.11.12**; Chaquopy ships bare CPython.
+
+⚠️ **Shipping the `qjs` binary is closed off**: Android 10+ refuses to exec outside `nativeLibraryDir`,
+which needs `extractNativeLibs=true` — a flag applying to *every* `.so` in a ~144 MB app. So QuickJS is
+compiled into `liblcarsnative.so` and Python reaches it through JNI via yt-dlp's documented
+challenge-provider extension point (`EJSBaseJCP` requires implementing exactly one method).
+
+⚠️ **THE PIN WAS MEASURED, AND THE MEASUREMENT CORRECTED IT.** Built both candidates and ran them
+against the **real 2.88 MB YouTube player with real n and sig challenges**:
+
+    quickjs-ng v0.11.0   FAILED — still running at 183 seconds
+    quickjs-ng v0.16.0   ok in 7.8 seconds, answers byte-identical to node
+    node (reference)     2.1 seconds
+
+A first draft pinned v0.11.0 — **below the `(0, 12, 0)` floor yt-dlp names in its own
+`_QJS_MIN_RECOMMENDED` table**, warning that older builds are "missing important optimizations".
+Reading the code would never have caught it. **Do not lower this pin.** The 120 s timeout comes from
+the same numbers: a phone core is several times slower, so the obvious 30 s would have been
+uncomfortably close.
+
+⚠️ **`yt-dlp-ejs` is not optional, also measured.** yt-dlp vendors the solver's **core** script but
+NOT its **lib** script — `_builtin/vendor` holds `yt.solver.core.js` and two 240-byte NPM shims. So
+the builtin source can never supply that half; the remaining routes are this package, a warm cache, or
+a GitHub download behind an opt-in `remote_components` flag. ⚠️ **The version must track yt-dlp's own
+`vendor.VERSION`**, because a mismatch is not an error — it is a warning and a silently unavailable
+provider. Verified 0.8.0 hashes exactly to yt-dlp's table.
+
+**The load-bearing override is `runtime_info`.** The base class looks for an executable on a path and
+finds nothing, so `is_available()` would be False and the provider would never be asked to solve
+anything — extraction would keep working and quietly lose formats, which is the exact failure being
+removed. Every import in `lcars_jsi.py` is guarded so a moved yt-dlp internal costs formats, not
+extraction.
+
+⚠️ **CI asserts `JsRuntime_nativeVersion`, NOT `nativeAvailable`.** The latter is compiled in *both*
+CMake branches — it has to be, or asking "is there an engine" would throw instead of answering — so its
+presence proves nothing. Both branches were built on the host and their exports read: absent without
+the tree, present with it.
+
+**T4 — the fallback, offered and never substituted.** `EmbeddedPlayer.kt` plays through YouTube's own
+IFrame player, which does not depend on extraction at all. The failure and the extractor's words stay
+on screen above it. What is given up is *stated*: HARVEST cannot save it (a player, not a file), the
+transport is YouTube's, ads may appear. ⚠️ The position is read with `evaluateJavascript` and **no
+JavaScript interface is injected** — this page runs Google's script, and `addJavascriptInterface` would
+hand it a live object into the app for a value that can simply be asked for.
+
+**⚠️ NEW CAPABILITY, and it contradicts a note recorded earlier in this file: Compose UI IS locally
+type-checkable.** `android_compile_check.sh` was reporting genuinely clean Compose files as failures —
+Kotlin compiles in two halves, a `@Composable` cannot be *lowered* without the Compose plugin, so a
+clean frontend followed by `Exception during IR lowering` is exactly what a correct Compose file looks
+like there. The guard conflated that with a missing jar. Now distinguished and negative-tested: it
+passes the clean file and catches both a nonexistent platform method and a wrong argument type. Pass
+the Compose jars with `-l androidx.compose.ui:ui-android:1.7.6` and friends.
+
+**New local gate: `tools/check_jsi.py`** — nothing else checks the bundled Python. `--engine <binary>`
+drives the *shipped* provider through real QuickJS via a fake `java` module. All five load-bearing
+rules negative-tested. ⚠️ It publishes the already-loaded module as `sys.modules["lcars_jsi"]` rather
+than importing it twice: yt-dlp **asserts** on a duplicate provider key, and a second import under a
+second name would fail on a collision that cannot happen in the app.
+
+**Verification, all local, no CI round spent:** 8 JNI cases through real QuickJS; the real solver
+bundle run under our engine, node and bun with identical results; both CMake branches built; the
+`add_library(qjs` gate negative-tested against a renamed target; `android_compile_check` clean.
+
+⚠️ **Owner-verify on the Pixel — none of this can be proven here.** Play the failing THEATER item: it
+may simply work now, and if it does not, **the failure line carries yt-dlp's own words plus a
+`javascript: quickjs 0.16.0` status line** — that text is the next diagnostic step and is worth sending
+back. Then: the PLAY IT ANOTHER WAY button, and tune 92.7 The Van for 10+ minutes screen-off (it should
+stay on air, with now-playing appearing without a second connection).
+
+**Open:** the exact cause of the original 403 is still unproven — this container's datacenter IP is
+bot-flagged by YouTube, so its own 403 said nothing about the phone's residential one. T2 is the
+leading candidate (a missing runtime means the n-parameter cannot be transformed), and T4 is the
+insurance either way.
