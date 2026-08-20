@@ -65,6 +65,8 @@ import dev.mascwa.pulse.desktop.feature.world.MarketsViewModel
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryScreen
 import dev.mascwa.pulse.desktop.feature.world.ObservatoryViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesScreen
+import dev.mascwa.pulse.desktop.feature.diagnostics.CrashScreen
+import dev.mascwa.pulse.desktop.feature.diagnostics.CrashViewModel
 import dev.mascwa.pulse.desktop.feature.world.MapScreen
 import dev.mascwa.pulse.desktop.feature.world.MapViewModel
 import dev.mascwa.pulse.desktop.feature.world.PlacesViewModel
@@ -143,6 +145,7 @@ fun PulseDesktopApp(
     radioPlayer: dev.mascwa.pulse.desktop.radio.RadioPlayer,
     notesStore: dev.mascwa.pulse.desktop.notes.NotesStore,
     diaryStore: dev.mascwa.pulse.desktop.notes.DiaryStore,
+    crashReporter: dev.mascwa.pulse.desktop.diagnostics.CrashReporter,
     onQuitForInstall: () -> Unit = {},
 ) {
     PulseDesktopTheme {
@@ -298,6 +301,7 @@ fun PulseDesktopApp(
             )
         }
 
+        val crashVm = remember { CrashViewModel(scope, crashReporter) }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
         val settingsVm = remember {
@@ -349,6 +353,7 @@ fun PulseDesktopApp(
                                         SpaceWeatherScreen(spaceWeatherVm, Modifier.fillMaxWidth())
                                     Screen.OBSERVATORY ->
                                         ObservatoryScreen(observatoryVm, Modifier.fillMaxWidth())
+                                    Screen.CRASH -> CrashScreen(crashVm, Modifier.fillMaxWidth())
                                     Screen.MAP -> MapScreen(mapVm, Modifier.fillMaxWidth())
                                     Screen.RADAR -> RadarScreen(radarVm, Modifier.fillMaxWidth())
                                     Screen.SAFETY -> SafetyScreen(safetyVm, Modifier.fillMaxWidth())

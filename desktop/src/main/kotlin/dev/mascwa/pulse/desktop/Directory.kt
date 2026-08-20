@@ -41,7 +41,7 @@ data class DeskGroup(
  */
 enum class Screen {
     HOME,
-    REMOTE, ABOUT, SETTINGS,
+    REMOTE, ABOUT, SETTINGS, CRASH,
     LIBRARY, SEARCH, STUDY, PACKS,
     ADVISORIES,
     NEWS, LIVE,
@@ -113,6 +113,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("preferences", "options", "config", "units", "location")),
         DeskEntry(Screen.ABOUT, "About", "Which build you are on, and install a newer one",
             listOf("version", "update", "upgrade", "build")),
+        DeskEntry(Screen.CRASH, "Crash console", "What went wrong, and when — kept on this machine",
+            listOf("fault", "error", "exception", "stack trace", "log", "diagnostics", "bug", "broken")),
     )),
 )
 

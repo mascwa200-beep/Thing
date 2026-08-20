@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.desktop.diagnostics.CrashReporter
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.live.LivePlayer
@@ -13,6 +14,7 @@ import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.notes.DiaryStore
 import dev.mascwa.pulse.desktop.notes.NotesStore
 import dev.mascwa.pulse.desktop.study.StudyStore
+import dev.mascwa.pulse.desktop.update.BuildInfo
 import kotlinx.coroutines.runBlocking
 
 private val settingsStore = DesktopSettingsStore()
@@ -52,7 +54,18 @@ private val radioPlayer = dev.mascwa.pulse.desktop.radio.RadioPlayer()
 private val notesStore = NotesStore()
 private val diaryStore = DiaryStore()
 
+/**
+ * ⚠️ Owned here and installed FIRST, before anything else in [main] runs.
+ *
+ * A fault during startup is exactly the one nobody can diagnose otherwise — the window never
+ * appears, so there is no screen to read it back from — and a handler installed after the thing it
+ * was meant to catch is decoration.
+ */
+private val crashReporter = CrashReporter(AppPaths.dataDir.toFile())
+
 fun main() {
+    crashReporter.install(BuildInfo.display)
+
     // How the shared HTTP client introduces itself. Several feeds answer differently depending on what
     // they think they are talking to, and this is a Windows program rather than a phone — so it is set
     // once here, before anything fetches, rather than left reading the Android default.
@@ -107,6 +120,7 @@ fun main() {
                 radioPlayer,
                 notesStore,
                 diaryStore,
+                crashReporter,
                 // Handing over to the installer. Flushed the same way the close button does, because an
                 // upgrade that lost the last answered study card would be a poor trade for being current.
                 onQuitForInstall = {
