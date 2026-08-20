@@ -1,6 +1,6 @@
 package dev.mascwa.pulse.desktop.update
 
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.core.telemetry.UpdatePolicy
 import kotlinx.coroutines.Dispatchers

@@ -18,9 +18,18 @@ data class Async<T>(
     val isError: Boolean get() = error != null && data == null
 }
 
-/** Result returned by repositories: the payload plus whether it came from cache. */
+/**
+ * Result returned by repositories: the payload plus where it came from and when.
+ *
+ * ⚠️ [refreshFailed] is deliberately distinct from [fromCache]. "This came from disk because it was
+ * fresh" and "the network was tried and did not answer, so here is what we had" are different things to
+ * tell someone, and collapsing them is what made a failed refresh silent — yesterday's numbers stayed on
+ * screen looking live. It is defaulted, so a repository that has not yet been taught to report it behaves
+ * exactly as before; the phone's own staleness signal currently comes from `AsyncLoader` instead.
+ */
 data class Fetched<T>(
     val data: T,
     val fromCache: Boolean,
     val timestampEpochMs: Long = System.currentTimeMillis(),
+    val refreshFailed: Boolean = false,
 )

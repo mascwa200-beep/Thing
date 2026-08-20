@@ -251,6 +251,10 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:model-inference"))
     implementation(project(":core:telemetry"))
+    // The HTTP client, the disk cache and the sixteen world-data repositories, shared with the
+    // desktop companion. Moved out of this module in the same pass that made `:core:telemetry`
+    // a plain JVM module: not one of those files imported `android.*`.
+    implementation(project(":core:feeds"))
 
     // Offline on-device speech-to-text (Vosk). JNA must be the Android @aar variant so its
     // native libraries are packaged; the plain jar lacks them.

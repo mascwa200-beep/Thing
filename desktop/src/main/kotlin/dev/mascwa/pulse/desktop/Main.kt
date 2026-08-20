@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.library.LibraryRepository
 import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.live.LivePlayer
@@ -45,6 +46,11 @@ private val notesStore = NotesStore()
 private val diaryStore = DiaryStore()
 
 fun main() {
+    // How the shared HTTP client introduces itself. Several feeds answer differently depending on what
+    // they think they are talking to, and this is a Windows program rather than a phone — so it is set
+    // once here, before anything fetches, rather than left reading the Android default.
+    HttpClient.USER_AGENT = "PulseDesktop/1.0 (Windows; +https://localhost) okhttp"
+
     // A local file read, not a network call — a one-time blocking read at startup to seed the initial
     // window size is negligible and keeps main() simple; every later access goes through the coroutine API.
     val initial = runBlocking { settingsStore.current() }

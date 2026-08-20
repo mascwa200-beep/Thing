@@ -53,6 +53,16 @@ data class DesktopSettings(
     val libraryCategory: String = "",
 
     /**
+     * Which Lemmy and Mastodon servers the discussion tabs read.
+     *
+     * Both are federated: there is no single site to point at, and the one you choose decides what you
+     * see. The defaults are the largest general-purpose instance of each, which is what someone who has
+     * never thought about it would want.
+     */
+    val lemmyInstance: String = "lemmy.world",
+    val mastodonInstance: String = "mastodon.social",
+
+    /**
      * Offer live TV channels from the volunteer-maintained public catalogue as well as the handful of
      * broadcasters' own feeds the app ships with.
      *

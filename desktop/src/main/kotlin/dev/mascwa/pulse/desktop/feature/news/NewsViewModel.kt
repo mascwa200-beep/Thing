@@ -1,10 +1,15 @@
 package dev.mascwa.pulse.desktop.feature.news
 
 import dev.mascwa.pulse.desktop.news.Article
-import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.desktop.news.NewsRepository
+import dev.mascwa.pulse.desktop.news.NewsTab
+import dev.mascwa.pulse.desktop.news.NewsTabs
+import dev.mascwa.pulse.desktop.news.SocialSource
 import dev.mascwa.pulse.desktop.reader.ReaderRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
+import dev.mascwa.pulse.data.social.SocialItem
+import dev.mascwa.pulse.data.social.SocialRepository
+import dev.mascwa.pulse.core.util.Fetched
 import dev.mascwa.pulse.core.telemetry.Readability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -20,7 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class NewsUiState(
-    val category: NewsCategory = NewsCategory.TOP,
+    val tab: NewsTab = NewsTabs.DEFAULT,
     val articles: List<Article> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
@@ -47,6 +52,7 @@ class NewsViewModel(
     private val repository: NewsRepository,
     private val settings: DesktopSettingsStore,
     private val reader: ReaderRepository? = null,
+    private val social: SocialRepository? = null,
 ) {
     private val _state = MutableStateFlow(NewsUiState())
     val state: StateFlow<NewsUiState> = _state.asStateFlow()
@@ -112,16 +118,22 @@ class NewsViewModel(
      * land on a copy that was cached minutes ago, and the countdown to the next refresh has to restart
      * from *that* copy's age rather than from when the tab was tapped.
      */
-    private val live: Flow<NewsCategory?> =
-        combine(onScreen, _state.map { it.category }.distinctUntilChanged()) { visible, category ->
-            if (visible) category else null
+    private val live: Flow<NewsTab?> =
+        combine(onScreen, _state.map { it.tab }.distinctUntilChanged()) { visible, tab ->
+            if (visible) tab else null
         }
+
+    /** The rail. Discussion tabs are dropped when there is no repository behind them, rather than
+     *  offered and then apologised for. */
+    val tabs: List<NewsTab> =
+        if (social != null) NewsTabs.ALL else NewsTabs.ALL.filter { it.social == null }
 
     init {
         scope.launch {
-            val saved = runCatching { NewsCategory.valueOf(settings.current().newsCategory) }
-                .getOrDefault(NewsCategory.TOP)
-            _state.value = _state.value.copy(category = saved)
+            val saved = NewsTabs.byKey(settings.current().newsCategory)
+                ?.takeIf { it in tabs }
+                ?: NewsTabs.DEFAULT
+            _state.value = _state.value.copy(tab = saved)
             load(saved)
         }
         scope.launch {
@@ -129,11 +141,11 @@ class NewsViewModel(
             // than leaving it to fire once more into a screen nobody is looking at. Off-screen the
             // collector body returns immediately and there is no timer running at all — which is the
             // whole reason this is a flow and not a `while (true) { delay(); if (visible) … }`.
-            live.collectLatest { category ->
-                if (category == null) return@collectLatest
+            live.collectLatest { tab ->
+                if (tab == null) return@collectLatest
                 while (true) {
                     delay(nextTickDelayMs(_state.value.lastUpdatedEpochMs, System.currentTimeMillis()))
-                    tick(category)
+                    tick(tab)
                 }
             }
         }
@@ -151,14 +163,14 @@ class NewsViewModel(
         onScreen.value = visible
     }
 
-    fun select(category: NewsCategory) {
-        if (category == _state.value.category && _state.value.articles.isNotEmpty()) return
-        _state.value = _state.value.copy(category = category, error = null)
-        scope.launch { settings.update { it.copy(newsCategory = category.name) } }
-        load(category)
+    fun select(tab: NewsTab) {
+        if (tab == _state.value.tab && _state.value.articles.isNotEmpty()) return
+        _state.value = _state.value.copy(tab = tab, error = null)
+        scope.launch { settings.update { it.copy(newsCategory = tab.key) } }
+        load(tab)
     }
 
-    fun refresh() = load(_state.value.category, force = true)
+    fun refresh() = load(_state.value.tab, force = true)
 
     /**
      * One beat of the live feed.
@@ -167,11 +179,51 @@ class NewsViewModel(
      * tick would otherwise be a no-op every other time. Skipped entirely while a fetch is already in
      * flight — a tick landing on top of a tab switch is two requests for one answer.
      */
-    private suspend fun tick(category: NewsCategory) {
+    private suspend fun tick(tab: NewsTab) {
         if (job?.isActive == true) return
-        if (_state.value.category != category) return
-        load(category, force = true, background = true)
+        if (_state.value.tab != tab) return
+        load(tab, force = true, background = true)
     }
+
+    /**
+     * A tab's articles, whichever kind of tab it is.
+     *
+     * A discussion post has a title, a link, a source and a time, which is everything the list draws —
+     * so the feeds are adapted into [Article] rather than given a screen of their own. That is exactly
+     * what the phone does, and it is why Lemmy and Hacker News get the reader, the topic tags and the
+     * market line for free.
+     */
+    private suspend fun fetch(tab: NewsTab, force: Boolean): Fetched<List<Article>> {
+        val src = tab.social
+        if (src == null) return repository.headlines(tab.category!!, force).getOrThrow()
+        val repo = social ?: error("no discussion feeds on this build")
+        val items = when (src) {
+            SocialSource.LEMMY -> repo.lemmy(force).let { it.data.items to it }
+            SocialSource.HN -> repo.hackerNews(force).let { it.data.items to it }
+            SocialSource.MASTODON -> repo.mastodon(force).let { it.data.statuses to it }
+        }
+        val (posts, fetched) = items
+        return Fetched(
+            posts.map { it.asArticle(tab.title) },
+            fromCache = fetched.fromCache,
+            refreshFailed = fetched.refreshFailed,
+            timestampEpochMs = fetched.timestampEpochMs,
+        )
+    }
+
+    /**
+     * ⚠️ The summary is the post's own text where there is one. Using the vote count unconditionally —
+     * which is what the phone did until it was fixed — turns an Ask HN thread, which is nothing BUT its
+     * text, into a title and "▲ 412 · 88 comments" with the actual question discarded.
+     */
+    private fun SocialItem.asArticle(category: String) = Article(
+        title = title,
+        url = url,
+        summary = body ?: meta,
+        source = source,
+        publishedEpochMs = publishedEpochMs,
+        category = category,
+    )
 
     /**
      * @param background a tick nobody asked for. It must not announce itself: no busy bar, and a
@@ -179,14 +231,14 @@ class NewsViewModel(
      *   replacing them with an error. Wiping a readable page because a background request timed out
      *   would be a worse outcome than the staleness it was trying to fix.
      */
-    private fun load(category: NewsCategory, force: Boolean = false, background: Boolean = false) {
+    private fun load(tab: NewsTab, force: Boolean = false, background: Boolean = false) {
         job?.cancel()
         if (!background) _state.value = _state.value.copy(loading = true, error = null)
         job = scope.launch {
-            repository.headlines(category, force)
+            runCatching { fetch(tab, force) }
                 .onSuccess { fetched ->
                     // Guard against a stale response landing after the user moved on.
-                    if (_state.value.category == category) {
+                    if (_state.value.tab == tab) {
                         _state.value = _state.value.copy(
                             articles = fetched.data,
                             loading = false,
@@ -198,13 +250,13 @@ class NewsViewModel(
                     }
                 }
                 .onFailure { e ->
-                    if (_state.value.category != category) return@onFailure
+                    if (_state.value.tab != tab) return@onFailure
                     _state.value = if (background) {
                         _state.value.copy(loading = false, refreshFailed = true)
                     } else {
                         _state.value.copy(
                             loading = false,
-                            error = "Could not load headlines: ${e.message ?: "no connection"}",
+                            error = "Could not load ${tab.title}: ${e.message ?: "no connection"}",
                         )
                     }
                 }

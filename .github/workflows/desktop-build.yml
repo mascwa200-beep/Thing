@@ -26,6 +26,7 @@ on:
       # The module's own build file too, not just its sources — :desktop depends on this project
       # now, so a dependency change there changes what the desktop compiles against.
       - "core/telemetry/**"
+      - "core/feeds/**"
       - "settings.gradle.kts"
       - "build.gradle.kts"
       - "gradle/libs.versions.toml"

@@ -7,8 +7,8 @@ package dev.mascwa.pulse.desktop.reader
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import dev.mascwa.pulse.desktop.network.HttpClient
-import dev.mascwa.pulse.desktop.network.HttpException
+import dev.mascwa.pulse.core.network.HttpClient
+import dev.mascwa.pulse.core.network.HttpException
 import dev.mascwa.pulse.core.telemetry.Readability
 
 /**

@@ -217,7 +217,7 @@ jobs:
           # and a JVM module has no build variants — so the Android task name simply does not exist
           # there any more. Getting this wrong does not fail loudly: gradle would report an unknown
           # task, and 1,322 core tests would stop being a gate.
-          ./gradlew :core:telemetry:test :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
+          ./gradlew :core:telemetry:test :core:feeds:test :core:model-inference:testDebugUnitTest :app:testDebugUnitTest --stacktrace --no-daemon 2>&1 | tee /tmp/gradle-tests.log
 
       - name: Build release APK
         # Release here is the SHIPPED sideload build: non-debuggable (so the baseline profile is honoured

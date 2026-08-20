@@ -6,8 +6,8 @@
 // is plumbing rather than logic: nothing here decides anything about a channel.
 package dev.mascwa.pulse.desktop.live
 
-import dev.mascwa.pulse.desktop.cache.DiskCache
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.cache.DiskCache
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.telemetry.LiveChannels.LiveChannel
 import dev.mascwa.pulse.core.telemetry.M3uCatalog
 import kotlinx.serialization.builtins.serializer

@@ -3,7 +3,6 @@ package dev.mascwa.pulse.data.orbital
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
-import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +25,15 @@ import java.util.TimeZone
 class OrbitalRepository(
     private val http: HttpClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /**
+     * The NASA NeoWs key, or NASA's shared `DEMO_KEY`.
+     *
+     * ⚠️ A function rather than a settings object, and that is the whole reason this repository could
+     * move into a shared module: the two applications store their preferences in entirely different
+     * places (DataStore on the phone, a JSON file on the desktop) and neither shape belongs in here.
+     * Called per fetch, so changing the key in settings takes effect on the next request.
+     */
+    private val nasaKey: suspend () -> String,
 ) {
     private val ttl = 5 * 60 * 1000L
 
@@ -48,7 +55,7 @@ class OrbitalRepository(
                 return Fetched(withSky(it.value, latitude, longitude), true, it.savedAtMs)
             }
         }
-        val nasaKey = settings.current().apiKeys.nasaOrDemo
+        val nasaKey = nasaKey()
         return try {
             // ⚠️ Each sub-fetch used to swallow its own exception, so the outer catch below could
             // never fire: a total network failure produced an all-empty payload, wrote it over the

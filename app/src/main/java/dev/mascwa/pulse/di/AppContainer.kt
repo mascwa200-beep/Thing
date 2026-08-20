@@ -59,7 +59,9 @@ class AppContainer(private val appContext: Context) {
 
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
-    val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
+    // ⚠️ `filesDir`, not the `Context` itself. The cache is shared with the desktop companion now,
+    // and reading a directory was the only thing it ever wanted a `Context` for.
+    val diskCache: DiskCache by lazy { DiskCache(appContext.filesDir, json) }
     /** Checks the CI `latest` GitHub release for a newer build and downloads the APK (in-app updater). */
     val updateRepository: dev.mascwa.pulse.data.update.UpdateRepository by lazy {
         dev.mascwa.pulse.data.update.UpdateRepository(appContext, http, settingsRepository)
@@ -198,7 +200,7 @@ class AppContainer(private val appContext: Context) {
         SpaceWeatherRepository(http, diskCache)
     }
     val orbitalRepository: OrbitalRepository by lazy {
-        OrbitalRepository(http, diskCache, settingsRepository)
+        OrbitalRepository(http, diskCache) { settingsRepository.current().apiKeys.nasaOrDemo }
     }
     val tleRepository: TleRepository by lazy { TleRepository(http, diskCache) }
     val launchRepository: LaunchRepository by lazy { LaunchRepository(http, diskCache) }
@@ -303,7 +305,12 @@ class AppContainer(private val appContext: Context) {
     val emergencyService: EmergencyService by lazy { EmergencyService(appContext) }
     val survivalTools: SurvivalTools by lazy { SurvivalTools(appContext) }
     val socialRepository: dev.mascwa.pulse.data.social.SocialRepository by lazy {
-        dev.mascwa.pulse.data.social.SocialRepository(http, diskCache, settingsRepository)
+        dev.mascwa.pulse.data.social.SocialRepository(
+            http,
+            diskCache,
+            lemmyInstance = { settingsRepository.current().lemmyInstance },
+            mastodonInstance = { settingsRepository.current().mastodonInstance },
+        )
     }
     val radarRepository: dev.mascwa.pulse.data.radar.RadarRepository by lazy {
         dev.mascwa.pulse.data.radar.RadarRepository(http, diskCache, tleRepository)

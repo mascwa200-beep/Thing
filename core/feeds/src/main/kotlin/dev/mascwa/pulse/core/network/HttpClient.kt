@@ -183,7 +183,16 @@ class HttpClient(
     }
 
     companion object {
-        const val USER_AGENT =
+        /**
+         * How this client introduces itself.
+         *
+         * A real UA avoids 403s from feeds (Google News, Stooq) that reject empty or default clients, and
+         * several of them answer differently depending on what they think they are talking to — so this is
+         * a `var` each application sets once at startup rather than a constant. Set it before the first
+         * request; nothing reads it earlier.
+         */
+        @Volatile
+        var USER_AGENT: String =
             "PulseApp/1.0 (Android; Pixel 10 Pro XL; +https://localhost) okhttp"
 
         fun create(json: Json, cacheDir: File? = null): HttpClient {

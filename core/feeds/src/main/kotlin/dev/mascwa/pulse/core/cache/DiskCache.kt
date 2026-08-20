@@ -1,6 +1,5 @@
 package dev.mascwa.pulse.core.cache
 
-import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,12 +14,18 @@ import java.security.MessageDigest
  * A simple, robust JSON-on-disk cache with per-entry TTL. Used to give every
  * screen instant content offline and to fall back to the last good payload
  * when the network is down. No Room / annotation processors required.
+ *
+ * ⚠️ Takes a directory rather than an Android `Context`, and that one change is what let this whole
+ * module become shared. The `Context` was only ever read for `filesDir`, so it was the single Android
+ * dependency standing between sixteen repositories and both applications being able to use them. Each
+ * application resolves its own root — `filesDir` on the phone, the OS app-data directory on the desktop —
+ * and hands it in.
  */
 class DiskCache(
-    context: Context,
+    root: File,
     private val json: Json,
 ) {
-    private val dir: File = File(context.filesDir, "pulse_cache").apply { mkdirs() }
+    private val dir: File = File(root, "pulse_cache").apply { mkdirs() }
     private val mutex = Mutex()
 
     @Serializable

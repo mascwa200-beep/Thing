@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.mascwa.pulse.desktop.cache.DiskCache
+import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.desktop.feature.about.AboutScreen
 import dev.mascwa.pulse.desktop.feature.about.AboutViewModel
 import dev.mascwa.pulse.desktop.feature.library.LibraryScreen
@@ -58,9 +58,10 @@ import dev.mascwa.pulse.desktop.library.PackStore
 import dev.mascwa.pulse.desktop.live.LiveCatalogRepository
 import dev.mascwa.pulse.desktop.live.LivePlayer
 import dev.mascwa.pulse.desktop.location.IpLocationService
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.desktop.news.NewsRepository
 import dev.mascwa.pulse.desktop.reader.ReaderRepository
+import dev.mascwa.pulse.data.social.SocialRepository
 import dev.mascwa.pulse.desktop.settings.DesktopSettingsStore
 import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
@@ -103,26 +104,38 @@ fun PulseDesktopApp(
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
         val remoteVm = remember { RemoteViewModel(scope, settings) }
         val json = remember { HttpClient.defaultJson() }
+
+        // ⚠️ ONE client and ONE cache for everything that fetches, which is what the phone's
+        // `AppContainer` does and what the desktop was NOT doing — it built a fresh `HttpClient` per
+        // feature, so the connection pool, the dispatcher's per-host limits and the HTTP cache were all
+        // fragmented four ways. The disk cache is the sharper case: each instance carries its own Mutex,
+        // so several of them over one directory serialise nothing against each other.
+        val http = remember { HttpClient.create(json, AppPaths.dataDir.toFile()) }
+        val cache = remember { DiskCache(AppPaths.dataDir.toFile(), json) }
+
         val newsVm = remember {
-            // ⚠️ One client for both, deliberately. It carries the disk cache, which is what makes
-            // re-opening an article inside its cache window cost no request — the reader keeps no
-            // cache of its own for exactly that reason.
-            val newsHttp = HttpClient.create(json, AppPaths.dataDir.toFile())
             NewsViewModel(
                 scope = scope,
-                repository = NewsRepository(
-                    http = newsHttp,
-                    cache = DiskCache(json, subdirectory = "news"),
-                ),
+                repository = NewsRepository(http, cache),
                 settings = settings,
-                reader = ReaderRepository(newsHttp),
+                // The reader keeps no cache of its own on purpose: it goes through the same client, so
+                // re-opening an article inside the HTTP cache window costs no request.
+                reader = ReaderRepository(http),
+                // The discussion feeds ride the same rail as the categories, so they ride the same
+                // client and cache too.
+                social = SocialRepository(
+                    http,
+                    cache,
+                    lemmyInstance = { settings.current().lemmyInstance },
+                    mastodonInstance = { settings.current().mastodonInstance },
+                ),
             )
         }
         // The library and the deck are passed in, not built here — see the note in Main.kt on why they
         // have to outlive the composition. One instance each, so the resident index and the shard LRU
         // are paid for once across all three screens below.
         val packsVm = remember {
-            PacksViewModel(scope, PackRepository(HttpClient.create(json), settings, packStore))
+            PacksViewModel(scope, PackRepository(http, settings, packStore))
         }
         val studyVm = remember { StudyViewModel(scope, studyStore) }
         val liveVm = remember {
@@ -130,21 +143,18 @@ fun PulseDesktopApp(
                 scope = scope,
                 player = livePlayer,
                 settings = settings,
-                catalogue = LiveCatalogRepository(
-                    HttpClient.create(json),
-                    DiskCache(json, subdirectory = "live"),
-                ),
+                catalogue = LiveCatalogRepository(http, cache),
             )
         }
         val libraryVm = remember { LibraryViewModel(scope, library, settings) }
         val searchVm = remember { SearchViewModel(scope, library, studyStore) }
         val aboutVm = remember {
-            AboutViewModel(scope, DesktopUpdater(HttpClient.create(json), settings), settings)
+            AboutViewModel(scope, DesktopUpdater(http, settings), settings)
         }
         val notesVm = remember { NotesViewModel(scope, notesStore) }
         val diaryVm = remember { DiaryViewModel(scope, diaryStore) }
         val settingsVm = remember {
-            SettingsViewModel(scope, settings, IpLocationService(HttpClient.create(json)))
+            SettingsViewModel(scope, settings, IpLocationService(http))
         }
 
         // Opening a guide from STUDY or SEARCH means switching screen AND telling the reader what to

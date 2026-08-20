@@ -1,6 +1,6 @@
 package dev.mascwa.pulse.desktop.location
 
-import dev.mascwa.pulse.desktop.network.HttpClient
+import dev.mascwa.pulse.core.network.HttpClient
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

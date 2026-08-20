@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mascwa.pulse.desktop.news.Article
-import dev.mascwa.pulse.desktop.news.NewsCategory
 import dev.mascwa.pulse.core.telemetry.Freshness
 import dev.mascwa.pulse.core.telemetry.NewsInsights
 import dev.mascwa.pulse.core.telemetry.NewsSummary
@@ -82,8 +81,15 @@ fun NewsScreen(vm: NewsViewModel, modifier: Modifier = Modifier) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            NewsCategory.entries.forEach { cat ->
-                LcarsChip(cat.title, selected = cat == state.category, onClick = { vm.select(cat) })
+            // Categories, then the discussion sites — the phone's own arrangement. A Lemmy post and a
+            // wire story are the same kind of row, so they share a rail rather than a second screen.
+            vm.tabs.forEach { tab ->
+                LcarsChip(
+                    tab.title,
+                    selected = tab == state.tab,
+                    onClick = { vm.select(tab) },
+                    accent = if (tab.social != null) c.violet else c.accent,
+                )
             }
         }
 

@@ -106,19 +106,24 @@ dependencies {
     // This is still not a dependency on `:app` — that is an Android application module and always will
     // be. What stays copied here is only what genuinely reaches into `:app`'s own plumbing.
     implementation(project(":core:telemetry"))
+    // The world's data, fetched by the same sixteen repositories the phone uses — space weather,
+    // satellites, launches, aircraft, earthquakes, official alerts, places, routing, discussion feeds —
+    // plus the HTTP client and disk cache beneath them. Every one of those files imported `android.*`
+    // exactly zero times; the only thing standing in the way was `DiskCache` taking a `Context`.
+    //
+    // It brings okhttp, coroutines and serialization with it as `api` dependencies, which is why those
+    // three are no longer declared below.
+    implementation(project(":core:feeds"))
     implementation(compose.desktop.currentOs)
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-media:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
     implementation(compose.material3)
-    implementation(libs.kotlinx.coroutines.core)
+    // Swing only — the rest of coroutines, plus serialization and okhttp, arrive through `:core:feeds`,
+    // and jsoup through `:core:telemetry`. Both are `api` dependencies there, so re-declaring them here
+    // would be two statements of one version.
     implementation(libs.kotlinx.coroutines.swing)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.okhttp)
-    // jsoup comes through `:core:telemetry` as an `api` dependency (Readability is built on it), so it
-    // is not declared again here — the desktop reads a web page with exactly the same parser and the
-    // same rules the phone does, because it is literally the same code now.
 
     testImplementation(libs.junit)
 }

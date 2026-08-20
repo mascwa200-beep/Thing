@@ -3,7 +3,6 @@ package dev.mascwa.pulse.data.social
 import dev.mascwa.pulse.core.cache.DiskCache
 import dev.mascwa.pulse.core.network.HttpClient
 import dev.mascwa.pulse.core.util.Fetched
-import dev.mascwa.pulse.data.settings.SettingsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,12 +25,20 @@ import java.time.Instant
 class SocialRepository(
     private val http: HttpClient,
     private val cache: DiskCache,
-    private val settings: SettingsRepository,
+    /**
+     * Which Lemmy / Mastodon server to read.
+     *
+     * ⚠️ Functions rather than a settings object — see [dev.mascwa.pulse.data.orbital.OrbitalRepository]
+     * for why. Called per fetch, so pointing at another instance takes effect on the next request, and
+     * the instance name is part of the cache key so the two do not overwrite each other.
+     */
+    private val lemmyInstance: suspend () -> String = { DEFAULT_LEMMY },
+    private val mastodonInstance: suspend () -> String = { DEFAULT_MASTODON },
 ) {
     private val ttl = 10 * 60 * 1000L
 
     suspend fun lemmy(force: Boolean): Fetched<SocialFeed> {
-        val instance = settings.current().lemmyInstance.ifBlank { "lemmy.world" }
+        val instance = lemmyInstance().ifBlank { DEFAULT_LEMMY }
         val key = "social_lemmy_$instance"
         return cachedJson(key, force, SocialFeed.serializer()) {
             val url = "https://$instance/api/v3/post/list?sort=Active&type_=All&limit=30"
@@ -61,7 +68,7 @@ class SocialRepository(
     }
 
     suspend fun mastodon(force: Boolean): Fetched<MastodonTrends> {
-        val instance = settings.current().mastodonInstance.ifBlank { "mastodon.social" }
+        val instance = mastodonInstance().ifBlank { DEFAULT_MASTODON }
         val key = "social_mastodon_$instance"
         return cachedJson(key, force, MastodonTrends.serializer()) {
             val tagsResult = runCatching {
@@ -178,6 +185,11 @@ class SocialRepository(
             cache.readAny(key, serializer)?.let { return Fetched(it.value, true, it.savedAtMs) }
             throw e
         }
+    }
+
+    private companion object {
+        const val DEFAULT_LEMMY = "lemmy.world"
+        const val DEFAULT_MASTODON = "mastodon.social"
     }
 
     private val tagRegex = Regex("<[^>]*>")
