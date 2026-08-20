@@ -8616,6 +8616,28 @@
    "file": "guides_hazards.json"
   },
   {
+   "id": "house-fires-prevention-escape-and-survival",
+   "title": "House Fires: Prevention, Escape and Survival",
+   "category": "Hazards",
+   "summary": "How to prevent a house fire and escape a burning building: smoke alarms, a two-ways-out escape plan, escaping through smoke, pan and grease fires in the kitchen, what to do when trapped in a room or a high-rise, clothes on fire, burns first aid, and the aftermath.",
+   "headings": [
+    "Why House Fires Kill: Smoke, Heat and the Two-Minute Window",
+    "Smoke Alarms: The One Device That Buys Back Time",
+    "The Escape Plan: Two Ways Out of Every Room",
+    "Kitchens: Pan Fires, Grease Fires and Where Most Home Fires Start",
+    "Heating, Electrical and Cigarettes: The Other Big Causes",
+    "Fight or Flee: The Small-Fire Decision and Extinguisher Basics",
+    "Escaping Through Smoke: Low, Fast and by Feel",
+    "Windows, Upper Floors and Escape Ladders",
+    "Trapped: Defending a Room Until Rescue",
+    "Apartments and High-Rise Buildings: Stairs, Never Lifts",
+    "Clothes on Fire, Burns and the First Minutes of First Aid",
+    "Children, Older Adults, Disability and Pets",
+    "After the Fire: Re-Entry, Recovery and Rebuilding Safety"
+   ],
+   "file": "guides_hazards.json"
+  },
+  {
    "id": "sexual-health",
    "title": "Sexual Health",
    "category": "Health",
