@@ -157,6 +157,20 @@ data class DesktopSettings(
      *  means it shows what it has until the timer comes round, which is quieter on a metered link. */
     val refreshOnOpen: Boolean = true,
 
+    // ----- The ops wall -----------------------------------------------------------------------
+
+    /**
+     * Which screens the ops wall shows, as [dev.mascwa.pulse.desktop.Screen] names.
+     *
+     * ⚠️ **Names, not ordinals.** An ordinal is a position in an enum, and inserting a screen anywhere
+     * but the end silently rewrites what someone chose — the wall would come back showing a different
+     * set with no way to tell it had changed. A name that no longer exists is simply dropped on load,
+     * which is the honest outcome for a screen that has been removed.
+     *
+     * The default is the four that answer "what is going on" without being asked a question first:
+     * what to do about it, the money, the sky, and the wire.
+     */
+    val opsWall: List<String> = listOf("ADVISORIES", "MARKETS", "WEATHER", "NEWS"),
 )
 
 private val defaultJson = Json {

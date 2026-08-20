@@ -63,6 +63,15 @@ private val diaryStore = DiaryStore()
  */
 private val crashReporter = CrashReporter(AppPaths.dataDir.toFile())
 
+/**
+ * The window's keyboard shortcuts.
+ *
+ * ⚠️ Owned here because `onKeyEvent` is a parameter of `Window`, which is built before any composition
+ * exists — so the handler cannot be a lambda closing over shell state. The shell publishes into this
+ * instead; see [ConsoleKeys].
+ */
+private val consoleKeys = ConsoleKeys()
+
 fun main() {
     crashReporter.install(BuildInfo.display)
 
@@ -110,6 +119,12 @@ fun main() {
             },
             title = "LCARS",
             state = state,
+            // ⚠️ `onKeyEvent`, NOT `onPreviewKeyEvent`. Preview runs from the root DOWN to whatever has
+            // focus, so a handler here would see every keystroke before a text field could — which is
+            // the exact bug this project already shipped once, where typing a digit into a filter box
+            // changed the television channel instead. Bubbling means a focused field keeps what it
+            // handles and only the combinations nothing wanted reach the console.
+            onKeyEvent = { consoleKeys.handle(it) },
         ) {
             PulseDesktopApp(
                 settingsStore,
@@ -121,6 +136,7 @@ fun main() {
                 notesStore,
                 diaryStore,
                 crashReporter,
+                consoleKeys,
                 // Handing over to the installer. Flushed the same way the close button does, because an
                 // upgrade that lost the last answered study card would be a poor trade for being current.
                 onQuitForInstall = {

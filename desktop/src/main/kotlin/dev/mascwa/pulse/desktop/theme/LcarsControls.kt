@@ -136,6 +136,16 @@ fun LcarsTextField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     enabled: Boolean = true,
+    /**
+     * Applied to the editable field itself rather than the labelled column around it.
+     *
+     * ⚠️ Additive, and the distinction is the whole reason it exists: focus and key handling belong to
+     * the thing that receives typing, not to its label. The command bar needs to take focus the moment
+     * it opens and to read the arrow keys before the field's own caret handling does, and neither is
+     * expressible through [modifier], which lands on the outer column. Every existing call site leaves
+     * it alone and is unaffected.
+     */
+    fieldModifier: Modifier = Modifier,
 ) {
     val c = Pulse.colors
     Column(modifier) {
@@ -168,7 +178,7 @@ fun LcarsTextField(
                     fontSize = 13.sp,
                 ),
                 cursorBrush = SolidColor(c.accent),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(fieldModifier),
             )
         }
     }

@@ -21,8 +21,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -116,6 +118,7 @@ import dev.mascwa.pulse.desktop.study.StudyStore
 import dev.mascwa.pulse.desktop.theme.ChakraPetch
 import dev.mascwa.pulse.desktop.theme.JetBrainsMono
 import dev.mascwa.pulse.desktop.theme.LcarsCorner
+import dev.mascwa.pulse.desktop.theme.LcarsGhostButton
 import dev.mascwa.pulse.desktop.theme.LcarsScreenFrame
 import dev.mascwa.pulse.desktop.theme.LocalConsoleSection
 import dev.mascwa.pulse.desktop.theme.Orbitron
@@ -127,6 +130,7 @@ import dev.mascwa.pulse.desktop.update.DesktopUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * The desktop shell: a left LCARS rail and the selected screen.
@@ -146,6 +150,11 @@ fun PulseDesktopApp(
     notesStore: dev.mascwa.pulse.desktop.notes.NotesStore,
     diaryStore: dev.mascwa.pulse.desktop.notes.DiaryStore,
     crashReporter: dev.mascwa.pulse.desktop.diagnostics.CrashReporter,
+    /**
+     * The window's key handler, which the shell fills in — see [ConsoleKeys]. Defaulted so a caller
+     * that has no window (a test, a preview) needs to know nothing about shortcuts.
+     */
+    keys: ConsoleKeys = remember { ConsoleKeys() },
     onQuitForInstall: () -> Unit = {},
 ) {
     PulseDesktopTheme {
@@ -315,19 +324,127 @@ fun PulseDesktopApp(
             libraryVm.open(id)
             screen = Screen.LIBRARY
         }
+        val studyGuide: (String) -> Unit = { id ->
+            studyVm.teach(id)
+            screen = Screen.STUDY
+        }
+
+        // ⚠️ Built with `remember` keyed on nothing, so it is one instance for the process. Every view
+        // model in it is already a single instance; this only bundles them so a second host can be
+        // handed all of them without twenty-six parameters.
+        val vms = remember {
+            DeskViewModels(
+                library = library,
+                about = aboutVm, advisories = advisoriesVm, crash = crashVm, diary = diaryVm,
+                economy = economyVm, fuel = fuelVm, home = homeVm, libraryVm = libraryVm,
+                live = liveVm, map = mapVm, markets = marketsVm, news = newsVm, notes = notesVm,
+                observatory = observatoryVm, packs = packsVm, places = placesVm, radar = radarVm,
+                radio = radioVm, remote = remoteVm, safety = safetyVm, search = searchVm,
+                settings = settingsVm, spaceWeather = spaceWeatherVm, study = studyVm,
+                weather = weatherVm, wildlife = wildlifeVm,
+            )
+        }
+
+        // Which screens are torn off into windows of their own, in the order they were torn off.
+        // ⚠️ A list rather than a set: the order is what someone sees in their taskbar, and a set
+        // reorders on every change, which would shuffle the windows' identities under `key`.
+        var poppedOut by remember { mutableStateOf(listOf<Screen>()) }
+        // Asking an existing window to come forward. The tick is what makes a second request for the
+        // same window fire again — the screen alone would be an unchanged key and the effect would not
+        // re-run, so clicking the directory twice would raise it once.
+        var raise by remember { mutableStateOf<Screen?>(null) }
+        var raiseTick by remember { mutableStateOf(0) }
+
+        val openScreen: (Screen) -> Unit = { target ->
+            if (target in poppedOut) {
+                // It already has a window. Raise that rather than drawing a second live copy of one
+                // screen — confusing on the ordinary screens, and genuinely wrong on any holding a
+                // native surface.
+                raise = target
+                raiseTick++
+            } else {
+                screen = target
+            }
+        }
+        val popOut: (Screen) -> Unit = { target ->
+            if (canPopOut(target) && target !in poppedOut) {
+                poppedOut = poppedOut + target
+                // The main pane cannot keep showing what just left it. Home is where this console
+                // starts, and it is the one screen that is always worth looking at.
+                if (screen == target) screen = Screen.HOME
+            }
+        }
+
+        // The ops wall. Open/closed is deliberately NOT persisted — a full-screen window that comes
+        // back on next launch, covering a monitor, is a surprise rather than a convenience. WHAT is on
+        // it is persisted, because that is a choice someone made.
+        var wallOpen by remember { mutableStateOf(false) }
+        var commandOpen by remember { mutableStateOf(false) }
+
+        // ⚠️ Kept here rather than inside the key handler so the handler stays a lookup: what a key
+        // MEANS is [consoleCommandFor]'s pure decision, and what to DO about it is this.
+        val runCommand: (ConsoleCommand) -> Unit = { cmd ->
+            when (cmd) {
+                ConsoleCommand.OPEN_COMMAND_BAR -> commandOpen = true
+                ConsoleCommand.TOGGLE_OPS_WALL -> wallOpen = !wallOpen
+                ConsoleCommand.CLOSE_OVERLAY -> commandOpen = false
+                ConsoleCommand.POP_OUT_CURRENT -> popOut(screen)
+            }
+        }
+        // ⚠️ Published every composition rather than once, because both fields go stale: the callback
+        // closes over `screen`, so a stale one would tear off whatever was showing when the shell first
+        // composed, and `overlayOpen` decides whether Escape has anything to close.
+        SideEffect {
+            keys.overlayOpen = commandOpen
+            keys.onCommand = runCommand
+        }
 
         // Where you are, for the frame's header readout — one provider around everything, so no
         // screen has to know its own name. Same arrangement as the phone's.
         // The unit switches, read once for the whole app. Collected rather than fetched so flipping
         // one redraws every screen holding a distance or a clock time — see [LocalUnits].
         val prefs by settings.settingsFlow.collectAsState()
+        val units = UnitPrefs(miles = prefs.miles, twelveHourClock = prefs.twelveHourClock)
         CompositionLocalProvider(
             LocalConsoleSection provides (DESK_SECTION[screen] ?: ""),
-            LocalUnits provides UnitPrefs(miles = prefs.miles, twelveHourClock = prefs.twelveHourClock),
+            LocalUnits provides units,
         ) {
             ProvideStardate {
+                // The torn-off windows. Declared inside the composition on purpose — see [PopOutWindows]
+                // — so they read the same view models the main pane does rather than a second graph.
+                PopOutWindows(
+                    open = poppedOut,
+                    vms = vms,
+                    units = units,
+                    raise = raise,
+                    raiseTick = raiseTick,
+                    onClose = { poppedOut = poppedOut - it },
+                    onOpenGuide = openGuide,
+                    onStudyGuide = studyGuide,
+                )
+                if (wallOpen) {
+                    OpsWallWindow(
+                        // ⚠️ Resolved by NAME, and an unknown one is dropped rather than crashing.
+                        // The stored list outlives the enum it names, so a screen that was removed
+                        // must simply stop appearing.
+                        wall = prefs.opsWall.mapNotNull { name ->
+                            runCatching { Screen.valueOf(name) }.getOrNull()
+                        }.filter { canPutOnWall(it) },
+                        vms = vms,
+                        units = units,
+                        onClose = { wallOpen = false },
+                        onSetWall = { next ->
+                            scope.launch {
+                                settings.update { it.copy(opsWall = next.map(Screen::name)) }
+                            }
+                        },
+                        onOpenGuide = openGuide,
+                        onStudyGuide = studyGuide,
+                    )
+                }
                 Surface(color = c.void) {
                     val entry = DESK_ENTRIES[screen]
+                    Box(Modifier.fillMaxSize()) {
                     LcarsScreenFrame(
                         title = entry?.label ?: "LCARS",
                         seed = screen.name,
@@ -336,81 +453,54 @@ fun PulseDesktopApp(
                         // corner takes the same width so the console's L still closes.
                         rail = false,
                         railWidth = DIRECTORY_WIDTH,
+                        actions = {
+                            // ⚠️ The keyboard shortcut is on the label, because a shortcut nobody can
+                            // see is a shortcut nobody uses. Same reason the ops wall says how to leave.
+                            LcarsGhostButton("⌕ GO TO · CTRL+K", onClick = { commandOpen = true })
+                            if (canPopOut(screen)) {
+                                LcarsGhostButton("⧉ POP OUT", onClick = { popOut(screen) })
+                            }
+                            LcarsGhostButton("▦ OPS WALL", onClick = { wallOpen = true })
+                        },
                     ) {
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             Directory(
                                 current = screen,
-                                onSelect = { screen = it },
+                                poppedOut = poppedOut,
+                                onSelect = openScreen,
                                 modifier = Modifier.width(DIRECTORY_WIDTH).fillMaxHeight(),
                             )
                             Box(Modifier.weight(1f).fillMaxHeight()) {
-                                when (screen) {
-                                    Screen.REMOTE -> RemoteScreen(remoteVm, Modifier.fillMaxWidth())
-                                    Screen.NEWS -> NewsScreen(newsVm, Modifier.fillMaxWidth())
-                                    Screen.LIVE -> LiveScreen(liveVm, Modifier.fillMaxWidth())
-                                    Screen.SETTINGS -> SettingsScreen(settingsVm, Modifier.fillMaxWidth())
-                                    Screen.SPACE_WEATHER ->
-                                        SpaceWeatherScreen(spaceWeatherVm, Modifier.fillMaxWidth())
-                                    Screen.OBSERVATORY ->
-                                        ObservatoryScreen(observatoryVm, Modifier.fillMaxWidth())
-                                    Screen.CRASH -> CrashScreen(crashVm, Modifier.fillMaxWidth())
-                                    Screen.MAP -> MapScreen(mapVm, Modifier.fillMaxWidth())
-                                    Screen.RADAR -> RadarScreen(radarVm, Modifier.fillMaxWidth())
-                                    Screen.SAFETY -> SafetyScreen(safetyVm, Modifier.fillMaxWidth())
-                                    Screen.PLACES -> PlacesScreen(placesVm, Modifier.fillMaxWidth())
-                                    Screen.WILDLIFE -> WildlifeScreen(wildlifeVm, Modifier.fillMaxWidth())
-                                    Screen.MARKETS -> MarketsScreen(marketsVm, Modifier.fillMaxWidth())
-                                    Screen.WEATHER -> WeatherScreen(weatherVm, Modifier.fillMaxWidth())
-                                    Screen.ECONOMY -> EconomyScreen(economyVm, Modifier.fillMaxWidth())
-                                    Screen.FUEL -> FuelScreen(fuelVm, Modifier.fillMaxWidth())
-                                    Screen.RADIO -> RadioScreen(radioVm, Modifier.fillMaxWidth())
-                                    Screen.HOME -> HomeScreen(
-                                        vm = homeVm,
-                                        // The SAME advisories view model the ADVISORIES screen reads,
-                                        // so the two pages can never rank one machine's signals
-                                        // differently.
-                                        advisories = advisoriesVm,
-                                        onOpenScreen = { screen = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Screen.ADVISORIES -> AdvisoriesScreen(
-                                        vm = advisoriesVm,
-                                        // Acting on an advisory means going where it points, which is
-                                        // the one thing only the shell can do.
-                                        onOpenScreen = { screen = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Screen.NOTES -> NotesScreen(notesVm, Modifier.fillMaxWidth())
-                                    Screen.DIARY -> DiaryScreen(diaryVm, Modifier.fillMaxWidth())
-                                    Screen.STUDY -> StudyScreen(
-                                        studyVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Screen.LIBRARY -> LibraryScreen(
-                                        vm = libraryVm,
-                                        repository = library,
-                                        // "STUDY THIS" from the reader: turn the guide into questions,
-                                        // then go answer them. Marking it read instead would record the
-                                        // visit and teach nothing, which is not what the button says.
-                                        onStudy = { id ->
-                                            studyVm.teach(id)
-                                            screen = Screen.STUDY
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Screen.PACKS -> PacksScreen(packsVm, Modifier.fillMaxWidth())
-                                    Screen.SEARCH -> SearchScreen(
-                                        searchVm, onOpenGuide = openGuide, modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    Screen.ABOUT -> AboutScreen(
-                                        vm = aboutVm,
-                                        // The installer cannot replace files this process holds open, so
-                                        // handing over means actually letting go.
-                                        onQuitForInstall = onQuitForInstall,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                }
+                                // ⚠️ ONE dispatch, shared with every torn-off window — see [ScreenHost].
+                                // A second copy of a twenty-six-branch `when` drifts the moment a screen
+                                // is added to one host and forgotten in the other.
+                                ScreenHost(
+                                    screen = screen,
+                                    vms = vms,
+                                    onOpenScreen = openScreen,
+                                    onOpenGuide = openGuide,
+                                    onStudyGuide = studyGuide,
+                                    onQuitForInstall = onQuitForInstall,
+                                )
                             }
                         }
+                    }
+                    if (commandOpen) {
+                        // Over the whole page, so the answer to "where do I type" is never in doubt.
+                        CommandScrim(onDismiss = { commandOpen = false })
+                        Box(
+                            Modifier.fillMaxSize().padding(top = 90.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            CommandBar(
+                                onPick = { target ->
+                                    commandOpen = false
+                                    openScreen(target)
+                                },
+                                onDismiss = { commandOpen = false },
+                            )
+                        }
+                    }
                     }
                 }
             }
@@ -433,6 +523,8 @@ fun PulseDesktopApp(
 @Composable
 private fun Directory(
     current: Screen,
+    /** Screens living in windows of their own — marked, because selecting one raises it instead. */
+    poppedOut: List<Screen>,
     onSelect: (Screen) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -455,7 +547,12 @@ private fun Directory(
                 modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 3.dp),
             )
             group.entries.forEach { e ->
-                DirectoryBlock(e, group.accent(c), e.screen == current) { onSelect(e.screen) }
+                DirectoryBlock(
+                    entry = e,
+                    accent = group.accent(c),
+                    selected = e.screen == current,
+                    torn = e.screen in poppedOut,
+                ) { onSelect(e.screen) }
             }
         }
         Box(Modifier.height(16.dp))
@@ -467,6 +564,7 @@ private fun DirectoryBlock(
     entry: DeskEntry,
     accent: Color,
     selected: Boolean,
+    torn: Boolean,
     onClick: () -> Unit,
 ) {
     val c = Pulse.colors
@@ -479,7 +577,11 @@ private fun DirectoryBlock(
             .padding(horizontal = 10.dp, vertical = 7.dp),
     ) {
         Text(
-            entry.label.uppercase(),
+            // ⚠️ The mark says where the screen IS, which is what makes clicking it raising a window
+            // rather than a dead selection. Without it, a torn-off screen looks exactly like every
+            // other entry and clicking it appears to do nothing — the window it raised is behind this
+            // one, or on the other monitor.
+            if (torn) "⧉ ${entry.label.uppercase()}" else entry.label.uppercase(),
             fontFamily = ChakraPetch, fontWeight = FontWeight.Bold,
             fontSize = 12.sp, letterSpacing = 1.sp,
             // Black on the lit block: LCARS letters a filled block in the ground colour, and the
