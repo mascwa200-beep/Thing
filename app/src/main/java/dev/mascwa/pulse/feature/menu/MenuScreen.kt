@@ -62,6 +62,9 @@ import dev.mascwa.pulse.ui.theme.Pulse
 fun MenuScreen(vm: MenuViewModel, onOpen: (String) -> Unit) {
     val c = Pulse.colors
     val recents by vm.recents.collectAsState()
+    // Re-fires on every composition ENTRY (return from a pushed chip, tab-restore) — the VM
+    // survives both, so an init-only load froze the strip at the first composition's snapshot.
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refresh() }
     var query by remember { mutableStateOf("") }
     val results = remember(query) {
         val q = query.trim()

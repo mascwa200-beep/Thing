@@ -136,19 +136,25 @@ class HomeViewModel(
             // revived: a second, weaker opinion about the same data helps nobody.
             launch {
                 val snap = runCatching { usage.snapshot() }.getOrNull()
+                val menuEntries = dev.mascwa.pulse.navigation.GROUPS
+                    .flatMap { g -> g.entries }.associateBy { it.route }
                 val recs = snap?.let { sn ->
                     runCatching {
                         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                        // ⚠️ Menu-listed routes only, the same eligibility rule as the launcher row
+                        // and the MENU strip. The unfiltered snapshot recommended "Your go-to is
+                        // Home" ON Home (a tab, recorded on every arrival, near-always the top
+                        // count), and uncataloged keys like "reader" leaked a raw route id as
+                        // user-facing copy whose tap landed on a Reader with an empty address.
+                        val eligible = sn.copy(features = sn.features.filter { it.key in menuEntries })
                         dev.mascwa.pulse.core.telemetry.UsageInsights.recommend(
-                            sn, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
+                            eligible, hour, dev.mascwa.pulse.data.usage.FeatureCatalog.entries,
                         )
                     }.getOrDefault(emptyList())
                 }.orEmpty()
                 // The launcher row: most-opened MENU destinations, by count (the MENU's own strip is
                 // recency-ordered — that one answers "what was I just doing", this one "what do I
                 // always use"). Same eligibility rule as there: menu-listed routes only.
-                val menuEntries = dev.mascwa.pulse.navigation.GROUPS
-                    .flatMap { g -> g.entries }.associateBy { it.route }
                 val most = snap?.features.orEmpty()
                     .filter { it.key in menuEntries }
                     .sortedByDescending { it.count }

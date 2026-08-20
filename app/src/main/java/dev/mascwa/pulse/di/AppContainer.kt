@@ -49,6 +49,14 @@ class AppContainer(private val appContext: Context) {
      */
     val navigationBus = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
 
+    /**
+     * Whether the Activity is between onStart and onStop. The navigation bus's collector is a
+     * composition-lifetime LaunchedEffect, which survives a STOPPED Activity — so subscriptionCount
+     * alone reads "someone is listening" while the screen is off, and a spoken "open the radar"
+     * would navigate an invisible NavController and claim success. This flag is the visible half.
+     */
+    val appForeground = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     val json: Json by lazy { HttpClient.defaultJson() }
     val http: HttpClient by lazy { HttpClient.create(json, appContext.cacheDir) }
     val diskCache: DiskCache by lazy { DiskCache(appContext, json) }
@@ -593,7 +601,7 @@ class AppContainer(private val appContext: Context) {
     /** Read-only, on-device tools J.A.R.V.I.S. can invoke (web/GitHub-read/device/memory). */
     val agentTools: List<dev.mascwa.pulse.jarvis.agent.JarvisTool> by lazy {
         listOf(
-            dev.mascwa.pulse.jarvis.agent.OpenScreenTool(navigationBus),
+            dev.mascwa.pulse.jarvis.agent.OpenScreenTool(navigationBus, appForeground),
             dev.mascwa.pulse.jarvis.agent.WebSearchTool(webSearchRepository),
             dev.mascwa.pulse.jarvis.agent.WebFetchTool(http),
             dev.mascwa.pulse.jarvis.agent.DownloadTool(appContext, http),

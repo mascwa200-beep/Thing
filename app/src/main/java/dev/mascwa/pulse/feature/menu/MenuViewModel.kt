@@ -25,6 +25,18 @@ class MenuViewModel(private val usage: UsageRepository) : ViewModel() {
     val recents: StateFlow<List<MenuEntry>> = _recents.asStateFlow()
 
     init {
+        refresh()
+    }
+
+    /**
+     * Re-read the usage snapshot. ⚠️ Called from the screen on every composition ENTRY, not only
+     * here: this VM lives on the MENU NavBackStackEntry, which survives both of the strip's
+     * primary flows — open a chip (openApp PUSHES, so MENU stays on the stack) and come back, or
+     * tab away and back (navigateTopLevel's saveState/restoreState retains the ViewModelStore).
+     * A one-shot init load froze the strip at whatever the first composition saw, so the thing
+     * you JUST opened — the exact "take me back to what I was just doing" case — never appeared.
+     */
+    fun refresh() {
         viewModelScope.launch {
             val byRoute = GROUPS.flatMap { it.entries }.associateBy { it.route }
             _recents.value = usage.snapshot().features

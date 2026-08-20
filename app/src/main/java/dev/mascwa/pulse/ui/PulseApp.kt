@@ -221,9 +221,11 @@ fun PulseApp(
                 FuelScreen(vm, onBack = { navController.popBackStack() })
             }
 
-            val openRoute: (String) -> Unit = { route ->
-                navController.navigate(route) { launchSingleTop = true }
-            }
+            // ⚠️ Delegates to openApp — B3's ONE navigate idiom. This used to be a plain
+            // navigate{launchSingleTop}, and the Oracle routes its insights through it with TAB
+            // routes ("weather", "markets", "news", "jarvis"): a plain push stacked a second copy
+            // of a tab on the back stack instead of switching tabs, skipping the tab's saved state.
+            val openRoute: (String) -> Unit = { route -> openApp(route) }
 
             // ---- THE MENU — the flat directory: every feature, one tap, plain English ----
             composable(Routes.MENU) {

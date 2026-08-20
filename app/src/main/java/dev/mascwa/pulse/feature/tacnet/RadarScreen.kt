@@ -385,8 +385,11 @@ private fun QuakeRow(q: Contact, selected: Boolean, onClick: () -> Unit) {
     val severe = (mag ?: 0.0) >= 5.5
     NeonPanel(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
-        corners = selected,
-        borderColor = if (severe) Pip.alert else Pip.grid,
+        // The border IS the selection channel now. It used to be `corners = selected` — the one
+        // conditional corners call site in the app — and the B8 shim ignores corners, which
+        // silently erased this list's only selected-row styling. Severity keeps its channel in
+        // the label/detail colours below, so a selected severe row stays unambiguous.
+        borderColor = if (selected) Pip.glow else if (severe) Pip.alert else Pip.grid,
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {

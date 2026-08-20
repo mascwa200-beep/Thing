@@ -175,6 +175,9 @@ private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.
         Modifier.fillMaxWidth().padding(top = 6.dp)
             .let { m -> if (open != null) m.clickable { open(result) } else m },
     ) {
+      // ⚠️ LcarsFrame seats its content in a Box — siblings emitted directly STACK at top-start
+      // (the recorded NeonPanel lesson). These three overlapped into unreadable text.
+      Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 result.kind.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 8.sp,
@@ -192,6 +195,7 @@ private fun DeviceResultRow(result: DeviceSearch.Result, onOpen: ((DeviceSearch.
                 color = c.ink2, modifier = Modifier.padding(top = 2.dp),
             )
         }
+      }
     }
 }
 
@@ -215,6 +219,8 @@ private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: ((String) -
             .let { m -> if (open != null) m.clickable { open(gid!!) } else m },
         accent = c.magenta,
     ) {
+      // Same Box-stacking trap as DeviceResultRow above — the Column is load-bearing.
+      Column {
         Text(
             e.label.uppercase(), fontFamily = JetBrainsMono, fontSize = 9.sp,
             letterSpacing = 1.sp, fontWeight = FontWeight.Bold, color = c.magenta,
@@ -229,5 +235,6 @@ private fun EmergencyCard(e: EmergencyTriage.Emergency, onOpenGuide: ((String) -
                 letterSpacing = 0.8.sp, color = c.muted, modifier = Modifier.padding(top = 6.dp),
             )
         }
+      }
     }
 }

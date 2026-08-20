@@ -65,7 +65,6 @@ fun LcarsField(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val shape = lcarsBlockShape(10.dp, LcarsCorner.TopStart)
-    val act: () -> Unit = { onImeAction?.invoke() }
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -77,8 +76,13 @@ fun LcarsField(
         keyboardOptions = KeyboardOptions(imeAction = imeAction),
         // Every action key routes to the one callback; asking for Search but wiring only onGo is a
         // silent dead key, and nothing at a call site can get this pairing wrong now.
-        keyboardActions = KeyboardActions(
-            onDone = { act() }, onGo = { act() }, onSearch = { act() }, onSend = { act() },
+        // ⚠️ With NO callback the actions must be Default (all-null handlers): Compose runs
+        // defaultKeyboardAction — which is what hides the keyboard on Done — only when the
+        // handler is null, so a present-but-empty lambda silently kills the action key on every
+        // adopter that passes nothing.
+        keyboardActions = if (onImeAction == null) KeyboardActions.Default else KeyboardActions(
+            onDone = { onImeAction() }, onGo = { onImeAction() },
+            onSearch = { onImeAction() }, onSend = { onImeAction() },
         ),
         decorationBox = { inner ->
             Row(

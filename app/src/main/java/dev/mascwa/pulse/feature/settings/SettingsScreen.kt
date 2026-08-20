@@ -139,12 +139,14 @@ fun SettingsScreen(
     // Steam-style master-detail state: which category is open (null = the compact master list), and the
     // cross-category search query. A section is visible when it belongs to the active category, or (while
     // searching) when its title/keywords match — so a search result is the real, live control.
-    var selectedCat by remember { mutableStateOf(initialCategory) }
+    // VM-backed (see SettingsViewModel.selectedCategory) — a remember{} here died on tab-away.
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.seedCategory(initialCategory) }
+    val selectedCat by vm.selectedCategory.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
 
     // ⚠️ System back leaves the CATEGORY, then the screen — Settings previously exited wholesale
     // from three levels deep. Gated on the sub-state, per the app-wide BackHandler rule.
-    androidx.activity.compose.BackHandler(enabled = selectedCat != null) { selectedCat = null }
+    androidx.activity.compose.BackHandler(enabled = selectedCat != null) { vm.selectedCategory.value = null }
     val activeCat = selectedCat ?: SettingsCategory.FIRST
     fun vis(cat: SettingsCategory, keywords: String): Boolean {
         val q = query.trim()
@@ -1301,13 +1303,13 @@ fun SettingsScreen(
     // system-back gesture above.
     PulseScaffold(
         title = "Settings",
-        onBack = { if (selectedCat != null) selectedCat = null else onBack?.invoke() },
+        onBack = { if (selectedCat != null) vm.selectedCategory.value = null else onBack?.invoke() },
     ) { innerPadding ->
         SettingsShell(
             modifier = Modifier.padding(innerPadding),
             selectedCat = selectedCat,
             query = query,
-            onSelect = { selectedCat = it },
+            onSelect = { vm.selectedCategory.value = it },
             onQuery = { query = it },
             detail = detail,
         )

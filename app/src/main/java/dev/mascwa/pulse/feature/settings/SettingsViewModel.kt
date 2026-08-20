@@ -45,6 +45,20 @@ class SettingsViewModel(
     private val python: dev.mascwa.pulse.data.python.PythonRuntime,
 ) : ViewModel() {
 
+    // Steam-style master-detail position — WHICH category is open (null = the master list).
+    // VM-scoped, per the arc's rule for state that must outlive the composition: this used to be a
+    // plain remember{} in the screen, so tabbing away and back (saveState/restoreState retains the
+    // ViewModelStore but rebuilds the composition) snapped the user from deep inside a category
+    // back to the entry category. Seeded ONCE per VM from the route argument, so a restore never
+    // re-applies a stale deep-link argument over where the user actually navigated.
+    val selectedCategory = kotlinx.coroutines.flow.MutableStateFlow<SettingsCategory?>(null)
+    private var categorySeeded = false
+    fun seedCategory(cat: SettingsCategory?) {
+        if (categorySeeded) return
+        categorySeeded = true
+        if (cat != null) selectedCategory.value = cat
+    }
+
     private val _selfTest = MutableStateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?>(null)
     /** Result of the ledger self-test (null = not run / dialog dismissed). */
     val ledgerSelfTestResult: StateFlow<dev.mascwa.pulse.data.blackbox.LedgerSelfTest.Report?> = _selfTest

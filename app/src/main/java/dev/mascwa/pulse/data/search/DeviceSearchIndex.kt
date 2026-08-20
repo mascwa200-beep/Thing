@@ -82,7 +82,7 @@ object DeviceSearchIndex {
         val terms = dev.mascwa.pulse.navigation.GROUPS
             .flatMap { it.entries }
             .associateBy({ it.route }, { it.searchTerms })
-        return dev.mascwa.pulse.data.usage.FeatureCatalog.entries
+        val features = dev.mascwa.pulse.data.usage.FeatureCatalog.entries
             .filter { it.key != dev.mascwa.pulse.navigation.Routes.SEARCH }
             .map { f ->
                 DeviceSearch.of(
@@ -92,5 +92,18 @@ object DeviceSearchIndex {
                     body = (listOf(f.pitch) + terms[f.key].orEmpty()).joinToString(" "),
                 )
             }
+        // Every Settings CATEGORY is findable by name ("notifications", "storage") and opens
+        // Settings AT that category — a FEATURE id IS a route by convention, and openApp carries
+        // the argument through. This is the settings?cat= route argument's first producer: it
+        // shipped with zero callers (this repo's recorded computed-and-never-used class).
+        val settingsCats = dev.mascwa.pulse.feature.settings.SettingsCategory.entries.map { cat ->
+            DeviceSearch.of(
+                id = "${dev.mascwa.pulse.navigation.Routes.SETTINGS}?cat=${cat.name.lowercase()}",
+                kind = RecordKind.FEATURE,
+                title = "Settings · ${cat.title}",
+                body = "${cat.blurb} ${cat.keywords}",
+            )
+        }
+        return features + settingsCats
     }
 }
