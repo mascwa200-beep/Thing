@@ -627,6 +627,23 @@ object Oracle {
     fun pushWorthy(insights: List<Insight>): List<Insight> =
         insights.filter { it.urgency.weight >= Urgency.URGENT.weight }
 
+    /**
+     * How urgent an insight looks, as a packed 0xAARRGGBB value.
+     *
+     * ⚠️ A number rather than a colour type because this module has no Compose dependency — and it lives
+     * here rather than beside one of the screens because **three** surfaces now draw the same stream: the
+     * phone's advisories page, the phone's Home, and the desktop's advisories page. Five hex values
+     * written out twice is exactly how a palette drifts, which this project has had to correct four
+     * times. Each platform wraps the number in its own colour type at the call site.
+     */
+    fun urgencyArgb(u: Urgency): Long = when (u) {
+        Urgency.CRITICAL -> 0xFFE0331A
+        Urgency.URGENT -> 0xFFE0661A
+        Urgency.IMPORTANT -> 0xFFE0A21A
+        Urgency.NOTABLE -> 0xFF35C46A
+        Urgency.AMBIENT -> 0xFF7C8894
+    }
+
     // ---- small formatting helpers (pure) ----
     private fun km(m: Double): String = if (m >= 1000) "${(m / 100).roundToInt() / 10.0} km" else "${m.roundToInt()} m"
     private fun fmtPct(p: Double): String = (if (p >= 0) "+" else "") + "${(p * 10).roundToInt() / 10.0}%"

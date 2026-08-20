@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.mascwa.pulse.core.telemetry.DayAhead
 import dev.mascwa.pulse.core.telemetry.Insight
+import dev.mascwa.pulse.core.telemetry.Oracle
 import dev.mascwa.pulse.core.telemetry.Urgency
 import dev.mascwa.pulse.data.oracle.DayAheadEngine
 import dev.mascwa.pulse.feature.common.LcarsCorner
@@ -212,15 +213,10 @@ private fun SourceRow(ins: Insight) {
  * How urgent an insight looks.
  *
  * `internal` rather than private because Home shows the same insights and must colour them the same
- * way. A second copy is how a palette drifts — this app has already had to correct four of those.
+ * way. The values themselves now live beside the rules that produce the urgency — the desktop draws
+ * this same stream, and a third copy of five hex values is how a palette drifts.
  */
-internal fun urgencyColor(u: Urgency): Color = when (u) {
-    Urgency.CRITICAL -> Color(0xFFE0331A)
-    Urgency.URGENT -> Color(0xFFE0661A)
-    Urgency.IMPORTANT -> Color(0xFFE0A21A)
-    Urgency.NOTABLE -> Color(0xFF35C46A)
-    Urgency.AMBIENT -> Color(0xFF7C8894)
-}
+internal fun urgencyColor(u: Urgency): Color = Color(Oracle.urgencyArgb(u))
 
 /**
  * One entry on the projected day.

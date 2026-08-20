@@ -40,8 +40,10 @@ data class DeskGroup(
  * directory information rather than something the screen itself needs to know about.
  */
 enum class Screen {
+    HOME,
     REMOTE, ABOUT, SETTINGS,
     LIBRARY, SEARCH, STUDY, PACKS,
+    ADVISORIES,
     NEWS, LIVE,
     SPACE_WEATHER, OBSERVATORY, RADAR, SAFETY, PLACES, WILDLIFE,
     MARKETS, WEATHER, ECONOMY,
@@ -49,6 +51,10 @@ enum class Screen {
 }
 
 val DESK_GROUPS: List<DeskGroup> = listOf(
+    DeskGroup("OVERVIEW", { it.accent }, listOf(
+        DeskEntry(Screen.HOME, "Home", "Everything worth knowing, on one page",
+            listOf("dashboard", "overview", "start", "summary", "today")),
+    )),
     DeskGroup("KNOWLEDGE", { it.accent }, listOf(
         DeskEntry(Screen.LIBRARY, "Library", "Every bundled page, by subject — works offline",
             listOf("guides", "wiki", "encyclopedia", "reference", "read", "book")),
@@ -60,6 +66,8 @@ val DESK_GROUPS: List<DeskGroup> = listOf(
             listOf("expansion", "download", "more guides")),
     )),
     DeskGroup("THE WORLD", { it.sky }, listOf(
+        DeskEntry(Screen.ADVISORIES, "Advisories", "What is worth knowing right now, across every feed at once",
+            listOf("oracle", "insights", "alerts", "brief", "briefing", "what matters", "now")),
         DeskEntry(Screen.NEWS, "News", "Headlines, refreshed while you watch",
             listOf("headlines", "stories", "press", "wire", "lemmy", "mastodon", "hacker news")),
         DeskEntry(Screen.LIVE, "Live", "Television news, in a window of its own",
@@ -108,6 +116,30 @@ val DESK_ENTRIES: Map<Screen, DeskEntry> =
 /** Which group a screen belongs to, for the header's location readout. */
 val DESK_SECTION: Map<Screen, String> =
     DESK_GROUPS.flatMap { g -> g.entries.map { it.screen to g.label } }.toMap()
+
+/**
+ * The phone's deep-link route for a screen this machine also has, or null.
+ *
+ * ⚠️ The direction matters: this reads a route the SHARED cores produce — [dev.mascwa.pulse.core.telemetry.Insight.actionRoute]
+ * is written in the phone's vocabulary because the rules that set it live in a module that knows
+ * nothing about either shell. Rather than teach the core a second vocabulary, the desktop translates
+ * at the one place it consumes them.
+ *
+ * Null is the ordinary answer for a route this machine has no equivalent of, and the caller simply
+ * offers no action — which is honest, and better than sending someone to an approximate screen.
+ */
+fun screenForRoute(route: String): Screen? = when (route) {
+    "weather" -> Screen.WEATHER
+    "markets" -> Screen.MARKETS
+    "news" -> Screen.NEWS
+    "space_wx" -> Screen.SPACE_WEATHER
+    "study" -> Screen.STUDY
+    "settings" -> Screen.SETTINGS
+    // "nav", "jarvis", "objectives", "sensorium" — a map, the assistant, a task board and the ambient
+    // sensors. None of them exist here, and none of the rules that emit them can fire on this machine
+    // either, so this is a belt-and-braces null rather than a gap.
+    else -> null
+}
 
 /** Case-insensitive contains over everything an entry says about itself — same rule as the phone. */
 fun deskMatches(e: DeskEntry, q: String): Boolean =

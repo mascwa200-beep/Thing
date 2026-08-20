@@ -49,6 +49,10 @@ import dev.mascwa.pulse.desktop.feature.remote.RemoteViewModel
 import dev.mascwa.pulse.desktop.feature.search.SearchScreen
 import dev.mascwa.pulse.desktop.feature.search.SearchViewModel
 import dev.mascwa.pulse.desktop.feature.settings.SettingsScreen
+import dev.mascwa.pulse.desktop.feature.home.HomeScreen
+import dev.mascwa.pulse.desktop.feature.home.HomeViewModel
+import dev.mascwa.pulse.desktop.feature.world.AdvisoriesScreen
+import dev.mascwa.pulse.desktop.feature.world.AdvisoriesViewModel
 import dev.mascwa.pulse.desktop.feature.world.EconomyScreen
 import dev.mascwa.pulse.desktop.feature.world.EconomyViewModel
 import dev.mascwa.pulse.desktop.feature.world.MarketsScreen
@@ -130,7 +134,9 @@ fun PulseDesktopApp(
 ) {
     PulseDesktopTheme {
         val c = Pulse.colors
-        var screen by remember { mutableStateOf(Screen.REMOTE) }
+        // Home, not the pairing page: the first thing this machine should show is what is going on,
+        // not a setup screen you have already been through.
+        var screen by remember { mutableStateOf(Screen.HOME) }
 
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
         val remoteVm = remember { RemoteViewModel(scope, settings) }
@@ -144,10 +150,24 @@ fun PulseDesktopApp(
         val http = remember { HttpClient.create(json, AppPaths.dataDir.toFile()) }
         val cache = remember { DiskCache(AppPaths.dataDir.toFile(), json) }
 
+        // ⚠️ Four repositories are hoisted out of their view models because ADVISORIES reads the same
+        // feeds the screens below present. One instance each keeps their per-host rate gates and their
+        // in-memory throttles honest — two `MarketsRepository`s would each think they were the only
+        // caller and burst twice as hard at a venue that answers 429 to exactly that.
+        val newsRepository = remember { NewsRepository(http, cache) }
+        val spaceWeatherRepository = remember { SpaceWeatherRepository(http, cache) }
+        val marketsRepository = remember {
+            // ⚠️ The watch list is empty until the desktop grows a settings surface for one, which is
+            // honest: this machine has never been told what to price. `DefaultData` on the phone comes
+            // from `AppSettings`, which deliberately did not move.
+            MarketsRepository(http, cache) { MarketPreferences() }
+        }
+        val weatherRepository = remember { WeatherRepository(http, cache) { WeatherPreferences() } }
+
         val newsVm = remember {
             NewsViewModel(
                 scope = scope,
-                repository = NewsRepository(http, cache),
+                repository = newsRepository,
                 settings = settings,
                 // The reader keeps no cache of its own on purpose: it goes through the same client, so
                 // re-opening an article inside the HTTP cache window costs no request.
@@ -186,7 +206,7 @@ fun PulseDesktopApp(
         // coordinate out of settings for itself — a tower PC has no GPS, so "we do not know where you
         // are" is an ordinary state on all of them rather than an error.
         val spaceWeatherVm = remember {
-            SpaceWeatherViewModel(scope, SpaceWeatherRepository(http, cache), settings)
+            SpaceWeatherViewModel(scope, spaceWeatherRepository, settings)
         }
         val observatoryVm = remember {
             ObservatoryViewModel(
@@ -205,17 +225,31 @@ fun PulseDesktopApp(
         val safetyVm = remember { SafetyViewModel(scope, SafetyRepository(http, cache), settings) }
         val placesVm = remember { PlacesViewModel(scope, OverpassRepository(http, cache), settings) }
         val wildlifeVm = remember { WildlifeViewModel(scope, settings) }
-        val marketsVm = remember {
-            // ⚠️ The watch list is empty until the desktop grows a settings surface for one, which is
-            // honest: this machine has never been told what to price. `DefaultData` on the phone comes
-            // from `AppSettings`, which deliberately did not move.
-            MarketsViewModel(scope, MarketsRepository(http, cache) { MarketPreferences() })
-        }
-        val weatherVm = remember {
-            WeatherViewModel(scope, WeatherRepository(http, cache) { WeatherPreferences() }, settings)
-        }
+        val marketsVm = remember { MarketsViewModel(scope, marketsRepository) }
+        val weatherVm = remember { WeatherViewModel(scope, weatherRepository, settings) }
         val economyVm = remember {
             EconomyViewModel(scope, EconomyRepository(WorldBankClient(http), cache) { "US" })
+        }
+        val homeVm = remember {
+            HomeViewModel(
+                scope = scope,
+                settings = settings,
+                weather = weatherRepository,
+                markets = marketsRepository,
+                news = newsRepository,
+                study = studyStore,
+            )
+        }
+        val advisoriesVm = remember {
+            AdvisoriesViewModel(
+                scope = scope,
+                settings = settings,
+                weather = weatherRepository,
+                markets = marketsRepository,
+                space = spaceWeatherRepository,
+                news = newsRepository,
+                study = studyStore,
+            )
         }
 
         val notesVm = remember { NotesViewModel(scope, notesStore) }
@@ -270,6 +304,22 @@ fun PulseDesktopApp(
                                     Screen.MARKETS -> MarketsScreen(marketsVm, Modifier.fillMaxWidth())
                                     Screen.WEATHER -> WeatherScreen(weatherVm, Modifier.fillMaxWidth())
                                     Screen.ECONOMY -> EconomyScreen(economyVm, Modifier.fillMaxWidth())
+                                    Screen.HOME -> HomeScreen(
+                                        vm = homeVm,
+                                        // The SAME advisories view model the ADVISORIES screen reads,
+                                        // so the two pages can never rank one machine's signals
+                                        // differently.
+                                        advisories = advisoriesVm,
+                                        onOpenScreen = { screen = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    Screen.ADVISORIES -> AdvisoriesScreen(
+                                        vm = advisoriesVm,
+                                        // Acting on an advisory means going where it points, which is
+                                        // the one thing only the shell can do.
+                                        onOpenScreen = { screen = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
                                     Screen.NOTES -> NotesScreen(notesVm, Modifier.fillMaxWidth())
                                     Screen.DIARY -> DiaryScreen(diaryVm, Modifier.fillMaxWidth())
                                     Screen.STUDY -> StudyScreen(

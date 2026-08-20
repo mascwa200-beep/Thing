@@ -618,6 +618,23 @@ class StudyStore(
         return snapshot.copy(lastStudiedAtMs = maxOf(snapshot.lastStudiedAtMs, s.lastStudiedAtMs))
     }
 
+    /**
+     * The guide going worst, named, with the record behind the claim — or null when nothing has enough
+     * evidence to say.
+     *
+     * ⚠️ This was deliberately left off the desktop when the phone gained it, on the grounds that the
+     * Oracle was its only caller and the desktop had no Oracle. It has one now, so the method has
+     * exactly one caller here too — which was the whole condition. The evidence bar lives upstream in
+     * [StudyProgress.weakest], so anything returned has already earned the claim.
+     */
+    suspend fun weakestGuide(): Pair<String, String>? {
+        val s = ensureLoaded()
+        val worst = StudyProgress.weakest(s.attempts.map { it.attempt() }, limit = 1).firstOrNull()
+            ?: return null
+        val title = s.cards.firstOrNull { it.guideId == worst.guideId }?.guideTitle ?: return null
+        return title to "${worst.correct} of ${worst.answered} right so far."
+    }
+
     /** How well one guide is known, from its answers and its schedule together. */
     suspend fun mastery(guideId: String): StudyProgress.Mastery {
         val s = ensureLoaded()
